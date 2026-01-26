@@ -338,7 +338,9 @@ fn bench_shamir(c: &mut Criterion) {
 
     let backup = shares.to_backup_format();
     group.bench_function("from_backup_format", |b| {
-        b.iter(|| bsv_sdk::primitives::bsv::shamir::KeyShares::from_backup_format(black_box(&backup)))
+        b.iter(|| {
+            bsv_sdk::primitives::bsv::shamir::KeyShares::from_backup_format(black_box(&backup))
+        })
     });
 
     group.finish();
