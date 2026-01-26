@@ -1,6 +1,6 @@
 //! Chain tracker implementations.
 //!
-//! This module provides concrete implementations of the [`ChainTracker`] trait
+//! This module provides concrete implementations of the [`ChainTracker`](super::ChainTracker) trait
 //! for verifying merkle roots against the blockchain.
 //!
 //! # Available Trackers

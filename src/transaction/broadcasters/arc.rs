@@ -35,7 +35,7 @@ use crate::transaction::{
 /// ARC broadcaster configuration.
 #[derive(Debug, Clone)]
 pub struct ArcConfig {
-    /// ARC API URL (e.g., "https://arc.taal.com")
+    /// ARC API URL (e.g., `https://arc.taal.com`)
     pub url: String,
     /// API key for authentication (optional)
     pub api_key: Option<String>,

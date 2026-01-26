@@ -629,7 +629,7 @@ impl Script {
     }
 
     /// Check if this is a multisig script, returns (M, N) if so
-    /// Pattern: OP_M <pubkey>... OP_N OP_CHECKMULTISIG
+    /// Pattern: `OP_M <pubkey>... OP_N OP_CHECKMULTISIG`
     pub fn is_multisig(&self) -> Option<(u8, u8)> {
         let chunks = self.chunks();
         if chunks.len() < 4 {

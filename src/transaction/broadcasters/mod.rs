@@ -1,6 +1,6 @@
 //! Transaction broadcaster implementations.
 //!
-//! This module provides concrete implementations of the [`Broadcaster`] trait
+//! This module provides concrete implementations of the [`Broadcaster`](super::Broadcaster) trait
 //! for broadcasting transactions to the BSV network.
 //!
 //! # Available Broadcasters
