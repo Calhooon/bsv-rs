@@ -523,6 +523,93 @@ New error variants in `src/error.rs`:
 
 ---
 
+### Phase 6a: Transaction Signature Hash (Sighash)
+
+#### Added
+BIP-143 style sighash computation in `src/bsv/sighash.rs`:
+
+**SIGHASH Constants:**
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `SIGHASH_ALL` | `0x01` | Sign all inputs and outputs |
+| `SIGHASH_NONE` | `0x02` | Sign all inputs, no outputs |
+| `SIGHASH_SINGLE` | `0x03` | Sign all inputs, only matching output |
+| `SIGHASH_FORKID` | `0x40` | BSV-specific flag for BIP-143 style |
+| `SIGHASH_ANYONECANPAY` | `0x80` | Only sign this input |
+
+**Transaction Parsing (`parse_transaction`):**
+
+| Struct | Fields | Description |
+|--------|--------|-------------|
+| `TxInput` | `txid`, `output_index`, `script`, `sequence` | Transaction input |
+| `TxOutput` | `satoshis`, `script` | Transaction output |
+| `RawTransaction` | `version`, `inputs`, `outputs`, `locktime` | Full parsed transaction |
+
+**Sighash Functions:**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `parse_transaction` | `fn parse_transaction(raw: &[u8]) -> Result<RawTransaction>` | Parse raw transaction bytes |
+| `build_sighash_preimage` | `fn build_sighash_preimage(params: &SighashParams) -> Vec<u8>` | Build BIP-143 preimage |
+| `compute_sighash` | `fn compute_sighash(params: &SighashParams) -> [u8; 32]` | Compute sighash (display order) |
+| `compute_sighash_for_signing` | `fn compute_sighash_for_signing(params: &SighashParams) -> [u8; 32]` | Compute sighash (for ECDSA) |
+| `compute_sighash_from_raw` | `fn compute_sighash_from_raw(...) -> Result<[u8; 32]>` | Parse + compute in one call |
+
+**TransactionSignature (`src/bsv/tx_signature.rs`):**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `new` | `fn new(sig: Signature, scope: u32) -> Self` | Create from signature + scope |
+| `from_components` | `fn from_components(r, s, scope) -> Self` | Create from R, S, scope |
+| `from_checksig_format` | `fn from_checksig_format(data: &[u8]) -> Result<Self>` | Parse DER + sighash byte |
+| `to_checksig_format` | `fn to_checksig_format(&self) -> Vec<u8>` | Encode as DER + sighash byte |
+| `signature` | `fn signature(&self) -> &Signature` | Get underlying ECDSA signature |
+| `scope` | `fn scope(&self) -> u32` | Get sighash type |
+| `has_low_s` | `fn has_low_s(&self) -> bool` | Check BIP 62 compliance |
+| `to_low_s` | `fn to_low_s(&self) -> Self` | Convert to low-S form |
+
+#### BIP-143 Preimage Structure
+The sighash preimage consists of 10 concatenated components:
+
+1. **nVersion** (4 bytes LE) - Transaction version
+2. **hashPrevouts** (32 bytes) - SHA256d of all outpoints (zeros if ANYONECANPAY)
+3. **hashSequence** (32 bytes) - SHA256d of all sequences (zeros if ANYONECANPAY/SINGLE/NONE)
+4. **outpoint** (36 bytes) - txid + output index of input being signed
+5. **scriptCode** (varint + bytes) - The script being executed
+6. **value** (8 bytes LE) - Satoshi amount of input being spent
+7. **nSequence** (4 bytes LE) - Sequence number of this input
+8. **hashOutputs** (32 bytes) - Depends on sighash type
+9. **nLocktime** (4 bytes LE) - Transaction locktime
+10. **sighash type** (4 bytes LE) - The sighash flags
+
+#### Tests
+**499 test vectors** from `tests/vectors/sighash.json` covering:
+
+- All SIGHASH types (ALL, NONE, SINGLE)
+- ANYONECANPAY combinations
+- FORKID flag handling
+- Negative hash_type values (signed-to-unsigned conversion)
+- Multi-input/multi-output transactions
+- Edge cases (out-of-range SINGLE index)
+
+| Test File | Tests | Description |
+|-----------|-------|-------------|
+| `tests/sighash_tests.rs` | 3 | Integration tests for 499 vectors |
+| `src/bsv/sighash.rs` | 9 | Unit tests for components |
+| `src/bsv/tx_signature.rs` | 6 | TransactionSignature tests |
+
+#### Cross-SDK Compatibility
+- **TypeScript SDK**: Sighash output matches `TransactionSignature.ts`
+- Returns hash in display order (reversed) for compatibility
+- `compute_sighash_for_signing()` provides internal order for ECDSA
+
+#### Documentation
+- Comprehensive rustdoc comments on all public types and functions
+- Module-level documentation with usage examples
+
+---
+
 ## Reference Implementations
 
 This library is being ported from two reference implementations:
@@ -544,6 +631,7 @@ Test vectors are shared across all three implementations to ensure byte-for-byte
 | Phase 3 | Encoding Utilities | ✅ Complete |
 | Phase 4 | BigNumber Compatibility | ✅ Complete |
 | Phase 5 | Elliptic Curve Operations | ✅ Complete |
-| Phase 6 | BSV-Specific Components | 🔲 Pending |
+| Phase 6a | Sighash Computation | ✅ Complete |
+| Phase 6b | Script Interpreter | 🔲 Pending |
 | Phase 7 | P-256 Support | 🔲 Pending |
 | Phase 8 | Integration Testing | 🔲 Pending |
