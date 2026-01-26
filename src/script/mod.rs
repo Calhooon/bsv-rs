@@ -1,6 +1,6 @@
 //! # BSV Script
 //!
-//! Bitcoin Script construction, parsing, execution, and validation.
+//! Bitcoin Script construction, parsing, execution, validation, and templates.
 //!
 //! This module provides:
 //! - Opcode constants (`op` module)
@@ -10,8 +10,9 @@
 //! - Script number encoding (`script_num` module)
 //! - Script evaluation errors (`evaluation_error` module)
 //! - Spend validation (`Spend`)
+//! - Script templates (`template` module, `templates` module)
 //!
-//! # Example
+//! # Example: Building Scripts
 //!
 //! ```rust
 //! use bsv_sdk::script::{Script, LockingScript, op};
@@ -35,6 +36,24 @@
 //! let locking = LockingScript::from_script(script);
 //! assert!(locking.is_locking_script());
 //! ```
+//!
+//! # Example: Using Templates
+//!
+//! ```rust,ignore
+//! use bsv_sdk::script::templates::P2PKH;
+//! use bsv_sdk::script::template::{ScriptTemplate, SignOutputs};
+//! use bsv_sdk::primitives::ec::PrivateKey;
+//!
+//! let private_key = PrivateKey::random();
+//! let pubkey_hash = private_key.public_key().hash160();
+//!
+//! // Create locking script
+//! let template = P2PKH::new();
+//! let locking = template.lock(&pubkey_hash)?;
+//!
+//! // Or from an address
+//! let locking = P2PKH::lock_from_address("1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2")?;
+//! ```
 
 pub mod chunk;
 pub mod evaluation_error;
@@ -44,6 +63,8 @@ pub mod op;
 pub mod script;
 pub mod script_num;
 pub mod spend;
+pub mod template;
+pub mod templates;
 pub mod unlocking_script;
 
 // Re-exports for convenience
@@ -53,4 +74,5 @@ pub use locking_script::LockingScript;
 pub use script::Script;
 pub use script_num::ScriptNum;
 pub use spend::{Spend, SpendParams};
+pub use template::{ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
 pub use unlocking_script::UnlockingScript;
