@@ -6,6 +6,7 @@
 //! # Available Broadcasters
 //!
 //! - [`ArcBroadcaster`] - Broadcasts via the ARC (TAAL's broadcast service)
+//! - [`WhatsOnChainBroadcaster`] - Broadcasts via the WhatsOnChain API
 //!
 //! # Feature Requirements
 //!
@@ -17,5 +18,7 @@
 //! ```
 
 mod arc;
+mod whatsonchain;
 
 pub use arc::{ArcBroadcaster, ArcConfig};
+pub use whatsonchain::{WhatsOnChainBroadcaster, WocBroadcastConfig, WocBroadcastNetwork};

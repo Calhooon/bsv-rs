@@ -28,8 +28,10 @@
 
 use async_trait::async_trait;
 
+#[cfg(feature = "http")]
+use crate::transaction::BroadcastResponse;
 use crate::transaction::{
-    BroadcastFailure, BroadcastResponse, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
+    BroadcastFailure, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
 };
 
 /// ARC broadcaster configuration.

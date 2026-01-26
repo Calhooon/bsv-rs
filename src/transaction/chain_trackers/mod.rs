@@ -6,6 +6,7 @@
 //! # Available Trackers
 //!
 //! - [`WhatsOnChainTracker`] - Verifies via WhatsOnChain API
+//! - [`BlockHeadersServiceTracker`] - Verifies via Block Headers Service API
 //!
 //! # Feature Requirements
 //!
@@ -30,6 +31,10 @@
 //! }
 //! ```
 
+mod block_headers_service;
 mod whatsonchain;
 
+pub use block_headers_service::{
+    BlockHeadersServiceConfig, BlockHeadersServiceTracker, DEFAULT_HEADERS_URL,
+};
 pub use whatsonchain::{WhatsOnChainTracker, WocNetwork};

@@ -389,6 +389,42 @@ impl std::hash::Hash for PublicKey {
     }
 }
 
+// Serde implementation for PublicKey - serializes as hex string
+impl serde::Serialize for PublicKey {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for PublicKey {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct PublicKeyVisitor;
+
+        impl serde::de::Visitor<'_> for PublicKeyVisitor {
+            type Value = PublicKey;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a hex-encoded public key string")
+            }
+
+            fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                PublicKey::from_hex(v).map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_str(PublicKeyVisitor)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

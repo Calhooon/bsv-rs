@@ -3,7 +3,10 @@
 
 ## Overview
 
-This module provides production-ready implementations of the [`Broadcaster`](../broadcaster.rs) trait. Currently includes the `ArcBroadcaster` for TAAL's ARC (Avalanche Relay Client) service, which is the recommended broadcaster for BSV applications.
+This module provides production-ready implementations of the [`Broadcaster`](../broadcaster.rs) trait:
+
+- **`ArcBroadcaster`** - TAAL's ARC (Avalanche Relay Client) service, recommended for production
+- **`WhatsOnChainBroadcaster`** - WhatsOnChain API, free tier available
 
 These implementations require the `http` feature flag to enable actual network requests.
 
@@ -11,8 +14,9 @@ These implementations require the `http` feature flag to enable actual network r
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports `ArcBroadcaster` and `ArcConfig` |
+| `mod.rs` | Module root; re-exports all broadcasters |
 | `arc.rs` | ARC broadcaster implementation for TAAL's service |
+| `whatsonchain.rs` | WhatsOnChain API broadcaster implementation |
 
 ## Feature Requirements
 
@@ -195,8 +199,96 @@ cargo test broadcasters
 
 Integration tests with actual ARC endpoints require network access and valid API keys.
 
+### WocBroadcastNetwork
+
+Network selection for WhatsOnChain broadcaster:
+
+```rust
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WocBroadcastNetwork {
+    #[default]
+    Mainnet,   // https://api.whatsonchain.com/v1/bsv/main/tx/raw
+    Testnet,   // https://api.whatsonchain.com/v1/bsv/test/tx/raw
+    Stn,       // https://api.whatsonchain.com/v1/bsv/stn/tx/raw
+}
+```
+
+### WocBroadcastConfig
+
+Configuration for WhatsOnChain broadcaster:
+
+```rust
+pub struct WocBroadcastConfig {
+    pub network: WocBroadcastNetwork,  // Network to broadcast to
+    pub api_key: Option<String>,       // Optional API key for higher rate limits
+    pub timeout_ms: u64,               // Request timeout (default: 30,000 ms)
+}
+```
+
+### WhatsOnChainBroadcaster
+
+WhatsOnChain API broadcaster:
+
+```rust
+pub struct WhatsOnChainBroadcaster {
+    config: WocBroadcastConfig,
+    client: reqwest::Client,  // Only with "http" feature
+}
+
+impl WhatsOnChainBroadcaster {
+    pub fn mainnet() -> Self          // Create mainnet broadcaster
+    pub fn testnet() -> Self          // Create testnet broadcaster
+    pub fn stn() -> Self              // Create STN broadcaster
+    pub fn new(network: WocBroadcastNetwork, api_key: Option<String>) -> Self
+    pub fn with_config(config: WocBroadcastConfig) -> Self
+    pub fn network(&self) -> WocBroadcastNetwork
+    pub fn api_key(&self) -> Option<&str>
+}
+
+#[async_trait(?Send)]
+impl Broadcaster for WhatsOnChainBroadcaster {
+    async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
+    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>
+}
+```
+
+## WhatsOnChain API Details
+
+**Endpoint**: `POST https://api.whatsonchain.com/v1/bsv/{network}/tx/raw`
+
+**Request**: Raw transaction hex as body (Content-Type: application/json)
+
+**Success Response** (HTTP 2xx): Returns TXID as plain text
+
+**Error Response** (HTTP 4xx/5xx): Returns error description
+
+### WhatsOnChain Usage Example
+
+```rust
+use bsv_sdk::transaction::{WhatsOnChainBroadcaster, Broadcaster, WocBroadcastNetwork};
+
+// Create mainnet broadcaster
+let broadcaster = WhatsOnChainBroadcaster::mainnet();
+
+// Or testnet
+let broadcaster = WhatsOnChainBroadcaster::testnet();
+
+// Or with API key
+let broadcaster = WhatsOnChainBroadcaster::new(
+    WocBroadcastNetwork::Mainnet,
+    Some("your-api-key".to_string())
+);
+
+// Broadcast
+match broadcaster.broadcast(&tx).await {
+    Ok(response) => println!("Success: {}", response.txid),
+    Err(failure) => println!("Failed: {}", failure.description),
+}
+```
+
 ## Related Documentation
 
 - `../CLAUDE.md` - Transaction module overview
 - `../broadcaster.rs` - `Broadcaster` trait definition and types
 - [ARC Documentation](https://github.com/bitcoin-sv/arc) - Official ARC service documentation
+- [WhatsOnChain API](https://developers.whatsonchain.com/) - WhatsOnChain API documentation

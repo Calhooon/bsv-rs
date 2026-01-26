@@ -148,51 +148,98 @@ pub use types::{
     validate_key_id,
     validate_protocol_name,
     validate_satoshis,
+    // Abort action types
+    AbortActionArgs,
+    AbortActionResult,
+    AcquireCertificateArgs,
     // Certificate types
     AcquisitionProtocol,
     // Action status
     ActionStatus,
-
+    // Auth types
+    AuthenticatedResult,
+    // Basket types
+    BasketInsertion,
     Certificate,
+    CertificateResult,
     // Security and protocols
     Counterparty,
     // Create action types
+    CreateActionArgs,
     CreateActionInput,
     CreateActionOptions,
     CreateActionOutput,
     CreateActionResult,
+    // Discovery types
+    DiscoverByAttributesArgs,
+    DiscoverByIdentityKeyArgs,
+    DiscoverCertificatesResult,
+    // Header types
+    GetHeaderArgs,
+    GetHeaderResult,
+    GetHeightResult,
+    GetNetworkResult,
+    GetVersionResult,
+    // Identity types
+    IdentityCertificate,
+    IdentityCertifier,
+    // Internalize types
+    InternalizeActionArgs,
+    InternalizeActionResult,
+    InternalizeOutput,
     // Key linkage
     KeyLinkageResult,
     KeyringRevealer,
-
+    // List types
+    ListActionsArgs,
+    ListActionsResult,
+    ListCertificatesArgs,
+    ListCertificatesResult,
+    ListOutputsArgs,
+    ListOutputsResult,
     // Primitive types
     Network,
     // Outpoint
     Outpoint,
-
+    // Output include mode
+    OutputInclude,
     Protocol,
+    // Prove certificate types
+    ProveCertificateArgs,
+    ProveCertificateResult,
+    // Query mode
+    QueryMode,
+    // Relinquish types
+    RelinquishCertificateArgs,
+    RelinquishCertificateResult,
+    RelinquishOutputArgs,
+    RelinquishOutputResult,
     RevealCounterpartyKeyLinkageResult,
     RevealSpecificKeyLinkageResult,
-
     // Action results
     ReviewActionResult,
     ReviewActionResultStatus,
     SatoshiValue,
     SecurityLevel,
-
     SendWithResult,
     SendWithResultStatus,
+    // Sign action types
+    SignActionArgs,
+    SignActionOptions,
+    SignActionResult,
+    SignActionSpend,
     SignableTransaction,
-
     TrustSelf,
-
     TxId,
     // Wallet action types
     WalletAction,
     WalletActionInput,
     WalletActionOutput,
+    // Wallet certificate type
+    WalletCertificate,
     WalletOutput,
-
+    // Wallet payment type
+    WalletPayment,
     MAX_SATOSHIS,
 };
 

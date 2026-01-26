@@ -3,20 +3,25 @@
 
 ## Overview
 
-This module provides concrete implementations of the `FeeModel` trait for computing transaction fees. The primary implementation is `SatoshisPerKilobyte`, which calculates fees based on transaction size using the standard BSV fee rate model.
+This module provides concrete implementations of the `FeeModel` trait for computing transaction fees:
+
+- **`SatoshisPerKilobyte`** - Static fee rate based on transaction size
+- **`LivePolicy`** - Dynamic fee rate fetched from ARC policy endpoint
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; exports `SatoshisPerKilobyte` |
+| `mod.rs` | Module root; exports all fee models |
 | `sats_per_kb.rs` | Size-based fee model computing satoshis per kilobyte |
+| `live_policy.rs` | Live fee rate fetched from ARC policy API |
 
 ## Key Exports
 
 ```rust
 // Re-exported from mod.rs
 pub use sats_per_kb::SatoshisPerKilobyte;
+pub use live_policy::{LivePolicy, LivePolicyConfig, DEFAULT_POLICY_URL, DEFAULT_CACHE_TTL_SECS, DEFAULT_FALLBACK_RATE};
 ```
 
 ### SatoshisPerKilobyte
@@ -143,6 +148,91 @@ The module includes unit tests in `sats_per_kb.rs`:
 | `test_default` | Verifies default is 100 sat/KB |
 | `test_varint_size` | Tests varint size calculation for boundary values |
 | `test_empty_transaction_fee` | Tests fee calculation for empty transaction (10 bytes = 10 sats at 1000 sat/KB) |
+
+## LivePolicy
+
+The `LivePolicy` fee model fetches the current fee rate from an ARC policy endpoint and caches it for a configurable duration.
+
+### LivePolicyConfig
+
+```rust
+pub struct LivePolicyConfig {
+    pub policy_url: String,        // Default: "https://arc.gorillapool.io/v1/policy"
+    pub api_key: Option<String>,   // Optional Bearer token
+    pub cache_ttl: Duration,       // Default: 5 minutes
+    pub fallback_rate: u64,        // Default: 100 sat/KB
+    pub timeout_ms: u64,           // Default: 10,000 ms
+}
+```
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `DEFAULT_POLICY_URL` | `"https://arc.gorillapool.io/v1/policy"` | Default ARC policy endpoint |
+| `DEFAULT_CACHE_TTL_SECS` | `300` | 5 minute cache TTL |
+| `DEFAULT_FALLBACK_RATE` | `100` | Fallback rate in sat/KB |
+
+### LivePolicy
+
+```rust
+pub struct LivePolicy {
+    config: LivePolicyConfig,
+    cached_rate: RwLock<Option<CachedRate>>,
+    client: reqwest::Client,  // Only with "http" feature
+}
+
+impl LivePolicy {
+    pub fn new() -> Self                         // Create with default config
+    pub fn with_url(policy_url: &str) -> Self    // Create with custom URL
+    pub fn with_config(config: LivePolicyConfig) -> Self
+    pub fn policy_url(&self) -> &str
+    pub fn cache_ttl(&self) -> Duration
+    pub fn cached_rate(&self) -> Option<u64>     // Get cached rate if valid
+    pub fn effective_rate(&self) -> u64          // Get cached or fallback rate
+    pub fn set_rate(&self, rate: u64)            // Manually set cached rate
+    pub async fn refresh(&self) -> Result<u64>   // Fetch rate from API
+}
+
+impl FeeModel for LivePolicy {
+    fn compute_fee(&self, tx: &Transaction) -> Result<u64>
+}
+```
+
+### LivePolicy Usage
+
+```rust
+use bsv_sdk::transaction::{LivePolicy, FeeModel, Transaction};
+
+// Create with default configuration
+let fee_model = LivePolicy::default();
+
+// Refresh the cached rate (async)
+fee_model.refresh().await?;
+
+// Compute fee using cached or fallback rate
+let tx = Transaction::new();
+let fee = fee_model.compute_fee(&tx)?;
+
+// Or set a rate manually for offline use
+fee_model.set_rate(100);
+```
+
+### LivePolicy API
+
+**Endpoint**: `GET {policy_url}`
+
+**Response Format**:
+```json
+{
+  "miningFee": {
+    "satoshis": 1,
+    "bytes": 1000
+  }
+}
+```
+
+The rate is converted to sat/KB: `(satoshis * 1000) / bytes`
 
 ## Related
 

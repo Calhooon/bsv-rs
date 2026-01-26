@@ -6,8 +6,14 @@
 
 use crate::primitives::encoding::{Reader, Writer};
 use crate::primitives::{from_hex, to_hex, PublicKey};
-use crate::wallet::types::{ActionStatus, Counterparty, Outpoint, Protocol, SecurityLevel};
+use crate::wallet::types::{
+    ActionStatus, BasketInsertion, Counterparty, IdentityCertificate, IdentityCertifier,
+    InternalizeOutput, Outpoint, OutputInclude, Protocol, QueryMode, SecurityLevel, SendWithResult,
+    SendWithResultStatus, SignActionSpend, WalletAction, WalletActionInput, WalletActionOutput,
+    WalletCertificate, WalletOutput, WalletPayment,
+};
 use crate::Error;
+use std::collections::HashMap;
 
 /// Wire protocol reader with signed varint support.
 ///
@@ -271,6 +277,444 @@ impl<'a> WireReader<'a> {
         let bytes = self.read_bytes(32)?;
         Ok(to_hex(bytes))
     }
+
+    // =========================================================================
+    // New type encoding methods
+    // =========================================================================
+
+    /// Reads a query mode (0 = any, 1 = all).
+    pub fn read_query_mode(&mut self) -> Result<QueryMode, Error> {
+        let val = self.read_u8()?;
+        match val {
+            0 => Ok(QueryMode::Any),
+            1 => Ok(QueryMode::All),
+            _ => Err(Error::WalletError(format!(
+                "invalid query mode: expected 0 (any) or 1 (all), got {}",
+                val
+            ))),
+        }
+    }
+
+    /// Reads an optional query mode.
+    pub fn read_optional_query_mode(&mut self) -> Result<Option<QueryMode>, Error> {
+        let val = self.read_i8()?;
+        match val {
+            -1 => Ok(None),
+            0 => Ok(Some(QueryMode::Any)),
+            1 => Ok(Some(QueryMode::All)),
+            _ => Err(Error::WalletError(format!(
+                "invalid query mode: expected -1, 0, or 1, got {}",
+                val
+            ))),
+        }
+    }
+
+    /// Reads an output include mode.
+    pub fn read_output_include(&mut self) -> Result<OutputInclude, Error> {
+        let val = self.read_u8()?;
+        match val {
+            0 => Ok(OutputInclude::LockingScripts),
+            1 => Ok(OutputInclude::EntireTransactions),
+            _ => Err(Error::WalletError(format!(
+                "invalid output include mode: expected 0 or 1, got {}",
+                val
+            ))),
+        }
+    }
+
+    /// Reads an optional output include mode.
+    pub fn read_optional_output_include(&mut self) -> Result<Option<OutputInclude>, Error> {
+        let val = self.read_i8()?;
+        match val {
+            -1 => Ok(None),
+            0 => Ok(Some(OutputInclude::LockingScripts)),
+            1 => Ok(Some(OutputInclude::EntireTransactions)),
+            _ => Err(Error::WalletError(format!(
+                "invalid output include mode: expected -1, 0, or 1, got {}",
+                val
+            ))),
+        }
+    }
+
+    /// Reads a string to string map.
+    pub fn read_string_map(&mut self) -> Result<HashMap<String, String>, Error> {
+        let count = self.read_signed_var_int()?;
+        if count < 0 {
+            return Ok(HashMap::new());
+        }
+
+        let mut map = HashMap::with_capacity(count as usize);
+        for _ in 0..count {
+            let key = self.read_string()?;
+            let value = self.read_string()?;
+            map.insert(key, value);
+        }
+        Ok(map)
+    }
+
+    /// Reads an optional string map.
+    pub fn read_optional_string_map(&mut self) -> Result<Option<HashMap<String, String>>, Error> {
+        let count = self.read_signed_var_int()?;
+        if count < 0 {
+            return Ok(None);
+        }
+
+        let mut map = HashMap::with_capacity(count as usize);
+        for _ in 0..count {
+            let key = self.read_string()?;
+            let value = self.read_string()?;
+            map.insert(key, value);
+        }
+        Ok(Some(map))
+    }
+
+    /// Reads a SendWithResultStatus.
+    pub fn read_send_with_result_status(&mut self) -> Result<SendWithResultStatus, Error> {
+        let val = self.read_u8()?;
+        match val {
+            0 => Ok(SendWithResultStatus::Unproven),
+            1 => Ok(SendWithResultStatus::Sending),
+            2 => Ok(SendWithResultStatus::Failed),
+            _ => Err(Error::WalletError(format!(
+                "invalid send with result status: {}",
+                val
+            ))),
+        }
+    }
+
+    /// Reads a SendWithResult.
+    pub fn read_send_with_result(&mut self) -> Result<SendWithResult, Error> {
+        let txid_bytes = self.read_bytes(32)?;
+        let mut txid = [0u8; 32];
+        txid.copy_from_slice(txid_bytes);
+        let status = self.read_send_with_result_status()?;
+        Ok(SendWithResult { txid, status })
+    }
+
+    /// Reads an array of SendWithResults.
+    pub fn read_send_with_result_array(&mut self) -> Result<Option<Vec<SendWithResult>>, Error> {
+        let count = self.read_signed_var_int()?;
+        if count < 0 {
+            return Ok(None);
+        }
+
+        let mut results = Vec::with_capacity(count as usize);
+        for _ in 0..count {
+            results.push(self.read_send_with_result()?);
+        }
+        Ok(Some(results))
+    }
+
+    /// Reads a SignActionSpend.
+    pub fn read_sign_action_spend(&mut self) -> Result<SignActionSpend, Error> {
+        let unlocking_script_len = self.read_var_int()? as usize;
+        let unlocking_script = self.read_bytes(unlocking_script_len)?.to_vec();
+        let sequence_number = self.read_optional_var_int()?.map(|v| v as u32);
+        Ok(SignActionSpend {
+            unlocking_script,
+            sequence_number,
+        })
+    }
+
+    /// Reads a map of u32 to SignActionSpend.
+    pub fn read_sign_action_spends(&mut self) -> Result<HashMap<u32, SignActionSpend>, Error> {
+        let count = self.read_signed_var_int()?;
+        if count < 0 {
+            return Ok(HashMap::new());
+        }
+
+        let mut spends = HashMap::with_capacity(count as usize);
+        for _ in 0..count {
+            let index = self.read_var_int()? as u32;
+            let spend = self.read_sign_action_spend()?;
+            spends.insert(index, spend);
+        }
+        Ok(spends)
+    }
+
+    /// Reads a WalletCertificate.
+    pub fn read_wallet_certificate(&mut self) -> Result<WalletCertificate, Error> {
+        let certificate_type = self.read_string()?;
+        let subject = self.read_txid_hex()?; // 33-byte pubkey as hex
+        let serial_number = self.read_string()?;
+        let certifier = self.read_txid_hex()?; // 33-byte pubkey as hex
+        let revocation_outpoint = self.read_outpoint_string()?;
+        let signature_len = self.read_var_int()? as usize;
+        let signature = to_hex(self.read_bytes(signature_len)?);
+        let fields = self.read_string_map()?;
+
+        Ok(WalletCertificate {
+            certificate_type,
+            subject,
+            serial_number,
+            certifier,
+            revocation_outpoint,
+            signature,
+            fields,
+        })
+    }
+
+    /// Reads an optional WalletCertificate.
+    pub fn read_optional_wallet_certificate(&mut self) -> Result<Option<WalletCertificate>, Error> {
+        let flag = self.read_i8()?;
+        if flag < 0 {
+            return Ok(None);
+        }
+        // Re-read as we consumed the flag
+        self.read_wallet_certificate().map(Some)
+    }
+
+    /// Reads an IdentityCertifier.
+    pub fn read_identity_certifier(&mut self) -> Result<IdentityCertifier, Error> {
+        let name = self.read_string()?;
+        let icon_url = self.read_optional_string()?;
+        let description = self.read_optional_string()?;
+        let trust = self.read_u8()?;
+
+        Ok(IdentityCertifier {
+            name,
+            icon_url,
+            description,
+            trust,
+        })
+    }
+
+    /// Reads an optional IdentityCertifier.
+    pub fn read_optional_identity_certifier(&mut self) -> Result<Option<IdentityCertifier>, Error> {
+        let flag = self.read_i8()?;
+        if flag < 0 {
+            return Ok(None);
+        }
+        let name = self.read_string()?;
+        let icon_url = self.read_optional_string()?;
+        let description = self.read_optional_string()?;
+        let trust = self.read_u8()?;
+
+        Ok(Some(IdentityCertifier {
+            name,
+            icon_url,
+            description,
+            trust,
+        }))
+    }
+
+    /// Reads an IdentityCertificate.
+    pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
+        let certificate = self.read_wallet_certificate()?;
+        let certifier_info = self.read_optional_identity_certifier()?;
+        let publicly_revealed_keyring = self.read_optional_string_map()?;
+        let decrypted_fields = self.read_optional_string_map()?;
+
+        Ok(IdentityCertificate {
+            certificate,
+            certifier_info,
+            publicly_revealed_keyring,
+            decrypted_fields,
+        })
+    }
+
+    /// Reads a WalletPayment.
+    pub fn read_wallet_payment(&mut self) -> Result<WalletPayment, Error> {
+        let derivation_prefix = self.read_string()?;
+        let derivation_suffix = self.read_string()?;
+        let sender_identity_key = self.read_string()?;
+
+        Ok(WalletPayment {
+            derivation_prefix,
+            derivation_suffix,
+            sender_identity_key,
+        })
+    }
+
+    /// Reads an optional WalletPayment.
+    pub fn read_optional_wallet_payment(&mut self) -> Result<Option<WalletPayment>, Error> {
+        let flag = self.read_i8()?;
+        if flag < 0 {
+            return Ok(None);
+        }
+        self.read_wallet_payment().map(Some)
+    }
+
+    /// Reads a BasketInsertion.
+    pub fn read_basket_insertion(&mut self) -> Result<BasketInsertion, Error> {
+        let basket = self.read_string()?;
+        let custom_instructions = self.read_optional_string()?;
+        let tags = {
+            let arr = self.read_string_array()?;
+            if arr.is_empty() {
+                None
+            } else {
+                Some(arr)
+            }
+        };
+
+        Ok(BasketInsertion {
+            basket,
+            custom_instructions,
+            tags,
+        })
+    }
+
+    /// Reads an optional BasketInsertion.
+    pub fn read_optional_basket_insertion(&mut self) -> Result<Option<BasketInsertion>, Error> {
+        let flag = self.read_i8()?;
+        if flag < 0 {
+            return Ok(None);
+        }
+        self.read_basket_insertion().map(Some)
+    }
+
+    /// Reads an InternalizeOutput.
+    pub fn read_internalize_output(&mut self) -> Result<InternalizeOutput, Error> {
+        let output_index = self.read_var_int()? as u32;
+        let protocol = self.read_string()?;
+        let payment_remittance = self.read_optional_wallet_payment()?;
+        let insertion_remittance = self.read_optional_basket_insertion()?;
+
+        Ok(InternalizeOutput {
+            output_index,
+            protocol,
+            payment_remittance,
+            insertion_remittance,
+        })
+    }
+
+    /// Reads a WalletActionInput.
+    pub fn read_wallet_action_input(&mut self) -> Result<WalletActionInput, Error> {
+        let source_outpoint = self.read_outpoint()?;
+        let source_satoshis = self.read_var_int()?;
+        let source_locking_script = self.read_optional_bytes()?;
+        let unlocking_script = self.read_optional_bytes()?;
+        let input_description = self.read_string()?;
+        let sequence_number = self.read_u32_le()?;
+
+        Ok(WalletActionInput {
+            source_outpoint,
+            source_satoshis,
+            source_locking_script,
+            unlocking_script,
+            input_description,
+            sequence_number,
+        })
+    }
+
+    /// Reads a WalletActionOutput.
+    pub fn read_wallet_action_output(&mut self) -> Result<WalletActionOutput, Error> {
+        let satoshis = self.read_var_int()?;
+        let locking_script = self.read_optional_bytes()?;
+        let spendable = self.read_optional_bool()?.unwrap_or(false);
+        let custom_instructions = self.read_optional_string()?;
+        let tags = self.read_string_array()?;
+        let output_index = self.read_var_int()? as u32;
+        let output_description = self.read_string()?;
+        let basket = self.read_string()?;
+
+        Ok(WalletActionOutput {
+            satoshis,
+            locking_script,
+            spendable,
+            custom_instructions,
+            tags,
+            output_index,
+            output_description,
+            basket,
+        })
+    }
+
+    /// Reads a WalletAction.
+    pub fn read_wallet_action(&mut self) -> Result<WalletAction, Error> {
+        let txid_bytes = self.read_bytes(32)?;
+        let mut txid = [0u8; 32];
+        txid.copy_from_slice(txid_bytes);
+        let satoshis = self.read_var_int()?;
+        let status = self
+            .read_action_status()?
+            .unwrap_or(ActionStatus::Unprocessed);
+        let is_outgoing = self.read_optional_bool()?.unwrap_or(false);
+        let description = self.read_string()?;
+        let labels = {
+            let arr = self.read_string_array()?;
+            if arr.is_empty() {
+                None
+            } else {
+                Some(arr)
+            }
+        };
+        let version = self.read_u32_le()?;
+        let lock_time = self.read_u32_le()?;
+
+        // Read optional inputs array
+        let inputs_count = self.read_signed_var_int()?;
+        let inputs = if inputs_count < 0 {
+            None
+        } else {
+            let mut inputs = Vec::with_capacity(inputs_count as usize);
+            for _ in 0..inputs_count {
+                inputs.push(self.read_wallet_action_input()?);
+            }
+            Some(inputs)
+        };
+
+        // Read optional outputs array
+        let outputs_count = self.read_signed_var_int()?;
+        let outputs = if outputs_count < 0 {
+            None
+        } else {
+            let mut outputs = Vec::with_capacity(outputs_count as usize);
+            for _ in 0..outputs_count {
+                outputs.push(self.read_wallet_action_output()?);
+            }
+            Some(outputs)
+        };
+
+        Ok(WalletAction {
+            txid,
+            satoshis,
+            status,
+            is_outgoing,
+            description,
+            labels,
+            version,
+            lock_time,
+            inputs,
+            outputs,
+        })
+    }
+
+    /// Reads a WalletOutput.
+    pub fn read_wallet_output(&mut self) -> Result<WalletOutput, Error> {
+        let satoshis = self.read_var_int()?;
+        let locking_script = self.read_optional_bytes()?;
+        let spendable = self.read_optional_bool()?.unwrap_or(false);
+        let custom_instructions = self.read_optional_string()?;
+        let tags = {
+            let arr = self.read_string_array()?;
+            if arr.is_empty() {
+                None
+            } else {
+                Some(arr)
+            }
+        };
+        let outpoint = self.read_outpoint()?;
+        let labels = {
+            let arr = self.read_string_array()?;
+            if arr.is_empty() {
+                None
+            } else {
+                Some(arr)
+            }
+        };
+
+        Ok(WalletOutput {
+            satoshis,
+            locking_script,
+            spendable,
+            custom_instructions,
+            tags,
+            outpoint,
+            labels,
+        })
+    }
 }
 
 /// Wire protocol writer with signed varint support.
@@ -521,6 +965,319 @@ impl WireWriter {
             )));
         }
         Ok(self.write_bytes(&bytes))
+    }
+
+    // =========================================================================
+    // New type encoding methods
+    // =========================================================================
+
+    /// Writes a query mode (0 = any, 1 = all).
+    pub fn write_query_mode(&mut self, mode: QueryMode) -> &mut Self {
+        let val = match mode {
+            QueryMode::Any => 0,
+            QueryMode::All => 1,
+        };
+        self.write_u8(val)
+    }
+
+    /// Writes an optional query mode (-1 = None).
+    pub fn write_optional_query_mode(&mut self, mode: Option<QueryMode>) -> &mut Self {
+        match mode {
+            None => self.write_i8(-1),
+            Some(QueryMode::Any) => self.write_i8(0),
+            Some(QueryMode::All) => self.write_i8(1),
+        }
+    }
+
+    /// Writes an output include mode.
+    pub fn write_output_include(&mut self, mode: OutputInclude) -> &mut Self {
+        let val = match mode {
+            OutputInclude::LockingScripts => 0,
+            OutputInclude::EntireTransactions => 1,
+        };
+        self.write_u8(val)
+    }
+
+    /// Writes an optional output include mode.
+    pub fn write_optional_output_include(&mut self, mode: Option<OutputInclude>) -> &mut Self {
+        match mode {
+            None => self.write_i8(-1),
+            Some(OutputInclude::LockingScripts) => self.write_i8(0),
+            Some(OutputInclude::EntireTransactions) => self.write_i8(1),
+        }
+    }
+
+    /// Writes a string to string map.
+    pub fn write_string_map(&mut self, map: &HashMap<String, String>) -> &mut Self {
+        self.write_signed_var_int(map.len() as i64);
+        for (key, value) in map {
+            self.write_string(key);
+            self.write_string(value);
+        }
+        self
+    }
+
+    /// Writes an optional string map.
+    pub fn write_optional_string_map(
+        &mut self,
+        map: Option<&HashMap<String, String>>,
+    ) -> &mut Self {
+        match map {
+            None => self.write_signed_var_int(-1),
+            Some(map) => self.write_string_map(map),
+        }
+    }
+
+    /// Writes a SendWithResultStatus.
+    pub fn write_send_with_result_status(&mut self, status: SendWithResultStatus) -> &mut Self {
+        let val = match status {
+            SendWithResultStatus::Unproven => 0,
+            SendWithResultStatus::Sending => 1,
+            SendWithResultStatus::Failed => 2,
+        };
+        self.write_u8(val)
+    }
+
+    /// Writes a SendWithResult.
+    pub fn write_send_with_result(&mut self, result: &SendWithResult) -> &mut Self {
+        self.write_bytes(&result.txid);
+        self.write_send_with_result_status(result.status)
+    }
+
+    /// Writes an optional array of SendWithResults.
+    pub fn write_send_with_result_array(
+        &mut self,
+        results: Option<&[SendWithResult]>,
+    ) -> &mut Self {
+        match results {
+            None => self.write_signed_var_int(-1),
+            Some(results) => {
+                self.write_signed_var_int(results.len() as i64);
+                for r in results {
+                    self.write_send_with_result(r);
+                }
+                self
+            }
+        }
+    }
+
+    /// Writes a SignActionSpend.
+    pub fn write_sign_action_spend(&mut self, spend: &SignActionSpend) -> &mut Self {
+        self.write_var_int(spend.unlocking_script.len() as u64);
+        self.write_bytes(&spend.unlocking_script);
+        self.write_optional_var_int(spend.sequence_number.map(|v| v as u64))
+    }
+
+    /// Writes a map of u32 to SignActionSpend.
+    pub fn write_sign_action_spends(
+        &mut self,
+        spends: &HashMap<u32, SignActionSpend>,
+    ) -> &mut Self {
+        self.write_signed_var_int(spends.len() as i64);
+        for (index, spend) in spends {
+            self.write_var_int(*index as u64);
+            self.write_sign_action_spend(spend);
+        }
+        self
+    }
+
+    /// Writes a WalletCertificate.
+    pub fn write_wallet_certificate(
+        &mut self,
+        cert: &WalletCertificate,
+    ) -> Result<&mut Self, Error> {
+        self.write_string(&cert.certificate_type);
+        // Write subject as 33-byte pubkey (from hex)
+        let subject_bytes = from_hex(&cert.subject)?;
+        self.write_bytes(&subject_bytes);
+        self.write_string(&cert.serial_number);
+        // Write certifier as 33-byte pubkey (from hex)
+        let certifier_bytes = from_hex(&cert.certifier)?;
+        self.write_bytes(&certifier_bytes);
+        // Write revocation outpoint
+        self.write_outpoint_string(&cert.revocation_outpoint)?;
+        // Write signature
+        let sig_bytes = from_hex(&cert.signature)?;
+        self.write_var_int(sig_bytes.len() as u64);
+        self.write_bytes(&sig_bytes);
+        // Write fields
+        self.write_string_map(&cert.fields);
+        Ok(self)
+    }
+
+    /// Writes an optional WalletCertificate.
+    pub fn write_optional_wallet_certificate(
+        &mut self,
+        cert: Option<&WalletCertificate>,
+    ) -> Result<&mut Self, Error> {
+        match cert {
+            None => {
+                self.write_i8(-1);
+                Ok(self)
+            }
+            Some(cert) => {
+                self.write_i8(1);
+                self.write_wallet_certificate(cert)
+            }
+        }
+    }
+
+    /// Writes an IdentityCertifier.
+    pub fn write_identity_certifier(&mut self, certifier: &IdentityCertifier) -> &mut Self {
+        self.write_string(&certifier.name);
+        self.write_optional_string(certifier.icon_url.as_deref());
+        self.write_optional_string(certifier.description.as_deref());
+        self.write_u8(certifier.trust)
+    }
+
+    /// Writes an optional IdentityCertifier.
+    pub fn write_optional_identity_certifier(
+        &mut self,
+        certifier: Option<&IdentityCertifier>,
+    ) -> &mut Self {
+        match certifier {
+            None => self.write_i8(-1),
+            Some(c) => {
+                self.write_i8(1);
+                self.write_identity_certifier(c)
+            }
+        }
+    }
+
+    /// Writes an IdentityCertificate.
+    pub fn write_identity_certificate(
+        &mut self,
+        cert: &IdentityCertificate,
+    ) -> Result<&mut Self, Error> {
+        self.write_wallet_certificate(&cert.certificate)?;
+        self.write_optional_identity_certifier(cert.certifier_info.as_ref());
+        self.write_optional_string_map(cert.publicly_revealed_keyring.as_ref());
+        self.write_optional_string_map(cert.decrypted_fields.as_ref());
+        Ok(self)
+    }
+
+    /// Writes a WalletPayment.
+    pub fn write_wallet_payment(&mut self, payment: &WalletPayment) -> &mut Self {
+        self.write_string(&payment.derivation_prefix);
+        self.write_string(&payment.derivation_suffix);
+        self.write_string(&payment.sender_identity_key)
+    }
+
+    /// Writes an optional WalletPayment.
+    pub fn write_optional_wallet_payment(&mut self, payment: Option<&WalletPayment>) -> &mut Self {
+        match payment {
+            None => self.write_i8(-1),
+            Some(p) => {
+                self.write_i8(1);
+                self.write_wallet_payment(p)
+            }
+        }
+    }
+
+    /// Writes a BasketInsertion.
+    pub fn write_basket_insertion(&mut self, insertion: &BasketInsertion) -> &mut Self {
+        self.write_string(&insertion.basket);
+        self.write_optional_string(insertion.custom_instructions.as_deref());
+        let tags = insertion.tags.as_deref().unwrap_or(&[]);
+        self.write_string_array(tags)
+    }
+
+    /// Writes an optional BasketInsertion.
+    pub fn write_optional_basket_insertion(
+        &mut self,
+        insertion: Option<&BasketInsertion>,
+    ) -> &mut Self {
+        match insertion {
+            None => self.write_i8(-1),
+            Some(i) => {
+                self.write_i8(1);
+                self.write_basket_insertion(i)
+            }
+        }
+    }
+
+    /// Writes an InternalizeOutput.
+    pub fn write_internalize_output(&mut self, output: &InternalizeOutput) -> &mut Self {
+        self.write_var_int(output.output_index as u64);
+        self.write_string(&output.protocol);
+        self.write_optional_wallet_payment(output.payment_remittance.as_ref());
+        self.write_optional_basket_insertion(output.insertion_remittance.as_ref())
+    }
+
+    /// Writes a WalletActionInput.
+    pub fn write_wallet_action_input(&mut self, input: &WalletActionInput) -> &mut Self {
+        self.write_outpoint(&input.source_outpoint);
+        self.write_var_int(input.source_satoshis);
+        self.write_optional_bytes(input.source_locking_script.as_deref());
+        self.write_optional_bytes(input.unlocking_script.as_deref());
+        self.write_string(&input.input_description);
+        self.write_u32_le(input.sequence_number)
+    }
+
+    /// Writes a WalletActionOutput.
+    pub fn write_wallet_action_output(&mut self, output: &WalletActionOutput) -> &mut Self {
+        self.write_var_int(output.satoshis);
+        self.write_optional_bytes(output.locking_script.as_deref());
+        self.write_optional_bool(Some(output.spendable));
+        self.write_optional_string(output.custom_instructions.as_deref());
+        self.write_string_array(&output.tags);
+        self.write_var_int(output.output_index as u64);
+        self.write_string(&output.output_description);
+        self.write_string(&output.basket)
+    }
+
+    /// Writes a WalletAction.
+    pub fn write_wallet_action(&mut self, action: &WalletAction) -> &mut Self {
+        self.write_bytes(&action.txid);
+        self.write_var_int(action.satoshis);
+        self.write_action_status(Some(action.status));
+        self.write_optional_bool(Some(action.is_outgoing));
+        self.write_string(&action.description);
+        let labels = action.labels.as_deref().unwrap_or(&[]);
+        self.write_string_array(labels);
+        self.write_u32_le(action.version);
+        self.write_u32_le(action.lock_time);
+
+        // Write optional inputs array
+        match &action.inputs {
+            None => {
+                self.write_signed_var_int(-1);
+            }
+            Some(inputs) => {
+                self.write_signed_var_int(inputs.len() as i64);
+                for input in inputs {
+                    self.write_wallet_action_input(input);
+                }
+            }
+        }
+
+        // Write optional outputs array
+        match &action.outputs {
+            None => {
+                self.write_signed_var_int(-1);
+            }
+            Some(outputs) => {
+                self.write_signed_var_int(outputs.len() as i64);
+                for output in outputs {
+                    self.write_wallet_action_output(output);
+                }
+            }
+        }
+
+        self
+    }
+
+    /// Writes a WalletOutput.
+    pub fn write_wallet_output(&mut self, output: &WalletOutput) -> &mut Self {
+        self.write_var_int(output.satoshis);
+        self.write_optional_bytes(output.locking_script.as_deref());
+        self.write_optional_bool(Some(output.spendable));
+        self.write_optional_string(output.custom_instructions.as_deref());
+        let tags = output.tags.as_deref().unwrap_or(&[]);
+        self.write_string_array(tags);
+        self.write_outpoint(&output.outpoint);
+        let labels = output.labels.as_deref().unwrap_or(&[]);
+        self.write_string_array(labels)
     }
 }
 

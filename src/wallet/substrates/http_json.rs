@@ -5,10 +5,18 @@
 
 use crate::wallet::types::{Counterparty, Network, Protocol};
 use crate::wallet::{
-    CreateHmacArgs, CreateHmacResult, CreateSignatureArgs, CreateSignatureResult, DecryptArgs,
-    DecryptResult, EncryptArgs, EncryptResult, GetPublicKeyArgs, GetPublicKeyResult,
-    VerifyHmacArgs, VerifyHmacResult, VerifySignatureArgs, VerifySignatureResult,
+    AbortActionArgs, AbortActionResult, AcquireCertificateArgs, CreateActionArgs,
+    CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
+    CreateSignatureResult, DecryptArgs, DecryptResult, DiscoverByAttributesArgs,
+    DiscoverByIdentityKeyArgs, DiscoverCertificatesResult, EncryptArgs, EncryptResult,
+    GetHeaderArgs, GetHeaderResult, GetPublicKeyArgs, GetPublicKeyResult, InternalizeActionArgs,
+    InternalizeActionResult, ListActionsArgs, ListActionsResult, ListCertificatesArgs,
+    ListCertificatesResult, ListOutputsArgs, ListOutputsResult, ProveCertificateArgs,
+    ProveCertificateResult, RelinquishCertificateArgs, RelinquishCertificateResult,
+    RelinquishOutputArgs, RelinquishOutputResult, SignActionArgs, SignActionResult, VerifyHmacArgs,
+    VerifyHmacResult, VerifySignatureArgs, VerifySignatureResult, WalletCertificate,
 };
+
 use crate::Error;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -420,6 +428,172 @@ impl HttpWalletJson {
             .await?;
 
         Ok(response.version)
+    }
+
+    // =========================================================================
+    // Action Methods
+    // =========================================================================
+
+    /// Creates a new transaction action.
+    pub async fn create_action(
+        &self,
+        args: CreateActionArgs,
+        originator: &str,
+    ) -> Result<CreateActionResult, Error> {
+        self.request("createAction", &args, originator).await
+    }
+
+    /// Signs a previously created action.
+    pub async fn sign_action(
+        &self,
+        args: SignActionArgs,
+        originator: &str,
+    ) -> Result<SignActionResult, Error> {
+        self.request("signAction", &args, originator).await
+    }
+
+    /// Aborts an in-progress action.
+    pub async fn abort_action(
+        &self,
+        args: AbortActionArgs,
+        originator: &str,
+    ) -> Result<AbortActionResult, Error> {
+        self.request("abortAction", &args, originator).await
+    }
+
+    /// Lists wallet actions (transactions).
+    pub async fn list_actions(
+        &self,
+        args: ListActionsArgs,
+        originator: &str,
+    ) -> Result<ListActionsResult, Error> {
+        self.request("listActions", &args, originator).await
+    }
+
+    /// Internalizes an external transaction.
+    pub async fn internalize_action(
+        &self,
+        args: InternalizeActionArgs,
+        originator: &str,
+    ) -> Result<InternalizeActionResult, Error> {
+        self.request("internalizeAction", &args, originator).await
+    }
+
+    // =========================================================================
+    // Output Methods
+    // =========================================================================
+
+    /// Lists wallet outputs.
+    pub async fn list_outputs(
+        &self,
+        args: ListOutputsArgs,
+        originator: &str,
+    ) -> Result<ListOutputsResult, Error> {
+        self.request("listOutputs", &args, originator).await
+    }
+
+    /// Relinquishes an output from a basket.
+    pub async fn relinquish_output(
+        &self,
+        args: RelinquishOutputArgs,
+        originator: &str,
+    ) -> Result<RelinquishOutputResult, Error> {
+        self.request("relinquishOutput", &args, originator).await
+    }
+
+    // =========================================================================
+    // Certificate Methods
+    // =========================================================================
+
+    /// Acquires a certificate.
+    pub async fn acquire_certificate(
+        &self,
+        args: AcquireCertificateArgs,
+        originator: &str,
+    ) -> Result<WalletCertificate, Error> {
+        self.request("acquireCertificate", &args, originator).await
+    }
+
+    /// Lists certificates.
+    pub async fn list_certificates(
+        &self,
+        args: ListCertificatesArgs,
+        originator: &str,
+    ) -> Result<ListCertificatesResult, Error> {
+        self.request("listCertificates", &args, originator).await
+    }
+
+    /// Proves a certificate.
+    pub async fn prove_certificate(
+        &self,
+        args: ProveCertificateArgs,
+        originator: &str,
+    ) -> Result<ProveCertificateResult, Error> {
+        self.request("proveCertificate", &args, originator).await
+    }
+
+    /// Relinquishes a certificate.
+    pub async fn relinquish_certificate(
+        &self,
+        args: RelinquishCertificateArgs,
+        originator: &str,
+    ) -> Result<RelinquishCertificateResult, Error> {
+        self.request("relinquishCertificate", &args, originator)
+            .await
+    }
+
+    // =========================================================================
+    // Discovery Methods
+    // =========================================================================
+
+    /// Discovers certificates by identity key.
+    pub async fn discover_by_identity_key(
+        &self,
+        args: DiscoverByIdentityKeyArgs,
+        originator: &str,
+    ) -> Result<DiscoverCertificatesResult, Error> {
+        self.request("discoverByIdentityKey", &args, originator)
+            .await
+    }
+
+    /// Discovers certificates by attributes.
+    pub async fn discover_by_attributes(
+        &self,
+        args: DiscoverByAttributesArgs,
+        originator: &str,
+    ) -> Result<DiscoverCertificatesResult, Error> {
+        self.request("discoverByAttributes", &args, originator)
+            .await
+    }
+
+    // =========================================================================
+    // Chain Methods
+    // =========================================================================
+
+    /// Gets a block header for a given height.
+    pub async fn get_header(
+        &self,
+        args: GetHeaderArgs,
+        originator: &str,
+    ) -> Result<GetHeaderResult, Error> {
+        self.request("getHeaderForHeight", &args, originator).await
+    }
+
+    /// Waits for authentication.
+    pub async fn wait_for_authentication(&self, originator: &str) -> Result<bool, Error> {
+        #[derive(Serialize)]
+        struct EmptyRequest {}
+
+        #[derive(Deserialize)]
+        struct AuthResponse {
+            authenticated: bool,
+        }
+
+        let response: AuthResponse = self
+            .request("waitForAuthentication", &EmptyRequest {}, originator)
+            .await?;
+
+        Ok(response.authenticated)
     }
 }
 

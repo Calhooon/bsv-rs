@@ -3,16 +3,19 @@
 
 ## Overview
 
-This module provides production-ready implementations of the [`ChainTracker`](../chain_tracker.rs) trait for verifying merkle roots against the BSV blockchain. These implementations connect to blockchain explorer APIs to validate that transaction inclusion proofs are anchored in real blocks.
+This module provides production-ready implementations of the [`ChainTracker`](../chain_tracker.rs) trait for verifying merkle roots against the BSV blockchain. These implementations connect to blockchain services to validate that transaction inclusion proofs are anchored in real blocks.
 
-The primary implementation uses the WhatsOnChain API, which provides free access to BSV blockchain data for both mainnet and testnet.
+Available implementations:
+- **`WhatsOnChainTracker`** - WhatsOnChain API (free tier available)
+- **`BlockHeadersServiceTracker`** - Block Headers Service API (headers.spv.money)
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports `WhatsOnChainTracker` and `WocNetwork` |
+| `mod.rs` | Module root; re-exports all trackers |
 | `whatsonchain.rs` | WhatsOnChain API implementation of `ChainTracker` |
+| `block_headers_service.rs` | Block Headers Service implementation of `ChainTracker` |
 
 ## Feature Requirements
 
@@ -209,8 +212,78 @@ Note: Integration tests against the live API are marked `ignore` to avoid networ
 - `../merkle_path.rs` - `MerklePath` for computing merkle roots from proofs
 - `../beef.rs` - BEEF format verification that uses `ChainTracker`
 
+## BlockHeadersServiceTracker
+
+The Block Headers Service provides a fast, reliable way to verify merkle roots via a dedicated headers service.
+
+### BlockHeadersServiceConfig
+
+```rust
+pub struct BlockHeadersServiceConfig {
+    pub base_url: String,          // Default: "https://headers.spv.money"
+    pub auth_token: Option<String>, // Optional Bearer token
+    pub timeout_ms: u64,           // Request timeout (default: 30,000 ms)
+}
+```
+
+### BlockHeadersServiceTracker
+
+```rust
+pub struct BlockHeadersServiceTracker {
+    config: BlockHeadersServiceConfig,
+    client: reqwest::Client,  // Only with "http" feature
+}
+
+impl BlockHeadersServiceTracker {
+    pub fn new() -> Self                    // Create with default URL
+    pub fn with_url(base_url: &str) -> Self // Create with custom URL
+    pub fn with_config(config: BlockHeadersServiceConfig) -> Self
+    pub fn base_url(&self) -> &str
+    pub fn auth_token(&self) -> Option<&str>
+}
+
+impl Default for BlockHeadersServiceTracker {
+    fn default() -> Self  // Returns tracker with default URL
+}
+
+#[async_trait]
+impl ChainTracker for BlockHeadersServiceTracker {
+    async fn is_valid_root_for_height(&self, root: &str, height: u32)
+        -> Result<bool, ChainTrackerError>;
+    async fn current_height(&self) -> Result<u32, ChainTrackerError>;
+}
+```
+
+### Block Headers Service API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `is_valid_root_for_height` | `GET /api/v1/chain/header/{height}` | Fetch header, compare merkleroot |
+| `current_height` | `GET /api/v1/chain/tip` | Get current blockchain height |
+
+### Block Headers Service Usage
+
+```rust
+use bsv_sdk::transaction::{ChainTracker, BlockHeadersServiceTracker};
+
+// Create with default URL
+let tracker = BlockHeadersServiceTracker::default();
+
+// Or with custom URL
+let tracker = BlockHeadersServiceTracker::with_url("https://custom.headers.com");
+
+// Verify a merkle root
+let is_valid = tracker
+    .is_valid_root_for_height("abc123...", 700000)
+    .await?;
+
+// Get current height
+let height = tracker.current_height().await?;
+```
+
 ## External References
 
 - [WhatsOnChain API Documentation](https://developers.whatsonchain.com/)
+- [Block Headers Service](https://headers.spv.money)
 - [BRC-74 BUMP](https://github.com/bitcoin-sv/BRCs/blob/master/transactions/0074.md) - Merkle proof format
 - [BRC-62 BEEF](https://github.com/bitcoin-sv/BRCs/blob/master/transactions/0062.md) - Background Evaluation Extended Format
