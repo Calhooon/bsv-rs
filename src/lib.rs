@@ -62,3 +62,7 @@ pub use primitives::{
 // Convenience re-exports from script
 #[cfg(feature = "script")]
 pub use script::{LockingScript, Script, ScriptChunk, UnlockingScript};
+
+// Convenience re-exports from transaction
+#[cfg(feature = "transaction")]
+pub use transaction::{ChangeDistribution, Transaction, TransactionInput, TransactionOutput};
