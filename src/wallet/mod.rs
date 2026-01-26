@@ -107,8 +107,11 @@
 //! ```
 
 mod cached_key_deriver;
+#[cfg(feature = "http")]
+mod client;
 mod key_deriver;
 mod proto_wallet;
+pub mod substrates;
 pub mod types;
 pub mod validation;
 pub mod wire;
@@ -192,3 +195,7 @@ pub use types::{
 
     MAX_SATOSHIS,
 };
+
+// Re-export client types (requires http feature)
+#[cfg(feature = "http")]
+pub use client::{SubstrateType, WalletClient};

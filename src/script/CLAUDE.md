@@ -9,7 +9,8 @@ This module provides complete Bitcoin Script functionality for the BSV SDK:
 - Specialized types for locking (output) and unlocking (input) scripts
 - Script number encoding for stack operations
 - Full script interpreter with spend validation
-- Script templates for common transaction types (P2PKH, R-Puzzle)
+- Script templates for common transaction types (P2PKH, R-Puzzle, PushDrop)
+- Script type detection (P2PKH, P2PK, P2SH, multisig, data)
 - Transaction interface traits for Script/Transaction module integration
 
 Compatible with the TypeScript and Go SDKs through shared opcode values, serialization formats, and execution semantics.
@@ -21,7 +22,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `mod.rs` | Module root; submodule declarations and public re-exports |
 | `op.rs` | Opcode constants (u8) and name/value lookup functions |
 | `chunk.rs` | `ScriptChunk` type representing individual script elements |
-| `script.rs` | Core `Script` class with parsing, serialization, and builder methods |
+| `script.rs` | Core `Script` class with parsing, serialization, builder methods, and type detection |
 | `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) |
 | `unlocking_script.rs` | `UnlockingScript` newtype wrapper for input scripts (scriptSig) |
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding |
@@ -32,6 +33,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `templates/mod.rs` | Templates module declarations and re-exports |
 | `templates/p2pkh.rs` | P2PKH (Pay-to-Public-Key-Hash) template |
 | `templates/rpuzzle.rs` | R-Puzzle template for knowledge-based locking |
+| `templates/pushdrop.rs` | PushDrop template for data envelope scripts with P2PK lock |
 
 ## Key Exports
 
@@ -57,7 +59,7 @@ pub use transaction::{
 };
 
 // Templates (via templates module)
-pub use templates::{P2PKH, RPuzzle, RPuzzleType};
+pub use templates::{P2PKH, RPuzzle, RPuzzleType, PushDrop, LockPosition};
 ```
 
 ## Core Types
@@ -131,6 +133,15 @@ impl Script {
     pub fn is_push_only(&self) -> bool
     pub fn is_locking_script(&self) -> bool   // Always false for base Script
     pub fn is_unlocking_script(&self) -> bool // Always false for base Script
+
+    // Script Type Detection
+    pub fn is_p2pkh(&self) -> bool             // OP_DUP OP_HASH160 <20> OP_EQUALVERIFY OP_CHECKSIG
+    pub fn is_p2pk(&self) -> bool              // <33|65 bytes> OP_CHECKSIG
+    pub fn is_p2sh(&self) -> bool              // OP_HASH160 <20> OP_EQUAL
+    pub fn is_data(&self) -> bool              // OP_RETURN or OP_FALSE OP_RETURN
+    pub fn is_multisig(&self) -> Option<(u8, u8)>  // Returns (M, N) if multisig
+    pub fn opcode_to_small_int(op: u8) -> Option<u8>  // OP_1..OP_16 -> 1..16
+    pub fn extract_pubkey_hash(&self) -> Option<[u8; 20]>  // From P2PKH scripts
 }
 ```
 
@@ -289,6 +300,25 @@ impl ScriptTemplate for RPuzzle {
 }
 ```
 
+### PushDrop
+
+Data envelope template with embedded fields and P2PK lock. Used by token protocols like BSV-20:
+
+```rust
+pub enum LockPosition { Before, After }  // Pubkey position relative to data
+
+impl PushDrop {
+    pub fn new(locking_public_key: PublicKey, fields: Vec<Vec<u8>>) -> Self
+    pub fn with_position(self, position: LockPosition) -> Self
+    pub fn lock(&self) -> LockingScript
+    pub fn decode(script: &LockingScript) -> Result<Self>  // Parse existing script
+    pub fn estimate_unlocking_length(&self) -> usize  // 107 bytes
+}
+
+// Lock-Before pattern: <pubkey> OP_CHECKSIG <field1> <field2> ... OP_2DROP... OP_DROP
+// Lock-After pattern:  <field1> <field2> ... OP_2DROP... OP_DROP <pubkey> OP_CHECKSIG
+```
+
 ## Transaction Interface Traits
 
 Traits for Transaction module integration:
@@ -353,12 +383,17 @@ script.write_opcode(op::OP_DUP)
     .write_bin(&pubkey_hash)
     .write_opcode(op::OP_EQUALVERIFY)
     .write_opcode(op::OP_CHECKSIG);
+
+// Script type detection
+if script.is_p2pkh() {
+    let hash = script.extract_pubkey_hash();
+}
 ```
 
 ### Using Templates
 
 ```rust
-use bsv_sdk::script::templates::P2PKH;
+use bsv_sdk::script::templates::{P2PKH, PushDrop, LockPosition};
 use bsv_sdk::script::{ScriptTemplate, SignOutputs, SigningContext};
 
 // Create locking script from address
@@ -372,6 +407,12 @@ let locking = template.lock(&pubkey_hash)?;
 let unlock = P2PKH::unlock(&private_key, SignOutputs::All, false);
 let context = SigningContext::new(&raw_tx, 0, 100_000, locking.as_script());
 let unlocking = unlock.sign(&context)?;
+
+// PushDrop for token data
+let fields = vec![b"BSV20".to_vec(), b"transfer".to_vec()];
+let pushdrop = PushDrop::new(public_key, fields)
+    .with_position(LockPosition::Before);
+let locking = pushdrop.lock();
 ```
 
 ### Validating Spends

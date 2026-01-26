@@ -3,7 +3,7 @@
 
 ## Overview
 
-This module provides ready-to-use templates for creating and spending common Bitcoin script types. Templates abstract away the complexity of script construction and signing, providing simple interfaces for standard transaction patterns like P2PKH (Pay-to-Public-Key-Hash) and R-Puzzles.
+This module provides ready-to-use templates for creating and spending common Bitcoin script types. Templates abstract away the complexity of script construction and signing, providing simple interfaces for standard transaction patterns like P2PKH (Pay-to-Public-Key-Hash), R-Puzzles, and PushDrop data envelopes.
 
 The implementation maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs through shared script structures and signing conventions.
 
@@ -13,6 +13,7 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 |------|---------|
 | `mod.rs` | Module root; submodule declarations and public re-exports |
 | `p2pkh.rs` | P2PKH template for the most common Bitcoin transaction type |
+| `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock |
 | `rpuzzle.rs` | R-Puzzle template for knowledge-based locking using ECDSA K-values |
 
 ## Key Exports
@@ -21,6 +22,7 @@ The module re-exports the following from `mod.rs`:
 
 ```rust
 pub use p2pkh::P2PKH;
+pub use pushdrop::{LockPosition, PushDrop};
 pub use rpuzzle::{RPuzzle, RPuzzleType};
 ```
 
@@ -97,7 +99,7 @@ The R-extraction prefix parses a DER-encoded signature to extract the R value:
 6. `OP_DROP` - Discard remainder
 
 ```rust
-/// Hash variants for R-Puzzle locking scripts
+/// Hash variants for R-Puzzle locking scripts (default: Raw)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum RPuzzleType {
     #[default]
@@ -149,6 +151,63 @@ impl ScriptTemplate for RPuzzle {
     fn lock(&self, params: &[u8]) -> Result<LockingScript>
 }
 ```
+
+### PushDrop
+
+PushDrop is a data envelope template that embeds arbitrary data fields in a transaction output, protected by a P2PK (Pay-to-Public-Key) signature. It's commonly used by token protocols like BSV-20.
+
+**Locking Script Pattern (lock-before, default):**
+```text
+<pubkey> OP_CHECKSIG <field1> <field2> ... OP_2DROP ... OP_DROP
+```
+
+**Locking Script Pattern (lock-after):**
+```text
+<field1> <field2> ... OP_2DROP ... OP_DROP <pubkey> OP_CHECKSIG
+```
+
+The script pushes data fields onto the stack, then drops them using `OP_2DROP` (for pairs) and `OP_DROP` (for remaining single field), leaving only the P2PK signature check.
+
+```rust
+/// Lock position for PushDrop template
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LockPosition {
+    #[default]
+    Before,  // <pubkey> OP_CHECKSIG comes before data fields
+    After,   // <pubkey> OP_CHECKSIG comes after data fields
+}
+
+#[derive(Debug, Clone)]
+pub struct PushDrop {
+    pub locking_public_key: PublicKey,
+    pub fields: Vec<Vec<u8>>,
+    pub lock_position: LockPosition,
+}
+
+impl PushDrop {
+    /// Creates a new PushDrop with lock-before pattern (default)
+    pub fn new(locking_public_key: PublicKey, fields: Vec<Vec<u8>>) -> Self
+
+    /// Sets the lock position and returns self for chaining
+    pub fn with_position(mut self, position: LockPosition) -> Self
+
+    /// Creates the locking script
+    pub fn lock(&self) -> LockingScript
+
+    /// Decodes a PushDrop locking script back into its components
+    pub fn decode(script: &LockingScript) -> Result<Self>
+
+    /// Estimates unlocking script length (returns 107 bytes)
+    pub fn estimate_unlocking_length(&self) -> usize
+}
+```
+
+**Minimal Encoding:**
+PushDrop automatically applies Bitcoin Script minimal encoding rules:
+- Empty data or `[0]` → `OP_0`
+- Single byte 1-16 → `OP_1` through `OP_16`
+- Single byte `0x81` (-1) → `OP_1NEGATE`
+- Other data → standard push
 
 ## Usage
 
@@ -254,6 +313,46 @@ let unlocking = RPuzzle::sign_with_sighash(
 )?;
 ```
 
+### PushDrop: Create Data Envelope
+
+```rust
+use bsv_sdk::script::templates::{PushDrop, LockPosition};
+use bsv_sdk::primitives::ec::PrivateKey;
+
+let privkey = PrivateKey::random();
+let pubkey = privkey.public_key();
+
+// Create with embedded token data (lock-before pattern)
+let fields = vec![
+    b"BSV20".to_vec(),
+    b"transfer".to_vec(),
+    b"1000".to_vec(),
+];
+let pushdrop = PushDrop::new(pubkey.clone(), fields);
+let locking = pushdrop.lock();
+// Produces: <pubkey> OP_CHECKSIG <"BSV20"> <"transfer"> <"1000"> OP_2DROP OP_DROP
+
+// Lock-after pattern (data fields first)
+let pushdrop = PushDrop::new(pubkey, vec![b"data".to_vec()])
+    .with_position(LockPosition::After);
+let locking = pushdrop.lock();
+// Produces: <"data"> OP_DROP <pubkey> OP_CHECKSIG
+```
+
+### PushDrop: Decode Existing Script
+
+```rust
+use bsv_sdk::script::templates::PushDrop;
+use bsv_sdk::script::LockingScript;
+
+let script = LockingScript::from_hex("...")?;
+let decoded = PushDrop::decode(&script)?;
+
+println!("Public key: {:?}", decoded.locking_public_key);
+println!("Fields: {:?}", decoded.fields);
+println!("Lock position: {:?}", decoded.lock_position);
+```
+
 ### Sighash Types
 
 The `SignOutputs` enum and `anyone_can_pay` flag control which parts of the transaction are signed:
@@ -279,11 +378,13 @@ Both templates produce DER-encoded ECDSA signatures with:
 
 ### Estimated Lengths
 
-The `estimate_length()` method returns 108 bytes for both templates:
+The `estimate_length()` method returns 108 bytes for P2PKH and RPuzzle:
 - Signature push: 1 + 73 bytes (max DER + sighash byte)
 - Public key push: 1 + 33 bytes (compressed)
 
-This is a worst-case estimate; actual signatures may be 1-2 bytes shorter.
+PushDrop's `estimate_unlocking_length()` returns 107 bytes (signature only, since public key is in the locking script).
+
+These are worst-case estimates; actual signatures may be 1-2 bytes shorter.
 
 ### R-Puzzle K Value Security
 
@@ -304,6 +405,25 @@ The `sign_with_k` function in `rpuzzle.rs` performs raw ECDSA signing with a spe
 ```
 
 This bypasses RFC 6979 deterministic nonce generation, which is necessary for R-Puzzles but should be avoided for regular signatures.
+
+### PushDrop DROP Operations
+
+PushDrop efficiently cleans up the stack using:
+- `OP_2DROP` for each pair of fields (removes 2 items)
+- `OP_DROP` for a remaining single field
+
+Example for 5 fields: `OP_2DROP OP_2DROP OP_DROP` (removes 2+2+1 = 5 items)
+
+### PushDrop Decoding
+
+The `decode` method determines the lock position by examining the first chunk:
+- If first chunk is a 33 or 65-byte data push (public key), it's lock-before
+- Otherwise, it's lock-after
+
+Decoded minimal-encoded values are converted back to their byte representations:
+- `OP_0` → `[0]`
+- `OP_1` through `OP_16` → `[1]` through `[16]`
+- `OP_1NEGATE` → `[0x81]`
 
 ## Related Documentation
 

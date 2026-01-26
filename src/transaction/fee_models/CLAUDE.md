@@ -38,9 +38,15 @@ pub struct SatoshisPerKilobyte {
 | `new(value: u64)` | Constructs a fee model with the specified sat/KB rate |
 | `compute_fee(&self, tx: &Transaction)` | Computes the fee for a transaction (from `FeeModel` trait) |
 
+**Private Methods:**
+
+| Method | Description |
+|--------|-------------|
+| `estimate_size(&self, tx: &Transaction)` | Estimates transaction size in bytes for fee calculation |
+
 **Traits Implemented:**
 
-- `FeeModel` - Core trait for fee computation
+- `FeeModel` - Core trait for fee computation (requires `Send + Sync`)
 - `Default` - Returns `SatoshisPerKilobyte::new(100)` (standard BSV rate)
 - `Debug`, `Clone`, `Copy`
 
@@ -87,7 +93,7 @@ The `estimate_size` method calculates transaction size by summing:
 
 ### Varint Encoding
 
-Bitcoin uses variable-length integers for counts and lengths:
+Bitcoin uses variable-length integers for counts and lengths. The module includes a helper function `varint_size()`:
 
 | Value Range | Encoded Size |
 |-------------|--------------|
@@ -100,7 +106,7 @@ Bitcoin uses variable-length integers for counts and lengths:
 
 For inputs without a finalized unlocking script, the fee model uses:
 
-1. **`unlocking_script`** - If present, uses actual script size
+1. **`unlocking_script`** - If present, uses actual script size via `to_binary().len()`
 2. **`unlocking_script_template`** - If present, calls `estimate_length()` for estimated size
 3. **Neither** - Returns `FeeModelError` since fee cannot be computed
 
@@ -109,7 +115,7 @@ For inputs without a finalized unlocking script, the fee model uses:
 The fee is computed using ceiling division to ensure miners receive at least the minimum fee:
 
 ```rust
-fee = (size_bytes * satoshis_per_kb + 999) / 1000
+let fee = (size as u64 * self.value).div_ceil(1000);
 ```
 
 This rounds up any fractional kilobyte to ensure the miner receives the extra satoshi.
@@ -126,6 +132,17 @@ Err(crate::Error::FeeModelError(format!(
     i
 )))
 ```
+
+## Tests
+
+The module includes unit tests in `sats_per_kb.rs`:
+
+| Test | Description |
+|------|-------------|
+| `test_new` | Verifies constructor sets value correctly |
+| `test_default` | Verifies default is 100 sat/KB |
+| `test_varint_size` | Tests varint size calculation for boundary values |
+| `test_empty_transaction_fee` | Tests fee calculation for empty transaction (10 bytes = 10 sats at 1000 sat/KB) |
 
 ## Related
 

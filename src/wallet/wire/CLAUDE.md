@@ -9,30 +9,29 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, re-exports | ~150 |
-| `calls.rs` | WalletCall enum (28 call codes) | ~180 |
-| `encoding.rs` | WireReader/WireWriter with signed varint support | ~500 |
-| `processor.rs` | Server-side message processing | ~450 |
-| `transceiver.rs` | Client-side message serialization | ~400 |
-| `CLAUDE.md` | This documentation | ~350 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~170 |
+| `calls.rs` | WalletCall enum (28 call codes) | ~200 |
+| `encoding.rs` | WireReader/WireWriter with signed varint support | ~720 |
+| `processor.rs` | Server-side message processing | ~650 |
+| `transceiver.rs` | Client-side message serialization | ~590 |
 
 ## Architecture
 
 ```
-┌─────────────────────┐         ┌─────────────────────┐
-│  WalletWireTransceiver │       │  WalletWireProcessor   │
-│      (Client)         │         │      (Server)          │
-└──────────┬──────────┘         └──────────┬───────────┘
-           │                                │
-           │   Binary Message               │
-           │ ──────────────────────────────>│
-           │                                │
-           │   Binary Response              │
-           │ <──────────────────────────────│
-           │                                │
-           └────────────────────────────────┘
-                    WalletWire
-                   (Transport)
+┌───────────────────────────┐         ┌───────────────────────────┐
+│  WalletWireTransceiver    │         │  WalletWireProcessor      │
+│        (Client)           │         │        (Server)           │
+└───────────┬───────────────┘         └───────────┬───────────────┘
+            │                                     │
+            │       Binary Message                │
+            │ ───────────────────────────────────>│
+            │                                     │
+            │       Binary Response               │
+            │ <───────────────────────────────────│
+            │                                     │
+            └─────────────────────────────────────┘
+                        WalletWire
+                       (Transport)
 ```
 
 ## Wire Protocol Format
@@ -192,7 +191,7 @@ let result = wallet.get_public_key(
 ### Direct Encoding
 
 ```rust
-use bsv_sdk::wallet::wire::encoding::{WireReader, WireWriter};
+use bsv_sdk::wallet::wire::{WireReader, WireWriter};
 use bsv_sdk::wallet::types::{Counterparty, Protocol, SecurityLevel};
 
 // Writing
@@ -295,9 +294,26 @@ Messages serialized by one SDK can be deserialized by another, enabling cross-pl
 - `async-trait` - For async trait methods in `WalletWire`
 - Internal: `primitives::encoding::{Reader, Writer}` for base serialization
 
+## Public Exports
+
+```rust
+// From mod.rs
+pub use calls::WalletCall;
+pub use encoding::{WireReader, WireWriter};
+pub use processor::WalletWireProcessor;
+pub use transceiver::WalletWireTransceiver;
+
+pub trait WalletWire: Send + Sync {
+    async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error>;
+}
+
+pub mod counterparty_codes { /* UNDEFINED, SELF, ANYONE */ }
+pub mod status_codes { /* COMPLETED, UNPROCESSED, SENDING, etc. */ }
+```
+
 ## Related Documentation
 
 - `../CLAUDE.md` - Wallet module documentation
 - `../types.rs` - Core wallet type definitions
 - `../proto_wallet.rs` - ProtoWallet implementation
-- `../../primitives/encoding.rs` - Base Reader/Writer
+- `../../primitives/encoding/` - Base Reader/Writer
