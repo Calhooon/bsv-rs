@@ -10,6 +10,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | File | Purpose |
 |------|---------|
 | `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs |
+| `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors |
 | `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests |
 | `integration_tests.rs` | Full workflow tests across all modules |
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors |
@@ -43,6 +44,7 @@ Transaction test vectors are in `tests/transaction/vectors/`:
 | `bump_valid.rs` | Valid BRC-74 BUMP (MerklePath) hex vectors |
 | `bump_invalid.rs` | Invalid BUMP vectors with expected error messages |
 | `bigtx.rs` | Large transaction test vectors |
+| `CLAUDE.md` | Transaction vectors documentation |
 
 ## Test Categories
 
@@ -76,6 +78,22 @@ Tests that verify the Rust implementation matches TypeScript and Go SDK output:
 - `test_large_message_encryption` - 1MB message handling
 - `test_brc42_empty_invoice` - Empty invoice number derivation
 - `test_brc42_long_invoice` - 1000-character invoice number
+
+### DRBG Tests (`drbg_tests.rs`)
+
+HMAC-DRBG (Deterministic Random Bit Generator) tests using NIST SP 800-90A vectors:
+
+**NIST Vector Tests**
+- `test_drbg_nist_vectors` - Runs all 15 NIST test vectors with SHA-256
+
+**DRBG Variants**
+- `test_drbg_sha512_variant` - Tests SHA-512 HMAC-DRBG produces different output than SHA-256
+- `test_drbg_empty_personalization` - Empty personalization string works correctly
+
+**DRBG Operations**
+- `test_drbg_reseed_changes_output` - Verifies reseed changes generator state
+- `test_drbg_output_length` - Tests various output lengths (1, 16, 32, 64, 128, 256 bytes)
+- `test_drbg_determinism` - Verifies same inputs produce same outputs
 
 ### EC Module Tests (`ec_tests.rs`)
 
@@ -253,11 +271,30 @@ Transaction module tests (requires `transaction` feature flag):
 - `test_add_change_output` - Add change output with flag
 - `test_metadata` - Transaction metadata updates
 
+**Extended BEEF Tests** (in `beef_extended_tests` submodule)
+- `test_beef_merge_transaction_with_parents` - Merge parent and child transactions
+- `test_beef_merge_two_beefs` - Merge two BEEF containers
+- `test_beef_sort_txs_dependency_order` - Sort transactions by dependency order
+- `test_beef_atomic_serialization` - Atomic BEEF serialization with target txid
+- `test_beef_v1_v2_roundtrip` - BEEF V1 and V2 format roundtrips
+- `test_beef_version_default` - Default BEEF version is V2
+- `test_beef_multiple_bumps` - Add multiple merkle paths to BEEF
+- `test_beef_empty_validation` - Empty BEEF validation passes
+- `test_beef_txid_only_validation` - Txid-only validation modes
+- `test_beef_find_transaction_not_found` - Non-existent txid lookup
+- `test_beef_hex_roundtrip` - Hex format roundtrip
+- `test_beef_binary_roundtrip` - Binary format roundtrip
+- `test_beef_merge_duplicate_txid` - Duplicate transaction deduplication
+- `test_beef_merge_raw_tx` - Merge raw transaction bytes
+- `test_beef_bump_at_different_heights` - Bumps at various block heights
+- `test_beef_validation_result` - Validation result structure
+
 ## Running Tests
 
 ```bash
 # Run all integration tests
 cargo test --test cross_sdk_tests
+cargo test --test drbg_tests
 cargo test --test ec_tests
 cargo test --test integration_tests
 cargo test --test script_vectors_tests
@@ -275,84 +312,6 @@ cargo test --test sighash_tests -- --nocapture
 cargo test --test transaction_tests --features transaction -- test_mock_chain_tracker
 ```
 
-## Test Vector Structures
-
-### BRC-42 Private Vector
-```rust
-struct Brc42PrivateVector {
-    sender_public_key: String,      // Hex-encoded compressed public key
-    recipient_private_key: String,  // Hex-encoded 32-byte private key
-    invoice_number: String,         // Invoice string (used directly, not decoded)
-    private_key: String,            // Expected derived private key (hex)
-}
-```
-
-### BRC-42 Public Vector
-```rust
-struct Brc42PublicVector {
-    sender_private_key: String,     // Hex-encoded 32-byte private key
-    recipient_public_key: String,   // Hex-encoded compressed public key
-    invoice_number: String,         // Invoice string
-    public_key: String,             // Expected derived public key (hex)
-}
-```
-
-### Symmetric Key Vector
-```rust
-struct SymmetricKeyVector {
-    ciphertext: String,  // Base64-encoded ciphertext
-    key: String,         // Base64-encoded 32-byte key
-    plaintext: String,   // UTF-8 plaintext (not base64)
-}
-```
-
-### Sighash Vector
-```rust
-struct SighashVector {
-    raw_tx: String,       // Hex-encoded raw transaction
-    script: String,       // Hex-encoded subscript
-    input_index: usize,   // Input being signed
-    hash_type: i32,       // Sighash flags (can be negative when high bit set)
-    expected_hash: String, // Expected sighash (hex)
-}
-```
-
-### Spend/Script Vector
-```rust
-struct SpendVector {
-    script_sig: String,      // Hex-encoded unlocking script
-    script_pub_key: String,  // Hex-encoded locking script
-    comment: String,         // Description of what vector tests
-}
-
-struct ScriptVector {
-    script_sig: String,      // Hex-encoded unlocking script
-    script_pub_key: String,  // Hex-encoded locking script
-    flags: String,           // Test flags (e.g., "P2SH", "STRICTENC")
-    comment: String,         // Description of what vector tests
-}
-```
-
-### DRBG Vector
-```rust
-struct DrbgVector {
-    name: String,            // Vector identifier
-    entropy: String,         // Hex-encoded entropy (32 bytes)
-    nonce: String,           // Hex-encoded nonce (16 bytes)
-    pers: Option<String>,    // Optional personalization string
-    add: Vec<Option<String>>, // Additional data for each generate call
-    expected: String,        // Expected HMAC-DRBG output (128 bytes hex)
-}
-```
-
-### Invalid BUMP Vector
-```rust
-struct BumpInvalidVector {
-    bump: &'static str,      // Invalid BUMP hex data
-    error: &'static str,     // Expected error description
-}
-```
-
 ## Key Types Used
 
 | Type | Import Path | Description |
@@ -364,6 +323,7 @@ struct BumpInvalidVector {
 | `P256PublicKey` | `bsv_sdk::primitives::p256` | NIST P-256 public key |
 | `Schnorr` | `bsv_sdk::primitives::bsv::schnorr` | Schnorr proof generation/verification |
 | `KeyShares` | `bsv_sdk::primitives::bsv::shamir` | Shamir secret sharing |
+| `HmacDrbg` | `bsv_sdk::primitives::drbg` | HMAC-based deterministic random bit generator |
 | `BigNumber` | `bsv_sdk::primitives` | Arbitrary precision integers |
 | `Script` | `bsv_sdk::script` | Bitcoin script |
 | `LockingScript` | `bsv_sdk::script` | Script for locking outputs |
@@ -383,71 +343,39 @@ struct BumpInvalidVector {
 | `ChainTracker` | `bsv_sdk::transaction` | Block header/merkle root tracker (async) |
 | `AlwaysValidChainTracker` | `bsv_sdk::transaction` | ChainTracker that accepts all roots |
 | `MockChainTracker` | `bsv_sdk::transaction` | ChainTracker with configurable roots |
-| `BroadcastResponse` | `bsv_sdk::transaction` | Successful broadcast result |
-| `BroadcastFailure` | `bsv_sdk::transaction` | Failed broadcast result |
-| `BroadcastStatus` | `bsv_sdk::transaction` | Broadcast status enum (Success, Error) |
 
-## Hash Functions Used
+## Utility Functions
 
-| Function | Import Path | Output |
-|----------|-------------|--------|
-| `sha256` | `bsv_sdk::primitives::hash` | 32 bytes |
-| `sha256d` | `bsv_sdk::primitives::hash` | 32 bytes (double SHA256) |
-| `hash160` | `bsv_sdk::primitives::hash` | 20 bytes (SHA256 + RIPEMD160) |
-| `sha256_hmac` | `bsv_sdk::primitives::hash` | 32 bytes |
-| `sha512_hmac` | `bsv_sdk::primitives::hash` | 64 bytes |
+**Hash Functions** (`bsv_sdk::primitives::hash`):
+- `sha256` - 32 bytes
+- `sha256d` - 32 bytes (double SHA256)
+- `hash160` - 20 bytes (SHA256 + RIPEMD160)
+- `sha256_hmac` / `sha512_hmac` - HMAC variants
 
-## Encoding Functions Used
-
-| Function | Import Path | Description |
-|----------|-------------|-------------|
-| `from_hex` / `to_hex` | `bsv_sdk::primitives` | Hex encoding |
-| `from_base64` / `to_base64` | `bsv_sdk::primitives` | Base64 encoding |
-| `from_base58` / `to_base58` | `bsv_sdk::primitives` | Base58 encoding |
-| `from_base58_check` | `bsv_sdk::primitives` | Base58Check decoding |
+**Encoding** (`bsv_sdk::primitives`):
+- `from_hex` / `to_hex` - Hex encoding
+- `from_base64` / `to_base64` - Base64 encoding
+- `from_base58` / `to_base58` - Base58 encoding
+- `from_base58_check` - Base58Check decoding
 
 ## Adding New Tests
 
-When adding cross-SDK compatibility tests:
+**Cross-SDK Compatibility Tests:**
+1. Add JSON vectors to `tests/vectors/`
+2. Use `#[serde(rename_all = "camelCase")]` for deserialization
+3. Load with `fs::read_to_string` or `include_str!`
+4. Include vector index in panic messages: `panic!("Vector {}: {}", i, e)`
 
-1. Add test vectors to `tests/vectors/` in JSON format
-2. Use `serde` for deserialization with `#[serde(rename_all = "camelCase")]` for camelCase JSON
-3. Load vectors using `fs::read_to_string` or `include_str!`
-4. Iterate over vectors with index for clear error messages
-5. Use `unwrap_or_else` with panic messages that include vector index
+**Transaction Module Tests:**
+1. Add const vectors to `tests/transaction/vectors/`
+2. Use `#[cfg(feature = "transaction")]` gate
+3. Use `#[tokio::test]` for async tests
+4. Implement `Broadcaster` with `#[async_trait(?Send)]`
 
-Example pattern:
-```rust
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct MyVector {
-    input_data: String,
-    expected_output: String,
-}
-
-#[test]
-fn test_my_vectors() {
-    let data = fs::read_to_string("tests/vectors/my_vectors.json")
-        .expect("Failed to read vectors");
-    let vectors: Vec<MyVector> = serde_json::from_str(&data)
-        .expect("Failed to parse vectors");
-
-    for (i, v) in vectors.iter().enumerate() {
-        let result = compute_something(&v.input_data)
-            .unwrap_or_else(|e| panic!("Vector {}: {}", i, e));
-
-        assert_eq!(result, v.expected_output, "Vector {}: mismatch", i);
-    }
-}
-```
-
-When adding transaction module tests:
-
-1. Add Rust const vectors to `tests/transaction/vectors/` modules
-2. Use `#[cfg(feature = "transaction")]` for tests requiring the transaction feature
-3. Export vectors from module using `pub const` declarations
-4. Wrap async tests with `#[tokio::test]` for ChainTracker and Broadcaster tests
-5. Implement the `Broadcaster` trait with `#[async_trait(?Send)]` for test broadcasters
+**DRBG Tests:**
+1. `HmacDrbg::new()` for SHA-256, `new_with_hash(..., true)` for SHA-512
+2. Generate multiple times if required by vector specification
+3. Expected output is from the final generate call
 
 ## Notes on BSV vs BTC Script Vectors
 
@@ -466,3 +394,4 @@ The BSV-specific `spend_valid.json` vectors should all pass.
 - `src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
 - `src/script/CLAUDE.md` - Script module documentation
 - `src/transaction/CLAUDE.md` - Transaction module documentation
+- `tests/transaction/vectors/CLAUDE.md` - Transaction test vectors documentation

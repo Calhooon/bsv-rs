@@ -1,5 +1,5 @@
 # BSV Wallet Module
-> BRC-42 Key Derivation, ProtoWallet, and Validation for the BSV Rust SDK
+> BRC-42 Key Derivation, ProtoWallet, WalletClient, and Validation for the BSV Rust SDK
 
 ## Overview
 
@@ -9,17 +9,65 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with feature-gated exports | ~180 |
-| `types.rs` | Core wallet type definitions | ~800 |
+| `mod.rs` | Module root with feature-gated exports | ~200 |
+| `types.rs` | Core wallet type definitions | ~790 |
 | `key_deriver.rs` | BRC-42 key derivation | ~640 |
 | `cached_key_deriver.rs` | LRU-cached key deriver | ~490 |
-| `proto_wallet.rs` | ProtoWallet cryptographic operations | ~700 |
-| `validation.rs` | Input validation helpers | ~850 |
-| `CLAUDE.md` | This documentation file | ~600 |
+| `proto_wallet.rs` | ProtoWallet cryptographic operations | ~1000 |
+| `validation.rs` | Input validation helpers | ~1170 |
+| `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~385 |
+| `substrates/` | Transport substrate implementations | - |
+| `wire/` | Wire protocol encoding/decoding | - |
+
+## Submodules
+
+### substrates/
+Transport layer implementations for wallet communication:
+- `http_json.rs` - JSON over HTTP substrate
+- `http_wire.rs` - Binary wire protocol over HTTP substrate
+- See `substrates/CLAUDE.md` for details
+
+### wire/
+Wire protocol implementation:
+- `encoding.rs` - Binary encoding/decoding
+- `calls.rs` - Call frame definitions
+- `transceiver.rs` - Protocol transceiver
+- `processor.rs` - Request/response processing
+- See `wire/CLAUDE.md` for details
 
 ## Key Exports
 
-### ProtoWallet (NEW - W-Beta)
+### WalletClient (requires `http` feature)
+
+```rust
+pub enum SubstrateType {
+    Auto,           // Auto-detect available substrate
+    JsonApi,        // HTTP JSON API (port 3321)
+    Cicada,         // Wire protocol over HTTP (port 3301)
+    SecureJsonApi,  // Secure local JSON API (port 2121)
+}
+
+pub struct WalletClient {
+    pub fn new(substrate_type: SubstrateType, originator: Option<String>) -> Self
+    pub fn substrate_type(&self) -> SubstrateType
+    pub fn originator(&self) -> Option<&str>
+
+    // Async methods (require http feature)
+    pub async fn get_public_key(&mut self, args: GetPublicKeyArgs) -> Result<GetPublicKeyResult>
+    pub async fn encrypt(&mut self, args: EncryptArgs) -> Result<EncryptResult>
+    pub async fn decrypt(&mut self, args: DecryptArgs) -> Result<DecryptResult>
+    pub async fn create_hmac(&mut self, args: CreateHmacArgs) -> Result<CreateHmacResult>
+    pub async fn verify_hmac(&mut self, args: VerifyHmacArgs) -> Result<VerifyHmacResult>
+    pub async fn create_signature(&mut self, args: CreateSignatureArgs) -> Result<CreateSignatureResult>
+    pub async fn verify_signature(&mut self, args: VerifySignatureArgs) -> Result<VerifySignatureResult>
+    pub async fn is_authenticated(&mut self) -> Result<bool>
+    pub async fn get_height(&mut self) -> Result<u64>
+    pub async fn get_network(&mut self) -> Result<Network>
+    pub async fn get_version(&mut self) -> Result<String>
+}
+```
+
+### ProtoWallet
 
 ```rust
 pub struct ProtoWallet {
@@ -28,21 +76,22 @@ pub struct ProtoWallet {
     pub fn anyone() -> Self
 
     // Identity
+    pub fn key_deriver(&self) -> &CachedKeyDeriver
     pub fn identity_key(&self) -> PublicKey
     pub fn identity_key_hex(&self) -> String
 
     // Public Key
     pub fn get_public_key(&self, args: GetPublicKeyArgs) -> Result<GetPublicKeyResult>
 
-    // Encryption
+    // Encryption (AES-256-GCM)
     pub fn encrypt(&self, args: EncryptArgs) -> Result<EncryptResult>
     pub fn decrypt(&self, args: DecryptArgs) -> Result<DecryptResult>
 
-    // HMAC
+    // HMAC (SHA-256)
     pub fn create_hmac(&self, args: CreateHmacArgs) -> Result<CreateHmacResult>
     pub fn verify_hmac(&self, args: VerifyHmacArgs) -> Result<VerifyHmacResult>
 
-    // Signatures
+    // Signatures (ECDSA)
     pub fn create_signature(&self, args: CreateSignatureArgs) -> Result<CreateSignatureResult>
     pub fn verify_signature(&self, args: VerifySignatureArgs) -> Result<VerifySignatureResult>
 
@@ -55,7 +104,7 @@ pub struct ProtoWallet {
 #### ProtoWallet Capabilities
 
 ProtoWallet can:
-- Derive keys using BRC-42
+- Derive keys using BRC-42 (via internal CachedKeyDeriver)
 - Create and verify ECDSA signatures
 - Encrypt and decrypt data (AES-256-GCM via derived symmetric keys)
 - Create and verify HMACs (SHA-256)
@@ -68,7 +117,7 @@ ProtoWallet does NOT:
 - Manage certificates
 - Store any persistent data
 
-### Validation Module (NEW - W-Beta)
+### Validation Module
 
 The `validation` module provides 40+ validation functions for wallet API inputs:
 
@@ -78,11 +127,13 @@ pub fn validate_satoshis(value: u64, name: &str, min: Option<u64>) -> Result<u64
 
 // Integer validation
 pub fn validate_integer(value: Option<i64>, name: &str, default: Option<i64>, min: Option<i64>, max: Option<i64>) -> Result<i64>
+pub fn validate_integer_u32(value: Option<u32>, name: &str, default: Option<u32>, min: Option<u32>, max: Option<u32>) -> Result<u32>
 
 // String validation
 pub fn validate_string_length<'a>(s: &'a str, name: &str, min: Option<usize>, max: Option<usize>) -> Result<&'a str>
 pub fn validate_hex_string(s: &str, name: &str, min_chars: Option<usize>, max_chars: Option<usize>) -> Result<String>
 pub fn validate_base64_string(s: &str, name: &str, min_decoded_bytes: Option<usize>, max_decoded_bytes: Option<usize>) -> Result<String>
+pub fn is_hex_string(s: &str) -> bool
 
 // Identifier validation
 pub fn validate_basket(s: &str) -> Result<String>  // 1-300 bytes, trimmed, lowercase
@@ -99,6 +150,15 @@ pub fn validate_create_action_args(args: &CreateActionArgsRaw) -> Result<ValidCr
 pub fn validate_create_action_input(input: &CreateActionInputRaw) -> Result<ValidCreateActionInput>
 pub fn validate_create_action_output(output: &CreateActionOutputRaw) -> Result<ValidCreateActionOutput>
 pub fn validate_create_action_options(options: Option<&CreateActionOptionsRaw>) -> Result<ValidCreateActionOptions>
+pub fn validate_sign_action_spend(spend: &SignActionSpendRaw) -> Result<ValidSignActionSpend>
+
+// Certificate validation
+pub fn validate_certificate_fields(fields: &HashMap<String, String>) -> Result<HashMap<String, String>>
+pub fn validate_keyring_revealer(kr: &str, name: &str) -> Result<String>
+
+// Protocol validation
+pub fn validate_protocol_tuple(tuple: (u8, &str)) -> Result<Protocol>
+pub fn validate_query_mode(mode: Option<&str>, name: &str) -> Result<QueryMode>
 ```
 
 ### Security Level
@@ -212,6 +272,27 @@ pub trait KeyDeriverApi {
 
 ## Usage
 
+### WalletClient (Remote Wallet Communication)
+
+```rust
+use bsv_sdk::wallet::{WalletClient, SubstrateType, GetPublicKeyArgs};
+
+// Create client with auto-detection
+let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.example.com".into()));
+
+// Get wallet version (triggers auto-detection)
+let version = client.get_version().await?;
+
+// Get identity key
+let result = client.get_public_key(GetPublicKeyArgs {
+    identity_key: true,
+    protocol_id: None,
+    key_id: None,
+    counterparty: None,
+    for_self: None,
+}).await?;
+```
+
 ### ProtoWallet - Signing and Verification
 
 ```rust
@@ -272,40 +353,13 @@ let decrypted = bob.decrypt(DecryptArgs {
 assert_eq!(decrypted.plaintext, message);
 ```
 
-### ProtoWallet - HMAC Operations
-
-```rust
-use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateHmacArgs, VerifyHmacArgs};
-use bsv_sdk::primitives::PrivateKey;
-
-let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-let protocol = Protocol::new(SecurityLevel::App, "hmac example");
-
-// Create HMAC
-let hmac_result = wallet.create_hmac(CreateHmacArgs {
-    data: b"data to authenticate".to_vec(),
-    protocol_id: protocol.clone(),
-    key_id: "hmac-1".to_string(),
-    counterparty: None,
-}).unwrap();
-
-// Verify HMAC
-wallet.verify_hmac(VerifyHmacArgs {
-    data: b"data to authenticate".to_vec(),
-    hmac: hmac_result.hmac,
-    protocol_id: protocol,
-    key_id: "hmac-1".to_string(),
-    counterparty: None,
-}).unwrap();
-```
-
 ### Input Validation
 
 ```rust
 use bsv_sdk::wallet::validation::{
     validate_satoshis, validate_hex_string, validate_basket,
     parse_wallet_outpoint, validate_create_action_args,
-    CreateActionArgsRaw, CreateActionInputRaw, CreateActionOutputRaw,
+    CreateActionArgsRaw,
 };
 
 // Validate satoshi amount with minimum
@@ -318,20 +372,7 @@ let txid = validate_hex_string("deadbeef...", "txid", Some(64), Some(64)).unwrap
 let basket = validate_basket("  MY-BASKET  ").unwrap(); // Returns "my-basket"
 
 // Parse outpoint string
-let outpoint = parse_wallet_outpoint("txid_hex.0").unwrap();
-
-// Validate full action arguments
-let args = CreateActionArgsRaw {
-    description: "Payment for services".to_string(),
-    inputs: vec![],
-    outputs: vec![],
-    lock_time: None,
-    version: None,
-    labels: vec![],
-    options: None,
-    input_beef: None,
-};
-let validated = validate_create_action_args(&args).unwrap();
+let outpoint = parse_wallet_outpoint("0000...0001.5").unwrap();
 ```
 
 ### Basic Key Derivation
@@ -350,28 +391,6 @@ let pub_key = deriver.derive_public_key(&protocol, key_id, &Counterparty::Self_,
 let priv_key = deriver.derive_private_key(&protocol, key_id, &Counterparty::Self_)?;
 
 assert_eq!(priv_key.public_key().to_compressed(), pub_key.to_compressed());
-```
-
-### Two-Party Key Derivation
-
-```rust
-use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-use bsv_sdk::primitives::PrivateKey;
-
-let alice = KeyDeriver::new(Some(PrivateKey::random()));
-let bob = KeyDeriver::new(Some(PrivateKey::random()));
-
-let protocol = Protocol::new(SecurityLevel::App, "payment system");
-let key_id = "payment-456";
-
-// Bob derives his private key using Alice as counterparty
-let alice_cp = Counterparty::Other(alice.identity_key());
-let bob_priv = bob.derive_private_key(&protocol, key_id, &alice_cp)?;
-
-// Alice can derive Bob's public key
-let bob_pub = bob.derive_public_key(&protocol, key_id, &alice_cp, true)?;
-
-assert_eq!(bob_priv.public_key().to_compressed(), bob_pub.to_compressed());
 ```
 
 ## BRC-42 Key Derivation Algorithm
@@ -395,6 +414,17 @@ The invoice number is computed as: `{security_level}-{protocol_name}-{key_id}`
 
 Example: `1-my application-invoice-12345`
 
+## Feature Flags
+
+```toml
+[dependencies]
+# Basic wallet functionality (key derivation, ProtoWallet, validation)
+bsv-sdk = { version = "0.2", features = ["wallet"] }
+
+# With remote wallet communication (WalletClient)
+bsv-sdk = { version = "0.2", features = ["wallet", "http"] }
+```
+
 ## Error Types
 
 | Error | Description |
@@ -404,22 +434,10 @@ Example: `1-my application-invoice-12345`
 | `ProtocolValidationError(String)` | Invalid protocol name or parameters |
 | `InvalidCounterparty(String)` | Invalid counterparty specification |
 
-## Test Coverage
-
-The wallet module has comprehensive test coverage:
-
-- **KeyDeriver**: 19 tests (creation, derivation, two-party, validation)
-- **CachedKeyDeriver**: 13 tests (caching, LRU eviction, trait impl)
-- **ProtoWallet**: 12 tests (signatures, encryption, HMAC, linkage)
-- **Validation**: 14 tests (satoshis, strings, hex, base64, outpoints, identifiers)
-- **Types**: 10 tests (security levels, protocols, outpoints)
-
-**Total: 58 unit tests**
-
 ## Cross-SDK Compatibility
 
 This module maintains API compatibility with:
-- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `KeyDeriver`, `CachedKeyDeriver`, `ProtoWallet`
+- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `KeyDeriver`, `CachedKeyDeriver`, `ProtoWallet`, `WalletClient`
 - [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `KeyDeriver`, `ProtoWallet`
 
 Key derivation uses the same algorithm (BRC-42) and produces identical keys across all SDK implementations.
@@ -433,6 +451,7 @@ Key derivation uses the same algorithm (BRC-42) and produces identical keys acro
 | `Counterparty` (string\|PublicKey) | `Counterparty` (enum) |
 | `KeyDeriverApi` (interface) | `KeyDeriverApi` (trait) |
 | `ProtoWallet` (class) | `ProtoWallet` (struct) |
+| `Wallet` (class) | `WalletClient` (struct) |
 | `validationHelpers.ts` functions | `validation` module functions |
 
 ## Dependencies
@@ -451,14 +470,15 @@ Run wallet module tests:
 cargo test wallet --features wallet
 ```
 
-Run all tests including wallet:
+Run with HTTP client tests:
 
 ```bash
-cargo test --all-features
+cargo test wallet --features wallet,http
 ```
 
 ## Related Documentation
 
+- `substrates/CLAUDE.md` - Transport substrate implementations
+- `wire/CLAUDE.md` - Wire protocol encoding/decoding
 - `../primitives/CLAUDE.md` - Cryptographic primitives
 - `../primitives/ec/CLAUDE.md` - EC operations and BRC-42 derivation
-- `../CLAUDE.md` - Project root documentation

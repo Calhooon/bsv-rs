@@ -18,8 +18,8 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 |-----------|--------------|--------|-------------|
 | `primitives/` | `primitives` | Complete | Cryptographic primitives (hash, EC, encoding) |
 | `script/` | `script` | Complete | Script parsing and execution |
-| `transaction/` | `transaction` | In Progress | Transaction construction, signing, BEEF format |
-| `wallet/` | `wallet` | Planned | HD wallets and key management |
+| `transaction/` | `transaction` | Complete | Transaction construction, signing, BEEF format |
+| `wallet/` | `wallet` | Complete | BRC-42 key derivation and wallet types |
 
 ## Key Exports
 
@@ -66,6 +66,16 @@ pub mod wallet;
 - `TransactionOutput` - Transaction output with value and locking script
 - `ChangeDistribution` - Strategy for distributing change across outputs
 
+**Convenience re-exports** from `wallet`:
+- `KeyDeriver` - BRC-42 key derivation implementation
+- `KeyDeriverApi` - Trait for key derivation operations
+- `CachedKeyDeriver` - Key deriver with LRU caching for performance
+- `CacheConfig` - Configuration for key derivation cache
+- `ProtoWallet` - Protocol-aware wallet wrapper
+- `Protocol` - BRC-43 protocol identifier (security level, protocol ID, key ID)
+- `Counterparty` - Key derivation counterparty (self or public key)
+- `SecurityLevel` - Security level for key derivation (0, 1, or 2)
+
 ### Error Types (`error.rs`)
 
 The `Error` enum provides unified error handling across all modules. It uses `thiserror` for derive-based error messages and implements `Clone`, `PartialEq`, and `Eq` for easy comparison in tests:
@@ -107,6 +117,14 @@ The `Error` enum provides unified error handling across all modules. It uses `th
 | `MerklePathError` | `(String)` | Invalid or malformed Merkle path |
 | `BeefError` | `(String)` | BEEF format parsing or validation error |
 | `FeeModelError` | `(String)` | Fee calculation or model error |
+
+**Wallet errors** (requires `wallet` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `WalletError` | `(String)` | General wallet-related error |
+| `KeyDerivationError` | `(String)` | BRC-42 key derivation failed |
+| `ProtocolValidationError` | `(String)` | Invalid BRC-43 protocol specification |
+| `InvalidCounterparty` | `(String)` | Invalid counterparty for key derivation |
 
 **Result alias**:
 ```rust
@@ -234,4 +252,5 @@ thiserror = "1.0"
 - `primitives/ec/CLAUDE.md` - Elliptic curve submodule
 - `script/CLAUDE.md` - Script module documentation
 - `transaction/CLAUDE.md` - Transaction module documentation
+- `wallet/CLAUDE.md` - Wallet module documentation
 - `../CLAUDE.md` - Project root documentation

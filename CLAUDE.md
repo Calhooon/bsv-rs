@@ -10,9 +10,9 @@ This is the Rust implementation of the BSV SDK, providing a complete toolkit for
 | Module | Status | Description |
 |--------|--------|-------------|
 | `primitives` | Complete | Cryptographic primitives (hash, EC, encoding) |
-| `script` | In Progress | Script parsing, execution, templates |
-| `transaction` | Planned | Transaction construction and signing |
-| `wallet` | Planned | HD wallets, BIP-32/39/44 |
+| `script` | Complete | Script parsing, execution, templates |
+| `transaction` | Complete | Transaction construction and signing |
+| `wallet` | Complete | BRC-42 key derivation, ProtoWallet, WalletClient |
 
 ## Files
 
@@ -23,8 +23,8 @@ This is the Rust implementation of the BSV SDK, providing a complete toolkit for
 | `src/error.rs` | Unified error types |
 | `src/primitives/` | Cryptographic primitives module |
 | `src/script/` | Script module |
-| `src/transaction/` | Transaction module (future) |
-| `src/wallet/` | Wallet module (future) |
+| `src/transaction/` | Transaction module |
+| `src/wallet/` | Wallet module |
 
 ## Feature Flags
 
@@ -35,8 +35,9 @@ primitives = []
 script = ["primitives"]
 transaction = ["script"]
 wallet = ["transaction"]
-full = ["primitives", "script", "transaction", "wallet"]
 wasm = ["getrandom/js"]
+full = ["primitives", "script", "transaction", "wallet"]
+http = ["dep:reqwest"]
 ```
 
 ## Building
@@ -73,6 +74,20 @@ All implementations share test vectors to ensure cross-platform compatibility.
 
 ## Related Documentation
 
-- `src/primitives/CLAUDE.md` - Primitives module documentation
-- `src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
-- `SCRIPT_MIGRATION_PROMPTS.md` - Migration prompts for Script module
+### Module Documentation
+- `src/CLAUDE.md` - Source root and error handling
+- `src/primitives/CLAUDE.md` - Primitives module
+- `src/primitives/ec/CLAUDE.md` - Elliptic curve submodule
+- `src/primitives/bsv/CLAUDE.md` - BSV-specific primitives
+- `src/script/CLAUDE.md` - Script module
+- `src/script/templates/CLAUDE.md` - Script templates
+- `src/transaction/CLAUDE.md` - Transaction module
+- `src/transaction/fee_models/CLAUDE.md` - Fee calculation models
+- `src/transaction/broadcasters/CLAUDE.md` - Transaction broadcasters
+- `src/transaction/chain_trackers/CLAUDE.md` - Chain tracking
+- `src/wallet/CLAUDE.md` - Wallet module
+- `src/wallet/wire/CLAUDE.md` - Wire protocol types
+- `src/wallet/substrates/CLAUDE.md` - Wallet substrates (HTTP, etc.)
+
+### Test Documentation
+- `tests/CLAUDE.md` - Integration tests and cross-SDK vectors

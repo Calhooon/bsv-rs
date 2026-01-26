@@ -3,17 +3,18 @@
 
 ## Overview
 
-This module provides cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation), and P-256 (secp256r1) curve operations for certain authentication scenarios.
+This module provides cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), HMAC-DRBG for deterministic randomness, secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation), and P-256 (secp256r1) curve operations for certain authentication scenarios.
 
 ## Files
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module declarations and re-exports | 34 |
+| `mod.rs` | Module declarations and re-exports | 35 |
 | `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 702 |
-| `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility | 728 |
+| `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility | 972 |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer | 1696 |
-| `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation | 1184 |
+| `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation | 1550 |
+| `drbg.rs` | HMAC-DRBG deterministic random bit generator (RFC 6979) | 201 |
 | `p256.rs` | P-256 (secp256r1) elliptic curve: P256PrivateKey, P256PublicKey, P256Signature | 910 |
 | `ec/` | secp256k1 elliptic curve: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | (subdir) |
 | `bsv/` | BSV-specific operations (sighash, transaction signatures, Schnorr proofs, Shamir secret sharing) | (subdir) |
@@ -145,6 +146,20 @@ pub struct BigNumber {
 **Design Note**: Following the Go SDK approach, this is a minimal compatibility layer wrapping `num-bigint`. It does NOT implement the full bn.js API (no word arrays, reduction contexts, or in-place mutation). It provides what's needed for EC scalar operations and BRC-42 key derivation.
 
 **Trait Implementations**: `From<i64>`, `From<u64>`, `From<i32>`, `From<u32>`, `From<BigInt>`, `Into<BigInt>`, `Default`, `Debug`, `Display`, `PartialOrd`, `Ord`, `Hash`.
+
+### HMAC-DRBG (Deterministic Random Bit Generator)
+```rust
+pub struct HmacDrbg {
+    pub fn new(entropy: &[u8], nonce: &[u8], personalization: &[u8]) -> Self  // SHA-256 DRBG
+    pub fn new_with_hash(entropy: &[u8], nonce: &[u8], personalization: &[u8], use_sha512: bool) -> Self
+    pub fn generate(&mut self, num_bytes: usize) -> Vec<u8>   // Generate random bytes
+    pub fn reseed(&mut self, entropy: &[u8], additional_input: &[u8])  // Reseed with new entropy
+}
+```
+
+**Implementation**: NIST SP 800-90A compliant HMAC-DRBG. Used internally for RFC 6979 deterministic ECDSA signatures. Supports both SHA-256 and SHA-512 as the underlying hash function.
+
+**Security Note**: This is designed for deterministic signature generation and is NOT forward-secure. Do not use as a general-purpose RNG.
 
 ### Elliptic Curve (secp256k1)
 ```rust
