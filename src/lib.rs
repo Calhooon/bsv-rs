@@ -8,8 +8,8 @@
 //! - **HMAC**: HMAC-SHA256 and HMAC-SHA512
 //! - **Key derivation**: PBKDF2-SHA512
 //! - **Symmetric encryption**: AES-256-GCM with BSV SDK compatibility
-//! - **Elliptic curve cryptography**: secp256k1, secp256r1 (Phase 5)
-//! - **BSV-specific**: Transaction signatures, BRC-42 key derivation (Phase 6)
+//! - **Elliptic curve cryptography**: secp256k1 ECDSA, key derivation (BRC-42)
+//! - **BSV-specific**: Transaction signatures (Phase 6)
 //!
 //! ## Example
 //!
@@ -44,20 +44,55 @@
 //! let decrypted = key.decrypt(&ciphertext).expect("decryption failed");
 //! assert_eq!(plaintext, &decrypted[..]);
 //! ```
+//!
+//! ## Elliptic Curve Operations
+//!
+//! ```rust
+//! use bsv_primitives::ec::{PrivateKey, PublicKey, Signature};
+//! use bsv_primitives::hash::sha256;
+//!
+//! // Generate a key pair
+//! let private_key = PrivateKey::random();
+//! let public_key = private_key.public_key();
+//!
+//! // Sign a message
+//! let msg_hash = sha256(b"Hello, BSV!");
+//! let signature = private_key.sign(&msg_hash).unwrap();
+//!
+//! // Verify the signature
+//! assert!(public_key.verify(&msg_hash, &signature));
+//! assert!(signature.is_low_s()); // BIP 62 compliant
+//! ```
+//!
+//! ## BRC-42 Key Derivation
+//!
+//! ```rust
+//! use bsv_primitives::ec::PrivateKey;
+//!
+//! let alice = PrivateKey::random();
+//! let bob = PrivateKey::random();
+//!
+//! // Derive child keys
+//! let alice_child = alice.derive_child(&bob.public_key(), "invoice-123").unwrap();
+//! let bob_derived = alice.public_key().derive_child(&bob, "invoice-123").unwrap();
+//!
+//! // They arrive at the same public key
+//! assert_eq!(alice_child.public_key().to_compressed(), bob_derived.to_compressed());
+//! ```
 
 pub mod bignum;
+pub mod ec;
+pub mod encoding;
 pub mod error;
 pub mod hash;
 pub mod symmetric;
 
 // Placeholder modules for future phases
-pub mod encoding;
-
 pub mod bsv;
-pub mod ec;
 
 // Re-export commonly used items
 pub use bignum::BigNumber;
+pub use ec::{PrivateKey, PublicKey, Signature};
 pub use error::Error;
 pub use hash::{
     hash160, pbkdf2_sha512, ripemd160, sha1, sha256, sha256_hmac, sha256d, sha512, sha512_hmac,

@@ -3,7 +3,7 @@
 
 ## Overview
 
-This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, and arbitrary-precision integers (BigNumber). Elliptic curve and BSV-specific modules are placeholders for future implementation phases.
+This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), and secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation). BSV-specific transaction modules are placeholders for future implementation.
 
 ## Files
 
@@ -15,7 +15,7 @@ This is the source directory for the `bsv-primitives` crate, providing cryptogra
 | `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer |
 | `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation |
-| `ec/` | Placeholder for secp256k1 elliptic curve (Phase 5) |
+| `ec/` | secp256k1 elliptic curve: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 |
 | `bsv/` | Placeholder for BSV-specific operations (Phase 6) |
 
 ## Key Exports
@@ -135,6 +135,70 @@ pub struct BigNumber {
 ```
 
 **Design Note**: Following the Go SDK approach, this is a minimal compatibility layer wrapping `num-bigint`. It does NOT implement the full bn.js API (no word arrays, reduction contexts, or in-place mutation). It provides what's needed for EC scalar operations and BRC-42 key derivation.
+
+### Elliptic Curve (secp256k1)
+```rust
+pub struct PrivateKey {
+    pub fn random() -> Self                                      // Generate random key
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self>              // From 32 bytes
+    pub fn from_hex(hex: &str) -> Result<Self>                   // From hex string
+    pub fn from_wif(wif: &str) -> Result<Self>                   // From WIF (Base58Check)
+    pub fn public_key(&self) -> PublicKey                        // Derive public key
+    pub fn sign(&self, msg_hash: &[u8; 32]) -> Result<Signature> // ECDSA sign (low-S)
+    pub fn to_bytes(&self) -> [u8; 32]                           // Export as bytes
+    pub fn to_hex(&self) -> String                               // Export as hex
+    pub fn to_wif(&self) -> String                               // Export as WIF (mainnet)
+    pub fn to_wif_with_prefix(&self, prefix: u8) -> String       // Export as WIF (custom)
+    pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<PublicKey>  // ECDH
+    pub fn derive_child(&self, other_pubkey: &PublicKey, invoice_number: &str) -> Result<PrivateKey>  // BRC-42
+}
+
+pub struct PublicKey {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self>              // From 33 or 65 bytes
+    pub fn from_hex(hex: &str) -> Result<Self>                   // From hex string
+    pub fn from_private_key(private_key: &PrivateKey) -> Self    // From private key
+    pub fn verify(&self, msg_hash: &[u8; 32], signature: &Signature) -> bool  // Verify signature
+    pub fn to_compressed(&self) -> [u8; 33]                      // 02/03 prefix + X
+    pub fn to_uncompressed(&self) -> [u8; 65]                    // 04 prefix + X + Y
+    pub fn to_hex(&self) -> String                               // Compressed hex
+    pub fn to_hex_uncompressed(&self) -> String                  // Uncompressed hex
+    pub fn x(&self) -> [u8; 32]                                  // X coordinate
+    pub fn y(&self) -> [u8; 32]                                  // Y coordinate
+    pub fn y_is_even(&self) -> bool                              // Check Y parity
+    pub fn hash160(&self) -> [u8; 20]                            // RIPEMD160(SHA256(compressed))
+    pub fn to_address(&self) -> String                           // P2PKH mainnet address
+    pub fn to_address_with_prefix(&self, version: u8) -> String  // P2PKH custom prefix
+    pub fn derive_child(&self, other_privkey: &PrivateKey, invoice_number: &str) -> Result<PublicKey>  // BRC-42
+    pub fn mul_scalar(&self, scalar: &[u8; 32]) -> Result<PublicKey>  // Scalar multiplication
+    pub fn derive_shared_secret(&self, other_privkey: &PrivateKey) -> Result<PublicKey>  // ECDH
+}
+
+pub struct Signature {
+    pub fn new(r: [u8; 32], s: [u8; 32]) -> Self                 // Create from R, S
+    pub fn from_der(der: &[u8]) -> Result<Self>                  // Parse DER format
+    pub fn from_compact(data: &[u8; 64]) -> Result<Self>         // Parse 64-byte format
+    pub fn r(&self) -> &[u8; 32]                                 // R component
+    pub fn s(&self) -> &[u8; 32]                                 // S component
+    pub fn to_der(&self) -> Vec<u8>                              // Encode as DER (low-S)
+    pub fn to_compact(&self) -> [u8; 64]                         // Encode as 64 bytes
+    pub fn is_low_s(&self) -> bool                               // Check BIP 62 compliance
+    pub fn to_low_s(&self) -> Signature                          // Convert to low-S form
+    pub fn verify(&self, msg_hash: &[u8; 32], public_key: &PublicKey) -> bool  // Verify
+}
+
+// ECDSA functions
+pub fn sign(msg_hash: &[u8; 32], private_key: &PrivateKey) -> Result<Signature>
+pub fn verify(msg_hash: &[u8; 32], signature: &Signature, public_key: &PublicKey) -> bool
+pub fn recover_public_key(msg_hash: &[u8; 32], signature: &Signature, recovery_id: u8) -> Result<PublicKey>
+```
+
+**Key Features:**
+- RFC 6979 deterministic nonce generation for signing
+- BIP 62 compliant (low-S signatures enforced)
+- BRC-42 key derivation for hierarchical key generation
+- ECDH for shared secret computation
+- WIF encoding/decoding for wallet import/export
+- Address generation (P2PKH, Base58Check encoded)
 
 ### Binary Reader/Writer
 ```rust

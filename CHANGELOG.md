@@ -392,6 +392,137 @@ Minimal `BigNumber` implementation in `src/bignum.rs` following the Go SDK appro
 
 ---
 
+### Phase 5: Elliptic Curve Operations (secp256k1)
+
+#### Added
+Full secp256k1 elliptic curve implementation in `src/ec/`:
+
+**PrivateKey (`src/ec/private_key.rs`):**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `random` | `fn random() -> Self` | Generate cryptographically random private key |
+| `from_bytes` | `fn from_bytes(bytes: &[u8]) -> Result<Self>` | Create from 32 bytes |
+| `from_hex` | `fn from_hex(hex: &str) -> Result<Self>` | Parse from hex string |
+| `from_wif` | `fn from_wif(wif: &str) -> Result<Self>` | Parse from WIF (Base58Check) |
+| `public_key` | `fn public_key(&self) -> PublicKey` | Derive corresponding public key |
+| `sign` | `fn sign(&self, msg_hash: &[u8; 32]) -> Result<Signature>` | ECDSA sign with low-S |
+| `to_bytes` | `fn to_bytes(&self) -> [u8; 32]` | Export as 32 bytes |
+| `to_hex` | `fn to_hex(&self) -> String` | Export as hex string |
+| `to_wif` | `fn to_wif(&self) -> String` | Export as WIF (mainnet, compressed) |
+| `to_wif_with_prefix` | `fn to_wif_with_prefix(&self, prefix: u8) -> String` | Export as WIF with custom prefix |
+| `derive_shared_secret` | `fn derive_shared_secret(&self, other: &PublicKey) -> Result<PublicKey>` | ECDH shared secret |
+| `derive_child` | `fn derive_child(&self, other: &PublicKey, invoice: &str) -> Result<PrivateKey>` | BRC-42 child key derivation |
+
+**PublicKey (`src/ec/public_key.rs`):**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `from_bytes` | `fn from_bytes(bytes: &[u8]) -> Result<Self>` | Parse from 33 or 65 bytes |
+| `from_hex` | `fn from_hex(hex: &str) -> Result<Self>` | Parse from hex string |
+| `from_private_key` | `fn from_private_key(priv_key: &PrivateKey) -> Self` | Derive from private key |
+| `verify` | `fn verify(&self, msg_hash: &[u8; 32], sig: &Signature) -> bool` | Verify ECDSA signature |
+| `to_compressed` | `fn to_compressed(&self) -> [u8; 33]` | Export as 02/03 + X |
+| `to_uncompressed` | `fn to_uncompressed(&self) -> [u8; 65]` | Export as 04 + X + Y |
+| `to_hex` | `fn to_hex(&self) -> String` | Export compressed as hex |
+| `to_hex_uncompressed` | `fn to_hex_uncompressed(&self) -> String` | Export uncompressed as hex |
+| `x` | `fn x(&self) -> [u8; 32]` | Get X coordinate |
+| `y` | `fn y(&self) -> [u8; 32]` | Get Y coordinate |
+| `y_is_even` | `fn y_is_even(&self) -> bool` | Check Y coordinate parity |
+| `hash160` | `fn hash160(&self) -> [u8; 20]` | RIPEMD160(SHA256(compressed)) |
+| `to_address` | `fn to_address(&self) -> String` | P2PKH mainnet address |
+| `to_address_with_prefix` | `fn to_address_with_prefix(&self, version: u8) -> String` | P2PKH custom prefix |
+| `derive_child` | `fn derive_child(&self, other: &PrivateKey, invoice: &str) -> Result<PublicKey>` | BRC-42 child key derivation |
+| `mul_scalar` | `fn mul_scalar(&self, scalar: &[u8; 32]) -> Result<PublicKey>` | EC scalar multiplication |
+| `derive_shared_secret` | `fn derive_shared_secret(&self, other: &PrivateKey) -> Result<PublicKey>` | ECDH shared secret |
+
+**Signature (`src/ec/signature.rs`):**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `new` | `fn new(r: [u8; 32], s: [u8; 32]) -> Self` | Create from R, S components |
+| `from_der` | `fn from_der(der: &[u8]) -> Result<Self>` | Parse DER encoding |
+| `from_compact` | `fn from_compact(data: &[u8; 64]) -> Result<Self>` | Parse 64-byte R||S format |
+| `r` | `fn r(&self) -> &[u8; 32]` | Get R component |
+| `s` | `fn s(&self) -> &[u8; 32]` | Get S component |
+| `to_der` | `fn to_der(&self) -> Vec<u8>` | Encode as DER (low-S) |
+| `to_compact` | `fn to_compact(&self) -> [u8; 64]` | Encode as 64 bytes R||S |
+| `is_low_s` | `fn is_low_s(&self) -> bool` | Check BIP 62 compliance |
+| `to_low_s` | `fn to_low_s(&self) -> Signature` | Convert to low-S form |
+| `verify` | `fn verify(&self, msg_hash: &[u8; 32], pubkey: &PublicKey) -> bool` | Verify signature |
+
+**ECDSA Functions (`src/ec/ecdsa.rs`):**
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `sign` | `fn sign(msg_hash: &[u8; 32], key: &PrivateKey) -> Result<Signature>` | Sign message hash |
+| `verify` | `fn verify(msg_hash: &[u8; 32], sig: &Signature, key: &PublicKey) -> bool` | Verify signature |
+| `recover_public_key` | `fn recover_public_key(msg_hash: &[u8; 32], sig: &Signature, id: u8) -> Result<PublicKey>` | Recover public key |
+| `calculate_recovery_id` | `fn calculate_recovery_id(msg_hash: &[u8; 32], sig: &Signature, key: &PublicKey) -> Result<u8>` | Find recovery ID |
+
+#### Implementation Details
+
+**ECDSA Signing:**
+- Uses RFC 6979 deterministic nonce generation
+- Automatically produces low-S signatures (BIP 62 compliant)
+- Deterministic: same key + message always produces same signature
+
+**WIF Encoding:**
+- Mainnet compressed: `0x80` prefix + 32-byte key + `0x01` suffix + 4-byte checksum
+- Testnet compressed: `0xef` prefix + 32-byte key + `0x01` suffix + 4-byte checksum
+
+**BRC-42 Key Derivation:**
+```
+1. Compute shared secret: ECDH(sender_pub, recipient_priv) -> point
+2. Compute HMAC: HMAC-SHA256(key=compressed_point, data=invoice_number)
+3. For private key: new_key = (old_key + hmac) mod n
+4. For public key: new_point = old_point + G * hmac
+```
+
+**Address Generation:**
+```
+1. Compress public key -> 33 bytes
+2. SHA256(compressed) -> 32 bytes
+3. RIPEMD160(sha256_result) -> 20 bytes (pubkey hash)
+4. Base58Check(version || pubkey_hash) -> address
+```
+
+#### Tests
+76 tests covering all EC functionality:
+
+| Test Category | Count | Description |
+|--------------|-------|-------------|
+| PrivateKey | 12 | Random, from_bytes, from_hex, from_wif, to_wif, sign/verify |
+| PublicKey | 15 | Compression, coordinates, hash160, address, from_private_key |
+| Signature | 10 | DER encoding, compact format, low-S conversion |
+| ECDSA | 8 | Sign, verify, deterministic, public key recovery |
+| BRC-42 Private | 5 | Test vectors from `tests/vectors/brc42_private.json` |
+| BRC-42 Public | 5 | Test vectors from `tests/vectors/brc42_public.json` |
+| ECDH | 4 | Shared secret symmetry, known vectors |
+| WIF | 6 | Known vectors, roundtrip encoding |
+| Addresses | 4 | Known vectors (generator point address) |
+| Edge cases | 7 | Invalid inputs, error handling |
+
+#### Cross-SDK Compatibility
+- **BRC-42 vectors**: All 5 private key and 5 public key derivation vectors pass
+- **WIF encoding**: Compatible with TypeScript and Go SDKs
+- **Address generation**: Produces identical addresses to reference implementations
+- **ECDSA signatures**: Deterministic and compatible with k256 crate
+
+#### Error Types Added
+New error variants in `src/error.rs`:
+- `InvalidSignature(String)` - Invalid signature format or parameters
+- `InvalidPublicKey(String)` - Invalid public key encoding or point
+- `InvalidPrivateKey(String)` - Invalid private key (zero, out of range)
+- `PointAtInfinity` - EC operation resulted in point at infinity
+
+#### Documentation
+- Comprehensive rustdoc comments on all public types and methods
+- Module-level documentation with usage examples
+- 27 doc-tests that serve as executable examples
+
+---
+
 ## Reference Implementations
 
 This library is being ported from two reference implementations:
@@ -412,7 +543,7 @@ Test vectors are shared across all three implementations to ensure byte-for-byte
 | Phase 2 | Symmetric Encryption (AES-GCM) | ✅ Complete |
 | Phase 3 | Encoding Utilities | ✅ Complete |
 | Phase 4 | BigNumber Compatibility | ✅ Complete |
-| Phase 5 | Elliptic Curve Operations | 🔲 Pending |
+| Phase 5 | Elliptic Curve Operations | ✅ Complete |
 | Phase 6 | BSV-Specific Components | 🔲 Pending |
 | Phase 7 | P-256 Support | 🔲 Pending |
 | Phase 8 | Integration Testing | 🔲 Pending |
