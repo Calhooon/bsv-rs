@@ -243,10 +243,7 @@ mod tests {
         // R should match (S may be converted to low-S)
         assert_eq!(decoded.r(), tx_sig.r());
         // Scope should match (only low byte)
-        assert_eq!(
-            decoded.scope() & 0xff,
-            SIGHASH_ALL | SIGHASH_FORKID
-        );
+        assert_eq!(decoded.scope() & 0xff, SIGHASH_ALL | SIGHASH_FORKID);
     }
 
     #[test]
