@@ -9,6 +9,7 @@
 //! - **Key derivation**: PBKDF2-SHA512
 //! - **Symmetric encryption**: AES-256-GCM with BSV SDK compatibility
 //! - **Elliptic curve cryptography**: secp256k1 ECDSA, key derivation (BRC-42)
+//! - **P-256 (secp256r1)**: NIST P-256 curve for certain authentication scenarios
 //! - **BSV-specific**: Transaction signatures (Phase 6)
 //!
 //! ## Example
@@ -45,7 +46,7 @@
 //! assert_eq!(plaintext, &decrypted[..]);
 //! ```
 //!
-//! ## Elliptic Curve Operations
+//! ## Elliptic Curve Operations (secp256k1)
 //!
 //! ```rust
 //! use bsv_primitives::ec::{PrivateKey, PublicKey, Signature};
@@ -62,6 +63,23 @@
 //! // Verify the signature
 //! assert!(public_key.verify(&msg_hash, &signature));
 //! assert!(signature.is_low_s()); // BIP 62 compliant
+//! ```
+//!
+//! ## P-256 (secp256r1) Operations
+//!
+//! ```rust
+//! use bsv_primitives::p256::{P256PrivateKey, P256PublicKey};
+//!
+//! // Generate a P-256 key pair
+//! let private_key = P256PrivateKey::random();
+//! let public_key = private_key.public_key();
+//!
+//! // Sign a message (hashed with SHA-256)
+//! let message = b"Hello, P-256!";
+//! let signature = private_key.sign(message);
+//!
+//! // Verify the signature
+//! assert!(public_key.verify(message, &signature));
 //! ```
 //!
 //! ## BRC-42 Key Derivation
@@ -85,6 +103,7 @@ pub mod ec;
 pub mod encoding;
 pub mod error;
 pub mod hash;
+pub mod p256;
 pub mod symmetric;
 
 // Placeholder modules for future phases

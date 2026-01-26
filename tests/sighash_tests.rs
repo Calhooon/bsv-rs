@@ -112,7 +112,10 @@ fn test_sighash_vectors() {
         }
     }
 
-    println!("Results: {} passed, {} failed out of {}", passed, failed, total);
+    println!(
+        "Results: {} passed, {} failed out of {}",
+        passed, failed, total
+    );
 
     if !first_failures.is_empty() {
         println!("\nFirst {} failures:", first_failures.len());
@@ -138,7 +141,10 @@ fn test_sighash_first_vector_detailed() {
     println!("  raw_tx: {}...", &v.raw_tx[..60.min(v.raw_tx.len())]);
     println!("  script: {}", v.script);
     println!("  input_index: {}", v.input_index);
-    println!("  hash_type: {} (0x{:08x})", v.hash_type, v.hash_type as u32);
+    println!(
+        "  hash_type: {} (0x{:08x})",
+        v.hash_type, v.hash_type as u32
+    );
     println!("  expected_hash: {}", v.expected_hash);
 
     let raw_tx = hex::decode(&v.raw_tx).expect("Failed to decode raw_tx");

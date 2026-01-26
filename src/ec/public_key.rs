@@ -282,6 +282,62 @@ impl PublicKey {
         self.mul_scalar(&scalar_bytes)
     }
 
+    /// Creates a public key by multiplying the generator point G by a scalar.
+    ///
+    /// Returns: `G * scalar`
+    ///
+    /// # Arguments
+    ///
+    /// * `scalar_bytes` - The 32-byte scalar value (big-endian)
+    ///
+    /// # Returns
+    ///
+    /// The resulting public key, or an error if the result would be the point at infinity
+    pub fn from_scalar_mul_generator(scalar_bytes: &[u8; 32]) -> Result<PublicKey> {
+        let scalar = bytes_to_scalar(scalar_bytes)?;
+
+        let generator = ProjectivePoint::GENERATOR;
+        let result = generator * scalar;
+
+        let affine = result.to_affine();
+        if affine.is_identity().into() {
+            return Err(Error::PointAtInfinity);
+        }
+
+        let pubkey = K256PublicKey::from_affine(affine)
+            .map_err(|_| Error::InvalidPublicKey("Result is invalid".to_string()))?;
+
+        Ok(Self { inner: pubkey })
+    }
+
+    /// Adds another public key to this one (elliptic curve point addition).
+    ///
+    /// Returns: `this + other`
+    ///
+    /// # Arguments
+    ///
+    /// * `other` - The public key to add
+    ///
+    /// # Returns
+    ///
+    /// The resulting public key, or an error if the result would be the point at infinity
+    pub fn add(&self, other: &PublicKey) -> Result<PublicKey> {
+        let self_point = ProjectivePoint::from(*self.inner.as_affine());
+        let other_point = ProjectivePoint::from(*other.inner.as_affine());
+
+        let result = self_point + other_point;
+
+        let affine = result.to_affine();
+        if affine.is_identity().into() {
+            return Err(Error::PointAtInfinity);
+        }
+
+        let pubkey = K256PublicKey::from_affine(affine)
+            .map_err(|_| Error::InvalidPublicKey("Result is invalid".to_string()))?;
+
+        Ok(Self { inner: pubkey })
+    }
+
     /// Creates a public key from an internal k256 public key.
     pub(crate) fn from_k256(inner: K256PublicKey) -> Self {
         Self { inner }
@@ -432,5 +488,87 @@ mod tests {
         let result = pubkey.mul_scalar(&scalar).unwrap();
         // Should be 2G
         assert!(result.to_hex() != pubkey.to_hex());
+    }
+
+    #[test]
+    fn test_from_scalar_mul_generator() {
+        // Scalar = 1 should give us the generator point
+        let mut scalar_one = [0u8; 32];
+        scalar_one[31] = 1;
+
+        let result = PublicKey::from_scalar_mul_generator(&scalar_one).unwrap();
+
+        // Generator point G
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let g = PublicKey::from_hex(g_hex).unwrap();
+
+        assert_eq!(result.to_compressed(), g.to_compressed());
+    }
+
+    #[test]
+    fn test_from_scalar_mul_generator_matches_private_key() {
+        // Creating a public key from scalar multiplication of G should match
+        // creating it from a private key with the same bytes
+        use crate::PrivateKey;
+
+        let priv_key = PrivateKey::random();
+        let pub_key = priv_key.public_key();
+
+        let scalar_bytes = priv_key.to_bytes();
+        let from_scalar = PublicKey::from_scalar_mul_generator(&scalar_bytes).unwrap();
+
+        assert_eq!(pub_key.to_compressed(), from_scalar.to_compressed());
+    }
+
+    #[test]
+    fn test_public_key_add() {
+        // Test that G + G = 2G
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let g = PublicKey::from_hex(g_hex).unwrap();
+
+        // Compute G + G
+        let two_g_from_add = g.add(&g).unwrap();
+
+        // Compute 2*G directly
+        let mut scalar_two = [0u8; 32];
+        scalar_two[31] = 2;
+        let two_g_from_mul = PublicKey::from_scalar_mul_generator(&scalar_two).unwrap();
+
+        assert_eq!(
+            two_g_from_add.to_compressed(),
+            two_g_from_mul.to_compressed()
+        );
+    }
+
+    #[test]
+    fn test_public_key_add_associative() {
+        // Test that (A + B) + C = A + (B + C)
+        use crate::PrivateKey;
+
+        let a = PrivateKey::random().public_key();
+        let b = PrivateKey::random().public_key();
+        let c = PrivateKey::random().public_key();
+
+        let ab = a.add(&b).unwrap();
+        let ab_c = ab.add(&c).unwrap();
+
+        let bc = b.add(&c).unwrap();
+        let a_bc = a.add(&bc).unwrap();
+
+        assert_eq!(ab_c.to_compressed(), a_bc.to_compressed());
+    }
+
+    #[test]
+    fn test_public_key_add_commutative() {
+        // Test that A + B = B + A
+        use crate::PrivateKey;
+
+        let a = PrivateKey::random().public_key();
+        let b = PrivateKey::random().public_key();
+
+        let a_plus_b = a.add(&b).unwrap();
+        let b_plus_a = b.add(&a).unwrap();
+
+        assert_eq!(a_plus_b.to_compressed(), b_plus_a.to_compressed());
     }
 }

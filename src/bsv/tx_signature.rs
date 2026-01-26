@@ -225,13 +225,17 @@ mod tests {
         r_arr.copy_from_slice(&r);
         s_arr.copy_from_slice(&s);
 
-        let tx_sig = TransactionSignature::from_components(r_arr, s_arr, SIGHASH_ALL | SIGHASH_FORKID);
+        let tx_sig =
+            TransactionSignature::from_components(r_arr, s_arr, SIGHASH_ALL | SIGHASH_FORKID);
 
         // Encode to checksig format
         let encoded = tx_sig.to_checksig_format();
 
         // Last byte should be the scope
-        assert_eq!(encoded.last().unwrap(), &((SIGHASH_ALL | SIGHASH_FORKID) as u8));
+        assert_eq!(
+            encoded.last().unwrap(),
+            &((SIGHASH_ALL | SIGHASH_FORKID) as u8)
+        );
 
         // Decode back
         let decoded = TransactionSignature::from_checksig_format(&encoded).unwrap();
@@ -239,7 +243,10 @@ mod tests {
         // R should match (S may be converted to low-S)
         assert_eq!(decoded.r(), tx_sig.r());
         // Scope should match (only low byte)
-        assert_eq!(decoded.scope() & 0xff, (SIGHASH_ALL | SIGHASH_FORKID) as u32);
+        assert_eq!(
+            decoded.scope() & 0xff,
+            (SIGHASH_ALL | SIGHASH_FORKID) as u32
+        );
     }
 
     #[test]

@@ -3,7 +3,7 @@
 
 ## Overview
 
-This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), and secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation). BSV-specific transaction modules are placeholders for future implementation.
+This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation), and P-256 (secp256r1) curve operations for certain authentication scenarios.
 
 ## Files
 
@@ -16,7 +16,8 @@ This is the source directory for the `bsv-primitives` crate, providing cryptogra
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer |
 | `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation |
 | `ec/` | secp256k1 elliptic curve: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 |
-| `bsv/` | Placeholder for BSV-specific operations (Phase 6) |
+| `p256.rs` | P-256 (secp256r1) elliptic curve: P256PrivateKey, P256PublicKey, P256Signature |
+| `bsv/` | BSV-specific operations (sighash, transaction signatures, Schnorr proofs, Shamir secret sharing) |
 
 ## Key Exports
 
@@ -99,6 +100,7 @@ pub struct BigNumber {
     pub fn to_bytes_be(&self, len: usize) -> Vec<u8> // Padded to length
     pub fn to_bytes_le(&self, len: usize) -> Vec<u8>
     pub fn to_bytes_be_min(&self) -> Vec<u8>         // Minimum bytes
+    pub fn to_bytes_le_min(&self) -> Vec<u8>         // Minimum bytes (LE)
 
     // Arithmetic
     pub fn add(&self, other: &BigNumber) -> BigNumber
@@ -131,6 +133,10 @@ pub struct BigNumber {
     // Curve constants
     pub fn secp256k1_order() -> BigNumber   // Curve order n
     pub fn secp256k1_prime() -> BigNumber   // Field prime p
+
+    // Primitive conversion
+    pub fn to_i64(&self) -> Option<i64>
+    pub fn to_u64(&self) -> Option<u64>
 }
 ```
 
@@ -199,6 +205,62 @@ pub fn recover_public_key(msg_hash: &[u8; 32], signature: &Signature, recovery_i
 - ECDH for shared secret computation
 - WIF encoding/decoding for wallet import/export
 - Address generation (P2PKH, Base58Check encoded)
+
+### P-256 (secp256r1) Elliptic Curve
+
+The P-256 (NIST secp256r1) curve, used for certain authentication scenarios:
+
+```rust
+pub struct P256PrivateKey {
+    pub fn random() -> Self                                      // Generate random key
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self>              // From 32 bytes
+    pub fn from_hex(hex: &str) -> Result<Self>                   // From hex string
+    pub fn public_key(&self) -> P256PublicKey                    // Derive public key
+    pub fn sign(&self, message: &[u8]) -> P256Signature          // Sign message (SHA-256 hash)
+    pub fn sign_hash(&self, hash: &[u8; 32]) -> P256Signature    // Sign pre-hashed data
+    pub fn to_bytes(&self) -> [u8; 32]                           // Export as bytes
+    pub fn to_hex(&self) -> String                               // Export as hex
+}
+
+pub struct P256PublicKey {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self>              // From 33 or 65 bytes
+    pub fn from_hex(hex: &str) -> Result<Self>                   // From hex string
+    pub fn verify(&self, message: &[u8], signature: &P256Signature) -> bool  // Verify (SHA-256 hash)
+    pub fn verify_hash(&self, hash: &[u8; 32], signature: &P256Signature) -> bool  // Verify pre-hashed
+    pub fn to_compressed(&self) -> [u8; 33]                      // 02/03 prefix + X
+    pub fn to_uncompressed(&self) -> [u8; 65]                    // 04 prefix + X + Y
+    pub fn to_hex(&self) -> String                               // Compressed hex
+    pub fn to_hex_uncompressed(&self) -> String                  // Uncompressed hex
+    pub fn x(&self) -> [u8; 32]                                  // X coordinate
+    pub fn y(&self) -> [u8; 32]                                  // Y coordinate
+}
+
+pub struct P256Signature {
+    pub fn new(r: [u8; 32], s: [u8; 32]) -> Result<Self>         // Create from R, S
+    pub fn from_der(der: &[u8]) -> Result<Self>                  // Parse DER format
+    pub fn from_compact(data: &[u8; 64]) -> Result<Self>         // Parse 64-byte format
+    pub fn from_compact_slice(data: &[u8]) -> Result<Self>       // Parse from slice
+    pub fn r(&self) -> [u8; 32]                                  // R component
+    pub fn s(&self) -> [u8; 32]                                  // S component
+    pub fn to_der(&self) -> Vec<u8>                              // Encode as DER (low-S)
+    pub fn to_compact(&self) -> [u8; 64]                         // Encode as 64 bytes
+    pub fn is_low_s(&self) -> bool                               // Check low-S compliance
+    pub fn to_low_s(&self) -> P256Signature                      // Convert to low-S form
+}
+
+// Convenience functions
+pub fn generate_private_key_hex() -> String
+pub fn public_key_from_private(private_key_hex: &str) -> Result<P256PublicKey>
+pub fn sign(message: &[u8], private_key_hex: &str) -> Result<P256Signature>
+pub fn verify(message: &[u8], signature: &P256Signature, public_key: &P256PublicKey) -> bool
+```
+
+**Key Features:**
+- RFC 6979 deterministic nonce generation
+- Low-S signature normalization (S <= n/2)
+- Automatic SHA-256 hashing for message signing/verification
+- Prehash variants for direct hash signing
+- Compressed and uncompressed point encoding
 
 ### Binary Reader/Writer
 ```rust
@@ -358,6 +420,97 @@ let m = BigNumber::from_i64(7);
 let inv = a.mod_inverse(&m).unwrap();  // 3 * 5 = 1 (mod 7)
 ```
 
+### Elliptic Curve Operations
+
+```rust
+use bsv_primitives::{PrivateKey, PublicKey, Signature};
+use bsv_primitives::hash::sha256;
+
+// Generate a random key pair
+let private_key = PrivateKey::random();
+let public_key = private_key.public_key();
+
+// Sign a message
+let msg_hash = sha256(b"Hello, BSV!");
+let signature = private_key.sign(&msg_hash)?;
+
+// Verify the signature
+assert!(public_key.verify(&msg_hash, &signature));
+assert!(signature.is_low_s()); // BIP 62 compliant
+
+// WIF import/export
+let wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn";
+let key = PrivateKey::from_wif(wif)?;
+assert_eq!(key.to_wif(), wif);
+
+// Address generation
+let address = public_key.to_address(); // P2PKH mainnet address
+```
+
+### BRC-42 Key Derivation
+
+```rust
+use bsv_primitives::PrivateKey;
+
+let alice = PrivateKey::random();
+let bob = PrivateKey::random();
+
+// Derive child keys
+let alice_child = alice.derive_child(&bob.public_key(), "invoice-123")?;
+let bob_derived = alice.public_key().derive_child(&bob, "invoice-123")?;
+
+// They arrive at the same public key
+assert_eq!(alice_child.public_key().to_compressed(), bob_derived.to_compressed());
+```
+
+### Shamir Secret Sharing
+
+```rust
+use bsv_primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_primitives::ec::PrivateKey;
+
+// Generate a random private key
+let key = PrivateKey::random();
+
+// Split into 5 shares with threshold of 3
+let shares = split_private_key(&key, 3, 5)?;
+
+// Export to backup format for storage
+let backup = shares.to_backup_format();
+// Each share: "base58(x).base58(y).threshold.integrity"
+
+// Later, recover from any 3 shares
+let subset = KeyShares::from_backup_format(&backup[0..3])?;
+let recovered = subset.recover_private_key()?;
+
+assert_eq!(key.to_bytes(), recovered.to_bytes());
+```
+
+### P-256 Operations
+
+```rust
+use bsv_primitives::p256::{P256PrivateKey, P256PublicKey, P256Signature};
+
+// Generate a P-256 key pair
+let private_key = P256PrivateKey::random();
+let public_key = private_key.public_key();
+
+// Sign a message (automatically hashed with SHA-256)
+let message = b"Hello, P-256!";
+let signature = private_key.sign(message);
+
+// Verify the signature
+assert!(public_key.verify(message, &signature));
+
+// Signature encoding
+let der = signature.to_der();       // Variable-length DER format
+let compact = signature.to_compact(); // Fixed 64-byte format
+
+// Parse signatures
+let sig_from_der = P256Signature::from_der(&der)?;
+let sig_from_compact = P256Signature::from_compact(&compact)?;
+```
+
 ### Binary Serialization
 
 ```rust
@@ -405,18 +558,25 @@ The Reader/Writer support Bitcoin's variable-length integer format:
 - Test vectors are in `tests/vectors/symmetric_key.json`
 - Cross-SDK compatibility verified against TypeScript and Go implementations
 
-## Placeholder Modules
+## Module Structure
 
-### ec/ (Phase 5)
-Reserved for elliptic curve operations:
-- `private_key.rs` - secp256k1 private key operations
-- `public_key.rs` - secp256k1 public key operations
-- `signature.rs` - ECDSA signature operations
+### ec/ (Elliptic Curve Operations)
+Fully implemented secp256k1 operations:
+- `mod.rs` - Module re-exports
+- `private_key.rs` - PrivateKey: random generation, WIF, signing, BRC-42 derivation
+- `public_key.rs` - PublicKey: verification, addresses, BRC-42 derivation
+- `signature.rs` - Signature: DER/compact encoding, low-S normalization
+- `ecdsa.rs` - Core ECDSA sign/verify/recover functions
 
-### bsv/ (Phase 6)
-Reserved for BSV-specific operations:
-- `key_derivation.rs` - BRC-42 key derivation
-- `tx_signature.rs` - Transaction signature operations
+### bsv/ (BSV-Specific Operations)
+Transaction signatures, sighash computation, Schnorr proofs, and Shamir secret sharing:
+- `mod.rs` - Module re-exports
+- `sighash.rs` - BIP-143 style sighash computation with 499 test vectors
+- `tx_signature.rs` - Transaction signature encoding/decoding
+- `schnorr.rs` - Schnorr zero-knowledge proofs for ECDH verification
+- `polynomial.rs` - Polynomial operations for Shamir secret sharing
+- `shamir.rs` - Shamir secret sharing for private key backup/recovery
+- `key_derivation.rs` - Placeholder for additional key derivation utilities
 
 ## Dependencies
 
@@ -424,10 +584,12 @@ Key external crates used:
 - `sha1`, `sha2`, `ripemd` - Hash algorithms
 - `hmac`, `pbkdf2` - HMAC and key derivation
 - `aes-gcm` - AES-256-GCM encryption
+- `k256` - secp256k1 elliptic curve operations
+- `p256` - P-256 (secp256r1) elliptic curve operations
 - `num-bigint`, `num-traits`, `num-integer` - Arbitrary-precision integers
 - `hex`, `bs58`, `base64` - Encoding
 - `thiserror` - Error handling
-- `getrandom` - Cryptographically secure random bytes
+- `rand`, `getrandom` - Cryptographically secure random bytes
 - `subtle` - Constant-time comparison
 - `serde`, `serde_json` - Test vector deserialization
 
