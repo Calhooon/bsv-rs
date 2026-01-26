@@ -232,7 +232,9 @@ mod tests {
 
     #[test]
     fn test_roundtrip() {
-        let test_values = [0i64, 1, -1, 127, -127, 128, -128, 255, -255, 256, -256, 1000, -1000];
+        let test_values = [
+            0i64, 1, -1, 127, -127, 128, -128, 255, -255, 256, -256, 1000, -1000,
+        ];
 
         for val in test_values {
             let bn = BigNumber::from_i64(val);

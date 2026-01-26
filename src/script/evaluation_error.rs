@@ -98,7 +98,10 @@ impl ScriptEvaluationError {
 
     /// Formats the if stack as a boolean list.
     fn format_if_stack(if_stack: &[bool]) -> String {
-        let items: Vec<&str> = if_stack.iter().map(|&b| if b { "true" } else { "false" }).collect();
+        let items: Vec<&str> = if_stack
+            .iter()
+            .map(|&b| if b { "true" } else { "false" })
+            .collect();
         format!("[{}]", items.join(", "))
     }
 }
@@ -161,8 +164,14 @@ mod tests {
 
     #[test]
     fn test_execution_context_display() {
-        assert_eq!(format!("{}", ExecutionContext::UnlockingScript), "UnlockingScript");
-        assert_eq!(format!("{}", ExecutionContext::LockingScript), "LockingScript");
+        assert_eq!(
+            format!("{}", ExecutionContext::UnlockingScript),
+            "UnlockingScript"
+        );
+        assert_eq!(
+            format!("{}", ExecutionContext::LockingScript),
+            "LockingScript"
+        );
     }
 
     #[test]

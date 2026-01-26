@@ -231,9 +231,7 @@ impl Spend {
         }
 
         if !ScriptNum::cast_to_bool(&self.stack[self.stack.len() - 1]) {
-            return Err(self.error(
-                "The top stack element must be truthy after script evaluation.",
-            ));
+            return Err(self.error("The top stack element must be truthy after script evaluation."));
         }
 
         Ok(true)
@@ -390,15 +388,13 @@ impl Spend {
             }
             OP_VERIFY => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_VERIFY requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_VERIFY requires at least one item to be on the stack.")
+                    );
                 }
                 let f_value = ScriptNum::cast_to_bool(self.stack_top()?);
                 if !f_value {
-                    return Err(self.error(
-                        "OP_VERIFY requires the top stack value to be truthy.",
-                    ));
+                    return Err(self.error("OP_VERIFY requires the top stack value to be truthy."));
                 }
                 self.pop_stack()?;
             }
@@ -421,9 +417,9 @@ impl Spend {
             // ================================================================
             OP_TOALTSTACK => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_TOALTSTACK requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_TOALTSTACK requires at least one item to be on the stack.")
+                    );
                 }
                 let item = self.pop_stack()?;
                 self.push_alt_stack(item)?;
@@ -439,18 +435,18 @@ impl Spend {
             }
             OP_2DROP => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_2DROP requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_2DROP requires at least two items to be on the stack.")
+                    );
                 }
                 self.pop_stack()?;
                 self.pop_stack()?;
             }
             OP_2DUP => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_2DUP requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_2DUP requires at least two items to be on the stack.")
+                    );
                 }
                 let buf1 = self.stack_top_n(2)?.to_vec();
                 let buf2 = self.stack_top()?.to_vec();
@@ -459,9 +455,9 @@ impl Spend {
             }
             OP_3DUP => {
                 if self.stack.len() < 3 {
-                    return Err(self.error(
-                        "OP_3DUP requires at least three items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_3DUP requires at least three items to be on the stack.")
+                    );
                 }
                 let buf1 = self.stack_top_n(3)?.to_vec();
                 let buf2 = self.stack_top_n(2)?.to_vec();
@@ -472,9 +468,9 @@ impl Spend {
             }
             OP_2OVER => {
                 if self.stack.len() < 4 {
-                    return Err(self.error(
-                        "OP_2OVER requires at least four items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_2OVER requires at least four items to be on the stack.")
+                    );
                 }
                 let buf1 = self.stack_top_n(4)?.to_vec();
                 let buf2 = self.stack_top_n(3)?.to_vec();
@@ -483,9 +479,9 @@ impl Spend {
             }
             OP_2ROT => {
                 if self.stack.len() < 6 {
-                    return Err(self.error(
-                        "OP_2ROT requires at least six items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_2ROT requires at least six items to be on the stack.")
+                    );
                 }
                 let x6 = self.pop_stack()?;
                 let x5 = self.pop_stack()?;
@@ -502,9 +498,9 @@ impl Spend {
             }
             OP_2SWAP => {
                 if self.stack.len() < 4 {
-                    return Err(self.error(
-                        "OP_2SWAP requires at least four items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_2SWAP requires at least four items to be on the stack.")
+                    );
                 }
                 let x4 = self.pop_stack()?;
                 let x3 = self.pop_stack()?;
@@ -517,9 +513,9 @@ impl Spend {
             }
             OP_IFDUP => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_IFDUP requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_IFDUP requires at least one item to be on the stack.")
+                    );
                 }
                 let top = self.stack_top()?.to_vec();
                 if ScriptNum::cast_to_bool(&top) {
@@ -532,26 +528,24 @@ impl Spend {
             }
             OP_DROP => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_DROP requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_DROP requires at least one item to be on the stack.")
+                    );
                 }
                 self.pop_stack()?;
             }
             OP_DUP => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_DUP requires at least one item to be on the stack.",
-                    ));
+                    return Err(self.error("OP_DUP requires at least one item to be on the stack."));
                 }
                 let top = self.stack_top()?.to_vec();
                 self.push_stack(top)?;
             }
             OP_NIP => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_NIP requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_NIP requires at least two items to be on the stack.")
+                    );
                 }
                 let top = self.pop_stack()?;
                 self.pop_stack()?;
@@ -559,9 +553,9 @@ impl Spend {
             }
             OP_OVER => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_OVER requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_OVER requires at least two items to be on the stack.")
+                    );
                 }
                 let second = self.stack_top_n(2)?.to_vec();
                 self.push_stack(second)?;
@@ -600,9 +594,9 @@ impl Spend {
             }
             OP_ROT => {
                 if self.stack.len() < 3 {
-                    return Err(self.error(
-                        "OP_ROT requires at least three items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_ROT requires at least three items to be on the stack.")
+                    );
                 }
                 let x3 = self.pop_stack()?;
                 let x2 = self.pop_stack()?;
@@ -613,9 +607,9 @@ impl Spend {
             }
             OP_SWAP => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_SWAP requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_SWAP requires at least two items to be on the stack.")
+                    );
                 }
                 let x2 = self.pop_stack()?;
                 let x1 = self.pop_stack()?;
@@ -624,9 +618,9 @@ impl Spend {
             }
             OP_TUCK => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_TUCK requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_TUCK requires at least two items to be on the stack.")
+                    );
                 }
                 let top = self.stack_top()?.to_vec();
                 self.ensure_stack_mem(top.len())?;
@@ -636,9 +630,9 @@ impl Spend {
             }
             OP_SIZE => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_SIZE requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_SIZE requires at least one item to be on the stack.")
+                    );
                 }
                 let size = self.stack_top()?.len();
                 let bn = BigNumber::from_u64(size as u64);
@@ -650,9 +644,9 @@ impl Spend {
             // ================================================================
             OP_CAT => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_CAT requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_CAT requires at least two items to be on the stack.")
+                    );
                 }
                 let buf2 = self.pop_stack()?;
                 let buf1 = self.pop_stack()?;
@@ -668,9 +662,9 @@ impl Spend {
             }
             OP_SPLIT => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_SPLIT requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_SPLIT requires at least two items to be on the stack.")
+                    );
                 }
                 let pos_bytes = self.pop_stack()?;
                 let data = self.pop_stack()?;
@@ -693,9 +687,9 @@ impl Spend {
             }
             OP_NUM2BIN => {
                 if self.stack.len() < 2 {
-                    return Err(self.error(
-                        "OP_NUM2BIN requires at least two items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_NUM2BIN requires at least two items to be on the stack.")
+                    );
                 }
                 let size_bytes = self.pop_stack()?;
                 let size_bn = ScriptNum::from_bytes(&size_bytes, REQUIRE_MINIMAL_PUSH)
@@ -743,16 +737,16 @@ impl Spend {
             }
             OP_BIN2NUM => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_BIN2NUM requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_BIN2NUM requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let result = ScriptNum::minimally_encode(&buf);
                 if !ScriptNum::is_minimally_encoded(&result) {
-                    return Err(self.error(
-                        "OP_BIN2NUM requires that the resulting number is valid.",
-                    ));
+                    return Err(
+                        self.error("OP_BIN2NUM requires that the resulting number is valid.")
+                    );
                 }
                 self.push_stack(result)?;
             }
@@ -762,9 +756,9 @@ impl Spend {
             // ================================================================
             OP_INVERT => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_INVERT requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_INVERT requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let result: Vec<u8> = buf.iter().map(|&b| !b).collect();
@@ -893,9 +887,22 @@ impl Spend {
                 };
                 self.push_stack(ScriptNum::to_bytes(&bn))?;
             }
-            OP_ADD | OP_SUB | OP_MUL | OP_DIV | OP_MOD | OP_BOOLAND | OP_BOOLOR | OP_NUMEQUAL
-            | OP_NUMEQUALVERIFY | OP_NUMNOTEQUAL | OP_LESSTHAN | OP_GREATERTHAN
-            | OP_LESSTHANOREQUAL | OP_GREATERTHANOREQUAL | OP_MIN | OP_MAX => {
+            OP_ADD
+            | OP_SUB
+            | OP_MUL
+            | OP_DIV
+            | OP_MOD
+            | OP_BOOLAND
+            | OP_BOOLOR
+            | OP_NUMEQUAL
+            | OP_NUMEQUALVERIFY
+            | OP_NUMNOTEQUAL
+            | OP_LESSTHAN
+            | OP_GREATERTHAN
+            | OP_LESSTHANOREQUAL
+            | OP_GREATERTHANOREQUAL
+            | OP_MIN
+            | OP_MAX => {
                 if self.stack.len() < 2 {
                     return Err(self.error(&format!(
                         "{} requires at least two items to be on the stack.",
@@ -1002,18 +1009,17 @@ impl Spend {
 
                 if opcode == OP_NUMEQUALVERIFY {
                     if !ScriptNum::cast_to_bool(self.stack_top()?) {
-                        return Err(self.error(
-                            "OP_NUMEQUALVERIFY requires the top stack item to be truthy.",
-                        ));
+                        return Err(self
+                            .error("OP_NUMEQUALVERIFY requires the top stack item to be truthy."));
                     }
                     self.pop_stack()?;
                 }
             }
             OP_WITHIN => {
                 if self.stack.len() < 3 {
-                    return Err(self.error(
-                        "OP_WITHIN requires at least three items to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_WITHIN requires at least three items to be on the stack.")
+                    );
                 }
                 let max_bytes = self.pop_stack()?;
                 let min_bytes = self.pop_stack()?;
@@ -1034,9 +1040,9 @@ impl Spend {
             // ================================================================
             OP_RIPEMD160 => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_RIPEMD160 requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_RIPEMD160 requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let hash = ripemd160(&buf);
@@ -1044,9 +1050,9 @@ impl Spend {
             }
             OP_SHA1 => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_SHA1 requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_SHA1 requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let hash = sha1(&buf);
@@ -1054,9 +1060,9 @@ impl Spend {
             }
             OP_SHA256 => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_SHA256 requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_SHA256 requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let hash = sha256(&buf);
@@ -1064,9 +1070,9 @@ impl Spend {
             }
             OP_HASH160 => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_HASH160 requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_HASH160 requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let hash = hash160(&buf);
@@ -1074,9 +1080,9 @@ impl Spend {
             }
             OP_HASH256 => {
                 if self.stack.is_empty() {
-                    return Err(self.error(
-                        "OP_HASH256 requires at least one item to be on the stack.",
-                    ));
+                    return Err(
+                        self.error("OP_HASH256 requires at least one item to be on the stack.")
+                    );
                 }
                 let buf = self.pop_stack()?;
                 let hash = sha256d(&buf);
@@ -1351,9 +1357,7 @@ impl Spend {
         }
 
         if pubkey.len() < 33 {
-            return Err(self.error(
-                "The public key is too short, it must be at least 33 bytes.",
-            ));
+            return Err(self.error("The public key is too short, it must be at least 33 bytes."));
         }
 
         if pubkey[0] == 0x04 {
