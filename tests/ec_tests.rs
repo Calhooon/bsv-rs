@@ -47,8 +47,9 @@ fn test_brc42_private_derivation() {
             .unwrap_or_else(|e| panic!("Vector {}: Failed to parse sender public key: {}", i, e));
 
         // Parse recipient's private key
-        let recipient_priv = PrivateKey::from_hex(&v.recipient_private_key)
-            .unwrap_or_else(|e| panic!("Vector {}: Failed to parse recipient private key: {}", i, e));
+        let recipient_priv = PrivateKey::from_hex(&v.recipient_private_key).unwrap_or_else(|e| {
+            panic!("Vector {}: Failed to parse recipient private key: {}", i, e)
+        });
 
         // The invoice number is used directly as a string (the base64 string is the invoice number)
         // This matches the Go SDK behavior where the JSON string is passed directly
@@ -79,8 +80,9 @@ fn test_brc42_public_derivation() {
             .unwrap_or_else(|e| panic!("Vector {}: Failed to parse sender private key: {}", i, e));
 
         // Parse recipient's public key
-        let recipient_pub = PublicKey::from_hex(&v.recipient_public_key)
-            .unwrap_or_else(|e| panic!("Vector {}: Failed to parse recipient public key: {}", i, e));
+        let recipient_pub = PublicKey::from_hex(&v.recipient_public_key).unwrap_or_else(|e| {
+            panic!("Vector {}: Failed to parse recipient public key: {}", i, e)
+        });
 
         // The invoice number is used directly as a string (the base64 string is the invoice number)
         let invoice_str = &v.invoice_number;
@@ -114,7 +116,9 @@ fn test_brc42_consistency() {
         let invoice_str = &v.invoice_number;
 
         // Derive using private key method
-        let derived_priv = recipient_priv.derive_child(&sender_pub, invoice_str).unwrap();
+        let derived_priv = recipient_priv
+            .derive_child(&sender_pub, invoice_str)
+            .unwrap();
 
         // Verify the derived private key matches the expected result
         let derived_pub_from_priv = derived_priv.public_key();
@@ -144,7 +148,12 @@ fn test_wif_roundtrip_known_vectors() {
 
     for (wif, expected_hex) in test_cases {
         let key = PrivateKey::from_wif(wif).expect("Failed to parse WIF");
-        assert_eq!(key.to_hex(), expected_hex, "WIF {} decoded incorrectly", wif);
+        assert_eq!(
+            key.to_hex(),
+            expected_hex,
+            "WIF {} decoded incorrectly",
+            wif
+        );
         assert_eq!(key.to_wif(), wif, "WIF roundtrip failed");
     }
 }
@@ -193,7 +202,11 @@ fn test_address_generation_known_vectors() {
     for (pub_hex, expected_address) in test_cases {
         let pub_key = PublicKey::from_hex(pub_hex).expect("Failed to parse public key");
         let address = pub_key.to_address();
-        assert_eq!(address, expected_address, "Address mismatch for {}", pub_hex);
+        assert_eq!(
+            address, expected_address,
+            "Address mismatch for {}",
+            pub_hex
+        );
     }
 }
 
@@ -254,10 +267,9 @@ fn test_ecdh_shared_secret() {
 #[test]
 fn test_deterministic_signatures() {
     // RFC 6979 should produce deterministic signatures
-    let private_key = PrivateKey::from_hex(
-        "0000000000000000000000000000000000000000000000000000000000000001",
-    )
-    .unwrap();
+    let private_key =
+        PrivateKey::from_hex("0000000000000000000000000000000000000000000000000000000000000001")
+            .unwrap();
 
     let msg_hash = sha256(b"test message");
 

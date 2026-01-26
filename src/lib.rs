@@ -93,12 +93,12 @@ pub mod bsv;
 // Re-export commonly used items
 pub use bignum::BigNumber;
 pub use ec::{PrivateKey, PublicKey, Signature};
+pub use encoding::{
+    from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes, to_base58,
+    to_base58_check, to_base64, to_hex, to_utf8_bytes, Reader, Writer,
+};
 pub use error::Error;
 pub use hash::{
     hash160, pbkdf2_sha512, ripemd160, sha1, sha256, sha256_hmac, sha256d, sha512, sha512_hmac,
 };
 pub use symmetric::SymmetricKey;
-pub use encoding::{
-    from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes, to_base58,
-    to_base58_check, to_base64, to_hex, to_utf8_bytes, Reader, Writer,
-};

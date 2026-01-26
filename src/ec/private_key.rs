@@ -122,7 +122,7 @@ impl PrivateKey {
         if version.len() != 1 || (version[0] != 0x80 && version[0] != 0xef) {
             return Err(Error::InvalidPrivateKey(format!(
                 "Invalid WIF version byte: expected 0x80 or 0xef, got {:02x}",
-                version.get(0).unwrap_or(&0)
+                version.first().unwrap_or(&0)
             )));
         }
 
@@ -146,7 +146,7 @@ impl PrivateKey {
     /// This performs scalar multiplication: `G * private_key`
     pub fn public_key(&self) -> PublicKey {
         let verifying_key = self.inner.public_key();
-        PublicKey::from_k256(verifying_key.into())
+        PublicKey::from_k256(verifying_key)
     }
 
     /// Signs a message hash (32 bytes) and returns a low-S signature.
@@ -179,9 +179,10 @@ impl PrivateKey {
         let signing_key = SigningKey::from(&self.inner);
 
         // Use prehash signing (RFC 6979)
-        let (sig, _recovery_id): (k256::ecdsa::Signature, _) = signing_key
-            .sign_prehash(msg_hash)
-            .map_err(|e| Error::CryptoError(format!("Signing failed: {}", e)))?;
+        let (sig, _recovery_id): (k256::ecdsa::Signature, _) =
+            signing_key
+                .sign_prehash(msg_hash)
+                .map_err(|e| Error::CryptoError(format!("Signing failed: {}", e)))?;
 
         // Convert to our Signature type
         let r_bytes = sig.r().to_bytes();
@@ -298,7 +299,11 @@ impl PrivateKey {
     /// // They get the same public key
     /// assert_eq!(bob_child.public_key().to_compressed(), alice_derived_pub.to_compressed());
     /// ```
-    pub fn derive_child(&self, other_pubkey: &PublicKey, invoice_number: &str) -> Result<PrivateKey> {
+    pub fn derive_child(
+        &self,
+        other_pubkey: &PublicKey,
+        invoice_number: &str,
+    ) -> Result<PrivateKey> {
         // 1. Compute shared secret
         let shared_secret = self.derive_shared_secret(other_pubkey)?;
 
@@ -316,15 +321,12 @@ impl PrivateKey {
 
         // Check that the result is not zero
         if new_scalar.is_zero() {
-            return Err(Error::CryptoError(
-                "Derived key would be zero".to_string(),
-            ));
+            return Err(Error::CryptoError("Derived key would be zero".to_string()));
         }
 
         let new_bytes = new_scalar.to_bytes_be(32);
         PrivateKey::from_bytes(&new_bytes)
     }
-
 }
 
 impl Drop for PrivateKey {
@@ -454,8 +456,9 @@ mod tests {
     fn test_sign_deterministic() {
         // RFC 6979 should produce deterministic signatures
         let key = PrivateKey::from_hex(
-            "0000000000000000000000000000000000000000000000000000000000000001"
-        ).unwrap();
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
 
         let msg_hash = sha256(b"test");
         let sig1 = key.sign(&msg_hash).unwrap();
@@ -484,10 +487,15 @@ mod tests {
         let invoice = "test-invoice-12345";
 
         // Bob derives child private key
-        let bob_child_priv = bob_priv.derive_child(&alice_priv.public_key(), invoice).unwrap();
+        let bob_child_priv = bob_priv
+            .derive_child(&alice_priv.public_key(), invoice)
+            .unwrap();
 
         // Alice derives child public key (for Bob)
-        let bob_child_pub_from_alice = bob_priv.public_key().derive_child(&alice_priv, invoice).unwrap();
+        let bob_child_pub_from_alice = bob_priv
+            .public_key()
+            .derive_child(&alice_priv, invoice)
+            .unwrap();
 
         // They should match
         assert_eq!(

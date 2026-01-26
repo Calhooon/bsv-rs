@@ -77,9 +77,7 @@ impl Signature {
 
         let total_len = der[1] as usize;
         if der.len() < total_len + 2 {
-            return Err(Error::InvalidSignature(
-                "DER length mismatch".to_string(),
-            ));
+            return Err(Error::InvalidSignature("DER length mismatch".to_string()));
         }
 
         let mut pos = 2;
@@ -320,8 +318,8 @@ impl Signature {
 impl std::fmt::Debug for Signature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Signature")
-            .field("r", &hex::encode(&self.r))
-            .field("s", &hex::encode(&self.s))
+            .field("r", &hex::encode(self.r))
+            .field("s", &hex::encode(self.s))
             .finish()
     }
 }

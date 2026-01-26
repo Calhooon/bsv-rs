@@ -196,6 +196,7 @@ impl SymmetricKey {
         getrandom::getrandom(&mut iv)
             .map_err(|e| Error::CryptoError(format!("Failed to generate IV: {}", e)))?;
 
+        #[allow(deprecated)]
         let nonce = Nonce::<U32>::from_slice(&iv);
 
         // Encrypt (aes-gcm appends the auth tag to the ciphertext)
@@ -254,6 +255,7 @@ impl SymmetricKey {
 
         // Extract IV and ciphertext (including tag)
         let (iv, ciphertext_with_tag) = data.split_at(IV_SIZE);
+        #[allow(deprecated)]
         let nonce = Nonce::<U32>::from_slice(iv);
 
         // Decrypt (aes-gcm expects ciphertext || tag format)
@@ -509,7 +511,8 @@ mod tests {
         fn get_31_byte_key() -> SymmetricKey {
             // X coordinate from Go SDK: 6f54f86a07f22ac6934a61e5a2bf0da03ce1cd6e6f978bfd064a37d0e1a111
             // This is 31 bytes, so SymmetricKey::from_bytes will pad with leading zero
-            let key_bytes = hex_decode("6f54f86a07f22ac6934a61e5a2bf0da03ce1cd6e6f978bfd064a37d0e1a111");
+            let key_bytes =
+                hex_decode("6f54f86a07f22ac6934a61e5a2bf0da03ce1cd6e6f978bfd064a37d0e1a111");
             assert_eq!(key_bytes.len(), 31, "Expected 31-byte key");
             SymmetricKey::from_bytes(&key_bytes).unwrap()
         }
@@ -535,8 +538,16 @@ mod tests {
             let key = get_31_byte_key();
 
             // Verify the key was padded correctly (leading zero)
-            assert_eq!(key.as_bytes()[0], 0x00, "31-byte key should be padded with leading zero");
-            assert_eq!(key.as_bytes()[1], 0x6f, "First byte of original key should be at index 1");
+            assert_eq!(
+                key.as_bytes()[0],
+                0x00,
+                "31-byte key should be padded with leading zero"
+            );
+            assert_eq!(
+                key.as_bytes()[1],
+                0x6f,
+                "First byte of original key should be at index 1"
+            );
 
             let ts_ciphertexts = [
                 "c374d70a4623036f1dd7b971dbeeea375630dc1da40e7068f4c4aa03487d3b19de3afb26a29173deccfbb1ece4fee6c92406b25948e6fe9cb53383057cb826d0a20269e290bd",
@@ -546,9 +557,9 @@ mod tests {
 
             for (i, hex_ciphertext) in ts_ciphertexts.iter().enumerate() {
                 let ciphertext = hex_decode(hex_ciphertext);
-                let decrypted = key
-                    .decrypt(&ciphertext)
-                    .expect(&format!("Failed to decrypt TS ciphertext {} with 31-byte key", i));
+                let decrypted = key.decrypt(&ciphertext).unwrap_or_else(|_| {
+                    panic!("Failed to decrypt TS ciphertext {} with 31-byte key", i)
+                });
                 assert_eq!(
                     decrypted, EXPECTED_PLAINTEXT,
                     "TS ciphertext {} decryption mismatch",
@@ -586,9 +597,9 @@ mod tests {
 
             for (i, hex_ciphertext) in ts_ciphertexts.iter().enumerate() {
                 let ciphertext = hex_decode(hex_ciphertext);
-                let decrypted = key
-                    .decrypt(&ciphertext)
-                    .expect(&format!("Failed to decrypt TS ciphertext {} with 32-byte key", i));
+                let decrypted = key.decrypt(&ciphertext).unwrap_or_else(|_| {
+                    panic!("Failed to decrypt TS ciphertext {} with 32-byte key", i)
+                });
                 assert_eq!(
                     decrypted, EXPECTED_PLAINTEXT,
                     "TS ciphertext {} decryption mismatch",
@@ -623,7 +634,8 @@ mod tests {
         #[test]
         fn test_31_byte_key_padding_matches_go() {
             // Verify that our padding produces the same 32-byte key as Go
-            let key_31_bytes = hex_decode("6f54f86a07f22ac6934a61e5a2bf0da03ce1cd6e6f978bfd064a37d0e1a111");
+            let key_31_bytes =
+                hex_decode("6f54f86a07f22ac6934a61e5a2bf0da03ce1cd6e6f978bfd064a37d0e1a111");
             let sym_key = SymmetricKey::from_bytes(&key_31_bytes).unwrap();
 
             // Expected: [0x00, 0x6f, 0x54, 0xf8, ...]
@@ -658,10 +670,10 @@ mod tests {
                 // Decode base64 encoded key and ciphertext
                 let key_bytes = BASE64
                     .decode(&vector.key)
-                    .expect(&format!("Failed to decode key for vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to decode key for vector {}", i));
                 let ciphertext = BASE64
                     .decode(&vector.ciphertext)
-                    .expect(&format!("Failed to decode ciphertext for vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to decode ciphertext for vector {}", i));
 
                 // Plaintext is stored as raw UTF-8 string (not base64 encoded)
                 // Note: Some plaintexts happen to BE base64 strings (random bytes for testing)
@@ -669,12 +681,12 @@ mod tests {
 
                 // Create symmetric key
                 let sym_key = SymmetricKey::from_bytes(&key_bytes)
-                    .expect(&format!("Failed to create key for vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to create key for vector {}", i));
 
                 // Decrypt
                 let decrypted = sym_key
                     .decrypt(&ciphertext)
-                    .expect(&format!("Failed to decrypt vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to decrypt vector {}", i));
 
                 assert_eq!(
                     decrypted, expected_plaintext,
@@ -692,28 +704,24 @@ mod tests {
                 // Decode base64 encoded key
                 let key_bytes = BASE64
                     .decode(&vector.key)
-                    .expect(&format!("Failed to decode key for vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to decode key for vector {}", i));
 
                 // Plaintext is stored as raw UTF-8 string
                 let plaintext = vector.plaintext.as_bytes();
 
                 // Create symmetric key
                 let sym_key = SymmetricKey::from_bytes(&key_bytes)
-                    .expect(&format!("Failed to create key for vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to create key for vector {}", i));
 
                 // Encrypt then decrypt (should work with our implementation)
                 let ciphertext = sym_key
                     .encrypt(plaintext)
-                    .expect(&format!("Failed to encrypt vector {}", i));
-                let decrypted = sym_key
-                    .decrypt(&ciphertext)
-                    .expect(&format!("Failed to decrypt our ciphertext for vector {}", i));
+                    .unwrap_or_else(|_| panic!("Failed to encrypt vector {}", i));
+                let decrypted = sym_key.decrypt(&ciphertext).unwrap_or_else(|_| {
+                    panic!("Failed to decrypt our ciphertext for vector {}", i)
+                });
 
-                assert_eq!(
-                    decrypted, plaintext,
-                    "Vector {} round-trip mismatch",
-                    i
-                );
+                assert_eq!(decrypted, plaintext, "Vector {} round-trip mismatch", i);
             }
         }
     }

@@ -144,7 +144,9 @@ pub const BASE58_ALPHABET: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkm
 /// assert_eq!(to_base58(&bytes), "C3CPq7c8PY");
 /// ```
 pub fn to_base58(data: &[u8]) -> String {
-    bs58::encode(data).with_alphabet(bs58::Alphabet::BITCOIN).into_string()
+    bs58::encode(data)
+        .with_alphabet(bs58::Alphabet::BITCOIN)
+        .into_string()
 }
 
 /// Decodes a Base58 string to bytes using the Bitcoin alphabet.
@@ -627,12 +629,8 @@ impl<'a> Reader<'a> {
     /// It will return an error if the value exceeds usize::MAX on 32-bit platforms.
     pub fn read_var_int_num(&mut self) -> Result<usize> {
         let val = self.read_var_int()?;
-        usize::try_from(val).map_err(|_| {
-            Error::CryptoError(format!(
-                "varint value {} exceeds maximum usize",
-                val
-            ))
-        })
+        usize::try_from(val)
+            .map_err(|_| Error::CryptoError(format!("varint value {} exceeds maximum usize", val)))
     }
 
     // ------------------------------------------------------------------------
@@ -916,24 +914,15 @@ mod tests {
 
     #[test]
     fn test_from_hex_basic() {
-        assert_eq!(
-            from_hex("deadbeef").unwrap(),
-            vec![0xde, 0xad, 0xbe, 0xef]
-        );
+        assert_eq!(from_hex("deadbeef").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
         assert_eq!(from_hex("00010203").unwrap(), vec![0x00, 0x01, 0x02, 0x03]);
         assert_eq!(from_hex("").unwrap(), Vec::<u8>::new());
     }
 
     #[test]
     fn test_from_hex_case_insensitive() {
-        assert_eq!(
-            from_hex("DEADBEEF").unwrap(),
-            vec![0xde, 0xad, 0xbe, 0xef]
-        );
-        assert_eq!(
-            from_hex("DeAdBeEf").unwrap(),
-            vec![0xde, 0xad, 0xbe, 0xef]
-        );
+        assert_eq!(from_hex("DEADBEEF").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
+        assert_eq!(from_hex("DeAdBeEf").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
     }
 
     #[test]
@@ -999,9 +988,14 @@ mod tests {
 
     #[test]
     fn test_base58_roundtrip() {
-        let original = from_hex("02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeb05f9d2").unwrap();
+        let original =
+            from_hex("02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeb05f9d2")
+                .unwrap();
         let encoded = to_base58(&original);
-        assert_eq!(encoded, "6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV");
+        assert_eq!(
+            encoded,
+            "6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"
+        );
         let decoded = from_base58(&encoded).unwrap();
         assert_eq!(decoded, original);
     }
@@ -1034,7 +1028,10 @@ mod tests {
         let private_key =
             from_hex("1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD").unwrap();
         let encoded = to_base58_check(&private_key, &[0x80]);
-        assert_eq!(encoded, "5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn");
+        assert_eq!(
+            encoded,
+            "5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"
+        );
 
         let (version, payload) = from_base58_check(&encoded).unwrap();
         assert_eq!(version, vec![0x80]);
@@ -1045,10 +1042,12 @@ mod tests {
     fn test_base58check_wif_compressed() {
         // WIF with compression flag (33 bytes: 32 + 0x01)
         let private_key_compressed =
-            from_hex("1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD01")
-                .unwrap();
+            from_hex("1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD01").unwrap();
         let encoded = to_base58_check(&private_key_compressed, &[0x80]);
-        assert_eq!(encoded, "KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ");
+        assert_eq!(
+            encoded,
+            "KxFC1jmwwCoACiCAWZ3eXa96mBM6tb3TYzGmf6YwgdGWZgawvrtJ"
+        );
 
         let (version, payload) = from_base58_check(&encoded).unwrap();
         assert_eq!(version, vec![0x80]);
@@ -1058,7 +1057,7 @@ mod tests {
     #[test]
     fn test_base58check_invalid_checksum() {
         // Tamper with a valid address
-        let valid = "1PRTTaJesdNovgne6Ehcdu1fpEdX7913CK";
+        let _valid = "1PRTTaJesdNovgne6Ehcdu1fpEdX7913CK";
         // Change last character
         let invalid = "1PRTTaJesdNovgne6Ehcdu1fpEdX7913CL";
         let result = from_base58_check(invalid);
@@ -1131,14 +1130,8 @@ mod tests {
 
     #[test]
     fn test_from_utf8_bytes_basic() {
-        assert_eq!(
-            from_utf8_bytes(&[72, 101, 108, 108, 111]).unwrap(),
-            "Hello"
-        );
-        assert_eq!(
-            from_utf8_bytes(&[0xE2, 0x82, 0xAC]).unwrap(),
-            "€"
-        );
+        assert_eq!(from_utf8_bytes(&[72, 101, 108, 108, 111]).unwrap(), "Hello");
+        assert_eq!(from_utf8_bytes(&[0xE2, 0x82, 0xAC]).unwrap(), "€");
     }
 
     #[test]
@@ -1547,14 +1540,11 @@ mod tests {
         let actual = from_base58("111z").unwrap();
         assert_eq!(to_hex(&actual), "00000039");
 
-        let actual = to_base58(&from_hex(
-            "02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeb05f9d2",
-        )
-        .unwrap());
-        assert_eq!(
-            actual,
-            "6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV"
+        let actual = to_base58(
+            &from_hex("02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeb05f9d2")
+                .unwrap(),
         );
+        assert_eq!(actual, "6MRyAjQq8ud7hVNYcfnVPJqcVpscN5So8BhtHuGYqET5GDW5CV");
 
         assert_eq!(to_base58(&[0, 0, 0, 4]), "1115");
     }
@@ -1571,10 +1561,13 @@ mod tests {
         assert_eq!(decoded, data);
 
         // Custom prefix test
-        let data = from_hex("1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD")
-            .unwrap();
+        let data =
+            from_hex("1E99423A4ED27608A15A2616A2B0E9E52CED330AC530EDCC32C8FFC6A526AEDD").unwrap();
         let encoded = to_base58_check(&data, &[0x80]);
-        assert_eq!(encoded, "5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn");
+        assert_eq!(
+            encoded,
+            "5J3mBbAH58CpQ3Y5RNJpUKPE62SQ5tfcvU2JpbnkeyhfsYB1Jcn"
+        );
     }
 
     #[test]

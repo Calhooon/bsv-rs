@@ -37,15 +37,12 @@ impl PublicKey {
     ///
     /// The parsed public key, or an error if the format is invalid
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let encoded = EncodedPoint::from_bytes(bytes).map_err(|e| {
-            Error::InvalidPublicKey(format!("Invalid public key encoding: {}", e))
-        })?;
+        let encoded = EncodedPoint::from_bytes(bytes)
+            .map_err(|e| Error::InvalidPublicKey(format!("Invalid public key encoding: {}", e)))?;
 
         let point = AffinePoint::from_encoded_point(&encoded);
         if point.is_none().into() {
-            return Err(Error::InvalidPublicKey(
-                "Point not on curve".to_string(),
-            ));
+            return Err(Error::InvalidPublicKey("Point not on curve".to_string()));
         }
 
         let inner = K256PublicKey::from_affine(point.unwrap())

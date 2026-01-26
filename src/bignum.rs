@@ -588,9 +588,7 @@ impl BigNumber {
             return BigNumber::one();
         }
 
-        let result = self
-            .inner
-            .modpow(&exp.inner, &modulus.inner);
+        let result = self.inner.modpow(&exp.inner, &modulus.inner);
 
         // Ensure non-negative result
         if result.is_negative() {
@@ -1078,14 +1076,12 @@ mod tests {
     #[test]
     fn test_key_derivation_pattern() {
         // Simulate the key derivation math
-        let priv_key = BigNumber::from_hex(
-            "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-        )
-        .unwrap();
-        let hmac_value = BigNumber::from_hex(
-            "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210",
-        )
-        .unwrap();
+        let priv_key =
+            BigNumber::from_hex("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+                .unwrap();
+        let hmac_value =
+            BigNumber::from_hex("fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210")
+                .unwrap();
         let order = BigNumber::secp256k1_order();
 
         let new_key = priv_key.add(&hmac_value).modulo(&order);
@@ -1101,10 +1097,9 @@ mod tests {
     #[test]
     fn test_256_bit_numbers() {
         // Large number (256-bit)
-        let large = BigNumber::from_hex(
-            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-        )
-        .unwrap();
+        let large =
+            BigNumber::from_hex("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff")
+                .unwrap();
         assert_eq!(large.byte_length(), 32);
         assert_eq!(large.bit_length(), 256);
     }
@@ -1154,8 +1149,7 @@ mod tests {
         let n = BigNumber::from_i64(12345);
         assert_eq!(n.to_i64(), Some(12345));
 
-        let large =
-            BigNumber::from_hex("ffffffffffffffffffffffffffffffff").unwrap();
+        let large = BigNumber::from_hex("ffffffffffffffffffffffffffffffff").unwrap();
         assert_eq!(large.to_i64(), None);
     }
 

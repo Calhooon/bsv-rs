@@ -290,8 +290,9 @@ mod tests {
     #[test]
     fn test_deterministic_signing() {
         let key = PrivateKey::from_hex(
-            "0000000000000000000000000000000000000000000000000000000000000001"
-        ).unwrap();
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
 
         let msg_hash = sha256(b"test");
 
