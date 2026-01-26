@@ -134,17 +134,20 @@ pub trait SpendValidation: TransactionContext {
     ///
     /// Returns `Ok(true)` if the input is valid, `Ok(false)` if invalid,
     /// or `Err` with details if validation fails with an error.
-    fn validate_input(&self, index: usize) -> Result<bool, crate::script::ScriptEvaluationError>;
+    fn validate_input(
+        &self,
+        index: usize,
+    ) -> Result<bool, Box<crate::script::ScriptEvaluationError>>;
 
     /// Validate all inputs in the transaction.
     ///
     /// Returns `Ok(())` if all inputs are valid, or the first error encountered.
-    fn validate_all_inputs(&self) -> Result<(), crate::script::ScriptEvaluationError> {
+    fn validate_all_inputs(&self) -> Result<(), Box<crate::script::ScriptEvaluationError>> {
         for i in 0..self.input_count() {
             match self.validate_input(i) {
                 Ok(true) => continue,
                 Ok(false) => {
-                    return Err(crate::script::ScriptEvaluationError {
+                    return Err(Box::new(crate::script::ScriptEvaluationError {
                         message: format!("Input {} validation returned false", i),
                         source_txid: String::new(),
                         source_output_index: 0,
@@ -155,7 +158,7 @@ pub trait SpendValidation: TransactionContext {
                         if_stack: vec![],
                         stack_mem: 0,
                         alt_stack_mem: 0,
-                    });
+                    }));
                 }
                 Err(e) => return Err(e),
             }
