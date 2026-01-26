@@ -245,7 +245,7 @@ mod tests {
         // Scope should match (only low byte)
         assert_eq!(
             decoded.scope() & 0xff,
-            (SIGHASH_ALL | SIGHASH_FORKID) as u32
+            SIGHASH_ALL | SIGHASH_FORKID
         );
     }
 
