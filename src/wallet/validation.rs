@@ -208,6 +208,7 @@ pub fn validate_optional_string_length(
 /// * `name` - The parameter name for error messages
 /// * `min_chars` - Optional minimum character length
 /// * `max_chars` - Optional maximum character length
+#[allow(unknown_lints, clippy::manual_is_multiple_of)]
 pub fn validate_hex_string(
     s: &str,
     name: &str,
@@ -269,6 +270,7 @@ pub fn validate_optional_hex_string(
 }
 
 /// Checks if a string is a valid hex string.
+#[allow(unknown_lints, clippy::manual_is_multiple_of)]
 pub fn is_hex_string(s: &str) -> bool {
     let s = s.trim();
     if s.len() % 2 != 0 {

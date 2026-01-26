@@ -709,6 +709,7 @@ fn days_to_ymd(days: u64) -> (u64, u64, u64) {
 }
 
 /// Checks if a year is a leap year.
+#[allow(unknown_lints, clippy::manual_is_multiple_of)]
 fn is_leap_year(year: u64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }

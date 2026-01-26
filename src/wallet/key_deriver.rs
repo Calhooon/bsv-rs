@@ -122,7 +122,7 @@ impl KeyDeriver {
     /// * `key_id` - The unique key identifier (1-800 characters)
     /// * `counterparty` - The counterparty (self, anyone, or specific public key)
     /// * `for_self` - If true, derive the public key for the wallet owner;
-    ///                if false, derive the public key for the counterparty
+    ///   if false, derive the public key for the counterparty
     ///
     /// # Returns
     ///

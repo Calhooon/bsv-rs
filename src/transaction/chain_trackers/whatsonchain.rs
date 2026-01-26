@@ -38,9 +38,10 @@ use async_trait::async_trait;
 use crate::transaction::{ChainTracker, ChainTrackerError};
 
 /// WhatsOnChain network selection.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum WocNetwork {
     /// BSV Mainnet
+    #[default]
     Mainnet,
     /// BSV Testnet
     Testnet,
@@ -53,12 +54,6 @@ impl WocNetwork {
             WocNetwork::Mainnet => "https://api.whatsonchain.com/v1/bsv/main",
             WocNetwork::Testnet => "https://api.whatsonchain.com/v1/bsv/test",
         }
-    }
-}
-
-impl Default for WocNetwork {
-    fn default() -> Self {
-        Self::Mainnet
     }
 }
 
