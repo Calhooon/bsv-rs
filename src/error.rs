@@ -56,6 +56,18 @@ pub enum Error {
     /// Invalid tag (for authenticated encryption).
     #[error("invalid authentication tag")]
     InvalidTag,
+
+    /// Invalid UTF-8 sequence.
+    #[error("invalid UTF-8 sequence: {0}")]
+    InvalidUtf8(String),
+
+    /// Reader underflow (not enough bytes to read).
+    #[error("reader underflow: need {needed} bytes, only {available} available")]
+    ReaderUnderflow { needed: usize, available: usize },
+
+    /// Invalid checksum.
+    #[error("invalid checksum")]
+    InvalidChecksum,
 }
 
 /// A specialized Result type for BSV primitives operations.
