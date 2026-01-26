@@ -1,6 +1,6 @@
 //! Benchmarks for hash functions.
 
-use bsv_primitives::hash;
+use bsv_sdk::primitives::hash;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 fn bench_sha256(c: &mut Criterion) {

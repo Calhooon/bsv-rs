@@ -1,10 +1,13 @@
-//! Error types for the BSV primitives library.
+//! Error types for the BSV SDK.
 
 use thiserror::Error;
 
-/// The main error type for the BSV primitives library.
+/// Main error type for the BSV SDK.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    // ===================
+    // Primitives errors
+    // ===================
     /// Invalid key length for cryptographic operations.
     #[error("invalid key length: expected {expected}, got {actual}")]
     InvalidKeyLength { expected: usize, actual: usize },
@@ -68,7 +71,48 @@ pub enum Error {
     /// Invalid checksum.
     #[error("invalid checksum")]
     InvalidChecksum,
+
+    // ===================
+    // Script errors (Phase S1+)
+    // ===================
+    /// Script parse error.
+    #[cfg(feature = "script")]
+    #[error("script parse error: {0}")]
+    ScriptParseError(String),
+
+    /// Script execution error.
+    #[cfg(feature = "script")]
+    #[error("script execution error: {0}")]
+    ScriptExecutionError(String),
+
+    /// Invalid opcode.
+    #[cfg(feature = "script")]
+    #[error("invalid opcode: 0x{0:02x}")]
+    InvalidOpcode(u8),
+
+    /// Disabled opcode.
+    #[cfg(feature = "script")]
+    #[error("disabled opcode: 0x{0:02x}")]
+    DisabledOpcode(u8),
+
+    /// Stack underflow.
+    #[cfg(feature = "script")]
+    #[error("stack underflow")]
+    StackUnderflow,
+
+    /// Stack overflow.
+    #[cfg(feature = "script")]
+    #[error("stack overflow")]
+    StackOverflow,
+
+    // ===================
+    // Transaction errors (future)
+    // ===================
+    /// Transaction error.
+    #[cfg(feature = "transaction")]
+    #[error("transaction error: {0}")]
+    TransactionError(String),
 }
 
-/// A specialized Result type for BSV primitives operations.
+/// Result type alias for BSV SDK operations.
 pub type Result<T> = std::result::Result<T, Error>;

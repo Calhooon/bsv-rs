@@ -1,7 +1,7 @@
 //! Integration tests for the EC module with BRC-42 test vectors.
 
-use bsv_primitives::ec::{PrivateKey, PublicKey};
-use bsv_primitives::hash::sha256;
+use bsv_sdk::primitives::ec::{PrivateKey, PublicKey};
+use bsv_sdk::primitives::hash::sha256;
 use serde::Deserialize;
 use std::fs;
 
@@ -282,7 +282,7 @@ fn test_deterministic_signatures() {
 
 #[test]
 fn test_public_key_recovery() {
-    use bsv_primitives::ec::recover_public_key;
+    use bsv_sdk::primitives::ec::recover_public_key;
 
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();

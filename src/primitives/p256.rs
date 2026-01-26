@@ -12,7 +12,7 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_primitives::p256::{P256PrivateKey, P256PublicKey};
+//! use bsv_sdk::primitives::p256::{P256PrivateKey, P256PublicKey};
 //!
 //! // Generate a random key pair
 //! let private_key = P256PrivateKey::random();
@@ -27,7 +27,7 @@
 //! ```
 
 use crate::error::{Error, Result};
-use crate::hash::sha256;
+use crate::primitives::hash::sha256;
 use p256::ecdsa::signature::hazmat::PrehashSigner;
 use p256::ecdsa::{Signature as P256EcdsaSignature, SigningKey, VerifyingKey};
 use p256::elliptic_curve::sec1::FromEncodedPoint;
@@ -68,7 +68,7 @@ impl P256PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::P256PrivateKey;
+    /// use bsv_sdk::primitives::p256::P256PrivateKey;
     ///
     /// let key = P256PrivateKey::random();
     /// ```
@@ -92,7 +92,7 @@ impl P256PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::P256PrivateKey;
+    /// use bsv_sdk::primitives::p256::P256PrivateKey;
     ///
     /// let bytes = [1u8; 32];
     /// let key = P256PrivateKey::from_bytes(&bytes).unwrap();
@@ -126,14 +126,14 @@ impl P256PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::P256PrivateKey;
+    /// use bsv_sdk::primitives::p256::P256PrivateKey;
     ///
     /// let key = P256PrivateKey::from_hex(
     ///     "0000000000000000000000000000000000000000000000000000000000000001"
     /// ).unwrap();
     /// ```
     pub fn from_hex(hex: &str) -> Result<Self> {
-        let bytes = crate::encoding::from_hex(hex)?;
+        let bytes = crate::primitives::encoding::from_hex(hex)?;
         Self::from_bytes(&bytes)
     }
 
@@ -142,7 +142,7 @@ impl P256PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::P256PrivateKey;
+    /// use bsv_sdk::primitives::p256::P256PrivateKey;
     ///
     /// let key = P256PrivateKey::random();
     /// let pubkey = key.public_key();
@@ -168,7 +168,7 @@ impl P256PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::P256PrivateKey;
+    /// use bsv_sdk::primitives::p256::P256PrivateKey;
     ///
     /// let key = P256PrivateKey::random();
     /// let sig = key.sign(b"Hello, P-256!");
@@ -255,7 +255,7 @@ impl P256PublicKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::{P256PrivateKey, P256PublicKey};
+    /// use bsv_sdk::primitives::p256::{P256PrivateKey, P256PublicKey};
     ///
     /// let key = P256PrivateKey::random();
     /// let pubkey = key.public_key();
@@ -287,7 +287,7 @@ impl P256PublicKey {
     ///
     /// * `hex` - The hex-encoded public key (compressed or uncompressed)
     pub fn from_hex(hex: &str) -> Result<Self> {
-        let bytes = crate::encoding::from_hex(hex)?;
+        let bytes = crate::primitives::encoding::from_hex(hex)?;
         Self::from_bytes(&bytes)
     }
 
@@ -305,7 +305,7 @@ impl P256PublicKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::p256::P256PrivateKey;
+    /// use bsv_sdk::primitives::p256::P256PrivateKey;
     ///
     /// let key = P256PrivateKey::random();
     /// let pubkey = key.public_key();
@@ -586,7 +586,7 @@ impl std::fmt::Display for P256Signature {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::p256::generate_private_key_hex;
+/// use bsv_sdk::primitives::p256::generate_private_key_hex;
 ///
 /// let hex = generate_private_key_hex();
 /// assert_eq!(hex.len(), 64);

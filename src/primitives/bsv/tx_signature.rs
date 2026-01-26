@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_primitives::bsv::tx_signature::TransactionSignature;
-//! use bsv_primitives::ec::Signature;
+//! use bsv_sdk::primitives::bsv::tx_signature::TransactionSignature;
+//! use bsv_sdk::primitives::ec::Signature;
 //!
 //! // Parse a signature from checksig format
 //! let checksig_bytes = hex::decode("3044...41").unwrap();
@@ -27,11 +27,11 @@
 //! let encoded = tx_sig.to_checksig_format();
 //! ```
 
-use crate::ec::Signature;
 use crate::error::{Error, Result};
-use crate::BigNumber;
+use crate::primitives::ec::Signature;
+use crate::primitives::BigNumber;
 
-pub use crate::bsv::sighash::{
+pub use crate::primitives::bsv::sighash::{
     SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
 };
 
@@ -88,7 +88,7 @@ impl TransactionSignature {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_primitives::bsv::tx_signature::TransactionSignature;
+    /// use bsv_sdk::primitives::bsv::tx_signature::TransactionSignature;
     ///
     /// let checksig = hex::decode("30440220...0141").unwrap();
     /// let sig = TransactionSignature::from_checksig_format(&checksig).unwrap();

@@ -3,10 +3,10 @@
 //! This module provides the [`PrivateKey`] struct for working with secp256k1 private keys,
 //! including signing, WIF encoding/decoding, and BRC-42 key derivation.
 
-use crate::encoding::{from_base58_check, from_hex, to_base58_check, to_hex};
 use crate::error::{Error, Result};
-use crate::hash::sha256_hmac;
-use crate::BigNumber;
+use crate::primitives::encoding::{from_base58_check, from_hex, to_base58_check, to_hex};
+use crate::primitives::hash::sha256_hmac;
+use crate::primitives::BigNumber;
 use k256::ecdsa::signature::hazmat::PrehashSigner;
 use k256::ecdsa::SigningKey;
 use k256::elliptic_curve::rand_core::OsRng;
@@ -35,7 +35,7 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::random();
     /// assert_eq!(key.to_bytes().len(), 32);
@@ -58,7 +58,7 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let bytes = [1u8; 32];
     /// let key = PrivateKey::from_bytes(&bytes).unwrap();
@@ -86,7 +86,7 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::from_hex("0000000000000000000000000000000000000000000000000000000000000001").unwrap();
     /// ```
@@ -110,7 +110,7 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn";
     /// let key = PrivateKey::from_wif(wif).unwrap();
@@ -165,8 +165,8 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
-    /// use bsv_primitives::hash::sha256;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::hash::sha256;
     ///
     /// let key = PrivateKey::random();
     /// let msg_hash = sha256(b"Hello, BSV!");
@@ -251,7 +251,7 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let alice = PrivateKey::random();
     /// let bob = PrivateKey::random();
@@ -285,7 +285,7 @@ impl PrivateKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let alice_priv = PrivateKey::random();
     /// let bob_priv = PrivateKey::random();
@@ -357,7 +357,7 @@ impl Eq for PrivateKey {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hash::sha256;
+    use crate::primitives::hash::sha256;
 
     #[test]
     fn test_private_key_random() {

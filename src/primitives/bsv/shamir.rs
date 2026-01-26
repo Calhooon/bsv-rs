@@ -7,8 +7,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_primitives::bsv::shamir::{split_private_key, KeyShares};
-//! use bsv_primitives::ec::PrivateKey;
+//! use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
+//! use bsv_sdk::primitives::ec::PrivateKey;
 //!
 //! // Generate a random private key
 //! let key = PrivateKey::random();
@@ -35,12 +35,12 @@
 //! - `threshold` is the minimum number of shares needed for recovery
 //! - `integrity` is the first 4 characters of base58(sha256(secret)) for verification
 
-use crate::bsv::polynomial::{PointInFiniteField, Polynomial};
-use crate::encoding::{from_base58, to_base58};
 use crate::error::{Error, Result};
-use crate::hash::sha256;
-use crate::BigNumber;
-use crate::PrivateKey;
+use crate::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
+use crate::primitives::encoding::{from_base58, to_base58};
+use crate::primitives::hash::sha256;
+use crate::primitives::BigNumber;
+use crate::primitives::PrivateKey;
 
 /// A collection of key shares that can be used to recover a private key.
 ///
@@ -94,7 +94,7 @@ impl KeyShares {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::bsv::shamir::KeyShares;
+    /// use bsv_sdk::primitives::bsv::shamir::KeyShares;
     ///
     /// let backup = vec![
     ///     "2.someY.3.abcd".to_string(),
@@ -162,8 +162,8 @@ impl KeyShares {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::bsv::shamir::split_private_key;
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::bsv::shamir::split_private_key;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::random();
     /// let shares = split_private_key(&key, 2, 3).unwrap();
@@ -203,8 +203,8 @@ impl KeyShares {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::bsv::shamir::split_private_key;
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::bsv::shamir::split_private_key;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::random();
     /// let shares = split_private_key(&key, 3, 5).unwrap();
@@ -264,8 +264,8 @@ impl KeyShares {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::bsv::shamir::split_private_key;
-/// use bsv_primitives::ec::PrivateKey;
+/// use bsv_sdk::primitives::bsv::shamir::split_private_key;
+/// use bsv_sdk::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 ///

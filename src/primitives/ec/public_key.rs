@@ -3,10 +3,10 @@
 //! This module provides the [`PublicKey`] struct for working with secp256k1 public keys,
 //! including serialization, address generation, signature verification, and BRC-42 key derivation.
 
-use crate::encoding::{from_hex, to_base58_check, to_hex};
 use crate::error::{Error, Result};
-use crate::hash::{hash160, sha256_hmac};
-use crate::BigNumber;
+use crate::primitives::encoding::{from_hex, to_base58_check, to_hex};
+use crate::primitives::hash::{hash160, sha256_hmac};
+use crate::primitives::BigNumber;
 use k256::elliptic_curve::group::prime::PrimeCurveAffine;
 use k256::elliptic_curve::scalar::FromUintUnchecked;
 use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
@@ -193,7 +193,7 @@ impl PublicKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::PrivateKey;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
     ///
     /// let alice_priv = PrivateKey::random();
     /// let bob_priv = PrivateKey::random();
@@ -509,7 +509,7 @@ mod tests {
     fn test_from_scalar_mul_generator_matches_private_key() {
         // Creating a public key from scalar multiplication of G should match
         // creating it from a private key with the same bytes
-        use crate::PrivateKey;
+        use crate::primitives::PrivateKey;
 
         let priv_key = PrivateKey::random();
         let pub_key = priv_key.public_key();
@@ -543,7 +543,7 @@ mod tests {
     #[test]
     fn test_public_key_add_associative() {
         // Test that (A + B) + C = A + (B + C)
-        use crate::PrivateKey;
+        use crate::primitives::PrivateKey;
 
         let a = PrivateKey::random().public_key();
         let b = PrivateKey::random().public_key();
@@ -561,7 +561,7 @@ mod tests {
     #[test]
     fn test_public_key_add_commutative() {
         // Test that A + B = B + A
-        use crate::PrivateKey;
+        use crate::primitives::PrivateKey;
 
         let a = PrivateKey::random().public_key();
         let b = PrivateKey::random().public_key();

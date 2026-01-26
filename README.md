@@ -1,214 +1,136 @@
-# BSV Primitives
+# BSV SDK for Rust
 
-A Rust library providing cryptographic primitives for the BSV blockchain.
+A comprehensive Rust SDK for building BSV (Bitcoin SV) blockchain applications.
 
-## Overview
+## Features
 
-This crate provides low-level cryptographic building blocks used in BSV (Bitcoin SV) applications:
-
-- **Hash functions**: SHA-1, SHA-256, SHA-512, RIPEMD-160
-- **Bitcoin-specific hashes**: hash256 (double SHA-256), hash160 (RIPEMD160(SHA256(x)))
-- **HMAC**: HMAC-SHA256, HMAC-SHA512
-- **Key derivation**: PBKDF2-SHA512
-- **Symmetric encryption**: AES-256-GCM *(coming soon)*
-- **Elliptic curve cryptography**: secp256k1, secp256r1 *(coming soon)*
-- **BSV-specific**: Transaction signatures, BRC-42 key derivation *(coming soon)*
+- **Primitives**: Cryptographic primitives (SHA-256, RIPEMD-160, secp256k1, AES-GCM)
+- **Script**: Bitcoin Script parsing, execution, and templates (P2PKH, RPuzzle) *(coming soon)*
+- **Transaction**: Transaction construction, signing, and serialization *(coming soon)*
+- **Wallet**: HD wallets, BIP-32/39/44 key derivation *(coming soon)*
 
 ## Installation
 
-Add this to your `Cargo.toml`:
+Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bsv-primitives = "0.1"
+bsv-sdk = "0.2"
 ```
 
-## Usage
+Or with specific features:
 
-### Hash Functions
+```toml
+[dependencies]
+bsv-sdk = { version = "0.2", features = ["primitives", "script"] }
+```
+
+## Quick Start
+
+### Cryptographic Primitives
 
 ```rust
-use bsv_primitives::hash;
+use bsv_sdk::primitives::{PrivateKey, PublicKey, sha256, hash160};
 
-// SHA-256
-let digest = hash::sha256(b"hello world");
-assert_eq!(digest.len(), 32);
+// Generate a key pair
+let private_key = PrivateKey::random();
+let public_key = private_key.public_key();
 
-// Bitcoin double-SHA256 (used for txids, block hashes)
-let txid_hash = hash::sha256d(b"transaction data");
+// Get the address
+let address = public_key.to_address();
+println!("Address: {}", address);
 
-// Bitcoin hash160 (used for addresses)
-let address_hash = hash::hash160(b"public key bytes");
-assert_eq!(address_hash.len(), 20);
+// Sign a message
+let msg_hash = sha256(b"Hello, BSV!");
+let signature = private_key.sign(&msg_hash).unwrap();
 
-// RIPEMD-160
-let ripemd = hash::ripemd160(b"data");
-
-// SHA-512
-let sha512_hash = hash::sha512(b"data");
-assert_eq!(sha512_hash.len(), 64);
+// Verify
+assert!(public_key.verify(&msg_hash, &signature));
 ```
 
-### HMAC
+### Script Operations (Coming Soon)
 
-```rust
-use bsv_primitives::hash;
+```rust,ignore
+use bsv_sdk::script::{Script, LockingScript, P2PKH};
+use bsv_sdk::primitives::PrivateKey;
 
-let key = b"secret key";
-let message = b"message to authenticate";
+// Create a P2PKH locking script
+let private_key = PrivateKey::random();
+let public_key = private_key.public_key();
 
-// HMAC-SHA256
-let mac = hash::sha256_hmac(key, message);
-assert_eq!(mac.len(), 32);
+let p2pkh = P2PKH::new();
+let locking_script = p2pkh.lock(&public_key.hash160());
 
-// HMAC-SHA512
-let mac512 = hash::sha512_hmac(key, message);
-assert_eq!(mac512.len(), 64);
+// Parse a script from hex
+let script = Script::from_hex("76a914...88ac").unwrap();
+println!("ASM: {}", script.to_asm());
 ```
 
-### PBKDF2 Key Derivation
+## Module Overview
 
-```rust
-use bsv_primitives::hash;
+### Primitives (`bsv_sdk::primitives`)
 
-let password = b"user password";
-let salt = b"random salt";
-let iterations = 2048;
-let key_length = 64; // bytes
+| Component | Description |
+|-----------|-------------|
+| `sha256`, `sha512`, `ripemd160` | Hash functions |
+| `sha256d`, `hash160` | Bitcoin-specific composite hashes |
+| `PrivateKey`, `PublicKey` | secp256k1 key pairs |
+| `Signature` | ECDSA signatures (low-S enforced) |
+| `SymmetricKey` | AES-256-GCM encryption |
+| `BigNumber` | Arbitrary-precision integers |
+| `to_hex`, `from_hex`, `to_base58` | Encoding utilities |
 
-let derived_key = hash::pbkdf2_sha512(password, salt, iterations, key_length);
-assert_eq!(derived_key.len(), 64);
-```
+### Script (`bsv_sdk::script`) - Coming Soon
 
-## API Reference
+| Component | Description |
+|-----------|-------------|
+| `Script` | Base script class |
+| `LockingScript` | Output locking scripts |
+| `UnlockingScript` | Input unlocking scripts |
+| `Spend` | Script interpreter/validator |
+| `P2PKH` | Pay-to-Public-Key-Hash template |
+| `RPuzzle` | R-puzzle template |
 
-### Hash Functions
+## Feature Flags
 
-| Function | Output Size | Description |
-|----------|-------------|-------------|
-| `sha1(data)` | 20 bytes | SHA-1 (legacy, for compatibility only) |
-| `sha256(data)` | 32 bytes | SHA-256 |
-| `sha512(data)` | 64 bytes | SHA-512 |
-| `ripemd160(data)` | 20 bytes | RIPEMD-160 |
-| `sha256d(data)` | 32 bytes | SHA256(SHA256(data)) - Bitcoin "hash256" |
-| `hash160(data)` | 20 bytes | RIPEMD160(SHA256(data)) - Bitcoin address hash |
-
-### HMAC Functions
-
-| Function | Output Size | Description |
-|----------|-------------|-------------|
-| `sha256_hmac(key, data)` | 32 bytes | HMAC using SHA-256 |
-| `sha512_hmac(key, data)` | 64 bytes | HMAC using SHA-512 |
-
-### Key Derivation
-
-| Function | Description |
-|----------|-------------|
-| `pbkdf2_sha512(password, salt, iterations, key_len)` | PBKDF2 with HMAC-SHA512 |
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `primitives` | Yes | Cryptographic primitives |
+| `script` | Yes | Script parsing and execution |
+| `transaction` | No | Transaction building (coming soon) |
+| `wallet` | No | HD wallet support (coming soon) |
+| `wasm` | No | WebAssembly support |
+| `full` | No | All features |
 
 ## Compatibility
 
-This library is designed to be byte-for-byte compatible with:
-
-- [BSV TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) primitives module
-- [BSV Go SDK](https://github.com/bitcoin-sv/go-sdk) primitives module
-
-All implementations share the same test vectors to ensure cross-platform compatibility.
+This SDK is designed for cross-platform compatibility with:
+- [BSV TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk)
+- [BSV Go SDK](https://github.com/bitcoin-sv/go-sdk)
 
 ## Development
 
-### Building
-
 ```bash
+# Build
 cargo build
-```
 
-### Running Tests
-
-```bash
+# Test
 cargo test
-```
 
-### Running Clippy
-
-```bash
+# Lint
 cargo clippy --all-targets --all-features
-```
 
-### Formatting
-
-```bash
+# Format
 cargo fmt
-```
 
-### Building Documentation
-
-```bash
+# Docs
 cargo doc --open
 ```
-
-### Running Benchmarks
-
-```bash
-cargo bench
-```
-
-## Project Structure
-
-```
-bsv-primitives/
-├── Cargo.toml              # Package manifest
-├── src/
-│   ├── lib.rs              # Library root, public exports
-│   ├── error.rs            # Error types
-│   ├── hash.rs             # Hash functions (implemented)
-│   ├── encoding.rs         # Hex, base58, base64 (planned)
-│   ├── symmetric.rs        # AES-GCM encryption (planned)
-│   ├── ec/                 # Elliptic curve crypto (planned)
-│   │   ├── mod.rs
-│   │   ├── private_key.rs
-│   │   ├── public_key.rs
-│   │   └── signature.rs
-│   └── bsv/                # BSV-specific (planned)
-│       ├── mod.rs
-│       ├── key_derivation.rs
-│       └── tx_signature.rs
-├── tests/
-│   └── vectors/            # Test vectors from Go SDK
-│       ├── brc42_private.json
-│       ├── brc42_public.json
-│       ├── drbg.json
-│       └── symmetric_key.json
-└── benches/
-    └── hash_bench.rs       # Performance benchmarks
-```
-
-## Roadmap
-
-- [x] **Phase 0**: Project setup
-- [x] **Phase 1**: Hash functions (SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2)
-- [ ] **Phase 2**: Symmetric encryption (AES-256-GCM)
-- [ ] **Phase 3**: Encoding utilities (hex, base58, base64)
-- [ ] **Phase 4**: BigNumber compatibility layer
-- [ ] **Phase 5**: Elliptic curve operations (secp256k1)
-- [ ] **Phase 6**: BSV-specific components (BRC-42, transaction signatures)
-- [ ] **Phase 7**: P-256 (secp256r1) support
-- [ ] **Phase 8**: Integration testing and optimization
 
 ## License
 
 Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0
+- MIT license
 
 at your option.
-
-## Contributing
-
-Contributions are welcome! Please ensure that:
-
-1. All tests pass (`cargo test`)
-2. Code is formatted (`cargo fmt`)
-3. Clippy is happy (`cargo clippy`)
-4. New functionality includes tests and documentation

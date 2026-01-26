@@ -20,7 +20,7 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_primitives::symmetric::SymmetricKey;
+//! use bsv_sdk::primitives::symmetric::SymmetricKey;
 //!
 //! // Create a random symmetric key
 //! let key = SymmetricKey::random();
@@ -80,7 +80,7 @@ impl SymmetricKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::symmetric::SymmetricKey;
+    /// use bsv_sdk::primitives::symmetric::SymmetricKey;
     ///
     /// let key = SymmetricKey::random();
     /// ```
@@ -107,7 +107,7 @@ impl SymmetricKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::symmetric::SymmetricKey;
+    /// use bsv_sdk::primitives::symmetric::SymmetricKey;
     ///
     /// // 31-byte key (will be padded with leading zero)
     /// let key_31 = vec![0xFFu8; 31];
@@ -150,7 +150,7 @@ impl SymmetricKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::symmetric::SymmetricKey;
+    /// use bsv_sdk::primitives::symmetric::SymmetricKey;
     ///
     /// let key = SymmetricKey::random();
     /// let bytes = key.as_bytes();
@@ -177,7 +177,7 @@ impl SymmetricKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::symmetric::SymmetricKey;
+    /// use bsv_sdk::primitives::symmetric::SymmetricKey;
     ///
     /// let key = SymmetricKey::random();
     /// let plaintext = b"Hello, BSV!";
@@ -230,7 +230,7 @@ impl SymmetricKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::symmetric::SymmetricKey;
+    /// use bsv_sdk::primitives::symmetric::SymmetricKey;
     ///
     /// let key = SymmetricKey::random();
     /// let plaintext = b"Hello, BSV!";
@@ -658,7 +658,7 @@ mod tests {
         }
 
         fn load_test_vectors() -> Vec<TestVector> {
-            let json_str = include_str!("../tests/vectors/symmetric_key.json");
+            let json_str = include_str!("../../tests/vectors/symmetric_key.json");
             serde_json::from_str(json_str).expect("Failed to parse test vectors")
         }
 

@@ -1,123 +1,60 @@
-//! # BSV Primitives
+//! # BSV SDK
 //!
-//! A Rust library providing cryptographic primitives for the BSV blockchain.
+//! A comprehensive Rust SDK for building BSV (Bitcoin SV) applications.
 //!
-//! This crate provides:
-//! - **Hash functions**: SHA-1, SHA-256, SHA-512, RIPEMD-160, and Bitcoin-specific
-//!   composite hashes (hash256, hash160)
-//! - **HMAC**: HMAC-SHA256 and HMAC-SHA512
-//! - **Key derivation**: PBKDF2-SHA512
-//! - **Symmetric encryption**: AES-256-GCM with BSV SDK compatibility
-//! - **Elliptic curve cryptography**: secp256k1 ECDSA, key derivation (BRC-42)
-//! - **P-256 (secp256r1)**: NIST P-256 curve for certain authentication scenarios
-//! - **BSV-specific**: Transaction signatures (Phase 6)
+//! ## Modules
 //!
-//! ## Example
+//! - **primitives**: Cryptographic primitives (hash, EC, encoding)
+//! - **script**: Bitcoin Script parsing and execution
+//! - **transaction**: Transaction construction and signing (coming soon)
+//! - **wallet**: HD wallets and key management (coming soon)
 //!
-//! ```rust
-//! use bsv_primitives::hash;
+//! ## Feature Flags
 //!
-//! // Single hash
-//! let digest = hash::sha256(b"hello world");
-//! assert_eq!(digest.len(), 32);
+//! - `primitives` (default): Core cryptographic primitives
+//! - `script` (default): Script parsing and interpreter
+//! - `transaction`: Transaction building and signing
+//! - `wallet`: HD wallet support
+//! - `full`: All features
+//! - `wasm`: WebAssembly support
 //!
-//! // Bitcoin double-SHA256 (hash256)
-//! let double_hash = hash::sha256d(b"hello world");
-//!
-//! // Bitcoin hash160 (RIPEMD160(SHA256(x)))
-//! let h160 = hash::hash160(b"hello world");
-//! assert_eq!(h160.len(), 20);
-//! ```
-//!
-//! ## Symmetric Encryption
+//! ## Quick Start
 //!
 //! ```rust
-//! use bsv_primitives::symmetric::SymmetricKey;
-//!
-//! // Create a random symmetric key
-//! let key = SymmetricKey::random();
-//!
-//! // Encrypt some data
-//! let plaintext = b"Hello, BSV!";
-//! let ciphertext = key.encrypt(plaintext).expect("encryption failed");
-//!
-//! // Decrypt the data
-//! let decrypted = key.decrypt(&ciphertext).expect("decryption failed");
-//! assert_eq!(plaintext, &decrypted[..]);
-//! ```
-//!
-//! ## Elliptic Curve Operations (secp256k1)
-//!
-//! ```rust
-//! use bsv_primitives::ec::{PrivateKey, PublicKey, Signature};
-//! use bsv_primitives::hash::sha256;
+//! use bsv_sdk::primitives::{PrivateKey, sha256};
 //!
 //! // Generate a key pair
 //! let private_key = PrivateKey::random();
 //! let public_key = private_key.public_key();
 //!
+//! // Hash some data
+//! let hash = sha256(b"Hello, BSV!");
+//!
 //! // Sign a message
-//! let msg_hash = sha256(b"Hello, BSV!");
-//! let signature = private_key.sign(&msg_hash).unwrap();
-//!
-//! // Verify the signature
-//! assert!(public_key.verify(&msg_hash, &signature));
-//! assert!(signature.is_low_s()); // BIP 62 compliant
-//! ```
-//!
-//! ## P-256 (secp256r1) Operations
-//!
-//! ```rust
-//! use bsv_primitives::p256::{P256PrivateKey, P256PublicKey};
-//!
-//! // Generate a P-256 key pair
-//! let private_key = P256PrivateKey::random();
-//! let public_key = private_key.public_key();
-//!
-//! // Sign a message (hashed with SHA-256)
-//! let message = b"Hello, P-256!";
-//! let signature = private_key.sign(message);
-//!
-//! // Verify the signature
-//! assert!(public_key.verify(message, &signature));
-//! ```
-//!
-//! ## BRC-42 Key Derivation
-//!
-//! ```rust
-//! use bsv_primitives::ec::PrivateKey;
-//!
-//! let alice = PrivateKey::random();
-//! let bob = PrivateKey::random();
-//!
-//! // Derive child keys
-//! let alice_child = alice.derive_child(&bob.public_key(), "invoice-123").unwrap();
-//! let bob_derived = alice.public_key().derive_child(&bob, "invoice-123").unwrap();
-//!
-//! // They arrive at the same public key
-//! assert_eq!(alice_child.public_key().to_compressed(), bob_derived.to_compressed());
+//! let signature = private_key.sign(&hash).unwrap();
+//! assert!(public_key.verify(&hash, &signature));
 //! ```
 
-pub mod bignum;
-pub mod ec;
-pub mod encoding;
+// Error types (shared across modules)
 pub mod error;
-pub mod hash;
-pub mod p256;
-pub mod symmetric;
+pub use error::{Error, Result};
 
-// Placeholder modules for future phases
-pub mod bsv;
+// Feature-gated modules
+#[cfg(feature = "primitives")]
+pub mod primitives;
 
-// Re-export commonly used items
-pub use bignum::BigNumber;
-pub use ec::{PrivateKey, PublicKey, Signature};
-pub use encoding::{
-    from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes, to_base58,
-    to_base58_check, to_base64, to_hex, to_utf8_bytes, Reader, Writer,
+#[cfg(feature = "script")]
+pub mod script;
+
+#[cfg(feature = "transaction")]
+pub mod transaction;
+
+#[cfg(feature = "wallet")]
+pub mod wallet;
+
+// Convenience re-exports from primitives (most common items)
+#[cfg(feature = "primitives")]
+pub use primitives::{
+    from_hex, hash160, sha256, sha256d, to_hex, BigNumber, PrivateKey, PublicKey, Signature,
+    SymmetricKey,
 };
-pub use error::Error;
-pub use hash::{
-    hash160, pbkdf2_sha512, ripemd160, sha1, sha256, sha256_hmac, sha256d, sha512, sha512_hmac,
-};
-pub use symmetric::SymmetricKey;

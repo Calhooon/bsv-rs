@@ -576,7 +576,6 @@ Transaction signatures, sighash computation, Schnorr proofs, and Shamir secret s
 - `schnorr.rs` - Schnorr zero-knowledge proofs for ECDH verification
 - `polynomial.rs` - Polynomial operations for Shamir secret sharing
 - `shamir.rs` - Shamir secret sharing for private key backup/recovery
-- `key_derivation.rs` - Placeholder for additional key derivation utilities
 
 ## Dependencies
 

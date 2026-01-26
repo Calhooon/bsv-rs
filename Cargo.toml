@@ -1,12 +1,12 @@
 [package]
-name = "bsv-primitives"
-version = "0.1.0"
+name = "bsv-sdk"
+version = "0.2.0"
 edition = "2021"
-description = "BSV blockchain cryptographic primitives in Rust"
+description = "BSV blockchain SDK for Rust - primitives, script, transactions, and more"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/bsv/rust-sdk"
-keywords = ["bitcoin", "bsv", "cryptography", "blockchain"]
-categories = ["cryptography", "encoding"]
+repository = "https://github.com/bsv-blockchain/bsv-sdk-rust"
+keywords = ["bitcoin", "bsv", "blockchain", "cryptocurrency", "sdk"]
+categories = ["cryptography", "encoding", "parser-implementations"]
 
 [dependencies]
 # Hashing
@@ -49,8 +49,13 @@ thiserror = "1.0"
 criterion = "0.5"
 
 [features]
-default = []
+default = ["primitives", "script"]
+primitives = []
+script = ["primitives"]
+transaction = ["script"]
+wallet = ["transaction"]
 wasm = ["getrandom/js"]
+full = ["primitives", "script", "transaction", "wallet"]
 
 [[bench]]
 name = "hash_bench"

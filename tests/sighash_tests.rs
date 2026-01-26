@@ -1,6 +1,6 @@
 //! Integration tests for sighash computation with 499 test vectors.
 
-use bsv_primitives::bsv::sighash::{compute_sighash, parse_transaction, SighashParams};
+use bsv_sdk::primitives::bsv::sighash::{compute_sighash, parse_transaction, SighashParams};
 use serde::Deserialize;
 
 /// Test vector for sighash computation.

@@ -8,7 +8,7 @@
 //! ## Hex encoding
 //!
 //! ```rust
-//! use bsv_primitives::encoding::{to_hex, from_hex};
+//! use bsv_sdk::primitives::encoding::{to_hex, from_hex};
 //!
 //! let bytes = vec![0xde, 0xad, 0xbe, 0xef];
 //! let hex_str = to_hex(&bytes);
@@ -21,7 +21,7 @@
 //! ## Base58 encoding
 //!
 //! ```rust
-//! use bsv_primitives::encoding::{to_base58, from_base58};
+//! use bsv_sdk::primitives::encoding::{to_base58, from_base58};
 //!
 //! // Leading zeros become '1' characters
 //! let bytes = vec![0x00, 0x00, 0x00];
@@ -35,7 +35,7 @@
 //! ## Reader and Writer
 //!
 //! ```rust
-//! use bsv_primitives::encoding::{Reader, Writer};
+//! use bsv_sdk::primitives::encoding::{Reader, Writer};
 //!
 //! // Writing binary data
 //! let mut writer = Writer::new();
@@ -56,7 +56,7 @@
 //! ```
 
 use crate::error::{Error, Result};
-use crate::hash::sha256d;
+use crate::primitives::hash::sha256d;
 
 // ============================================================================
 // Hex Encoding
@@ -75,7 +75,7 @@ use crate::hash::sha256d;
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::to_hex;
+/// use bsv_sdk::primitives::encoding::to_hex;
 ///
 /// assert_eq!(to_hex(&[0xde, 0xad, 0xbe, 0xef]), "deadbeef");
 /// assert_eq!(to_hex(&[0x00, 0x01, 0x02]), "000102");
@@ -99,7 +99,7 @@ pub fn to_hex(data: &[u8]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::from_hex;
+/// use bsv_sdk::primitives::encoding::from_hex;
 ///
 /// assert_eq!(from_hex("deadbeef").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
 /// assert_eq!(from_hex("DEADBEEF").unwrap(), vec![0xde, 0xad, 0xbe, 0xef]);
@@ -133,7 +133,7 @@ pub const BASE58_ALPHABET: &str = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkm
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::to_base58;
+/// use bsv_sdk::primitives::encoding::to_base58;
 ///
 /// // Leading zeros become '1' characters
 /// assert_eq!(to_base58(&[0x00]), "1");
@@ -164,7 +164,7 @@ pub fn to_base58(data: &[u8]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::from_base58;
+/// use bsv_sdk::primitives::encoding::from_base58;
 ///
 /// assert_eq!(from_base58("111").unwrap(), vec![0x00, 0x00, 0x00]);
 /// assert!(from_base58("0OIl").is_err()); // Invalid characters
@@ -202,7 +202,7 @@ pub fn from_base58(s: &str) -> Result<Vec<u8>> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::{to_base58_check, from_base58_check};
+/// use bsv_sdk::primitives::encoding::{to_base58_check, from_base58_check};
 ///
 /// // Bitcoin mainnet address (version 0x00)
 /// let pubkey_hash = hex::decode("f5f2d624cfb5c3f66d06123d0829d1c9cebf770e").unwrap();
@@ -242,7 +242,7 @@ pub fn to_base58_check(payload: &[u8], version: &[u8]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::from_base58_check;
+/// use bsv_sdk::primitives::encoding::from_base58_check;
 ///
 /// // Decode a Bitcoin address
 /// let (version, pubkey_hash) = from_base58_check("1PRTTaJesdNovgne6Ehcdu1fpEdX7913CK").unwrap();
@@ -315,7 +315,7 @@ pub fn from_base58_check_with_prefix_length(
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::to_base64;
+/// use bsv_sdk::primitives::encoding::to_base64;
 ///
 /// assert_eq!(to_base64(b"Hello"), "SGVsbG8=");
 /// assert_eq!(to_base64(b"f"), "Zg==");
@@ -343,7 +343,7 @@ pub fn to_base64(data: &[u8]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::from_base64;
+/// use bsv_sdk::primitives::encoding::from_base64;
 ///
 /// assert_eq!(from_base64("SGVsbG8=").unwrap(), b"Hello");
 /// assert_eq!(from_base64("Zg==").unwrap(), b"f");
@@ -395,7 +395,7 @@ pub fn from_base64(s: &str) -> Result<Vec<u8>> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::to_utf8_bytes;
+/// use bsv_sdk::primitives::encoding::to_utf8_bytes;
 ///
 /// assert_eq!(to_utf8_bytes("Hello"), vec![72, 101, 108, 108, 111]);
 /// assert_eq!(to_utf8_bytes("€"), vec![0xE2, 0x82, 0xAC]); // 3-byte UTF-8
@@ -418,7 +418,7 @@ pub fn to_utf8_bytes(s: &str) -> Vec<u8> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::from_utf8_bytes;
+/// use bsv_sdk::primitives::encoding::from_utf8_bytes;
 ///
 /// assert_eq!(from_utf8_bytes(&[72, 101, 108, 108, 111]).unwrap(), "Hello");
 /// assert!(from_utf8_bytes(&[0xFF, 0xFE]).is_err()); // Invalid UTF-8
@@ -439,7 +439,7 @@ pub fn from_utf8_bytes(data: &[u8]) -> Result<String> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::Reader;
+/// use bsv_sdk::primitives::encoding::Reader;
 ///
 /// let data = vec![0x01, 0x02, 0x00, 0x03, 0x00, 0x00, 0x00];
 /// let mut reader = Reader::new(&data);
@@ -603,7 +603,7 @@ impl<'a> Reader<'a> {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::encoding::Reader;
+    /// use bsv_sdk::primitives::encoding::Reader;
     ///
     /// // Single byte: 0xFC (252)
     /// let mut reader = Reader::new(&[0xFC]);
@@ -704,7 +704,7 @@ impl<'a> Reader<'a> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_primitives::encoding::Writer;
+/// use bsv_sdk::primitives::encoding::Writer;
 ///
 /// let mut writer = Writer::new();
 /// writer.write_u8(0x01);
@@ -831,7 +831,7 @@ impl Writer {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::encoding::Writer;
+    /// use bsv_sdk::primitives::encoding::Writer;
     ///
     /// let mut w = Writer::new();
     /// w.write_var_int(252); // 0xFC - single byte

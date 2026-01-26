@@ -4,7 +4,7 @@
 //! on the secp256k1 curve, including DER and compact encoding/decoding.
 
 use crate::error::{Error, Result};
-use crate::BigNumber;
+use crate::primitives::BigNumber;
 
 /// The secp256k1 curve order divided by 2.
 /// Used to check if S is in low form (BIP 62).
@@ -56,7 +56,7 @@ impl Signature {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_primitives::ec::Signature;
+    /// use bsv_sdk::primitives::ec::Signature;
     ///
     /// let der = hex::decode(
     ///     "3045022100b4d19cdc7e93c36f3b5d6f7e8a2a6c9e3c8f9a1b2c3d4e5f6a7b8c9d0e1f2a3b02207f8e9d0c1b2a3948576a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e"
@@ -257,7 +257,7 @@ impl Signature {
 
     /// Verifies this signature against a message hash and public key.
     ///
-    /// This is a convenience method that calls [`crate::ec::verify`].
+    /// This is a convenience method that calls [`super::verify`].
     ///
     /// # Arguments
     ///

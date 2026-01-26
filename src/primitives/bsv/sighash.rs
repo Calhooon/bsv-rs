@@ -18,7 +18,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_primitives::bsv::sighash::{compute_sighash, SighashParams, parse_transaction};
+//! use bsv_sdk::primitives::bsv::sighash::{compute_sighash, SighashParams, parse_transaction};
 //!
 //! // Parse a raw transaction
 //! let raw_tx = hex::decode("0100000001...").unwrap();
@@ -38,9 +38,9 @@
 //! });
 //! ```
 
-use crate::encoding::{Reader, Writer};
 use crate::error::{Error, Result};
-use crate::hash::sha256d;
+use crate::primitives::encoding::{Reader, Writer};
+use crate::primitives::hash::sha256d;
 
 // ============================================================================
 // SIGHASH Constants
@@ -120,7 +120,7 @@ pub struct RawTransaction {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_primitives::bsv::sighash::parse_transaction;
+/// use bsv_sdk::primitives::bsv::sighash::parse_transaction;
 ///
 /// let raw = hex::decode("0100000001...").unwrap();
 /// let tx = parse_transaction(&raw).unwrap();
@@ -381,7 +381,7 @@ pub fn build_sighash_preimage(params: &SighashParams) -> Vec<u8> {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_primitives::bsv::sighash::{compute_sighash, SighashParams, SIGHASH_ALL, SIGHASH_FORKID};
+/// use bsv_sdk::primitives::bsv::sighash::{compute_sighash, SighashParams, SIGHASH_ALL, SIGHASH_FORKID};
 ///
 /// let sighash = compute_sighash(&SighashParams {
 ///     version: 1,

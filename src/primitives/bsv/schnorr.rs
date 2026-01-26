@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_primitives::ec::PrivateKey;
-//! use bsv_primitives::bsv::schnorr::Schnorr;
+//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_sdk::primitives::bsv::schnorr::Schnorr;
 //!
 //! // Alice and Bob have key pairs
 //! let alice = PrivateKey::random();
@@ -41,10 +41,10 @@
 //! ));
 //! ```
 
-use crate::ec::{PrivateKey, PublicKey};
 use crate::error::Result;
-use crate::hash::sha256;
-use crate::BigNumber;
+use crate::primitives::ec::{PrivateKey, PublicKey};
+use crate::primitives::hash::sha256;
+use crate::primitives::BigNumber;
 
 /// A Schnorr zero-knowledge proof.
 ///
