@@ -83,6 +83,7 @@ impl Script {
             } else if op_code_num.is_none() {
                 // It's hex data
                 let mut hex = token.to_string();
+                #[allow(unknown_lints, clippy::manual_is_multiple_of)]
                 if hex.len() % 2 != 0 {
                     hex = format!("0{}", hex);
                 }
