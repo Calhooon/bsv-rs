@@ -51,6 +51,9 @@ async-trait = "0.1"
 # Lazy initialization
 lazy_static = "1.4"
 
+# HTTP client (optional, for broadcasters and chain trackers)
+reqwest = { version = "0.12", features = ["json"], optional = true }
+
 [dev-dependencies]
 criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros"] }
@@ -63,6 +66,7 @@ transaction = ["script"]
 wallet = ["transaction"]
 wasm = ["getrandom/js"]
 full = ["primitives", "script", "transaction", "wallet"]
+http = ["dep:reqwest"]
 
 [[bench]]
 name = "hash_bench"

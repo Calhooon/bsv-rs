@@ -14,6 +14,7 @@
 
 pub mod bignum;
 pub mod bsv;
+pub mod drbg;
 pub mod ec;
 pub mod encoding;
 pub mod hash;
@@ -22,6 +23,7 @@ pub mod symmetric;
 
 // Re-exports for convenience
 pub use bignum::BigNumber;
+pub use drbg::HmacDrbg;
 pub use ec::{PrivateKey, PublicKey, Signature};
 pub use encoding::{
     from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes, to_base58,

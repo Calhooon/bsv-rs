@@ -1181,4 +1181,370 @@ mod tests {
         assert!(a <= a);
         assert!(a >= a);
     }
+
+    // ========================================================================
+    // Extended Constructor Tests
+    // ========================================================================
+
+    #[test]
+    fn test_from_zero() {
+        assert!(BigNumber::zero().is_zero());
+        assert!(!BigNumber::zero().is_positive());
+        assert!(!BigNumber::zero().is_negative());
+    }
+
+    #[test]
+    fn test_from_one() {
+        assert!(!BigNumber::one().is_zero());
+        assert!(BigNumber::one().is_positive());
+        assert_eq!(BigNumber::one().to_i64(), Some(1));
+    }
+
+    #[test]
+    fn test_from_u64_max() {
+        let max = BigNumber::from_u64(u64::MAX);
+        assert_eq!(max.to_u64(), Some(u64::MAX));
+    }
+
+    #[test]
+    fn test_from_i64_min_max() {
+        let max = BigNumber::from_i64(i64::MAX);
+        assert_eq!(max.to_i64(), Some(i64::MAX));
+
+        let min = BigNumber::from_i64(i64::MIN);
+        assert_eq!(min.to_i64(), Some(i64::MIN));
+    }
+
+    // ========================================================================
+    // Extended Arithmetic Tests
+    // ========================================================================
+
+    #[test]
+    fn test_add_with_overflow() {
+        let max_u64 = BigNumber::from_u64(u64::MAX);
+        let one = BigNumber::one();
+        let result = max_u64.add(&one);
+        // Result should be 2^64
+        assert_eq!(result.to_hex(), "10000000000000000");
+    }
+
+    #[test]
+    fn test_sub_to_negative() {
+        let a = BigNumber::from_i64(5);
+        let b = BigNumber::from_i64(10);
+        let result = a.sub(&b);
+        assert!(result.is_negative());
+        assert_eq!(result.to_i64(), Some(-5));
+    }
+
+    #[test]
+    fn test_mul_large_numbers() {
+        let a = BigNumber::from_hex("ffffffff").unwrap();
+        let b = BigNumber::from_hex("ffffffff").unwrap();
+        let result = a.mul(&b);
+        assert_eq!(result.to_hex(), "fffffffe00000001");
+    }
+
+    #[test]
+    fn test_div_with_remainder() {
+        let a = BigNumber::from_i64(17);
+        let b = BigNumber::from_i64(5);
+        assert_eq!(a.div(&b), BigNumber::from_i64(3));
+    }
+
+    #[test]
+    fn test_pow_edge_cases() {
+        let base = BigNumber::from_i64(2);
+        assert_eq!(base.pow(0), BigNumber::one());
+        assert_eq!(base.pow(1), BigNumber::from_i64(2));
+        assert_eq!(base.pow(10), BigNumber::from_i64(1024));
+    }
+
+    #[test]
+    fn test_neg_double() {
+        let n = BigNumber::from_i64(42);
+        assert_eq!(n.neg().neg(), n);
+    }
+
+    #[test]
+    fn test_abs_negative() {
+        let neg = BigNumber::from_i64(-42);
+        let pos = BigNumber::from_i64(42);
+        assert_eq!(neg.abs(), pos);
+    }
+
+    // ========================================================================
+    // Extended Modular Arithmetic Tests
+    // ========================================================================
+
+    #[test]
+    fn test_mod_add_overflow() {
+        let a = BigNumber::from_hex("ffffffff").unwrap();
+        let b = BigNumber::from_hex("00000001").unwrap();
+        let m = BigNumber::from_hex("100000000").unwrap();
+
+        let result = a.add(&b).modulo(&m);
+        assert_eq!(result, BigNumber::zero());
+    }
+
+    #[test]
+    fn test_mod_sub_underflow() {
+        let a = BigNumber::from_i64(1);
+        let b = BigNumber::from_i64(2);
+        let m = BigNumber::from_hex("100000000").unwrap();
+
+        // (1 - 2) mod 2^32 = 2^32 - 1
+        let result = a.sub(&b).modulo(&m);
+        assert_eq!(result, BigNumber::from_hex("ffffffff").unwrap());
+    }
+
+    #[test]
+    fn test_mod_mul_large() {
+        let a = BigNumber::from_hex("ffffffffffffffff").unwrap();
+        let b = BigNumber::from_hex("ffffffffffffffff").unwrap();
+        let m = BigNumber::from_hex("10000000000000000").unwrap();
+
+        let result = a.mul(&b).modulo(&m);
+        // (2^64-1)^2 mod 2^64 = 1
+        assert_eq!(result, BigNumber::one());
+    }
+
+    #[test]
+    fn test_mod_inverse_prime() {
+        // Test modular inverse in prime field
+        let a = BigNumber::from_u64(3);
+        let p = BigNumber::from_u64(11);
+
+        let inv = a.mod_inverse(&p).unwrap();
+        let check = a.mul(&inv).modulo(&p);
+        assert_eq!(check, BigNumber::one());
+    }
+
+    #[test]
+    fn test_mod_inverse_secp256k1() {
+        // Test with secp256k1 prime
+        let p =
+            BigNumber::from_hex("fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f")
+                .unwrap();
+        let a = BigNumber::from_hex("deadbeef").unwrap();
+
+        let inv = a.mod_inverse(&p).unwrap();
+        let check = a.mul(&inv).modulo(&p);
+        assert_eq!(check, BigNumber::one());
+    }
+
+    #[test]
+    fn test_mod_pow_fermat() {
+        // Fermat's little theorem: a^(p-1) = 1 mod p
+        let a = BigNumber::from_u64(2);
+        let p = BigNumber::from_u64(17);
+        let exp = BigNumber::from_u64(16); // p - 1
+
+        let result = a.mod_pow(&exp, &p);
+        assert_eq!(result, BigNumber::one());
+    }
+
+    #[test]
+    fn test_mod_pow_large() {
+        let base = BigNumber::from_i64(2);
+        let exp = BigNumber::from_i64(100);
+        let modulus = BigNumber::from_i64(1000000007);
+        let result = base.mod_pow(&exp, &modulus);
+        // 2^100 mod 1000000007 should be a specific value
+        assert!(result.compare(&modulus) == Ordering::Less);
+    }
+
+    #[test]
+    fn test_gcd_coprime() {
+        let a = BigNumber::from_i64(17);
+        let b = BigNumber::from_i64(13);
+        assert_eq!(a.gcd(&b), BigNumber::one());
+    }
+
+    #[test]
+    fn test_gcd_common_factor() {
+        let a = BigNumber::from_i64(18);
+        let b = BigNumber::from_i64(24);
+        assert_eq!(a.gcd(&b), BigNumber::from_i64(6));
+    }
+
+    // ========================================================================
+    // Extended Bit Operations Tests
+    // ========================================================================
+
+    #[test]
+    fn test_bit_length_powers_of_two() {
+        assert_eq!(BigNumber::from_i64(1).bit_length(), 1); // 2^0
+        assert_eq!(BigNumber::from_i64(2).bit_length(), 2); // 2^1
+        assert_eq!(BigNumber::from_i64(4).bit_length(), 3); // 2^2
+        assert_eq!(BigNumber::from_i64(8).bit_length(), 4); // 2^3
+        assert_eq!(BigNumber::from_i64(128).bit_length(), 8); // 2^7
+        assert_eq!(BigNumber::from_i64(256).bit_length(), 9); // 2^8
+    }
+
+    #[test]
+    fn test_byte_length_edge_cases() {
+        assert_eq!(BigNumber::from_i64(0).byte_length(), 0);
+        assert_eq!(BigNumber::from_i64(1).byte_length(), 1);
+        assert_eq!(BigNumber::from_i64(127).byte_length(), 1);
+        assert_eq!(BigNumber::from_i64(128).byte_length(), 1);
+        assert_eq!(BigNumber::from_i64(255).byte_length(), 1);
+        assert_eq!(BigNumber::from_i64(256).byte_length(), 2);
+        assert_eq!(BigNumber::from_i64(65535).byte_length(), 2);
+        assert_eq!(BigNumber::from_i64(65536).byte_length(), 3);
+    }
+
+    // ========================================================================
+    // Extended Comparison Tests
+    // ========================================================================
+
+    #[test]
+    fn test_is_one() {
+        assert!(!BigNumber::zero().is_positive() && !BigNumber::zero().is_negative());
+        assert!(BigNumber::one().is_positive());
+        assert_eq!(BigNumber::one().to_i64(), Some(1));
+    }
+
+    #[test]
+    fn test_sign() {
+        let pos = BigNumber::from_i64(5);
+        let neg = BigNumber::from_i64(-5);
+        let zero = BigNumber::zero();
+
+        assert!(pos.is_positive());
+        assert!(!pos.is_negative());
+        assert!(neg.is_negative());
+        assert!(!neg.is_positive());
+        assert!(!zero.is_positive());
+        assert!(!zero.is_negative());
+    }
+
+    #[test]
+    fn test_compare_across_signs() {
+        let neg = BigNumber::from_i64(-100);
+        let zero = BigNumber::zero();
+        let pos = BigNumber::from_i64(100);
+
+        assert_eq!(neg.compare(&zero), Ordering::Less);
+        assert_eq!(zero.compare(&pos), Ordering::Less);
+        assert_eq!(neg.compare(&pos), Ordering::Less);
+        assert_eq!(pos.compare(&neg), Ordering::Greater);
+    }
+
+    // ========================================================================
+    // Extended Serialization Tests
+    // ========================================================================
+
+    #[test]
+    fn test_to_bytes_be_min_variations() {
+        // Zero returns empty
+        assert!(BigNumber::zero().to_bytes_be_min().is_empty());
+
+        // One returns [1]
+        assert_eq!(BigNumber::one().to_bytes_be_min(), vec![1]);
+
+        // 256 returns [1, 0]
+        assert_eq!(BigNumber::from_u64(256).to_bytes_be_min(), vec![1, 0]);
+
+        // 255 returns [255]
+        assert_eq!(BigNumber::from_u64(255).to_bytes_be_min(), vec![255]);
+
+        // 65535 returns [255, 255]
+        assert_eq!(BigNumber::from_u64(65535).to_bytes_be_min(), vec![255, 255]);
+    }
+
+    #[test]
+    fn test_to_bytes_le_min() {
+        assert!(BigNumber::zero().to_bytes_le_min().is_empty());
+        assert_eq!(BigNumber::from_u64(256).to_bytes_le_min(), vec![0, 1]);
+    }
+
+    #[test]
+    fn test_bytes_roundtrip() {
+        let values = [0u64, 1, 255, 256, 65535, 65536, u64::MAX];
+        for val in values {
+            let n = BigNumber::from_u64(val);
+            let bytes_be = n.to_bytes_be_min();
+            let bytes_le = n.to_bytes_le_min();
+
+            let from_be = BigNumber::from_bytes_be(&bytes_be);
+            let from_le = BigNumber::from_bytes_le(&bytes_le);
+
+            assert_eq!(n, from_be, "BE roundtrip failed for {}", val);
+            assert_eq!(n, from_le, "LE roundtrip failed for {}", val);
+        }
+    }
+
+    #[test]
+    fn test_hex_roundtrip_edge_cases() {
+        let cases = [
+            "0",
+            "1",
+            "ff",
+            "100",
+            "ffff",
+            "10000",
+            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        ];
+
+        for hex in cases {
+            let n = BigNumber::from_hex(hex).unwrap();
+            let back = n.to_hex();
+            let n2 = BigNumber::from_hex(&back).unwrap();
+            assert_eq!(n, n2, "Roundtrip failed for {}", hex);
+        }
+    }
+
+    #[test]
+    fn test_from_signed_bytes_be() {
+        // Positive number
+        let pos = BigNumber::from_signed_bytes_be(&[0x7f, 0xff]);
+        assert!(pos.is_positive());
+
+        // Negative number (high bit set)
+        let neg = BigNumber::from_signed_bytes_be(&[0xff, 0xff]);
+        assert!(neg.is_negative());
+    }
+
+    #[test]
+    fn test_dec_string_roundtrip() {
+        let values = [
+            "0",
+            "1",
+            "-1",
+            "123456789",
+            "-987654321",
+            "99999999999999999999999999999999999999999999",
+        ];
+
+        for dec in values {
+            let n = BigNumber::from_dec_str(dec).unwrap();
+            let back = n.to_dec_string();
+            assert_eq!(back, dec, "Dec roundtrip failed for {}", dec);
+        }
+    }
+
+    #[test]
+    fn test_to_u64_overflow() {
+        let too_big = BigNumber::from_hex("10000000000000000").unwrap(); // 2^64
+        assert!(too_big.to_u64().is_none());
+    }
+
+    #[test]
+    fn test_to_i64_negative() {
+        let neg = BigNumber::from_i64(-42);
+        assert_eq!(neg.to_i64(), Some(-42));
+    }
+
+    #[test]
+    fn test_hash_trait() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        set.insert(BigNumber::from_i64(42));
+        set.insert(BigNumber::from_i64(42));
+        assert_eq!(set.len(), 1);
+
+        set.insert(BigNumber::from_i64(43));
+        assert_eq!(set.len(), 2);
+    }
 }

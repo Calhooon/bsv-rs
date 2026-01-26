@@ -570,6 +570,119 @@ impl Script {
     pub fn is_unlocking_script(&self) -> bool {
         false
     }
+
+    /// Check if this is a Pay-to-Public-Key-Hash script
+    /// Pattern: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+    pub fn is_p2pkh(&self) -> bool {
+        let chunks = self.chunks();
+        chunks.len() == 5
+            && chunks[0].op == OP_DUP
+            && chunks[1].op == OP_HASH160
+            && chunks[2]
+                .data
+                .as_ref()
+                .map(|d| d.len() == 20)
+                .unwrap_or(false)
+            && chunks[3].op == OP_EQUALVERIFY
+            && chunks[4].op == OP_CHECKSIG
+    }
+
+    /// Check if this is a Pay-to-Public-Key script
+    /// Pattern: <33 or 65 bytes pubkey> OP_CHECKSIG
+    pub fn is_p2pk(&self) -> bool {
+        let chunks = self.chunks();
+        chunks.len() == 2
+            && chunks[0]
+                .data
+                .as_ref()
+                .map(|d| d.len() == 33 || d.len() == 65)
+                .unwrap_or(false)
+            && chunks[1].op == OP_CHECKSIG
+    }
+
+    /// Check if this is a Pay-to-Script-Hash script
+    /// Pattern: OP_HASH160 <20 bytes> OP_EQUAL
+    pub fn is_p2sh(&self) -> bool {
+        let chunks = self.chunks();
+        chunks.len() == 3
+            && chunks[0].op == OP_HASH160
+            && chunks[1]
+                .data
+                .as_ref()
+                .map(|d| d.len() == 20)
+                .unwrap_or(false)
+            && chunks[2].op == OP_EQUAL
+    }
+
+    /// Check if this is a data-only script (OP_RETURN or OP_FALSE OP_RETURN)
+    pub fn is_data(&self) -> bool {
+        let chunks = self.chunks();
+        if chunks.is_empty() {
+            return false;
+        }
+        // OP_RETURN ...
+        if chunks[0].op == OP_RETURN {
+            return true;
+        }
+        // OP_FALSE OP_RETURN ... (safe data carrier)
+        chunks.len() >= 2 && chunks[0].op == OP_FALSE && chunks[1].op == OP_RETURN
+    }
+
+    /// Check if this is a multisig script, returns (M, N) if so
+    /// Pattern: OP_M <pubkey>... OP_N OP_CHECKMULTISIG
+    pub fn is_multisig(&self) -> Option<(u8, u8)> {
+        let chunks = self.chunks();
+        if chunks.len() < 4 {
+            return None;
+        }
+
+        // Last opcode must be OP_CHECKMULTISIG
+        if chunks.last()?.op != OP_CHECKMULTISIG {
+            return None;
+        }
+
+        // Second to last must be N (OP_1 through OP_16)
+        let n = Self::opcode_to_small_int(chunks[chunks.len() - 2].op)?;
+
+        // First must be M (OP_1 through OP_16)
+        let m = Self::opcode_to_small_int(chunks[0].op)?;
+
+        // Verify we have exactly N pubkeys
+        if chunks.len() != (n as usize) + 3 {
+            return None;
+        }
+
+        // Verify all middle elements are pubkeys (33 or 65 bytes)
+        for chunk in chunks.iter().take((n as usize) + 1).skip(1) {
+            let data = chunk.data.as_ref()?;
+            if data.len() != 33 && data.len() != 65 {
+                return None;
+            }
+        }
+
+        Some((m, n))
+    }
+
+    /// Convert OP_1 through OP_16 to their numeric values
+    pub fn opcode_to_small_int(op: u8) -> Option<u8> {
+        if (OP_1..=OP_16).contains(&op) {
+            Some(op - OP_1 + 1)
+        } else {
+            None
+        }
+    }
+
+    /// Extract the public key hash from a P2PKH script
+    pub fn extract_pubkey_hash(&self) -> Option<[u8; 20]> {
+        if !self.is_p2pkh() {
+            return None;
+        }
+        let chunks = self.chunks();
+        let data = chunks[2].data.as_ref()?;
+        let mut hash = [0u8; 20];
+        hash.copy_from_slice(data);
+        Some(hash)
+    }
 }
 
 impl Default for Script {
@@ -797,5 +910,179 @@ mod tests {
         let script1 = Script::from_hex("76a9").unwrap();
         let script2 = Script::from_asm("OP_DUP OP_HASH160").unwrap();
         assert_eq!(script1, script2);
+    }
+}
+
+#[cfg(test)]
+mod script_type_tests {
+    use super::*;
+
+    #[test]
+    fn test_is_p2pkh() {
+        // Valid P2PKH: OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG
+        let p2pkh = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(p2pkh.is_p2pkh());
+
+        // Not P2PKH - wrong length pubkey hash
+        let wrong_len = Script::from_hex("76a9140000000000000000000088ac").unwrap();
+        assert!(!wrong_len.is_p2pkh());
+
+        // Not P2PKH - missing OP_DUP
+        let no_dup = Script::from_hex("a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(!no_dup.is_p2pkh());
+
+        // Empty script
+        let empty = Script::new();
+        assert!(!empty.is_p2pkh());
+    }
+
+    #[test]
+    fn test_is_p2pk() {
+        // Valid P2PK with compressed pubkey (33 bytes)
+        let mut p2pk_compressed = Script::new();
+        p2pk_compressed.write_bin(&[0x02; 33]);
+        p2pk_compressed.write_opcode(OP_CHECKSIG);
+        assert!(p2pk_compressed.is_p2pk());
+
+        // Valid P2PK with uncompressed pubkey (65 bytes)
+        let mut p2pk_uncompressed = Script::new();
+        p2pk_uncompressed.write_bin(&[0x04; 65]);
+        p2pk_uncompressed.write_opcode(OP_CHECKSIG);
+        assert!(p2pk_uncompressed.is_p2pk());
+
+        // Invalid - wrong pubkey length
+        let mut wrong_len = Script::new();
+        wrong_len.write_bin(&[0x02; 32]);
+        wrong_len.write_opcode(OP_CHECKSIG);
+        assert!(!wrong_len.is_p2pk());
+
+        // Invalid - missing OP_CHECKSIG
+        let mut no_checksig = Script::new();
+        no_checksig.write_bin(&[0x02; 33]);
+        assert!(!no_checksig.is_p2pk());
+    }
+
+    #[test]
+    fn test_is_p2sh() {
+        // Valid P2SH: OP_HASH160 <20 bytes> OP_EQUAL
+        let p2sh = Script::from_hex("a914000000000000000000000000000000000000000087").unwrap();
+        assert!(p2sh.is_p2sh());
+
+        // Not P2SH - wrong hash length
+        let wrong_len = Script::from_hex("a91400000000000000000087").unwrap();
+        assert!(!wrong_len.is_p2sh());
+
+        // Not P2SH - OP_EQUALVERIFY instead of OP_EQUAL
+        let equalverify =
+            Script::from_hex("a914000000000000000000000000000000000000000088").unwrap();
+        assert!(!equalverify.is_p2sh());
+    }
+
+    #[test]
+    fn test_is_data() {
+        // OP_RETURN script
+        let op_return = Script::from_asm("OP_RETURN").unwrap();
+        assert!(op_return.is_data());
+
+        // OP_RETURN with data
+        let mut op_return_data = Script::new();
+        op_return_data.write_opcode(OP_RETURN);
+        op_return_data.write_bin(b"hello");
+        assert!(op_return_data.is_data());
+
+        // OP_FALSE OP_RETURN (safe data carrier)
+        let safe_data = Script::from_asm("OP_FALSE OP_RETURN").unwrap();
+        assert!(safe_data.is_data());
+
+        // Not a data script
+        let p2pkh = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(!p2pkh.is_data());
+
+        // Empty script
+        let empty = Script::new();
+        assert!(!empty.is_data());
+    }
+
+    #[test]
+    fn test_is_multisig() {
+        // 2-of-3 multisig: OP_2 <pk1> <pk2> <pk3> OP_3 OP_CHECKMULTISIG
+        let mut multisig = Script::new();
+        multisig.write_opcode(OP_2);
+        multisig.write_bin(&[0x02; 33]); // pubkey 1
+        multisig.write_bin(&[0x03; 33]); // pubkey 2
+        multisig.write_bin(&[0x02; 33]); // pubkey 3
+        multisig.write_opcode(OP_3);
+        multisig.write_opcode(OP_CHECKMULTISIG);
+
+        let result = multisig.is_multisig();
+        assert!(result.is_some());
+        let (m, n) = result.unwrap();
+        assert_eq!(m, 2);
+        assert_eq!(n, 3);
+
+        // 1-of-1 multisig
+        let mut one_of_one = Script::new();
+        one_of_one.write_opcode(OP_1);
+        one_of_one.write_bin(&[0x02; 33]);
+        one_of_one.write_opcode(OP_1);
+        one_of_one.write_opcode(OP_CHECKMULTISIG);
+
+        let result = one_of_one.is_multisig();
+        assert!(result.is_some());
+        let (m, n) = result.unwrap();
+        assert_eq!(m, 1);
+        assert_eq!(n, 1);
+
+        // Not multisig - P2PKH
+        let p2pkh = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(p2pkh.is_multisig().is_none());
+
+        // Not multisig - wrong number of pubkeys
+        let mut wrong_count = Script::new();
+        wrong_count.write_opcode(OP_2);
+        wrong_count.write_bin(&[0x02; 33]); // only 1 pubkey
+        wrong_count.write_opcode(OP_2);
+        wrong_count.write_opcode(OP_CHECKMULTISIG);
+        assert!(wrong_count.is_multisig().is_none());
+    }
+
+    #[test]
+    fn test_opcode_to_small_int() {
+        assert_eq!(Script::opcode_to_small_int(OP_1), Some(1));
+        assert_eq!(Script::opcode_to_small_int(OP_2), Some(2));
+        assert_eq!(Script::opcode_to_small_int(OP_16), Some(16));
+        assert_eq!(Script::opcode_to_small_int(OP_0), None);
+        assert_eq!(Script::opcode_to_small_int(OP_DUP), None);
+    }
+
+    #[test]
+    fn test_extract_pubkey_hash() {
+        // Valid P2PKH
+        let p2pkh = Script::from_hex("76a914000102030405060708090a0b0c0d0e0f1011121388ac").unwrap();
+        let hash = p2pkh.extract_pubkey_hash();
+        assert!(hash.is_some());
+        let hash = hash.unwrap();
+        assert_eq!(
+            hash,
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+        );
+
+        // Not P2PKH
+        let p2sh = Script::from_hex("a914000000000000000000000000000000000000000087").unwrap();
+        assert!(p2sh.extract_pubkey_hash().is_none());
+    }
+
+    #[test]
+    fn test_is_push_only_comprehensive() {
+        // Push-only scripts
+        let push_only = Script::from_asm("OP_1 OP_2 OP_3").unwrap();
+        assert!(push_only.is_push_only());
+
+        let data_push = Script::from_hex("03010203").unwrap(); // Push 3 bytes
+        assert!(data_push.is_push_only());
+
+        // Not push-only
+        let with_ops = Script::from_asm("OP_DUP OP_HASH160").unwrap();
+        assert!(!with_ops.is_push_only());
     }
 }

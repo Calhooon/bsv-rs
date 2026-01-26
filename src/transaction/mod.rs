@@ -87,7 +87,9 @@
 pub mod beef;
 pub mod beef_tx;
 pub mod broadcaster;
+pub mod broadcasters;
 pub mod chain_tracker;
+pub mod chain_trackers;
 pub mod fee_model;
 pub mod fee_models;
 pub mod input;
@@ -103,9 +105,11 @@ pub use broadcaster::{
     is_broadcast_failure, is_broadcast_success, BroadcastFailure, BroadcastResponse,
     BroadcastResult, BroadcastStatus, Broadcaster,
 };
+pub use broadcasters::{ArcBroadcaster, ArcConfig};
 pub use chain_tracker::{
     AlwaysValidChainTracker, ChainTracker, ChainTrackerError, MockChainTracker,
 };
+pub use chain_trackers::{WhatsOnChainTracker, WocNetwork};
 pub use fee_model::{FeeModel, FixedFee};
 pub use fee_models::SatoshisPerKilobyte;
 pub use input::TransactionInput;

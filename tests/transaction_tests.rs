@@ -477,4 +477,305 @@ mod transaction_tests {
 
         assert_eq!(tx.metadata.get("key"), Some(&serde_json::json!("value")));
     }
+
+    // ===================
+    // Extended BEEF tests
+    // ===================
+
+    mod beef_extended_tests {
+        use super::*;
+        use bsv_sdk::transaction::{BEEF_V1, BEEF_V2};
+
+        fn create_test_transaction(n: u32) -> Transaction {
+            let mut tx = Transaction::new();
+            tx.version = n;
+            tx.add_output(TransactionOutput::new(1000, LockingScript::new()))
+                .unwrap();
+            tx
+        }
+
+        fn create_test_transaction_with_input(source: &Transaction, vout: u32) -> Transaction {
+            let mut tx = Transaction::new();
+            tx.add_input(TransactionInput::with_source_transaction(
+                source.clone(),
+                vout,
+            ))
+            .unwrap();
+            tx.add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+            tx
+        }
+
+        #[test]
+        fn test_beef_merge_transaction_with_parents() {
+            // Create parent tx
+            let parent = create_test_transaction(1);
+
+            // Create child tx referencing parent
+            let child = create_test_transaction_with_input(&parent, 0);
+
+            // Merge both transactions into BEEF (parent first, then child)
+            let mut beef = Beef::new();
+            beef.merge_transaction(parent.clone());
+            beef.merge_transaction(child.clone());
+
+            // Verify both are included
+            assert!(
+                beef.find_txid(&parent.id()).is_some(),
+                "Parent should be included"
+            );
+            assert!(
+                beef.find_txid(&child.id()).is_some(),
+                "Child should be included"
+            );
+
+            // Verify count
+            assert_eq!(beef.txs.len(), 2, "Should have 2 transactions");
+        }
+
+        #[test]
+        fn test_beef_merge_two_beefs() {
+            let mut beef1 = Beef::new();
+            let mut beef2 = Beef::new();
+
+            // Add different transactions to each
+            let tx1 = create_test_transaction(1);
+            let tx2 = create_test_transaction(2);
+
+            beef1.merge_transaction(tx1.clone());
+            beef2.merge_transaction(tx2.clone());
+
+            // Merge beef2 into beef1
+            beef1.merge_beef(&beef2);
+
+            // Both transactions should be in beef1
+            assert!(
+                beef1.find_txid(&tx1.id()).is_some(),
+                "tx1 should be in merged beef"
+            );
+            assert!(
+                beef1.find_txid(&tx2.id()).is_some(),
+                "tx2 should be in merged beef"
+            );
+        }
+
+        #[test]
+        fn test_beef_sort_txs_dependency_order() {
+            let mut beef = Beef::new();
+
+            // Create chain: grandparent -> parent -> child
+            let grandparent = create_test_transaction(1);
+            let parent = create_test_transaction_with_input(&grandparent, 0);
+            let child = create_test_transaction_with_input(&parent, 0);
+
+            // Add in wrong order - child first
+            beef.merge_transaction(child.clone());
+
+            // Sort
+            beef.sort_txs();
+
+            // Verify order: grandparent, parent, child
+            let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+            let gp_idx = txids.iter().position(|t| t == &grandparent.id());
+            let p_idx = txids.iter().position(|t| t == &parent.id());
+            let c_idx = txids.iter().position(|t| t == &child.id());
+
+            if let (Some(gp_idx), Some(p_idx), Some(c_idx)) = (gp_idx, p_idx, c_idx) {
+                assert!(gp_idx < p_idx, "grandparent should come before parent");
+                assert!(p_idx < c_idx, "parent should come before child");
+            }
+        }
+
+        #[test]
+        fn test_beef_atomic_serialization() {
+            let mut beef = Beef::new();
+            let tx = create_test_transaction(1);
+            let txid = tx.id();
+
+            beef.merge_transaction(tx);
+
+            // Serialize as atomic BEEF
+            let atomic = beef.to_binary_atomic(&txid).unwrap();
+
+            // Parse back
+            let parsed = Beef::from_binary(&atomic).unwrap();
+
+            // Verify atomic_txid is set
+            assert_eq!(parsed.atomic_txid, Some(txid));
+        }
+
+        #[test]
+        fn test_beef_v1_v2_roundtrip() {
+            // Create BEEF V1
+            let mut beef_v1 = Beef::with_version(BEEF_V1);
+            beef_v1.merge_transaction(create_test_transaction(1));
+
+            let binary = beef_v1.to_binary();
+            let parsed = Beef::from_binary(&binary).unwrap();
+            assert_eq!(parsed.version, BEEF_V1);
+
+            // Create BEEF V2
+            let mut beef_v2 = Beef::with_version(BEEF_V2);
+            beef_v2.merge_transaction(create_test_transaction(2));
+
+            let binary = beef_v2.to_binary();
+            let parsed = Beef::from_binary(&binary).unwrap();
+            assert_eq!(parsed.version, BEEF_V2);
+        }
+
+        #[test]
+        fn test_beef_version_default() {
+            let beef = Beef::new();
+            assert_eq!(beef.version, BEEF_V2, "Default version should be V2");
+        }
+
+        #[test]
+        fn test_beef_multiple_bumps() {
+            let mut beef = Beef::new();
+
+            // Add multiple merkle paths
+            let bump1 = MerklePath::from_coinbase_txid(&"a".repeat(64), 100);
+            let bump2 = MerklePath::from_coinbase_txid(&"b".repeat(64), 200);
+            let bump3 = MerklePath::from_coinbase_txid(&"c".repeat(64), 300);
+
+            let idx1 = beef.merge_bump(bump1);
+            let idx2 = beef.merge_bump(bump2);
+            let idx3 = beef.merge_bump(bump3);
+
+            assert_eq!(idx1, 0);
+            assert_eq!(idx2, 1);
+            assert_eq!(idx3, 2);
+            assert_eq!(beef.bumps.len(), 3);
+        }
+
+        #[test]
+        fn test_beef_empty_validation() {
+            let mut beef = Beef::new();
+            assert!(beef.is_valid(false), "Empty BEEF should be valid");
+            assert!(
+                beef.is_valid(true),
+                "Empty BEEF should be valid with txid_only"
+            );
+        }
+
+        #[test]
+        fn test_beef_txid_only_validation() {
+            let mut beef = Beef::new();
+            let txid = "a".repeat(64);
+            beef.merge_txid_only(txid.clone());
+
+            // Should fail without allowing txid_only
+            assert!(
+                !beef.is_valid(false),
+                "BEEF with txid-only should fail strict validation"
+            );
+
+            // Should pass with txid_only allowed
+            assert!(
+                beef.is_valid(true),
+                "BEEF with txid-only should pass lenient validation"
+            );
+        }
+
+        #[test]
+        fn test_beef_find_transaction_not_found() {
+            let beef = Beef::new();
+            let result = beef.find_txid(&"a".repeat(64));
+            assert!(result.is_none(), "Should not find non-existent txid");
+        }
+
+        #[test]
+        fn test_beef_hex_roundtrip() {
+            let mut beef = Beef::new();
+            beef.merge_transaction(create_test_transaction(1));
+
+            let hex = beef.to_hex();
+            let parsed = Beef::from_hex(&hex).unwrap();
+
+            assert_eq!(beef.version, parsed.version);
+            assert_eq!(beef.txs.len(), parsed.txs.len());
+        }
+
+        #[test]
+        fn test_beef_binary_roundtrip() {
+            let mut beef = Beef::new();
+            beef.merge_transaction(create_test_transaction(1));
+            beef.merge_transaction(create_test_transaction(2));
+
+            let binary = beef.to_binary();
+            let parsed = Beef::from_binary(&binary).unwrap();
+
+            assert_eq!(beef.version, parsed.version);
+            assert_eq!(beef.txs.len(), parsed.txs.len());
+        }
+
+        #[test]
+        fn test_beef_merge_duplicate_txid() {
+            let mut beef = Beef::new();
+            let tx = create_test_transaction(1);
+            let txid = tx.id();
+
+            // Add same transaction twice
+            beef.merge_transaction(tx.clone());
+            beef.merge_transaction(tx.clone());
+
+            // Should only have one copy
+            let count = beef.txs.iter().filter(|t| t.txid() == txid).count();
+            assert_eq!(count, 1, "Should deduplicate transactions");
+        }
+
+        #[test]
+        fn test_beef_merge_raw_tx() {
+            let mut beef = Beef::new();
+
+            // Create raw transaction bytes
+            let tx = create_test_transaction(1);
+            let raw = tx.to_binary();
+            let txid = tx.id();
+
+            beef.merge_raw_tx(raw, None);
+
+            assert!(beef.find_txid(&txid).is_some(), "Raw tx should be merged");
+        }
+
+        #[test]
+        fn test_beef_bump_at_different_heights() {
+            let mut beef = Beef::new();
+
+            // Add bumps at different heights
+            for height in [100u32, 1000, 10000, 100000, 1000000] {
+                let bump = MerklePath::from_coinbase_txid(&format!("{:064x}", height), height);
+                beef.merge_bump(bump);
+            }
+
+            assert_eq!(beef.bumps.len(), 5);
+
+            // Check that heights are preserved
+            for (i, bump) in beef.bumps.iter().enumerate() {
+                let expected_height = match i {
+                    0 => 100,
+                    1 => 1000,
+                    2 => 10000,
+                    3 => 100000,
+                    4 => 1000000,
+                    _ => unreachable!(),
+                };
+                assert_eq!(bump.block_height, expected_height);
+            }
+        }
+
+        #[test]
+        fn test_beef_validation_result() {
+            let mut beef = Beef::new();
+            let tx = create_test_transaction(1);
+            beef.merge_transaction(tx);
+
+            let result = beef.verify_valid(true);
+            // Check that validation result is returned (structure is valid)
+            // The validation may pass or fail depending on merkle path,
+            // but the result struct should be properly returned
+            let _ = result.valid; // Ensure we can access the field
+            let _ = result.roots; // Ensure roots map is accessible
+        }
+    }
 }

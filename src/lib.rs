@@ -7,7 +7,7 @@
 //! - **primitives**: Cryptographic primitives (hash, EC, encoding)
 //! - **script**: Bitcoin Script parsing and execution
 //! - **transaction**: Transaction construction and signing (coming soon)
-//! - **wallet**: HD wallets and key management (coming soon)
+//! - **wallet**: BRC-42 key derivation and wallet types
 //!
 //! ## Feature Flags
 //!
@@ -66,3 +66,10 @@ pub use script::{LockingScript, Script, ScriptChunk, UnlockingScript};
 // Convenience re-exports from transaction
 #[cfg(feature = "transaction")]
 pub use transaction::{ChangeDistribution, Transaction, TransactionInput, TransactionOutput};
+
+// Convenience re-exports from wallet
+#[cfg(feature = "wallet")]
+pub use wallet::{
+    CacheConfig, CachedKeyDeriver, Counterparty, KeyDeriver, KeyDeriverApi, ProtoWallet, Protocol,
+    SecurityLevel,
+};

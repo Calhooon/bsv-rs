@@ -725,4 +725,248 @@ mod tests {
             }
         }
     }
+
+    /// AES-GCM security tests for edge cases and tampering detection
+    mod aesgcm_security_tests {
+        use super::*;
+
+        #[test]
+        fn test_empty_plaintext_encryption_decryption() {
+            let key = SymmetricKey::random();
+
+            // Empty plaintext should work
+            let ciphertext = key.encrypt(b"").expect("Empty plaintext encryption failed");
+
+            // Ciphertext should be exactly IV (32 bytes) + tag (16 bytes) = 48 bytes
+            assert_eq!(
+                ciphertext.len(),
+                48,
+                "Empty plaintext ciphertext wrong size"
+            );
+
+            let decrypted = key
+                .decrypt(&ciphertext)
+                .expect("Empty plaintext decryption failed");
+            assert!(
+                decrypted.is_empty(),
+                "Decrypted empty plaintext should be empty"
+            );
+        }
+
+        #[test]
+        fn test_block_boundary_sizes() {
+            let key = SymmetricKey::random();
+
+            // Test sizes around AES block boundaries (16 bytes)
+            let test_sizes = [15, 16, 17, 31, 32, 33, 63, 64, 65];
+
+            for size in test_sizes {
+                let plaintext = vec![0xABu8; size];
+                let ciphertext = key
+                    .encrypt(&plaintext)
+                    .unwrap_or_else(|_| panic!("Failed to encrypt {} bytes", size));
+
+                // Verify ciphertext size: IV (32) + plaintext (size) + tag (16)
+                assert_eq!(
+                    ciphertext.len(),
+                    32 + size + 16,
+                    "Wrong ciphertext size for {} byte plaintext",
+                    size
+                );
+
+                let decrypted = key
+                    .decrypt(&ciphertext)
+                    .unwrap_or_else(|_| panic!("Failed to decrypt {} bytes", size));
+                assert_eq!(
+                    decrypted, plaintext,
+                    "Decryption mismatch for {} bytes",
+                    size
+                );
+            }
+        }
+
+        #[test]
+        fn test_tag_tampering_detection() {
+            let key = SymmetricKey::random();
+            let plaintext = b"test message for tag tampering";
+
+            let mut ciphertext = key.encrypt(plaintext).expect("Encryption failed");
+
+            // Tamper with each byte of the auth tag (last 16 bytes)
+            let tag_start = ciphertext.len() - 16;
+            for i in 0..16 {
+                let original_byte = ciphertext[tag_start + i];
+                ciphertext[tag_start + i] ^= 0x01; // Flip one bit
+
+                let result = key.decrypt(&ciphertext);
+                assert!(
+                    result.is_err(),
+                    "Tampered tag byte {} should fail decryption",
+                    i
+                );
+
+                // Restore original byte for next iteration
+                ciphertext[tag_start + i] = original_byte;
+            }
+        }
+
+        #[test]
+        fn test_nonce_tampering_detection() {
+            let key = SymmetricKey::random();
+            let plaintext = b"test message for nonce tampering";
+
+            let mut ciphertext = key.encrypt(plaintext).expect("Encryption failed");
+
+            // Tamper with the nonce (first 32 bytes)
+            for i in 0..32 {
+                let original_byte = ciphertext[i];
+                ciphertext[i] ^= 0x01; // Flip one bit
+
+                let result = key.decrypt(&ciphertext);
+                assert!(
+                    result.is_err(),
+                    "Tampered nonce byte {} should fail decryption",
+                    i
+                );
+
+                // Restore original byte
+                ciphertext[i] = original_byte;
+            }
+        }
+
+        #[test]
+        fn test_ciphertext_tampering_detection() {
+            let key = SymmetricKey::random();
+            let plaintext = b"test message for ciphertext tampering detection";
+
+            let mut ciphertext = key.encrypt(plaintext).expect("Encryption failed");
+
+            // Tamper with the actual ciphertext (between IV and tag)
+            let ct_start = 32; // After IV
+            let ct_end = ciphertext.len() - 16; // Before tag
+
+            if ct_end > ct_start {
+                for i in ct_start..ct_end {
+                    let original_byte = ciphertext[i];
+                    ciphertext[i] ^= 0xFF; // Flip all bits
+
+                    let result = key.decrypt(&ciphertext);
+                    assert!(
+                        result.is_err(),
+                        "Tampered ciphertext byte {} should fail decryption",
+                        i
+                    );
+
+                    // Restore original byte
+                    ciphertext[i] = original_byte;
+                }
+            }
+        }
+
+        #[test]
+        fn test_minimum_length_validation() {
+            let key = SymmetricKey::random();
+
+            // Minimum valid ciphertext is 48 bytes (IV + tag, no actual ciphertext)
+            // Anything shorter should fail
+
+            // Test lengths from 0 to 47 (all should fail)
+            for len in 0..48 {
+                let data = vec![0u8; len];
+                let result = key.decrypt(&data);
+                assert!(
+                    result.is_err(),
+                    "Ciphertext of {} bytes should fail (min is 48)",
+                    len
+                );
+            }
+
+            // 48 bytes should work (empty plaintext)
+            let valid_empty = key.encrypt(b"").expect("Encryption failed");
+            assert_eq!(valid_empty.len(), 48);
+            let result = key.decrypt(&valid_empty);
+            assert!(
+                result.is_ok(),
+                "48-byte ciphertext (empty plaintext) should work"
+            );
+        }
+
+        #[test]
+        fn test_nonce_uniqueness() {
+            let key = SymmetricKey::random();
+            let plaintext = b"same message encrypted multiple times";
+
+            // Encrypt the same message multiple times
+            let mut nonces = Vec::new();
+            for _ in 0..10 {
+                let ciphertext = key.encrypt(plaintext).expect("Encryption failed");
+                // Extract the nonce (first 32 bytes)
+                let nonce: Vec<u8> = ciphertext[..32].to_vec();
+                nonces.push(nonce);
+            }
+
+            // All nonces should be unique
+            for i in 0..nonces.len() {
+                for j in (i + 1)..nonces.len() {
+                    assert_ne!(
+                        nonces[i], nonces[j],
+                        "Nonces {} and {} should be different",
+                        i, j
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn test_wrong_key_decryption() {
+            let key1 = SymmetricKey::random();
+            let key2 = SymmetricKey::random();
+            let plaintext = b"secret message";
+
+            let ciphertext = key1.encrypt(plaintext).expect("Encryption failed");
+
+            // Decryption with wrong key should fail
+            let result = key2.decrypt(&ciphertext);
+            assert!(result.is_err(), "Decryption with wrong key should fail");
+        }
+
+        #[test]
+        fn test_truncated_ciphertext() {
+            let key = SymmetricKey::random();
+            let plaintext = b"test message for truncation";
+
+            let ciphertext = key.encrypt(plaintext).expect("Encryption failed");
+
+            // Truncate ciphertext at various points
+            for truncate_at in [47, 40, 32, 16, 8, 1] {
+                if truncate_at < ciphertext.len() {
+                    let truncated = &ciphertext[..truncate_at];
+                    let result = key.decrypt(truncated);
+                    assert!(
+                        result.is_err(),
+                        "Truncated ciphertext at {} bytes should fail",
+                        truncate_at
+                    );
+                }
+            }
+        }
+
+        #[test]
+        fn test_extended_ciphertext() {
+            let key = SymmetricKey::random();
+            let plaintext = b"test message";
+
+            let mut ciphertext = key.encrypt(plaintext).expect("Encryption failed");
+
+            // Append extra bytes
+            ciphertext.push(0x00);
+
+            // Extended ciphertext should fail (tag position is wrong)
+            let result = key.decrypt(&ciphertext);
+            assert!(
+                result.is_err(),
+                "Extended ciphertext should fail decryption"
+            );
+        }
+    }
 }

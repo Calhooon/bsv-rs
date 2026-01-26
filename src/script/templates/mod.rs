@@ -8,6 +8,7 @@
 //!
 //! - [`P2PKH`] - Pay-to-Public-Key-Hash (most common)
 //! - [`RPuzzle`] - R-Puzzle (knowledge-based locking using ECDSA K-value)
+//! - [`PushDrop`] - Data envelope with embedded fields and P2PK lock
 //!
 //! # Example: P2PKH
 //!
@@ -57,10 +58,41 @@
 //! let unlock = RPuzzle::unlock(&k, &private_key, SignOutputs::All, false);
 //! let unlocking = unlock.sign(&context)?;
 //! ```
+//!
+//! # Example: PushDrop
+//!
+//! ```rust,ignore
+//! use bsv_sdk::script::templates::{PushDrop, LockPosition};
+//! use bsv_sdk::primitives::ec::PrivateKey;
+//!
+//! let private_key = PrivateKey::random();
+//! let public_key = private_key.public_key();
+//!
+//! // Create with embedded token data
+//! let fields = vec![
+//!     b"BSV20".to_vec(),
+//!     b"transfer".to_vec(),
+//!     b"1000".to_vec(),
+//! ];
+//!
+//! // Lock-before pattern (default)
+//! let pushdrop = PushDrop::new(public_key.clone(), fields.clone());
+//! let locking = pushdrop.lock();
+//!
+//! // Lock-after pattern
+//! let pushdrop = PushDrop::new(public_key, fields)
+//!     .with_position(LockPosition::After);
+//! let locking = pushdrop.lock();
+//!
+//! // Decode a PushDrop script
+//! let decoded = PushDrop::decode(&locking)?;
+//! ```
 
 pub mod p2pkh;
+pub mod pushdrop;
 pub mod rpuzzle;
 
 // Re-export main types
 pub use p2pkh::P2PKH;
+pub use pushdrop::{LockPosition, PushDrop};
 pub use rpuzzle::{RPuzzle, RPuzzleType};

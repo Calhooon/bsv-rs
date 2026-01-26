@@ -127,6 +127,29 @@ pub enum Error {
     #[cfg(feature = "transaction")]
     #[error("fee model error: {0}")]
     FeeModelError(String),
+
+    // ===================
+    // Wallet errors
+    // ===================
+    /// General wallet error.
+    #[cfg(feature = "wallet")]
+    #[error("wallet error: {0}")]
+    WalletError(String),
+
+    /// Key derivation error.
+    #[cfg(feature = "wallet")]
+    #[error("key derivation error: {0}")]
+    KeyDerivationError(String),
+
+    /// Protocol validation error.
+    #[cfg(feature = "wallet")]
+    #[error("protocol validation error: {0}")]
+    ProtocolValidationError(String),
+
+    /// Invalid counterparty.
+    #[cfg(feature = "wallet")]
+    #[error("invalid counterparty: {0}")]
+    InvalidCounterparty(String),
 }
 
 /// Result type alias for BSV SDK operations.
