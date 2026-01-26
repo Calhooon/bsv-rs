@@ -315,7 +315,8 @@ impl BigNumber {
     /// assert_eq!(n.to_bytes_be_min(), vec![0x12, 0x34]);
     ///
     /// let z = BigNumber::zero();
-    /// assert_eq!(z.to_bytes_be_min(), vec![]);
+    /// let empty: Vec<u8> = vec![];
+    /// assert_eq!(z.to_bytes_be_min(), empty);
     /// ```
     pub fn to_bytes_be_min(&self) -> Vec<u8> {
         if self.is_zero() {
