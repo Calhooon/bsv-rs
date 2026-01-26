@@ -514,7 +514,7 @@ impl BigNumber {
         if self.is_zero() {
             return 0;
         }
-        (self.bit_length() + 7) / 8
+        self.bit_length().div_ceil(8)
     }
 
     // ========================================================================
