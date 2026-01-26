@@ -76,7 +76,7 @@ pub struct BlockHeadersServiceTracker {
 }
 
 impl BlockHeadersServiceTracker {
-    /// Create a tracker with the default URL (https://headers.spv.money).
+    /// Create a tracker with the default URL (<https://headers.spv.money>).
     pub fn new() -> Self {
         Self::with_url(DEFAULT_HEADERS_URL)
     }
