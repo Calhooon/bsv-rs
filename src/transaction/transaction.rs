@@ -8,6 +8,8 @@ use std::collections::HashMap;
 
 use serde_json::Value;
 
+use super::beef::Beef;
+use super::beef_tx::BEEF_V2;
 use super::input::TransactionInput;
 use super::output::TransactionOutput;
 use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
@@ -274,6 +276,11 @@ impl Transaction {
     }
 
     /// Parses a transaction from a Reader.
+    pub(crate) fn from_reader_internal(reader: &mut Reader) -> Result<Self> {
+        Self::from_reader(reader)
+    }
+
+    /// Parses a transaction from a Reader.
     fn from_reader(reader: &mut Reader) -> Result<Self> {
         let version = reader.read_u32_le()?;
 
@@ -391,6 +398,86 @@ impl Transaction {
             inputs: input_offsets,
             outputs: output_offsets,
         })
+    }
+
+    // ===================
+    // BEEF Format Methods
+    // ===================
+
+    /// Parses a transaction from BEEF format.
+    ///
+    /// # Arguments
+    ///
+    /// * `beef` - The BEEF binary data
+    /// * `txid` - Optional txid to extract. If None, returns the last transaction.
+    ///
+    /// # Returns
+    ///
+    /// The parsed transaction.
+    pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self> {
+        let parsed = Beef::from_binary(beef)?;
+
+        match txid {
+            Some(id) => parsed
+                .find_txid(id)
+                .and_then(|btx| btx.tx().cloned())
+                .ok_or_else(|| {
+                    crate::Error::TransactionError(format!("Transaction {} not found in BEEF", id))
+                }),
+            None => parsed
+                .txs
+                .last()
+                .and_then(|btx| btx.tx().cloned())
+                .ok_or_else(|| {
+                    crate::Error::TransactionError("No transactions in BEEF".to_string())
+                }),
+        }
+    }
+
+    /// Parses a transaction from Atomic BEEF format.
+    ///
+    /// The atomic txid in the BEEF header identifies the transaction to return.
+    pub fn from_atomic_beef(beef: &[u8]) -> Result<Self> {
+        let parsed = Beef::from_binary(beef)?;
+
+        let txid = parsed.atomic_txid.as_ref().ok_or_else(|| {
+            crate::Error::TransactionError("Not an Atomic BEEF format".to_string())
+        })?;
+
+        parsed.find_atomic_transaction(txid).ok_or_else(|| {
+            crate::Error::TransactionError("Atomic transaction not found".to_string())
+        })
+    }
+
+    /// Serializes this transaction to BEEF format.
+    ///
+    /// # Arguments
+    ///
+    /// * `allow_partial` - If true, allows incomplete proofs
+    ///
+    /// # Returns
+    ///
+    /// The BEEF binary data.
+    pub fn to_beef(&self, _allow_partial: bool) -> Result<Vec<u8>> {
+        let mut beef = Beef::with_version(BEEF_V2);
+        beef.merge_transaction(self.clone());
+        Ok(beef.to_binary())
+    }
+
+    /// Serializes this transaction to Atomic BEEF format.
+    ///
+    /// # Arguments
+    ///
+    /// * `allow_partial` - If true, allows incomplete proofs
+    ///
+    /// # Returns
+    ///
+    /// The Atomic BEEF binary data.
+    pub fn to_atomic_beef(&self, _allow_partial: bool) -> Result<Vec<u8>> {
+        let mut beef = Beef::with_version(BEEF_V2);
+        beef.merge_transaction(self.clone());
+        let txid = self.id();
+        beef.to_binary_atomic(&txid)
     }
 
     /// Invalidates all serialization caches.

@@ -106,12 +106,22 @@ pub enum Error {
     StackOverflow,
 
     // ===================
-    // Transaction errors (future)
+    // Transaction errors
     // ===================
     /// Transaction error.
     #[cfg(feature = "transaction")]
     #[error("transaction error: {0}")]
     TransactionError(String),
+
+    /// MerklePath error.
+    #[cfg(feature = "transaction")]
+    #[error("merkle path error: {0}")]
+    MerklePathError(String),
+
+    /// BEEF format error.
+    #[cfg(feature = "transaction")]
+    #[error("BEEF error: {0}")]
+    BeefError(String),
 }
 
 /// Result type alias for BSV SDK operations.
