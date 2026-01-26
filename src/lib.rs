@@ -45,6 +45,7 @@
 //! assert_eq!(plaintext, &decrypted[..]);
 //! ```
 
+pub mod bignum;
 pub mod error;
 pub mod hash;
 pub mod symmetric;
@@ -56,6 +57,7 @@ pub mod bsv;
 pub mod ec;
 
 // Re-export commonly used items
+pub use bignum::BigNumber;
 pub use error::Error;
 pub use hash::{
     hash160, pbkdf2_sha512, ripemd160, sha1, sha256, sha256_hmac, sha256d, sha512, sha512_hmac,

@@ -3,7 +3,7 @@
 
 ## Overview
 
-This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, and binary serialization. Elliptic curve and BSV-specific modules are placeholders for future implementation phases.
+This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, and arbitrary-precision integers (BigNumber). Elliptic curve and BSV-specific modules are placeholders for future implementation phases.
 
 ## Files
 
@@ -14,6 +14,7 @@ This is the source directory for the `bsv-primitives` crate, providing cryptogra
 | `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 |
 | `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer |
+| `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation |
 | `ec/` | Placeholder for secp256k1 elliptic curve (Phase 5) |
 | `bsv/` | Placeholder for BSV-specific operations (Phase 6) |
 
@@ -77,6 +78,63 @@ pub fn from_base64(s: &str) -> Result<Vec<u8>>
 pub fn to_utf8_bytes(s: &str) -> Vec<u8>
 pub fn from_utf8_bytes(data: &[u8]) -> Result<String>
 ```
+
+### BigNumber (Arbitrary-Precision Integers)
+```rust
+pub struct BigNumber {
+    // Construction
+    pub fn zero() -> Self
+    pub fn one() -> Self
+    pub fn from_i64(val: i64) -> Self
+    pub fn from_u64(val: u64) -> Self
+    pub fn from_hex(s: &str) -> Result<Self>         // Parses "deadbeef" or "0xDEADBEEF"
+    pub fn from_dec_str(s: &str) -> Result<Self>     // Parses decimal strings
+    pub fn from_bytes_be(bytes: &[u8]) -> Self       // Big-endian unsigned
+    pub fn from_bytes_le(bytes: &[u8]) -> Self       // Little-endian unsigned
+    pub fn from_signed_bytes_be(bytes: &[u8]) -> Self // Two's complement
+
+    // Serialization
+    pub fn to_hex(&self) -> String                   // Lowercase, no prefix
+    pub fn to_dec_string(&self) -> String
+    pub fn to_bytes_be(&self, len: usize) -> Vec<u8> // Padded to length
+    pub fn to_bytes_le(&self, len: usize) -> Vec<u8>
+    pub fn to_bytes_be_min(&self) -> Vec<u8>         // Minimum bytes
+
+    // Arithmetic
+    pub fn add(&self, other: &BigNumber) -> BigNumber
+    pub fn sub(&self, other: &BigNumber) -> BigNumber
+    pub fn mul(&self, other: &BigNumber) -> BigNumber
+    pub fn div(&self, other: &BigNumber) -> BigNumber
+    pub fn modulo(&self, other: &BigNumber) -> BigNumber  // Always positive result
+    pub fn mod_floor(&self, other: &BigNumber) -> BigNumber // Can be negative
+    pub fn neg(&self) -> BigNumber
+    pub fn abs(&self) -> BigNumber
+    pub fn pow(&self, exp: u32) -> BigNumber
+
+    // Comparisons
+    pub fn compare(&self, other: &BigNumber) -> Ordering
+    pub fn is_zero(&self) -> bool
+    pub fn is_negative(&self) -> bool
+    pub fn is_positive(&self) -> bool
+    pub fn is_odd(&self) -> bool
+    pub fn is_even(&self) -> bool
+
+    // Bit operations
+    pub fn bit_length(&self) -> usize
+    pub fn byte_length(&self) -> usize
+
+    // Modular arithmetic (for EC operations)
+    pub fn mod_inverse(&self, modulus: &BigNumber) -> Option<BigNumber>
+    pub fn mod_pow(&self, exp: &BigNumber, modulus: &BigNumber) -> BigNumber
+    pub fn gcd(&self, other: &BigNumber) -> BigNumber
+
+    // Curve constants
+    pub fn secp256k1_order() -> BigNumber   // Curve order n
+    pub fn secp256k1_prime() -> BigNumber   // Field prime p
+}
+```
+
+**Design Note**: Following the Go SDK approach, this is a minimal compatibility layer wrapping `num-bigint`. It does NOT implement the full bn.js API (no word arrays, reduction contexts, or in-place mutation). It provides what's needed for EC scalar operations and BRC-42 key derivation.
 
 ### Binary Reader/Writer
 ```rust
@@ -209,6 +267,33 @@ let address = to_base58_check(&pubkey_hash, &[0x00]); // P2PKH address
 let (version, payload) = from_base58_check(&address)?;
 ```
 
+### BigNumber
+
+```rust
+use bsv_primitives::BigNumber;
+
+// Create from various sources
+let n1 = BigNumber::from_hex("deadbeef").unwrap();
+let n2 = BigNumber::from_i64(12345);
+let n3 = BigNumber::from_bytes_be(&[0x12, 0x34]);
+
+// Arithmetic
+let sum = n1.add(&n2);
+let product = n1.mul(&n2);
+
+// Key derivation pattern (BRC-42)
+let private_key = BigNumber::from_hex("0123...").unwrap();
+let hmac_value = BigNumber::from_hex("fedc...").unwrap();
+let order = BigNumber::secp256k1_order();
+let new_key = private_key.add(&hmac_value).modulo(&order);
+let key_bytes = new_key.to_bytes_be(32);  // 32-byte padded
+
+// Modular arithmetic
+let a = BigNumber::from_i64(3);
+let m = BigNumber::from_i64(7);
+let inv = a.mod_inverse(&m).unwrap();  // 3 * 5 = 1 (mod 7)
+```
+
 ### Binary Serialization
 
 ```rust
@@ -275,6 +360,7 @@ Key external crates used:
 - `sha1`, `sha2`, `ripemd` - Hash algorithms
 - `hmac`, `pbkdf2` - HMAC and key derivation
 - `aes-gcm` - AES-256-GCM encryption
+- `num-bigint`, `num-traits`, `num-integer` - Arbitrary-precision integers
 - `hex`, `bs58`, `base64` - Encoding
 - `thiserror` - Error handling
 - `getrandom` - Cryptographically secure random bytes

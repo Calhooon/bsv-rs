@@ -23,9 +23,10 @@ p256 = "0.13"
 # Symmetric Encryption (for later phases)
 aes-gcm = "0.10"
 
-# Big Integers (for later phases)
+# Big Integers
 num-bigint = "0.4"
 num-traits = "0.2"
+num-integer = "0.1"
 
 # Randomness
 rand = "0.8"

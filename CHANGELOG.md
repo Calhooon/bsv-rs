@@ -281,6 +281,117 @@ Example compatible values:
 
 ---
 
+### Phase 4: BigNumber Compatibility Layer
+
+#### Added
+Minimal `BigNumber` implementation in `src/bignum.rs` following the Go SDK approach:
+
+**Construction:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `zero` | `fn zero() -> Self` | Create BigNumber with value 0 |
+| `one` | `fn one() -> Self` | Create BigNumber with value 1 |
+| `from_i64` | `fn from_i64(val: i64) -> Self` | Create from signed 64-bit integer |
+| `from_u64` | `fn from_u64(val: u64) -> Self` | Create from unsigned 64-bit integer |
+| `from_hex` | `fn from_hex(s: &str) -> Result<Self>` | Parse hex string (with optional "0x" prefix) |
+| `from_dec_str` | `fn from_dec_str(s: &str) -> Result<Self>` | Parse decimal string |
+| `from_bytes_be` | `fn from_bytes_be(bytes: &[u8]) -> Self` | Create from big-endian bytes (unsigned) |
+| `from_bytes_le` | `fn from_bytes_le(bytes: &[u8]) -> Self` | Create from little-endian bytes (unsigned) |
+| `from_signed_bytes_be` | `fn from_signed_bytes_be(bytes: &[u8]) -> Self` | Create from two's complement bytes |
+
+**Serialization:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `to_hex` | `fn to_hex(&self) -> String` | Lowercase hex, no prefix, no leading zeros |
+| `to_dec_string` | `fn to_dec_string(&self) -> String` | Decimal string representation |
+| `to_bytes_be` | `fn to_bytes_be(&self, len: usize) -> Vec<u8>` | Big-endian, padded to length |
+| `to_bytes_le` | `fn to_bytes_le(&self, len: usize) -> Vec<u8>` | Little-endian, padded to length |
+| `to_bytes_be_min` | `fn to_bytes_be_min(&self) -> Vec<u8>` | Big-endian, minimum length |
+| `to_bytes_le_min` | `fn to_bytes_le_min(&self) -> Vec<u8>` | Little-endian, minimum length |
+
+**Arithmetic:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `add` | `fn add(&self, other: &BigNumber) -> BigNumber` | Addition |
+| `sub` | `fn sub(&self, other: &BigNumber) -> BigNumber` | Subtraction |
+| `mul` | `fn mul(&self, other: &BigNumber) -> BigNumber` | Multiplication |
+| `div` | `fn div(&self, other: &BigNumber) -> BigNumber` | Division (truncated) |
+| `modulo` | `fn modulo(&self, other: &BigNumber) -> BigNumber` | Modulo (always positive) |
+| `mod_floor` | `fn mod_floor(&self, other: &BigNumber) -> BigNumber` | Modulo (can be negative) |
+| `neg` | `fn neg(&self) -> BigNumber` | Negation |
+| `abs` | `fn abs(&self) -> BigNumber` | Absolute value |
+| `pow` | `fn pow(&self, exp: u32) -> BigNumber` | Exponentiation |
+
+**Comparisons:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `compare` | `fn compare(&self, other: &BigNumber) -> Ordering` | Compare two BigNumbers |
+| `is_zero` | `fn is_zero(&self) -> bool` | Check if zero |
+| `is_negative` | `fn is_negative(&self) -> bool` | Check if negative |
+| `is_positive` | `fn is_positive(&self) -> bool` | Check if positive (> 0) |
+| `is_odd` | `fn is_odd(&self) -> bool` | Check if odd |
+| `is_even` | `fn is_even(&self) -> bool` | Check if even |
+
+**Bit Operations:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `bit_length` | `fn bit_length(&self) -> usize` | Number of bits to represent |
+| `byte_length` | `fn byte_length(&self) -> usize` | Number of bytes to represent |
+
+**Modular Arithmetic:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `mod_inverse` | `fn mod_inverse(&self, modulus: &BigNumber) -> Option<BigNumber>` | Modular inverse (extended Euclidean algorithm) |
+| `mod_pow` | `fn mod_pow(&self, exp: &BigNumber, modulus: &BigNumber) -> BigNumber` | Modular exponentiation |
+| `gcd` | `fn gcd(&self, other: &BigNumber) -> BigNumber` | Greatest common divisor |
+
+**Curve Constants:**
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `secp256k1_order` | `fn secp256k1_order() -> BigNumber` | Curve order n |
+| `secp256k1_prime` | `fn secp256k1_prime() -> BigNumber` | Field prime p |
+
+#### Design Decisions
+- **Minimal API**: Following Go SDK approach, wraps `num-bigint` with BSV-specific serialization
+- **No bn.js compatibility**: Does NOT implement word arrays, reduction contexts, or in-place mutation
+- **Focus on key derivation**: Provides exactly what's needed for BRC-42 key derivation pattern:
+  ```rust
+  let new_key = private_key.add(&hmac_value).modulo(&order);
+  let bytes = new_key.to_bytes_be(32);
+  ```
+
+#### Tests
+42 unit tests covering all BigNumber functionality:
+
+| Test Category | Count | Description |
+|--------------|-------|-------------|
+| Construction | 9 | zero/one, from_i64/u64, from_hex, from_dec_str, from_bytes |
+| Serialization | 7 | to_hex, to_bytes_be/le, to_bytes_min, padding |
+| Arithmetic | 7 | add, sub, mul, div, modulo (positive/negative), mod_floor |
+| Comparisons | 5 | cmp, is_zero, is_negative/positive, is_odd/even |
+| Bit operations | 2 | bit_length, byte_length |
+| Modular arithmetic | 4 | mod_inverse, mod_inverse_none, mod_pow, gcd |
+| Key derivation | 2 | 256-bit numbers, key derivation pattern simulation |
+| Curve constants | 2 | secp256k1_order, secp256k1_prime |
+| Traits | 4 | From implementations, Ord, Display/Debug |
+
+#### Dependencies Added
+- `num-integer` crate for GCD and is_even/is_odd traits
+
+#### Documentation
+- Comprehensive rustdoc comments on all public methods
+- Module-level documentation with usage examples
+- 13 doc-tests that serve as executable examples
+
+---
+
 ## Reference Implementations
 
 This library is being ported from two reference implementations:
@@ -300,7 +411,7 @@ Test vectors are shared across all three implementations to ensure byte-for-byte
 | Phase 1 | Hash Functions | ✅ Complete |
 | Phase 2 | Symmetric Encryption (AES-GCM) | ✅ Complete |
 | Phase 3 | Encoding Utilities | ✅ Complete |
-| Phase 4 | BigNumber Compatibility | 🔲 Pending |
+| Phase 4 | BigNumber Compatibility | ✅ Complete |
 | Phase 5 | Elliptic Curve Operations | 🔲 Pending |
 | Phase 6 | BSV-Specific Components | 🔲 Pending |
 | Phase 7 | P-256 Support | 🔲 Pending |
