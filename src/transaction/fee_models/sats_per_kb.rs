@@ -131,9 +131,9 @@ impl FeeModel for SatoshisPerKilobyte {
     fn compute_fee(&self, tx: &Transaction) -> Result<u64> {
         let size = self.estimate_size(tx)?;
 
-        // Calculate fee with ceiling division: (size * value + 999) / 1000
+        // Calculate fee with ceiling division
         // This ensures miners get the extra satoshi for any fractional KB
-        let fee = ((size as u64 * self.value) + 999) / 1000;
+        let fee = (size as u64 * self.value).div_ceil(1000);
 
         Ok(fee)
     }
