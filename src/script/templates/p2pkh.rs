@@ -353,7 +353,7 @@ mod tests {
         // Last byte should be the sighash type
         assert_eq!(
             sig_data.last().unwrap(),
-            &((0x41) as u8) // SIGHASH_ALL | SIGHASH_FORKID
+            &0x41_u8 // SIGHASH_ALL | SIGHASH_FORKID
         );
 
         // Second chunk should be the compressed public key (33 bytes)

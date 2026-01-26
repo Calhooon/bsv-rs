@@ -265,8 +265,8 @@ fn test_p2pkh_spend_validation() {
     // The actual signature verification would fail with a mock sighash.
 
     // Verify the scripts are well-formed
-    assert!(locking_script.to_binary().len() > 0);
-    assert!(unlocking_script.to_binary().len() > 0);
+    assert!(!locking_script.to_binary().is_empty());
+    assert!(!unlocking_script.to_binary().is_empty());
     assert_eq!(unlocking_script.chunks().len(), 2);
 }
 
