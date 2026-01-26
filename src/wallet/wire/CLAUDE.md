@@ -9,11 +9,11 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~172 |
-| `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~1474 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~939 |
-| `transceiver.rs` | Client-side message serialization and full wallet interface | ~1616 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~173 |
+| `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display impls | ~198 |
+| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~1475 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~944 |
+| `transceiver.rs` | Client-side message serialization and full wallet interface | ~1617 |
 
 ## Architecture
 
@@ -268,8 +268,12 @@ The encoding module supports many wallet-specific types:
 | `read_u16_le()` / `read_u32_le()` / `read_u64_le()` | integers | Little-endian |
 | `read_var_int()` | `u64` | Unsigned varint |
 | `read_signed_var_int()` | `i64` | ZigZag-encoded signed varint |
+| `read_optional_var_int()` | `Option<u64>` | Varint or None if negative |
 | `read_bytes(len)` | `&[u8]` | Fixed-length bytes |
 | `read_remaining()` | `&[u8]` | All remaining bytes |
+| `remaining()` | `usize` | Bytes remaining |
+| `is_empty()` | `bool` | True if no bytes remain |
+| `position()` | `usize` | Current read position |
 
 **Wire Protocol Types:**
 | Method | Returns | Description |
@@ -280,21 +284,32 @@ The encoding module supports many wallet-specific types:
 | `read_string_array()` | `Vec<String>` | Count + strings |
 | `read_optional_bool()` | `Option<bool>` | -1=None, 0=false, 1=true |
 | `read_outpoint()` | `Outpoint` | 32-byte txid + varint vout |
+| `read_outpoint_string()` | `String` | Outpoint as "txid.vout" |
 | `read_counterparty()` | `Option<Counterparty>` | Sentinel or 33-byte pubkey |
 | `read_protocol_id()` | `Protocol` | Security level + name |
 | `read_optional_protocol_id()` | `Option<Protocol>` | 255 = None |
 | `read_action_status()` | `Option<ActionStatus>` | Status code (1-8 or -1) |
+| `read_txid_hex()` | `String` | 32-byte txid as hex |
 | `read_query_mode()` | `QueryMode` | Any (0) or All (1) |
+| `read_optional_query_mode()` | `Option<QueryMode>` | -1 = None |
 | `read_output_include()` | `OutputInclude` | Locking scripts or full tx |
+| `read_optional_output_include()` | `Option<OutputInclude>` | -1 = None |
 | `read_string_map()` | `HashMap<String, String>` | Key-value pairs |
+| `read_optional_string_map()` | `Option<HashMap<...>>` | -1 = None |
+| `read_send_with_result_status()` | `SendWithResultStatus` | 0/1/2 status |
 | `read_send_with_result()` | `SendWithResult` | Txid + status |
+| `read_send_with_result_array()` | `Option<Vec<SendWithResult>>` | Array or None |
 | `read_sign_action_spend()` | `SignActionSpend` | Unlocking script + sequence |
 | `read_sign_action_spends()` | `HashMap<u32, SignActionSpend>` | Index -> spend map |
 | `read_wallet_certificate()` | `WalletCertificate` | Certificate with fields |
+| `read_optional_wallet_certificate()` | `Option<WalletCertificate>` | -1 = None |
 | `read_identity_certifier()` | `IdentityCertifier` | Certifier info |
+| `read_optional_identity_certifier()` | `Option<IdentityCertifier>` | -1 = None |
 | `read_identity_certificate()` | `IdentityCertificate` | Full identity cert |
 | `read_wallet_payment()` | `WalletPayment` | Payment derivation info |
+| `read_optional_wallet_payment()` | `Option<WalletPayment>` | -1 = None |
 | `read_basket_insertion()` | `BasketInsertion` | Basket + tags |
+| `read_optional_basket_insertion()` | `Option<BasketInsertion>` | -1 = None |
 | `read_internalize_output()` | `InternalizeOutput` | Output with remittance |
 | `read_wallet_action_input()` | `WalletActionInput` | Action input |
 | `read_wallet_action_output()` | `WalletActionOutput` | Action output |
@@ -303,15 +318,39 @@ The encoding module supports many wallet-specific types:
 
 ### WireWriter Methods
 
-All reader methods have corresponding writer methods with matching signatures:
-- Basic: `write_u8()`, `write_i8()`, `write_u16_le()`, `write_u32_le()`, `write_u64_le()`, `write_var_int()`, `write_signed_var_int()`, `write_bytes()`
-- Strings: `write_string()`, `write_optional_string()`, `write_string_array()`, `write_optional_string_array()`
-- Protocol: `write_outpoint()`, `write_counterparty()`, `write_protocol_id()`, `write_optional_protocol_id()`
-- Status: `write_action_status()`, `write_query_mode()`, `write_optional_query_mode()`, `write_output_include()`, `write_optional_output_include()`
-- Maps: `write_string_map()`, `write_optional_string_map()`
-- Actions: `write_send_with_result()`, `write_send_with_result_array()`, `write_sign_action_spend()`, `write_sign_action_spends()`
-- Certificates: `write_wallet_certificate()`, `write_optional_wallet_certificate()`, `write_identity_certifier()`, `write_identity_certificate()`
-- Outputs: `write_wallet_payment()`, `write_basket_insertion()`, `write_internalize_output()`, `write_wallet_action_input()`, `write_wallet_action_output()`, `write_wallet_action()`, `write_wallet_output()`
+**Basic Types:**
+- `write_u8()`, `write_i8()` - Single byte
+- `write_u16_le()`, `write_u32_le()`, `write_u64_le()` - Little-endian integers
+- `write_var_int()` - Unsigned varint
+- `write_signed_var_int()` - ZigZag-encoded signed varint
+- `write_optional_var_int()` - Varint or -1 for None
+- `write_bytes()` - Raw bytes
+- `len()`, `is_empty()`, `as_bytes()`, `into_bytes()` - Buffer access
+
+**Wire Protocol Types:**
+- `write_string()`, `write_optional_string()` - Strings
+- `write_optional_bytes()` - Optional byte arrays
+- `write_string_array()`, `write_optional_string_array()` - String arrays
+- `write_optional_bool()` - Optional boolean
+- `write_outpoint()`, `write_outpoint_string()` - Outpoints
+- `write_counterparty()` - Counterparty encoding
+- `write_protocol_id()`, `write_optional_protocol_id()` - Protocol IDs
+- `write_action_status()` - Action status codes
+- `write_txid_hex()` - Txid from hex string
+- `write_query_mode()`, `write_optional_query_mode()` - Query modes
+- `write_output_include()`, `write_optional_output_include()` - Output include modes
+- `write_string_map()`, `write_optional_string_map()` - String maps
+- `write_send_with_result_status()`, `write_send_with_result()`, `write_send_with_result_array()` - Send results
+- `write_sign_action_spend()`, `write_sign_action_spends()` - Sign action spends
+- `write_wallet_certificate()`, `write_optional_wallet_certificate()` - Certificates
+- `write_identity_certifier()`, `write_optional_identity_certifier()` - Certifier info
+- `write_identity_certificate()` - Identity certificates
+- `write_wallet_payment()`, `write_optional_wallet_payment()` - Payments
+- `write_basket_insertion()`, `write_optional_basket_insertion()` - Basket insertions
+- `write_internalize_output()` - Internalize outputs
+- `write_wallet_action_input()`, `write_wallet_action_output()` - Action I/O
+- `write_wallet_action()` - Full actions
+- `write_wallet_output()` - Wallet outputs
 
 ## Implemented Methods
 
@@ -359,7 +398,7 @@ The `WalletWireTransceiver` implements serialization for ALL 28 methods:
 
 **Auth Operations:** isAuthenticated, waitForAuthentication
 
-**Key Linkage:** revealCounterpartyKeyLinkage, revealSpecificKeyLinkage
+**Key Linkage:** revealCounterpartyKeyLinkage, revealSpecificKeyLinkage (not exposed in transceiver public API)
 
 ## Error Codes
 
@@ -367,7 +406,6 @@ The `WalletWireTransceiver` implements serialization for ALL 28 methods:
 |------|---------|
 | 0 | Success |
 | 1 | Generic error |
-| 5 | Review actions required |
 | 6 | Invalid parameter |
 | 7 | Insufficient funds |
 
@@ -409,6 +447,7 @@ The `WalletCall` enum provides type-safe call codes with helper methods:
 
 ```rust
 #[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WalletCall {
     CreateAction = 1,
     SignAction = 2,

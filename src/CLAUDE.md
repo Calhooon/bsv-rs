@@ -16,10 +16,10 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 
 | Directory | Feature Flag | Status | Description |
 |-----------|--------------|--------|-------------|
-| `primitives/` | `primitives` | Complete | Cryptographic primitives (hash, EC, encoding) |
-| `script/` | `script` | Complete | Script parsing and execution |
-| `transaction/` | `transaction` | Complete | Transaction construction, signing, BEEF format |
-| `wallet/` | `wallet` | Complete | BRC-42 key derivation and wallet types |
+| `primitives/` | `primitives` | Complete | Cryptographic primitives (hash, EC, encoding, AES-256-GCM) |
+| `script/` | `script` | Complete | Script parsing, execution, and templates (P2PKH, RPuzzle, PushDrop) |
+| `transaction/` | `transaction` | Complete | Transaction construction, signing, BEEF/MerklePath SPV proofs |
+| `wallet/` | `wallet` | Complete | BRC-42 key derivation, ProtoWallet, WalletClient |
 
 ## Key Exports
 
