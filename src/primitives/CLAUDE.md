@@ -7,16 +7,16 @@ This module provides cryptographic primitives compatible with the BSV TypeScript
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module declarations and re-exports |
-| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 |
-| `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility |
-| `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer |
-| `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation |
-| `ec/` | secp256k1 elliptic curve: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 |
-| `p256.rs` | P-256 (secp256r1) elliptic curve: P256PrivateKey, P256PublicKey, P256Signature |
-| `bsv/` | BSV-specific operations (sighash, transaction signatures, Schnorr proofs, Shamir secret sharing) |
+| File | Purpose | Lines |
+|------|---------|-------|
+| `mod.rs` | Module declarations and re-exports | 34 |
+| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 702 |
+| `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility | 728 |
+| `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer | 1696 |
+| `bignum.rs` | Arbitrary-precision integers for EC scalars and key derivation | 1184 |
+| `p256.rs` | P-256 (secp256r1) elliptic curve: P256PrivateKey, P256PublicKey, P256Signature | 910 |
+| `ec/` | secp256k1 elliptic curve: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | (subdir) |
+| `bsv/` | BSV-specific operations (sighash, transaction signatures, Schnorr proofs, Shamir secret sharing) | (subdir) |
 
 Note: Error types are defined in `src/error.rs` at the crate root.
 
@@ -52,7 +52,7 @@ pub struct SymmetricKey {
 }
 ```
 
-**Important**: Uses non-standard 32-byte nonce for BSV SDK compatibility. Output format: `IV (32 bytes) || ciphertext || auth_tag (16 bytes)`. Keys shorter than 32 bytes are padded with leading zeros.
+**Important**: Uses non-standard 32-byte nonce for BSV SDK compatibility. Output format: `IV (32 bytes) || ciphertext || auth_tag (16 bytes)`. Keys shorter than 32 bytes are padded with leading zeros. Implements constant-time comparison (`PartialEq`) and secure zeroing on drop.
 
 ### Encoding Functions
 ```rust
@@ -67,10 +67,11 @@ pub fn from_base58(s: &str) -> Result<Vec<u8>>
 // Base58Check (with version byte and checksum)
 pub fn to_base58_check(payload: &[u8], version: &[u8]) -> String
 pub fn from_base58_check(s: &str) -> Result<(Vec<u8>, Vec<u8>)>
+pub fn from_base58_check_with_prefix_length(s: &str, prefix_length: usize) -> Result<(Vec<u8>, Vec<u8>)>
 
 // Base64
 pub fn to_base64(data: &[u8]) -> String
-pub fn from_base64(s: &str) -> Result<Vec<u8>>
+pub fn from_base64(s: &str) -> Result<Vec<u8>>  // Handles URL-safe variants and whitespace
 
 // UTF-8
 pub fn to_utf8_bytes(s: &str) -> Vec<u8>
@@ -134,10 +135,16 @@ pub struct BigNumber {
     // Primitive conversion
     pub fn to_i64(&self) -> Option<i64>
     pub fn to_u64(&self) -> Option<u64>
+
+    // Internal access (for EC operations)
+    pub fn as_bigint(&self) -> &BigInt
+    pub fn from_bigint(inner: BigInt) -> Self
 }
 ```
 
 **Design Note**: Following the Go SDK approach, this is a minimal compatibility layer wrapping `num-bigint`. It does NOT implement the full bn.js API (no word arrays, reduction contexts, or in-place mutation). It provides what's needed for EC scalar operations and BRC-42 key derivation.
+
+**Trait Implementations**: `From<i64>`, `From<u64>`, `From<i32>`, `From<u32>`, `From<BigInt>`, `Into<BigInt>`, `Default`, `Debug`, `Display`, `PartialOrd`, `Ord`, `Hash`.
 
 ### Elliptic Curve (secp256k1)
 ```rust
@@ -256,8 +263,9 @@ pub fn verify(message: &[u8], signature: &P256Signature, public_key: &P256Public
 - RFC 6979 deterministic nonce generation
 - Low-S signature normalization (S <= n/2)
 - Automatic SHA-256 hashing for message signing/verification
-- Prehash variants for direct hash signing
+- Prehash variants for direct hash signing (`sign_hash`, `verify_hash`)
 - Compressed and uncompressed point encoding
+- Constant-time private key comparison
 
 ### Binary Reader/Writer
 ```rust
@@ -304,7 +312,7 @@ pub struct Writer {
 
 ## Error Variants
 
-The `Error` enum in `src/error.rs` provides specific error types for primitives:
+The `Error` enum in `src/error.rs` provides specific error types for primitives (all implement `Clone`, `PartialEq`, `Eq`):
 
 | Variant | Description |
 |---------|-------------|
@@ -324,6 +332,8 @@ The `Error` enum in `src/error.rs` provides specific error types for primitives:
 | `InvalidNonce(String)` | Invalid nonce for encryption |
 | `InvalidTag` | Authentication tag mismatch |
 | `ReaderUnderflow { needed, available }` | Not enough bytes to read |
+
+A `Result<T>` type alias is provided for convenience.
 
 ## Usage
 
@@ -577,28 +587,29 @@ Transaction signatures, sighash computation, Schnorr proofs, and Shamir secret s
 ## Dependencies
 
 Key external crates used:
-- `sha1`, `sha2`, `ripemd` - Hash algorithms
-- `hmac`, `pbkdf2` - HMAC and key derivation
-- `aes-gcm` - AES-256-GCM encryption
-- `k256` - secp256k1 elliptic curve operations
+- `sha1`, `sha2`, `ripemd` - Hash algorithms (SHA-1, SHA-256, SHA-512, RIPEMD-160)
+- `hmac`, `pbkdf2` - HMAC and PBKDF2 key derivation
+- `aes-gcm` - AES-256-GCM authenticated encryption
+- `k256` - secp256k1 elliptic curve operations (ECDSA, ECDH)
 - `p256` - P-256 (secp256r1) elliptic curve operations
-- `num-bigint`, `num-traits`, `num-integer` - Arbitrary-precision integers
-- `hex`, `bs58`, `base64` - Encoding
-- `thiserror` - Error handling
+- `num-bigint`, `num-traits`, `num-integer` - Arbitrary-precision integers for BigNumber
+- `hex`, `bs58`, `base64` - Encoding libraries
+- `thiserror` - Error handling with derive macros
 - `rand`, `getrandom` - Cryptographically secure random bytes
-- `subtle` - Constant-time comparison
-- `serde`, `serde_json` - Test vector deserialization
+- `subtle` - Constant-time comparison for cryptographic secrets
+- `serde`, `serde_json` - Test vector deserialization (test-only)
 
 ## Testing
 
 Tests are extensive and include:
-- Standard test vectors (NIST, etc.)
-- TypeScript SDK compatibility tests
-- Cross-SDK compatibility with Go implementation
-- Round-trip encoding/decoding tests
-- Edge cases (empty inputs, padding, Unicode)
+- Standard test vectors (NIST HMAC/PBKDF2, etc.)
+- TypeScript SDK compatibility tests (Reader/Writer, encoding functions)
+- Cross-SDK compatibility with Go implementation (SymmetricKey, sighash)
+- Round-trip encoding/decoding tests (hex, base58, base64, DER signatures)
+- Edge cases (empty inputs, key padding, Unicode, varint boundaries)
+- Test vectors from JSON files (`tests/vectors/symmetric_key.json`)
 
 Run tests with:
 ```bash
-cargo test
+cargo test primitives
 ```

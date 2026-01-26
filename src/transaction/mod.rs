@@ -10,6 +10,9 @@
 //! - Serialization (hex, binary, Extended Format)
 //! - MerklePath (BRC-74 BUMP) for merkle proofs
 //! - BEEF format (BRC-62/95/96) for SPV proofs
+//! - Fee models for computing transaction fees
+//! - Broadcaster trait for transaction broadcasting
+//! - ChainTracker trait for SPV verification
 //!
 //! # Example
 //!
@@ -41,6 +44,16 @@
 //! let txid = tx.id();
 //! ```
 //!
+//! # Fee Models
+//!
+//! ```rust,ignore
+//! use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte};
+//!
+//! // 100 satoshis per kilobyte
+//! let fee_model = SatoshisPerKilobyte::new(100);
+//! let fee = fee_model.compute_fee(&tx)?;
+//! ```
+//!
 //! # BEEF Format
 //!
 //! ```rust,ignore
@@ -57,9 +70,26 @@
 //!     println!("Found transaction");
 //! }
 //! ```
+//!
+//! # Chain Tracking
+//!
+//! ```rust,ignore
+//! use bsv_sdk::transaction::{ChainTracker, MockChainTracker};
+//!
+//! // Create a mock tracker for testing
+//! let mut tracker = MockChainTracker::new(1000);
+//! tracker.add_root(999, "merkle_root_hex".to_string());
+//!
+//! // Verify a merkle root
+//! let is_valid = tracker.is_valid_root_for_height("merkle_root_hex", 999)?;
+//! ```
 
 pub mod beef;
 pub mod beef_tx;
+pub mod broadcaster;
+pub mod chain_tracker;
+pub mod fee_model;
+pub mod fee_models;
 pub mod input;
 pub mod merkle_path;
 pub mod output;
@@ -69,6 +99,15 @@ pub mod transaction;
 // Re-exports for convenience
 pub use beef::{Beef, BeefValidationResult, SortResult};
 pub use beef_tx::{BeefTx, TxDataFormat, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
+pub use broadcaster::{
+    is_broadcast_failure, is_broadcast_success, BroadcastFailure, BroadcastResponse,
+    BroadcastResult, BroadcastStatus, Broadcaster,
+};
+pub use chain_tracker::{
+    AlwaysValidChainTracker, ChainTracker, ChainTrackerError, MockChainTracker,
+};
+pub use fee_model::{FeeModel, FixedFee};
+pub use fee_models::SatoshisPerKilobyte;
 pub use input::TransactionInput;
 pub use merkle_path::{MerklePath, MerklePathLeaf};
 pub use output::TransactionOutput;

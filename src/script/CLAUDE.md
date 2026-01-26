@@ -19,7 +19,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root; submodule declarations and public re-exports |
-| `op.rs` | Opcode constants and name/value lookup functions |
+| `op.rs` | Opcode constants (u8) and name/value lookup functions |
 | `chunk.rs` | `ScriptChunk` type representing individual script elements |
 | `script.rs` | Core `Script` class with parsing, serialization, and builder methods |
 | `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) |
@@ -28,8 +28,8 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging |
 | `spend.rs` | `Spend` interpreter for validating transaction spends |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
-| `transaction.rs` | Transaction interface traits for future Transaction module |
-| `templates/mod.rs` | Templates module declarations |
+| `transaction.rs` | Transaction interface traits for Transaction module integration |
+| `templates/mod.rs` | Templates module declarations and re-exports |
 | `templates/p2pkh.rs` | P2PKH (Pay-to-Public-Key-Hash) template |
 | `templates/rpuzzle.rs` | R-Puzzle template for knowledge-based locking |
 
@@ -55,20 +55,25 @@ pub use transaction::{
     SimpleUtxo, SpendValidation, TransactionContext, TransactionInputContext,
     TransactionOutputContext, UtxoProvider,
 };
+
+// Templates (via templates module)
+pub use templates::{P2PKH, RPuzzle, RPuzzleType};
 ```
 
 ## Core Types
 
 ### Opcodes (`op` module)
 
-All Bitcoin Script opcodes defined as `u8` constants. Key opcodes:
+All Bitcoin Script opcodes defined as `u8` constants with LazyLock HashMaps for lookup:
 
 ```rust
 // Push values: OP_0, OP_1..OP_16, OP_1NEGATE, OP_PUSHDATA1/2/4
 // Control: OP_IF, OP_NOTIF, OP_ELSE, OP_ENDIF, OP_VERIFY, OP_RETURN
-// Stack: OP_DUP, OP_DROP, OP_SWAP, OP_OVER, OP_NIP, etc.
+// Stack: OP_DUP, OP_DROP, OP_SWAP, OP_OVER, OP_NIP, OP_PICK, OP_ROLL, etc.
 // BSV re-enabled: OP_CAT, OP_SPLIT, OP_NUM2BIN, OP_BIN2NUM, OP_MUL, OP_DIV, OP_MOD
-// Crypto: OP_HASH160, OP_HASH256, OP_CHECKSIG, OP_CHECKMULTISIG
+// Bitwise: OP_INVERT, OP_AND, OP_OR, OP_XOR, OP_LSHIFT, OP_RSHIFT
+// Crypto: OP_HASH160, OP_HASH256, OP_SHA256, OP_RIPEMD160, OP_SHA1
+// Signature: OP_CHECKSIG, OP_CHECKSIGVERIFY, OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY
 
 pub fn name_to_opcode(name: &str) -> Option<u8>      // "OP_DUP" -> Some(0x76)
 pub fn opcode_to_name(op: u8) -> Option<&'static str>   // 0x76 -> Some("OP_DUP")
@@ -76,19 +81,23 @@ pub fn opcode_to_name(op: u8) -> Option<&'static str>   // 0x76 -> Some("OP_DUP"
 
 ### ScriptChunk
 
+Represents a single script element (opcode or data push):
+
 ```rust
 pub struct ScriptChunk { pub op: u8, pub data: Option<Vec<u8>> }
+
 impl ScriptChunk {
     pub fn new_opcode(op: u8) -> Self
-    pub fn new_push(data: Vec<u8>) -> Self      // Auto-selects push opcode
-    pub fn is_push_data(&self) -> bool
+    pub fn new_push(data: Vec<u8>) -> Self      // Auto-selects optimal push opcode
+    pub fn new(op: u8, data: Option<Vec<u8>>) -> Self
+    pub fn is_push_data(&self) -> bool          // True if op <= OP_16
     pub fn to_asm(&self) -> String
 }
 ```
 
 ### Script
 
-Core script type with lazy parsing and caching:
+Core script type with lazy parsing and serialization caching:
 
 ```rust
 impl Script {
@@ -113,11 +122,15 @@ impl Script {
     // Manipulation
     pub fn remove_codeseparators(&mut self) -> &mut Self
     pub fn find_and_delete(&mut self, script: &Script) -> &mut Self
+    pub fn set_chunk_opcode(&mut self, index: usize, op: u8) -> &mut Self
 
     // Inspection
     pub fn chunks(&self) -> Vec<ScriptChunk>
     pub fn len(&self) -> usize
+    pub fn is_empty(&self) -> bool
     pub fn is_push_only(&self) -> bool
+    pub fn is_locking_script(&self) -> bool   // Always false for base Script
+    pub fn is_unlocking_script(&self) -> bool // Always false for base Script
 }
 ```
 
@@ -130,9 +143,18 @@ pub struct LockingScript(Script);
 pub struct UnlockingScript(Script);
 
 // Both provide: new(), from_chunks(), from_asm(), from_hex(), from_binary(),
-// from_script(), as_script(), into_script(), and delegate serialization methods
+// from_script(), as_script(), into_script(), to_asm(), to_hex(), to_binary(),
+// chunks(), len(), is_empty(), is_push_only()
+
+// Type identification:
 // LockingScript::is_locking_script() -> true
 // UnlockingScript::is_unlocking_script() -> true
+
+// Conversions via From trait:
+impl From<Script> for LockingScript
+impl From<LockingScript> for Script
+impl From<Script> for UnlockingScript
+impl From<UnlockingScript> for Script
 ```
 
 ### ScriptNum
@@ -145,6 +167,7 @@ impl ScriptNum {
     pub fn to_bytes(value: &BigNumber) -> Vec<u8>
     pub fn is_minimally_encoded(bytes: &[u8]) -> bool
     pub fn cast_to_bool(bytes: &[u8]) -> bool
+    pub fn minimally_encode(bytes: &[u8]) -> Vec<u8>
 }
 ```
 
@@ -162,7 +185,11 @@ pub struct ScriptEvaluationError {
     pub stack: Vec<Vec<u8>>,
     pub alt_stack: Vec<Vec<u8>>,
     pub if_stack: Vec<bool>,
+    pub stack_mem: usize,
+    pub alt_stack_mem: usize,
 }
+
+pub enum ExecutionContext { UnlockingScript, LockingScript }
 ```
 
 ### Spend
@@ -187,8 +214,9 @@ pub struct SpendParams {
 
 impl Spend {
     pub fn new(params: SpendParams) -> Self
+    pub fn reset(&mut self)                           // Reset for re-execution
     pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError>
-    pub fn step(&mut self) -> Result<bool, ScriptEvaluationError>
+    pub fn step(&mut self) -> Result<bool, ScriptEvaluationError>  // Single instruction
 }
 ```
 
@@ -201,7 +229,7 @@ pub trait ScriptTemplate {
     fn lock(&self, params: &[u8]) -> Result<LockingScript>;
 }
 
-pub enum SignOutputs { All, None, Single }  // SIGHASH flags
+pub enum SignOutputs { All, None, Single }  // SIGHASH output flags
 
 pub struct SigningContext<'a> {
     pub raw_tx: &'a [u8],
@@ -209,14 +237,18 @@ pub struct SigningContext<'a> {
     pub source_satoshis: u64,
     pub locking_script: &'a Script,
 }
-impl SigningContext {
+impl SigningContext<'_> {
+    pub fn new(...) -> Self
     pub fn compute_sighash(&self, scope: u32) -> Result<[u8; 32]>
 }
 
-pub struct ScriptTemplateUnlock {
+pub struct ScriptTemplateUnlock { ... }
+impl ScriptTemplateUnlock {
     pub fn sign(&self, context: &SigningContext) -> Result<UnlockingScript>
     pub fn estimate_length(&self) -> usize
 }
+
+pub fn compute_sighash_scope(sign_outputs: SignOutputs, anyone_can_pay: bool) -> u32
 ```
 
 ### P2PKH (Pay-to-Public-Key-Hash)
@@ -226,7 +258,7 @@ The most common Bitcoin transaction type. Locking script: `OP_DUP OP_HASH160 <pu
 ```rust
 impl P2PKH {
     pub fn new() -> Self
-    pub fn lock_from_address(address: &str) -> Result<LockingScript>
+    pub fn lock_from_address(address: &str) -> Result<LockingScript>  // Mainnet or testnet
     pub fn unlock(private_key: &PrivateKey, sign_outputs: SignOutputs, anyone_can_pay: bool) -> ScriptTemplateUnlock
     pub fn sign_with_sighash(private_key: &PrivateKey, sighash: &[u8; 32], sign_outputs: SignOutputs, anyone_can_pay: bool) -> Result<UnlockingScript>
 }
@@ -242,9 +274,13 @@ Knowledge-based locking using ECDSA R-value. Anyone who knows the K-value can sp
 ```rust
 pub enum RPuzzleType { Raw, Sha1, Sha256, Hash256, Ripemd160, Hash160 }
 
+impl RPuzzleType {
+    pub fn hash(self, data: &[u8]) -> Vec<u8>  // Hash data with this type
+}
+
 impl RPuzzle {
     pub fn new(puzzle_type: RPuzzleType) -> Self
-    pub fn compute_r_from_k(k: &BigNumber) -> Result<[u8; 32]>
+    pub fn compute_r_from_k(k: &BigNumber) -> Result<[u8; 32]>  // R = (k*G).x
     pub fn unlock(k: &BigNumber, private_key: &PrivateKey, sign_outputs: SignOutputs, anyone_can_pay: bool) -> ScriptTemplateUnlock
     pub fn sign_with_sighash(k: &BigNumber, private_key: &PrivateKey, sighash: &[u8; 32], sign_outputs: SignOutputs, anyone_can_pay: bool) -> Result<UnlockingScript>
 }
@@ -255,7 +291,7 @@ impl ScriptTemplate for RPuzzle {
 
 ## Transaction Interface Traits
 
-Traits for future Transaction module integration:
+Traits for Transaction module integration:
 
 ```rust
 pub trait TransactionInputContext {
@@ -279,16 +315,24 @@ pub trait TransactionContext {
     fn inputs(&self) -> &[Self::Input];
     fn outputs(&self) -> &[Self::Output];
     fn lock_time(&self) -> u32;
+    fn input(&self, index: usize) -> Option<&Self::Input>;    // Default impl
+    fn output(&self, index: usize) -> Option<&Self::Output>;  // Default impl
+    fn input_count(&self) -> usize;                           // Default impl
+    fn output_count(&self) -> usize;                          // Default impl
 }
 
 pub trait SpendValidation: TransactionContext {
-    fn validate_input(&self, index: usize) -> Result<bool, ScriptEvaluationError>;
-    fn validate_all_inputs(&self) -> Result<(), ScriptEvaluationError>;
+    fn validate_input(&self, index: usize) -> Result<bool, Box<ScriptEvaluationError>>;
+    fn validate_all_inputs(&self) -> Result<(), Box<ScriptEvaluationError>>;  // Default impl
 }
 
 pub trait UtxoProvider {
     fn get_utxo(&self, txid: &[u8; 32], output_index: u32) -> Option<(u64, LockingScript)>;
 }
+
+// Simple test implementation
+pub struct SimpleUtxo { pub satoshis: u64, pub locking_script: LockingScript }
+impl TransactionOutputContext for SimpleUtxo { ... }
 ```
 
 ## Usage Examples
@@ -317,8 +361,12 @@ script.write_opcode(op::OP_DUP)
 use bsv_sdk::script::templates::P2PKH;
 use bsv_sdk::script::{ScriptTemplate, SignOutputs, SigningContext};
 
-// Create locking script
+// Create locking script from address
 let locking = P2PKH::lock_from_address("1BvBMSEY...")?;
+
+// Or from pubkey hash
+let template = P2PKH::new();
+let locking = template.lock(&pubkey_hash)?;
 
 // Create unlock and sign
 let unlock = P2PKH::unlock(&private_key, SignOutputs::All, false);
@@ -326,29 +374,58 @@ let context = SigningContext::new(&raw_tx, 0, 100_000, locking.as_script());
 let unlocking = unlock.sign(&context)?;
 ```
 
+### Validating Spends
+
+```rust
+use bsv_sdk::script::{Spend, SpendParams, LockingScript, UnlockingScript};
+
+let mut spend = Spend::new(SpendParams {
+    source_txid: txid,
+    source_output_index: 0,
+    source_satoshis: 100_000,
+    locking_script: LockingScript::from_asm("OP_DUP OP_HASH160...")?,
+    transaction_version: 1,
+    other_inputs: vec![],
+    outputs: vec![...],
+    input_index: 0,
+    unlocking_script: UnlockingScript::from_asm("<sig> <pubkey>")?,
+    input_sequence: 0xffffffff,
+    lock_time: 0,
+    memory_limit: None,
+});
+
+let valid = spend.validate()?;  // Returns Ok(true) if valid
+```
+
 ## Implementation Notes
 
-- **Lazy Parsing**: Scripts cache raw bytes; chunks parsed on demand
-- **PUSHDATA**: Uses smallest encoding (direct push, PUSHDATA1/2/4)
-- **BSV Opcodes**: Supports re-enabled opcodes (CAT, SPLIT, MUL, DIV, MOD, etc.)
+- **Lazy Parsing**: Scripts cache raw bytes; chunks parsed on demand via `ensure_parsed()`
+- **Caching**: Raw bytes and hex strings are cached and invalidated on mutation
+- **PUSHDATA**: Uses smallest encoding (direct push 0x01-0x4b, PUSHDATA1/2/4)
+- **BSV Opcodes**: All BSV re-enabled opcodes supported (CAT, SPLIT, MUL, DIV, MOD, etc.)
 - **Disabled Opcodes**: OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF
 
 ### Script Interpreter Rules
 
 - **Memory Limit**: 32MB default for stack usage
+- **Element Size**: 1GB max for BSV (unlimited mode)
 - **Minimal Push**: Required for data pushes
 - **Push-Only Unlocking**: Unlocking scripts can only contain pushes
-- **Low-S Signatures**: Required for all signatures
+- **Low-S Signatures**: Required for all signatures (BIP 62)
 - **Clean Stack**: Exactly one true item after execution
 - **SIGHASH_FORKID**: Required for all BSV signatures
 
-## Test Vectors
+### Configuration Constants (spend.rs)
 
-| Vector File | Count | Purpose |
-|-------------|-------|---------|
-| `spend_valid.json` | 458 | Valid spend executions (all pass) |
-| `script_valid.json` | 598 | Valid script parsing |
-| `script_invalid.json` | 432 | Invalid scripts that should fail |
+```rust
+const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;  // 1GB
+const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;              // 32MB
+const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
+const REQUIRE_MINIMAL_PUSH: bool = true;
+const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;
+const REQUIRE_LOW_S_SIGNATURES: bool = true;
+const REQUIRE_CLEAN_STACK: bool = true;
+```
 
 ## Related Documentation
 

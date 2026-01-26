@@ -17,8 +17,8 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | Directory | Feature Flag | Status | Description |
 |-----------|--------------|--------|-------------|
 | `primitives/` | `primitives` | Complete | Cryptographic primitives (hash, EC, encoding) |
-| `script/` | `script` | In Progress | Script parsing and execution |
-| `transaction/` | `transaction` | Planned | Transaction construction and signing |
+| `script/` | `script` | Complete | Script parsing and execution |
+| `transaction/` | `transaction` | In Progress | Transaction construction, signing, BEEF format |
 | `wallet/` | `wallet` | Planned | HD wallets and key management |
 
 ## Key Exports
@@ -60,6 +60,12 @@ pub mod wallet;
 - `LockingScript` - Output script (scriptPubKey)
 - `UnlockingScript` - Input script (scriptSig)
 
+**Convenience re-exports** from `transaction`:
+- `Transaction` - Bitcoin transaction with inputs, outputs, and metadata
+- `TransactionInput` - Transaction input referencing a previous output
+- `TransactionOutput` - Transaction output with value and locking script
+- `ChangeDistribution` - Strategy for distributing change across outputs
+
 ### Error Types (`error.rs`)
 
 The `Error` enum provides unified error handling across all modules. It uses `thiserror` for derive-based error messages and implements `Clone`, `PartialEq`, and `Eq` for easy comparison in tests:
@@ -97,7 +103,10 @@ The `Error` enum provides unified error handling across all modules. It uses `th
 **Transaction errors** (requires `transaction` feature):
 | Variant | Fields | Description |
 |---------|--------|-------------|
-| `TransactionError` | `(String)` | Transaction-related error |
+| `TransactionError` | `(String)` | General transaction-related error |
+| `MerklePathError` | `(String)` | Invalid or malformed Merkle path |
+| `BeefError` | `(String)` | BEEF format parsing or validation error |
+| `FeeModelError` | `(String)` | Fee calculation or model error |
 
 **Result alias**:
 ```rust
@@ -120,6 +129,10 @@ use bsv_sdk::primitives::{PrivateKey, sha256};
 
 // Import script types
 use bsv_sdk::{Script, LockingScript};
+
+// Import transaction types (requires feature)
+#[cfg(feature = "transaction")]
+use bsv_sdk::{Transaction, TransactionInput, TransactionOutput};
 ```
 
 ### Quick Start Example
@@ -220,5 +233,5 @@ thiserror = "1.0"
 - `primitives/CLAUDE.md` - Cryptographic primitives module
 - `primitives/ec/CLAUDE.md` - Elliptic curve submodule
 - `script/CLAUDE.md` - Script module documentation
+- `transaction/CLAUDE.md` - Transaction module documentation
 - `../CLAUDE.md` - Project root documentation
-- `../SCRIPT_MIGRATION_PROMPTS.md` - Script module migration guide

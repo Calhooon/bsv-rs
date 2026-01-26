@@ -15,6 +15,8 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle) |
+| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models) |
+| `transaction/` | Transaction test vectors module |
 
 ## Test Vectors
 
@@ -30,6 +32,17 @@ Test vectors are stored in `tests/vectors/` and shared with the TypeScript and G
 | `spend_valid.json` | Valid spend execution vectors (~570+ vectors) |
 | `script_valid.json` | Valid script parsing vectors (~590+ vectors) |
 | `script_invalid.json` | Invalid scripts that should fail (~500+ vectors) |
+
+Transaction test vectors are in `tests/transaction/vectors/`:
+
+| File | Contents |
+|------|----------|
+| `mod.rs` | Module declarations for vector submodules |
+| `tx_valid.rs` | Valid transaction hex strings for roundtrip testing |
+| `tx_invalid.rs` | Invalid transaction vectors (semantically invalid) |
+| `bump_valid.rs` | Valid BRC-74 BUMP (MerklePath) hex vectors |
+| `bump_invalid.rs` | Invalid BUMP vectors with expected error messages |
+| `bigtx.rs` | Large transaction test vectors |
 
 ## Test Categories
 
@@ -185,6 +198,61 @@ Script template integration tests:
 - `test_sighash_types` - Tests ALL, NONE, SINGLE, and ANYONECANPAY sighash flags
 - `test_rpuzzle_type_hash_functions` - Verifies hash output lengths for all RPuzzle types
 
+### Transaction Tests (`transaction_tests.rs`)
+
+Transaction module tests (requires `transaction` feature flag):
+
+**Transaction Parsing**
+- `test_transaction_from_hex` - Parse valid transaction from hex
+- `test_transaction_roundtrip_hex` - Hex serialization/deserialization roundtrip
+- `test_transaction_roundtrip_binary` - Binary serialization/deserialization roundtrip
+- `test_transaction_txid` - Transaction ID computation
+- `test_transaction_hash_differs_from_id` - Hash vs TXID byte order
+- `test_new_transaction_defaults` - Default transaction values
+- `test_invalid_tx_can_be_parsed_structurally` - Invalid tx vectors can still be parsed
+
+**Fee Models**
+- `test_fixed_fee` - FixedFee model (constant fee)
+- `test_satoshis_per_kilobyte_default` - Default 100 sat/KB rate
+- `test_satoshis_per_kilobyte_new` - Custom sat/KB rate
+- `test_satoshis_per_kilobyte_empty_tx` - Fee for empty transaction (10 bytes)
+- `test_satoshis_per_kilobyte_ceiling_division` - Fees rounded up
+
+**Chain Tracker (async)**
+- `test_mock_chain_tracker` - MockChainTracker with merkle root validation
+- `test_always_valid_chain_tracker` - AlwaysValidChainTracker accepts all roots
+
+**Broadcaster (async)**
+- `test_broadcaster_success` - Successful broadcast response
+- `test_broadcaster_failure` - Failed broadcast with error code
+- `test_broadcaster_many` - Batch broadcasting multiple transactions
+
+**MerklePath (BUMP)**
+- `test_merkle_path_from_hex` - Parse BRC-74 BUMP format
+- `test_merkle_path_roundtrip` - BUMP hex roundtrip
+- `test_merkle_path_from_coinbase` - Create MerklePath for coinbase tx
+- `test_merkle_path_compute_root` - Compute merkle root from path
+- `test_invalid_bump_vectors` - Invalid BUMP vectors fail parsing/validation
+
+**BEEF Format**
+- `test_beef_new` - Create empty BEEF container
+- `test_beef_merge_txid_only` - Add txid-only references
+- `test_beef_merge_bump` - Add MerklePath to BEEF
+- `test_beef_empty_is_valid` - Empty BEEF validation
+
+**Big Transaction Tests**
+- `test_big_tx_constant_exists` - Verify big TX TXID constant
+- `test_large_tx_parses` - Parse large coinbase transaction
+- `test_multi_io_tx_parses` - Parse transaction with multiple inputs/outputs
+
+**Transaction Construction**
+- `test_estimate_size` - Size estimation accuracy
+- `test_add_input_requires_txid_or_source` - Input validation
+- `test_add_input_with_txid` - Add input with txid
+- `test_add_output` - Add output
+- `test_add_change_output` - Add change output with flag
+- `test_metadata` - Transaction metadata updates
+
 ## Running Tests
 
 ```bash
@@ -195,12 +263,16 @@ cargo test --test integration_tests
 cargo test --test script_vectors_tests
 cargo test --test sighash_tests
 cargo test --test template_tests
+cargo test --test transaction_tests --features transaction
 
 # Run specific test
 cargo test --test integration_tests test_complete_payment_workflow
 
 # Run with output (for debugging tests that print)
 cargo test --test sighash_tests -- --nocapture
+
+# Run async tests (transaction module requires tokio)
+cargo test --test transaction_tests --features transaction -- test_mock_chain_tracker
 ```
 
 ## Test Vector Structures
@@ -261,6 +333,26 @@ struct ScriptVector {
 }
 ```
 
+### DRBG Vector
+```rust
+struct DrbgVector {
+    name: String,            // Vector identifier
+    entropy: String,         // Hex-encoded entropy (32 bytes)
+    nonce: String,           // Hex-encoded nonce (16 bytes)
+    pers: Option<String>,    // Optional personalization string
+    add: Vec<Option<String>>, // Additional data for each generate call
+    expected: String,        // Expected HMAC-DRBG output (128 bytes hex)
+}
+```
+
+### Invalid BUMP Vector
+```rust
+struct BumpInvalidVector {
+    bump: &'static str,      // Invalid BUMP hex data
+    error: &'static str,     // Expected error description
+}
+```
+
 ## Key Types Used
 
 | Type | Import Path | Description |
@@ -279,6 +371,21 @@ struct ScriptVector {
 | `Spend` | `bsv_sdk::script` | Script spend validator/interpreter |
 | `P2PKH` | `bsv_sdk::script::templates` | Pay-to-Public-Key-Hash template |
 | `RPuzzle` | `bsv_sdk::script::templates` | R-Puzzle template |
+| `Transaction` | `bsv_sdk::transaction` | Bitcoin transaction |
+| `TransactionInput` | `bsv_sdk::transaction` | Transaction input |
+| `TransactionOutput` | `bsv_sdk::transaction` | Transaction output |
+| `MerklePath` | `bsv_sdk::transaction` | BRC-74 BUMP merkle proof |
+| `Beef` | `bsv_sdk::transaction` | BRC-62 BEEF container |
+| `FeeModel` | `bsv_sdk::transaction` | Fee computation trait |
+| `SatoshisPerKilobyte` | `bsv_sdk::transaction` | Per-KB fee model |
+| `FixedFee` | `bsv_sdk::transaction` | Constant fee model |
+| `Broadcaster` | `bsv_sdk::transaction` | Transaction broadcast trait (async) |
+| `ChainTracker` | `bsv_sdk::transaction` | Block header/merkle root tracker (async) |
+| `AlwaysValidChainTracker` | `bsv_sdk::transaction` | ChainTracker that accepts all roots |
+| `MockChainTracker` | `bsv_sdk::transaction` | ChainTracker with configurable roots |
+| `BroadcastResponse` | `bsv_sdk::transaction` | Successful broadcast result |
+| `BroadcastFailure` | `bsv_sdk::transaction` | Failed broadcast result |
+| `BroadcastStatus` | `bsv_sdk::transaction` | Broadcast status enum (Success, Error) |
 
 ## Hash Functions Used
 
@@ -334,9 +441,28 @@ fn test_my_vectors() {
 }
 ```
 
+When adding transaction module tests:
+
+1. Add Rust const vectors to `tests/transaction/vectors/` modules
+2. Use `#[cfg(feature = "transaction")]` for tests requiring the transaction feature
+3. Export vectors from module using `pub const` declarations
+4. Wrap async tests with `#[tokio::test]` for ChainTracker and Broadcaster tests
+5. Implement the `Broadcaster` trait with `#[async_trait(?Send)]` for test broadcasters
+
+## Notes on BSV vs BTC Script Vectors
+
+Some test vectors in `script_valid.json` may fail execution because:
+- BSV requires push-only unlocking scripts
+- BSV requires minimal push encoding
+- BSV has different clean stack requirements
+- Some vectors test BTC-specific behavior (P2SH, etc.)
+
+The BSV-specific `spend_valid.json` vectors should all pass.
+
 ## Related Documentation
 
 - `CLAUDE.md` - Root project documentation
 - `src/primitives/CLAUDE.md` - Primitives module documentation
 - `src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
 - `src/script/CLAUDE.md` - Script module documentation
+- `src/transaction/CLAUDE.md` - Transaction module documentation

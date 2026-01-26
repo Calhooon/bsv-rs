@@ -122,6 +122,11 @@ pub enum Error {
     #[cfg(feature = "transaction")]
     #[error("BEEF error: {0}")]
     BeefError(String),
+
+    /// Fee model error.
+    #[cfg(feature = "transaction")]
+    #[error("fee model error: {0}")]
+    FeeModelError(String),
 }
 
 /// Result type alias for BSV SDK operations.

@@ -1,5 +1,5 @@
 # BSV Transaction Module
-> Transaction construction, signing, and serialization for BSV blockchain
+> Transaction construction, signing, serialization, and SPV verification for BSV blockchain
 
 ## Overview
 
@@ -11,6 +11,11 @@ This module provides complete Bitcoin transaction functionality for the BSV SDK:
 - Transaction hash and TXID computation
 - Signing infrastructure with script templates
 - Fee calculation and change distribution
+- MerklePath (BRC-74 BUMP) for merkle proofs
+- BEEF format (BRC-62/95/96) for SPV proofs
+- Fee models for computing transaction fees
+- Broadcaster trait for transaction broadcasting
+- ChainTracker trait for SPV verification
 
 Compatible with the TypeScript and Go SDKs through shared binary formats and test vectors.
 
@@ -22,13 +27,39 @@ Compatible with the TypeScript and Go SDKs through shared binary formats and tes
 | `input.rs` | `TransactionInput` struct for transaction inputs |
 | `output.rs` | `TransactionOutput` struct for transaction outputs |
 | `transaction.rs` | `Transaction` struct with parsing, serialization, and signing |
+| `merkle_path.rs` | `MerklePath` for BRC-74 BUMP merkle proofs |
+| `beef.rs` | `Beef` for BRC-62/95/96 SPV proofs |
+| `beef_tx.rs` | `BeefTx` for transactions within BEEF format |
+| `fee_model.rs` | `FeeModel` trait and `FixedFee` implementation |
+| `fee_models/` | Fee model implementations (`SatoshisPerKilobyte`) |
+| `broadcaster.rs` | `Broadcaster` trait for transaction broadcasting |
+| `chain_tracker.rs` | `ChainTracker` trait for SPV verification |
 
 ## Key Exports
 
 ```rust
+// Core transaction types
+pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};
 pub use input::TransactionInput;
 pub use output::TransactionOutput;
-pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};
+
+// MerklePath and BEEF
+pub use merkle_path::{MerklePath, MerklePathLeaf};
+pub use beef::{Beef, BeefValidationResult, SortResult};
+pub use beef_tx::{BeefTx, TxDataFormat, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
+
+// Fee models
+pub use fee_model::{FeeModel, FixedFee};
+pub use fee_models::SatoshisPerKilobyte;
+
+// External interfaces
+pub use broadcaster::{
+    is_broadcast_failure, is_broadcast_success, BroadcastFailure, BroadcastResponse,
+    BroadcastResult, BroadcastStatus, Broadcaster,
+};
+pub use chain_tracker::{
+    AlwaysValidChainTracker, ChainTracker, ChainTrackerError, MockChainTracker,
+};
 ```
 
 ## Core Types
@@ -102,6 +133,8 @@ impl Transaction {
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_ef(ef: &[u8]) -> Result<Self>      // Extended Format (BRC-30)
     pub fn from_hex_ef(hex: &str) -> Result<Self>
+    pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self>
+    pub fn from_atomic_beef(beef: &[u8]) -> Result<Self>
     pub fn parse_script_offsets(bin: &[u8]) -> Result<ScriptOffsets>
 
     // Serialization
@@ -109,6 +142,8 @@ impl Transaction {
     pub fn to_hex(&self) -> String
     pub fn to_ef(&self) -> Result<Vec<u8>>         // Extended Format (BRC-30)
     pub fn to_hex_ef(&self) -> Result<String>
+    pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>>
+    pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>>
 
     // Hashing
     pub fn hash(&self) -> [u8; 32]                 // Double SHA-256
@@ -132,31 +167,238 @@ impl Transaction {
 }
 ```
 
-### ChangeDistribution
+## Fee Models
 
-Controls how change is distributed among change outputs:
+### FeeModel Trait
 
 ```rust
-pub enum ChangeDistribution {
-    Equal,   // Divide equally among change outputs
-    Random,  // Use Benford's law distribution for privacy
+pub trait FeeModel: Send + Sync {
+    fn compute_fee(&self, tx: &Transaction) -> Result<u64>;
 }
 ```
 
-### ScriptOffsets
+### FixedFee
 
-For efficient script retrieval from binary transaction data:
+Always returns the same fee amount:
 
 ```rust
-pub struct ScriptOffsets {
-    pub inputs: Vec<ScriptOffset>,
-    pub outputs: Vec<ScriptOffset>,
+pub struct FixedFee(u64);
+
+impl FixedFee {
+    pub fn new(satoshis: u64) -> Self
+}
+```
+
+### SatoshisPerKilobyte
+
+The standard fee model that computes fees based on transaction size:
+
+```rust
+pub struct SatoshisPerKilobyte {
+    pub value: u64,  // satoshis per kilobyte
 }
 
-pub struct ScriptOffset {
-    pub index: usize,   // Input/output index
-    pub offset: usize,  // Byte offset in transaction
-    pub length: usize,  // Script length in bytes
+impl SatoshisPerKilobyte {
+    pub fn new(value: u64) -> Self
+}
+
+impl Default for SatoshisPerKilobyte {
+    fn default() -> Self { Self::new(100) }  // 100 sat/KB standard rate
+}
+```
+
+Example:
+```rust
+use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte};
+
+let fee_model = SatoshisPerKilobyte::new(100); // 100 sat/KB
+let fee = fee_model.compute_fee(&tx)?;
+```
+
+## Broadcasting
+
+### Broadcaster Trait (Async)
+
+The Broadcaster trait uses async methods, matching the TypeScript and Go SDK interfaces:
+
+```rust
+use async_trait::async_trait;
+
+#[async_trait(?Send)]
+pub trait Broadcaster: Send + Sync {
+    async fn broadcast(&self, tx: &Transaction) -> BroadcastResult;
+    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>;
+}
+```
+
+Note: Uses `#[async_trait(?Send)]` because `Transaction` contains `RefCell` for caching.
+
+### BroadcastResponse / BroadcastFailure
+
+```rust
+pub struct BroadcastResponse {
+    pub status: BroadcastStatus,
+    pub txid: String,
+    pub message: String,
+    pub competing_txs: Option<Vec<String>>,
+}
+
+pub struct BroadcastFailure {
+    pub status: BroadcastStatus,
+    pub code: String,
+    pub txid: Option<String>,
+    pub description: String,
+    pub more: Option<Value>,
+}
+
+pub enum BroadcastStatus { Success, Error }
+pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
+```
+
+Example implementation:
+```rust
+use bsv_sdk::transaction::{Broadcaster, BroadcastResult, BroadcastResponse, Transaction};
+use async_trait::async_trait;
+
+struct MyBroadcaster { endpoint: String }
+
+#[async_trait(?Send)]
+impl Broadcaster for MyBroadcaster {
+    async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
+        // Async HTTP POST to endpoint
+        Ok(BroadcastResponse::success(tx.id(), "Accepted".to_string()))
+    }
+
+    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult> {
+        let mut results = Vec::with_capacity(txs.len());
+        for tx in &txs {
+            results.push(self.broadcast(tx).await);
+        }
+        results
+    }
+}
+```
+
+## Chain Tracking
+
+### ChainTracker Trait (Async)
+
+Used for SPV verification of merkle proofs. Uses async methods matching the Go SDK context-based interface:
+
+```rust
+use async_trait::async_trait;
+
+#[async_trait]
+pub trait ChainTracker: Send + Sync {
+    async fn is_valid_root_for_height(&self, root: &str, height: u32) -> Result<bool, ChainTrackerError>;
+    async fn current_height(&self) -> Result<u32, ChainTrackerError>;
+}
+
+#[derive(Error)]
+pub enum ChainTrackerError {
+    NetworkError(String),
+    InvalidResponse(String),
+    BlockNotFound(u32),
+    Other(String),
+}
+```
+
+### MockChainTracker
+
+For testing SPV verification (implements async ChainTracker trait):
+
+```rust
+pub struct MockChainTracker {
+    pub height: u32,
+    pub roots: HashMap<u32, String>,
+}
+
+impl MockChainTracker {
+    pub fn new(height: u32) -> Self
+    pub fn add_root(&mut self, height: u32, root: String)
+    pub fn always_valid(height: u32) -> AlwaysValidChainTracker
+}
+```
+
+### AlwaysValidChainTracker
+
+Always returns true for any merkle root (testing only):
+
+```rust
+pub struct AlwaysValidChainTracker { pub height: u32 }
+
+impl AlwaysValidChainTracker {
+    pub fn new(height: u32) -> Self
+}
+```
+
+Example:
+```rust
+use bsv_sdk::transaction::{ChainTracker, MockChainTracker};
+
+let mut tracker = MockChainTracker::new(1000);
+tracker.add_root(999, "merkle_root_hex".to_string());
+
+let is_valid = tracker.is_valid_root_for_height("merkle_root_hex", 999)?;
+```
+
+## MerklePath (BUMP)
+
+BRC-74 merkle proof format:
+
+```rust
+pub struct MerklePath {
+    pub block_height: u32,
+    pub path: Vec<Vec<MerklePathLeaf>>,
+}
+
+pub struct MerklePathLeaf {
+    pub offset: u64,
+    pub hash: Option<String>,
+    pub txid: bool,
+    pub duplicate: bool,
+}
+
+impl MerklePath {
+    pub fn from_hex(hex: &str) -> Result<Self>
+    pub fn from_binary(bin: &[u8]) -> Result<Self>
+    pub fn from_coinbase_txid(txid: &str, height: u32) -> Self
+    pub fn to_hex(&self) -> String
+    pub fn to_binary(&self) -> Vec<u8>
+    pub fn compute_root(&self, txid: Option<&str>) -> Result<String>
+    pub fn contains(&self, txid: &str) -> bool
+    pub fn txids(&self) -> Vec<String>
+    pub fn combine(&mut self, other: &MerklePath) -> Result<()>
+}
+```
+
+## BEEF Format
+
+BRC-62/95/96 SPV proof format:
+
+```rust
+pub struct Beef {
+    pub bumps: Vec<MerklePath>,
+    pub txs: Vec<BeefTx>,
+    pub version: u32,
+    pub atomic_txid: Option<String>,
+}
+
+impl Beef {
+    pub fn new() -> Self
+    pub fn with_version(version: u32) -> Self
+    pub fn from_hex(hex: &str) -> Result<Self>
+    pub fn from_binary(bin: &[u8]) -> Result<Self>
+    pub fn to_hex(&mut self) -> String
+    pub fn to_binary(&mut self) -> Vec<u8>
+    pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>>
+    pub fn is_valid(&mut self, allow_txid_only: bool) -> bool
+    pub fn verify_valid(&mut self, allow_txid_only: bool) -> BeefValidationResult
+    pub fn find_txid(&self, txid: &str) -> Option<&BeefTx>
+    pub fn merge_bump(&mut self, bump: MerklePath) -> usize
+    pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx
+    pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx
+    pub fn merge_beef(&mut self, other: &Beef)
 }
 ```
 
@@ -221,6 +463,9 @@ let tx = Transaction::from_binary(&bytes)?;
 
 // From Extended Format
 let tx = Transaction::from_ef(&ef_bytes)?;
+
+// From BEEF
+let tx = Transaction::from_beef(&beef_bytes, None)?;
 ```
 
 ### Building Transactions
@@ -247,6 +492,20 @@ tx.add_p2pkh_output("1BvBMSEY...", Some(50_000))?;
 
 // Add change output (amount computed during fee())
 tx.add_p2pkh_output("1MyChange...", None)?;
+```
+
+### Using Fee Models
+
+```rust
+use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte, FixedFee};
+
+// 100 sat/KB (standard rate)
+let fee_model = SatoshisPerKilobyte::new(100);
+let fee = fee_model.compute_fee(&tx)?;
+
+// Or use a fixed fee
+let fixed = FixedFee::new(500);
+let fee = fixed.compute_fee(&tx)?;
 ```
 
 ### Fee Calculation and Signing
@@ -277,6 +536,9 @@ let bytes = tx.to_binary();
 // To Extended Format (requires source transactions)
 let ef_bytes = tx.to_ef()?;
 
+// To BEEF
+let beef_bytes = tx.to_beef(false)?;
+
 // Get TXID
 let txid = tx.id();  // "abc123..."
 
@@ -302,6 +564,29 @@ tx.add_input(input)?;
 tx.add_output(output)?;
 tx.fee(None, ChangeDistribution::Equal).await?;
 tx.sign().await?;  // Template generates unlocking script
+```
+
+### SPV Verification with Chain Tracker
+
+```rust
+use bsv_sdk::transaction::{Beef, ChainTracker, MockChainTracker};
+
+// Parse BEEF
+let beef = Beef::from_hex("0100beef...")?;
+
+// Create chain tracker with known roots
+let mut tracker = MockChainTracker::new(1000);
+tracker.add_root(999, "expected_merkle_root".to_string());
+
+// Verify BEEF structure
+let validation = beef.verify_valid(false);
+if validation.valid {
+    // Check each root against chain tracker
+    for (height, root) in validation.roots {
+        let valid = tracker.is_valid_root_for_height(&root, height)?;
+        assert!(valid);
+    }
+}
 ```
 
 ## Implementation Notes
@@ -330,6 +615,25 @@ tx.sign().await?;  // Template generates unlocking script
 - `id()` returns the hash reversed as a hex string (display format)
 - TXIDs in inputs are stored in display format, serialized reversed
 
+### Fee Model Design
+
+- `FeeModel` trait is synchronous (fee computation is CPU-bound, no I/O needed)
+- `SatoshisPerKilobyte` uses ceiling division to ensure miners get minimum fees
+- Default rate is 100 sat/KB (standard BSV network fee)
+
+### Broadcasting Design
+
+- `Broadcaster` trait is async, matching TypeScript and Go SDKs
+- Uses `#[async_trait(?Send)]` because `Transaction` uses `RefCell` for caching
+- `broadcast_many` must be implemented by each broadcaster (no default impl due to Send constraints)
+- Implementations can use concurrent or batch broadcasting
+
+### Chain Tracker Design
+
+- `ChainTracker` trait is async, matching Go SDK's context-based interface
+- `MockChainTracker` and `AlwaysValidChainTracker` implement the async trait for testing
+- Real implementations would use async HTTP clients
+
 ## Error Handling
 
 Transaction operations return `crate::Error::TransactionError` for:
@@ -341,6 +645,12 @@ Transaction operations return `crate::Error::TransactionError` for:
 | Uncomputed change | Signing before fee() with change outputs |
 | Missing source tx | EF serialization without source transactions |
 | Invalid EF marker | EF parsing with wrong marker bytes |
+
+Fee operations return `crate::Error::FeeModelError` for:
+
+| Error | Condition |
+|-------|-----------|
+| Missing script | Input without unlocking script or template |
 
 ## Related Documentation
 
