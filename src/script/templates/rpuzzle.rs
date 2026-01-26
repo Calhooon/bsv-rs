@@ -503,10 +503,9 @@ mod tests {
     #[test]
     fn test_compute_r_from_k() {
         // Use a known K value
-        let k = BigNumber::from_hex(
-            "0000000000000000000000000000000000000000000000000000000000000001",
-        )
-        .unwrap();
+        let k =
+            BigNumber::from_hex("0000000000000000000000000000000000000000000000000000000000000001")
+                .unwrap();
 
         let r = RPuzzle::compute_r_from_k(&k).unwrap();
 
@@ -520,10 +519,9 @@ mod tests {
 
     #[test]
     fn test_rpuzzle_unlock_produces_valid_script() {
-        let k = BigNumber::from_hex(
-            "0000000000000000000000000000000000000000000000000000000000000002",
-        )
-        .unwrap();
+        let k =
+            BigNumber::from_hex("0000000000000000000000000000000000000000000000000000000000000002")
+                .unwrap();
         let private_key = PrivateKey::random();
         let sighash = [1u8; 32];
 
@@ -550,16 +548,9 @@ mod tests {
         let r_bytes = &sig_data[r_start..r_start + r_len];
 
         // R may have a leading zero if high bit is set
-        let r_trimmed: Vec<u8> = r_bytes
-            .iter()
-            .copied()
-            .skip_while(|&b| b == 0)
-            .collect();
-        let expected_trimmed: Vec<u8> = expected_r
-            .iter()
-            .copied()
-            .skip_while(|&b| b == 0)
-            .collect();
+        let r_trimmed: Vec<u8> = r_bytes.iter().copied().skip_while(|&b| b == 0).collect();
+        let expected_trimmed: Vec<u8> =
+            expected_r.iter().copied().skip_while(|&b| b == 0).collect();
 
         assert_eq!(r_trimmed, expected_trimmed);
     }

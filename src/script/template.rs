@@ -14,8 +14,8 @@
 //! ```
 
 use crate::primitives::bsv::sighash::{
-    compute_sighash_for_signing, parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_ANYONECANPAY,
-    SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
+    compute_sighash_for_signing, parse_transaction, SighashParams, SIGHASH_ALL,
+    SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
 };
 use crate::primitives::bsv::TransactionSignature;
 use crate::primitives::ec::PrivateKey;

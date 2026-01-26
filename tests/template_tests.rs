@@ -6,7 +6,7 @@
 use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
 use bsv_sdk::primitives::ec::PrivateKey;
 use bsv_sdk::primitives::BigNumber;
-use bsv_sdk::script::templates::{P2PKH, RPuzzle, RPuzzleType};
+use bsv_sdk::script::templates::{RPuzzle, RPuzzleType, P2PKH};
 use bsv_sdk::script::ScriptTemplate;
 
 /// Test that P2PKH locking script can be spent with the correct key.
@@ -53,7 +53,10 @@ fn test_p2pkh_end_to_end_spend() {
     // Second chunk: compressed public key (33 bytes)
     let pubkey_data = chunks[1].data.as_ref().unwrap();
     assert_eq!(pubkey_data.len(), 33);
-    assert_eq!(pubkey_data.as_slice(), public_key.to_compressed().as_slice());
+    assert_eq!(
+        pubkey_data.as_slice(),
+        public_key.to_compressed().as_slice()
+    );
 }
 
 /// Test P2PKH address-based locking.
@@ -81,10 +84,8 @@ fn test_p2pkh_from_address() {
 #[test]
 fn test_rpuzzle_lock_script_structure() {
     // Create a K value
-    let k = BigNumber::from_hex(
-        "0000000000000000000000000000000000000000000000000000000000000002",
-    )
-    .unwrap();
+    let k = BigNumber::from_hex("0000000000000000000000000000000000000000000000000000000000000002")
+        .unwrap();
 
     // Compute R from K
     let r_value = RPuzzle::compute_r_from_k(&k).unwrap();
@@ -132,10 +133,8 @@ fn test_rpuzzle_hashed_lock() {
 #[test]
 fn test_rpuzzle_unlock_k_value() {
     // Create a specific K value
-    let k = BigNumber::from_hex(
-        "0000000000000000000000000000000000000000000000000000000000000002",
-    )
-    .unwrap();
+    let k = BigNumber::from_hex("0000000000000000000000000000000000000000000000000000000000000002")
+        .unwrap();
 
     // Compute expected R
     let expected_r = RPuzzle::compute_r_from_k(&k).unwrap();
@@ -165,7 +164,10 @@ fn test_rpuzzle_unlock_k_value() {
     let r_trimmed: Vec<u8> = r_bytes.iter().copied().skip_while(|&b| b == 0).collect();
     let expected_trimmed: Vec<u8> = expected_r.iter().copied().skip_while(|&b| b == 0).collect();
 
-    assert_eq!(r_trimmed, expected_trimmed, "R value in signature should match k*G");
+    assert_eq!(
+        r_trimmed, expected_trimmed,
+        "R value in signature should match k*G"
+    );
 }
 
 /// Test script template unlock estimate_length.
@@ -179,41 +181,53 @@ fn test_template_unlock_estimate_length() {
 
     // RPuzzle should also estimate 108 bytes
     let k = BigNumber::from_i64(1);
-    let rpuzzle_unlock = RPuzzle::unlock(&k, &private_key, bsv_sdk::script::SignOutputs::All, false);
+    let rpuzzle_unlock =
+        RPuzzle::unlock(&k, &private_key, bsv_sdk::script::SignOutputs::All, false);
     assert_eq!(rpuzzle_unlock.estimate_length(), 108);
 }
 
 /// Test different sighash types.
 #[test]
 fn test_sighash_types() {
-    use bsv_sdk::primitives::bsv::sighash::{
-        SIGHASH_ANYONECANPAY, SIGHASH_NONE, SIGHASH_SINGLE,
-    };
+    use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ANYONECANPAY, SIGHASH_NONE, SIGHASH_SINGLE};
     use bsv_sdk::script::SignOutputs;
 
     let private_key = PrivateKey::random();
     let sighash = [1u8; 32];
 
     // ALL | FORKID (0x41)
-    let unlocking = P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::All, false).unwrap();
+    let unlocking =
+        P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::All, false).unwrap();
     let chunks = unlocking.chunks();
     let sig_data = chunks[0].data.as_ref().unwrap();
-    assert_eq!(*sig_data.last().unwrap(), (SIGHASH_ALL | SIGHASH_FORKID) as u8);
+    assert_eq!(
+        *sig_data.last().unwrap(),
+        (SIGHASH_ALL | SIGHASH_FORKID) as u8
+    );
 
     // NONE | FORKID (0x42)
-    let unlocking = P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::None, false).unwrap();
+    let unlocking =
+        P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::None, false).unwrap();
     let chunks = unlocking.chunks();
     let sig_data = chunks[0].data.as_ref().unwrap();
-    assert_eq!(*sig_data.last().unwrap(), (SIGHASH_NONE | SIGHASH_FORKID) as u8);
+    assert_eq!(
+        *sig_data.last().unwrap(),
+        (SIGHASH_NONE | SIGHASH_FORKID) as u8
+    );
 
     // SINGLE | FORKID (0x43)
-    let unlocking = P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::Single, false).unwrap();
+    let unlocking =
+        P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::Single, false).unwrap();
     let chunks = unlocking.chunks();
     let sig_data = chunks[0].data.as_ref().unwrap();
-    assert_eq!(*sig_data.last().unwrap(), (SIGHASH_SINGLE | SIGHASH_FORKID) as u8);
+    assert_eq!(
+        *sig_data.last().unwrap(),
+        (SIGHASH_SINGLE | SIGHASH_FORKID) as u8
+    );
 
     // ALL | FORKID | ANYONECANPAY (0xC1)
-    let unlocking = P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::All, true).unwrap();
+    let unlocking =
+        P2PKH::sign_with_sighash(&private_key, &sighash, SignOutputs::All, true).unwrap();
     let chunks = unlocking.chunks();
     let sig_data = chunks[0].data.as_ref().unwrap();
     assert_eq!(
@@ -270,8 +284,14 @@ fn test_rpuzzle_type_hash_functions() {
     assert_eq!(RPuzzleType::Hash160.hash(data).len(), 20);
 
     // Verify hashes match the primitives functions
-    assert_eq!(RPuzzleType::Sha256.hash(data), bsv_sdk::primitives::sha256(data).to_vec());
-    assert_eq!(RPuzzleType::Hash160.hash(data), bsv_sdk::primitives::hash160(data).to_vec());
+    assert_eq!(
+        RPuzzleType::Sha256.hash(data),
+        bsv_sdk::primitives::sha256(data).to_vec()
+    );
+    assert_eq!(
+        RPuzzleType::Hash160.hash(data),
+        bsv_sdk::primitives::hash160(data).to_vec()
+    );
 }
 
 /// Test compute_r_from_k with known values.
@@ -282,9 +302,8 @@ fn test_compute_r_from_k_known_values() {
     let r1 = RPuzzle::compute_r_from_k(&k1).unwrap();
 
     // Generator point x-coordinate (well-known value)
-    let expected_gx = hex::decode(
-        "79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798"
-    ).unwrap();
+    let expected_gx =
+        hex::decode("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798").unwrap();
     assert_eq!(r1.to_vec(), expected_gx);
 
     // k = 2 should give a different R
