@@ -58,3 +58,7 @@ pub use primitives::{
     from_hex, hash160, sha256, sha256d, to_hex, BigNumber, PrivateKey, PublicKey, Signature,
     SymmetricKey,
 };
+
+// Convenience re-exports from script
+#[cfg(feature = "script")]
+pub use script::{LockingScript, Script, ScriptChunk, UnlockingScript};
