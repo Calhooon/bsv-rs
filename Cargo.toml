@@ -45,6 +45,9 @@ base64 = "0.22"
 # Error handling
 thiserror = "1.0"
 
+# Lazy initialization
+lazy_static = "1.4"
+
 [dev-dependencies]
 criterion = "0.5"
 

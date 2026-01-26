@@ -7,6 +7,9 @@
 //! - Script chunks (`ScriptChunk`)
 //! - Script parsing and serialization (`Script`)
 //! - Locking and unlocking script types (`LockingScript`, `UnlockingScript`)
+//! - Script number encoding (`script_num` module)
+//! - Script evaluation errors (`evaluation_error` module)
+//! - Spend validation (`Spend`)
 //!
 //! # Example
 //!
@@ -34,14 +37,20 @@
 //! ```
 
 pub mod chunk;
+pub mod evaluation_error;
 pub mod locking_script;
 pub mod op;
 #[allow(clippy::module_inception)]
 pub mod script;
+pub mod script_num;
+pub mod spend;
 pub mod unlocking_script;
 
 // Re-exports for convenience
 pub use chunk::ScriptChunk;
+pub use evaluation_error::{ExecutionContext, ScriptEvaluationError};
 pub use locking_script::LockingScript;
 pub use script::Script;
+pub use script_num::ScriptNum;
+pub use spend::{Spend, SpendParams};
 pub use unlocking_script::UnlockingScript;
