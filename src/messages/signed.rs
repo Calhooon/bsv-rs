@@ -89,7 +89,7 @@ pub fn sign(message: &[u8], signer: &PrivateKey, verifier: Option<&PublicKey>) -
 /// * `message` - The original message bytes
 /// * `sig` - The signature bytes in wire format
 /// * `recipient` - Optional recipient private key. Required if the message was signed
-///                 for a specific recipient. For "anyone" messages, pass None.
+///   for a specific recipient. For "anyone" messages, pass None.
 ///
 /// # Returns
 ///
