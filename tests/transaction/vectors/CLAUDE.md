@@ -11,11 +11,11 @@ This module provides test vectors for the transaction subsystem. Vectors include
 |------|---------|
 | `mod.rs` | Module declarations, re-exports all vector submodules |
 | `tx_valid.rs` | Valid transaction hex strings for serialization/deserialization testing |
-| `tx_invalid.rs` | Structurally valid but semantically invalid transactions |
+| `tx_invalid.rs` | Structurally valid but semantically invalid transactions (includes unit tests) |
 | `bump_valid.rs` | Valid BRC-74 MerklePath (BUMP) hex strings |
 | `bump_invalid.rs` | Malformed BUMP data with expected error messages |
 | `bigtx.rs` | Large transaction vectors for stress testing |
-| `beef_cross_sdk.rs` | BEEF (BRC-62) vectors from TypeScript and Go SDKs |
+| `beef_cross_sdk.rs` | BEEF (BRC-62/BRC-74) vectors from TypeScript and Go SDKs |
 
 ## Key Exports
 
@@ -31,16 +31,18 @@ This module provides test vectors for the transaction subsystem. Vectors include
 
 **`TX_SIMPLE: &str`** - Minimal transaction for basic testing.
 
-**`TX_INVALID_VECTORS: &[(&str, &str)]`** - Array of (hex, description) tuples for invalid transactions. Includes:
+**`TX_INVALID_VECTORS: &[(&str, &str)]`** - Array of 10 (hex, description) tuples for invalid transactions. Includes:
 - Extra junk in scriptPubKey
 - Non-standard pushdata prefix
 - Invalid P2SH script hash
 - No outputs
-- Coinbase size violations (too small or too large)
+- Coinbase of size 1 (below minimum 2 bytes)
+- Coinbase of size 101 (above maximum 100 bytes)
 - CHECKMULTISIG missing dummy value
 - Empty stack for CHECKSIG
 - Non-standard DER signature
-- CHECKLOCKTIMEVERIFY/CHECKSEQUENCEVERIFY issues
+- CHECKLOCKTIMEVERIFY locked input
+- CHECKSEQUENCEVERIFY argument missing
 
 ### BUMP/MerklePath Vectors
 
@@ -54,10 +56,12 @@ This module provides test vectors for the transaction subsystem. Vectors include
 - `bump: &'static str` - The invalid BUMP hex
 - `error: &'static str` - Expected error message substring
 
-**`BUMP_INVALID_VECTORS: &[InvalidBumpVector]`** - Array of invalid BUMP vectors with expected errors:
-- Invalid offset at specific height
-- Duplicate offset at height
-- Missing hash for index at height
+**`BUMP_INVALID_VECTORS: &[InvalidBumpVector]`** - Array of 6 invalid BUMP vectors with expected errors:
+- Invalid offset at height 1 (offset 12, legal offset 413)
+- Duplicate offset 413 at height 1
+- Duplicate offset 231 at height 3
+- Missing hash for index 923 at height 0
+- Missing hash for index 1844 at height 6
 - Mismatched merkle roots
 
 ### Large Transaction Vectors
@@ -76,7 +80,7 @@ This module provides test vectors for the transaction subsystem. Vectors include
 
 **`BRC62_EXPECTED_TXID: &str`** - Expected transaction ID from the BRC62 BEEF.
 
-**`BEEF_SET_HEX: &str`** - BEEF hex containing multiple transactions from Go SDK.
+**`BEEF_SET_HEX: &str`** - BEEF V2 hex containing multiple transactions from Go SDK.
 
 **`BEEF_SET_FIND_TXID: &str`** - Expected TXID when finding a specific transaction in BEEF set.
 
@@ -173,39 +177,42 @@ assert_eq!(merkle_path.root().to_hex(), BRC74_ROOT);
 
 ## Invalid Transaction Categories
 
-The `TX_INVALID_VECTORS` cover various failure modes:
+The `TX_INVALID_VECTORS` cover 10 failure modes:
 
 | Category | Description |
 |----------|-------------|
-| Script Structure | Invalid scriptPubKey/scriptSig content |
+| Script Structure | Extra junk in scriptPubKey, non-standard pushdata prefix |
 | P2SH | Invalid script hashes |
-| Output Count | Missing outputs |
-| Coinbase | Size violations (must be 2-100 bytes) |
-| Signatures | Missing dummy values, non-standard DER |
-| Timelocks | CLTV/CSV verification failures |
+| Output Count | Missing outputs (zero outputs) |
+| Coinbase | Size violations (must be 2-100 bytes): size 1 and size 101 |
+| Signatures | CHECKMULTISIG missing dummy, empty stack for CHECKSIG, non-standard DER |
+| Timelocks | CHECKLOCKTIMEVERIFY locked input, CHECKSEQUENCEVERIFY argument missing |
+
+Note: These vectors test serialization/deserialization parsing, not script verification. The `tx_invalid.rs` file includes a unit test (`test_invalid_tx_can_be_parsed`) that verifies all vectors have non-empty hex strings.
 
 ## Invalid BUMP Error Types
 
-The `BUMP_INVALID_VECTORS` test these error conditions:
+The `BUMP_INVALID_VECTORS` test 6 error conditions:
 
-| Error Type | Description |
-|------------|-------------|
-| Invalid offset | Offset doesn't match legal values for height |
-| Duplicate offset | Same offset appears twice at a height |
-| Missing hash | Required hash missing for merkle tree computation |
-| Mismatched roots | Computed root doesn't match expected |
+| Error Type | Count | Description |
+|------------|-------|-------------|
+| Invalid offset | 1 | Offset doesn't match legal values for height |
+| Duplicate offset | 2 | Same offset appears twice at a height |
+| Missing hash | 2 | Required hash missing for merkle tree computation |
+| Mismatched roots | 1 | Computed root doesn't match expected |
 
 ## BEEF Format (BRC-62)
 
 BEEF (Background Evaluation Extended Format) is a serialization format for transactions that includes SPV proof data. The `beef_cross_sdk.rs` module provides vectors for testing:
 
-| Vector Type | Description |
-|-------------|-------------|
-| BRC62 BEEF | Single transaction with merkle proof |
-| BEEF Set | Multiple transactions with shared ancestry |
-| BRC74 MerklePath | Standalone merkle path with multiple TXIDs |
-| Single-TX Block | Edge case where merkle root equals coinbase TXID |
-| Empty BEEF | Version 1 and 2 empty containers |
+| Vector Type | Constant | Description |
+|-------------|----------|-------------|
+| BRC62 BEEF V1 | `BRC62_HEX` | Single transaction with merkle proof (version 1) |
+| BEEF Set V2 | `BEEF_SET_HEX` | Multiple transactions with shared ancestry (version 2) |
+| BRC74 MerklePath | `BRC74_HEX` | Standalone merkle path with 3 TXIDs at block height 813706 |
+| Single-TX Block | `SINGLE_TX_BUMP_HEX` | Edge case where merkle root equals coinbase TXID |
+| Empty BEEF V1 | `EMPTY_BEEF_V1_HEX` | Empty version 1 container (`0100beef0000`) |
+| Empty BEEF V2 | `EMPTY_BEEF_V2_HEX` | Empty version 2 container (`0200beef0000`) |
 
 ## Cross-SDK Compatibility
 
@@ -216,9 +223,23 @@ All vectors in this module are derived from the TypeScript and Go SDKs to ensure
 
 The BEEF vectors specifically come from the Go SDK implementation to ensure compatibility with the most recent BEEF specification.
 
+## Module Structure
+
+The `mod.rs` file exports all submodules publicly:
+
+```rust
+pub mod beef_cross_sdk;
+pub mod bigtx;
+pub mod bump_invalid;
+pub mod bump_valid;
+pub mod tx_invalid;
+pub mod tx_valid;
+```
+
+All constants and types are accessed via their respective submodules (e.g., `vectors::tx_valid::TX_VALID_1`).
+
 ## Related
 
 - `src/transaction/CLAUDE.md` - Transaction module implementation
-- `src/transaction/beef/CLAUDE.md` - BEEF format implementation
 - `tests/transaction/CLAUDE.md` - Transaction test module documentation
 - `CLAUDE.md` - Root project documentation

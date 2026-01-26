@@ -9,8 +9,9 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Purpose |
 |------|---------|
+| `compat_bip39_tests.rs` | BIP-39 mnemonic tests with official TREZOR vectors (22 vectors) |
 | `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs |
-| `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors |
+| `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors (15 vectors) |
 | `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests |
 | `integration_tests.rs` | Full workflow tests across all modules |
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors |
@@ -48,6 +49,46 @@ Transaction test vectors are in `tests/transaction/vectors/`:
 | `CLAUDE.md` | Transaction vectors documentation |
 
 ## Test Categories
+
+### BIP-39 Compatibility (`compat_bip39_tests.rs`)
+
+BIP-39 mnemonic phrase tests using official TREZOR vectors (requires `compat` feature):
+
+**Entropy to Mnemonic**
+- `test_entropy_to_mnemonic` - 22 vectors converting entropy to mnemonic phrases
+- `test_entropy_roundtrip` - Verifies entropy extraction from mnemonic matches original
+
+**Mnemonic to Seed**
+- `test_mnemonic_to_seed` - 22 vectors with passphrase "TREZOR" producing 512-bit seeds
+- `test_to_seed_empty_passphrase` - Empty passphrase matches `to_seed_normalized()`
+
+**Mnemonic Validation**
+- `test_mnemonic_validation` - All test vectors produce valid mnemonics
+- `test_invalid_mnemonic_bad_sentences` - 16 bad sentences from Go SDK rejected
+- `test_invalid_mnemonic_wrong_word_count` - 11 and 13 word mnemonics rejected
+- `test_invalid_mnemonic_bad_checksum` - Invalid checksum detection
+- `test_invalid_mnemonic_unknown_word` - Unknown word detection
+
+**Mnemonic Generation**
+- `test_generate_mnemonic_12_words` - Generate valid 12-word mnemonic
+- `test_generate_mnemonic_15_words` - Generate valid 15-word mnemonic
+- `test_generate_mnemonic_18_words` - Generate valid 18-word mnemonic
+- `test_generate_mnemonic_21_words` - Generate valid 21-word mnemonic
+- `test_generate_mnemonic_24_words` - Generate valid 24-word mnemonic
+
+**Entropy Validation**
+- `test_invalid_entropy_length` - Rejects 15, 17, and 33 byte entropy
+- `test_valid_entropy_lengths` - Accepts 16, 20, 24, 28, 32 byte entropy
+
+**Parsing**
+- `test_phrase_case_insensitive` - Mixed case phrases normalize to lowercase
+- `test_phrase_with_extra_spaces` - Extra whitespace is trimmed
+
+**Utilities**
+- `test_word_count_enum` - WordCount methods (entropy_bytes, word_count, checksum_bits)
+- `test_language_default` - Default language is English
+- `test_mnemonic_display` - Display trait implementation
+- `test_zero_leading_entropy` - Zero-leading entropy roundtrips correctly
 
 ### Cross-SDK Compatibility (`cross_sdk_tests.rs`)
 
@@ -98,223 +139,202 @@ HMAC-DRBG (Deterministic Random Bit Generator) tests using NIST SP 800-90A vecto
 
 ### EC Module Tests (`ec_tests.rs`)
 
-Focused tests for elliptic curve operations:
+Focused tests for elliptic curve operations using BRC-42 test vectors:
 
 **BRC-42 Key Derivation**
-- `test_brc42_private_derivation` - Recipient derives child private key from sender's public key
-- `test_brc42_public_derivation` - Sender derives child public key from recipient's public key
+- `test_brc42_private_derivation` - Recipient derives child private key from sender's public key using JSON vectors
+- `test_brc42_public_derivation` - Sender derives child public key from recipient's public key using JSON vectors
 - `test_brc42_consistency` - Verifies private and public derivation produce matching key pairs
 
 **Key Serialization**
-- `test_wif_roundtrip_known_vectors` - WIF encoding/decoding with known test cases
-- `test_public_key_known_vectors` - Known private to public key mappings
-- `test_address_generation_known_vectors` - Known public key to address mappings
+- `test_wif_roundtrip_known_vectors` - WIF encoding/decoding with known test cases (k=1, k=known)
+- `test_public_key_known_vectors` - Known private to public key mappings (generator point, 2G, 3G)
+- `test_address_generation_known_vectors` - Known public key to address mappings (1BgGZ9...)
 
 **Signing and Verification**
-- `test_sign_and_verify_roundtrip` - Signs and verifies messages of various lengths
-- `test_deterministic_signatures` - Verifies RFC 6979 deterministic signing
-- `test_public_key_recovery` - Recovers public key from signature
+- `test_sign_and_verify_roundtrip` - Signs and verifies messages of various lengths (empty, 100 bytes, 256 bytes)
+- `test_deterministic_signatures` - Verifies RFC 6979 deterministic signing (same message = same signature)
+- `test_public_key_recovery` - Recovers public key from signature using recovery IDs 0-1
 
 **ECDH**
 - `test_ecdh_shared_secret` - Verifies both parties derive identical shared secret
 
 ### Integration Tests (`integration_tests.rs`)
 
-Full workflow tests combining multiple modules:
+Full workflow tests combining multiple modules (25 tests):
 
 **Key Derivation Workflows**
-- `test_full_key_derivation_workflow` - Complete BRC-42 key agreement
-- `test_key_derivation_multiple_invoices` - Verifies different invoices produce unique keys
-- `test_sign_and_verify_with_derived_keys` - Signs with BRC-42 derived keys
+- `test_full_key_derivation_workflow` - Complete BRC-42 key agreement between sender and recipient
+- `test_key_derivation_multiple_invoices` - Verifies different invoices produce unique keys (4 invoices)
+- `test_sign_and_verify_with_derived_keys` - Signs with BRC-42 derived keys, verifies low-S
 - `test_signature_recovery_with_derived_keys` - Recovers public key from derived key signature
 
 **Symmetric Encryption**
-- `test_symmetric_encryption_with_derived_key` - Encrypts using ECDH shared secret
-- `test_symmetric_encryption_bidirectional` - Both parties can encrypt/decrypt
+- `test_symmetric_encryption_with_derived_key` - Encrypts using ECDH X coordinate as key
+- `test_symmetric_encryption_bidirectional` - Both parties can encrypt/decrypt using shared secret
 
 **WIF and Address**
-- `test_wif_address_roundtrip` - Mainnet key export and address generation
-- `test_testnet_wif_address` - Testnet key export (prefix 0xEF) and address (prefix 0x6F)
+- `test_wif_address_roundtrip` - Mainnet key export and address generation (prefix '1')
+- `test_testnet_wif_address` - Testnet WIF (prefix 0xEF) and address (prefix 0x6F, starts with 'm' or 'n')
 
 **Schnorr Proofs**
-- `test_schnorr_proof_with_derived_keys` - Generates and verifies Schnorr proofs
-- `test_schnorr_proof_fails_with_wrong_secret` - Verifies proof rejection with wrong secret
+- `test_schnorr_proof_with_derived_keys` - Generates and verifies Schnorr proofs using shared secret
+- `test_schnorr_proof_fails_with_wrong_secret` - Verifies proof rejection with Carol's secret instead of Bob's
 
 **Shamir Secret Sharing**
-- `test_shamir_with_wif_export` - Splits key, recovers from shares, verifies WIF match
-- `test_shamir_different_subsets` - Recovers from different 3-of-5 share combinations
+- `test_shamir_with_wif_export` - Splits key into 5 shares (threshold 3), recovers, verifies WIF match
+- `test_shamir_different_subsets` - Recovers from 4 different 3-of-5 share combinations
 
 **P-256 Curve**
 - `test_p256_sign_verify_roundtrip` - P-256 signing and verification
-- `test_p256_key_serialization` - P-256 key hex and compressed/uncompressed formats
+- `test_p256_key_serialization` - P-256 key hex and compressed (33 bytes) / uncompressed (65 bytes) formats
 
 **Hash Functions**
-- `test_hash_chain_for_key_derivation` - SHA256, SHA256d, Hash160 chaining
-- `test_hmac_for_key_derivation` - SHA256-HMAC and SHA512-HMAC
+- `test_hash_chain_for_key_derivation` - SHA256 (32 bytes), SHA256d (32 bytes), Hash160 (20 bytes) chaining
+- `test_hmac_for_key_derivation` - SHA256-HMAC (32 bytes) and SHA512-HMAC (64 bytes)
 
 **Encoding**
 - `test_encoding_roundtrips` - Hex, Base64, Base58 roundtrips
-- `test_address_encoding_integration` - Address encoding with Base58Check
+- `test_address_encoding_integration` - Address encoding with Base58Check (version byte 0x00)
 
 **Sighash**
-- `test_sighash_with_signature` - Computes sighash and signs
+- `test_sighash_with_signature` - Computes sighash with SIGHASH_ALL | SIGHASH_FORKID and signs
 
 **Complete Workflows**
-- `test_complete_payment_workflow` - Full merchant/customer payment scenario with BRC-42, ECDH encryption, and signing
-- `test_key_backup_and_recovery_workflow` - Complete Shamir split, backup, recover, and sign workflow
-- `test_multi_party_schnorr_verification` - Both parties generate and cross-verify proofs
+- `test_complete_payment_workflow` - Full merchant/customer payment with BRC-42, ECDH encryption, signing
+- `test_key_backup_and_recovery_workflow` - Complete Shamir split (3-of-5), backup, recover, sign workflow
+- `test_multi_party_schnorr_verification` - Both Alice and Bob generate and cross-verify proofs
 
 ### Script Vectors Tests (`script_vectors_tests.rs`)
 
-Comprehensive script interpreter tests using TypeScript SDK vectors:
+Comprehensive script interpreter tests using TypeScript SDK vectors (716 lines):
 
 **Spend Valid Vectors**
-- `test_spend_valid_vectors` - Runs ~570+ spend execution test vectors
-- `test_first_spend_vector_detailed` - Detailed debugging output for first vector
+- `test_spend_valid_vectors` - Runs ~570+ spend execution test vectors with SpendParams
+- `test_first_spend_vector_detailed` - Detailed debugging output for first vector (ASM, hex)
 
 **Script Parsing Tests**
-- `test_script_valid_vectors_parsing` - Tests ~590+ scripts can be parsed correctly
-- `test_script_valid_vectors_execution` - Tests script execution (some skipped for BTC-specific behavior)
+- `test_script_valid_vectors_parsing` - Tests ~590+ scripts can be parsed and hex roundtrips
+- `test_script_valid_vectors_execution` - Tests script execution (P2SH vectors skipped for BSV)
 
 **Script Invalid Vectors**
 - `test_script_invalid_vectors` - Verifies ~500+ invalid scripts fail during parsing or execution
 
 **Individual Script Tests**
-- `test_arithmetic_script` - Basic arithmetic (1 + 2 = 3)
-- `test_op_depth` - OP_DEPTH operation
-- `test_conditional` - IF/ELSE/ENDIF control flow
-- `test_op_cat` - BSV re-enabled OP_CAT
-- `test_op_split` - BSV re-enabled OP_SPLIT
+- `test_arithmetic_script` - Basic arithmetic (OP_1 OP_2 OP_ADD OP_3 OP_EQUAL)
+- `test_op_depth` - OP_DEPTH operation (empty stack = 0)
+- `test_conditional` - IF/ELSE/ENDIF control flow with OP_1 condition
+- `test_op_cat` - BSV re-enabled OP_CAT ("ab" + "cd" = "abcd")
+- `test_op_split` - BSV re-enabled OP_SPLIT ("abcd" at position 2)
 - `test_op_mul` - BSV re-enabled OP_MUL (3 * 7 = 21)
 - `test_op_div` - BSV re-enabled OP_DIV (21 / 7 = 3)
-- `test_hash_operations` - OP_SHA256 with computed expected hash
+- `test_hash_operations` - OP_SHA256 with computed expected hash from primitives
 
 ### Sighash Tests (`sighash_tests.rs`)
 
-Transaction sighash computation tests:
+Transaction sighash computation tests (227 lines):
 
-- `test_sighash_vectors` - Runs all 499 sighash test vectors
-- `test_sighash_first_vector_detailed` - Detailed debugging output for first vector
-- `test_parse_all_vectors_transactions` - Verifies transaction parsing for all vectors
+- `test_sighash_vectors` - Runs all 499 sighash test vectors using `compute_sighash` and `parse_transaction`
+- `test_sighash_first_vector_detailed` - Detailed debugging output: raw_tx, script, hash_type, parsed inputs/outputs
+- `test_parse_all_vectors_transactions` - Verifies all 499 transactions can be parsed from raw hex
 
 ### Template Tests (`template_tests.rs`)
 
-Script template integration tests:
+Script template integration tests (313 lines):
 
 **P2PKH Template**
-- `test_p2pkh_end_to_end_spend` - Full P2PKH locking script creation and unlocking
-- `test_p2pkh_from_address` - P2PKH locking from Bitcoin address
-- `test_p2pkh_spend_validation` - P2PKH spend with Spend interpreter
+- `test_p2pkh_end_to_end_spend` - Full P2PKH locking script creation (DUP HASH160 EQUALVERIFY CHECKSIG) and unlocking
+- `test_p2pkh_from_address` - P2PKH locking from Bitcoin address matches locking from pubkey hash
+- `test_p2pkh_spend_validation` - P2PKH spend with Spend interpreter (validates structure)
 
 **RPuzzle Template**
-- `test_rpuzzle_lock_script_structure` - Verifies RPuzzle script structure (OP_OVER, OP_SPLIT, etc.)
-- `test_rpuzzle_hashed_lock` - RPuzzle with HASH160 and SHA256 R values
-- `test_rpuzzle_unlock_k_value` - Verifies K value produces correct R in signature
-- `test_compute_r_from_k_known_values` - Tests k=1 produces generator point x-coordinate
+- `test_rpuzzle_lock_script_structure` - Verifies RPuzzle script: OP_OVER, OP_3, OP_SPLIT, OP_NIP, OP_SWAP, OP_DROP, OP_EQUALVERIFY, OP_CHECKSIG
+- `test_rpuzzle_hashed_lock` - RPuzzle with HASH160 (contains OP_HASH160) and SHA256 (contains OP_SHA256) R values
+- `test_rpuzzle_unlock_k_value` - Verifies K value produces correct R in signature (DER R extraction)
+- `test_compute_r_from_k_known_values` - Tests k=1 produces generator point x-coordinate (79BE667E...)
 
 **Template Utilities**
-- `test_template_unlock_estimate_length` - Verifies unlock script length estimation (108 bytes)
-- `test_sighash_types` - Tests ALL, NONE, SINGLE, and ANYONECANPAY sighash flags
-- `test_rpuzzle_type_hash_functions` - Verifies hash output lengths for all RPuzzle types
+- `test_template_unlock_estimate_length` - Both P2PKH and RPuzzle estimate 108 bytes
+- `test_sighash_types` - Tests ALL|FORKID (0x41), NONE|FORKID (0x42), SINGLE|FORKID (0x43), ALL|FORKID|ANYONECANPAY (0xC1)
+- `test_rpuzzle_type_hash_functions` - Verifies Raw (same length), Sha1 (20), Sha256 (32), Hash256 (32), Ripemd160 (20), Hash160 (20)
 
 ### Transaction Tests (`transaction_tests.rs`)
 
-Transaction module tests (requires `transaction` feature flag):
+Transaction module tests (1027 lines, requires `transaction` feature flag):
 
 **Transaction Parsing**
-- `test_transaction_from_hex` - Parse valid transaction from hex
-- `test_transaction_roundtrip_hex` - Hex serialization/deserialization roundtrip
+- `test_transaction_from_hex` - Parse valid transaction from hex (version=1, locktime=0)
+- `test_transaction_roundtrip_hex` - Hex serialization/deserialization roundtrip for all TX_VALID_VECTORS
 - `test_transaction_roundtrip_binary` - Binary serialization/deserialization roundtrip
-- `test_transaction_txid` - Transaction ID computation
-- `test_transaction_hash_differs_from_id` - Hash vs TXID byte order
-- `test_new_transaction_defaults` - Default transaction values
-- `test_invalid_tx_can_be_parsed_structurally` - Invalid tx vectors can still be parsed
+- `test_transaction_txid` - Transaction ID computation matches TX_VALID_2_TXID
+- `test_transaction_hash_differs_from_id` - Hash vs TXID byte order (reversed)
+- `test_new_transaction_defaults` - Default: version=1, lock_time=0, empty inputs/outputs
+- `test_invalid_tx_can_be_parsed_structurally` - Invalid tx vectors can still be parsed structurally
 
 **Fee Models**
-- `test_fixed_fee` - FixedFee model (constant fee)
+- `test_fixed_fee` - FixedFee model returns constant 500 sats
 - `test_satoshis_per_kilobyte_default` - Default 100 sat/KB rate
-- `test_satoshis_per_kilobyte_new` - Custom sat/KB rate
-- `test_satoshis_per_kilobyte_empty_tx` - Fee for empty transaction (10 bytes)
-- `test_satoshis_per_kilobyte_ceiling_division` - Fees rounded up
+- `test_satoshis_per_kilobyte_new` - Custom 1000 sat/KB rate
+- `test_satoshis_per_kilobyte_empty_tx` - Fee for empty transaction: 10 bytes × 1000 sat/KB = 10 sats
+- `test_satoshis_per_kilobyte_ceiling_division` - Fees rounded up (10 bytes × 100 sat/KB = 1 sat)
 
-**Chain Tracker (async)**
-- `test_mock_chain_tracker` - MockChainTracker with merkle root validation
-- `test_always_valid_chain_tracker` - AlwaysValidChainTracker accepts all roots
+**Chain Tracker (async, tokio)**
+- `test_mock_chain_tracker` - MockChainTracker with add_root and is_valid_root_for_height
+- `test_always_valid_chain_tracker` - AlwaysValidChainTracker accepts all roots at any height
 
-**Broadcaster (async)**
-- `test_broadcaster_success` - Successful broadcast response
-- `test_broadcaster_failure` - Failed broadcast with error code
-- `test_broadcaster_many` - Batch broadcasting multiple transactions
+**Broadcaster (async, tokio)**
+- `test_broadcaster_success` - BroadcastResponse::success with status Success
+- `test_broadcaster_failure` - BroadcastFailure with code "REJECTED"
+- `test_broadcaster_many` - broadcast_many for batch broadcasting
 
 **MerklePath (BUMP)**
-- `test_merkle_path_from_hex` - Parse BRC-74 BUMP format
+- `test_merkle_path_from_hex` - Parse BRC-74 BUMP format (all BUMP_VALID_VECTORS)
 - `test_merkle_path_roundtrip` - BUMP hex roundtrip
-- `test_merkle_path_from_coinbase` - Create MerklePath for coinbase tx
-- `test_merkle_path_compute_root` - Compute merkle root from path
-- `test_invalid_bump_vectors` - Invalid BUMP vectors fail parsing/validation
+- `test_merkle_path_from_coinbase` - Create MerklePath for coinbase tx at height 100
+- `test_merkle_path_compute_root` - Compute merkle root from path (64 hex chars)
+- `test_invalid_bump_vectors` - Invalid BUMP vectors with expected error descriptions
 
 **BEEF Format**
-- `test_beef_new` - Create empty BEEF container
-- `test_beef_merge_txid_only` - Add txid-only references
-- `test_beef_merge_bump` - Add MerklePath to BEEF
-- `test_beef_empty_is_valid` - Empty BEEF validation
+- `test_beef_new` - Create empty BEEF container (empty bumps/txs)
+- `test_beef_merge_txid_only` - Add txid-only references, find_txid works
+- `test_beef_merge_bump` - Add MerklePath to BEEF (index 0)
+- `test_beef_empty_is_valid` - Empty BEEF validation with is_valid(false)
 
 **Big Transaction Tests**
-- `test_big_tx_constant_exists` - Verify big TX TXID constant
-- `test_large_tx_parses` - Parse large coinbase transaction
-- `test_multi_io_tx_parses` - Parse transaction with multiple inputs/outputs
+- `test_big_tx_constant_exists` - Verify BIG_TX_TXID is 64 hex chars
+- `test_large_tx_parses` - Parse LARGE_TX_HEX coinbase (1 input, 1 output)
+- `test_multi_io_tx_parses` - Parse MULTI_IO_TX_HEX (2 inputs, 2 outputs)
 
 **Transaction Construction**
-- `test_estimate_size` - Size estimation accuracy
-- `test_add_input_requires_txid_or_source` - Input validation
-- `test_add_input_with_txid` - Add input with txid
-- `test_add_output` - Add output
-- `test_add_change_output` - Add change output with flag
-- `test_metadata` - Transaction metadata updates
+- `test_estimate_size` - Size estimation within 10 bytes of actual
+- `test_add_input_requires_txid_or_source` - Default TransactionInput fails
+- `test_add_input_with_txid` - TransactionInput::new with 64-char txid
+- `test_add_output` - TransactionOutput::new with satoshis and LockingScript
+- `test_add_change_output` - TransactionOutput::new_change with change=true flag
+- `test_metadata` - update_metadata with serde_json::json!
 
-**Extended BEEF Tests** (in `beef_extended_tests` submodule)
-- `test_beef_merge_transaction_with_parents` - Merge parent and child transactions
-- `test_beef_merge_two_beefs` - Merge two BEEF containers
-- `test_beef_sort_txs_dependency_order` - Sort transactions by dependency order
-- `test_beef_atomic_serialization` - Atomic BEEF serialization with target txid
-- `test_beef_v1_v2_roundtrip` - BEEF V1 and V2 format roundtrips
-- `test_beef_version_default` - Default BEEF version is V2
-- `test_beef_multiple_bumps` - Add multiple merkle paths to BEEF
-- `test_beef_empty_validation` - Empty BEEF validation passes
-- `test_beef_txid_only_validation` - Txid-only validation modes
-- `test_beef_find_transaction_not_found` - Non-existent txid lookup
-- `test_beef_hex_roundtrip` - Hex format roundtrip
-- `test_beef_binary_roundtrip` - Binary format roundtrip
-- `test_beef_merge_duplicate_txid` - Duplicate transaction deduplication
-- `test_beef_merge_raw_tx` - Merge raw transaction bytes
-- `test_beef_bump_at_different_heights` - Bumps at various block heights
-- `test_beef_validation_result` - Validation result structure
+**Extended BEEF Tests** (in `beef_extended_tests` submodule, 16 tests)
+- Transaction merging: parent/child, two BEEFs, duplicate deduplication, raw tx
+- Sorting: `sort_txs` orders by dependency (grandparent → parent → child)
+- Serialization: atomic (with target txid), V1/V2 roundtrip, hex/binary roundtrip
+- Validation: empty BEEF, txid-only (strict vs lenient), verify_valid result structure
+- MerklePaths: multiple bumps at heights 100-1000000
 
-**Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule)
-- `test_brc74_merkle_path_from_hex` - Parse BRC-74 MerklePath from TypeScript/Go SDKs
-- `test_brc74_merkle_path_hex_roundtrip` - BRC-74 hex roundtrip
-- `test_brc74_compute_root_txid1/2/3` - Compute merkle root for multiple TXIDs
-- `test_single_tx_block_merkle_path` - Single-tx block where root equals txid
-- `test_empty_beef_v1/v2` - Empty BEEF serialization for both versions
-- `test_brc62_beef_from_hex` - Parse BRC-62 BEEF from Go SDK
-- `test_brc62_beef_find_transaction` - Find transaction in BEEF
-- `test_beef_set_from_hex` - Parse BEEF with multiple transactions
-- `test_beef_set_find_transaction` - Find specific transaction in BEEF set
-- `test_beef_set_roundtrip` - BEEF set binary roundtrip
+**Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule, 10 tests)
+- BRC-74 MerklePath: parse, hex roundtrip, compute root for 3 TXIDs
+- Single-tx block: root equals coinbase txid
+- BRC-62 BEEF: V1/V2 empty serialization, parse from Go SDK, find transactions
+- BEEF set: parse multi-tx BEEF, find specific txid, binary roundtrip
 
-**MerklePath Advanced Tests** (in `merkle_path_advanced_tests` submodule)
-- `test_merkle_path_verify_with_chain_tracker` - Verify MerklePath using ChainTracker
-- `test_merkle_path_verify_wrong_root_fails` - Verification fails with wrong root
-- `test_merkle_path_verify_wrong_height_fails` - Verification fails with wrong height
-- `test_merkle_path_contains` - Check if txid is in MerklePath
-- `test_merkle_path_txids` - Get all txids from MerklePath
-- `test_merkle_path_compute_root_without_txid` - Compute root using first found txid
-- `test_merkle_path_binary_roundtrip` - Binary serialization roundtrip
+**MerklePath Advanced Tests** (in `merkle_path_advanced_tests` submodule, 7 async tests)
+- ChainTracker verification: correct root passes, wrong root/height fails
+- Utility methods: contains, txids, compute_root(None), binary roundtrip
 
 ## Running Tests
 
 ```bash
 # Run all integration tests
+cargo test --test compat_bip39_tests --features compat
 cargo test --test cross_sdk_tests
 cargo test --test drbg_tests
 cargo test --test ec_tests
@@ -324,6 +344,12 @@ cargo test --test sighash_tests
 cargo test --test template_tests
 cargo test --test transaction_tests --features transaction
 
+# Run all tests with transaction feature
+cargo test --features transaction
+
+# Run all tests with compat feature (includes BIP-39)
+cargo test --features compat
+
 # Run specific test
 cargo test --test integration_tests test_complete_payment_workflow
 
@@ -332,71 +358,85 @@ cargo test --test sighash_tests -- --nocapture
 
 # Run async tests (transaction module requires tokio)
 cargo test --test transaction_tests --features transaction -- test_mock_chain_tracker
+
+# Run all BEEF tests
+cargo test --test transaction_tests --features transaction -- beef
 ```
 
 ## Key Types Used
 
-| Type | Import Path | Description |
-|------|-------------|-------------|
-| `PrivateKey` | `bsv_sdk::primitives::ec` | secp256k1 private key |
-| `PublicKey` | `bsv_sdk::primitives::ec` | secp256k1 public key |
-| `SymmetricKey` | `bsv_sdk::primitives::symmetric` | AES-256-GCM symmetric key |
-| `P256PrivateKey` | `bsv_sdk::primitives::p256` | NIST P-256 private key |
-| `P256PublicKey` | `bsv_sdk::primitives::p256` | NIST P-256 public key |
-| `Schnorr` | `bsv_sdk::primitives::bsv::schnorr` | Schnorr proof generation/verification |
-| `KeyShares` | `bsv_sdk::primitives::bsv::shamir` | Shamir secret sharing |
-| `HmacDrbg` | `bsv_sdk::primitives::drbg` | HMAC-based deterministic random bit generator |
-| `BigNumber` | `bsv_sdk::primitives` | Arbitrary precision integers |
-| `Script` | `bsv_sdk::script` | Bitcoin script |
-| `LockingScript` | `bsv_sdk::script` | Script for locking outputs |
-| `UnlockingScript` | `bsv_sdk::script` | Script for unlocking inputs |
-| `Spend` | `bsv_sdk::script` | Script spend validator/interpreter |
-| `P2PKH` | `bsv_sdk::script::templates` | Pay-to-Public-Key-Hash template |
-| `RPuzzle` | `bsv_sdk::script::templates` | R-Puzzle template |
-| `Transaction` | `bsv_sdk::transaction` | Bitcoin transaction |
-| `TransactionInput` | `bsv_sdk::transaction` | Transaction input |
-| `TransactionOutput` | `bsv_sdk::transaction` | Transaction output |
-| `MerklePath` | `bsv_sdk::transaction` | BRC-74 BUMP merkle proof |
-| `Beef` | `bsv_sdk::transaction` | BRC-62 BEEF container |
-| `FeeModel` | `bsv_sdk::transaction` | Fee computation trait |
-| `SatoshisPerKilobyte` | `bsv_sdk::transaction` | Per-KB fee model |
-| `FixedFee` | `bsv_sdk::transaction` | Constant fee model |
-| `Broadcaster` | `bsv_sdk::transaction` | Transaction broadcast trait (async) |
-| `ChainTracker` | `bsv_sdk::transaction` | Block header/merkle root tracker (async) |
-| `AlwaysValidChainTracker` | `bsv_sdk::transaction` | ChainTracker that accepts all roots |
-| `MockChainTracker` | `bsv_sdk::transaction` | ChainTracker with configurable roots |
+**Primitives** (`bsv_sdk::primitives`):
+- `ec::PrivateKey`, `ec::PublicKey`, `ec::recover_public_key` - secp256k1 keys
+- `symmetric::SymmetricKey` - AES-256-GCM encryption
+- `p256::P256PrivateKey`, `p256::P256PublicKey` - NIST P-256 keys
+- `bsv::schnorr::Schnorr` - Schnorr proof generation/verification
+- `bsv::shamir::{KeyShares, split_private_key}` - Shamir secret sharing
+- `drbg::HmacDrbg` - HMAC-based DRBG
+- `BigNumber` - Arbitrary precision integers
+
+**Compat** (`bsv_sdk::compat`, requires `compat` feature):
+- `bip39::Mnemonic` - BIP-39 mnemonic phrase handling
+- `bip39::WordCount` - Word count enum (Words12, Words15, Words18, Words21, Words24)
+- `bip39::Language` - Language enum (currently English only)
+
+**Script** (`bsv_sdk::script`):
+- `Script`, `LockingScript`, `UnlockingScript` - Script types
+- `Spend`, `SpendParams` - Script spend validator
+- `templates::{P2PKH, RPuzzle, RPuzzleType}` - Script templates
+- `ScriptTemplate`, `SignOutputs` - Template trait and sighash selection
+
+**Transaction** (`bsv_sdk::transaction`):
+- `Transaction`, `TransactionInput`, `TransactionOutput` - Transaction types
+- `MerklePath` - BRC-74 BUMP merkle proof
+- `Beef`, `BEEF_V1`, `BEEF_V2` - BRC-62 BEEF container
+- `FeeModel`, `SatoshisPerKilobyte`, `FixedFee` - Fee computation
+- `Broadcaster`, `BroadcastResponse`, `BroadcastFailure`, `BroadcastStatus` - Broadcast (async)
+- `ChainTracker`, `AlwaysValidChainTracker`, `MockChainTracker` - Chain tracking (async)
 
 ## Utility Functions
 
 **Hash Functions** (`bsv_sdk::primitives::hash`):
-- `sha256` - 32 bytes
-- `sha256d` - 32 bytes (double SHA256)
-- `hash160` - 20 bytes (SHA256 + RIPEMD160)
-- `sha256_hmac` / `sha512_hmac` - HMAC variants
+- `sha256` (32 bytes), `sha256d` (32 bytes, double SHA256), `hash160` (20 bytes)
+- `sha256_hmac`, `sha512_hmac` - HMAC variants
 
 **Encoding** (`bsv_sdk::primitives`):
-- `from_hex` / `to_hex` - Hex encoding
-- `from_base64` / `to_base64` - Base64 encoding
-- `from_base58` / `to_base58` - Base58 encoding
-- `from_base58_check` - Base58Check decoding
+- `from_hex`/`to_hex`, `from_base64`/`to_base64`, `from_base58`/`to_base58`, `from_base58_check`
+
+**Sighash** (`bsv_sdk::primitives::bsv::sighash`):
+- `compute_sighash`, `parse_transaction`, `SighashParams`, `TxInput`, `TxOutput`
+- Flags: `SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_FORKID`, `SIGHASH_ANYONECANPAY`
 
 ## Adding New Tests
 
 **Cross-SDK Compatibility Tests:**
 1. Add JSON vectors to `tests/vectors/`
-2. Use `#[serde(rename_all = "camelCase")]` for deserialization
+2. Use `#[serde(rename_all = "camelCase")]` for deserialization (matching TypeScript/Go)
 3. Load with `fs::read_to_string` or `include_str!`
 4. Include vector index in panic messages: `panic!("Vector {}: {}", i, e)`
+5. Use `unwrap_or_else` for detailed error context
+
+**BIP-39 Compatibility Tests:**
+1. Add test vectors to `test_vectors()` function in `compat_bip39_tests.rs`
+2. Use `#[cfg(feature = "compat")]` gate for all compat tests
+3. Test both entropy→mnemonic and mnemonic→seed directions
+4. Add invalid cases to `bad_mnemonic_sentences()` for validation coverage
 
 **Transaction Module Tests:**
 1. Add const vectors to `tests/transaction/vectors/`
-2. Use `#[cfg(feature = "transaction")]` gate
-3. Use `#[tokio::test]` for async tests
+2. Use `#[cfg(feature = "transaction")]` gate for all transaction tests
+3. Use `#[tokio::test]` for async tests (ChainTracker, Broadcaster)
 4. Implement `Broadcaster` with `#[async_trait(?Send)]`
+5. Group related tests in submodules (e.g., `beef_extended_tests`, `cross_sdk_tests`)
+
+**Script Tests:**
+1. Use `SpendParams` struct for Spend constructor
+2. Set `source_satoshis: 1` for basic tests (or 0 for legacy sighash)
+3. Test both parsing (from_hex) and execution (validate)
+4. Script hex roundtrip should be case-insensitive match
 
 **DRBG Tests:**
 1. `HmacDrbg::new()` for SHA-256, `new_with_hash(..., true)` for SHA-512
-2. Generate multiple times if required by vector specification
+2. Generate multiple times if required by vector specification (e.g., `add.len()` times)
 3. Expected output is from the final generate call
 
 ## Notes on BSV vs BTC Script Vectors
@@ -407,7 +447,21 @@ Some test vectors in `script_valid.json` may fail execution because:
 - BSV has different clean stack requirements
 - Some vectors test BTC-specific behavior (P2SH, etc.)
 
-The BSV-specific `spend_valid.json` vectors should all pass.
+The BSV-specific `spend_valid.json` vectors should all pass. Vectors with `flags.contains("P2SH")` are skipped in `test_script_valid_vectors_execution`.
+
+## Test Organization
+
+Tests are organized by feature area:
+- **primitives tests**: `cross_sdk_tests.rs`, `drbg_tests.rs`, `ec_tests.rs`, `integration_tests.rs`
+- **script tests**: `script_vectors_tests.rs`, `template_tests.rs`
+- **transaction tests**: `sighash_tests.rs`, `transaction_tests.rs`
+- **compat tests**: `compat_bip39_tests.rs` (requires `compat` feature)
+
+The `transaction_tests.rs` file uses nested modules for organization:
+- `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)
+- `beef_extended_tests` - Extended BEEF format tests
+- `cross_sdk_tests` - Cross-SDK compatibility using `beef_cross_sdk.rs` vectors
+- `merkle_path_advanced_tests` - Advanced MerklePath verification with ChainTracker
 
 ## Related Documentation
 

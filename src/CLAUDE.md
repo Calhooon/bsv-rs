@@ -20,6 +20,8 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | `script/` | `script` | Complete | Script parsing, execution, and templates (P2PKH, RPuzzle, PushDrop) |
 | `transaction/` | `transaction` | Complete | Transaction construction, signing, BEEF/MerklePath SPV proofs |
 | `wallet/` | `wallet` | Complete | BRC-42 key derivation, ProtoWallet, WalletClient |
+| `messages/` | `messages` | Complete | BRC-78 message signing, encryption, and verification |
+| `compat/` | `compat` | Complete | BIP-39 mnemonic compatibility (legacy wallet support) |
 
 ## Key Exports
 
@@ -40,6 +42,12 @@ pub mod transaction;
 
 #[cfg(feature = "wallet")]
 pub mod wallet;
+
+#[cfg(feature = "messages")]
+pub mod messages;
+
+#[cfg(feature = "compat")]
+pub mod compat;
 ```
 
 **Convenience re-exports** from `primitives`:
@@ -56,6 +64,7 @@ pub mod wallet;
 
 **Convenience re-exports** from `script`:
 - `Script` - Bitcoin Script representation
+- `ScriptChunk` - Individual script element (opcode or data push)
 - `LockingScript` - Output script (scriptPubKey)
 - `UnlockingScript` - Input script (scriptSig)
 
@@ -74,6 +83,17 @@ pub mod wallet;
 - `Protocol` - BRC-43 protocol identifier (security level, protocol ID, key ID)
 - `Counterparty` - Key derivation counterparty (self or public key)
 - `SecurityLevel` - Security level for key derivation (0, 1, or 2)
+
+**Convenience re-exports** from `messages`:
+- `sign` - Sign a message with a private key
+- `verify` - Verify a signed message
+- `encrypt` - Encrypt a message for a recipient
+- `decrypt` - Decrypt a message from a sender
+
+**Convenience re-exports** from `compat`:
+- `Mnemonic` - BIP-39 mnemonic phrase for seed generation
+- `Language` - Wordlist language for mnemonic phrases
+- `WordCount` - Number of words in mnemonic (12, 15, 18, 21, or 24)
 
 ### Error Types (`error.rs`)
 
@@ -124,6 +144,20 @@ The `Error` enum provides unified error handling across all modules. It uses `th
 | `KeyDerivationError` | `(String)` | BRC-42 key derivation failed |
 | `ProtocolValidationError` | `(String)` | Invalid BRC-43 protocol specification |
 | `InvalidCounterparty` | `(String)` | Invalid counterparty for key derivation |
+
+**Messages errors** (requires `messages` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `MessageVersionMismatch` | `{ expected, actual }` | Message version does not match expected |
+| `MessageError` | `(String)` | General message-related error |
+| `MessageRecipientMismatch` | `{ expected, actual }` | Message recipient does not match expected |
+
+**Compat errors** (requires `compat` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `InvalidMnemonic` | `(String)` | Invalid BIP-39 mnemonic phrase |
+| `InvalidEntropyLength` | `{ expected, actual }` | Wrong entropy length for mnemonic generation |
+| `InvalidMnemonicWord` | `(String)` | Unknown word in mnemonic phrase |
 
 **Result alias**:
 ```rust
@@ -195,13 +229,17 @@ Features follow a dependency hierarchy:
 
 ```
 full
- └── wallet
-      └── transaction
-           └── script
-                └── primitives
+ ├── wallet
+ │    └── transaction
+ │         └── script
+ │              └── primitives
+ ├── messages
+ │    └── wallet
+ └── compat
+      └── primitives
 ```
 
-The `script` feature automatically enables `primitives`, and `transaction` enables `script`, etc.
+The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` feature only requires `primitives`.
 
 Default features include `primitives` and `script`:
 ```rust
@@ -215,11 +253,18 @@ use bsv_sdk::transaction;
 
 #[cfg(feature = "wallet")]
 use bsv_sdk::wallet;
+
+#[cfg(feature = "messages")]
+use bsv_sdk::messages;
+
+#[cfg(feature = "compat")]
+use bsv_sdk::compat;
 ```
 
 Additional optional features:
 - **`http`** - Enables HTTP clients for ARC broadcaster, WhatsOnChain chain tracker, and WalletClient substrate
 - **`wasm`** - Enables WebAssembly support via `getrandom/js`
+- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`
 
 ## Adding New Errors
 
@@ -256,4 +301,6 @@ thiserror = "1.0"
 - `script/CLAUDE.md` - Script module documentation
 - `transaction/CLAUDE.md` - Transaction module documentation
 - `wallet/CLAUDE.md` - Wallet module documentation
+- `messages/CLAUDE.md` - Messages module documentation
+- `compat/CLAUDE.md` - Compatibility module documentation
 - `../CLAUDE.md` - Project root documentation

@@ -150,6 +150,42 @@ pub enum Error {
     #[cfg(feature = "wallet")]
     #[error("invalid counterparty: {0}")]
     InvalidCounterparty(String),
+
+    // ===================
+    // Messages errors
+    // ===================
+    /// Message version mismatch.
+    #[cfg(feature = "messages")]
+    #[error("message version mismatch: expected {expected}, got {actual}")]
+    MessageVersionMismatch { expected: String, actual: String },
+
+    /// General message error.
+    #[cfg(feature = "messages")]
+    #[error("message error: {0}")]
+    MessageError(String),
+
+    /// Message recipient mismatch.
+    #[cfg(feature = "messages")]
+    #[error("message recipient mismatch: expected {expected}, got {actual}")]
+    MessageRecipientMismatch { expected: String, actual: String },
+
+    // ===================
+    // Compat errors
+    // ===================
+    /// Invalid mnemonic phrase.
+    #[cfg(feature = "compat")]
+    #[error("invalid mnemonic: {0}")]
+    InvalidMnemonic(String),
+
+    /// Invalid entropy length for mnemonic generation.
+    #[cfg(feature = "compat")]
+    #[error("invalid entropy length: expected {expected}, got {actual}")]
+    InvalidEntropyLength { expected: String, actual: usize },
+
+    /// Invalid word in mnemonic phrase.
+    #[cfg(feature = "compat")]
+    #[error("invalid word in mnemonic: {0}")]
+    InvalidMnemonicWord(String),
 }
 
 /// Result type alias for BSV SDK operations.

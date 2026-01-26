@@ -54,6 +54,12 @@ pub mod transaction;
 #[cfg(feature = "wallet")]
 pub mod wallet;
 
+#[cfg(feature = "messages")]
+pub mod messages;
+
+#[cfg(feature = "compat")]
+pub mod compat;
+
 // Convenience re-exports from primitives (most common items)
 #[cfg(feature = "primitives")]
 pub use primitives::{
@@ -75,3 +81,11 @@ pub use wallet::{
     CacheConfig, CachedKeyDeriver, Counterparty, KeyDeriver, KeyDeriverApi, ProtoWallet, Protocol,
     SecurityLevel,
 };
+
+// Convenience re-exports from messages
+#[cfg(feature = "messages")]
+pub use messages::{decrypt, encrypt, sign, verify};
+
+// Convenience re-exports from compat
+#[cfg(feature = "compat")]
+pub use compat::{Language, Mnemonic, WordCount};
