@@ -138,8 +138,8 @@ impl WalletClient {
     #[cfg(feature = "http")]
     async fn connect(&mut self) -> Result<&ConnectedSubstrate, Error> {
         // If already connected, return existing connection
-        if self.connected.is_some() {
-            return Ok(self.connected.as_ref().unwrap());
+        if let Some(ref connected) = self.connected {
+            return Ok(connected);
         }
 
         // Connect based on substrate type
@@ -164,7 +164,8 @@ impl WalletClient {
             }
         }
 
-        Ok(self.connected.as_ref().unwrap())
+        // Safe to unwrap here because we just set it above (or auto_detect did)
+        Ok(self.connected.as_ref().expect("connected was just set"))
     }
 
     /// Auto-detects available substrate by trying each in order.
