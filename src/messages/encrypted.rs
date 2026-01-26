@@ -241,7 +241,10 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(Error::MessageRecipientMismatch { expected, actual }) => {
-                assert_eq!(expected, hex::encode(recipient.public_key().to_compressed()));
+                assert_eq!(
+                    expected,
+                    hex::encode(recipient.public_key().to_compressed())
+                );
                 assert_eq!(
                     actual,
                     hex::encode(wrong_recipient.public_key().to_compressed())
@@ -338,8 +341,14 @@ mod tests {
         assert_ne!(ciphertext1, ciphertext2);
 
         // Both should decrypt correctly
-        assert_eq!(plaintext.to_vec(), decrypt(&ciphertext1, &recipient).unwrap());
-        assert_eq!(plaintext.to_vec(), decrypt(&ciphertext2, &recipient).unwrap());
+        assert_eq!(
+            plaintext.to_vec(),
+            decrypt(&ciphertext1, &recipient).unwrap()
+        );
+        assert_eq!(
+            plaintext.to_vec(),
+            decrypt(&ciphertext2, &recipient).unwrap()
+        );
     }
 
     /// Helper to create a private key from a small scalar (like Go/TS SDKs)
@@ -425,6 +434,9 @@ mod tests {
 
         // Should not panic - tests that rare key lengths are handled correctly
         let result = decrypt(&encrypted, &recipient);
-        assert!(result.is_ok(), "Decryption should succeed for cross-SDK test vector");
+        assert!(
+            result.is_ok(),
+            "Decryption should succeed for cross-SDK test vector"
+        );
     }
 }

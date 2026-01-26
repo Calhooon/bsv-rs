@@ -305,7 +305,10 @@ mod tests {
         assert!(result.is_err());
         match result {
             Err(Error::MessageRecipientMismatch { expected, actual }) => {
-                assert_eq!(expected, hex::encode(recipient.public_key().to_compressed()));
+                assert_eq!(
+                    expected,
+                    hex::encode(recipient.public_key().to_compressed())
+                );
                 assert_eq!(
                     actual,
                     hex::encode(wrong_recipient.public_key().to_compressed())

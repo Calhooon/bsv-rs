@@ -158,6 +158,7 @@ impl Mnemonic {
     pub fn from_entropy_with_language(entropy: &[u8], language: Language) -> Result<Self> {
         // Validate entropy length
         let entropy_bits = entropy.len() * 8;
+        #[allow(clippy::manual_is_multiple_of)]
         if !(128..=256).contains(&entropy_bits) || entropy_bits % 32 != 0 {
             return Err(Error::InvalidEntropyLength {
                 expected: "128, 160, 192, 224, or 256 bits".to_string(),
@@ -434,7 +435,7 @@ impl Mnemonic {
         let entropy_bits = total_bits - checksum_bit_count;
 
         // Calculate full byte size needed
-        let full_byte_size = (entropy_bits + checksum_bit_count + 7) / 8;
+        let full_byte_size = (entropy_bits + checksum_bit_count).div_ceil(8);
 
         // Extract all bits from word indices
         let mut bits = vec![false; total_bits];
