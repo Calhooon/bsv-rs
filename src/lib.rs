@@ -1,21 +1,23 @@
 //! # BSV SDK
 //!
 //! A comprehensive Rust SDK for building BSV (Bitcoin SV) applications.
+//! Feature-complete and production-ready.
 //!
 //! ## Modules
 //!
-//! - **primitives**: Cryptographic primitives (hash, EC, encoding)
-//! - **script**: Bitcoin Script parsing and execution
-//! - **transaction**: Transaction construction and signing (coming soon)
-//! - **wallet**: BRC-42 key derivation and wallet types
+//! - **primitives**: Cryptographic primitives (hash, EC, encoding, AES-256-GCM)
+//! - **script**: Bitcoin Script parsing, execution, and templates (P2PKH, RPuzzle, PushDrop)
+//! - **transaction**: Transaction construction, signing, BEEF/MerklePath SPV proofs
+//! - **wallet**: BRC-42 key derivation, ProtoWallet, WalletClient
 //!
 //! ## Feature Flags
 //!
 //! - `primitives` (default): Core cryptographic primitives
-//! - `script` (default): Script parsing and interpreter
-//! - `transaction`: Transaction building and signing
-//! - `wallet`: HD wallet support
+//! - `script` (default): Script parsing, execution, and templates
+//! - `transaction`: Transaction building, signing, BEEF format, fee models
+//! - `wallet`: BRC-42 key derivation, ProtoWallet, WalletClient
 //! - `full`: All features
+//! - `http`: HTTP client for ARC broadcaster, WhatsOnChain, WalletClient
 //! - `wasm`: WebAssembly support
 //!
 //! ## Quick Start
