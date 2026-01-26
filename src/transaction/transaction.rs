@@ -964,16 +964,6 @@ impl Default for Transaction {
     }
 }
 
-impl Default for TransactionOutput {
-    fn default() -> Self {
-        Self {
-            satoshis: None,
-            locking_script: LockingScript::new(),
-            change: false,
-        }
-    }
-}
-
 impl PartialEq for Transaction {
     fn eq(&self, other: &Self) -> bool {
         self.to_binary() == other.to_binary()

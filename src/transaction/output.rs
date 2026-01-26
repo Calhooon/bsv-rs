@@ -27,7 +27,7 @@ use crate::script::LockingScript;
 ///     LockingScript::from_hex("76a914...88ac")?,
 /// );
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct TransactionOutput {
     /// The amount of satoshis in this output.
     ///
