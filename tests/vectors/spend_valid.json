@@ -1,0 +1,2292 @@
+[
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "Test the test: we should have an empty stack after scriptSig evaluation"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "and multiple spaces should not change that."
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "Similarly whitespace around and between symbols"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63506851",
+    "comment": "0x50 is reserved (ok if not executed)"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "5f936087",
+    "comment": "0x51 through 0x60 push 1 through 16 onto stack"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6362675168",
+    "comment": "VER non-functional (ok if not executed)"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6350898a675168",
+    "comment": "RESERVED ok in un-executed IF"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "766368",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "76636768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "63635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "63635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "63635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "63635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "64635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "64635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "64635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "64635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63006751670068",
+    "comment": "Multiple ELSE's are valid and executed inverts on each ELSE encountered"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635167006768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "636700675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516700675168935287",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "64006751670068",
+    "comment": "Multiple ELSE's are valid and execution inverts on each ELSE encountered"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "645167006768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "646700675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "64516700675168935287",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6351636a676a676a6867516351676a675168676a68935287",
+    "comment": "Nested ELSE ELSE"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6400646a676a676a6867006451676a675168676a68935287",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "636a6851",
+    "comment": "RETURN only works if executed"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "69",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51050100000000",
+    "scriptPubKey": "69",
+    "comment": "values >4 bytes can be cast to boolean"
+  },
+  {
+    "scriptSig": "510180",
+    "scriptPubKey": "630068",
+    "comment": "negative 0 is false"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "76519351880087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "77",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b7575011587",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "716d6d75011787",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7c51880087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "7d7453887c6d",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5d5e",
+    "scriptPubKey": "6e7b8887",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f005152",
+    "scriptPubKey": "6f745788939353886d0088",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51525355",
+    "scriptPubKey": "709393588893935687",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51535557",
+    "scriptPubKey": "72935488935c87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "012a",
+    "scriptPubKey": "825188012a87",
+    "comment": "SIZE does not consume argument"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "9f91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "9f91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a0",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a191",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a2",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a2",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a291",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a291",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a291",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "510051",
+    "scriptPubKey": "a591",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0004ffffffff04ffffff7f",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f01e40164",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b01e40164",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffffff01e40164",
+    "scriptPubKey": "a591",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffff7f01e40164",
+    "scriptPubKey": "a591",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "b0b1b2b3b4b5b6b7b8b95187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61",
+    "comment": "Discourage NOPx flag allows OP_NOP"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63b96851",
+    "comment": "Discouraged NOPs are allowed if not executed"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ba675168",
+    "comment": "opcodes above NOP10 invalid if executed"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63be675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bf675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ca675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ce675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cf675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63da675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63db675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63dc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63dd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63de675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63df675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ea675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63eb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ec675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ed675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ee675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ef675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fa675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fe675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ff675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+    "comment": "201 opcodes executed. 0x61 is NOP"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6350505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050506851",
+    "comment": ">201 opcodes, but RESERVED (0x50) doesn't count towards opcode limit."
+  },
+  {
+    "scriptSig": "017f",
+    "scriptPubKey": "017f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "028000",
+    "scriptPubKey": "02800087",
+    "comment": "Leave room for the sign bit"
+  },
+  {
+    "scriptSig": "02ff7f",
+    "scriptPubKey": "02ff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03008000",
+    "scriptPubKey": "0300800087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03ffff7f",
+    "scriptPubKey": "03ffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0400008000",
+    "scriptPubKey": "040000800087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "04ffffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "050000008000",
+    "scriptPubKey": "05000000800087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "05ffffffff7f",
+    "scriptPubKey": "05ffffffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "08ffffffffffffff7f",
+    "scriptPubKey": "08ffffffffffffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "01ff",
+    "scriptPubKey": "01ff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "028080",
+    "scriptPubKey": "02808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "02ffff",
+    "scriptPubKey": "02ffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03008080",
+    "scriptPubKey": "0300808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03ffffff",
+    "scriptPubKey": "03ffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0400008080",
+    "scriptPubKey": "040000808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffffff",
+    "scriptPubKey": "04ffffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "050000008080",
+    "scriptPubKey": "05000000808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "05ffffffff80",
+    "scriptPubKey": "05ffffffff8087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "05ffffffffff",
+    "scriptPubKey": "05ffffffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "06000000008080",
+    "scriptPubKey": "0600000000808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "08ffffffffffffffff",
+    "scriptPubKey": "08ffffffffffffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "8b05000000800087",
+    "comment": "We can do math on 4-byte integers, and compare 5-byte ones"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "0201008791",
+    "comment": "Not the same byte array..."
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "01808791",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635168",
+    "comment": "They are here to catch copy-and-paste errors"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "645168",
+    "comment": "Most of them are duplicated elsewhere,"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6951",
+    "comment": "but, hey, more is always better, right?"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6b51",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6b6c",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "6d51",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "7551",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "77",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7a",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "8851",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "8787",
+    "comment": "OP_0 and bools must have identical byte representations"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "8b",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "52",
+    "scriptPubKey": "8c",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "8f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "90",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "92",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "93",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "94",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f4f",
+    "scriptPubKey": "9a",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9b",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "9c",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "9d51",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9e",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "a0",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "a2",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "a3",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "a4",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f4f00",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a6",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a7",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a8",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a9",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "aa",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae69740087",
+    "comment": "CHECKMULTISIG is allowed to have zero keys and/or sigs"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051ae69740087",
+    "comment": "Zero sigs means no sigs are checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae69740087",
+    "comment": "CHECKMULTISIG is allowed to have zero keys and/or sigs"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051ae69740087",
+    "comment": "Zero sigs means no sigs are checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "028000",
+    "scriptPubKey": "0280009c",
+    "comment": "0x8000 equals 128"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "2102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0ac91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "512102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac051ae91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac91",
+    "comment": "BIP66 example 4, without DERSIG"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac91",
+    "comment": "BIP66 example 4, with DERSIG"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "Test the test: we should have an empty stack after scriptSig evaluation"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "and multiple spaces should not change that."
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "Similarly whitespace around and between symbols"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63506851",
+    "comment": "0x50 is reserved (ok if not executed)"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "5f936087",
+    "comment": "0x51 through 0x60 push 1 through 16 onto stack"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6362675168",
+    "comment": "VER non-functional (ok if not executed)"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6350898a675168",
+    "comment": "RESERVED ok in un-executed IF"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "766368",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "76636768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "63635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "63635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "63635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "63635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "64635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "64635167006868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "64635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "64635167006867630067516868",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63006751670068",
+    "comment": "Multiple ELSE's are valid and executed inverts on each ELSE encountered"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635167006768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "636700675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516700675168935287",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "64006751670068",
+    "comment": "Multiple ELSE's are valid and execution inverts on each ELSE encountered"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "645167006768",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "646700675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "64516700675168935287",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6351636a676a676a6867516351676a675168676a68935287",
+    "comment": "Nested ELSE ELSE"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6400646a676a676a6867006451676a675168676a68935287",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "636a6851",
+    "comment": "RETURN only works if executed"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "69",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51050100000000",
+    "scriptPubKey": "69",
+    "comment": "values >4 bytes can be cast to boolean"
+  },
+  {
+    "scriptSig": "510180",
+    "scriptPubKey": "630068",
+    "comment": "negative 0 is false"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "76519351880087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "77",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b7575011587",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "716d6d75011787",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7c51880087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "7d7453887c6d",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5d5e",
+    "scriptPubKey": "6e7b8887",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f005152",
+    "scriptPubKey": "6f745788939353886d0088",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51525355",
+    "scriptPubKey": "709393588893935687",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51535557",
+    "scriptPubKey": "72935488935c87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "012a",
+    "scriptPubKey": "825188012a87",
+    "comment": "SIZE does not consume argument"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "9f91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "9f91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a0",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a091",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a191",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a2",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a2",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a291",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a291",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a291",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "510051",
+    "scriptPubKey": "a591",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0004ffffffff04ffffff7f",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f01e40164",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5b01e40164",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffffff01e40164",
+    "scriptPubKey": "a591",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffff7f01e40164",
+    "scriptPubKey": "a591",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "b0b1b2b3b4b5b6b7b8b95187",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61",
+    "comment": "Discourage NOPx flag allows OP_NOP"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63b96851",
+    "comment": "Discouraged NOPs are allowed if not executed"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ba675168",
+    "comment": "opcodes above NOP10 invalid if executed"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63be675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bf675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ca675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ce675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cf675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63da675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63db675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63dc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63dd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63de675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63df675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ea675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63eb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ec675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ed675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ee675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ef675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f0675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f1675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f2675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f3675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f4675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f5675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f6675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f7675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f8675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f9675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fa675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fb675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fc675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fd675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fe675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ff675168",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+    "comment": "201 opcodes executed. 0x61 is NOP"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6350505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050506851",
+    "comment": ">201 opcodes, but RESERVED (0x50) doesn't count towards opcode limit."
+  },
+  {
+    "scriptSig": "017f",
+    "scriptPubKey": "017f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "028000",
+    "scriptPubKey": "02800087",
+    "comment": "Leave room for the sign bit"
+  },
+  {
+    "scriptSig": "02ff7f",
+    "scriptPubKey": "02ff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03008000",
+    "scriptPubKey": "0300800087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03ffff7f",
+    "scriptPubKey": "03ffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0400008000",
+    "scriptPubKey": "040000800087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "04ffffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "050000008000",
+    "scriptPubKey": "05000000800087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "05ffffffff7f",
+    "scriptPubKey": "05ffffffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "08ffffffffffffff7f",
+    "scriptPubKey": "08ffffffffffffff7f87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "01ff",
+    "scriptPubKey": "01ff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "028080",
+    "scriptPubKey": "02808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "02ffff",
+    "scriptPubKey": "02ffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03008080",
+    "scriptPubKey": "0300808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "03ffffff",
+    "scriptPubKey": "03ffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0400008080",
+    "scriptPubKey": "040000808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffffff",
+    "scriptPubKey": "04ffffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "050000008080",
+    "scriptPubKey": "05000000808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "05ffffffff80",
+    "scriptPubKey": "05ffffffff8087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "05ffffffffff",
+    "scriptPubKey": "05ffffffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "06000000008080",
+    "scriptPubKey": "0600000000808087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "08ffffffffffffffff",
+    "scriptPubKey": "08ffffffffffffffff87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "8b05000000800087",
+    "comment": "We can do math on 4-byte integers, and compare 5-byte ones"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "0201008791",
+    "comment": "Not the same byte array..."
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "01808791",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635168",
+    "comment": "They are here to catch copy-and-paste errors"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "645168",
+    "comment": "Most of them are duplicated elsewhere,"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6951",
+    "comment": "but, hey, more is always better, right?"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6b51",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6b6c",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "6d51",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "7551",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "77",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7a",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "87",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "8851",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "8787",
+    "comment": "OP_0 and bools must have identical byte representations"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "8b",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "52",
+    "scriptPubKey": "8c",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "8f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "90",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "91",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "92",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "93",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "94",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f4f",
+    "scriptPubKey": "9a",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9b",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "9c",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "9d51",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9e",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9f",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "a0",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "a1",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "a2",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "a3",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "a4",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "4f4f00",
+    "scriptPubKey": "a5",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a6",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a7",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a8",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a9",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "aa",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae69740087",
+    "comment": "CHECKMULTISIG is allowed to have zero keys and/or sigs"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051ae69740087",
+    "comment": "Zero sigs means no sigs are checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae69740087",
+    "comment": "CHECKMULTISIG is allowed to have zero keys and/or sigs"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051ae69740087",
+    "comment": "Zero sigs means no sigs are checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051af740087",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af",
+    "comment": "test"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516a68",
+    "comment": "Returning within an if statement should succeed"
+  }
+]

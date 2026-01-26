@@ -1,16 +1,15 @@
-# BSV Primitives Source
+# BSV Primitives Module
 > Cryptographic primitives for the BSV blockchain in Rust
 
 ## Overview
 
-This is the source directory for the `bsv-primitives` crate, providing cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation), and P-256 (secp256r1) curve operations for certain authentication scenarios.
+This module provides cryptographic primitives compatible with the BSV TypeScript and Go SDKs. The library implements hash functions, symmetric encryption (AES-256-GCM), encoding utilities, binary serialization, arbitrary-precision integers (BigNumber), secp256k1 elliptic curve operations (ECDSA, BRC-42 key derivation), and P-256 (secp256r1) curve operations for certain authentication scenarios.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `lib.rs` | Crate root; module declarations and re-exports |
-| `error.rs` | Error types using `thiserror` |
+| `mod.rs` | Module declarations and re-exports |
 | `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 |
 | `symmetric.rs` | AES-256-GCM encryption with BSV SDK compatibility |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer |
@@ -19,13 +18,11 @@ This is the source directory for the `bsv-primitives` crate, providing cryptogra
 | `p256.rs` | P-256 (secp256r1) elliptic curve: P256PrivateKey, P256PublicKey, P256Signature |
 | `bsv/` | BSV-specific operations (sighash, transaction signatures, Schnorr proofs, Shamir secret sharing) |
 
+Note: Error types are defined in `src/error.rs` at the crate root.
+
 ## Key Exports
 
-The crate re-exports commonly used items from `lib.rs`:
-
-### Error Handling
-- `Error` - Main error enum with variants for key length, data length, encoding, crypto operations, and checksums
-- `Result<T>` - Type alias for `std::result::Result<T, Error>`
+The module re-exports commonly used items from `mod.rs`:
 
 ### Hash Functions
 ```rust
@@ -307,33 +304,33 @@ pub struct Writer {
 
 ## Error Variants
 
-The `Error` enum in `error.rs` provides specific error types:
+The `Error` enum in `src/error.rs` provides specific error types for primitives:
 
 | Variant | Description |
 |---------|-------------|
-| `InvalidKeyLength` | Key size mismatch (expected vs actual) |
-| `InvalidDataLength` | Data size mismatch for crypto operations |
-| `InvalidHex` | Malformed hexadecimal string |
-| `InvalidBase58` | Invalid Base58 characters or empty string |
-| `InvalidBase64` | Malformed Base64 encoding |
+| `InvalidKeyLength { expected, actual }` | Key size mismatch |
+| `InvalidDataLength { expected, actual }` | Data size mismatch for crypto operations |
+| `InvalidHex(String)` | Malformed hexadecimal string |
+| `InvalidBase58(String)` | Invalid Base58 characters or empty string |
+| `InvalidBase64(String)` | Malformed Base64 encoding |
 | `InvalidChecksum` | Base58Check checksum verification failed |
-| `InvalidUtf8` | Invalid UTF-8 byte sequence |
-| `CryptoError` | Generic cryptographic operation failure |
-| `InvalidSignature` | Invalid digital signature |
-| `InvalidPublicKey` | Invalid public key format |
-| `InvalidPrivateKey` | Invalid private key format |
+| `InvalidUtf8(String)` | Invalid UTF-8 byte sequence |
+| `CryptoError(String)` | Generic cryptographic operation failure |
+| `InvalidSignature(String)` | Invalid digital signature |
+| `InvalidPublicKey(String)` | Invalid public key format |
+| `InvalidPrivateKey(String)` | Invalid private key format |
 | `PointAtInfinity` | EC point at infinity (invalid) |
 | `DecryptionFailed` | AES-GCM decryption/authentication failed |
-| `InvalidNonce` | Invalid nonce for encryption |
+| `InvalidNonce(String)` | Invalid nonce for encryption |
 | `InvalidTag` | Authentication tag mismatch |
-| `ReaderUnderflow` | Not enough bytes to read |
+| `ReaderUnderflow { needed, available }` | Not enough bytes to read |
 
 ## Usage
 
 ### Hashing
 
 ```rust
-use bsv_primitives::{sha256, sha256d, hash160};
+use bsv_sdk::primitives::{sha256, sha256d, hash160};
 
 // Single SHA-256
 let digest = sha256(b"hello world");
@@ -348,7 +345,7 @@ let h160 = hash160(b"public_key_bytes");
 ### HMAC and Key Derivation
 
 ```rust
-use bsv_primitives::{sha256_hmac, sha512_hmac, pbkdf2_sha512};
+use bsv_sdk::primitives::{sha256_hmac, sha512_hmac, pbkdf2_sha512};
 
 // HMAC-SHA256 for message authentication
 let mac = sha256_hmac(b"secret_key", b"message");
@@ -360,7 +357,7 @@ let derived_key = pbkdf2_sha512(b"password", b"mnemonic", 2048, 64);
 ### Symmetric Encryption
 
 ```rust
-use bsv_primitives::SymmetricKey;
+use bsv_sdk::primitives::SymmetricKey;
 
 // Create random key
 let key = SymmetricKey::random();
@@ -378,7 +375,7 @@ let key = SymmetricKey::from_bytes(&key_bytes)?;
 ### Encoding
 
 ```rust
-use bsv_primitives::{to_hex, from_hex, to_base58, from_base58, to_base58_check, from_base58_check};
+use bsv_sdk::primitives::{to_hex, from_hex, to_base58, from_base58, to_base58_check, from_base58_check};
 
 // Hex encoding
 let hex = to_hex(&[0xde, 0xad, 0xbe, 0xef]); // "deadbeef"
@@ -396,7 +393,7 @@ let (version, payload) = from_base58_check(&address)?;
 ### BigNumber
 
 ```rust
-use bsv_primitives::BigNumber;
+use bsv_sdk::primitives::BigNumber;
 
 // Create from various sources
 let n1 = BigNumber::from_hex("deadbeef").unwrap();
@@ -423,8 +420,8 @@ let inv = a.mod_inverse(&m).unwrap();  // 3 * 5 = 1 (mod 7)
 ### Elliptic Curve Operations
 
 ```rust
-use bsv_primitives::{PrivateKey, PublicKey, Signature};
-use bsv_primitives::hash::sha256;
+use bsv_sdk::primitives::{PrivateKey, PublicKey, Signature};
+use bsv_sdk::primitives::hash::sha256;
 
 // Generate a random key pair
 let private_key = PrivateKey::random();
@@ -450,7 +447,7 @@ let address = public_key.to_address(); // P2PKH mainnet address
 ### BRC-42 Key Derivation
 
 ```rust
-use bsv_primitives::PrivateKey;
+use bsv_sdk::primitives::PrivateKey;
 
 let alice = PrivateKey::random();
 let bob = PrivateKey::random();
@@ -466,8 +463,8 @@ assert_eq!(alice_child.public_key().to_compressed(), bob_derived.to_compressed()
 ### Shamir Secret Sharing
 
 ```rust
-use bsv_primitives::bsv::shamir::{split_private_key, KeyShares};
-use bsv_primitives::ec::PrivateKey;
+use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_sdk::primitives::ec::PrivateKey;
 
 // Generate a random private key
 let key = PrivateKey::random();
@@ -489,7 +486,7 @@ assert_eq!(key.to_bytes(), recovered.to_bytes());
 ### P-256 Operations
 
 ```rust
-use bsv_primitives::p256::{P256PrivateKey, P256PublicKey, P256Signature};
+use bsv_sdk::primitives::p256::{P256PrivateKey, P256PublicKey, P256Signature};
 
 // Generate a P-256 key pair
 let private_key = P256PrivateKey::random();
@@ -514,7 +511,7 @@ let sig_from_compact = P256Signature::from_compact(&compact)?;
 ### Binary Serialization
 
 ```rust
-use bsv_primitives::{Reader, Writer};
+use bsv_sdk::primitives::{Reader, Writer};
 
 // Writing Bitcoin-format data
 let mut writer = Writer::new();

@@ -1,0 +1,3590 @@
+[
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Test the test: we should have an empty stack after scriptSig evaluation"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "and multiple spaces should not change that."
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Similarly whitespace around and between symbols"
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5152",
+    "scriptPubKey": "52885187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020100",
+    "scriptPubKey": "",
+    "flags": "P2SH,STRICTENC",
+    "comment": "all bytes are significant, not only the last one"
+  },
+  {
+    "scriptSig": "09000000000000000010",
+    "scriptPubKey": "",
+    "flags": "P2SH,STRICTENC",
+    "comment": "equals zero when cast to Int64"
+  },
+  {
+    "scriptSig": "010b",
+    "scriptPubKey": "5b87",
+    "flags": "P2SH,STRICTENC",
+    "comment": "push 1 byte"
+  },
+  {
+    "scriptSig": "02417a",
+    "scriptPubKey": "417a87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4b417a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a",
+    "scriptPubKey": "417a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a7a87",
+    "flags": "P2SH,STRICTENC",
+    "comment": "push 75 bytes"
+  },
+  {
+    "scriptSig": "4c0107",
+    "scriptPubKey": "5787",
+    "flags": "P2SH,STRICTENC",
+    "comment": "0x4c is OP_PUSHDATA1"
+  },
+  {
+    "scriptSig": "4d010008",
+    "scriptPubKey": "5887",
+    "flags": "P2SH,STRICTENC",
+    "comment": "0x4d is OP_PUSHDATA2"
+  },
+  {
+    "scriptSig": "4e0100000009",
+    "scriptPubKey": "5987",
+    "flags": "P2SH,STRICTENC",
+    "comment": "0x4e is OP_PUSHDATA4"
+  },
+  {
+    "scriptSig": "4c00",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4d0000",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4e00000000",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f02e80393",
+    "scriptPubKey": "02e70387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63506851",
+    "flags": "P2SH,STRICTENC",
+    "comment": "0x50 is reserved (ok if not executed)"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "5f936087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "0x51 through 0x60 push 1 through 16 onto stack"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6362675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": "VER non-functional (ok if not executed)"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6350898a675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": "RESERVED ok in un-executed IF"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "766368",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "76636768",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516768",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "63635167006868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "63635167006868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "63635167006867630067516868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "63635167006867630067516868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "64635167006868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "64635167006868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "64635167006867630067516868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "64635167006867630067516868",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63006751670068",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Multiple ELSE's are valid and executed inverts on each ELSE encountered"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635167006768",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "636700675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63516700675168935287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "63a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a7681468ca4fec736264c13b859bac43d5173df687168287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "64006751670068",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Multiple ELSE's are valid and execution inverts on each ELSE encountered"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "645167006768",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "646700675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "64516700675168935287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "64a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a76767a7681468ca4fec736264c13b859bac43d5173df687168287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6351636a676a676a6867516351676a675168676a68935287",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Nested ELSE ELSE"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6400646a676a676a6867006451676a675168676a68935287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "636a6851",
+    "flags": "P2SH,STRICTENC",
+    "comment": "RETURN only works if executed"
+  },
+  {
+    "scriptSig": "5151",
+    "scriptPubKey": "69",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51050100000000",
+    "scriptPubKey": "69",
+    "flags": "P2SH,STRICTENC",
+    "comment": "values >4 bytes can be cast to boolean"
+  },
+  {
+    "scriptSig": "510180",
+    "scriptPubKey": "630068",
+    "flags": "P2SH,STRICTENC",
+    "comment": "negative 0 is false"
+  },
+  {
+    "scriptSig": "5a005b6b756c",
+    "scriptPubKey": "93011587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "676176696e5f7761735f686572656b5b6c",
+    "scriptPubKey": "676176696e5f7761735f68657265885b87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0073",
+    "scriptPubKey": "7451880087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5173",
+    "scriptPubKey": "74528851885187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "05010000000073",
+    "scriptPubKey": "74528805010000000087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "IFDUP dups non ints"
+  },
+  {
+    "scriptSig": "0075",
+    "scriptPubKey": "740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "76519351880087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "77",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "78745388",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "0079011488745387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "5179011588745387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "5279011688745387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "007a011488745287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "517a011588745287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "527a011688745287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b011687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b75011487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b7575011587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b7b011587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011601150114",
+    "scriptPubKey": "7b7b7b011487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "71011887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "7175011987",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "716d011487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "716d75011587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "716d6d011687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "716d6d75011787",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "7171011687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "011901180117011601150114",
+    "scriptPubKey": "717171011487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7c51880087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "7d7453887c6d",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5d5e",
+    "scriptPubKey": "6e7b8887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f005152",
+    "scriptPubKey": "6f745788939353886d0088",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51525355",
+    "scriptPubKey": "709393588893935687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51535557",
+    "scriptPubKey": "72935488935c87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "820087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "825187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "017f",
+    "scriptPubKey": "825187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "028000",
+    "scriptPubKey": "825287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02ff7f",
+    "scriptPubKey": "825287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03008000",
+    "scriptPubKey": "825387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03ffff7f",
+    "scriptPubKey": "825387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0400008000",
+    "scriptPubKey": "825487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "825487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "050000008000",
+    "scriptPubKey": "825587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "05ffffffff7f",
+    "scriptPubKey": "825587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "06000000008000",
+    "scriptPubKey": "825687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "08ffffffffffffff7f",
+    "scriptPubKey": "825887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "825187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "01ff",
+    "scriptPubKey": "825187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "028080",
+    "scriptPubKey": "825287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02ffff",
+    "scriptPubKey": "825287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03008080",
+    "scriptPubKey": "825387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03ffffff",
+    "scriptPubKey": "825387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0400008080",
+    "scriptPubKey": "825487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffffff",
+    "scriptPubKey": "825487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "050000008080",
+    "scriptPubKey": "825587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "05ffffffffff",
+    "scriptPubKey": "825587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "06000000008080",
+    "scriptPubKey": "825687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "08ffffffffffffffff",
+    "scriptPubKey": "825887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6162636465666768696a6b6c6d6e6f707172737475767778797a",
+    "scriptPubKey": "82011a87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "012a",
+    "scriptPubKey": "825188012a87",
+    "flags": "P2SH,STRICTENC",
+    "comment": "SIZE does not consume argument"
+  },
+  {
+    "scriptSig": "52018293",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f04ffffffff93",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f4f93",
+    "scriptPubKey": "018287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "515193",
+    "scriptPubKey": "5287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "518b",
+    "scriptPubKey": "5287",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "016f8c",
+    "scriptPubKey": "016e87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "016f51935c94",
+    "scriptPubKey": "016487",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0090",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6090",
+    "scriptPubKey": "6087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "019090",
+    "scriptPubKey": "01908f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0091",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5191",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b91",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0092",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5192",
+    "scriptPubKey": "5187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "016f92",
+    "scriptPubKey": "5187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "01ef92",
+    "scriptPubKey": "5187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51519a",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51009a",
+    "scriptPubKey": "91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00519a",
+    "scriptPubKey": "91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00009a",
+    "scriptPubKey": "91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6001119a",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51519b",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51009b",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00519b",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00009b",
+    "scriptPubKey": "91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6001119b",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a5193",
+    "scriptPubKey": "9c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a5193",
+    "scriptPubKey": "9d51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a5193",
+    "scriptPubKey": "9e91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "016f5a5193",
+    "scriptPubKey": "9e",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "9f91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "9f91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "9f",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "9f",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "9f",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a0",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a091",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a091",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a091",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a091",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a191",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a1",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a1",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a1",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a1",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b5a",
+    "scriptPubKey": "a2",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5454",
+    "scriptPubKey": "a2",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5a5b",
+    "scriptPubKey": "a291",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b5b",
+    "scriptPubKey": "a291",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "018b018a",
+    "scriptPubKey": "a291",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100a3",
+    "scriptPubKey": "009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051a3",
+    "scriptPubKey": "009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f00a3",
+    "scriptPubKey": "4f9c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0004ffffffffa3",
+    "scriptPubKey": "04ffffffff9c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f00a4",
+    "scriptPubKey": "04ffffff7f9c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "000164a4",
+    "scriptPubKey": "01649c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "01e400a4",
+    "scriptPubKey": "009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0004ffffffffa4",
+    "scriptPubKey": "009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "a5",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "510051",
+    "scriptPubKey": "a591",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0004ffffffff04ffffff7f",
+    "scriptPubKey": "a5",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f01e40164",
+    "scriptPubKey": "a5",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5b01e40164",
+    "scriptPubKey": "a5",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffffff01e40164",
+    "scriptPubKey": "a591",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f01e40164",
+    "scriptPubKey": "a591",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f04ffffff7f94",
+    "scriptPubKey": "0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f7693",
+    "scriptPubKey": "05feffffff0087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ">32 bit EQUAL is valid"
+  },
+  {
+    "scriptSig": "04ffffff7f8f7693",
+    "scriptPubKey": "05feffffff8087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "a6149c1185a5c5e9fc54612808977ee8f548b2258d3187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "a6140bdc9d2d256b3ee9daae347be6f4dc835a467ffe87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6162636465666768696a6b6c6d6e6f707172737475767778797a",
+    "scriptPubKey": "a614f71c27109c692c1b56bbdceb5b9d2865b3708dbc87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "a714da39a3ee5e6b4b0d3255bfef95601890afd8070987",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "a71486f7e437faa5a7fce15d1ddcb9eaeaea377667b887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6162636465666768696a6b6c6d6e6f707172737475767778797a",
+    "scriptPubKey": "a71432d10c7b8cf96570ca04ce37f2a19d84240d3a8987",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "a820e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85587",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "a820ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6162636465666768696a6b6c6d6e6f707172737475767778797a",
+    "scriptPubKey": "a82071c480df93d6ae2f1efad1447c66c9525e316218cf51fc8d9ed832f2daf18b7387",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "76a97ca8a687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "76aa7ca8a887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "61a914b472a266d0bd89c13706a4132ccfb16f7c3b9fcb87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "a96114994355199e516ff76c4fa4aab39337b9d84cf12b87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6162636465666768696a6b6c6d6e6f707172737475767778797a",
+    "scriptPubKey": "a94c14c286a1af0947f58d1ad787385b1c2c4a976f9e7187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "aa205df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c945687",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "aa20bf5d3affb73efd2ec6c36ad3112dd933efed63c4e1cbffcfa88e2759c144f2d887",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "6162636465666768696a6b6c6d6e6f707172737475767778797a",
+    "scriptPubKey": "aa4c20ca139bc10c2f660da42666f72e89a225936fc60f193c161124a672050c43467187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "b0b1b2b3b4b5b6b7b8b95187",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4e060000005f746f5f3130b0b1b2b3b4b5b6b7b8b9",
+    "scriptPubKey": "4e060000005f746f5f313087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61",
+    "flags": "P2SH,STRICTENC,DISCOURAGE_UPGRADABLE_NOPS",
+    "comment": "Discourage NOPx flag allows OP_NOP"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63b96851",
+    "flags": "P2SH,STRICTENC,DISCOURAGE_UPGRADABLE_NOPS",
+    "comment": "Discouraged NOPs are allowed if not executed"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ba675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": "opcodes above NOP10 invalid if executed"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bb675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bc675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bd675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63be675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63bf675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c0675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c1675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c2675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c3675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c4675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c5675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c6675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c7675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c8675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63c9675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ca675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cb675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cc675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cd675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ce675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63cf675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d0675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d1675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d2675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d3675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d4675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d5675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d6675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d7675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d8675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63d9675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63da675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63db675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63dc675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63dd675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63de675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63df675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e0675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e1675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e2675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e3675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e4675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e5675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e6675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e7675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e8675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63e9675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ea675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63eb675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ec675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ed675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ee675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ef675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f0675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f1675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f2675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f3675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f4675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f5675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f6675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f7675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f8675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63f9675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fa675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fb675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fc675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fd675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63fe675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "63ff675168",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "62626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262",
+    "flags": "P2SH,STRICTENC",
+    "comment": "520 byte push"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+    "flags": "P2SH,STRICTENC",
+    "comment": "201 opcodes executed. 0x61 is NOP"
+  },
+  {
+    "scriptSig": "51525354556f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f",
+    "scriptPubKey": "51525354556f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f",
+    "flags": "P2SH,STRICTENC",
+    "comment": "1,000 stack size (0x6f is 3DUP)"
+  },
+  {
+    "scriptSig": "516b526b5354556f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f",
+    "scriptPubKey": "515253545556576f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f",
+    "flags": "P2SH,STRICTENC",
+    "comment": "1,000 stack size (altstack cleared between scriptSig/scriptPubKey)"
+  },
+  {
+    "scriptSig": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f",
+    "scriptPubKey": "616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626262626f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6f6e616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Max-size (10,000-byte), max-push(520 bytes), max-opcodes(201), max stack size(1,000 items). 0x6f is 3DUP, 0x61 is NOP"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6350505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050505050506851",
+    "flags": "P2SH,STRICTENC",
+    "comment": ">201 opcodes, but RESERVED (0x50) doesn't count towards opcode limit."
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "010187",
+    "flags": "P2SH,STRICTENC",
+    "comment": "The following is useful for checking implementations of BN_bn2mpi"
+  },
+  {
+    "scriptSig": "017f",
+    "scriptPubKey": "017f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "028000",
+    "scriptPubKey": "02800087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Leave room for the sign bit"
+  },
+  {
+    "scriptSig": "02ff7f",
+    "scriptPubKey": "02ff7f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03008000",
+    "scriptPubKey": "0300800087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03ffff7f",
+    "scriptPubKey": "03ffff7f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0400008000",
+    "scriptPubKey": "040000800087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "04ffffff7f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "050000008000",
+    "scriptPubKey": "05000000800087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "05ffffffff7f",
+    "scriptPubKey": "05ffffffff7f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "06000000008000",
+    "scriptPubKey": "06ffffffff7f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "08ffffffffffffff7f",
+    "scriptPubKey": "08ffffffffffffff7f87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "018187",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Numbers are little-endian with the MSB being a sign bit"
+  },
+  {
+    "scriptSig": "01ff",
+    "scriptPubKey": "01ff87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "028080",
+    "scriptPubKey": "02808087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02ffff",
+    "scriptPubKey": "02ffff87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03008080",
+    "scriptPubKey": "0300808087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03ffffff",
+    "scriptPubKey": "03ffffff87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0400008080",
+    "scriptPubKey": "040000808087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffffff",
+    "scriptPubKey": "04ffffffff87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "050000008080",
+    "scriptPubKey": "05000000808087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "05ffffffff80",
+    "scriptPubKey": "05ffffffff8087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "05ffffffffff",
+    "scriptPubKey": "05ffffffffff87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "06000000008080",
+    "scriptPubKey": "0600000000808087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "08ffffffffffffffff",
+    "scriptPubKey": "08ffffffffffffffff87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "8b05000000800087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "We can do math on 4-byte integers, and compare 5-byte ones"
+  },
+  {
+    "scriptSig": "04ffffff7f",
+    "scriptPubKey": "8b51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffffffff",
+    "scriptPubKey": "8b51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "0201008791",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Not the same byte array..."
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "0201009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": "... but they are numerically equal"
+  },
+  {
+    "scriptSig": "5b",
+    "scriptPubKey": "4c030b00009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "01808791",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "01809c",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Zero numerically equals negative zero"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "0200809c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03000080",
+    "scriptPubKey": "04000000809c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03100080",
+    "scriptPubKey": "04100000809c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03100000",
+    "scriptPubKey": "04100000009c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "6151",
+    "flags": "P2SH,STRICTENC",
+    "comment": "The following tests check the if(stack.size() < N) tests in each opcode"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "635168",
+    "flags": "P2SH,STRICTENC",
+    "comment": "They are here to catch copy-and-paste errors"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "645168",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Most of them are duplicated elsewhere,"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6951",
+    "flags": "P2SH,STRICTENC",
+    "comment": "but, hey, more is always better, right?"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "6b51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "6b6c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "6d51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "6e",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "6f",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00510000",
+    "scriptPubKey": "70",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "005100000000",
+    "scriptPubKey": "71",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00510000",
+    "scriptPubKey": "72",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "73",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "7451",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "7551",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "76",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "77",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "78",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100000053",
+    "scriptPubKey": "79",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "79",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100000053",
+    "scriptPubKey": "7a",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7a",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "510000",
+    "scriptPubKey": "7b",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "7c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0051",
+    "scriptPubKey": "7d",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "82",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "8851",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "000051",
+    "scriptPubKey": "8787",
+    "flags": "P2SH,STRICTENC",
+    "comment": "OP_0 and bools must have identical byte representations"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "8b",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "52",
+    "scriptPubKey": "8c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "8f",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "90",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "91",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f",
+    "scriptPubKey": "92",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "93",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "94",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f4f",
+    "scriptPubKey": "9a",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9b",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "9c",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "9d51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9e",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "9f",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "a0",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "a1",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "a2",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f00",
+    "scriptPubKey": "a3",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "5100",
+    "scriptPubKey": "a4",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4f4f00",
+    "scriptPubKey": "a5",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a6",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a7",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a8",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "a9",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "aa",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "ab51",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b051",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b151",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b251",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b351",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b451",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b551",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b651",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b751",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b851",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "61",
+    "scriptPubKey": "b951",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "CHECKMULTISIG is allowed to have zero keys and/or sigs"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Zero sigs means no sigs are checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "CHECKMULTISIG is allowed to have zero keys and/or sigs"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Zero sigs means no sigs are checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00000051af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "0000616252ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Test from up to 20 pubkeys, all not checked"
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000061626353ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636454ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "0000616263646555ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000061626364656656ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666757ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "0000616263646566676858ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000061626364656667686959ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a5aae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b5bae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c5cae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d5dae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e5eae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f5fae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f7060ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f70710111ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f7071720112ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f707172730113ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f70717273740114ae69740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006151af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "0000616252af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000061626353af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636454af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "0000616263646555af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000061626364656656af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666757af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "0000616263646566676858af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000061626364656667686959af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a5aaf740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b5baf740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c5caf740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d5daf740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e5eaf740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f5faf740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f7060af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f70710111af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f7071720112af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f707172730113af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "00006162636465666768696a6b6c6d6e6f70717273740114af740087",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "000000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae0000ae",
+    "flags": "P2SH,STRICTENC",
+    "comment": "nOpCount is incremented by the number of keys evaluated in addition to the usual one op per op. In this case we have zero keys, so we can execute 201 CHECKMULTISIGS"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af000000af",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "",
+    "scriptPubKey": "61616161616161616161616100006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae00006162636465666768696a6b6c6d6e6f70717273740114ae",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Even though there are no signatures being checked nOpCount is incremented by the number of keys."
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "61616161616161616161616100006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af00006162636465666768696a6b6c6d6e6f70717273740114af",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "000151",
+    "scriptPubKey": "a914da1745e9b549bd0bfa1a569971c77eba30cd5a4b87",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Very basic P2SH"
+  },
+  {
+    "scriptSig": "4c000151",
+    "scriptPubKey": "a914da1745e9b549bd0bfa1a569971c77eba30cd5a4b87",
+    "flags": "P2SH,STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "4042424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242",
+    "scriptPubKey": "4d40004242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424287",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Basic PUSH signedness check"
+  },
+  {
+    "scriptSig": "4c4042424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242",
+    "scriptPubKey": "4d40004242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424242424287",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Basic PUSHDATA1 signedness check"
+  },
+  {
+    "scriptSig": "4c4b111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+    "scriptPubKey": "4b11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111187",
+    "flags": "",
+    "comment": "PUSHDATA1 of 75 bytes equals direct push of it"
+  },
+  {
+    "scriptSig": "4dff00111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111",
+    "scriptPubKey": "4cff11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111187",
+    "flags": "",
+    "comment": "PUSHDATA2 of 255 bytes equals PUSHDATA1 of it"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "820087",
+    "flags": "P2SH,STRICTENC",
+    "comment": "Basic OP_0 execution"
+  },
+  {
+    "scriptSig": "0181",
+    "scriptPubKey": "4f87",
+    "flags": "",
+    "comment": "OP1_NEGATE pushes 0x81"
+  },
+  {
+    "scriptSig": "0101",
+    "scriptPubKey": "5187",
+    "flags": "",
+    "comment": "OP_1  pushes 0x01"
+  },
+  {
+    "scriptSig": "0102",
+    "scriptPubKey": "5287",
+    "flags": "",
+    "comment": "OP_2  pushes 0x02"
+  },
+  {
+    "scriptSig": "0103",
+    "scriptPubKey": "5387",
+    "flags": "",
+    "comment": "OP_3  pushes 0x03"
+  },
+  {
+    "scriptSig": "0104",
+    "scriptPubKey": "5487",
+    "flags": "",
+    "comment": "OP_4  pushes 0x04"
+  },
+  {
+    "scriptSig": "0105",
+    "scriptPubKey": "5587",
+    "flags": "",
+    "comment": "OP_5  pushes 0x05"
+  },
+  {
+    "scriptSig": "0106",
+    "scriptPubKey": "5687",
+    "flags": "",
+    "comment": "OP_6  pushes 0x06"
+  },
+  {
+    "scriptSig": "0107",
+    "scriptPubKey": "5787",
+    "flags": "",
+    "comment": "OP_7  pushes 0x07"
+  },
+  {
+    "scriptSig": "0108",
+    "scriptPubKey": "5887",
+    "flags": "",
+    "comment": "OP_8  pushes 0x08"
+  },
+  {
+    "scriptSig": "0109",
+    "scriptPubKey": "5987",
+    "flags": "",
+    "comment": "OP_9  pushes 0x09"
+  },
+  {
+    "scriptSig": "010a",
+    "scriptPubKey": "5a87",
+    "flags": "",
+    "comment": "OP_10 pushes 0x0a"
+  },
+  {
+    "scriptSig": "010b",
+    "scriptPubKey": "5b87",
+    "flags": "",
+    "comment": "OP_11 pushes 0x0b"
+  },
+  {
+    "scriptSig": "010c",
+    "scriptPubKey": "5c87",
+    "flags": "",
+    "comment": "OP_12 pushes 0x0c"
+  },
+  {
+    "scriptSig": "010d",
+    "scriptPubKey": "5d87",
+    "flags": "",
+    "comment": "OP_13 pushes 0x0d"
+  },
+  {
+    "scriptSig": "010e",
+    "scriptPubKey": "5e87",
+    "flags": "",
+    "comment": "OP_14 pushes 0x0e"
+  },
+  {
+    "scriptSig": "010f",
+    "scriptPubKey": "5f87",
+    "flags": "",
+    "comment": "OP_15 pushes 0x0f"
+  },
+  {
+    "scriptSig": "0110",
+    "scriptPubKey": "6087",
+    "flags": "",
+    "comment": "OP_16 pushes 0x10"
+  },
+  {
+    "scriptSig": "028000",
+    "scriptPubKey": "0280009c",
+    "flags": "",
+    "comment": "0x8000 equals 128"
+  },
+  {
+    "scriptSig": "0100",
+    "scriptPubKey": "009c",
+    "flags": "",
+    "comment": "0x00 numequals 0"
+  },
+  {
+    "scriptSig": "0180",
+    "scriptPubKey": "009c",
+    "flags": "",
+    "comment": "0x80 (negative zero) numequals 0"
+  },
+  {
+    "scriptSig": "020080",
+    "scriptPubKey": "009c",
+    "flags": "",
+    "comment": "0x0080 numequals 0"
+  },
+  {
+    "scriptSig": "020500",
+    "scriptPubKey": "559c",
+    "flags": "",
+    "comment": "0x0500 numequals 5"
+  },
+  {
+    "scriptSig": "03ff7f80",
+    "scriptPubKey": "02ffff9c",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "03ff7f00",
+    "scriptPubKey": "02ff7f9c",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffff7f80",
+    "scriptPubKey": "03ffffff9c",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "04ffff7f00",
+    "scriptPubKey": "03ffff7f9c",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00634c006851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "non-minimal PUSHDATA1 ignored"
+  },
+  {
+    "scriptSig": "00634d00006851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "non-minimal PUSHDATA2 ignored"
+  },
+  {
+    "scriptSig": "00634c000000006851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "non-minimal PUSHDATA4 ignored"
+  },
+  {
+    "scriptSig": "006301816851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "1NEGATE equiv"
+  },
+  {
+    "scriptSig": "006301016851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_1  equiv"
+  },
+  {
+    "scriptSig": "006301026851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_2  equiv"
+  },
+  {
+    "scriptSig": "006301036851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_3  equiv"
+  },
+  {
+    "scriptSig": "006301046851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_4  equiv"
+  },
+  {
+    "scriptSig": "006301056851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_5  equiv"
+  },
+  {
+    "scriptSig": "006301066851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_6  equiv"
+  },
+  {
+    "scriptSig": "006301076851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_7  equiv"
+  },
+  {
+    "scriptSig": "006301086851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_8  equiv"
+  },
+  {
+    "scriptSig": "006301096851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_9  equiv"
+  },
+  {
+    "scriptSig": "0063010a6851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_10 equiv"
+  },
+  {
+    "scriptSig": "0063010b6851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_11 equiv"
+  },
+  {
+    "scriptSig": "0063010c6851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_12 equiv"
+  },
+  {
+    "scriptSig": "0063010d6851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_13 equiv"
+  },
+  {
+    "scriptSig": "0063010e6851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_14 equiv"
+  },
+  {
+    "scriptSig": "0063010f6851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_15 equiv"
+  },
+  {
+    "scriptSig": "006301106851",
+    "scriptPubKey": "",
+    "flags": "MINIMALDATA",
+    "comment": "OP_16 equiv"
+  },
+  {
+    "scriptSig": "0100",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0180",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020180",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020100",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020200",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020300",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020400",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020500",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020600",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020700",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020800",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020900",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020a00",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020b00",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020c00",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020d00",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020e00",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020f00",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "021000",
+    "scriptPubKey": "51",
+    "flags": "MINIMALDATA",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51020000",
+    "scriptPubKey": "7975",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "51020000",
+    "scriptPubKey": "7a7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020000",
+    "scriptPubKey": "8b7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020000",
+    "scriptPubKey": "8c7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020000",
+    "scriptPubKey": "8f7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020000",
+    "scriptPubKey": "907551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020000",
+    "scriptPubKey": "917551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "020000",
+    "scriptPubKey": "927551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "937551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "937551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "947551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "947551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "9a7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "9a7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "9b7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "9b7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "9c7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000051",
+    "scriptPubKey": "9c7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "9d51",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "9d51",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "9e7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "9e7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "9f7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "9f7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "a07551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "a07551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "a17551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "a17551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "a27551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "a27551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "a37551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "a37551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00020000",
+    "scriptPubKey": "a47551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "02000000",
+    "scriptPubKey": "a47551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0200000000",
+    "scriptPubKey": "a57551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0002000000",
+    "scriptPubKey": "a57551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000020000",
+    "scriptPubKey": "a57551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000020000",
+    "scriptPubKey": "ae7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0002000000",
+    "scriptPubKey": "ae7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "000200000051",
+    "scriptPubKey": "ae7551",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000020000",
+    "scriptPubKey": "af51",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0002000000",
+    "scriptPubKey": "af51",
+    "flags": "",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "2102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac0ac91",
+    "flags": "STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "0000",
+    "scriptPubKey": "512102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac051ae91",
+    "flags": "STRICTENC",
+    "comment": ""
+  },
+  {
+    "scriptSig": "00473044022044dc17b0887c161bb67ba9635bf758735bdde503e4b0a0987f587f14a4e1143d022009a215772d49a85dae40d8ca03955af26ad3978a0ff965faa12915e9586249a501473044022044dc17b0887c161bb67ba9635bf758735bdde503e4b0a0987f587f14a4e1143d022009a215772d49a85dae40d8ca03955af26ad3978a0ff965faa12915e9586249a501",
+    "scriptPubKey": "52002102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac052ae91",
+    "flags": "STRICTENC",
+    "comment": "2-of-2 CHECKMULTISIG NOT with the second pubkey invalid, and both signatures validly encoded. Valid pubkey fails, and CHECKMULTISIG exits early, prior to evaluation of second invalid pubkey."
+  },
+  {
+    "scriptSig": "0000473044022044dc17b0887c161bb67ba9635bf758735bdde503e4b0a0987f587f14a4e1143d022009a215772d49a85dae40d8ca03955af26ad3978a0ff965faa12915e9586249a501",
+    "scriptPubKey": "522102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac02102865c40293a680cb9c020e7b1e106d8c1916d3cef99aa431a56d253e69256dac052ae91",
+    "flags": "STRICTENC",
+    "comment": "2-of-2 CHECKMULTISIG NOT with both pubkeys valid, but second signature invalid. Valid pubkey fails, and CHECKMULTISIG exits early, prior to evaluation of second invalid signature."
+  },
+  {
+    "scriptSig": "4a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Overly long signature is correctly encoded"
+  },
+  {
+    "scriptSig": "2530220220000000000000000000000000000000000000000000000000000000000000000000",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Missing S is correctly encoded"
+  },
+  {
+    "scriptSig": "273024021077777777777777777777777777777777020a7777777777777777777777777777777701",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "S with invalid S length is correctly encoded"
+  },
+  {
+    "scriptSig": "27302403107777777777777777777777777777777702107777777777777777777777777777777701",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Non-integer R is correctly encoded"
+  },
+  {
+    "scriptSig": "27302402107777777777777777777777777777777703107777777777777777777777777777777701",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Non-integer S is correctly encoded"
+  },
+  {
+    "scriptSig": "173014020002107777777777777777777777777777777701",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Zero-length R is correctly encoded"
+  },
+  {
+    "scriptSig": "173014021077777777777777777777777777777777020001",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Zero-length S is correctly encoded for DERSIG"
+  },
+  {
+    "scriptSig": "27302402107777777777777777777777777777777702108777777777777777777777777777777701",
+    "scriptPubKey": "00ac91",
+    "flags": "",
+    "comment": "Negative S is correctly encoded"
+  },
+  {
+    "scriptSig": "47304402200a5c6163f07b8d3b013c4d1d6dba25e780b39658d79ba37af7057a3b7f15ffa102201fd9b4eaa9943f734928b99a83592c2e7bf342ea2680f6a2bb705167966b742001",
+    "scriptPubKey": "410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+    "flags": "",
+    "comment": "P2PK"
+  },
+  {
+    "scriptSig": "47304402206e05a6fe23c59196ffe176c9ddc31e73a9885638f9d1328d47c0c703863b8876022076feb53811aa5b04e0e79f938eb19906cc5e67548bc555a8e8b8b0fc603d840c0121038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508",
+    "scriptPubKey": "76a9141018853670f9f3b0582c5b9ee8ce93764ac32b9388ac",
+    "flags": "",
+    "comment": "P2PKH"
+  },
+  {
+    "scriptSig": "47304402204710a85181663b32d25c70ec2bbd14adff5ddfff6cb50d09e155ef5f541fc86c0220056b0cc949be9386ecc5f6c2ac0493269031dbb185781db90171b54ac127790281",
+    "scriptPubKey": "41048282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150811f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26cafac",
+    "flags": "",
+    "comment": "P2PK anyonecanpay"
+  },
+  {
+    "scriptSig": "473044022003fef42ed6c7be8917441218f525a60e2431be978e28b7aca4d7a532cc413ae8022067a1f82c74e8d69291b90d148778405c6257bbcfc2353cc38a3e1f22bf4425460123210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798ac",
+    "scriptPubKey": "a91423b0ad3477f2178bc0b3eed26e4e6316f4e83aa187",
+    "flags": "P2SH",
+    "comment": "P2SH(P2PK)"
+  },
+  {
+    "scriptSig": "47304402204e2eb034be7b089534ac9e798cf6a2c79f38bcb34d1b179efd6f2de0841735db022071461beb056b5a7be1819da6a3e3ce3662831ecc298419ca101eb6887b5dd6a4011976a9147cf9c846cd4882efec4bf07e44ebdad495c94f4b88ac",
+    "scriptPubKey": "a9142df519943d5acc0ef5222091f9dfe3543f489a8287",
+    "flags": "",
+    "comment": "P2SH(P2PKH), bad sig but no VERIFY_P2SH"
+  },
+  {
+    "scriptSig": "00473044022051254b9fb476a52d85530792b578f86fea70ec1ffb4393e661bcccb23d8d63d3022076505f94a403c86097841944e044c70c2045ce90e36de51f7e9d3828db98a0750147304402200a358f750934b3feb822f1966bfcd8bbec9eeaa3a8ca941e11ee5960e181fa01022050bf6b5a8e7750f70354ae041cb68a7bade67ec6c3ab19eb359638974410626e0147304402200955d031fff71d8653221e85e36c3c85533d2312fc3045314b19650b7ae2f81002202a6bb8505e36201909d0921f01abff390ae6b7ff97bbf959f98aedeb0a56730901",
+    "scriptPubKey": "53210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464053ae",
+    "flags": "",
+    "comment": "3-of-3"
+  },
+  {
+    "scriptSig": "0047304402205b7d2c2f177ae76cfbbf14d589c113b0b35db753d305d5562dd0b61cbf366cfb02202e56f93c4f08a27f986cd424ffc48a462c3202c4902104d4d0ff98ed28f4bf80014730440220563e5b3b1fc11662a84bc5ea2a32cc3819703254060ba30d639a1aaf2d5068ad0220601c1f47ddc76d93284dd9ed68f7c9974c4a0ea7cbe8a247d6bc3878567a5fca014c6952210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464053ae",
+    "scriptPubKey": "a914c9e4a896d149702d0d1695434feddd52e24ad78d87",
+    "flags": "P2SH",
+    "comment": "P2SH(2-of-3)"
+  },
+  {
+    "scriptSig": "47304402200060558477337b9022e70534f1fea71a318caf836812465a2509931c5e7c4987022078ec32bd50ac9e03a349ba953dfd9fe1c8d2dd8bdb1d38ddca844d3d5c78c11801",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac",
+    "flags": "",
+    "comment": "P2PK with too much R padding but no DERSIG"
+  },
+  {
+    "scriptSig": "48304502202de8c03fc525285c9c535631019a5f2af7c6454fa9eb392a3756a4917c420edd02210046130bf2baf7cfc065067c8b9e33a066d9c15edcea9feb0ca2d233e3597925b401",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac",
+    "flags": "",
+    "comment": "P2PK with too much S padding but no DERSIG"
+  },
+  {
+    "scriptSig": "4730440220d7a0417c3f6d1a15094d1cf2a3378ca0503eb8a57630953a9e2987e21ddd0a6502207a6266d686c99090920249991d3d42065b6d43eb70187b219c0db82e4f94d1a201",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac",
+    "flags": "",
+    "comment": "P2PK with too little R padding but no DERSIG"
+  },
+  {
+    "scriptSig": "4730440220005ece1335e7f757a1a1f476a7fb5bd90964e8a022489f890614a04acfb734c002206c12b8294a6513c7710e8c82d3c23d75cdbfe83200eb7efb495701958501a5d601",
+    "scriptPubKey": "2103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640ac91",
+    "flags": "",
+    "comment": "P2PK NOT with bad sig with too much R padding but no DERSIG"
+  },
+  {
+    "scriptSig": "4730440220d7a0417c3f6d1a15094d1cf2a3378ca0503eb8a57630953a9e2987e21ddd0a6502207a6266d686c99090920249991d3d42065b6d43eb70187b219c0db82e4f94d1a201",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac",
+    "flags": "",
+    "comment": "BIP66 example 1, without DERSIG"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac91",
+    "flags": "",
+    "comment": "BIP66 example 4, without DERSIG"
+  },
+  {
+    "scriptSig": "00",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac91",
+    "flags": "DERSIG",
+    "comment": "BIP66 example 4, with DERSIG"
+  },
+  {
+    "scriptSig": "51",
+    "scriptPubKey": "21038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f51508ac91",
+    "flags": "",
+    "comment": "BIP66 example 6, without DERSIG"
+  },
+  {
+    "scriptSig": "004730440220cae00b1444babfbf6071b0ba8707f6bd373da3df494d6e74119b0430c5db810502205d5231b8c5939c8ff0c82242656d6e06edb073d42af336c99fe8837c36ea39d501473044022027c2714269ca5aeecc4d70edc88ba5ee0e3da4986e9216028f489ab4f1b8efce022022bd545b4951215267e4c5ceabd4c5350331b2e4a0b6494c56f361fa5a57a1a201",
+    "scriptPubKey": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464052ae",
+    "flags": "",
+    "comment": "BIP66 example 7, without DERSIG"
+  },
+  {
+    "scriptSig": "00004730440220da6f441dc3b4b2c84cfa8db0cd5b34ed92c9e01686de5a800d40498b70c0dcac02207c2cf91b0c32b860c4cd4994be36cfb84caf8bb7c3a8e4d96a31b2022c5299c501",
+    "scriptPubKey": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464052ae91",
+    "flags": "",
+    "comment": "BIP66 example 10, without DERSIG"
+  },
+  {
+    "scriptSig": "004730440220b119d67d389315308d1745f734a51ff3ec72e06081e84e236fdf9dc2f5d2a64802204b04e3bc38674c4422ea317231d642b56dc09d214a1ecbbf16ecca01ed996e220100",
+    "scriptPubKey": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464052ae91",
+    "flags": "",
+    "comment": "BIP66 example 12, without DERSIG"
+  },
+  {
+    "scriptSig": "004730440220b119d67d389315308d1745f734a51ff3ec72e06081e84e236fdf9dc2f5d2a64802204b04e3bc38674c4422ea317231d642b56dc09d214a1ecbbf16ecca01ed996e220100",
+    "scriptPubKey": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464052ae91",
+    "flags": "DERSIG",
+    "comment": "BIP66 example 12, with DERSIG"
+  },
+  {
+    "scriptSig": "48304402203e4516da7253cf068effec6b95c41221c0cf3a8e6ccb8cbf1725b562e9afde2c022054e1c258c2981cdfba5df1f46661fb6541c44f77ca0092f3600331abfffb12510101",
+    "scriptPubKey": "2103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640ac",
+    "flags": "",
+    "comment": "P2PK with multi-byte hashtype, without DERSIG"
+  },
+  {
+    "scriptSig": "48304502203e4516da7253cf068effec6b95c41221c0cf3a8e6ccb8cbf1725b562e9afde2c022100ab1e3da73d67e32045a20e0b999e049978ea8d6ee5480d485fcf2ce0d03b2ef001",
+    "scriptPubKey": "2103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff4640ac",
+    "flags": "",
+    "comment": "P2PK with high S but no LOW_S"
+  },
+  {
+    "scriptSig": "473044022057292e2d4dfe775becdd0a9e6547997c728cdf35390f6a017da56d654d374e4902206b643be2fc53763b4e284845bfea2c597d2dc7759941dce937636c9d341b71ed01",
+    "scriptPubKey": "410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+    "flags": "",
+    "comment": "P2PK with hybrid pubkey but no STRICTENC"
+  },
+  {
+    "scriptSig": "4730440220035d554e3153c04950c9993f41c496607a8e24093db0595be7bf875cf64fcf1f02204731c8c4e5daf15e706cec19cdd8f2c5b1d05490e11dab8465ed426569b6e92101",
+    "scriptPubKey": "410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac91",
+    "flags": "",
+    "comment": "P2PK NOT with invalid hybrid pubkey but no STRICTENC"
+  },
+  {
+    "scriptSig": "0047304402202e79441ad1baf5a07fb86bae3753184f6717d9692680947ea8b6e8b777c69af1022079a262e13d868bb5a0964fefe3ba26942e1b0669af1afb55ef3344bc9d4fc4c401",
+    "scriptPubKey": "51410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150852ae",
+    "flags": "",
+    "comment": "1-of-2 with the second 1 hybrid pubkey and no STRICTENC"
+  },
+  {
+    "scriptSig": "0047304402202e79441ad1baf5a07fb86bae3753184f6717d9692680947ea8b6e8b777c69af1022079a262e13d868bb5a0964fefe3ba26942e1b0669af1afb55ef3344bc9d4fc4c401",
+    "scriptPubKey": "51410679be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150852ae",
+    "flags": "STRICTENC",
+    "comment": "1-of-2 with the second 1 hybrid pubkey"
+  },
+  {
+    "scriptSig": "47304402206177d513ec2cda444c021a1f4f656fc4c72ba108ae063e157eb86dc3575784940220666fc66702815d0e5413bb9b1df22aed44f5f1efb8b99d41dd5dc9a5be6d205205",
+    "scriptPubKey": "41048282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150811f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26cafac",
+    "flags": "",
+    "comment": "P2PK with undefined hashtype but no STRICTENC"
+  },
+  {
+    "scriptSig": "47304402207409b5b320296e5e2136a7b281a7f803028ca4ca44e2b83eebd46932677725de02202d4eea1c8d3c98e6f42614f54764e6e5e6542e213eb4d079737e9a8b6e9812ec05",
+    "scriptPubKey": "41048282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150811f8a8098557dfe45e8256e830b60ace62d613ac2f7b17bed31b6eaff6e26cafac91",
+    "flags": "",
+    "comment": "P2PK NOT with invalid sig and undefined hashtype but no STRICTENC"
+  },
+  {
+    "scriptSig": "51473044022051254b9fb476a52d85530792b578f86fea70ec1ffb4393e661bcccb23d8d63d3022076505f94a403c86097841944e044c70c2045ce90e36de51f7e9d3828db98a0750147304402200a358f750934b3feb822f1966bfcd8bbec9eeaa3a8ca941e11ee5960e181fa01022050bf6b5a8e7750f70354ae041cb68a7bade67ec6c3ab19eb359638974410626e0147304402200955d031fff71d8653221e85e36c3c85533d2312fc3045314b19650b7ae2f81002202a6bb8505e36201909d0921f01abff390ae6b7ff97bbf959f98aedeb0a56730901",
+    "scriptPubKey": "53210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464053ae",
+    "flags": "",
+    "comment": "3-of-3 with nonzero dummy but no NULLDUMMY"
+  },
+  {
+    "scriptSig": "5147304402201bb2edab700a5d020236df174fefed78087697143731f659bea59642c759c16d022061f42cdbae5bcd3e8790f20bf76687443436e94a634321c16a72aa54cbc7c2ea0147304402204bb4a64f2a6e5c7fb2f07fef85ee56fde5e6da234c6a984262307a20e99842d702206f8303aaba5e625d223897e2ffd3f88ef1bcffef55f38dc3768e5f2e94c923f901473044022040c2809b71fffb155ec8b82fe7a27f666bd97f941207be4e14ade85a1249dd4d02204d56c85ec525dd18e29a0533d5ddf61b6b1bb32980c2f63edf951aebf7a27bfe01",
+    "scriptPubKey": "53210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464053ae91",
+    "flags": "",
+    "comment": "3-of-3 NOT with invalid sig and nonzero dummy but no NULLDUMMY"
+  },
+  {
+    "scriptSig": "0047304402200abeb4bd07f84222f474aed558cfbdfc0b4e96cde3c2935ba7098b1ff0bd74c302204a04c1ca67b2a20abee210cf9a21023edccbbf8024b988812634233115c6b7390176",
+    "scriptPubKey": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150852ae",
+    "flags": "",
+    "comment": "2-of-2 with two identical keys and sigs pushed using OP_DUP but no SIGPUSHONLY"
+  },
+  {
+    "scriptSig": "0047304402200abeb4bd07f84222f474aed558cfbdfc0b4e96cde3c2935ba7098b1ff0bd74c302204a04c1ca67b2a20abee210cf9a21023edccbbf8024b988812634233115c6b7390147304402200abeb4bd07f84222f474aed558cfbdfc0b4e96cde3c2935ba7098b1ff0bd74c302204a04c1ca67b2a20abee210cf9a21023edccbbf8024b988812634233115c6b73901",
+    "scriptPubKey": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150821038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f5150852ae",
+    "flags": "SIGPUSHONLY",
+    "comment": "2-of-2 with two identical keys and sigs pushed"
+  },
+  {
+    "scriptSig": "5b47304402200a5c6163f07b8d3b013c4d1d6dba25e780b39658d79ba37af7057a3b7f15ffa102201fd9b4eaa9943f734928b99a83592c2e7bf342ea2680f6a2bb705167966b742001",
+    "scriptPubKey": "410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+    "flags": "P2SH",
+    "comment": "P2PK with unnecessary input but no CLEANSTACK"
+  },
+  {
+    "scriptSig": "5b47304402202f7505132be14872581f35d74b759212d9da40482653f1ffa3116c3294a4a51702206adbf347a2240ca41c66522b1a22a41693610b76a8e7770645dc721d1635854f0143410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+    "scriptPubKey": "a91431edc23bdafda4639e669f89ad6b2318dd79d03287",
+    "flags": "P2SH",
+    "comment": "P2SH with unnecessary input but no CLEANSTACK"
+  },
+  {
+    "scriptSig": "47304402202f7505132be14872581f35d74b759212d9da40482653f1ffa3116c3294a4a51702206adbf347a2240ca41c66522b1a22a41693610b76a8e7770645dc721d1635854f0143410479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8ac",
+    "scriptPubKey": "a91431edc23bdafda4639e669f89ad6b2318dd79d03287",
+    "flags": "CLEANSTACK,P2SH",
+    "comment": "P2SH with CLEANSTACK"
+  }
+]

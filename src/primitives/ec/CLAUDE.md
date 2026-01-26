@@ -11,7 +11,7 @@ This module provides secp256k1 elliptic curve operations for Bitcoin SV, includi
 |------|---------|
 | `mod.rs` | Module root; re-exports `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key` |
 | `private_key.rs` | secp256k1 private key: generation, WIF encoding, signing, ECDH, BRC-42 child derivation |
-| `public_key.rs` | secp256k1 public key: serialization, address generation, verification, BRC-42 child derivation |
+| `public_key.rs` | secp256k1 public key: serialization, address generation, verification, point arithmetic, BRC-42 child derivation |
 | `signature.rs` | ECDSA signature: DER/compact encoding, low-S normalization (BIP 62) |
 | `ecdsa.rs` | Standalone ECDSA functions: `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
 
@@ -41,6 +41,7 @@ pub struct PrivateKey {
     pub fn derive_shared_secret(&self, other_pubkey: &PublicKey) -> Result<PublicKey>  // ECDH
     pub fn derive_child(&self, other_pubkey: &PublicKey, invoice_number: &str) -> Result<PrivateKey>  // BRC-42
 }
+// Implements: Clone, Debug (shows public key only), PartialEq, Eq, Drop (zeros memory)
 ```
 
 ### PublicKey
@@ -53,6 +54,7 @@ pub struct PublicKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self>   // 33 or 65 bytes
     pub fn from_hex(hex: &str) -> Result<Self>        // Compressed or uncompressed
     pub fn from_private_key(private_key: &PrivateKey) -> Self
+    pub fn from_scalar_mul_generator(scalar: &[u8; 32]) -> Result<Self>  // G * scalar
 
     // Serialization
     pub fn to_compressed(&self) -> [u8; 33]           // 02/03 || X
@@ -73,11 +75,15 @@ pub struct PublicKey {
     // Verification
     pub fn verify(&self, msg_hash: &[u8; 32], signature: &Signature) -> bool
 
-    // ECDH and key derivation
+    // Point arithmetic
     pub fn mul_scalar(&self, scalar: &[u8; 32]) -> Result<PublicKey>  // Point * scalar
+    pub fn add(&self, other: &PublicKey) -> Result<PublicKey>         // Point addition
+
+    // ECDH and key derivation
     pub fn derive_shared_secret(&self, other_privkey: &PrivateKey) -> Result<PublicKey>  // ECDH
     pub fn derive_child(&self, other_privkey: &PrivateKey, invoice_number: &str) -> Result<PublicKey>  // BRC-42
 }
+// Implements: Clone, Debug, Display, PartialEq, Eq, Hash
 ```
 
 ### Signature
@@ -107,6 +113,7 @@ pub struct Signature {
     // Verification
     pub fn verify(&self, msg_hash: &[u8; 32], public_key: &PublicKey) -> bool
 }
+// Implements: Clone, Debug, Display (DER hex), PartialEq, Eq
 ```
 
 ### ECDSA Functions
@@ -123,8 +130,8 @@ pub fn calculate_recovery_id(msg_hash: &[u8; 32], signature: &Signature, public_
 ### Key Generation and Signing
 
 ```rust
-use bsv_primitives::ec::{PrivateKey, sign, verify};
-use bsv_primitives::hash::sha256;
+use bsv_sdk::primitives::ec::{PrivateKey, sign, verify};
+use bsv_sdk::primitives::hash::sha256;
 
 // Generate random key pair
 let private_key = PrivateKey::random();
@@ -144,7 +151,7 @@ assert!(public_key.verify(&msg_hash, &signature));
 ### WIF Encoding (Wallet Import/Export)
 
 ```rust
-use bsv_primitives::ec::PrivateKey;
+use bsv_sdk::primitives::ec::PrivateKey;
 
 // Parse WIF
 let wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn";
@@ -158,7 +165,7 @@ let testnet_wif = key.to_wif_with_prefix(0xef);  // Testnet
 ### Address Generation
 
 ```rust
-use bsv_primitives::ec::PrivateKey;
+use bsv_sdk::primitives::ec::PrivateKey;
 
 let key = PrivateKey::from_hex(
     "0000000000000000000000000000000000000000000000000000000000000001"
@@ -176,7 +183,7 @@ let testnet_addr = pubkey.to_address_with_prefix(0x6f);
 ### ECDH Shared Secret
 
 ```rust
-use bsv_primitives::ec::PrivateKey;
+use bsv_sdk::primitives::ec::PrivateKey;
 
 let alice = PrivateKey::random();
 let bob = PrivateKey::random();
@@ -191,7 +198,7 @@ assert_eq!(alice_shared.to_compressed(), bob_shared.to_compressed());
 ### BRC-42 Key Derivation
 
 ```rust
-use bsv_primitives::ec::PrivateKey;
+use bsv_sdk::primitives::ec::PrivateKey;
 
 let alice_priv = PrivateKey::random();
 let bob_priv = PrivateKey::random();
@@ -210,8 +217,8 @@ assert_eq!(bob_child_priv.public_key().to_compressed(), bob_child_pub.to_compres
 ### Public Key Recovery
 
 ```rust
-use bsv_primitives::ec::{PrivateKey, sign, recover_public_key};
-use bsv_primitives::hash::sha256;
+use bsv_sdk::primitives::ec::{PrivateKey, sign, recover_public_key};
+use bsv_sdk::primitives::hash::sha256;
 
 let key = PrivateKey::random();
 let pubkey = key.public_key();
@@ -229,6 +236,25 @@ for recovery_id in 0..2 {
 }
 ```
 
+### Point Arithmetic
+
+```rust
+use bsv_sdk::primitives::ec::{PrivateKey, PublicKey};
+
+// Generator point multiplication
+let mut scalar = [0u8; 32];
+scalar[31] = 2;
+let two_g = PublicKey::from_scalar_mul_generator(&scalar).unwrap();
+
+// Point addition
+let a = PrivateKey::random().public_key();
+let b = PrivateKey::random().public_key();
+let sum = a.add(&b).unwrap();  // a + b
+
+// Scalar multiplication
+let result = a.mul_scalar(&scalar).unwrap();  // a * 2
+```
+
 ## BRC-42 Key Derivation Algorithm
 
 The BRC-42 key derivation enables hierarchical deterministic key generation between two parties:
@@ -244,7 +270,7 @@ The BRC-42 key derivation enables hierarchical deterministic key generation betw
 3. Compute offset point: `offset = G * hmac`
 4. Derive new key: `new_pubkey = self + offset`
 
-The HMAC parameter order matches the Go SDK (`sha256_hmac(key, data)`).
+The HMAC uses compressed shared secret as the key and invoice number bytes as the data. This matches the Go SDK's `Sha256HMAC(invoiceNumberBin, sharedSecret.Compressed())` where parameters are (data, key).
 
 ## DER Signature Format
 

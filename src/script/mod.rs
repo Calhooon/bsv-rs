@@ -65,6 +65,7 @@ pub mod script_num;
 pub mod spend;
 pub mod template;
 pub mod templates;
+pub mod transaction;
 pub mod unlocking_script;
 
 // Re-exports for convenience
@@ -75,4 +76,8 @@ pub use script::Script;
 pub use script_num::ScriptNum;
 pub use spend::{Spend, SpendParams};
 pub use template::{ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
+pub use transaction::{
+    SimpleUtxo, SpendValidation, TransactionContext, TransactionInputContext,
+    TransactionOutputContext, UtxoProvider,
+};
 pub use unlocking_script::UnlockingScript;
