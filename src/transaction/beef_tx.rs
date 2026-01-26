@@ -13,11 +13,11 @@ use crate::Result;
 
 use super::transaction::Transaction;
 
-/// BEEF V1 format marker (0x0100BEEF in little-endian).
-pub const BEEF_V1: u32 = 0x0100BEEF;
+/// BEEF V1 format marker - when written as little-endian u32, produces bytes: 01 00 BE EF
+pub const BEEF_V1: u32 = 0xEFBE0001;
 
-/// BEEF V2 format marker (0x0200BEEF in little-endian).
-pub const BEEF_V2: u32 = 0x0200BEEF;
+/// BEEF V2 format marker - when written as little-endian u32, produces bytes: 02 00 BE EF
+pub const BEEF_V2: u32 = 0xEFBE0002;
 
 /// Atomic BEEF format marker.
 pub const ATOMIC_BEEF: u32 = 0x01010101;

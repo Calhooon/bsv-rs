@@ -56,7 +56,6 @@ pub mod wallet;
 
 **Convenience re-exports** from `script`:
 - `Script` - Bitcoin Script representation
-- `ScriptChunk` - Individual opcode or data push
 - `LockingScript` - Output script (scriptPubKey)
 - `UnlockingScript` - Input script (scriptSig)
 

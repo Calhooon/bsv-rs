@@ -385,11 +385,11 @@ impl MerklePath {
             working_hash = if leaf.duplicate {
                 hash_pair(&working_hash, &working_hash)
             } else if offset % 2 != 0 {
-                // Odd offset means leaf is on the left
-                hash_pair(leaf.hash.as_deref().unwrap_or(""), &working_hash)
-            } else {
-                // Even offset means leaf is on the right
+                // Odd offset means sibling is on the RIGHT, working_hash is on the LEFT
                 hash_pair(&working_hash, leaf.hash.as_deref().unwrap_or(""))
+            } else {
+                // Even offset means sibling is on the LEFT, working_hash is on the RIGHT
+                hash_pair(leaf.hash.as_deref().unwrap_or(""), &working_hash)
             };
         }
 
@@ -429,9 +429,10 @@ impl MerklePath {
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             hash_pair(h0, h0)
         } else {
+            // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             let h1 = leaf1.hash.as_deref().unwrap_or("");
-            hash_pair(h1, h0)
+            hash_pair(h0, h1)
         };
 
         Ok(MerklePathLeaf::new(offset, working_hash))

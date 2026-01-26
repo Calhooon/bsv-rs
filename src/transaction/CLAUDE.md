@@ -161,8 +161,10 @@ impl SatoshisPerKilobyte {
 pub struct LivePolicy { /* ... */ }
 impl LivePolicy {
     pub fn new() -> Self                // Uses DEFAULT_POLICY_URL
-    pub fn with_url(url: &str) -> Self
+    pub fn with_url(policy_url: &str) -> Self
     pub fn with_config(config: LivePolicyConfig) -> Self
+    pub fn policy_url(&self) -> &str
+    pub fn cache_ttl(&self) -> Duration
     pub async fn refresh(&self) -> Result<u64>  // Fetch live rate
     pub fn cached_rate(&self) -> Option<u64>
     pub fn effective_rate(&self) -> u64  // Cached or fallback (100 sat/KB)
@@ -234,6 +236,29 @@ pub struct ArcConfig {
 }
 ```
 
+### WhatsOnChain Broadcaster
+
+```rust
+pub struct WhatsOnChainBroadcaster { /* ... */ }
+
+impl WhatsOnChainBroadcaster {
+    pub fn mainnet() -> Self
+    pub fn testnet() -> Self
+    pub fn stn() -> Self                 // Scaling Test Network
+    pub fn new(network: WocBroadcastNetwork, api_key: Option<String>) -> Self
+    pub fn with_config(config: WocBroadcastConfig) -> Self
+    pub fn network(&self) -> WocBroadcastNetwork
+    pub fn api_key(&self) -> Option<&str>
+}
+
+pub enum WocBroadcastNetwork { Mainnet, Testnet, Stn }
+pub struct WocBroadcastConfig {
+    pub network: WocBroadcastNetwork,
+    pub api_key: Option<String>,
+    pub timeout_ms: u64,
+}
+```
+
 ## Chain Tracking
 
 ```rust
@@ -255,6 +280,7 @@ pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String> }
 impl MockChainTracker {
     pub fn new(height: u32) -> Self
     pub fn add_root(&mut self, height: u32, root: String)
+    pub fn always_valid(height: u32) -> AlwaysValidChainTracker
 }
 
 pub struct AlwaysValidChainTracker { pub height: u32 }
@@ -279,6 +305,28 @@ pub enum WocNetwork { Mainnet, Testnet }
 impl WocNetwork {
     pub fn base_url(&self) -> &'static str
 }
+```
+
+### Block Headers Service Tracker
+
+```rust
+pub struct BlockHeadersServiceTracker { /* ... */ }
+
+impl BlockHeadersServiceTracker {
+    pub fn new() -> Self                 // Uses DEFAULT_HEADERS_URL
+    pub fn with_url(base_url: &str) -> Self
+    pub fn with_config(config: BlockHeadersServiceConfig) -> Self
+    pub fn base_url(&self) -> &str
+    pub fn auth_token(&self) -> Option<&str>
+}
+
+pub struct BlockHeadersServiceConfig {
+    pub base_url: String,
+    pub auth_token: Option<String>,
+    pub timeout_ms: u64,
+}
+
+pub const DEFAULT_HEADERS_URL: &str = "https://headers.spv.money";
 ```
 
 ## MerklePath (BUMP - BRC-74)
@@ -343,6 +391,7 @@ impl Beef {
     pub fn is_valid(&mut self, allow_txid_only: bool) -> bool
     pub fn verify_valid(&mut self, allow_txid_only: bool) -> BeefValidationResult
     pub fn find_txid(&self, txid: &str) -> Option<&BeefTx>
+    pub fn find_txid_mut(&mut self, txid: &str) -> Option<&mut BeefTx>
     pub fn find_bump(&self, txid: &str) -> Option<&MerklePath>
     pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction>
     pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction>
@@ -353,6 +402,7 @@ impl Beef {
     pub fn merge_beef(&mut self, other: &Beef)
     pub fn sort_txs(&mut self) -> SortResult
     pub fn is_atomic(&self) -> bool
+    pub fn clone_shallow(&self) -> Self
     pub fn to_log_string(&mut self) -> String
 }
 
@@ -380,12 +430,14 @@ impl BeefTx {
     pub fn is_txid_only(&self) -> bool
     pub fn txid(&self) -> String
     pub fn tx(&self) -> Option<&Transaction>
+    pub fn tx_mut(&mut self) -> Option<&mut Transaction>
     pub fn raw_tx(&self) -> Option<&[u8]>
+    pub fn raw_tx_or_compute(&mut self) -> Option<Vec<u8>>
 }
 
 pub enum TxDataFormat { RawTx = 0, RawTxAndBumpIndex = 1, TxidOnly = 2 }
-pub const BEEF_V1: u32 = 0x0100BEEF;
-pub const BEEF_V2: u32 = 0x0200BEEF;
+pub const BEEF_V1: u32 = 0xEFBE0001;
+pub const BEEF_V2: u32 = 0xEFBE0002;
 pub const ATOMIC_BEEF: u32 = 0x01010101;
 ```
 
@@ -413,6 +465,16 @@ match broadcaster.broadcast(&tx).await {
 }
 ```
 
+### Broadcasting with WhatsOnChain
+
+```rust
+let broadcaster = WhatsOnChainBroadcaster::mainnet();
+match broadcaster.broadcast(&tx).await {
+    Ok(response) => println!("Success: {}", response.txid),
+    Err(failure) => println!("Failed: {}", failure.description),
+}
+```
+
 ### SPV Verification with WhatsOnChain
 
 ```rust
@@ -429,7 +491,13 @@ if validation.valid {
 ### Fee Computation
 
 ```rust
+// Fixed fee rate
 let fee_model = SatoshisPerKilobyte::new(100);  // 100 sat/KB
+let fee = fee_model.compute_fee(&tx)?;
+
+// Live fee rate from ARC
+let fee_model = LivePolicy::default();
+fee_model.refresh().await?;  // Fetch current rate
 let fee = fee_model.compute_fee(&tx)?;
 ```
 
@@ -440,7 +508,7 @@ let fee = fee_model.compute_fee(&tx)?;
 - **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()`
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
-- **HTTP feature**: `ArcBroadcaster` and `WhatsOnChainTracker` require the `http` feature flag
+- **HTTP feature**: `ArcBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
 
 ## Error Types
 

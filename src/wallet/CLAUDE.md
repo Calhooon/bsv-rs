@@ -9,12 +9,12 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with feature-gated exports | ~255 |
+| `mod.rs` | Module root with feature-gated exports | ~254 |
 | `types.rs` | Core wallet type definitions (70+ types) | ~1550 |
-| `interface.rs` | WalletInterface trait (28 methods) | ~298 |
+| `interface.rs` | WalletInterface trait (26 methods) | ~297 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~641 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~491 |
-| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1342 |
+| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1345 |
 | `validation.rs` | 40+ input validation helpers | ~1170 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
@@ -40,7 +40,7 @@ Wire protocol implementation:
 
 ### WalletInterface Trait
 
-The `WalletInterface` trait defines all 28 wallet operations (async with `originator` parameter):
+The `WalletInterface` trait defines all 26 wallet operations (async with `originator` parameter):
 
 | Category | Methods |
 |----------|---------|
@@ -116,7 +116,7 @@ ProtoWallet can:
 - Encrypt and decrypt data (AES-256-GCM via derived symmetric keys)
 - Create and verify HMACs (SHA-256)
 - Reveal key linkages for verification
-- Implement all 28 `WalletInterface` methods (unsupported methods return errors)
+- Implement all 26 `WalletInterface` methods (unsupported methods return errors)
 
 ProtoWallet does NOT:
 - Create transactions (returns error)
@@ -128,9 +128,9 @@ ProtoWallet does NOT:
 #### WalletInterface Implementation
 
 ProtoWallet implements `WalletInterface` with full support for cryptographic operations:
-- Key operations: All 8 methods fully implemented
+- Key operations: All 9 methods fully implemented
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
-- Chain/Status operations: `is_authenticated` returns true, `get_network` returns mainnet, `get_version` returns SDK version
+- Chain/Status operations: `is_authenticated` returns true, `get_network` returns mainnet, `get_version` returns SDK version, `get_height` returns 0
 
 ### Validation Module
 
@@ -139,11 +139,12 @@ The `validation` module provides 40+ validation functions:
 | Category | Functions |
 |----------|-----------|
 | Satoshis | `validate_satoshis` |
-| Integers | `validate_integer`, `validate_integer_u32` |
-| Strings | `validate_string_length`, `validate_hex_string`, `validate_base64_string`, `is_hex_string` |
-| Identifiers | `validate_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase) |
-| Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string` |
-| Actions | `validate_create_action_args`, `validate_create_action_input`, `validate_create_action_output`, etc. |
+| Integers | `validate_integer`, `validate_integer_u32`, `validate_positive_integer_or_zero` |
+| Strings | `validate_string_length`, `validate_optional_string_length`, `validate_hex_string`, `validate_optional_hex_string`, `validate_base64_string`, `validate_optional_base64_string`, `is_hex_string` |
+| Identifiers | `validate_basket`, `validate_optional_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase) |
+| Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string`, `validate_optional_outpoint_string` |
+| Descriptions | `validate_description_5_2000`, `validate_description_5_50` |
+| Actions | `validate_create_action_args`, `validate_create_action_input`, `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend` |
 | Certificates | `validate_certificate_fields`, `validate_keyring_revealer` |
 | Protocol | `validate_protocol_tuple`, `validate_query_mode` |
 
@@ -158,16 +159,37 @@ The `validation` module provides 40+ validation functions:
 
 **Counterparty** - Key derivation target: `Self_`, `Anyone` (publicly derivable), or `Other(PublicKey)`.
 
+**Network** - Bitcoin network: `Mainnet` or `Testnet`.
+
+**ActionStatus** - Transaction status: `Completed`, `Unprocessed`, `Sending`, `Unproven`, `Unsigned`, `NoSend`, `NonFinal`, `Failed`.
+
+**QueryMode** - Filter mode for lists: `Any` or `All`.
+
+**OutputInclude** - What to include in output listings: `LockingScripts` or `EntireTransactions`.
+
 ### Key Derivation
 
 **KeyDeriver** - BRC-42 key derivation from root private key:
+- `new(root_key: Option<PrivateKey>)` - Creates deriver; None uses "anyone" key
+- `anyone_key() -> (PrivateKey, PublicKey)` - Returns the special "anyone" key pair (scalar value 1)
+- `root_key() -> &PrivateKey` - Returns the root private key
+- `identity_key() -> PublicKey` - Returns the identity public key
 - `derive_public_key()`, `derive_private_key()`, `derive_symmetric_key()`
 - `reveal_specific_secret()`, `reveal_counterparty_secret()` for linkage revelation
-- `anyone_key()` returns the special "anyone" key pair (scalar value 1)
 
-**CachedKeyDeriver** - Thread-safe LRU-cached wrapper (default 1000 entries).
+**CachedKeyDeriver** - Thread-safe LRU-cached wrapper (default 1000 entries):
+- `new(root_key: Option<PrivateKey>, config: Option<CacheConfig>)`
+- `inner() -> &KeyDeriver` - Access underlying deriver
+- `root_key() -> &PrivateKey` - Returns the root private key
+- Implements same `KeyDeriverApi` trait as `KeyDeriver`
 
-**KeyDeriverApi** - Trait implemented by both `KeyDeriver` and `CachedKeyDeriver`.
+**KeyDeriverApi** - Trait implemented by both `KeyDeriver` and `CachedKeyDeriver`:
+- `identity_key()`, `identity_key_hex()`
+- `derive_public_key()`, `derive_private_key()`, `derive_symmetric_key()`
+- `reveal_specific_secret()`, `reveal_counterparty_secret()`
+
+**CacheConfig** - Configuration for CachedKeyDeriver:
+- `max_size: usize` - Maximum entries per cache (default 1000)
 
 ## Usage Examples
 
@@ -218,6 +240,24 @@ let decrypted = bob.decrypt(DecryptArgs {
 ```rust
 let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.com".into()));
 let version = client.get_version().await?;
+```
+
+### Key Derivation
+
+```rust
+use bsv_sdk::wallet::{KeyDeriver, CachedKeyDeriver, Protocol, SecurityLevel, Counterparty, KeyDeriverApi};
+use bsv_sdk::primitives::PrivateKey;
+
+// Direct key derivation
+let deriver = KeyDeriver::new(Some(PrivateKey::random()));
+let protocol = Protocol::new(SecurityLevel::App, "my application");
+
+let pub_key = deriver.derive_public_key(&protocol, "key-1", &Counterparty::Self_, true).unwrap();
+let priv_key = deriver.derive_private_key(&protocol, "key-1", &Counterparty::Self_).unwrap();
+
+// With caching
+let cached = CachedKeyDeriver::new(Some(PrivateKey::random()), None);
+let pub_key = cached.derive_public_key(&protocol, "key-1", &Counterparty::Self_, true).unwrap();
 ```
 
 ## BRC-42 Key Derivation Algorithm
