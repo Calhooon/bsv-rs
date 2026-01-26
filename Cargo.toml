@@ -55,3 +55,7 @@ wasm = ["getrandom/js"]
 [[bench]]
 name = "hash_bench"
 harness = false
+
+[[bench]]
+name = "primitives_bench"
+harness = false
