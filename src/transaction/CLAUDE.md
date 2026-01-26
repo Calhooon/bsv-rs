@@ -11,8 +11,8 @@ This module provides complete Bitcoin transaction functionality:
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs
-- Async Broadcaster trait with ARC implementation
-- Async ChainTracker trait with WhatsOnChain implementation
+- Async Broadcaster trait with ARC and WhatsOnChain implementations
+- Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
 
 Compatible with the TypeScript and Go SDKs through shared binary formats.
 
@@ -28,11 +28,11 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef.rs` | `Beef` (BRC-62/95/96) |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
-| `fee_models/` | `SatoshisPerKilobyte` implementation |
+| `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy` |
 | `broadcaster.rs` | `Broadcaster` trait, response/failure types |
-| `broadcasters/` | `ArcBroadcaster`, `ArcConfig` |
+| `broadcasters/` | `ArcBroadcaster`, `WhatsOnChainBroadcaster` |
 | `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker`, `AlwaysValidChainTracker` |
-| `chain_trackers/` | `WhatsOnChainTracker`, `WocNetwork` |
+| `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker` |
 
 ## Core Types
 
@@ -156,6 +156,30 @@ impl SatoshisPerKilobyte {
     pub fn new(value: u64) -> Self      // value = satoshis per KB
     pub fn default() -> Self            // 100 sat/KB (standard BSV rate)
 }
+
+// Live policy - fetches fee rate from ARC policy endpoint
+pub struct LivePolicy { /* ... */ }
+impl LivePolicy {
+    pub fn new() -> Self                // Uses DEFAULT_POLICY_URL
+    pub fn with_url(url: &str) -> Self
+    pub fn with_config(config: LivePolicyConfig) -> Self
+    pub async fn refresh(&self) -> Result<u64>  // Fetch live rate
+    pub fn cached_rate(&self) -> Option<u64>
+    pub fn effective_rate(&self) -> u64  // Cached or fallback (100 sat/KB)
+    pub fn set_rate(&self, rate: u64)    // Manual override
+}
+
+pub struct LivePolicyConfig {
+    pub policy_url: String,
+    pub api_key: Option<String>,
+    pub cache_ttl: Duration,        // Default: 5 minutes
+    pub fallback_rate: u64,         // Default: 100 sat/KB
+    pub timeout_ms: u64,
+}
+
+pub const DEFAULT_POLICY_URL: &str = "https://arc.gorillapool.io/v1/policy";
+pub const DEFAULT_CACHE_TTL_SECS: u64 = 300;
+pub const DEFAULT_FALLBACK_RATE: u64 = 100;
 ```
 
 ## Broadcasting

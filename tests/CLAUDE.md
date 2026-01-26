@@ -44,6 +44,7 @@ Transaction test vectors are in `tests/transaction/vectors/`:
 | `bump_valid.rs` | Valid BRC-74 BUMP (MerklePath) hex vectors |
 | `bump_invalid.rs` | Invalid BUMP vectors with expected error messages |
 | `bigtx.rs` | Large transaction test vectors |
+| `beef_cross_sdk.rs` | BEEF (BRC-62) and MerklePath vectors from TypeScript/Go SDKs |
 | `CLAUDE.md` | Transaction vectors documentation |
 
 ## Test Categories
@@ -288,6 +289,27 @@ Transaction module tests (requires `transaction` feature flag):
 - `test_beef_merge_raw_tx` - Merge raw transaction bytes
 - `test_beef_bump_at_different_heights` - Bumps at various block heights
 - `test_beef_validation_result` - Validation result structure
+
+**Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule)
+- `test_brc74_merkle_path_from_hex` - Parse BRC-74 MerklePath from TypeScript/Go SDKs
+- `test_brc74_merkle_path_hex_roundtrip` - BRC-74 hex roundtrip
+- `test_brc74_compute_root_txid1/2/3` - Compute merkle root for multiple TXIDs
+- `test_single_tx_block_merkle_path` - Single-tx block where root equals txid
+- `test_empty_beef_v1/v2` - Empty BEEF serialization for both versions
+- `test_brc62_beef_from_hex` - Parse BRC-62 BEEF from Go SDK
+- `test_brc62_beef_find_transaction` - Find transaction in BEEF
+- `test_beef_set_from_hex` - Parse BEEF with multiple transactions
+- `test_beef_set_find_transaction` - Find specific transaction in BEEF set
+- `test_beef_set_roundtrip` - BEEF set binary roundtrip
+
+**MerklePath Advanced Tests** (in `merkle_path_advanced_tests` submodule)
+- `test_merkle_path_verify_with_chain_tracker` - Verify MerklePath using ChainTracker
+- `test_merkle_path_verify_wrong_root_fails` - Verification fails with wrong root
+- `test_merkle_path_verify_wrong_height_fails` - Verification fails with wrong height
+- `test_merkle_path_contains` - Check if txid is in MerklePath
+- `test_merkle_path_txids` - Get all txids from MerklePath
+- `test_merkle_path_compute_root_without_txid` - Compute root using first found txid
+- `test_merkle_path_binary_roundtrip` - Binary serialization roundtrip
 
 ## Running Tests
 

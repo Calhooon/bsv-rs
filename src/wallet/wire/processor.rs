@@ -2,22 +2,49 @@
 //!
 //! The [`WalletWireProcessor`] deserializes incoming binary messages, dispatches
 //! them to the appropriate wallet methods, and serializes the responses.
+//!
+//! # Generic Over WalletInterface
+//!
+//! The processor is generic over any type implementing [`WalletInterface`],
+//! allowing it to work with different wallet implementations:
+//! - `ProtoWallet`: Crypto-only operations
+//! - Custom full wallet: All 28 methods
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use bsv_sdk::wallet::wire::WalletWireProcessor;
+//! use bsv_sdk::wallet::ProtoWallet;
+//!
+//! let wallet = ProtoWallet::new(None);
+//! let processor = WalletWireProcessor::new(wallet);
+//!
+//! // Process incoming message
+//! let response = processor.process_message(&request_bytes).await?;
+//! ```
 
 use super::encoding::{WireReader, WireWriter};
 use super::WalletCall;
 use crate::primitives::{from_hex, PublicKey};
+use crate::wallet::interface::{
+    RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs, WalletInterface,
+};
 use crate::wallet::types::Network;
 use crate::wallet::{
-    CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs, ProtoWallet,
-    RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs, VerifyHmacArgs,
-    VerifySignatureArgs,
+    CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
+    VerifyHmacArgs, VerifySignatureArgs,
 };
 use crate::Error;
+use std::marker::PhantomData;
 
 /// Server-side processor for WalletWire messages.
 ///
 /// This processor handles incoming binary messages from clients, deserializes the
 /// parameters, invokes the appropriate wallet method, and serializes the response.
+///
+/// The processor is generic over `W: WalletInterface`, allowing it to work with
+/// any wallet implementation. When using `ProtoWallet`, only crypto operations
+/// are supported. A full wallet implementation would support all 28 methods.
 ///
 /// # Example
 ///
@@ -31,29 +58,47 @@ use crate::Error;
 /// // Process incoming message
 /// let response = processor.process_message(&request_bytes).await?;
 /// ```
-pub struct WalletWireProcessor {
-    wallet: ProtoWallet,
+pub struct WalletWireProcessor<W: WalletInterface> {
+    wallet: W,
     network: Network,
     version: String,
+    _marker: PhantomData<W>,
 }
 
-impl WalletWireProcessor {
+impl<W: WalletInterface> WalletWireProcessor<W> {
     /// Creates a new processor with the given wallet.
-    pub fn new(wallet: ProtoWallet) -> Self {
+    pub fn new(wallet: W) -> Self {
         Self {
             wallet,
             network: Network::Mainnet,
             version: "0.1.0".to_string(),
+            _marker: PhantomData,
         }
     }
 
     /// Creates a new processor with custom network and version.
-    pub fn with_config(wallet: ProtoWallet, network: Network, version: impl Into<String>) -> Self {
+    pub fn with_config(wallet: W, network: Network, version: impl Into<String>) -> Self {
         Self {
             wallet,
             network,
             version: version.into(),
+            _marker: PhantomData,
         }
+    }
+
+    /// Returns a reference to the underlying wallet.
+    pub fn wallet(&self) -> &W {
+        &self.wallet
+    }
+
+    /// Returns the configured network.
+    pub fn network(&self) -> Network {
+        self.network
+    }
+
+    /// Returns the configured version string.
+    pub fn version(&self) -> &str {
+        &self.version
     }
 
     /// Processes an incoming binary message and returns the response.
@@ -83,75 +128,89 @@ impl WalletWireProcessor {
         // Read originator
         let originator_len = reader.read_u8()? as usize;
         let originator_bytes = reader.read_bytes(originator_len)?;
-        let _originator = String::from_utf8(originator_bytes.to_vec())
+        let originator = String::from_utf8(originator_bytes.to_vec())
             .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?;
 
         // Dispatch based on call type
         match call {
-            WalletCall::GetPublicKey => self.handle_get_public_key(&mut reader).await,
-            WalletCall::Encrypt => self.handle_encrypt(&mut reader).await,
-            WalletCall::Decrypt => self.handle_decrypt(&mut reader).await,
-            WalletCall::CreateHmac => self.handle_create_hmac(&mut reader).await,
-            WalletCall::VerifyHmac => self.handle_verify_hmac(&mut reader).await,
-            WalletCall::CreateSignature => self.handle_create_signature(&mut reader).await,
-            WalletCall::VerifySignature => self.handle_verify_signature(&mut reader).await,
+            // Key Operations
+            WalletCall::GetPublicKey => self.handle_get_public_key(&mut reader, &originator).await,
+            WalletCall::Encrypt => self.handle_encrypt(&mut reader, &originator).await,
+            WalletCall::Decrypt => self.handle_decrypt(&mut reader, &originator).await,
+            WalletCall::CreateHmac => self.handle_create_hmac(&mut reader, &originator).await,
+            WalletCall::VerifyHmac => self.handle_verify_hmac(&mut reader, &originator).await,
+            WalletCall::CreateSignature => {
+                self.handle_create_signature(&mut reader, &originator).await
+            }
+            WalletCall::VerifySignature => {
+                self.handle_verify_signature(&mut reader, &originator).await
+            }
             WalletCall::RevealCounterpartyKeyLinkage => {
-                self.handle_reveal_counterparty_key_linkage(&mut reader)
+                self.handle_reveal_counterparty_key_linkage(&mut reader, &originator)
                     .await
             }
             WalletCall::RevealSpecificKeyLinkage => {
-                self.handle_reveal_specific_key_linkage(&mut reader).await
+                self.handle_reveal_specific_key_linkage(&mut reader, &originator)
+                    .await
             }
-            WalletCall::IsAuthenticated => self.handle_is_authenticated().await,
-            WalletCall::GetHeight => self.handle_get_height().await,
-            WalletCall::GetNetwork => self.handle_get_network().await,
-            WalletCall::GetVersion => self.handle_get_version().await,
-            // Transaction-related calls require full wallet implementation
-            WalletCall::CreateAction => Err(Error::WalletError(
-                "createAction not yet implemented".to_string(),
-            )),
-            WalletCall::SignAction => Err(Error::WalletError(
-                "signAction not yet implemented".to_string(),
-            )),
-            WalletCall::AbortAction => Err(Error::WalletError(
-                "abortAction not yet implemented".to_string(),
-            )),
-            WalletCall::ListActions => Err(Error::WalletError(
-                "listActions not yet implemented".to_string(),
-            )),
-            WalletCall::InternalizeAction => Err(Error::WalletError(
-                "internalizeAction not yet implemented".to_string(),
-            )),
-            WalletCall::ListOutputs => Err(Error::WalletError(
-                "listOutputs not yet implemented".to_string(),
-            )),
-            WalletCall::RelinquishOutput => Err(Error::WalletError(
-                "relinquishOutput not yet implemented".to_string(),
-            )),
-            WalletCall::AcquireCertificate => Err(Error::WalletError(
-                "acquireCertificate not yet implemented".to_string(),
-            )),
-            WalletCall::ListCertificates => Err(Error::WalletError(
-                "listCertificates not yet implemented".to_string(),
-            )),
-            WalletCall::ProveCertificate => Err(Error::WalletError(
-                "proveCertificate not yet implemented".to_string(),
-            )),
-            WalletCall::RelinquishCertificate => Err(Error::WalletError(
-                "relinquishCertificate not yet implemented".to_string(),
-            )),
-            WalletCall::DiscoverByIdentityKey => Err(Error::WalletError(
-                "discoverByIdentityKey not yet implemented".to_string(),
-            )),
-            WalletCall::DiscoverByAttributes => Err(Error::WalletError(
-                "discoverByAttributes not yet implemented".to_string(),
-            )),
-            WalletCall::WaitForAuthentication => Err(Error::WalletError(
-                "waitForAuthentication not yet implemented".to_string(),
-            )),
-            WalletCall::GetHeaderForHeight => Err(Error::WalletError(
-                "getHeaderForHeight not yet implemented".to_string(),
-            )),
+
+            // Chain/Status Operations
+            WalletCall::IsAuthenticated => self.handle_is_authenticated(&originator).await,
+            WalletCall::GetHeight => self.handle_get_height(&originator).await,
+            WalletCall::GetNetwork => self.handle_get_network(&originator).await,
+            WalletCall::GetVersion => self.handle_get_version(&originator).await,
+            WalletCall::WaitForAuthentication => {
+                self.handle_wait_for_authentication(&originator).await
+            }
+            WalletCall::GetHeaderForHeight => {
+                self.handle_get_header_for_height(&mut reader, &originator)
+                    .await
+            }
+
+            // Action Operations - delegated to wallet
+            WalletCall::CreateAction => self.handle_create_action(&mut reader, &originator).await,
+            WalletCall::SignAction => self.handle_sign_action(&mut reader, &originator).await,
+            WalletCall::AbortAction => self.handle_abort_action(&mut reader, &originator).await,
+            WalletCall::ListActions => self.handle_list_actions(&mut reader, &originator).await,
+            WalletCall::InternalizeAction => {
+                self.handle_internalize_action(&mut reader, &originator)
+                    .await
+            }
+
+            // Output Operations - delegated to wallet
+            WalletCall::ListOutputs => self.handle_list_outputs(&mut reader, &originator).await,
+            WalletCall::RelinquishOutput => {
+                self.handle_relinquish_output(&mut reader, &originator)
+                    .await
+            }
+
+            // Certificate Operations - delegated to wallet
+            WalletCall::AcquireCertificate => {
+                self.handle_acquire_certificate(&mut reader, &originator)
+                    .await
+            }
+            WalletCall::ListCertificates => {
+                self.handle_list_certificates(&mut reader, &originator)
+                    .await
+            }
+            WalletCall::ProveCertificate => {
+                self.handle_prove_certificate(&mut reader, &originator)
+                    .await
+            }
+            WalletCall::RelinquishCertificate => {
+                self.handle_relinquish_certificate(&mut reader, &originator)
+                    .await
+            }
+
+            // Discovery Operations - delegated to wallet
+            WalletCall::DiscoverByIdentityKey => {
+                self.handle_discover_by_identity_key(&mut reader, &originator)
+                    .await
+            }
+            WalletCall::DiscoverByAttributes => {
+                self.handle_discover_by_attributes(&mut reader, &originator)
+                    .await
+            }
         }
     }
 
@@ -192,10 +251,14 @@ impl WalletWireProcessor {
     }
 
     // =========================================================================
-    // Handler implementations
+    // Key Operation Handlers
     // =========================================================================
 
-    async fn handle_get_public_key(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_get_public_key(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments (matching transceiver serialization order)
         let identity_key = reader.read_optional_bool()?.unwrap_or(false);
         let protocol_id = reader.read_optional_protocol_id()?;
@@ -211,7 +274,7 @@ impl WalletWireProcessor {
             counterparty,
             for_self,
         };
-        let result = self.wallet.get_public_key(args)?;
+        let result = self.wallet.get_public_key(args, originator).await?;
 
         // Serialize response - result.public_key is a hex string
         let mut writer = WireWriter::new();
@@ -220,7 +283,11 @@ impl WalletWireProcessor {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_encrypt(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_encrypt(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let protocol_id = reader.read_protocol_id()?;
         let key_id = reader.read_string()?;
@@ -235,7 +302,7 @@ impl WalletWireProcessor {
             key_id,
             counterparty,
         };
-        let result = self.wallet.encrypt(args)?;
+        let result = self.wallet.encrypt(args, originator).await?;
 
         // Serialize response
         let mut writer = WireWriter::new();
@@ -244,7 +311,11 @@ impl WalletWireProcessor {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_decrypt(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_decrypt(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let protocol_id = reader.read_protocol_id()?;
         let key_id = reader.read_string()?;
@@ -259,7 +330,7 @@ impl WalletWireProcessor {
             key_id,
             counterparty,
         };
-        let result = self.wallet.decrypt(args)?;
+        let result = self.wallet.decrypt(args, originator).await?;
 
         // Serialize response
         let mut writer = WireWriter::new();
@@ -268,7 +339,11 @@ impl WalletWireProcessor {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_create_hmac(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_create_hmac(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let protocol_id = reader.read_protocol_id()?;
         let key_id = reader.read_string()?;
@@ -283,7 +358,7 @@ impl WalletWireProcessor {
             key_id,
             counterparty,
         };
-        let result = self.wallet.create_hmac(args)?;
+        let result = self.wallet.create_hmac(args, originator).await?;
 
         // Serialize response - hmac is [u8; 32]
         let mut writer = WireWriter::new();
@@ -292,7 +367,11 @@ impl WalletWireProcessor {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_verify_hmac(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_verify_hmac(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let protocol_id = reader.read_protocol_id()?;
         let key_id = reader.read_string()?;
@@ -320,7 +399,7 @@ impl WalletWireProcessor {
             key_id,
             counterparty,
         };
-        let result = self.wallet.verify_hmac(args)?;
+        let result = self.wallet.verify_hmac(args, originator).await?;
 
         // Serialize response
         let mut writer = WireWriter::new();
@@ -328,7 +407,11 @@ impl WalletWireProcessor {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_create_signature(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_create_signature(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let protocol_id = reader.read_protocol_id()?;
         let key_id = reader.read_string()?;
@@ -354,7 +437,7 @@ impl WalletWireProcessor {
             key_id,
             counterparty,
         };
-        let result = self.wallet.create_signature(args)?;
+        let result = self.wallet.create_signature(args, originator).await?;
 
         // Serialize response - signature is Vec<u8> (DER encoded)
         let mut writer = WireWriter::new();
@@ -363,7 +446,11 @@ impl WalletWireProcessor {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_verify_signature(&self, reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    async fn handle_verify_signature(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let protocol_id = reader.read_protocol_id()?;
         let key_id = reader.read_string()?;
@@ -396,7 +483,7 @@ impl WalletWireProcessor {
             counterparty,
             for_self,
         };
-        let result = self.wallet.verify_signature(args)?;
+        let result = self.wallet.verify_signature(args, originator).await?;
 
         // Serialize response
         let mut writer = WireWriter::new();
@@ -407,6 +494,7 @@ impl WalletWireProcessor {
     async fn handle_reveal_counterparty_key_linkage(
         &self,
         reader: &mut WireReader<'_>,
+        originator: &str,
     ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let counterparty_bytes = reader.read_bytes(33)?;
@@ -418,24 +506,25 @@ impl WalletWireProcessor {
         let args = RevealCounterpartyKeyLinkageArgs {
             counterparty,
             verifier,
+            privileged: None,
+            privileged_reason: None,
         };
-        let result = self.wallet.reveal_counterparty_key_linkage(args)?;
+        let result = self
+            .wallet
+            .reveal_counterparty_key_linkage(args, originator)
+            .await?;
 
-        // Serialize response - prover, verifier, counterparty are hex strings
+        // Serialize response
         let mut writer = WireWriter::new();
-        writer.write_var_int(result.encrypted_linkage.len() as u64);
-        writer.write_bytes(&result.encrypted_linkage);
-        writer.write_var_int(result.encrypted_linkage_proof.len() as u64);
-        writer.write_bytes(&result.encrypted_linkage_proof);
+        writer.write_var_int(result.linkage.encrypted_linkage.len() as u64);
+        writer.write_bytes(&result.linkage.encrypted_linkage);
+        writer.write_var_int(result.linkage.encrypted_linkage_proof.len() as u64);
+        writer.write_bytes(&result.linkage.encrypted_linkage_proof);
 
-        // Convert hex strings to bytes for public keys
-        let prover_bytes = from_hex(&result.prover)?;
-        let verifier_bytes = from_hex(&result.verifier)?;
-        let counterparty_bytes = from_hex(&result.counterparty)?;
-
-        writer.write_bytes(&prover_bytes);
-        writer.write_bytes(&verifier_bytes);
-        writer.write_bytes(&counterparty_bytes);
+        // Public keys are PublicKey types, convert to compressed bytes
+        writer.write_bytes(&result.linkage.prover.to_compressed());
+        writer.write_bytes(&result.linkage.verifier.to_compressed());
+        writer.write_bytes(&result.linkage.counterparty.to_compressed());
         writer.write_string(&result.revelation_time);
         Ok(writer.into_bytes())
     }
@@ -443,6 +532,7 @@ impl WalletWireProcessor {
     async fn handle_reveal_specific_key_linkage(
         &self,
         reader: &mut WireReader<'_>,
+        originator: &str,
     ) -> Result<Vec<u8>, Error> {
         // Read arguments
         let counterparty = reader
@@ -459,55 +549,235 @@ impl WalletWireProcessor {
             verifier,
             protocol_id,
             key_id,
+            privileged: None,
+            privileged_reason: None,
         };
-        let result = self.wallet.reveal_specific_key_linkage(args)?;
+        let result = self
+            .wallet
+            .reveal_specific_key_linkage(args, originator)
+            .await?;
 
         // Serialize response
         let mut writer = WireWriter::new();
-        writer.write_var_int(result.encrypted_linkage.len() as u64);
-        writer.write_bytes(&result.encrypted_linkage);
-        writer.write_var_int(result.encrypted_linkage_proof.len() as u64);
-        writer.write_bytes(&result.encrypted_linkage_proof);
+        writer.write_var_int(result.linkage.encrypted_linkage.len() as u64);
+        writer.write_bytes(&result.linkage.encrypted_linkage);
+        writer.write_var_int(result.linkage.encrypted_linkage_proof.len() as u64);
+        writer.write_bytes(&result.linkage.encrypted_linkage_proof);
 
-        // Convert hex strings to bytes for public keys
-        let prover_bytes = from_hex(&result.prover)?;
-        let verifier_bytes = from_hex(&result.verifier)?;
-        let counterparty_bytes = from_hex(&result.counterparty)
-            .unwrap_or_else(|_| result.counterparty.as_bytes().to_vec());
-
-        writer.write_bytes(&prover_bytes);
-        writer.write_bytes(&verifier_bytes);
-        writer.write_bytes(&counterparty_bytes);
-        writer.write_protocol_id(&result.protocol_id);
+        // Public keys are PublicKey types, convert to compressed bytes
+        writer.write_bytes(&result.linkage.prover.to_compressed());
+        writer.write_bytes(&result.linkage.verifier.to_compressed());
+        writer.write_bytes(&result.linkage.counterparty.to_compressed());
+        writer.write_protocol_id(&result.protocol);
         writer.write_string(&result.key_id);
         writer.write_u8(result.proof_type);
         Ok(writer.into_bytes())
     }
 
-    async fn handle_is_authenticated(&self) -> Result<Vec<u8>, Error> {
-        // ProtoWallet is always authenticated
+    // =========================================================================
+    // Chain/Status Operation Handlers
+    // =========================================================================
+
+    async fn handle_is_authenticated(&self, originator: &str) -> Result<Vec<u8>, Error> {
+        let result = self.wallet.is_authenticated(originator).await?;
         let mut writer = WireWriter::new();
-        writer.write_optional_bool(Some(true));
+        writer.write_optional_bool(Some(result.authenticated));
         Ok(writer.into_bytes())
     }
 
-    async fn handle_get_height(&self) -> Result<Vec<u8>, Error> {
-        // Return a placeholder height (ProtoWallet doesn't track chain state)
+    async fn handle_wait_for_authentication(&self, originator: &str) -> Result<Vec<u8>, Error> {
+        let result = self.wallet.wait_for_authentication(originator).await?;
         let mut writer = WireWriter::new();
-        writer.write_var_int(0);
+        writer.write_optional_bool(Some(result.authenticated));
         Ok(writer.into_bytes())
     }
 
-    async fn handle_get_network(&self) -> Result<Vec<u8>, Error> {
+    async fn handle_get_height(&self, originator: &str) -> Result<Vec<u8>, Error> {
+        let result = self.wallet.get_height(originator).await?;
+        let mut writer = WireWriter::new();
+        writer.write_var_int(result.height as u64);
+        Ok(writer.into_bytes())
+    }
+
+    async fn handle_get_header_for_height(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        // Read height argument
+        let height = reader.read_var_int()? as u32;
+
+        let args = crate::wallet::GetHeaderArgs { height };
+        let result = self.wallet.get_header_for_height(args, originator).await?;
+
+        let mut writer = WireWriter::new();
+        let header_bytes = from_hex(&result.header)?;
+        writer.write_var_int(header_bytes.len() as u64);
+        writer.write_bytes(&header_bytes);
+        Ok(writer.into_bytes())
+    }
+
+    async fn handle_get_network(&self, _originator: &str) -> Result<Vec<u8>, Error> {
+        // Use processor's configured network instead of delegating to wallet
         let mut writer = WireWriter::new();
         writer.write_string(self.network.as_str());
         Ok(writer.into_bytes())
     }
 
-    async fn handle_get_version(&self) -> Result<Vec<u8>, Error> {
+    async fn handle_get_version(&self, _originator: &str) -> Result<Vec<u8>, Error> {
+        // Use processor's configured version instead of delegating to wallet
         let mut writer = WireWriter::new();
         writer.write_string(&self.version);
         Ok(writer.into_bytes())
+    }
+
+    // =========================================================================
+    // Action Operation Handlers
+    // NOTE: These require a full wallet implementation. When args parsing
+    // is implemented in encoding.rs, these can be updated to call the wallet.
+    // For now, they return early errors since ProtoWallet doesn't support them.
+    // =========================================================================
+
+    async fn handle_create_action(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "createAction requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_sign_action(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "signAction requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_abort_action(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "abortAction requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_list_actions(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "listActions requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_internalize_action(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "internalizeAction requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Output Operation Handlers
+    // =========================================================================
+
+    async fn handle_list_outputs(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "listOutputs requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_relinquish_output(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "relinquishOutput requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Certificate Operation Handlers
+    // =========================================================================
+
+    async fn handle_acquire_certificate(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "acquireCertificate requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_list_certificates(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "listCertificates requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_prove_certificate(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "proveCertificate requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_relinquish_certificate(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "relinquishCertificate requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Discovery Operation Handlers
+    // =========================================================================
+
+    async fn handle_discover_by_identity_key(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "discoverByIdentityKey requires a full wallet implementation".to_string(),
+        ))
+    }
+
+    async fn handle_discover_by_attributes(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: &str,
+    ) -> Result<Vec<u8>, Error> {
+        Err(Error::WalletError(
+            "discoverByAttributes requires a full wallet implementation".to_string(),
+        ))
     }
 }
 
@@ -515,9 +785,9 @@ impl WalletWireProcessor {
 mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
-    use crate::wallet::SecurityLevel;
+    use crate::wallet::{ProtoWallet, SecurityLevel};
 
-    fn create_test_processor() -> WalletWireProcessor {
+    fn create_test_processor() -> WalletWireProcessor<ProtoWallet> {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
         WalletWireProcessor::new(wallet)
     }
@@ -643,5 +913,31 @@ mod tests {
 
         let authenticated = reader.read_optional_bool().unwrap();
         assert_eq!(authenticated, Some(true));
+    }
+
+    #[tokio::test]
+    async fn test_process_create_action_not_supported() {
+        let processor = create_test_processor();
+
+        let mut writer = WireWriter::new();
+        writer.write_u8(WalletCall::CreateAction.as_u8());
+        writer.write_u8(0);
+        // Write minimal args (will fail at wallet level)
+        writer.write_string("test description"); // description
+        writer.write_signed_var_int(-1); // no inputBEEF
+        writer.write_signed_var_int(-1); // no inputs
+        writer.write_signed_var_int(-1); // no outputs
+        writer.write_signed_var_int(-1); // no lockTime
+        writer.write_signed_var_int(-1); // no version
+        writer.write_signed_var_int(-1); // no labels
+        writer.write_i8(-1); // no options
+        let request = writer.into_bytes();
+
+        let response = processor.process_message(&request).await.unwrap();
+
+        let mut reader = WireReader::new(&response);
+        let error_byte = reader.read_u8().unwrap();
+        // Should return error because ProtoWallet doesn't support createAction
+        assert_ne!(error_byte, 0, "expected error from ProtoWallet");
     }
 }

@@ -778,4 +778,250 @@ mod transaction_tests {
             let _ = result.roots; // Ensure roots map is accessible
         }
     }
+
+    // ===================
+    // Cross-SDK Compatibility Tests
+    // ===================
+
+    mod cross_sdk_tests {
+        #[allow(unused_imports)]
+        use crate::transaction::vectors::beef_cross_sdk::*;
+        use bsv_sdk::transaction::{Beef, MerklePath, BEEF_V1, BEEF_V2};
+
+        #[test]
+        fn test_brc74_merkle_path_from_hex() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse BRC74 MerklePath");
+            assert_eq!(mp.block_height, BRC74_BLOCK_HEIGHT);
+            assert!(!mp.path.is_empty());
+        }
+
+        #[test]
+        fn test_brc74_merkle_path_hex_roundtrip() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+            let result = mp.to_hex();
+            assert_eq!(
+                result.to_lowercase(),
+                BRC74_HEX.to_lowercase(),
+                "BRC74 hex roundtrip should match"
+            );
+        }
+
+        #[test]
+        fn test_brc74_compute_root_txid1() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+            let root = mp
+                .compute_root(Some(BRC74_TXID1))
+                .expect("Should compute root for TXID1");
+            assert_eq!(root.to_lowercase(), BRC74_ROOT.to_lowercase());
+        }
+
+        #[test]
+        fn test_brc74_compute_root_txid2() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+            let root = mp
+                .compute_root(Some(BRC74_TXID2))
+                .expect("Should compute root for TXID2");
+            assert_eq!(root.to_lowercase(), BRC74_ROOT.to_lowercase());
+        }
+
+        #[test]
+        fn test_brc74_compute_root_txid3() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+            let root = mp
+                .compute_root(Some(BRC74_TXID3))
+                .expect("Should compute root for TXID3");
+            assert_eq!(root.to_lowercase(), BRC74_ROOT.to_lowercase());
+        }
+
+        #[test]
+        fn test_single_tx_block_merkle_path() {
+            let mp = MerklePath::from_hex(SINGLE_TX_BUMP_HEX).expect("Should parse single-tx BUMP");
+            let root = mp
+                .compute_root(Some(SINGLE_TX_COINBASE_TXID))
+                .expect("Should compute root");
+            // For single-tx block, root equals txid
+            assert_eq!(root.to_lowercase(), SINGLE_TX_COINBASE_TXID.to_lowercase());
+        }
+
+        #[test]
+        fn test_empty_beef_v1() {
+            let mut beef = Beef::with_version(BEEF_V1);
+            let hex = beef.to_hex();
+            assert_eq!(hex.to_lowercase(), EMPTY_BEEF_V1_HEX.to_lowercase());
+        }
+
+        #[test]
+        fn test_empty_beef_v2() {
+            let mut beef = Beef::with_version(BEEF_V2);
+            let hex = beef.to_hex();
+            assert_eq!(hex.to_lowercase(), EMPTY_BEEF_V2_HEX.to_lowercase());
+        }
+
+        #[test]
+        fn test_brc62_beef_from_hex() {
+            let beef = Beef::from_hex(BRC62_HEX).expect("Should parse BRC62 BEEF");
+            assert_eq!(beef.version, BEEF_V1);
+            assert!(!beef.txs.is_empty());
+        }
+
+        #[test]
+        fn test_brc62_beef_find_transaction() {
+            let beef = Beef::from_hex(BRC62_HEX).expect("Should parse");
+            let tx = beef.find_txid(BRC62_EXPECTED_TXID);
+            assert!(
+                tx.is_some(),
+                "Should find transaction {}",
+                BRC62_EXPECTED_TXID
+            );
+        }
+
+        #[test]
+        fn test_beef_set_from_hex() {
+            let beef = Beef::from_hex(BEEF_SET_HEX).expect("Should parse BEEF set");
+            assert_eq!(beef.version, BEEF_V2);
+            assert!(beef.txs.len() >= 3, "Should have at least 3 transactions");
+            assert!(!beef.bumps.is_empty(), "Should have BUMPs");
+        }
+
+        #[test]
+        fn test_beef_set_find_transaction() {
+            let beef = Beef::from_hex(BEEF_SET_HEX).expect("Should parse");
+            let tx = beef.find_txid(BEEF_SET_FIND_TXID);
+            assert!(
+                tx.is_some(),
+                "Should find transaction {}",
+                BEEF_SET_FIND_TXID
+            );
+        }
+
+        #[test]
+        fn test_beef_set_roundtrip() {
+            let mut beef = Beef::from_hex(BEEF_SET_HEX).expect("Should parse");
+            let binary = beef.to_binary();
+            let parsed = Beef::from_binary(&binary).expect("Should parse binary");
+            assert_eq!(beef.version, parsed.version);
+            assert_eq!(beef.txs.len(), parsed.txs.len());
+            assert_eq!(beef.bumps.len(), parsed.bumps.len());
+        }
+    }
+
+    // ===================
+    // MerklePath Advanced Tests
+    // ===================
+
+    mod merkle_path_advanced_tests {
+        use crate::transaction::vectors::beef_cross_sdk::*;
+        use bsv_sdk::transaction::{ChainTracker, MerklePath, MockChainTracker};
+
+        /// Tests MerklePath verification using ChainTracker.
+        /// This manually computes the root and compares with tracker.
+        #[tokio::test]
+        async fn test_merkle_path_verify_with_chain_tracker() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+
+            // Create a mock chain tracker with the correct root
+            let mut tracker = MockChainTracker::new(900000);
+            tracker.add_root(BRC74_BLOCK_HEIGHT, BRC74_ROOT.to_string());
+
+            // Compute the root and verify against tracker
+            let computed_root = mp
+                .compute_root(Some(BRC74_TXID1))
+                .expect("Should compute root");
+
+            // Verify the computed root matches what we expect
+            let is_valid = tracker
+                .is_valid_root_for_height(&computed_root, mp.block_height)
+                .await
+                .expect("Should check root");
+
+            assert!(
+                is_valid,
+                "Computed root should be valid according to tracker"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_merkle_path_verify_wrong_root_fails() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+
+            // Create a mock chain tracker with WRONG root
+            let mut tracker = MockChainTracker::new(900000);
+            tracker.add_root(BRC74_BLOCK_HEIGHT, "a".repeat(64));
+
+            // Compute the root and verify against tracker with wrong root
+            let computed_root = mp
+                .compute_root(Some(BRC74_TXID1))
+                .expect("Should compute root");
+
+            // Verification should fail - computed root doesn't match wrong tracker root
+            let is_valid = tracker
+                .is_valid_root_for_height(&computed_root, mp.block_height)
+                .await
+                .expect("Should check root");
+
+            assert!(
+                !is_valid,
+                "Computed root should NOT be valid when tracker has wrong root"
+            );
+        }
+
+        #[tokio::test]
+        async fn test_merkle_path_verify_wrong_height_fails() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+
+            // Create a mock chain tracker with root at wrong height
+            let mut tracker = MockChainTracker::new(900000);
+            tracker.add_root(BRC74_BLOCK_HEIGHT + 1, BRC74_ROOT.to_string());
+
+            // Compute the root and verify - should fail because root is at wrong height
+            let computed_root = mp
+                .compute_root(Some(BRC74_TXID1))
+                .expect("Should compute root");
+            let is_valid = tracker
+                .is_valid_root_for_height(&computed_root, mp.block_height)
+                .await
+                .expect("Should check root");
+
+            assert!(!is_valid, "Should not validate root at wrong height");
+        }
+
+        #[test]
+        fn test_merkle_path_contains() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+
+            assert!(mp.contains(BRC74_TXID1));
+            assert!(mp.contains(BRC74_TXID2));
+            assert!(mp.contains(BRC74_TXID3));
+            assert!(!mp.contains(&"f".repeat(64)));
+        }
+
+        #[test]
+        fn test_merkle_path_txids() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+            let txids = mp.txids();
+
+            // Should contain the marked txids
+            assert!(!txids.is_empty());
+        }
+
+        #[test]
+        fn test_merkle_path_compute_root_without_txid() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+
+            // Compute root without specifying txid (uses first found)
+            let root = mp.compute_root(None);
+            assert!(root.is_ok());
+            assert_eq!(root.unwrap().to_lowercase(), BRC74_ROOT.to_lowercase());
+        }
+
+        #[test]
+        fn test_merkle_path_binary_roundtrip() {
+            let mp = MerklePath::from_hex(BRC74_HEX).expect("Should parse");
+            let binary = mp.to_binary();
+            let parsed = MerklePath::from_binary(&binary).expect("Should parse binary");
+
+            assert_eq!(mp.block_height, parsed.block_height);
+            assert_eq!(mp.path.len(), parsed.path.len());
+        }
+    }
 }

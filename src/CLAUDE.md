@@ -218,6 +218,10 @@ use bsv_sdk::transaction;
 use bsv_sdk::wallet;
 ```
 
+Additional optional features:
+- **`http`** - Enables HTTP clients for ARC broadcaster, WhatsOnChain chain tracker, and WalletClient substrate
+- **`wasm`** - Enables WebAssembly support via `getrandom/js`
+
 ## Adding New Errors
 
 When adding errors for a new module:

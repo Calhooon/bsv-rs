@@ -9,10 +9,10 @@ This module provides transport substrates for communicating with BSV wallets ove
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, constants, re-exports | ~60 |
-| `http_wire.rs` | Binary wire protocol over HTTP | ~200 |
-| `http_json.rs` | JSON API over HTTP | ~500 |
-| `CLAUDE.md` | This documentation | ~200 |
+| `mod.rs` | Module root, constants, re-exports | ~65 |
+| `http_wire.rs` | Binary wire protocol over HTTP | ~240 |
+| `http_json.rs` | JSON API over HTTP | ~810 |
+| `CLAUDE.md` | This documentation | ~280 |
 
 ## Available Substrates
 
@@ -35,7 +35,22 @@ The following TypeScript SDK substrates are NOT included in the Rust SDK:
 
 ## HttpWalletWire
 
-Binary wire protocol transport over HTTP.
+Binary wire protocol transport over HTTP. Implements the `WalletWire` trait.
+
+### Constructors
+
+```rust
+// Basic constructor with optional originator and base URL
+HttpWalletWire::new(originator: Option<String>, base_url: Option<String>) -> Self
+
+// Constructor with custom reqwest::Client for timeouts, TLS, proxies
+HttpWalletWire::with_client(client: Client, originator: Option<String>, base_url: Option<String>) -> Self
+```
+
+### Accessors
+
+- `base_url(&self) -> &str` - Returns the base URL
+- `originator(&self) -> Option<&str>` - Returns the originator
 
 ### Usage
 
@@ -61,7 +76,7 @@ let version = wallet.get_version("myapp.example.com").await?;
 - **Method**: POST
 - **URL**: `{base_url}/{call_name}` (e.g., `http://localhost:3301/getPublicKey`)
 - **Content-Type**: `application/octet-stream`
-- **Headers**: `Origin` header set from originator
+- **Headers**: `Origin` header set from originator (converted to URL format)
 - **Body**: Raw binary payload (excluding call code and originator)
 
 ### Wire Message Parsing
@@ -72,11 +87,26 @@ The wire extracts the call name and originator from the binary message:
 [call_code: 1 byte][originator_len: 1 byte][originator: N bytes][payload: ...]
 ```
 
-The call code maps to endpoint names via `WalletCall::as_str()`.
+The call code maps to endpoint names via `WalletCall::method_name()`.
 
 ## HttpWalletJson
 
-JSON API transport over HTTP.
+JSON API transport over HTTP. Provides direct method implementations rather than implementing `WalletWire`.
+
+### Constructors
+
+```rust
+// Basic constructor with optional originator and base URL
+HttpWalletJson::new(originator: Option<String>, base_url: Option<String>) -> Self
+
+// Constructor with custom reqwest::Client for timeouts, TLS, proxies
+HttpWalletJson::with_client(client: Client, originator: Option<String>, base_url: Option<String>) -> Self
+```
+
+### Accessors
+
+- `base_url(&self) -> &str` - Returns the base URL
+- `originator(&self) -> Option<&str>` - Returns the originator
 
 ### Usage
 
@@ -106,22 +136,47 @@ let result = client.get_public_key(
 - **Method**: POST
 - **URL**: `{base_url}/{method_name}` (e.g., `http://localhost:3321/getPublicKey`)
 - **Content-Type**: `application/json`
-- **Headers**: `Originator` header set from originator
+- **Headers**: `Originator` header set from originator (converted to URL format)
 - **Body**: JSON-encoded method arguments
 
 ### Implemented Methods
 
-- `get_public_key`
-- `encrypt`
-- `decrypt`
-- `create_hmac`
-- `verify_hmac`
-- `create_signature`
-- `verify_signature`
-- `is_authenticated`
-- `get_height`
-- `get_network`
-- `get_version`
+**Cryptographic Methods:**
+- `get_public_key` - Get wallet public key (identity or derived)
+- `encrypt` / `decrypt` - Encrypt/decrypt data with derived keys
+- `create_hmac` / `verify_hmac` - Create/verify HMACs
+- `create_signature` / `verify_signature` - Create/verify ECDSA signatures
+
+**Wallet Status Methods:**
+- `is_authenticated` - Check authentication status
+- `wait_for_authentication` - Wait until authenticated
+- `get_height` - Get current block height
+- `get_network` - Get network (mainnet/testnet)
+- `get_version` - Get wallet version string
+
+**Action Methods:**
+- `create_action` - Create a new transaction action
+- `sign_action` - Sign a previously created action
+- `abort_action` - Abort an in-progress action
+- `list_actions` - List wallet actions (transactions)
+- `internalize_action` - Internalize an external transaction
+
+**Output Methods:**
+- `list_outputs` - List wallet outputs
+- `relinquish_output` - Relinquish an output from a basket
+
+**Certificate Methods:**
+- `acquire_certificate` - Acquire a certificate
+- `list_certificates` - List certificates
+- `prove_certificate` - Prove a certificate
+- `relinquish_certificate` - Relinquish a certificate
+
+**Discovery Methods:**
+- `discover_by_identity_key` - Discover certificates by identity key
+- `discover_by_attributes` - Discover certificates by attributes
+
+**Chain Methods:**
+- `get_header` - Get a block header for a given height
 
 ### Binary Data Encoding
 
@@ -130,49 +185,6 @@ Binary data in JSON requests/responses uses base64 encoding:
 - `hmac`, `signature` - base64
 - `hash_to_directly_sign`, `hash_to_directly_verify` - hex (32 bytes)
 - `public_key` - hex (33 bytes compressed)
-
-## WalletClient
-
-The [`WalletClient`] provides a unified interface with auto-detection.
-
-### Usage
-
-```rust
-use bsv_sdk::wallet::{WalletClient, SubstrateType};
-use bsv_sdk::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
-
-// Create client with auto-detection
-let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.example.com".into()));
-
-// First call triggers auto-detection
-let version = client.get_version().await?;
-
-// Subsequent calls use the detected substrate
-let result = client.get_public_key(GetPublicKeyArgs {
-    identity_key: true,
-    protocol_id: None,
-    key_id: None,
-    counterparty: None,
-    for_self: None,
-}).await?;
-```
-
-### Substrate Types
-
-| Type | Description |
-|------|-------------|
-| `Auto` | Auto-detect available substrate |
-| `JsonApi` | HTTP JSON API (http://localhost:3321) |
-| `Cicada` | Wire protocol over HTTP (http://localhost:3301) |
-| `SecureJsonApi` | Secure JSON API (https://localhost:2121) |
-
-### Auto-Detection Order
-
-1. Secure JSON API (https://localhost:2121)
-2. Standard JSON API (http://localhost:3321)
-3. Wire protocol (http://localhost:3301)
-
-Detection works by calling `getVersion` on each substrate until one responds.
 
 ## Constants
 
@@ -196,16 +208,25 @@ bsv-sdk = { version = "0.2", features = ["wallet", "http"] }
 ## Error Handling
 
 Substrates return `Error::WalletError` for:
+- Empty or malformed messages (HttpWalletWire)
 - HTTP request failures
 - Non-2xx status codes
-- JSON parsing errors
-- Invalid response data
+- JSON parsing errors (HttpWalletJson)
+- Invalid response data (base64 decoding, wrong HMAC length, etc.)
 
-Error responses from the wallet include error codes:
-- Code 0: Success
-- Code 5: Review actions required
-- Code 6: Invalid parameter
-- Code 7: Insufficient funds
+JSON error responses are parsed to extract error codes and descriptions. The wallet server may return structured error responses with `code` and `description` fields.
+
+## Originator Handling
+
+Both substrates convert the originator string to an HTTP origin header:
+- If originator starts with `http://` or `https://`, use as-is
+- Otherwise, prepend `http://` (e.g., `example.com` → `http://example.com`)
+
+The originator can be set:
+1. At construction time (applies to all requests)
+2. Per-request (extracted from wire message or passed to method)
+
+Per-request originator takes precedence over constructor originator.
 
 ## Testing
 
@@ -214,6 +235,12 @@ Run substrate tests:
 ```bash
 cargo test wallet::substrates --features "wallet http"
 ```
+
+Tests cover:
+- Origin header conversion
+- Default and custom URL handling
+- Originator accessor methods
+- Protocol and counterparty JSON serialization
 
 Note: Integration tests require a running wallet server.
 

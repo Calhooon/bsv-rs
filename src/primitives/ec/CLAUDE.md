@@ -83,7 +83,7 @@ pub struct PublicKey {
     pub fn derive_shared_secret(&self, other_privkey: &PrivateKey) -> Result<PublicKey>  // ECDH
     pub fn derive_child(&self, other_privkey: &PrivateKey, invoice_number: &str) -> Result<PublicKey>  // BRC-42
 }
-// Implements: Clone, Debug, Display, PartialEq, Eq, Hash
+// Implements: Clone, Debug, Display, PartialEq, Eq, Hash, Serialize, Deserialize
 ```
 
 ### Signature
@@ -283,6 +283,24 @@ The HMAC uses compressed shared secret as the key and invoice number bytes as th
 - R and S are minimal DER integers (no leading zeros unless high bit is set)
 - Leading 0x00 added when high bit is set (to indicate positive number)
 - `to_der()` always produces low-S form
+
+## Serialization
+
+`PublicKey` implements serde `Serialize` and `Deserialize`:
+- Serializes as a compressed hex string (66 characters)
+- Deserializes from any valid hex public key (compressed or uncompressed)
+
+```rust
+use bsv_sdk::primitives::ec::PublicKey;
+
+// Serializes to JSON as a hex string
+let pubkey = PrivateKey::random().public_key();
+let json = serde_json::to_string(&pubkey).unwrap();
+// -> "\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\""
+
+// Deserializes from hex string
+let recovered: PublicKey = serde_json::from_str(&json).unwrap();
+```
 
 ## Security Notes
 

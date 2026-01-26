@@ -1440,7 +1440,7 @@ mod tests {
 
     /// Test wire that loops back through the processor.
     struct LoopbackWire {
-        processor: Arc<WalletWireProcessor>,
+        processor: Arc<WalletWireProcessor<ProtoWallet>>,
     }
 
     #[async_trait::async_trait]

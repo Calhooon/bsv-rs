@@ -1,5 +1,6 @@
 //! Test vectors for transaction module.
 
+pub mod beef_cross_sdk;
 pub mod bigtx;
 pub mod bump_invalid;
 pub mod bump_valid;

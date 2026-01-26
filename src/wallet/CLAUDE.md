@@ -1,5 +1,5 @@
 # BSV Wallet Module
-> BRC-42 Key Derivation, ProtoWallet, WalletClient, and Validation for the BSV Rust SDK
+> BRC-42 Key Derivation, ProtoWallet, WalletClient, WalletInterface, and Validation for the BSV Rust SDK
 
 ## Overview
 
@@ -9,13 +9,14 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with feature-gated exports | ~200 |
-| `types.rs` | Core wallet type definitions | ~790 |
-| `key_deriver.rs` | BRC-42 key derivation | ~640 |
-| `cached_key_deriver.rs` | LRU-cached key deriver | ~490 |
-| `proto_wallet.rs` | ProtoWallet cryptographic operations | ~1000 |
-| `validation.rs` | Input validation helpers | ~1170 |
-| `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~385 |
+| `mod.rs` | Module root with feature-gated exports | ~255 |
+| `types.rs` | Core wallet type definitions (70+ types) | ~1550 |
+| `interface.rs` | WalletInterface trait (28 methods) | ~298 |
+| `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~641 |
+| `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~491 |
+| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1342 |
+| `validation.rs` | 40+ input validation helpers | ~1170 |
+| `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
 | `wire/` | Wire protocol encoding/decoding | - |
 
@@ -37,11 +38,26 @@ Wire protocol implementation:
 
 ## Key Exports
 
+### WalletInterface Trait
+
+The `WalletInterface` trait defines all 28 wallet operations (async with `originator` parameter):
+
+| Category | Methods |
+|----------|---------|
+| Key (9) | `get_public_key`, `encrypt`, `decrypt`, `create_hmac`, `verify_hmac`, `create_signature`, `verify_signature`, `reveal_counterparty_key_linkage`, `reveal_specific_key_linkage` |
+| Action (5) | `create_action`, `sign_action`, `abort_action`, `list_actions`, `internalize_action` |
+| Output (2) | `list_outputs`, `relinquish_output` |
+| Certificate (4) | `acquire_certificate`, `list_certificates`, `prove_certificate`, `relinquish_certificate` |
+| Discovery (2) | `discover_by_identity_key`, `discover_by_attributes` |
+| Status (6) | `is_authenticated`, `wait_for_authentication`, `get_height`, `get_header_for_height`, `get_network`, `get_version` |
+
+Marker traits: `CryptoWallet` (crypto-only), `FullWallet` (all methods supported).
+
 ### WalletClient (requires `http` feature)
 
 ```rust
 pub enum SubstrateType {
-    Auto,           // Auto-detect available substrate
+    Auto,           // Auto-detect (SecureJsonApi -> JsonApi -> Cicada)
     JsonApi,        // HTTP JSON API (port 3321)
     Cicada,         // Wire protocol over HTTP (port 3301)
     SecureJsonApi,  // Secure local JSON API (port 2121)
@@ -51,19 +67,7 @@ pub struct WalletClient {
     pub fn new(substrate_type: SubstrateType, originator: Option<String>) -> Self
     pub fn substrate_type(&self) -> SubstrateType
     pub fn originator(&self) -> Option<&str>
-
-    // Async methods (require http feature)
-    pub async fn get_public_key(&mut self, args: GetPublicKeyArgs) -> Result<GetPublicKeyResult>
-    pub async fn encrypt(&mut self, args: EncryptArgs) -> Result<EncryptResult>
-    pub async fn decrypt(&mut self, args: DecryptArgs) -> Result<DecryptResult>
-    pub async fn create_hmac(&mut self, args: CreateHmacArgs) -> Result<CreateHmacResult>
-    pub async fn verify_hmac(&mut self, args: VerifyHmacArgs) -> Result<VerifyHmacResult>
-    pub async fn create_signature(&mut self, args: CreateSignatureArgs) -> Result<CreateSignatureResult>
-    pub async fn verify_signature(&mut self, args: VerifySignatureArgs) -> Result<VerifySignatureResult>
-    pub async fn is_authenticated(&mut self) -> Result<bool>
-    pub async fn get_height(&mut self) -> Result<u64>
-    pub async fn get_network(&mut self) -> Result<Network>
-    pub async fn get_version(&mut self) -> Result<String>
+    // Implements all wallet operations as async methods
 }
 ```
 
@@ -99,6 +103,9 @@ pub struct ProtoWallet {
     pub fn reveal_counterparty_key_linkage(&self, args: RevealCounterpartyKeyLinkageArgs) -> Result<RevealCounterpartyKeyLinkageResult>
     pub fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs) -> Result<RevealSpecificKeyLinkageResult>
 }
+
+// ProtoWallet implements WalletInterface
+impl WalletInterface for ProtoWallet { ... }
 ```
 
 #### ProtoWallet Capabilities
@@ -109,236 +116,91 @@ ProtoWallet can:
 - Encrypt and decrypt data (AES-256-GCM via derived symmetric keys)
 - Create and verify HMACs (SHA-256)
 - Reveal key linkages for verification
+- Implement all 28 `WalletInterface` methods (unsupported methods return errors)
 
 ProtoWallet does NOT:
-- Create transactions
-- Manage UTXOs
+- Create transactions (returns error)
+- Manage UTXOs (returns error)
 - Interact with the blockchain
-- Manage certificates
+- Manage certificates (returns error)
 - Store any persistent data
+
+#### WalletInterface Implementation
+
+ProtoWallet implements `WalletInterface` with full support for cryptographic operations:
+- Key operations: All 8 methods fully implemented
+- Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
+- Chain/Status operations: `is_authenticated` returns true, `get_network` returns mainnet, `get_version` returns SDK version
 
 ### Validation Module
 
-The `validation` module provides 40+ validation functions for wallet API inputs:
+The `validation` module provides 40+ validation functions:
+
+| Category | Functions |
+|----------|-----------|
+| Satoshis | `validate_satoshis` |
+| Integers | `validate_integer`, `validate_integer_u32` |
+| Strings | `validate_string_length`, `validate_hex_string`, `validate_base64_string`, `is_hex_string` |
+| Identifiers | `validate_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase) |
+| Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string` |
+| Actions | `validate_create_action_args`, `validate_create_action_input`, `validate_create_action_output`, etc. |
+| Certificates | `validate_certificate_fields`, `validate_keyring_revealer` |
+| Protocol | `validate_protocol_tuple`, `validate_query_mode` |
+
+### Core Types
+
+**SecurityLevel** - User interaction level for key derivation:
+- `Silent` (0): No user interaction
+- `App` (1): Approval per application
+- `Counterparty` (2): Approval per counterparty per application
+
+**Protocol** - Combines `SecurityLevel` and `protocol_name` (5-400 chars, lowercase, no consecutive spaces).
+
+**Counterparty** - Key derivation target: `Self_`, `Anyone` (publicly derivable), or `Other(PublicKey)`.
+
+### Key Derivation
+
+**KeyDeriver** - BRC-42 key derivation from root private key:
+- `derive_public_key()`, `derive_private_key()`, `derive_symmetric_key()`
+- `reveal_specific_secret()`, `reveal_counterparty_secret()` for linkage revelation
+- `anyone_key()` returns the special "anyone" key pair (scalar value 1)
+
+**CachedKeyDeriver** - Thread-safe LRU-cached wrapper (default 1000 entries).
+
+**KeyDeriverApi** - Trait implemented by both `KeyDeriver` and `CachedKeyDeriver`.
+
+## Usage Examples
+
+### ProtoWallet - Signing
 
 ```rust
-// Satoshi validation
-pub fn validate_satoshis(value: u64, name: &str, min: Option<u64>) -> Result<u64>
-
-// Integer validation
-pub fn validate_integer(value: Option<i64>, name: &str, default: Option<i64>, min: Option<i64>, max: Option<i64>) -> Result<i64>
-pub fn validate_integer_u32(value: Option<u32>, name: &str, default: Option<u32>, min: Option<u32>, max: Option<u32>) -> Result<u32>
-
-// String validation
-pub fn validate_string_length<'a>(s: &'a str, name: &str, min: Option<usize>, max: Option<usize>) -> Result<&'a str>
-pub fn validate_hex_string(s: &str, name: &str, min_chars: Option<usize>, max_chars: Option<usize>) -> Result<String>
-pub fn validate_base64_string(s: &str, name: &str, min_decoded_bytes: Option<usize>, max_decoded_bytes: Option<usize>) -> Result<String>
-pub fn is_hex_string(s: &str) -> bool
-
-// Identifier validation
-pub fn validate_basket(s: &str) -> Result<String>  // 1-300 bytes, trimmed, lowercase
-pub fn validate_label(s: &str) -> Result<String>   // 1-300 bytes, trimmed, lowercase
-pub fn validate_tag(s: &str) -> Result<String>     // 1-300 bytes, trimmed, lowercase
-pub fn validate_originator(s: Option<&str>) -> Result<Option<String>>
-
-// Outpoint validation
-pub fn parse_wallet_outpoint(outpoint: &str) -> Result<Outpoint>
-pub fn validate_outpoint_string(outpoint: &str, name: &str) -> Result<String>
-
-// Action validation
-pub fn validate_create_action_args(args: &CreateActionArgsRaw) -> Result<ValidCreateActionArgs>
-pub fn validate_create_action_input(input: &CreateActionInputRaw) -> Result<ValidCreateActionInput>
-pub fn validate_create_action_output(output: &CreateActionOutputRaw) -> Result<ValidCreateActionOutput>
-pub fn validate_create_action_options(options: Option<&CreateActionOptionsRaw>) -> Result<ValidCreateActionOptions>
-pub fn validate_sign_action_spend(spend: &SignActionSpendRaw) -> Result<ValidSignActionSpend>
-
-// Certificate validation
-pub fn validate_certificate_fields(fields: &HashMap<String, String>) -> Result<HashMap<String, String>>
-pub fn validate_keyring_revealer(kr: &str, name: &str) -> Result<String>
-
-// Protocol validation
-pub fn validate_protocol_tuple(tuple: (u8, &str)) -> Result<Protocol>
-pub fn validate_query_mode(mode: Option<&str>, name: &str) -> Result<QueryMode>
-```
-
-### Security Level
-
-```rust
-#[repr(u8)]
-pub enum SecurityLevel {
-    Silent = 0,        // Level 0: No user interaction
-    App = 1,           // Level 1: Approval per application
-    Counterparty = 2,  // Level 2: Approval per counterparty per application
-}
-
-impl SecurityLevel {
-    pub fn from_u8(value: u8) -> Option<Self>
-    pub fn as_u8(&self) -> u8
-}
-```
-
-### Protocol
-
-```rust
-pub struct Protocol {
-    pub security_level: SecurityLevel,
-    pub protocol_name: String,  // 5-400 characters
-}
-
-impl Protocol {
-    pub fn new(security_level: SecurityLevel, protocol_name: impl Into<String>) -> Self
-    pub fn from_tuple(tuple: (u8, &str)) -> Option<Self>
-    pub fn to_tuple(&self) -> (u8, &str)
-}
-```
-
-**Protocol Name Rules:**
-- 5 to 400 characters (430 for "specific linkage revelation" protocols)
-- Lowercase letters, numbers, and single spaces only
-- Cannot contain consecutive spaces
-- Cannot end with " protocol"
-
-### Counterparty
-
-```rust
-pub enum Counterparty {
-    Self_,              // Derive for self
-    Anyone,             // Publicly derivable
-    Other(PublicKey),   // Specific counterparty
-}
-
-impl Counterparty {
-    pub fn from_hex(hex: &str) -> Result<Self>
-    pub fn is_self(&self) -> bool
-    pub fn is_anyone(&self) -> bool
-    pub fn public_key(&self) -> Option<&PublicKey>
-}
-```
-
-### KeyDeriver
-
-```rust
-pub struct KeyDeriver {
-    // Construction
-    pub fn new(root_key: Option<PrivateKey>) -> Self
-    pub fn anyone_key() -> (PrivateKey, PublicKey)
-
-    // Identity
-    pub fn root_key(&self) -> &PrivateKey
-    pub fn identity_key(&self) -> PublicKey
-    pub fn identity_key_hex(&self) -> String
-
-    // Key Derivation
-    pub fn derive_public_key(&self, protocol: &Protocol, key_id: &str, counterparty: &Counterparty, for_self: bool) -> Result<PublicKey>
-    pub fn derive_private_key(&self, protocol: &Protocol, key_id: &str, counterparty: &Counterparty) -> Result<PrivateKey>
-    pub fn derive_symmetric_key(&self, protocol: &Protocol, key_id: &str, counterparty: &Counterparty) -> Result<SymmetricKey>
-
-    // Secret Revelation
-    pub fn reveal_specific_secret(&self, counterparty: &Counterparty, protocol: &Protocol, key_id: &str) -> Result<Vec<u8>>
-    pub fn reveal_counterparty_secret(&self, counterparty: &Counterparty) -> Result<PublicKey>
-}
-```
-
-### CachedKeyDeriver
-
-```rust
-pub struct CacheConfig {
-    pub max_size: usize,  // Default: 1000
-}
-
-pub struct CachedKeyDeriver {
-    pub fn new(root_key: Option<PrivateKey>, config: Option<CacheConfig>) -> Self
-    pub fn inner(&self) -> &KeyDeriver
-    pub fn root_key(&self) -> &PrivateKey
-}
-
-// Implements KeyDeriverApi trait with caching
-impl KeyDeriverApi for CachedKeyDeriver { ... }
-```
-
-### KeyDeriverApi Trait
-
-```rust
-pub trait KeyDeriverApi {
-    fn identity_key(&self) -> PublicKey;
-    fn identity_key_hex(&self) -> String;
-    fn derive_public_key(...) -> Result<PublicKey>;
-    fn derive_private_key(...) -> Result<PrivateKey>;
-    fn derive_symmetric_key(...) -> Result<SymmetricKey>;
-    fn reveal_specific_secret(...) -> Result<Vec<u8>>;
-    fn reveal_counterparty_secret(...) -> Result<PublicKey>;
-}
-```
-
-## Usage
-
-### WalletClient (Remote Wallet Communication)
-
-```rust
-use bsv_sdk::wallet::{WalletClient, SubstrateType, GetPublicKeyArgs};
-
-// Create client with auto-detection
-let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.example.com".into()));
-
-// Get wallet version (triggers auto-detection)
-let version = client.get_version().await?;
-
-// Get identity key
-let result = client.get_public_key(GetPublicKeyArgs {
-    identity_key: true,
-    protocol_id: None,
-    key_id: None,
-    counterparty: None,
-    for_self: None,
-}).await?;
-```
-
-### ProtoWallet - Signing and Verification
-
-```rust
-use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs, VerifySignatureArgs, Counterparty};
+use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs};
 use bsv_sdk::primitives::PrivateKey;
 
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let protocol = Protocol::new(SecurityLevel::App, "signing app");
 
-// Create a signature
 let signed = wallet.create_signature(CreateSignatureArgs {
     data: Some(b"Hello, BSV!".to_vec()),
     hash_to_directly_sign: None,
-    protocol_id: protocol.clone(),
+    protocol_id: protocol,
     key_id: "sig-1".to_string(),
     counterparty: None,
 }).unwrap();
-
-// Verify the signature
-let verified = wallet.verify_signature(VerifySignatureArgs {
-    data: Some(b"Hello, BSV!".to_vec()),
-    hash_to_directly_verify: None,
-    signature: signed.signature,
-    protocol_id: protocol,
-    key_id: "sig-1".to_string(),
-    counterparty: Some(Counterparty::Anyone),
-    for_self: Some(true),
-}).unwrap();
 ```
 
-### ProtoWallet - Two-Party Encryption
+### Two-Party Encryption
 
 ```rust
-use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, EncryptArgs, DecryptArgs, Counterparty};
-use bsv_sdk::primitives::PrivateKey;
-
 let alice = ProtoWallet::new(Some(PrivateKey::random()));
 let bob = ProtoWallet::new(Some(PrivateKey::random()));
 let protocol = Protocol::new(SecurityLevel::App, "secure messaging");
-let message = b"Secret message from Alice to Bob".to_vec();
 
 // Alice encrypts for Bob
 let encrypted = alice.encrypt(EncryptArgs {
-    plaintext: message.clone(),
+    plaintext: b"Secret message".to_vec(),
     protocol_id: protocol.clone(),
-    key_id: "message-1".to_string(),
+    key_id: "msg-1".to_string(),
     counterparty: Some(Counterparty::Other(bob.identity_key())),
 }).unwrap();
 
@@ -346,51 +208,16 @@ let encrypted = alice.encrypt(EncryptArgs {
 let decrypted = bob.decrypt(DecryptArgs {
     ciphertext: encrypted.ciphertext,
     protocol_id: protocol,
-    key_id: "message-1".to_string(),
+    key_id: "msg-1".to_string(),
     counterparty: Some(Counterparty::Other(alice.identity_key())),
 }).unwrap();
-
-assert_eq!(decrypted.plaintext, message);
 ```
 
-### Input Validation
+### WalletClient (Remote Wallet)
 
 ```rust
-use bsv_sdk::wallet::validation::{
-    validate_satoshis, validate_hex_string, validate_basket,
-    parse_wallet_outpoint, validate_create_action_args,
-    CreateActionArgsRaw,
-};
-
-// Validate satoshi amount with minimum
-let sats = validate_satoshis(50000, "outputValue", Some(546)).unwrap();
-
-// Validate hex string with length constraints
-let txid = validate_hex_string("deadbeef...", "txid", Some(64), Some(64)).unwrap();
-
-// Validate and normalize basket identifier
-let basket = validate_basket("  MY-BASKET  ").unwrap(); // Returns "my-basket"
-
-// Parse outpoint string
-let outpoint = parse_wallet_outpoint("0000...0001.5").unwrap();
-```
-
-### Basic Key Derivation
-
-```rust
-use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-use bsv_sdk::primitives::PrivateKey;
-
-let root_key = PrivateKey::random();
-let deriver = KeyDeriver::new(Some(root_key));
-
-let protocol = Protocol::new(SecurityLevel::App, "my application");
-let key_id = "invoice-12345";
-
-let pub_key = deriver.derive_public_key(&protocol, key_id, &Counterparty::Self_, true)?;
-let priv_key = deriver.derive_private_key(&protocol, key_id, &Counterparty::Self_)?;
-
-assert_eq!(priv_key.public_key().to_compressed(), pub_key.to_compressed());
+let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.com".into()));
+let version = client.get_version().await?;
 ```
 
 ## BRC-42 Key Derivation Algorithm
@@ -450,7 +277,8 @@ Key derivation uses the same algorithm (BRC-42) and produces identical keys acro
 | `SecurityLevel` (0\|1\|2) | `SecurityLevel` (enum) |
 | `Counterparty` (string\|PublicKey) | `Counterparty` (enum) |
 | `KeyDeriverApi` (interface) | `KeyDeriverApi` (trait) |
-| `ProtoWallet` (class) | `ProtoWallet` (struct) |
+| `WalletInterface` (interface) | `WalletInterface` (trait) |
+| `ProtoWallet` (class) | `ProtoWallet` (struct, implements `WalletInterface`) |
 | `Wallet` (class) | `WalletClient` (struct) |
 | `validationHelpers.ts` functions | `validation` module functions |
 
@@ -461,6 +289,8 @@ The wallet module uses:
 - `sha256`, `sha256_hmac` from hash module
 - `derive_child` methods for BRC-42 derivation
 - `subtle` crate for constant-time comparison
+- `async_trait` crate for async trait methods
+- `serde` for serialization of types
 
 ## Testing
 

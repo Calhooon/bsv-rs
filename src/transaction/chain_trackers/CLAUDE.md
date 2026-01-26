@@ -13,7 +13,7 @@ Available implementations:
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports all trackers |
+| `mod.rs` | Module root; re-exports all trackers and constants |
 | `whatsonchain.rs` | WhatsOnChain API implementation of `ChainTracker` |
 | `block_headers_service.rs` | Block Headers Service implementation of `ChainTracker` |
 
@@ -29,6 +29,19 @@ bsv-sdk = { version = "0.2", features = ["transaction", "http"] }
 Without the `http` feature, the tracker methods will return `ChainTrackerError::NetworkError` indicating the feature is not enabled.
 
 ## Key Exports
+
+From `mod.rs`:
+- `WhatsOnChainTracker` - WhatsOnChain tracker implementation
+- `WocNetwork` - Network enum (Mainnet/Testnet)
+- `BlockHeadersServiceTracker` - Block Headers Service tracker implementation
+- `BlockHeadersServiceConfig` - Configuration struct for Block Headers Service
+- `DEFAULT_HEADERS_URL` - Default URL constant (`"https://headers.spv.money"`)
+
+---
+
+## WhatsOnChainTracker
+
+Production chain tracker using the WhatsOnChain blockchain explorer API.
 
 ### WocNetwork
 
@@ -47,21 +60,20 @@ impl WocNetwork {
 }
 ```
 
-### WhatsOnChainTracker
-
-Production chain tracker using the WhatsOnChain blockchain explorer API.
+### WhatsOnChainTracker Struct
 
 ```rust
 pub struct WhatsOnChainTracker {
     network: WocNetwork,
-    client: reqwest::Client,  // Only with "http" feature
+    #[cfg(feature = "http")]
+    client: reqwest::Client,
 }
 
 impl WhatsOnChainTracker {
-    pub fn mainnet() -> Self           // Create mainnet tracker
-    pub fn testnet() -> Self           // Create testnet tracker
+    pub fn mainnet() -> Self                 // Create mainnet tracker
+    pub fn testnet() -> Self                 // Create testnet tracker
     pub fn new(network: WocNetwork) -> Self  // Create with specific network
-    pub fn network(&self) -> WocNetwork     // Get configured network
+    pub fn network(&self) -> WocNetwork      // Get configured network
 }
 
 impl Default for WhatsOnChainTracker {
@@ -69,80 +81,154 @@ impl Default for WhatsOnChainTracker {
 }
 ```
 
-### ChainTracker Implementation
-
-The tracker implements the async `ChainTracker` trait:
-
-```rust
-#[async_trait]
-impl ChainTracker for WhatsOnChainTracker {
-    async fn is_valid_root_for_height(&self, root: &str, height: u32)
-        -> Result<bool, ChainTrackerError>;
-
-    async fn current_height(&self) -> Result<u32, ChainTrackerError>;
-}
-```
-
-## API Endpoints
-
-The WhatsOnChain tracker uses these API endpoints:
+### WhatsOnChain API Endpoints
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | `is_valid_root_for_height` | `GET /block/{height}/header` | Fetch block header, compare merkleroot |
 | `current_height` | `GET /chain/info` | Get current blockchain height from `blocks` field |
 
-## Error Handling
-
-The tracker returns `ChainTrackerError` variants:
-
-| Error | Condition |
-|-------|-----------|
-| `NetworkError` | HTTP request failed, or `http` feature not enabled |
-| `BlockNotFound` | HTTP 404 response (block height doesn't exist) |
-| `InvalidResponse` | Non-success HTTP status, or JSON parsing failure |
-
-## Usage Examples
-
-### Basic Usage
+### WhatsOnChain Usage
 
 ```rust
-use bsv_sdk::transaction::{ChainTracker, WhatsOnChainTracker};
+use bsv_sdk::transaction::{ChainTracker, WhatsOnChainTracker, WocNetwork};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create mainnet tracker (default)
-    let tracker = WhatsOnChainTracker::mainnet();
+// Create mainnet tracker (default)
+let tracker = WhatsOnChainTracker::mainnet();
 
-    // Get current blockchain height
-    let height = tracker.current_height().await?;
-    println!("Current height: {}", height);
+// Create testnet tracker
+let tracker = WhatsOnChainTracker::testnet();
 
-    // Verify a merkle root at a specific height
-    let merkle_root = "abc123def456...";
-    let is_valid = tracker
-        .is_valid_root_for_height(merkle_root, 700000)
-        .await?;
+// Or with explicit network
+let tracker = WhatsOnChainTracker::new(WocNetwork::Testnet);
 
-    if is_valid {
-        println!("Merkle root is valid for block 700000");
-    }
+// Get current blockchain height
+let height = tracker.current_height().await?;
 
-    Ok(())
+// Verify a merkle root at a specific height
+let is_valid = tracker
+    .is_valid_root_for_height("abc123def456...", 700000)
+    .await?;
+```
+
+---
+
+## BlockHeadersServiceTracker
+
+Chain tracker using the Block Headers Service API (headers.spv.money), a fast and reliable headers service designed for SPV verification.
+
+### BlockHeadersServiceConfig
+
+```rust
+#[derive(Debug, Clone)]
+pub struct BlockHeadersServiceConfig {
+    pub base_url: String,           // Default: "https://headers.spv.money"
+    pub auth_token: Option<String>, // Optional Bearer token for authentication
+    pub timeout_ms: u64,            // Request timeout (default: 30,000 ms)
+}
+
+impl Default for BlockHeadersServiceConfig {
+    fn default() -> Self  // Returns config with DEFAULT_HEADERS_URL, no auth, 30s timeout
 }
 ```
 
-### Testnet Usage
+### BlockHeadersServiceTracker Struct
 
 ```rust
-use bsv_sdk::transaction::{WhatsOnChainTracker, WocNetwork};
+pub struct BlockHeadersServiceTracker {
+    config: BlockHeadersServiceConfig,
+    #[cfg(feature = "http")]
+    client: reqwest::Client,
+}
 
-let tracker = WhatsOnChainTracker::testnet();
-// or
-let tracker = WhatsOnChainTracker::new(WocNetwork::Testnet);
+impl BlockHeadersServiceTracker {
+    pub fn new() -> Self                                      // Create with default URL
+    pub fn with_url(base_url: &str) -> Self                   // Create with custom URL
+    pub fn with_config(config: BlockHeadersServiceConfig) -> Self  // Create with full config
+    pub fn base_url(&self) -> &str                            // Get configured base URL
+    pub fn auth_token(&self) -> Option<&str>                  // Get configured auth token
+}
+
+impl Default for BlockHeadersServiceTracker {
+    fn default() -> Self  // Returns tracker with default URL
+}
 ```
 
-### SPV Verification with BEEF
+### Block Headers Service API Endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| `is_valid_root_for_height` | `GET /api/v1/chain/header/{height}` | Fetch header, compare merkleroot |
+| `current_height` | `GET /api/v1/chain/tip` | Get current blockchain height |
+
+The Block Headers Service API supports multiple field names for compatibility:
+- `merkleroot` or `merkleRoot` for the merkle root field
+- `height`, `blockHeight`, or `blocks` for the chain height field
+
+### Block Headers Service Usage
+
+```rust
+use bsv_sdk::transaction::{
+    ChainTracker, BlockHeadersServiceTracker, BlockHeadersServiceConfig,
+    DEFAULT_HEADERS_URL
+};
+
+// Create with default URL
+let tracker = BlockHeadersServiceTracker::default();
+
+// Or with custom URL
+let tracker = BlockHeadersServiceTracker::with_url("https://custom.headers.com");
+
+// Or with full configuration (including auth token)
+let config = BlockHeadersServiceConfig {
+    base_url: DEFAULT_HEADERS_URL.to_string(),
+    auth_token: Some("my-api-token".to_string()),
+    timeout_ms: 60_000,  // 60 second timeout
+};
+let tracker = BlockHeadersServiceTracker::with_config(config);
+
+// Verify a merkle root
+let is_valid = tracker
+    .is_valid_root_for_height("abc123...", 700000)
+    .await?;
+
+// Get current height
+let height = tracker.current_height().await?;
+```
+
+---
+
+## ChainTracker Trait Implementation
+
+Both trackers implement the async `ChainTracker` trait:
+
+```rust
+#[async_trait]
+impl ChainTracker for WhatsOnChainTracker {
+    async fn is_valid_root_for_height(&self, root: &str, height: u32)
+        -> Result<bool, ChainTrackerError>;
+    async fn current_height(&self) -> Result<u32, ChainTrackerError>;
+}
+
+#[async_trait]
+impl ChainTracker for BlockHeadersServiceTracker {
+    async fn is_valid_root_for_height(&self, root: &str, height: u32)
+        -> Result<bool, ChainTrackerError>;
+    async fn current_height(&self) -> Result<u32, ChainTrackerError>;
+}
+```
+
+## Error Handling
+
+Both trackers return `ChainTrackerError` variants:
+
+| Error | Condition |
+|-------|-----------|
+| `NetworkError` | HTTP request failed, timeout, or `http` feature not enabled |
+| `BlockNotFound` | HTTP 404 response (block height doesn't exist) |
+| `InvalidResponse` | Non-success HTTP status, JSON parsing failure, or missing required fields |
+
+## SPV Verification with BEEF
 
 ```rust
 use bsv_sdk::transaction::{Beef, ChainTracker, WhatsOnChainTracker};
@@ -173,7 +259,7 @@ async fn verify_beef(beef_hex: &str) -> Result<bool, Box<dyn std::error::Error>>
 
 ### Merkle Root Comparison
 
-The `is_valid_root_for_height` method performs case-insensitive comparison of merkle roots:
+Both trackers perform case-insensitive comparison of merkle roots:
 
 ```rust
 Ok(header.merkleroot.to_lowercase() == root.to_lowercase())
@@ -185,13 +271,21 @@ This ensures compatibility regardless of whether the caller provides uppercase o
 
 When the `http` feature is enabled, each tracker instance creates its own `reqwest::Client`. For high-volume applications, consider reusing tracker instances rather than creating new ones for each verification.
 
+### Authentication (BlockHeadersServiceTracker only)
+
+The `BlockHeadersServiceTracker` supports optional Bearer token authentication via the `auth_token` config field. When set, requests include an `Authorization: Bearer <token>` header.
+
+### Request Timeout (BlockHeadersServiceTracker only)
+
+The `BlockHeadersServiceTracker` supports configurable request timeouts via `timeout_ms` (default: 30 seconds).
+
 ### Conditional Compilation
 
-The implementation uses `#[cfg(feature = "http")]` to provide functional implementations only when HTTP support is available. Without the feature, methods return descriptive errors guiding users to enable it.
+Both implementations use `#[cfg(feature = "http")]` to provide functional implementations only when HTTP support is available. Without the feature, methods return descriptive errors guiding users to enable it.
 
 ## Testing
 
-The module includes unit tests for network configuration:
+The module includes unit tests for tracker configuration:
 
 ```bash
 cargo test chain_trackers
@@ -201,9 +295,11 @@ Tests verify:
 - `WocNetwork` URL generation for mainnet/testnet
 - `WocNetwork::default()` returns `Mainnet`
 - `WhatsOnChainTracker` construction methods
-- Network getter returns correct value
+- `BlockHeadersServiceConfig` default values
+- `BlockHeadersServiceTracker` construction with various configurations
+- Network/URL getter methods return correct values
 
-Note: Integration tests against the live API are marked `ignore` to avoid network dependencies in CI.
+Note: Integration tests against the live APIs are marked `ignore` to avoid network dependencies in CI.
 
 ## Related Documentation
 
@@ -211,75 +307,6 @@ Note: Integration tests against the live API are marked `ignore` to avoid networ
 - `../CLAUDE.md` - Transaction module overview including SPV verification patterns
 - `../merkle_path.rs` - `MerklePath` for computing merkle roots from proofs
 - `../beef.rs` - BEEF format verification that uses `ChainTracker`
-
-## BlockHeadersServiceTracker
-
-The Block Headers Service provides a fast, reliable way to verify merkle roots via a dedicated headers service.
-
-### BlockHeadersServiceConfig
-
-```rust
-pub struct BlockHeadersServiceConfig {
-    pub base_url: String,          // Default: "https://headers.spv.money"
-    pub auth_token: Option<String>, // Optional Bearer token
-    pub timeout_ms: u64,           // Request timeout (default: 30,000 ms)
-}
-```
-
-### BlockHeadersServiceTracker
-
-```rust
-pub struct BlockHeadersServiceTracker {
-    config: BlockHeadersServiceConfig,
-    client: reqwest::Client,  // Only with "http" feature
-}
-
-impl BlockHeadersServiceTracker {
-    pub fn new() -> Self                    // Create with default URL
-    pub fn with_url(base_url: &str) -> Self // Create with custom URL
-    pub fn with_config(config: BlockHeadersServiceConfig) -> Self
-    pub fn base_url(&self) -> &str
-    pub fn auth_token(&self) -> Option<&str>
-}
-
-impl Default for BlockHeadersServiceTracker {
-    fn default() -> Self  // Returns tracker with default URL
-}
-
-#[async_trait]
-impl ChainTracker for BlockHeadersServiceTracker {
-    async fn is_valid_root_for_height(&self, root: &str, height: u32)
-        -> Result<bool, ChainTrackerError>;
-    async fn current_height(&self) -> Result<u32, ChainTrackerError>;
-}
-```
-
-### Block Headers Service API Endpoints
-
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| `is_valid_root_for_height` | `GET /api/v1/chain/header/{height}` | Fetch header, compare merkleroot |
-| `current_height` | `GET /api/v1/chain/tip` | Get current blockchain height |
-
-### Block Headers Service Usage
-
-```rust
-use bsv_sdk::transaction::{ChainTracker, BlockHeadersServiceTracker};
-
-// Create with default URL
-let tracker = BlockHeadersServiceTracker::default();
-
-// Or with custom URL
-let tracker = BlockHeadersServiceTracker::with_url("https://custom.headers.com");
-
-// Verify a merkle root
-let is_valid = tracker
-    .is_valid_root_for_height("abc123...", 700000)
-    .await?;
-
-// Get current height
-let height = tracker.current_height().await?;
-```
 
 ## External References
 

@@ -109,6 +109,7 @@
 mod cached_key_deriver;
 #[cfg(feature = "http")]
 mod client;
+pub mod interface;
 mod key_deriver;
 mod proto_wallet;
 pub mod substrates;
@@ -118,6 +119,10 @@ pub mod wire;
 
 // Re-export all public types
 pub use cached_key_deriver::{CacheConfig, CachedKeyDeriver};
+pub use interface::{
+    CryptoWallet, FullWallet, RevealCounterpartyKeyLinkageArgs as WalletRevealCounterpartyArgs,
+    RevealSpecificKeyLinkageArgs as WalletRevealSpecificArgs, WalletInterface,
+};
 pub use key_deriver::{KeyDeriver, KeyDeriverApi};
 pub use proto_wallet::{
     // Argument types

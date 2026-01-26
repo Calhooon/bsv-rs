@@ -1001,3 +1001,345 @@ mod tests {
         assert!(timestamp.contains('T'));
     }
 }
+
+// =============================================================================
+// WalletInterface Implementation
+// =============================================================================
+
+use super::interface::{
+    RevealCounterpartyKeyLinkageArgs as InterfaceRevealCounterpartyArgs,
+    RevealSpecificKeyLinkageArgs as InterfaceRevealSpecificArgs, WalletInterface,
+};
+use super::types::{
+    KeyLinkageResult, RevealCounterpartyKeyLinkageResult as TypesRevealCounterpartyResult,
+    RevealSpecificKeyLinkageResult as TypesRevealSpecificResult,
+};
+use super::{
+    AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
+    CreateActionArgs, CreateActionResult, DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs,
+    DiscoverCertificatesResult, GetHeaderArgs, GetHeaderResult, GetHeightResult, GetNetworkResult,
+    GetVersionResult, InternalizeActionArgs, InternalizeActionResult, ListActionsArgs,
+    ListActionsResult, ListCertificatesArgs, ListCertificatesResult, ListOutputsArgs,
+    ListOutputsResult, Network, ProveCertificateArgs, ProveCertificateResult,
+    RelinquishCertificateArgs, RelinquishCertificateResult, RelinquishOutputArgs,
+    RelinquishOutputResult, SignActionArgs, SignActionResult, WalletCertificate,
+};
+use async_trait::async_trait;
+
+#[async_trait]
+impl WalletInterface for ProtoWallet {
+    // =========================================================================
+    // Key Operations (all supported)
+    // =========================================================================
+
+    async fn get_public_key(
+        &self,
+        args: GetPublicKeyArgs,
+        _originator: &str,
+    ) -> Result<GetPublicKeyResult> {
+        self.get_public_key(args)
+    }
+
+    async fn encrypt(&self, args: EncryptArgs, _originator: &str) -> Result<EncryptResult> {
+        self.encrypt(args)
+    }
+
+    async fn decrypt(&self, args: DecryptArgs, _originator: &str) -> Result<DecryptResult> {
+        self.decrypt(args)
+    }
+
+    async fn create_hmac(
+        &self,
+        args: CreateHmacArgs,
+        _originator: &str,
+    ) -> Result<CreateHmacResult> {
+        self.create_hmac(args)
+    }
+
+    async fn verify_hmac(
+        &self,
+        args: VerifyHmacArgs,
+        _originator: &str,
+    ) -> Result<VerifyHmacResult> {
+        self.verify_hmac(args)
+    }
+
+    async fn create_signature(
+        &self,
+        args: CreateSignatureArgs,
+        _originator: &str,
+    ) -> Result<CreateSignatureResult> {
+        self.create_signature(args)
+    }
+
+    async fn verify_signature(
+        &self,
+        args: VerifySignatureArgs,
+        _originator: &str,
+    ) -> Result<VerifySignatureResult> {
+        self.verify_signature(args)
+    }
+
+    async fn reveal_counterparty_key_linkage(
+        &self,
+        args: InterfaceRevealCounterpartyArgs,
+        _originator: &str,
+    ) -> Result<TypesRevealCounterpartyResult> {
+        let result = self.reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs {
+            counterparty: args.counterparty.clone(),
+            verifier: args.verifier.clone(),
+        })?;
+
+        // Parse the hex strings back to PublicKeys
+        let prover = PublicKey::from_hex(&result.prover)?;
+        let counterparty_key = PublicKey::from_hex(&result.counterparty)?;
+
+        Ok(TypesRevealCounterpartyResult {
+            linkage: KeyLinkageResult {
+                encrypted_linkage: result.encrypted_linkage,
+                encrypted_linkage_proof: result.encrypted_linkage_proof,
+                prover,
+                verifier: args.verifier,
+                counterparty: counterparty_key,
+            },
+            revelation_time: result.revelation_time,
+        })
+    }
+
+    async fn reveal_specific_key_linkage(
+        &self,
+        args: InterfaceRevealSpecificArgs,
+        _originator: &str,
+    ) -> Result<TypesRevealSpecificResult> {
+        let result = self.reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs {
+            counterparty: args.counterparty.clone(),
+            verifier: args.verifier.clone(),
+            protocol_id: args.protocol_id.clone(),
+            key_id: args.key_id.clone(),
+        })?;
+
+        // Parse the hex strings back to PublicKeys
+        let prover = PublicKey::from_hex(&result.prover)?;
+        // Counterparty may be "self" or "anyone" - handle gracefully
+        let counterparty_key = match args.counterparty {
+            Counterparty::Self_ | Counterparty::Anyone => self.identity_key(),
+            Counterparty::Other(ref pk) => pk.clone(),
+        };
+
+        Ok(TypesRevealSpecificResult {
+            linkage: KeyLinkageResult {
+                encrypted_linkage: result.encrypted_linkage,
+                encrypted_linkage_proof: result.encrypted_linkage_proof,
+                prover,
+                verifier: args.verifier,
+                counterparty: counterparty_key,
+            },
+            protocol: result.protocol_id,
+            key_id: result.key_id,
+            proof_type: result.proof_type,
+        })
+    }
+
+    // =========================================================================
+    // Action Operations (NOT supported - require full wallet)
+    // =========================================================================
+
+    async fn create_action(
+        &self,
+        _args: CreateActionArgs,
+        _originator: &str,
+    ) -> Result<CreateActionResult> {
+        Err(Error::WalletError(
+            "createAction requires a full wallet implementation with UTXO management".to_string(),
+        ))
+    }
+
+    async fn sign_action(
+        &self,
+        _args: SignActionArgs,
+        _originator: &str,
+    ) -> Result<SignActionResult> {
+        Err(Error::WalletError(
+            "signAction requires a full wallet implementation with UTXO management".to_string(),
+        ))
+    }
+
+    async fn abort_action(
+        &self,
+        _args: AbortActionArgs,
+        _originator: &str,
+    ) -> Result<AbortActionResult> {
+        Err(Error::WalletError(
+            "abortAction requires a full wallet implementation with UTXO management".to_string(),
+        ))
+    }
+
+    async fn list_actions(
+        &self,
+        _args: ListActionsArgs,
+        _originator: &str,
+    ) -> Result<ListActionsResult> {
+        Err(Error::WalletError(
+            "listActions requires a full wallet implementation with transaction history"
+                .to_string(),
+        ))
+    }
+
+    async fn internalize_action(
+        &self,
+        _args: InternalizeActionArgs,
+        _originator: &str,
+    ) -> Result<InternalizeActionResult> {
+        Err(Error::WalletError(
+            "internalizeAction requires a full wallet implementation with UTXO management"
+                .to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Output Operations (NOT supported - require full wallet)
+    // =========================================================================
+
+    async fn list_outputs(
+        &self,
+        _args: ListOutputsArgs,
+        _originator: &str,
+    ) -> Result<ListOutputsResult> {
+        Err(Error::WalletError(
+            "listOutputs requires a full wallet implementation with UTXO management".to_string(),
+        ))
+    }
+
+    async fn relinquish_output(
+        &self,
+        _args: RelinquishOutputArgs,
+        _originator: &str,
+    ) -> Result<RelinquishOutputResult> {
+        Err(Error::WalletError(
+            "relinquishOutput requires a full wallet implementation with UTXO management"
+                .to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Certificate Operations (NOT supported - require full wallet)
+    // =========================================================================
+
+    async fn acquire_certificate(
+        &self,
+        _args: AcquireCertificateArgs,
+        _originator: &str,
+    ) -> Result<WalletCertificate> {
+        Err(Error::WalletError(
+            "acquireCertificate requires a full wallet implementation with certificate storage"
+                .to_string(),
+        ))
+    }
+
+    async fn list_certificates(
+        &self,
+        _args: ListCertificatesArgs,
+        _originator: &str,
+    ) -> Result<ListCertificatesResult> {
+        Err(Error::WalletError(
+            "listCertificates requires a full wallet implementation with certificate storage"
+                .to_string(),
+        ))
+    }
+
+    async fn prove_certificate(
+        &self,
+        _args: ProveCertificateArgs,
+        _originator: &str,
+    ) -> Result<ProveCertificateResult> {
+        Err(Error::WalletError(
+            "proveCertificate requires a full wallet implementation with certificate storage"
+                .to_string(),
+        ))
+    }
+
+    async fn relinquish_certificate(
+        &self,
+        _args: RelinquishCertificateArgs,
+        _originator: &str,
+    ) -> Result<RelinquishCertificateResult> {
+        Err(Error::WalletError(
+            "relinquishCertificate requires a full wallet implementation with certificate storage"
+                .to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Discovery Operations (NOT supported - require full wallet)
+    // =========================================================================
+
+    async fn discover_by_identity_key(
+        &self,
+        _args: DiscoverByIdentityKeyArgs,
+        _originator: &str,
+    ) -> Result<DiscoverCertificatesResult> {
+        Err(Error::WalletError(
+            "discoverByIdentityKey requires a full wallet implementation with certificate discovery"
+                .to_string(),
+        ))
+    }
+
+    async fn discover_by_attributes(
+        &self,
+        _args: DiscoverByAttributesArgs,
+        _originator: &str,
+    ) -> Result<DiscoverCertificatesResult> {
+        Err(Error::WalletError(
+            "discoverByAttributes requires a full wallet implementation with certificate discovery"
+                .to_string(),
+        ))
+    }
+
+    // =========================================================================
+    // Chain/Status Operations (partial support)
+    // =========================================================================
+
+    async fn is_authenticated(&self, _originator: &str) -> Result<AuthenticatedResult> {
+        // ProtoWallet is always authenticated (it has a key)
+        Ok(AuthenticatedResult {
+            authenticated: true,
+        })
+    }
+
+    async fn wait_for_authentication(&self, _originator: &str) -> Result<AuthenticatedResult> {
+        // ProtoWallet is always authenticated
+        Ok(AuthenticatedResult {
+            authenticated: true,
+        })
+    }
+
+    async fn get_height(&self, _originator: &str) -> Result<GetHeightResult> {
+        // ProtoWallet doesn't track chain state
+        // Return 0 to indicate unknown
+        Ok(GetHeightResult { height: 0 })
+    }
+
+    async fn get_header_for_height(
+        &self,
+        _args: GetHeaderArgs,
+        _originator: &str,
+    ) -> Result<GetHeaderResult> {
+        Err(Error::WalletError(
+            "getHeaderForHeight requires a full wallet implementation with block header storage"
+                .to_string(),
+        ))
+    }
+
+    async fn get_network(&self, _originator: &str) -> Result<GetNetworkResult> {
+        // ProtoWallet defaults to mainnet
+        Ok(GetNetworkResult {
+            network: Network::Mainnet,
+        })
+    }
+
+    async fn get_version(&self, _originator: &str) -> Result<GetVersionResult> {
+        Ok(GetVersionResult {
+            version: "bsv-sdk-0.1.0".to_string(),
+        })
+    }
+}
