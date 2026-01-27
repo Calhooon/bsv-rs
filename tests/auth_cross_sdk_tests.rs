@@ -163,7 +163,7 @@ fn test_certificate_binary_roundtrip() {
         // Test binary serialization without signature
         let binary_no_sig = cert.to_binary(false);
         let parsed_no_sig = Certificate::from_binary(&binary_no_sig)
-            .expect(&format!("Vector {}: failed to parse binary (no sig)", i));
+            .unwrap_or_else(|_| panic!("Vector {}: failed to parse binary (no sig)", i));
 
         assert_eq!(cert.cert_type, parsed_no_sig.cert_type);
         assert_eq!(cert.serial_number, parsed_no_sig.serial_number);
@@ -181,7 +181,7 @@ fn test_certificate_binary_roundtrip() {
         if cert.signature.is_some() {
             let binary_with_sig = cert.to_binary(true);
             let parsed_with_sig = Certificate::from_binary(&binary_with_sig)
-                .expect(&format!("Vector {}: failed to parse binary (with sig)", i));
+                .unwrap_or_else(|_| panic!("Vector {}: failed to parse binary (with sig)", i));
 
             assert_eq!(cert.signature, parsed_with_sig.signature);
         }
@@ -240,7 +240,7 @@ fn test_certificate_fields_sorted_alphabetically() {
             let parsed_value = parsed
                 .fields
                 .get(name)
-                .expect(&format!("Field {} missing after roundtrip", name));
+                .unwrap_or_else(|| panic!("Field {} missing after roundtrip", name));
             assert_eq!(
                 value, parsed_value,
                 "Field {} value changed after roundtrip",
