@@ -108,10 +108,8 @@ impl<W: WalletInterface> ContactsManager<W> {
         let originator = self.originator();
 
         // Try to check if contact already exists on chain (for update)
-        let identity_tag = match self.create_identity_tag(&contact.identity_key).await {
-            Ok(tag) => Some(tag),
-            Err(_) => None, // HMAC not supported, fall back to cache-only
-        };
+        // HMAC not supported falls back to cache-only
+        let identity_tag = self.create_identity_tag(&contact.identity_key).await.ok();
 
         // If we have a tag, try to check for existing outputs
         let existing_outputs = if let Some(ref tag) = identity_tag {
@@ -209,7 +207,7 @@ impl<W: WalletInterface> ContactsManager<W> {
         }
 
         // Try to create new contact output on chain
-        let chain_success = if identity_tag.is_some() {
+        let chain_success = if let Some(tag) = identity_tag {
             let create_result = self
                 .wallet
                 .create_action(
@@ -229,7 +227,7 @@ impl<W: WalletInterface> ContactsManager<W> {
                             ),
                             basket: Some(self.config.basket.clone()),
                             custom_instructions: Some(custom_instructions),
-                            tags: Some(vec![identity_tag.unwrap()]),
+                            tags: Some(vec![tag]),
                         }]),
                         lock_time: None,
                         version: None,

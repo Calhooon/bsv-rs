@@ -1291,16 +1291,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .as_deref()
             .unwrap_or("identity-client");
 
-        let decrypted_fields = match verifiable_cert
+        let decrypted_fields: HashMap<String, String> = verifiable_cert
             .decrypt_fields(&anyone_wallet, &subject, originator)
             .await
-        {
-            Ok(fields) => fields,
-            Err(_) => {
-                // Return empty decrypted fields rather than failing entirely
-                HashMap::new()
-            }
-        };
+            .unwrap_or_default();
 
         // Step 9: Build certifier info (default for now, could be enhanced via registry lookup)
         let certifier_info = CertifierInfo {
