@@ -3,9 +3,9 @@
 //! Provides traits and implementations for communicating with overlay services
 //! over HTTP(S).
 
-use crate::overlay::types::{LookupAnswer, LookupQuestion, Steak, TaggedBEEF};
 #[cfg(feature = "http")]
 use crate::overlay::types::OutputListItem;
+use crate::overlay::types::{LookupAnswer, LookupQuestion, Steak, TaggedBEEF};
 use crate::{Error, Result};
 use async_trait::async_trait;
 
@@ -306,9 +306,8 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
                                 }
                             })?;
 
-                            let output_index = item
-                                .get("outputIndex")
-                                .and_then(|v| v.as_u64())? as u32;
+                            let output_index =
+                                item.get("outputIndex").and_then(|v| v.as_u64())? as u32;
 
                             let context = item.get("context").and_then(|v| {
                                 if let Some(arr) = v.as_array() {
@@ -373,7 +372,7 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
     for _ in 0..n_outpoints {
         // Read 32-byte txid
         let txid_bytes = reader
-            .read(32)
+            .read_bytes(32)
             .map_err(|e| Error::OverlayError(format!("Failed to read txid: {}", e)))?;
         let txid = to_hex(&txid_bytes);
 
@@ -392,7 +391,7 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
         let context = if context_len > 0 {
             Some(
                 reader
-                    .read(context_len)
+                    .read_bytes(context_len)
                     .map_err(|e| Error::OverlayError(format!("Failed to read context: {}", e)))?
                     .to_vec(),
             )
@@ -404,7 +403,7 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
     }
 
     // Remaining bytes are BEEF
-    let beef_data = reader.remaining().to_vec();
+    let beef_data = reader.read_remaining().to_vec();
 
     // Parse BEEF and create OutputListItems for each outpoint
     let outputs = outpoints
@@ -509,7 +508,10 @@ mod tests {
         assert_eq!(varint_encode(252), vec![252]);
         assert_eq!(varint_encode(253), vec![0xfd, 253, 0]);
         assert_eq!(varint_encode(0x1234), vec![0xfd, 0x34, 0x12]);
-        assert_eq!(varint_encode(0x12345678), vec![0xfe, 0x78, 0x56, 0x34, 0x12]);
+        assert_eq!(
+            varint_encode(0x12345678),
+            vec![0xfe, 0x78, 0x56, 0x34, 0x12]
+        );
     }
 
     #[test]

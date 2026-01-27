@@ -177,15 +177,16 @@ impl TopicBroadcaster {
         };
 
         // Find interested hosts
-        let interested_hosts = self.find_interested_hosts().await.map_err(|e| {
-            BroadcastFailure {
-                status: BroadcastStatus::Error,
-                code: "ERR_HOST_DISCOVERY".into(),
-                txid: Some(tx.id()),
-                description: e.to_string(),
-                more: None,
-            }
-        })?;
+        let interested_hosts =
+            self.find_interested_hosts()
+                .await
+                .map_err(|e| BroadcastFailure {
+                    status: BroadcastStatus::Error,
+                    code: "ERR_HOST_DISCOVERY".into(),
+                    txid: Some(tx.id()),
+                    description: e.to_string(),
+                    more: None,
+                })?;
 
         if interested_hosts.is_empty() {
             return Err(BroadcastFailure {
@@ -313,10 +314,7 @@ impl TopicBroadcaster {
         }
 
         // Query for hosts interested in our topics via SHIP lookup
-        let question = LookupQuestion::new(
-            "ls_ship",
-            serde_json::json!({ "topics": self.topics }),
-        );
+        let question = LookupQuestion::new("ls_ship", serde_json::json!({ "topics": self.topics }));
 
         let answer = self
             .resolver
@@ -354,10 +352,7 @@ impl TopicBroadcaster {
     }
 
     /// Check acknowledgment requirements.
-    fn check_acknowledgments(
-        &self,
-        host_acks: &HashMap<String, HashSet<String>>,
-    ) -> Result<()> {
+    fn check_acknowledgments(&self, host_acks: &HashMap<String, HashSet<String>>) -> Result<()> {
         // Check require_ack_from_all_hosts
         self.check_all_hosts_requirement(host_acks)?;
 
@@ -553,7 +548,10 @@ mod tests {
     #[test]
     fn test_require_ack_default() {
         let config = TopicBroadcasterConfig::default();
-        assert!(matches!(config.require_ack_from_all_hosts, RequireAck::None));
+        assert!(matches!(
+            config.require_ack_from_all_hosts,
+            RequireAck::None
+        ));
         assert!(matches!(config.require_ack_from_any_host, RequireAck::All));
     }
 

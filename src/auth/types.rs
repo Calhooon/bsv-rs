@@ -402,7 +402,10 @@ mod tests {
     #[test]
     fn test_message_type_conversion() {
         assert_eq!(MessageType::InitialRequest.as_str(), "initialRequest");
-        assert_eq!(MessageType::from_str("initialRequest"), Some(MessageType::InitialRequest));
+        assert_eq!(
+            MessageType::from_str("initialRequest"),
+            Some(MessageType::InitialRequest)
+        );
         assert_eq!(MessageType::from_str("invalid"), None);
     }
 

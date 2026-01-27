@@ -269,7 +269,9 @@ impl HostReputationTracker {
     ///
     /// Lower score = better reputation.
     fn compute_score(&self, entry: &HostReputationEntry, now: u64) -> f64 {
-        let latency = entry.avg_latency_ms.unwrap_or(self.config.default_latency_ms);
+        let latency = entry
+            .avg_latency_ms
+            .unwrap_or(self.config.default_latency_ms);
 
         let failure_penalty = (entry.consecutive_failures as f64) * self.config.failure_penalty_ms;
 
@@ -279,8 +281,8 @@ impl HostReputationTracker {
             0.0
         };
 
-        let success_bonus = (entry.total_successes as f64 * self.config.success_bonus_ms)
-            .min(latency / 2.0);
+        let success_bonus =
+            (entry.total_successes as f64 * self.config.success_bonus_ms).min(latency / 2.0);
 
         latency + failure_penalty + backoff_penalty - success_bonus
     }
@@ -380,11 +382,7 @@ mod tests {
 
         // New host (no records)
 
-        let hosts = vec![
-            "good".to_string(),
-            "bad".to_string(),
-            "new".to_string(),
-        ];
+        let hosts = vec!["good".to_string(), "bad".to_string(), "new".to_string()];
         let ranked = tracker.rank_hosts(&hosts);
 
         assert_eq!(ranked.len(), 3);

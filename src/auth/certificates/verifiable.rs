@@ -82,7 +82,10 @@ impl VerifiableCertificate {
             ))
         })?;
 
-        let protocol = Protocol::new(SecurityLevel::Counterparty, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL);
+        let protocol = Protocol::new(
+            SecurityLevel::Counterparty,
+            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
+        );
         let key_id = Certificate::get_field_encryption_key_id_verifiable(
             field_name,
             &self.certificate.serial_number,
@@ -210,7 +213,12 @@ mod tests {
         let certifier = PrivateKey::random();
         let subject = PrivateKey::random().public_key();
 
-        let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject.clone(), certifier.public_key());
+        let mut cert = Certificate::new(
+            [1u8; 32],
+            [2u8; 32],
+            subject.clone(),
+            certifier.public_key(),
+        );
         cert.sign(&certifier).unwrap();
 
         let mut keyring = HashMap::new();
@@ -242,7 +250,12 @@ mod tests {
         let certifier = PrivateKey::random();
         let subject = PrivateKey::random().public_key();
 
-        let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject.clone(), certifier.public_key());
+        let mut cert = Certificate::new(
+            [1u8; 32],
+            [2u8; 32],
+            subject.clone(),
+            certifier.public_key(),
+        );
         cert.sign(&certifier).unwrap();
 
         let verifiable = VerifiableCertificate::from_certificate(cert);

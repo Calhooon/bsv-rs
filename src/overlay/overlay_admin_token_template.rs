@@ -283,9 +283,8 @@ mod tests {
         );
 
         // A regular P2PKH script is not an admin token
-        let regular_script = LockingScript::from_asm(
-            "OP_DUP OP_HASH160 0x14 OP_EQUALVERIFY OP_CHECKSIG",
-        );
+        let regular_script =
+            LockingScript::from_asm("OP_DUP OP_HASH160 0x14 OP_EQUALVERIFY OP_CHECKSIG");
 
         assert!(is_overlay_admin_token(&admin_script));
         assert!(regular_script.is_err() || !is_overlay_admin_token(&regular_script.unwrap()));

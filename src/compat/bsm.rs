@@ -293,7 +293,8 @@ mod tests {
         let message = b"Hello!";
 
         let signature = sign_message(&key, message).unwrap();
-        let (recovered, compressed) = recover_public_key_from_signature(&signature, message).unwrap();
+        let (recovered, compressed) =
+            recover_public_key_from_signature(&signature, message).unwrap();
 
         assert_eq!(recovered.to_compressed(), key.public_key().to_compressed());
         assert!(compressed);

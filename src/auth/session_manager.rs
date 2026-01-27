@@ -262,7 +262,10 @@ mod tests {
     use crate::auth::types::current_time_ms;
     use crate::primitives::PrivateKey;
 
-    fn make_session(nonce: &str, identity_key: Option<&crate::primitives::PublicKey>) -> PeerSession {
+    fn make_session(
+        nonce: &str,
+        identity_key: Option<&crate::primitives::PublicKey>,
+    ) -> PeerSession {
         PeerSession {
             session_nonce: Some(nonce.to_string()),
             peer_identity_key: identity_key.cloned(),

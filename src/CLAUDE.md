@@ -21,7 +21,9 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | `transaction/` | `transaction` | Complete | Transaction construction, signing, BEEF/MerklePath SPV proofs |
 | `wallet/` | `wallet` | Complete | BRC-42 key derivation, ProtoWallet, WalletClient |
 | `messages/` | `messages` | Complete | BRC-78 message signing, encryption, and verification |
-| `compat/` | `compat` | Complete | BIP-39 mnemonic compatibility (legacy wallet support) |
+| `compat/` | `compat` | Complete | BIP-39/BIP-32 mnemonic and HD key compatibility (legacy wallet support) |
+| `auth/` | `auth` | Complete | Mutual authentication, certificates, and peer sessions |
+| `overlay/` | `overlay` | Complete | Overlay network lookup, topic broadcasting, and STEAK protocol |
 
 ## Key Exports
 
@@ -48,6 +50,12 @@ pub mod messages;
 
 #[cfg(feature = "compat")]
 pub mod compat;
+
+#[cfg(feature = "auth")]
+pub mod auth;
+
+#[cfg(feature = "overlay")]
+pub mod overlay;
 ```
 
 **Convenience re-exports** from `primitives`:
@@ -94,6 +102,31 @@ pub mod compat;
 - `Mnemonic` - BIP-39 mnemonic phrase for seed generation
 - `Language` - Wordlist language for mnemonic phrases
 - `WordCount` - Number of words in mnemonic (12, 15, 18, 21, or 24)
+
+**Convenience re-exports** from `auth`:
+- `AuthMessage` - Authenticated message for peer communication
+- `Certificate` - Identity certificate for authentication
+- `MasterCertificate` - Master certificate for issuing other certificates
+- `VerifiableCertificate` - Certificate with verification capabilities
+- `MessageType` - Type discriminator for auth protocol messages
+- `Peer` - Authenticated peer connection
+- `PeerOptions` - Configuration options for peer creation
+- `PeerSession` - Active session with an authenticated peer
+- `RequestedCertificateSet` - Set of certificates requested during handshake
+- `SessionManager` - Manager for multiple peer sessions
+- `SimplifiedFetchTransport` - HTTP-based transport implementation
+- `Transport` - Trait for message transport abstraction
+
+**Convenience re-exports** from `overlay`:
+- `LookupAnswer` - Response from overlay network lookup
+- `LookupQuestion` - Query for overlay network lookup
+- `LookupResolver` - Resolver for overlay network queries
+- `NetworkPreset` - Predefined network configurations (mainnet, testnet)
+- `Steak` - STEAK (Simplified Transaction Envelope with Attestation Keys) protocol
+- `TaggedBEEF` - BEEF transaction with topic tags for overlay routing
+- `TopicBroadcaster` - Broadcaster for topic-based overlay networks
+
+Note: `overlay::Protocol` is a separate type from `wallet::Protocol` and is not re-exported to avoid name collision.
 
 ### Error Types (`error.rs`)
 
@@ -158,6 +191,26 @@ The `Error` enum provides unified error handling across all modules. It uses `th
 | `InvalidMnemonic` | `(String)` | Invalid BIP-39 mnemonic phrase |
 | `InvalidEntropyLength` | `{ expected, actual }` | Wrong entropy length for mnemonic generation |
 | `InvalidMnemonicWord` | `(String)` | Unknown word in mnemonic phrase |
+| `InvalidExtendedKey` | `(String)` | Invalid BIP-32 extended key format |
+| `HardenedFromPublic` | — | Cannot derive hardened child from public key |
+| `InvalidDerivationPath` | `(String)` | Invalid BIP-32 derivation path |
+| `EciesDecryptionFailed` | `(String)` | ECIES decryption operation failed |
+| `EciesHmacMismatch` | — | ECIES HMAC verification failed |
+
+**Auth errors** (requires `auth` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `AuthError` | `(String)` | General authentication error |
+| `SessionNotFound` | `(String)` | Requested session does not exist |
+| `CertificateValidationError` | `(String)` | Certificate validation failed |
+| `TransportError` | `(String)` | Transport layer error (network, encoding) |
+
+**Overlay errors** (requires `overlay` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `OverlayError` | `(String)` | General overlay network error |
+| `NoHostsFound` | `(String)` | No hosts found for the specified service |
+| `OverlayBroadcastFailed` | `(String)` | Failed to broadcast to overlay network |
 
 **Result alias**:
 ```rust
@@ -235,11 +288,15 @@ full
  │              └── primitives
  ├── messages
  │    └── wallet
- └── compat
-      └── primitives
+ ├── compat
+ │    └── primitives
+ ├── auth
+ │    └── wallet
+ └── overlay
+      └── transaction
 ```
 
-The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` feature only requires `primitives`.
+The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` feature only requires `primitives`. The `auth` feature requires `wallet`, and `overlay` requires `transaction`.
 
 Default features include `primitives` and `script`:
 ```rust
@@ -259,12 +316,18 @@ use bsv_sdk::messages;
 
 #[cfg(feature = "compat")]
 use bsv_sdk::compat;
+
+#[cfg(feature = "auth")]
+use bsv_sdk::auth;
+
+#[cfg(feature = "overlay")]
+use bsv_sdk::overlay;
 ```
 
 Additional optional features:
 - **`http`** - Enables HTTP clients for ARC broadcaster, WhatsOnChain chain tracker, and WalletClient substrate
 - **`wasm`** - Enables WebAssembly support via `getrandom/js`
-- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`
+- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`, `auth`, `overlay`
 
 ## Adding New Errors
 
@@ -303,4 +366,6 @@ thiserror = "1.0"
 - `wallet/CLAUDE.md` - Wallet module documentation
 - `messages/CLAUDE.md` - Messages module documentation
 - `compat/CLAUDE.md` - Compatibility module documentation
+- `auth/CLAUDE.md` - Authentication module documentation
+- `overlay/CLAUDE.md` - Overlay network module documentation
 - `../CLAUDE.md` - Project root documentation

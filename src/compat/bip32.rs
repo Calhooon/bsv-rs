@@ -117,7 +117,9 @@ impl ExtendedKey {
         if seed.len() < MIN_SEED_BYTES || seed.len() > MAX_SEED_BYTES {
             return Err(Error::InvalidExtendedKey(format!(
                 "Seed length must be between {} and {} bytes, got {}",
-                MIN_SEED_BYTES, MAX_SEED_BYTES, seed.len()
+                MIN_SEED_BYTES,
+                MAX_SEED_BYTES,
+                seed.len()
             )));
         }
 
@@ -610,7 +612,10 @@ impl ExtendedKey {
         let pubkey_bytes = self.public_key_bytes()?;
         let hash = hash160(&pubkey_bytes);
         let version = if mainnet { 0x00 } else { 0x6f };
-        Ok(crate::primitives::encoding::to_base58_check(&hash, &[version]))
+        Ok(crate::primitives::encoding::to_base58_check(
+            &hash,
+            &[version],
+        ))
     }
 
     /// Helper to get public key bytes.

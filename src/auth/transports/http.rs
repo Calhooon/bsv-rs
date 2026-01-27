@@ -28,10 +28,9 @@ pub trait Transport: Send + Sync {
 }
 
 /// Type alias for transport callback function.
-pub type TransportCallback =
-    dyn Fn(AuthMessage) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
-        + Send
-        + Sync;
+pub type TransportCallback = dyn Fn(AuthMessage) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+    + Send
+    + Sync;
 
 /// BRC-104 HTTP header names for authenticated requests.
 pub mod headers {

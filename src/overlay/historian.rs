@@ -24,9 +24,7 @@ use std::pin::Pin;
 /// * `T` - The decoded/typed value produced for a matching output
 /// * `C` - The per-call context passed through Historian to the interpreter
 pub type InterpreterFn<T, C> = Box<
-    dyn Fn(&Transaction, u32, Option<&C>) -> Pin<Box<dyn Future<Output = Option<T>>>>
-        + Send
-        + Sync,
+    dyn Fn(&Transaction, u32, Option<&C>) -> Pin<Box<dyn Future<Output = Option<T>>>> + Send + Sync,
 >;
 
 /// Configuration for the Historian.
@@ -91,7 +89,9 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
             interpreter,
             debug: config.debug,
             history_cache: config.history_cache.map(tokio::sync::RwLock::new),
-            interpreter_version: config.interpreter_version.unwrap_or_else(|| "v1".to_string()),
+            interpreter_version: config
+                .interpreter_version
+                .unwrap_or_else(|| "v1".to_string()),
             ctx_key_fn: config.ctx_key_fn,
         }
     }
@@ -301,8 +301,8 @@ impl<T: Clone + Send + Sync, C: Send + Sync> SyncHistorian<T, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::transaction::{TransactionInput, TransactionOutput};
     use crate::script::LockingScript;
+    use crate::transaction::{TransactionInput, TransactionOutput};
 
     fn create_test_tx(_id_suffix: u8, source: Option<Transaction>) -> Transaction {
         let mut tx = Transaction::new();
@@ -324,9 +324,7 @@ mod tests {
     fn test_sync_historian_single_tx() {
         let tx = create_test_tx(1, None);
 
-        let historian = SyncHistorian::<u32, ()>::new(|_tx, output_idx, _ctx| {
-            Some(output_idx)
-        });
+        let historian = SyncHistorian::<u32, ()>::new(|_tx, output_idx, _ctx| Some(output_idx));
 
         let history = historian.build_history(&tx, None);
         assert_eq!(history, vec![0]);
@@ -339,9 +337,7 @@ mod tests {
         let tx2 = create_test_tx(2, Some(tx1));
         let tx3 = create_test_tx(3, Some(tx2));
 
-        let historian = SyncHistorian::<String, ()>::new(|tx, _output_idx, _ctx| {
-            Some(tx.id())
-        });
+        let historian = SyncHistorian::<String, ()>::new(|tx, _output_idx, _ctx| Some(tx.id()));
 
         let history = historian.build_history(&tx3, None);
 
@@ -371,9 +367,8 @@ mod tests {
     fn test_sync_historian_with_context() {
         let tx = create_test_tx(1, None);
 
-        let historian = SyncHistorian::<u32, u32>::new(|_tx, output_idx, ctx| {
-            ctx.map(|c| output_idx + c)
-        });
+        let historian =
+            SyncHistorian::<u32, u32>::new(|_tx, output_idx, ctx| ctx.map(|c| output_idx + c));
 
         let history_with_ctx = historian.build_history(&tx, Some(&10));
         assert_eq!(history_with_ctx, vec![10]);
@@ -387,9 +382,7 @@ mod tests {
         // Create a tx that references itself (shouldn't happen in practice)
         let tx = create_test_tx(1, None);
 
-        let historian = SyncHistorian::<u32, ()>::new(|_tx, output_idx, _ctx| {
-            Some(output_idx)
-        });
+        let historian = SyncHistorian::<u32, ()>::new(|_tx, output_idx, _ctx| Some(output_idx));
 
         // Should not infinite loop
         let history = historian.build_history(&tx, None);
@@ -400,9 +393,8 @@ mod tests {
     async fn test_async_historian_basic() {
         let tx = create_test_tx(1, None);
 
-        let interpreter: InterpreterFn<u32, ()> = Box::new(|_tx, output_idx, _ctx| {
-            Box::pin(async move { Some(output_idx) })
-        });
+        let interpreter: InterpreterFn<u32, ()> =
+            Box::new(|_tx, output_idx, _ctx| Box::pin(async move { Some(output_idx) }));
 
         let historian = Historian::new(interpreter, HistorianConfig::default());
         let history = historian.build_history(&tx, None).await.unwrap();
@@ -414,9 +406,8 @@ mod tests {
     async fn test_async_historian_with_cache() {
         let tx = create_test_tx(1, None);
 
-        let interpreter: InterpreterFn<u32, ()> = Box::new(|_tx, output_idx, _ctx| {
-            Box::pin(async move { Some(output_idx) })
-        });
+        let interpreter: InterpreterFn<u32, ()> =
+            Box::new(|_tx, output_idx, _ctx| Box::pin(async move { Some(output_idx) }));
 
         let config = HistorianConfig {
             debug: false,

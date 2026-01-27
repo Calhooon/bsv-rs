@@ -119,10 +119,9 @@ mod tests {
 
     #[test]
     fn test_roundtrip() {
-        let original = from_hex(
-            "02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeb05f9d2",
-        )
-        .unwrap();
+        let original =
+            from_hex("02c0ded2bc1f1305fb0faac5e6c03ee3a1924234985427b6167ca569d13df435cfeb05f9d2")
+                .unwrap();
         let encoded = encode(&original);
         assert_eq!(
             encoded,

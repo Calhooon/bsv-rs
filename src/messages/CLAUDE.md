@@ -7,11 +7,11 @@ This module implements BRC-77 (signed messages) and BRC-78 (encrypted messages) 
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module root with version constants and public re-exports |
-| `signed.rs` | BRC-77 message signing and verification |
-| `encrypted.rs` | BRC-78 message encryption and decryption |
+| File | Lines | Purpose |
+|------|-------|---------|
+| `mod.rs` | 131 | Module root with version constants, public re-exports, and integration tests |
+| `signed.rs` | 463 | BRC-77 message signing and verification with comprehensive test suite |
+| `encrypted.rs` | 442 | BRC-78 message encryption and decryption with cross-SDK test vectors |
 
 ## Key Exports
 
@@ -28,8 +28,8 @@ This module implements BRC-77 (signed messages) and BRC-78 (encrypted messages) 
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `SIGNED_VERSION` | `[0x42, 0x42, 0x33, 0x01]` | Version bytes for BRC-77 signed messages |
-| `ENCRYPTED_VERSION` | `[0x42, 0x42, 0x10, 0x33]` | Version bytes for BRC-78 encrypted messages |
+| `SIGNED_VERSION` | `[0x42, 0x42, 0x33, 0x01]` | Version bytes for BRC-77 signed messages (`0x42423301`) |
+| `ENCRYPTED_VERSION` | `[0x42, 0x42, 0x10, 0x33]` | Version bytes for BRC-78 encrypted messages (`0x42421033`) |
 
 ## Wire Formats
 
@@ -175,9 +175,30 @@ assert_eq!(plaintext.to_vec(), decrypted);
 
 | Error | Description |
 |-------|-------------|
-| `MessageVersionMismatch` | Version bytes don't match expected protocol version |
-| `MessageError` | General message format error (too short, missing recipient) |
-| `MessageRecipientMismatch` | Provided recipient key doesn't match encrypted/signed recipient |
+| `MessageVersionMismatch { expected, actual }` | Version bytes don't match expected protocol version (includes hex of both) |
+| `MessageError(String)` | General message format error (too short, missing recipient key) |
+| `MessageRecipientMismatch { expected, actual }` | Provided recipient key doesn't match encrypted/signed recipient (hex public keys) |
+
+### Error Examples
+
+```rust
+// Version mismatch (version bytes as hex)
+Err(Error::MessageVersionMismatch {
+    expected: "42423301".to_string(),
+    actual: "01423301".to_string(),
+})
+
+// Missing recipient for recipient-specific message
+Err(Error::MessageError(
+    "this signature can only be verified with knowledge of a specific private key. The associated public key is: 02...".to_string()
+))
+
+// Wrong recipient (public keys as hex)
+Err(Error::MessageRecipientMismatch {
+    expected: "02abc...".to_string(),
+    actual: "03def...".to_string(),
+})
+```
 
 ### Signature Verification Behavior
 
@@ -193,12 +214,16 @@ assert_eq!(plaintext.to_vec(), decrypted);
 - **Forward Secrecy**: Random key IDs per message prevent key reuse at the message level
 - **Recipient Binding**: Specific-recipient signatures cannot be verified by others
 
-### BRC-78 Limitations
+### BRC-78 Security Notes
 
 The encrypted message protocol does NOT provide:
-- **Forward secrecy at the identity level** (compromised long-term keys compromise all messages)
-- **Replay protection** (same message encrypted twice produces different ciphertext due to random IV/keyID)
+- **Forward secrecy at the identity level** (compromised long-term keys compromise past messages)
+- **Replay protection** (messages can be re-sent, though each encryption produces unique ciphertext)
 - **Explicit authentication** (no identity binding beyond key possession)
+
+The protocol DOES provide:
+- **Per-message key uniqueness**: Random keyID ensures each message uses different derived keys
+- **Ciphertext indistinguishability**: Same plaintext encrypted twice produces different ciphertext (random keyID + IV)
 
 ## Cross-SDK Compatibility
 
@@ -210,17 +235,53 @@ Key compatibility points:
 - Same version bytes
 - Same wire format byte ordering
 - Same invoice number format for key derivation
-- Same 32-byte nonce for AES-GCM (non-standard, but consistent across SDKs)
+- Same 32-byte IV for AES-GCM (non-standard, but consistent across SDKs)
 - Same DER encoding for signatures
 - Same compressed public key format (33 bytes)
+- Same error message format for version mismatch and recipient mismatch
+
+### Cross-SDK Test Vectors
+
+The test suite includes vectors from other SDK implementations to ensure compatibility:
+
+- **Deterministic key tests**: Use fixed scalar values (sender=15, recipient=21) matching Go/TS SDKs
+- **Edge case handling**: Test vector for rare key lengths (leading zeros in BigNumber arrays)
+- **Error format tests**: Verify error messages match Go/TS format (hex-encoded version bytes, public keys)
+
+Example cross-SDK test (`encrypted.rs:416-441`):
+```rust
+// Test vector from TypeScript SDK - handles edge case with rare key lengths
+let encrypted: Vec<u8> = vec![66, 66, 16, 51, /* ... */];
+let result = decrypt(&encrypted, &recipient);
+assert!(result.is_ok());
+```
 
 ## Dependencies
 
 This module depends on:
 - `crate::primitives` - `PrivateKey`, `PublicKey`, `SymmetricKey`, `Signature`, `sha256`, `to_base64`
-- `crate::wallet::KeyDeriver` - BRC-42 key derivation and anyone key
+- `crate::wallet::KeyDeriver` - BRC-42 key derivation and `anyone_key()`
+- `crate::error::{Error, Result}` - Unified error types
 - `rand` - Random key ID generation
 - `hex` - Error message formatting
+
+## Testing
+
+Run tests with:
+```bash
+cargo test messages
+```
+
+The test suite covers:
+- Round-trip signing/verification for specific recipients and "anyone"
+- Round-trip encryption/decryption
+- Version mismatch detection
+- Missing recipient key errors
+- Wrong recipient key errors
+- Message tampering detection
+- Empty and large message handling
+- Deterministic key derivation (matching Go/TS SDKs)
+- Cross-SDK test vectors for edge cases
 
 ## Related Documentation
 

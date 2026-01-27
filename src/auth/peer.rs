@@ -8,15 +8,15 @@ use crate::auth::{
     session_manager::SessionManager,
     transports::Transport,
     types::{
-        AuthMessage, MessageType, PeerSession, RequestedCertificateSet,
-        AUTH_PROTOCOL_ID, AUTH_VERSION,
+        AuthMessage, MessageType, PeerSession, RequestedCertificateSet, AUTH_PROTOCOL_ID,
+        AUTH_VERSION,
     },
     utils::{create_nonce, get_verifiable_certificates, validate_certificates, verify_nonce},
 };
 use crate::primitives::PublicKey;
 use crate::wallet::{
-    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, SecurityLevel, VerifySignatureArgs,
-    WalletInterface,
+    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, SecurityLevel,
+    VerifySignatureArgs, WalletInterface,
 };
 use crate::{Error, Result};
 use std::collections::HashMap;
@@ -26,7 +26,10 @@ use tokio::sync::{oneshot, RwLock};
 
 /// Type alias for general message callbacks.
 pub type GeneralMessageCallback = Box<
-    dyn Fn(PublicKey, Vec<u8>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+    dyn Fn(
+            PublicKey,
+            Vec<u8>,
+        ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
         + Send
         + Sync,
 >;
@@ -122,16 +125,12 @@ pub struct Peer<W: WalletInterface, T: Transport> {
 impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     /// Creates a new Peer with the given options.
     pub fn new(options: PeerOptions<W, T>) -> Self {
-        let originator = options
-            .originator
-            .unwrap_or_else(|| "unknown".to_string());
+        let originator = options.originator.unwrap_or_else(|| "unknown".to_string());
 
         Self {
             wallet: options.wallet,
             transport: Arc::new(options.transport),
-            session_manager: Arc::new(RwLock::new(
-                options.session_manager.unwrap_or_default(),
-            )),
+            session_manager: Arc::new(RwLock::new(options.session_manager.unwrap_or_default())),
             certificates_to_request: options.certificates_to_request,
             general_message_callbacks: Arc::new(RwLock::new(HashMap::new())),
             certificate_callbacks: Arc::new(RwLock::new(HashMap::new())),
@@ -167,8 +166,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let my_identity = self.get_identity_key().await?;
         let mut msg = AuthMessage::new(MessageType::General, my_identity);
         msg.nonce = Some(
-            create_nonce(&self.wallet, session.peer_identity_key.as_ref(), &self.originator)
-                .await?,
+            create_nonce(
+                &self.wallet,
+                session.peer_identity_key.as_ref(),
+                &self.originator,
+            )
+            .await?,
         );
         msg.your_nonce = session.peer_nonce.clone();
         msg.payload = Some(message.to_vec());
@@ -225,8 +228,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let my_identity = self.get_identity_key().await?;
         let mut msg = AuthMessage::new(MessageType::CertificateRequest, my_identity);
         msg.nonce = Some(
-            create_nonce(&self.wallet, session.peer_identity_key.as_ref(), &self.originator)
-                .await?,
+            create_nonce(
+                &self.wallet,
+                session.peer_identity_key.as_ref(),
+                &self.originator,
+            )
+            .await?,
         );
         msg.your_nonce = session.peer_nonce.clone();
         msg.requested_certificates = Some(requested);
@@ -255,8 +262,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let my_identity = self.get_identity_key().await?;
         let mut msg = AuthMessage::new(MessageType::CertificateResponse, my_identity);
         msg.nonce = Some(
-            create_nonce(&self.wallet, session.peer_identity_key.as_ref(), &self.originator)
-                .await?,
+            create_nonce(
+                &self.wallet,
+                session.peer_identity_key.as_ref(),
+                &self.originator,
+            )
+            .await?,
         );
         msg.your_nonce = session.peer_nonce.clone();
         msg.certificates = Some(certificates);
@@ -271,7 +282,11 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     /// Callback ID that can be used to stop listening.
     pub async fn listen_for_general_messages<F>(&self, callback: F) -> u32
     where
-        F: Fn(PublicKey, Vec<u8>) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+        F: Fn(
+                PublicKey,
+                Vec<u8>,
+            )
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync
             + 'static,
@@ -297,7 +312,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         F: Fn(
                 PublicKey,
                 Vec<VerifiableCertificate>,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+            )
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync
             + 'static,
@@ -323,7 +339,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         F: Fn(
                 PublicKey,
                 RequestedCertificateSet,
-            ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
+            )
+                -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send>>
             + Send
             + Sync
             + 'static,
@@ -496,13 +513,10 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         // Wait for response with timeout
         let timeout = max_wait_time.unwrap_or(30000);
-        let result = tokio::time::timeout(
-            tokio::time::Duration::from_millis(timeout),
-            rx,
-        )
-        .await
-        .map_err(|_| Error::AuthError("Handshake timeout".into()))?
-        .map_err(|_| Error::AuthError("Handshake cancelled".into()))??;
+        let result = tokio::time::timeout(tokio::time::Duration::from_millis(timeout), rx)
+            .await
+            .map_err(|_| Error::AuthError("Handshake timeout".into()))?
+            .map_err(|_| Error::AuthError("Handshake cancelled".into()))??;
 
         Ok(result)
     }
@@ -511,7 +525,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let my_identity = self.get_identity_key().await?;
 
         // Create our session
-        let session_nonce = create_nonce(&self.wallet, Some(&message.identity_key), &self.originator).await?;
+        let session_nonce =
+            create_nonce(&self.wallet, Some(&message.identity_key), &self.originator).await?;
         let mut session = PeerSession::with_nonce(session_nonce.clone());
         session.peer_identity_key = Some(message.identity_key.clone());
         session.peer_nonce = message.nonce.clone();
@@ -581,7 +596,10 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             ..Default::default()
         };
 
-        if !self.verify_message_signature(&message, &temp_session).await? {
+        if !self
+            .verify_message_signature(&message, &temp_session)
+            .await?
+        {
             // Clean up pending handshake
             let mut pending = self.pending_handshakes.write().await;
             if let Some(tx) = pending.remove(initial_nonce) {
@@ -642,7 +660,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         // Verify signature
         if !self.verify_message_signature(&message, session).await? {
-            return Err(Error::AuthError("CertificateRequest signature invalid".into()));
+            return Err(Error::AuthError(
+                "CertificateRequest signature invalid".into(),
+            ));
         }
 
         drop(mgr);
@@ -670,7 +690,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         // Verify signature
         if !self.verify_message_signature(&message, &session).await? {
-            return Err(Error::AuthError("CertificateResponse signature invalid".into()));
+            return Err(Error::AuthError(
+                "CertificateResponse signature invalid".into(),
+            ));
         }
 
         // Validate certificates

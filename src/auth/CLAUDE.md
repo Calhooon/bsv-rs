@@ -9,10 +9,10 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | ~70 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | ~350 |
-| `session_manager.rs` | Session management with dual indexing | ~260 |
-| `peer.rs` | Core Peer implementation | ~550 |
+| `mod.rs` | Module root with re-exports | ~80 |
+| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | ~450 |
+| `session_manager.rs` | Session management with dual indexing | ~440 |
+| `peer.rs` | Core Peer implementation | ~790 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations | - |
 | `utils/` | Utility functions | - |
@@ -27,13 +27,19 @@ Certificate types for BRC-52/53:
 
 ### transports/
 Transport layer implementations:
-- `http.rs` - SimplifiedFetchTransport for HTTP
-- `MockTransport` - Testing transport
+- `http.rs` - SimplifiedFetchTransport for HTTP, MockTransport for testing
 
 ### utils/
 Utility functions:
 - `nonce.rs` - Nonce creation and verification
 - `validation.rs` - Certificate validation
+
+## Constants
+
+```rust
+pub const AUTH_VERSION: &str = "0.1";
+pub const AUTH_PROTOCOL_ID: &str = "auth message signature";
+```
 
 ## Key Exports
 
@@ -45,6 +51,15 @@ Utility functions:
 - `CertificateRequest` - Requests certificates
 - `CertificateResponse` - Sends certificates
 - `General` - Authenticated message
+
+```rust
+impl MessageType {
+    pub fn as_str(&self) -> &'static str
+    pub fn from_str(s: &str) -> Option<Self>
+    pub fn is_handshake(&self) -> bool       // InitialRequest or InitialResponse
+    pub fn is_certificate(&self) -> bool     // CertificateRequest or CertificateResponse
+}
+```
 
 **AuthMessage** - Full authentication message structure:
 ```rust
@@ -60,6 +75,13 @@ pub struct AuthMessage {
     pub payload: Option<Vec<u8>>,
     pub signature: Option<Vec<u8>>,         // DER
 }
+
+impl AuthMessage {
+    pub fn new(message_type: MessageType, identity_key: PublicKey) -> Self
+    pub fn signing_data(&self) -> Vec<u8>
+    pub fn get_key_id(&self, peer_session_nonce: Option<&str>) -> String
+    pub fn validate(&self) -> Result<()>
+}
 ```
 
 **PeerSession** - Session state between peers:
@@ -73,6 +95,13 @@ pub struct PeerSession {
     pub certificates_required: bool,
     pub certificates_validated: bool,
 }
+
+impl PeerSession {
+    pub fn new() -> Self
+    pub fn with_nonce(session_nonce: String) -> Self
+    pub fn touch(&mut self)                  // Update last_update to now
+    pub fn is_ready(&self) -> bool           // Authenticated and certs validated (if required)
+}
 ```
 
 **RequestedCertificateSet** - Certificate request specification:
@@ -81,20 +110,42 @@ pub struct RequestedCertificateSet {
     pub certifiers: Vec<String>,            // hex-encoded public keys
     pub types: HashMap<String, Vec<String>>, // type_id -> field_names
 }
+
+impl RequestedCertificateSet {
+    pub fn new() -> Self
+    pub fn is_empty(&self) -> bool
+    pub fn add_certifier(&mut self, certifier_hex: impl Into<String>)
+    pub fn add_type(&mut self, type_id: impl Into<String>, fields: Vec<String>)
+    pub fn is_certifier_trusted(&self, certifier_hex: &str) -> bool
+    pub fn is_type_requested(&self, type_id: &str) -> bool
+    pub fn get_fields_for_type(&self, type_id: &str) -> Option<&Vec<String>>
+}
+```
+
+**current_time_ms** - Utility function:
+```rust
+pub fn current_time_ms() -> u64  // Milliseconds since Unix epoch
 ```
 
 ### Session Manager
 
-**SessionManager** - Manages concurrent sessions:
+**SessionManager** - Manages concurrent sessions with dual indexing:
 ```rust
 impl SessionManager {
     pub fn new() -> Self
     pub fn add_session(&mut self, session: PeerSession) -> Result<()>
     pub fn update_session(&mut self, session: PeerSession)
     pub fn get_session(&self, identifier: &str) -> Option<&PeerSession>
-    pub fn get_session_mut(&mut self, nonce: &str) -> Option<&mut PeerSession>
+    pub fn get_session_mut(&mut self, session_nonce: &str) -> Option<&mut PeerSession>
     pub fn remove_session(&mut self, session: &PeerSession)
+    pub fn remove_by_nonce(&mut self, session_nonce: &str)
     pub fn has_session(&self, identifier: &str) -> bool
+    pub fn len(&self) -> usize
+    pub fn is_empty(&self) -> bool
+    pub fn get_sessions_for_identity(&self, identity_key_hex: &str) -> Vec<&PeerSession>
+    pub fn iter(&self) -> impl Iterator<Item = &PeerSession>
+    pub fn clear(&mut self)
+    pub fn prune_stale_sessions(&mut self, max_age_ms: u64) -> usize
 }
 ```
 
@@ -104,6 +155,13 @@ Session lookup:
 3. "Best" = authenticated preferred, then most recent
 
 ### Peer
+
+**Callback types**:
+```rust
+pub type GeneralMessageCallback = Box<dyn Fn(PublicKey, Vec<u8>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+pub type CertificateCallback = Box<dyn Fn(PublicKey, Vec<VerifiableCertificate>) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+pub type CertificateRequestCallback = Box<dyn Fn(PublicKey, RequestedCertificateSet) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync>;
+```
 
 **Peer** - Main authentication handler:
 ```rust
@@ -116,13 +174,18 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub async fn request_certificates(&self, requested: RequestedCertificateSet, identity_key: Option<&str>, max_wait: Option<u64>) -> Result<()>
     pub async fn send_certificate_response(&self, verifier_key: &str, certs: Vec<VerifiableCertificate>) -> Result<()>
 
-    // Listening
+    // Listening for general messages
     pub async fn listen_for_general_messages<F>(&self, callback: F) -> u32
-    pub async fn stop_listening_for_general_messages(&self, id: u32)
-    pub async fn listen_for_certificates_received<F>(&self, callback: F) -> u32
-    pub async fn listen_for_certificates_requested<F>(&self, callback: F) -> u32
+    pub async fn stop_listening_for_general_messages(&self, callback_id: u32)
 
-    // Internal
+    // Listening for certificates
+    pub async fn listen_for_certificates_received<F>(&self, callback: F) -> u32
+    pub async fn stop_listening_for_certificates_received(&self, callback_id: u32)
+    pub async fn listen_for_certificates_requested<F>(&self, callback: F) -> u32
+    pub async fn stop_listening_for_certificates_requested(&self, callback_id: u32)
+
+    // Session and identity
+    pub fn session_manager(&self) -> &Arc<RwLock<SessionManager>>
     pub async fn get_identity_key(&self) -> Result<PublicKey>
     pub async fn handle_incoming_message(&self, message: AuthMessage) -> Result<()>
 }
@@ -194,6 +257,12 @@ impl VerifiableCertificate {
 }
 ```
 
+**Certificate Constants**:
+```rust
+pub const CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL: &str = "certificate field encryption";
+pub const CERTIFICATE_SIGNATURE_PROTOCOL: &str = "certificate signature";
+```
+
 ### Transport
 
 **Transport** - Trait for message transport:
@@ -228,14 +297,18 @@ impl MockTransport {
 
 **Nonce functions**:
 ```rust
+pub const NONCE_PROTOCOL: &str = "server hmac";
+
 pub async fn create_nonce<W: WalletInterface>(wallet: &W, counterparty: Option<&PublicKey>, originator: &str) -> Result<String>
 pub async fn verify_nonce<W: WalletInterface>(nonce: &str, wallet: &W, counterparty: Option<&PublicKey>, originator: &str) -> Result<bool>
 pub fn validate_nonce_format(nonce: &str) -> Result<()>
+pub fn get_nonce_random(nonce: &str) -> Result<Vec<u8>>
 ```
 
 **Validation functions**:
 ```rust
 pub async fn validate_certificates<W: WalletInterface>(verifier_wallet: &W, message: &AuthMessage, requested: Option<&RequestedCertificateSet>, originator: &str) -> Result<()>
+pub async fn validate_certificate<W: WalletInterface>(verifier_wallet: &W, cert: &VerifiableCertificate, requested: &RequestedCertificateSet, sender_key: &PublicKey, originator: &str) -> Result<()>
 pub async fn get_verifiable_certificates<W: WalletInterface>(wallet: &W, requested: &RequestedCertificateSet, verifier_key: &PublicKey, originator: &str) -> Result<Vec<VerifiableCertificate>>
 pub fn certificates_match_request(certs: &[VerifiableCertificate], requested: &RequestedCertificateSet) -> bool
 ```
@@ -302,6 +375,25 @@ peer.listen_for_certificates_received(|sender, certs| {
         Ok(())
     })
 }).await;
+```
+
+### Session Management
+
+```rust
+use bsv_sdk::auth::SessionManager;
+
+let mut mgr = SessionManager::new();
+
+// Add session
+let session = PeerSession::with_nonce("my-nonce".into());
+mgr.add_session(session)?;
+
+// Look up by nonce or identity key
+let session = mgr.get_session("my-nonce");
+let session = mgr.get_session(&identity_key_hex);
+
+// Prune stale sessions (older than 1 hour)
+let removed = mgr.prune_stale_sessions(3600 * 1000);
 ```
 
 ## Protocol Details
@@ -399,3 +491,6 @@ cargo test --features auth,http
 - `../wallet/CLAUDE.md` - Wallet module (WalletInterface)
 - `../messages/CLAUDE.md` - Messages module (BRC-77/78)
 - `../primitives/CLAUDE.md` - Cryptographic primitives
+- `certificates/CLAUDE.md` - Certificate submodule
+- `transports/CLAUDE.md` - Transport submodule
+- `utils/CLAUDE.md` - Utils submodule

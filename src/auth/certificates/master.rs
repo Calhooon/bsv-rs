@@ -56,7 +56,10 @@ impl MasterCertificate {
         _serial_number: &[u8; 32],
         originator: &str,
     ) -> Result<(HashMap<String, Vec<u8>>, HashMap<String, Vec<u8>>)> {
-        let protocol = Protocol::new(SecurityLevel::Counterparty, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL);
+        let protocol = Protocol::new(
+            SecurityLevel::Counterparty,
+            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
+        );
 
         let mut encrypted_fields = HashMap::new();
         let mut master_keyring = HashMap::new();
@@ -113,7 +116,10 @@ impl MasterCertificate {
         serial_number: &[u8; 32],
         originator: &str,
     ) -> Result<HashMap<String, Vec<u8>>> {
-        let protocol = Protocol::new(SecurityLevel::Counterparty, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL);
+        let protocol = Protocol::new(
+            SecurityLevel::Counterparty,
+            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
+        );
 
         let mut keyring = HashMap::new();
 
@@ -230,7 +236,10 @@ impl MasterCertificate {
             Error::AuthError(format!("Field '{}' not found in certificate", field_name))
         })?;
 
-        let protocol = Protocol::new(SecurityLevel::Counterparty, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL);
+        let protocol = Protocol::new(
+            SecurityLevel::Counterparty,
+            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
+        );
         let key_id = Certificate::get_field_encryption_key_id_master(field_name);
 
         let decrypted = subject_wallet
@@ -310,7 +319,12 @@ mod tests {
         let certifier = crate::primitives::PrivateKey::random();
         let subject = crate::primitives::PrivateKey::random().public_key();
 
-        let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject.clone(), certifier.public_key());
+        let mut cert = Certificate::new(
+            [1u8; 32],
+            [2u8; 32],
+            subject.clone(),
+            certifier.public_key(),
+        );
         cert.sign(&certifier).unwrap();
 
         let master_cert = MasterCertificate::new(cert, HashMap::new());

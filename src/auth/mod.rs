@@ -74,7 +74,7 @@ pub use peer::{Peer, PeerOptions};
 pub use session_manager::SessionManager;
 pub use transports::{MockTransport, SimplifiedFetchTransport, Transport};
 pub use types::{
-    current_time_ms, AuthMessage, MessageType, PeerSession, RequestedCertificateSet, AUTH_PROTOCOL_ID,
-    AUTH_VERSION,
+    current_time_ms, AuthMessage, MessageType, PeerSession, RequestedCertificateSet,
+    AUTH_PROTOCOL_ID, AUTH_VERSION,
 };
 pub use utils::{create_nonce, validate_certificates, verify_nonce};

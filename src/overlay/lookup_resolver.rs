@@ -96,7 +96,10 @@ impl LookupResolver {
         if let Some(ref overrides) = config.host_overrides {
             for service in overrides.keys() {
                 if !service.starts_with("ls_") {
-                    panic!("Host override service names must start with \"ls_\": {}", service);
+                    panic!(
+                        "Host override service names must start with \"ls_\": {}",
+                        service
+                    );
                 }
             }
         }
@@ -153,7 +156,11 @@ impl LookupResolver {
             .collect();
 
         if available.is_empty() {
-            let soonest = ranked.iter().map(|h| h.entry.backoff_until).min().unwrap_or(0);
+            let soonest = ranked
+                .iter()
+                .map(|h| h.entry.backoff_until)
+                .min()
+                .unwrap_or(0);
             let wait_ms = soonest.saturating_sub(now);
             return Err(Error::OverlayError(format!(
                 "All competent hosts for {} are backing off for approximately {}ms",
@@ -396,7 +403,9 @@ impl LookupResolver {
 
         // Validate protocol and service
         if token.protocol != Protocol::Slap {
-            return Err(Error::OverlayError("Token is not a SLAP advertisement".into()));
+            return Err(Error::OverlayError(
+                "Token is not a SLAP advertisement".into(),
+            ));
         }
 
         if token.topic_or_service != expected_service {
@@ -414,10 +423,14 @@ impl LookupResolver {
         // Use txid from BEEF (first 32 bytes after version) + output index
         // This is a simplified approach; a proper implementation would parse the BEEF
         use std::fmt::Write;
-        let beef_prefix = output.beef.iter().take(40).fold(String::new(), |mut acc, b| {
-            let _ = write!(acc, "{:02x}", b);
-            acc
-        });
+        let beef_prefix = output
+            .beef
+            .iter()
+            .take(40)
+            .fold(String::new(), |mut acc, b| {
+                let _ = write!(acc, "{:02x}", b);
+                acc
+            });
         format!("{}:{}", beef_prefix, output.output_index)
     }
 
@@ -476,7 +489,10 @@ mod tests {
     #[test]
     fn test_resolver_with_host_overrides() {
         let mut overrides = HashMap::new();
-        overrides.insert("ls_test".to_string(), vec!["https://override.host".to_string()]);
+        overrides.insert(
+            "ls_test".to_string(),
+            vec!["https://override.host".to_string()],
+        );
 
         let config = LookupResolverConfig {
             host_overrides: Some(overrides),
@@ -490,7 +506,10 @@ mod tests {
     #[should_panic(expected = "Host override service names must start with")]
     fn test_resolver_rejects_invalid_override_service() {
         let mut overrides = HashMap::new();
-        overrides.insert("invalid_service".to_string(), vec!["https://host".to_string()]);
+        overrides.insert(
+            "invalid_service".to_string(),
+            vec!["https://host".to_string()],
+        );
 
         let config = LookupResolverConfig {
             host_overrides: Some(overrides),

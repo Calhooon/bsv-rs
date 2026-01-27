@@ -50,8 +50,14 @@ pub async fn validate_certificates<W: WalletInterface>(
     let sender_key = &message.identity_key;
 
     for cert in certs {
-        validate_certificate(verifier_wallet, cert, sender_key, certificates_requested, originator)
-            .await?;
+        validate_certificate(
+            verifier_wallet,
+            cert,
+            sender_key,
+            certificates_requested,
+            originator,
+        )
+        .await?;
     }
 
     Ok(())
@@ -120,11 +126,7 @@ pub async fn validate_certificate<W: WalletInterface>(
                 // Attempt to decrypt fields to verify keyring is valid
                 let mut cert_clone = cert.clone();
                 cert_clone
-                    .decrypt_fields(
-                        verifier_wallet,
-                        &cert.certificate.subject,
-                        originator,
-                    )
+                    .decrypt_fields(verifier_wallet, &cert.certificate.subject, originator)
                     .await?;
             }
         }
@@ -224,7 +226,10 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         let revocation_outpoint = if cert_result.certificate.revocation_outpoint.is_empty() {
             None
         } else {
-            crate::wallet::types::Outpoint::from_string(&cert_result.certificate.revocation_outpoint).ok()
+            crate::wallet::types::Outpoint::from_string(
+                &cert_result.certificate.revocation_outpoint,
+            )
+            .ok()
         };
 
         // Parse signature
@@ -321,8 +326,12 @@ mod tests {
     use std::collections::HashMap;
 
     fn make_test_cert(certifier_key: &PrivateKey, subject: &PublicKey) -> VerifiableCertificate {
-        let mut cert =
-            Certificate::new([1u8; 32], [2u8; 32], subject.clone(), certifier_key.public_key());
+        let mut cert = Certificate::new(
+            [1u8; 32],
+            [2u8; 32],
+            subject.clone(),
+            certifier_key.public_key(),
+        );
         cert.sign(certifier_key).unwrap();
         VerifiableCertificate::from_certificate(cert)
     }
@@ -389,8 +398,12 @@ mod tests {
         let certifier = PrivateKey::random();
         let subject = PrivateKey::random().public_key();
 
-        let mut cert_inner =
-            Certificate::new([1u8; 32], [2u8; 32], subject.clone(), certifier.public_key());
+        let mut cert_inner = Certificate::new(
+            [1u8; 32],
+            [2u8; 32],
+            subject.clone(),
+            certifier.public_key(),
+        );
         cert_inner.sign(&certifier).unwrap();
 
         let mut keyring = HashMap::new();

@@ -47,10 +47,10 @@
 //! assert_eq!(decrypted, message);
 //! ```
 
-use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 use crate::error::{Error, Result};
 use crate::primitives::ec::{PrivateKey, PublicKey};
 use crate::primitives::hash::{sha256_hmac, sha512};
+use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 
 /// AES-128-CBC encryptor type
 type Aes128CbcEnc = cbc::Encryptor<aes::Aes128>;
@@ -171,16 +171,10 @@ pub fn electrum_encrypt(
 /// ).unwrap();
 /// assert_eq!(decrypted, b"Hello!");
 /// ```
-pub fn electrum_decrypt(
-    data: &[u8],
-    to: &PrivateKey,
-    from: Option<&PublicKey>,
-) -> Result<Vec<u8>> {
+pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) -> Result<Vec<u8>> {
     // Minimum length: 4 (magic) + 16 (min cipher block) + 32 (mac)
     if data.len() < 52 {
-        return Err(Error::EciesDecryptionFailed(
-            "Data too short".to_string(),
-        ));
+        return Err(Error::EciesDecryptionFailed("Data too short".to_string()));
     }
 
     // Verify magic bytes
@@ -353,9 +347,7 @@ pub fn bitcore_encrypt(
 pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>> {
     // Minimum length: 33 (pubkey) + 16 (iv) + 16 (min block) + 32 (mac)
     if data.len() < 97 {
-        return Err(Error::EciesDecryptionFailed(
-            "Data too short".to_string(),
-        ));
+        return Err(Error::EciesDecryptionFailed("Data too short".to_string()));
     }
 
     // Parse components: pubkey (33) || iv || ciphertext || mac (32)

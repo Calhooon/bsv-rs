@@ -357,9 +357,7 @@ mod tests {
 
     #[test]
     fn test_lookup_answer_type() {
-        let output_list = LookupAnswer::OutputList {
-            outputs: vec![],
-        };
+        let output_list = LookupAnswer::OutputList { outputs: vec![] };
         assert_eq!(output_list.answer_type(), LookupAnswerType::OutputList);
 
         let freeform = LookupAnswer::Freeform {
@@ -375,8 +373,11 @@ mod tests {
         assert_eq!(beef.topics, vec!["tm_test"]);
         assert!(beef.off_chain_values.is_none());
 
-        let beef_with_off_chain =
-            TaggedBEEF::with_off_chain_values(vec![1, 2, 3], vec!["tm_test".to_string()], vec![4, 5]);
+        let beef_with_off_chain = TaggedBEEF::with_off_chain_values(
+            vec![1, 2, 3],
+            vec!["tm_test".to_string()],
+            vec![4, 5],
+        );
         assert!(beef_with_off_chain.off_chain_values.is_some());
     }
 
@@ -400,10 +401,7 @@ mod tests {
 
     #[test]
     fn test_host_response() {
-        let success = HostResponse::success(
-            "https://example.com".to_string(),
-            HashMap::new(),
-        );
+        let success = HostResponse::success("https://example.com".to_string(), HashMap::new());
         assert!(success.success);
         assert!(success.steak.is_some());
         assert!(success.error.is_none());
