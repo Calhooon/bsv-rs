@@ -72,6 +72,15 @@ pub mod overlay;
 #[cfg(feature = "storage")]
 pub mod storage;
 
+#[cfg(feature = "registry")]
+pub mod registry;
+
+#[cfg(feature = "kvstore")]
+pub mod kvstore;
+
+#[cfg(feature = "identity")]
+pub mod identity;
+
 // Convenience re-exports from primitives (most common items)
 #[cfg(feature = "primitives")]
 pub use primitives::{
@@ -127,4 +136,27 @@ pub use overlay::{
 pub use storage::{
     get_hash_from_url, get_url_for_file, is_valid_url, DownloadResult, StorageDownloader,
     StorageUploader, UploadFileResult, UploadableFile,
+};
+
+// Convenience re-exports from registry
+#[cfg(feature = "registry")]
+pub use registry::{
+    BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
+    CertificateDefinitionData, CertificateFieldDescriptor, CertificateQuery, DefinitionData,
+    DefinitionType, ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult,
+    RegistryClient, RegistryClientConfig, RegistryRecord, RevokeDefinitionResult, TokenData,
+};
+
+// Convenience re-exports from kvstore
+#[cfg(feature = "kvstore")]
+pub use kvstore::{
+    GlobalKVStore, KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery,
+    KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken, LocalKVStore,
+};
+
+// Convenience re-exports from identity
+#[cfg(feature = "identity")]
+pub use identity::{
+    Contact, ContactsManager, ContactsManagerConfig, DisplayableIdentity, IdentityClient,
+    IdentityClientConfig, IdentityQuery, KnownCertificateType,
 };

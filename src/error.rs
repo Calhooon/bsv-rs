@@ -252,6 +252,75 @@ pub enum Error {
     #[cfg(feature = "overlay")]
     #[error("overlay broadcast failed: {0}")]
     OverlayBroadcastFailed(String),
+
+    // ===================
+    // Registry errors
+    // ===================
+    /// General registry error.
+    #[cfg(feature = "registry")]
+    #[error("registry error: {0}")]
+    RegistryError(String),
+
+    /// Definition not found in registry.
+    #[cfg(feature = "registry")]
+    #[error("definition not found: {0}")]
+    DefinitionNotFound(String),
+
+    /// Invalid definition data.
+    #[cfg(feature = "registry")]
+    #[error("invalid definition data: {0}")]
+    InvalidDefinitionData(String),
+
+    // ===================
+    // KVStore errors
+    // ===================
+    /// General kvstore error.
+    #[cfg(feature = "kvstore")]
+    #[error("kvstore error: {0}")]
+    KvStoreError(String),
+
+    /// Key not found in kvstore.
+    #[cfg(feature = "kvstore")]
+    #[error("kvstore key not found: {0}")]
+    KvStoreKeyNotFound(String),
+
+    /// Corrupted kvstore state.
+    #[cfg(feature = "kvstore")]
+    #[error("corrupted kvstore state: {0}")]
+    KvStoreCorruptedState(String),
+
+    /// Empty context (protocol_id) provided to kvstore.
+    #[cfg(feature = "kvstore")]
+    #[error("context cannot be empty")]
+    KvStoreEmptyContext,
+
+    /// Invalid key provided to kvstore (empty).
+    #[cfg(feature = "kvstore")]
+    #[error("invalid key")]
+    KvStoreInvalidKey,
+
+    /// Invalid value provided to kvstore (empty).
+    #[cfg(feature = "kvstore")]
+    #[error("invalid value")]
+    KvStoreInvalidValue,
+
+    // ===================
+    // Identity errors
+    // ===================
+    /// General identity error.
+    #[cfg(feature = "identity")]
+    #[error("identity error: {0}")]
+    IdentityError(String),
+
+    /// Identity not found.
+    #[cfg(feature = "identity")]
+    #[error("identity not found: {0}")]
+    IdentityNotFound(String),
+
+    /// Contact not found.
+    #[cfg(feature = "identity")]
+    #[error("contact not found: {0}")]
+    ContactNotFound(String),
 }
 
 /// Result type alias for BSV SDK operations.
