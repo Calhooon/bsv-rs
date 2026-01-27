@@ -1058,16 +1058,16 @@ fn test_protocol_json_roundtrip() {
 
 #[test]
 fn test_overlay_constants() {
-    // Verify constants have reasonable values
-    assert!(bsv_sdk::overlay::MAX_TRACKER_WAIT_TIME_MS > 0);
-    assert!(bsv_sdk::overlay::MAX_SHIP_QUERY_TIMEOUT_MS > 0);
-    assert!(bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_TTL_MS > 0);
-    assert!(bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_MAX_ENTRIES > 0);
-    assert!(bsv_sdk::overlay::DEFAULT_TX_MEMO_TTL_MS > 0);
-    assert!(bsv_sdk::overlay::DEFAULT_TX_MEMO_MAX_ENTRIES > 0);
+    // Verify constants have reasonable values (using const blocks for compile-time checks)
+    const _: () = assert!(bsv_sdk::overlay::MAX_TRACKER_WAIT_TIME_MS > 0);
+    const _: () = assert!(bsv_sdk::overlay::MAX_SHIP_QUERY_TIMEOUT_MS > 0);
+    const _: () = assert!(bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_TTL_MS > 0);
+    const _: () = assert!(bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_MAX_ENTRIES > 0);
+    const _: () = assert!(bsv_sdk::overlay::DEFAULT_TX_MEMO_TTL_MS > 0);
+    const _: () = assert!(bsv_sdk::overlay::DEFAULT_TX_MEMO_MAX_ENTRIES > 0);
 
     // TX memo TTL should be longer than hosts cache TTL
-    assert!(
+    const _: () = assert!(
         bsv_sdk::overlay::DEFAULT_TX_MEMO_TTL_MS >= bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_TTL_MS
     );
 }
@@ -1098,7 +1098,7 @@ fn test_global_reputation_tracker() {
     let tracker2 = bsv_sdk::overlay::get_overlay_host_reputation_tracker();
 
     // Should be the same instance (test by modifying and reading)
-    let unique_host = format!("https://test-{}.example.com", rand::random::<u64>());
+    let unique_host = format!("https://test-{}.example.com", rand::random());
     tracker1.record_success(&unique_host, 100);
 
     // Should see the change through the other reference
@@ -1111,7 +1111,7 @@ fn test_global_reputation_tracker() {
 mod rand {
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    pub fn random<T>() -> u64 {
+    pub fn random() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
