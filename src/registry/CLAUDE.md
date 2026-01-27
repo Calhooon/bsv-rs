@@ -87,6 +87,10 @@ impl DefinitionType {
     pub fn wallet_protocol(&self) -> (u8, &'static str)
     pub fn expected_field_count(&self) -> usize     // 6 for basket/protocol, 7 for cert
 }
+
+// Also implements Display and FromStr traits
+impl std::fmt::Display for DefinitionType { ... }
+impl std::str::FromStr for DefinitionType { ... }  // Returns crate::Error on failure
 ```
 
 ### DefinitionData (Go SDK Compatible)
@@ -104,7 +108,12 @@ impl DefinitionData {
     pub fn get_definition_type(&self) -> DefinitionType
     pub fn get_registry_operator(&self) -> &str
     pub fn set_registry_operator(&mut self, operator: String)
+    pub fn identifier(&self) -> String
+    pub fn name(&self) -> &str
     pub fn to_pushdrop_fields(&self, registry_operator: &str) -> Result<Vec<Vec<u8>>>
+    pub fn as_basket(&self) -> Option<&BasketDefinitionData>
+    pub fn as_protocol(&self) -> Option<&ProtocolDefinitionData>
+    pub fn as_certificate(&self) -> Option<&CertificateDefinitionData>
 }
 
 // From implementations for easy conversion
@@ -141,7 +150,7 @@ impl BasketDefinitionData {
     pub fn identifier(&self) -> &str  // Returns basket_id
     pub fn get_definition_type(&self) -> DefinitionType
     pub fn get_registry_operator(&self) -> &str
-    pub fn to_pushdrop_fields(&self, registry_operator: &str) -> Result<Vec<Vec<u8>>>
+    pub fn to_pushdrop_fields(&self, registry_operator: &str) -> Vec<Vec<u8>>
     pub fn from_pushdrop_fields(fields: &[Vec<u8>]) -> Result<Self>
 }
 ```
@@ -199,110 +208,65 @@ pub struct CertificateDefinitionData {
     #[serde(rename = "registryOperator")]
     pub registry_operator: String,   // Operator pubkey (auto-set)
 }
+
+impl CertificateDefinitionData {
+    pub fn new(cert_type: impl Into<String>, name: impl Into<String>) -> Self
+    pub fn with_icon_url(self, url: impl Into<String>) -> Self
+    pub fn with_description(self, desc: impl Into<String>) -> Self
+    pub fn with_documentation_url(self, url: impl Into<String>) -> Self
+    pub fn with_field(self, name: impl Into<String>, descriptor: CertificateFieldDescriptor) -> Self
+    pub fn identifier(&self) -> &str  // Returns cert_type
+    pub fn get_definition_type(&self) -> DefinitionType
+    pub fn get_registry_operator(&self) -> &str
+    pub fn to_pushdrop_fields(&self, registry_operator: &str) -> Result<Vec<Vec<u8>>>
+    pub fn from_pushdrop_fields(fields: &[Vec<u8>]) -> Result<Self>
+}
 ```
 
 ### CertificateFieldDescriptor
 
-Schema descriptor for certificate fields:
+Schema descriptor for certificate fields with `friendly_name`, `description`, `field_type` ("text", "imageURL", "other"), and `field_icon`. Builder methods: `text()`, `image_url()`, `new()`, `with_description()`, `with_icon()`.
+
+### Result Types
+
+All operation results (`RegisterDefinitionResult`, `RevokeDefinitionResult`, `UpdateDefinitionResult`) share the same structure:
 
 ```rust
-pub struct CertificateFieldDescriptor {
-    #[serde(rename = "friendlyName")]
-    pub friendly_name: String,       // User-friendly name
-    pub description: String,         // Field description (empty if not set)
-    #[serde(rename = "fieldType")]
-    pub field_type: String,          // "text", "imageURL", "other"
-    #[serde(rename = "fieldIcon")]
-    pub field_icon: String,          // Icon identifier (empty if not set)
-}
-
-impl CertificateFieldDescriptor {
-    pub fn text(friendly_name: impl Into<String>) -> Self
-    pub fn image_url(friendly_name: impl Into<String>) -> Self
-    pub fn new(friendly_name: impl Into<String>, field_type: impl Into<String>) -> Self
-    pub fn with_description(self, desc: impl Into<String>) -> Self
-    pub fn with_icon(self, icon: impl Into<String>) -> Self
-}
-```
-
-### Result Types (Go SDK Compatible)
-
-```rust
-/// Result of a register definition operation.
 pub struct RegisterDefinitionResult {
-    pub success: Option<BroadcastSuccess>,
-    pub failure: Option<BroadcastFailure>,
+    pub success: Option<BroadcastSuccess>,  // txid, message
+    pub failure: Option<BroadcastFailure>,  // code, description
 }
 
 impl RegisterDefinitionResult {
     pub fn is_success(&self) -> bool
     pub fn is_failure(&self) -> bool
 }
-
-/// Result of a revoke definition operation.
-pub struct RevokeDefinitionResult {
-    pub success: Option<BroadcastSuccess>,
-    pub failure: Option<BroadcastFailure>,
-}
-
-impl RevokeDefinitionResult {
-    pub fn is_success(&self) -> bool
-    pub fn is_failure(&self) -> bool
-}
-
-/// Result of an update definition operation.
-pub struct UpdateDefinitionResult {
-    pub success: Option<BroadcastSuccess>,
-    pub failure: Option<BroadcastFailure>,
-}
-
-impl UpdateDefinitionResult {
-    pub fn is_success(&self) -> bool
-    pub fn is_failure(&self) -> bool
-}
-
-/// Broadcast success information (matches Go SDK transaction.BroadcastSuccess).
-pub struct BroadcastSuccess {
-    pub txid: String,    // Transaction ID
-    pub message: String, // Success message
-}
-
-/// Broadcast failure information (matches Go SDK transaction.BroadcastFailure).
-pub struct BroadcastFailure {
-    pub code: String,        // Error code
-    pub description: String, // Error description
-}
 ```
 
 ### TokenData
 
-On-chain UTXO reference:
-
-```rust
-pub struct TokenData {
-    pub txid: String,            // Transaction ID (hex)
-    pub output_index: u32,       // Output index
-    pub satoshis: u64,           // UTXO value
-    pub locking_script: String,  // Locking script (hex)
-    pub beef: Option<Vec<u8>>,   // BEEF data for SPV
-}
-```
+On-chain UTXO reference with `txid`, `output_index`, `satoshis`, `locking_script`, and optional `beef` for SPV. Constructors: `new()`, `with_beef()`. Method: `outpoint()` returns "txid.outputIndex".
 
 ### RegistryRecord
 
 Combined definition and token:
 
 ```rust
-pub enum RegistryRecord {
-    Basket { definition: BasketDefinitionData, token: TokenData },
-    Protocol { definition: ProtocolDefinitionData, token: TokenData },
-    Certificate { definition: CertificateDefinitionData, token: TokenData },
+pub struct RegistryRecord {
+    #[serde(flatten)]
+    pub definition: DefinitionData,
+    #[serde(flatten)]
+    pub token: TokenData,
 }
 
 impl RegistryRecord {
+    pub fn new(definition: DefinitionData, token: TokenData) -> Self
+    pub fn basket(definition: BasketDefinitionData, token: TokenData) -> Self
+    pub fn protocol(definition: ProtocolDefinitionData, token: TokenData) -> Self
+    pub fn certificate(definition: CertificateDefinitionData, token: TokenData) -> Self
     pub fn token(&self) -> &TokenData
-    pub fn definition_type(&self) -> DefinitionType
-    pub fn registry_operator(&self) -> &str
+    pub fn get_definition_type(&self) -> DefinitionType
+    pub fn get_registry_operator(&self) -> &str
     pub fn identifier(&self) -> String
     pub fn txid(&self) -> &str
     pub fn output_index(&self) -> u32
@@ -344,19 +308,11 @@ impl<W: WalletInterface> RegistryClient<W> {
 
     // Update method (TypeScript SDK compatible)
     pub async fn update_definition(&self, record: &RegistryRecord, updated_data: DefinitionData) -> Result<UpdateDefinitionResult>
+
+    // Network configuration
+    pub fn set_network(&mut self, network: NetworkPreset)
 }
 ```
-
-### Key API Differences from Previous Implementation
-
-| Previous API | Go SDK Compatible API |
-|-------------|----------------------|
-| `register_basket(data)` | `register_definition(data.into())` |
-| `register_protocol(data)` | `register_definition(data.into())` |
-| `register_certificate(data)` | `register_definition(data.into())` |
-| `list_own_entries()` | `list_own_registry_entries(definition_type)` |
-| `revoke_entry(txid, output_index)` | `revoke_own_registry_entry(&record)` |
-| (not available) | `update_definition(&record, new_data)` |
 
 ### RegistryClientConfig
 
@@ -379,88 +335,41 @@ impl RegistryClientConfig {
 
 ## Usage Examples
 
-### Register a Basket (Go SDK Compatible)
+### Register a Definition
 
 ```rust
-use bsv_sdk::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData, DefinitionData};
+use bsv_sdk::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData};
 use bsv_sdk::wallet::ProtoWallet;
-use bsv_sdk::primitives::PrivateKey;
 
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let client = RegistryClient::new(wallet, RegistryClientConfig::default());
 
-let data = BasketDefinitionData::new("my_basket", "My Custom Basket")
-    .with_description("A basket for organizing my outputs")
-    .with_icon_url("https://example.com/icon.png");
-
-// Use register_definition with .into() conversion
+// Register basket (use .into() to convert to DefinitionData)
+let data = BasketDefinitionData::new("my_basket", "My Basket")
+    .with_description("Basket description");
 let result = client.register_definition(data.into()).await?;
-if result.is_success() {
-    println!("Registered: {}", result.success.unwrap().txid);
-}
-```
 
-### Register a Protocol
-
-```rust
-use bsv_sdk::registry::{RegistryClient, ProtocolDefinitionData};
-use bsv_sdk::wallet::{Protocol, SecurityLevel};
-
+// Register protocol
 let protocol = Protocol::new(SecurityLevel::App, "my_protocol");
-let data = ProtocolDefinitionData::new(protocol, "My Protocol")
-    .with_description("A custom protocol for my application");
-
+let data = ProtocolDefinitionData::new(protocol, "My Protocol");
 let result = client.register_definition(data.into()).await?;
 ```
 
-### List Own Registry Entries (Go SDK Compatible)
+### List, Revoke, and Update Entries
 
 ```rust
-use bsv_sdk::registry::{RegistryClient, DefinitionType};
-
-// List only basket entries (takes definition_type parameter)
-let basket_entries = client.list_own_registry_entries(DefinitionType::Basket).await?;
-
-for entry in basket_entries {
-    println!("{}: {} at {}",
-        entry.definition_type(),
-        entry.identifier(),
-        entry.outpoint()
-    );
-}
-```
-
-### Revoke an Entry (Go SDK Compatible)
-
-```rust
-// Takes a RegistryRecord, not (txid, output_index)
+// List entries by type
 let entries = client.list_own_registry_entries(DefinitionType::Basket).await?;
+
+// Revoke an entry
 if let Some(entry) = entries.first() {
-    let result = client.revoke_own_registry_entry(entry).await?;
-    if result.is_success() {
-        println!("Entry revoked");
-    }
+    client.revoke_own_registry_entry(entry).await?;
 }
-```
 
-### Update an Entry (TypeScript SDK Compatible)
-
-```rust
-use bsv_sdk::registry::{RegistryClient, DefinitionType, BasketDefinitionData};
-
-// Get existing entry
-let entries = client.list_own_registry_entries(DefinitionType::Basket).await?;
+// Update an entry
 if let Some(entry) = entries.first() {
-    // Create updated data (must be same type as original)
-    let updated_data = BasketDefinitionData::new("my_basket", "Updated Basket Name")
-        .with_description("New description for my basket")
-        .with_icon_url("https://example.com/new-icon.png");
-
-    // Update the entry
-    let result = client.update_definition(entry, updated_data.into()).await?;
-    if result.is_success() {
-        println!("Entry updated: {}", result.success.unwrap().txid);
-    }
+    let updated = BasketDefinitionData::new("my_basket", "New Name");
+    client.update_definition(entry, updated.into()).await?;
 }
 ```
 
@@ -468,78 +377,18 @@ if let Some(entry) = entries.first() {
 
 Registry entries use PushDrop tokens with individual fields (not JSON blobs):
 
-### Basket (6 fields)
-| Index | Field | Description |
-|-------|-------|-------------|
-| 0 | basketID | Unique identifier |
-| 1 | name | Human-readable name |
-| 2 | iconURL | Icon URL |
-| 3 | description | Description |
-| 4 | documentationURL | Documentation URL |
-| 5 | registryOperator | Public key hex of owner |
-
-### Protocol (6 fields)
-| Index | Field | Description |
-|-------|-------|-------------|
-| 0 | protocolID | JSON: `[securityLevel, "protocolName"]` |
-| 1 | name | Human-readable name |
-| 2 | iconURL | Icon URL |
-| 3 | description | Description |
-| 4 | documentationURL | Documentation URL |
-| 5 | registryOperator | Public key hex of owner |
-
-### Certificate (7 fields)
-| Index | Field | Description |
-|-------|-------|-------------|
-| 0 | type | Certificate type identifier |
-| 1 | name | Human-readable name |
-| 2 | iconURL | Icon URL |
-| 3 | description | Description |
-| 4 | documentationURL | Documentation URL |
-| 5 | fields | JSON map of field descriptors |
-| 6 | registryOperator | Public key hex of owner |
+- **Basket (6 fields)**: basketID, name, iconURL, description, documentationURL, registryOperator
+- **Protocol (6 fields)**: protocolID (JSON: `[level, "name"]`), name, iconURL, description, documentationURL, registryOperator
+- **Certificate (7 fields)**: type, name, iconURL, description, documentationURL, fields (JSON), registryOperator
 
 ## JSON Serialization
 
-All types use **exact Go SDK field names** (not generic camelCase):
-
-```json
-{
-  "definitionType": "basket",
-  "basketID": "my_basket",
-  "name": "My Basket",
-  "iconURL": "https://...",
-  "description": "...",
-  "documentationURL": "...",
-  "registryOperator": "02abc..."
-}
-```
-
-**Note**: Field names use specific capitalization:
-- `basketID` (not `basketId`)
-- `iconURL` (not `iconUrl`)
-- `documentationURL` (not `documentationUrl`)
-- `protocolID` (not `protocolId`)
-- `definitionType`
-- `registryOperator`
+All types use **exact Go SDK field names** with specific capitalization: `basketID`, `iconURL`, `documentationURL`, `protocolID`, `definitionType`, `registryOperator` (not generic camelCase like `basketId`).
 
 ## Overlay Integration
 
-### Lookup Services
-
-| Definition Type | Service |
-|-----------------|---------|
-| Basket | `ls_basketmap` |
-| Protocol | `ls_protomap` |
-| Certificate | `ls_certmap` |
-
-### Broadcast Topics
-
-| Definition Type | Topic |
-|-----------------|-------|
-| Basket | `tm_basketmap` |
-| Protocol | `tm_protomap` |
-| Certificate | `tm_certmap` |
+- **Lookup Services**: `ls_basketmap`, `ls_protomap`, `ls_certmap`
+- **Broadcast Topics**: `tm_basketmap`, `tm_protomap`, `tm_certmap`
 
 ## Error Types
 
@@ -550,39 +399,7 @@ All types use **exact Go SDK field names** (not generic camelCase):
 
 ## Cross-SDK Compatibility
 
-This module maintains **1:1 API compatibility** with:
-- [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `registry` package
-- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `registry` module
-
-### Type Mapping
-
-| Go SDK | Rust SDK |
-|--------|----------|
-| `DefinitionType` | `DefinitionType` |
-| `DefinitionData` (interface) | `DefinitionData` (enum) |
-| `BasketDefinitionData` | `BasketDefinitionData` |
-| `ProtocolDefinitionData` | `ProtocolDefinitionData` |
-| `CertificateDefinitionData` | `CertificateDefinitionData` |
-| `CertificateFieldDescriptor` | `CertificateFieldDescriptor` |
-| `TokenData` | `TokenData` |
-| `RegistryRecord` | `RegistryRecord` |
-| `RegisterDefinitionResult` | `RegisterDefinitionResult` |
-| `RevokeDefinitionResult` | `RevokeDefinitionResult` |
-| (TypeScript: BroadcastResponse) | `UpdateDefinitionResult` |
-| `transaction.BroadcastSuccess` | `BroadcastSuccess` |
-| `transaction.BroadcastFailure` | `BroadcastFailure` |
-
-### Method Mapping
-
-| Go SDK Method | Rust SDK Method |
-|---------------|-----------------|
-| `RegisterDefinition(ctx, data)` | `register_definition(data)` |
-| `ResolveBasket(ctx, query)` | `resolve_basket(query)` |
-| `ResolveProtocol(ctx, query)` | `resolve_protocol(query)` |
-| `ResolveCertificate(ctx, query)` | `resolve_certificate(query)` |
-| `ListOwnRegistryEntries(ctx, defType)` | `list_own_registry_entries(def_type)` |
-| `RevokeOwnRegistryEntry(ctx, record)` | `revoke_own_registry_entry(record)` |
-| (TypeScript: updateDefinition) | `update_definition(record, data)` |
+This module maintains **1:1 API compatibility** with the Go SDK `registry` package and TypeScript SDK `registry` module. Type and method names map directly between SDKs.
 
 ## Feature Flag
 
@@ -600,13 +417,7 @@ The `registry` feature automatically enables the `overlay` feature.
 
 ## Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `REGISTRANT_TOKEN_AMOUNT` | 1 | Satoshi value for registry tokens |
-| `REGISTRANT_KEY_ID` | "1" | PushDrop key derivation ID |
-| `BASKETMAP_PROTOCOL` | (1, "basketmap") | Wallet protocol for baskets |
-| `PROTOMAP_PROTOCOL` | (1, "protomap") | Wallet protocol for protocols |
-| `CERTMAP_PROTOCOL` | (1, "certmap") | Wallet protocol for certificates |
+`REGISTRANT_TOKEN_AMOUNT = 1` (satoshi value), `REGISTRANT_KEY_ID = "1"`, and wallet protocols: `BASKETMAP_PROTOCOL`, `PROTOMAP_PROTOCOL`, `CERTMAP_PROTOCOL` (all security level 1).
 
 ## Related Documentation
 

@@ -10,6 +10,7 @@ The identity module provides certificate-based identity discovery and management
 - **Parse certificates** into user-friendly display formats
 - **Manage contacts** with encrypted local storage
 - **Reveal attributes** publicly on the overlay network
+- **Revoke revelations** by spending identity tokens
 
 This module integrates with the `auth` module for certificate handling and the `overlay` module for network communication.
 
@@ -17,10 +18,10 @@ This module integrates with the `auth` module for certificate handling and the `
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root with re-exports |
-| `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs |
-| `client.rs` | IdentityClient for identity resolution and management |
-| `contacts.rs` | ContactsManager for encrypted contact storage |
+| `mod.rs` | Module root with re-exports (111 lines) |
+| `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (886 lines) |
+| `client.rs` | IdentityClient for identity resolution, revelation, and management (2077 lines) |
+| `contacts.rs` | ContactsManager for encrypted contact storage with caching (1277 lines) |
 
 ## Feature Flag
 
@@ -31,23 +32,40 @@ identity = ["auth", "overlay"]
 
 The identity feature depends on both `auth` (for certificate types) and `overlay` (for network communication).
 
-## Key Types
-
-### Type Aliases
+## Public Exports
 
 ```rust
-/// Certificate field name with constraint of under 50 bytes.
-pub type CertificateFieldNameUnder50Bytes = String;
-
-/// Originator domain name string with constraint of under 250 bytes.
-pub type OriginatorDomainNameStringUnder250Bytes = String;
-
-/// Public key in hex format (compressed, 33 bytes = 66 hex chars).
-pub type PubKeyHex = String;
-
-/// Base64-encoded string.
-pub type Base64String = String;
+// From mod.rs re-exports
+pub use client::IdentityClient;
+pub use contacts::ContactsManager;
+pub use types::{
+    // Type aliases
+    Base64String,
+    CertificateFieldNameUnder50Bytes,
+    OriginatorDomainNameStringUnder250Bytes,
+    PubKeyHex,
+    // Broadcast types
+    BroadcastFailure,
+    BroadcastResult,
+    BroadcastSuccess,
+    // Core types
+    CertifierInfo,
+    Contact,
+    ContactsManagerConfig,
+    DefaultIdentityValues,
+    DisplayableIdentity,
+    IdentityCertificate,
+    IdentityClientConfig,
+    IdentityQuery,
+    IdentityResolutionResult,
+    KnownCertificateType,
+    StaticAvatarUrls,
+    // Constants
+    DEFAULT_SOCIALCERT_CERTIFIER,
+};
 ```
+
+## Key Types
 
 ### KnownCertificateType
 
@@ -181,13 +199,13 @@ pub struct CertifierInfo {
     pub name: String,
     pub icon_url: String,
     pub description: String,
-    pub trust: u8,  // Trust level 1-10
+    pub trust: u8,  // Trust level 0-10
 }
 ```
 
 ## IdentityClient
 
-Main client for identity operations:
+Main client for identity operations. Generic over wallet implementation:
 
 ```rust
 use bsv_sdk::identity::{IdentityClient, IdentityClientConfig};
@@ -206,6 +224,9 @@ let config = IdentityClientConfig::with_originator("myapp.example.com")
     .with_network(NetworkPreset::Mainnet)
     .with_token_amount(5);
 let client = IdentityClient::new(wallet, config);
+
+// Create with custom resolver
+let client = IdentityClient::with_resolver(wallet, config, custom_resolver);
 ```
 
 ### Public Revelation Methods
@@ -225,7 +246,7 @@ match result {
 // Simplified version returning just txid
 let txid = client.publicly_reveal_attributes_simple(certificate, fields).await?;
 
-// Revoke a previous revelation
+// Revoke a previous revelation by spending the identity token
 client.revoke_certificate_revelation("serial-number-123").await?;
 ```
 
@@ -256,11 +277,11 @@ let x_certs = client.discover_certificates_by_type(
 let query = IdentityQuery::by_identity_key("02abc123...").with_limit(10);
 let results = client.query(query).await?;
 for result in results {
-    println!("{}: {} certificates", result.identity.name, result.certificates.len());
+    println!("{}: {} certs", result.identity.name, result.certificates.len());
 }
 ```
 
-### Contact Management
+### Contact Management via Client
 
 ```rust
 // Get all contacts (pass true to force refresh from storage)
@@ -291,7 +312,7 @@ let displayable = IdentityClient::<ProtoWallet>::parse_identity(&cert);
 
 ## ContactsManager
 
-Direct contact management with search, filtering, and caching:
+Direct contact management with encrypted storage, search, and caching:
 
 ```rust
 use bsv_sdk::identity::{ContactsManager, ContactsManagerConfig, Contact};
@@ -317,6 +338,14 @@ let is_init = manager.is_cache_initialized().await;
 let count = manager.cached_count().await;
 ```
 
+### Storage Model
+
+Contacts are stored as encrypted PushDrop tokens in the wallet's basket system:
+- Each contact is encrypted with a per-contact key
+- Tagged with HMAC-hashed identity key for privacy-preserving lookup
+- Stored in the "contacts" basket
+- Custom instructions store the key ID for decryption
+
 ## Configuration Types
 
 ### IdentityClientConfig
@@ -326,8 +355,8 @@ pub struct IdentityClientConfig {
     pub network_preset: NetworkPreset,  // Mainnet or Testnet
     pub protocol_id: (u8, String),      // Default: (1, "identity")
     pub key_id: String,                 // Default: "1"
-    pub token_amount: u64,              // Satoshis for revelation outputs
-    pub output_index: u32,              // Output index for identity token
+    pub token_amount: u64,              // Satoshis for revelation outputs (default: 1)
+    pub output_index: u32,              // Output index for identity token (default: 0)
     pub originator: Option<String>,     // Application originator for audit trails
 }
 
@@ -375,22 +404,26 @@ result.into_result();  // Result<BroadcastSuccess, BroadcastFailure>
 
 ## Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `DEFAULT_SOCIALCERT_CERTIFIER` | `02cf6cdf466951d8dfc9e7c9367511d0007ed6fba35ed42d425cc412fd6cfd4a17` | Default trusted certifier |
+| Constant | Value |
+|----------|-------|
+| `DEFAULT_SOCIALCERT_CERTIFIER` | `02cf6cdf466951d8dfc9e7c9367511d0007ed6fba35ed42d425cc412fd6cfd4a17` |
 
-### Static Avatar URLs
+### StaticAvatarUrls
+
+UHRP hashes for certificate type avatars:
 
 ```rust
 use bsv_sdk::identity::StaticAvatarUrls;
 
-StaticAvatarUrls::EMAIL;   // Email certificate avatar (envelope icon)
-StaticAvatarUrls::PHONE;   // Phone certificate avatar (phone icon)
+StaticAvatarUrls::EMAIL;   // Envelope icon
+StaticAvatarUrls::PHONE;   // Phone icon
 StaticAvatarUrls::ANYONE;  // Anyone certificate avatar
 StaticAvatarUrls::SELF;    // Self certificate avatar
 ```
 
-### Default Identity Values
+### DefaultIdentityValues
+
+Constants for unverified/unknown identities:
 
 ```rust
 use bsv_sdk::identity::DefaultIdentityValues;
@@ -414,9 +447,20 @@ Error::IdentityError(String)
 Error::ContactNotFound(String)
 ```
 
+## Overlay Network Integration
+
+The identity module uses the overlay network for discovery and broadcast:
+
+| Service | Purpose |
+|---------|---------|
+| `ls_identity` | Lookup service for identity queries |
+| `tm_identity` | Topic for broadcasting identity revelations |
+
+Queries are performed via `LookupResolver`, broadcasts via `TopicBroadcaster`.
+
 ## Wire Format Compatibility
 
-The identity module uses JSON serialization with camelCase field names for wire compatibility:
+JSON serialization uses camelCase field names for cross-SDK compatibility:
 
 ```rust
 #[derive(Serialize, Deserialize)]
@@ -429,19 +473,11 @@ pub struct DisplayableIdentity {
 }
 ```
 
-## Overlay Network Integration
-
-The identity module uses the overlay network for:
-- **ls_identity** - Lookup service for identity queries
-- **tm_identity** - Topic for broadcasting identity revelations
-
-Queries are performed via the `LookupResolver` from the overlay module.
-
 ## Cross-SDK Compatibility
 
-This module is designed for compatibility with:
-- [TypeScript SDK identity module](https://github.com/bitcoin-sv/ts-sdk/tree/master/src/identity)
-- [Go SDK identity module](https://github.com/bitcoin-sv/go-sdk/tree/master/identity)
+This module maintains API compatibility with:
+- [TypeScript SDK identity](https://github.com/bitcoin-sv/ts-sdk) - `IdentityClient`, `ContactsManager`
+- [Go SDK identity](https://github.com/bitcoin-sv/go-sdk) - `identity.Client`
 
 Key compatibility points:
 - Same certificate type IDs (base64-encoded SHA-256 hashes)

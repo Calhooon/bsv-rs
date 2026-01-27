@@ -19,6 +19,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `integration_tests.rs` | Full workflow tests across all modules (22 tests) |
 | `overlay_cross_sdk_tests.rs` | Overlay cross-SDK admin token and type tests (13 tests) |
 | `overlay_integration_tests.rs` | Overlay module integration tests (60 tests) |
+| `registry_integration_tests.rs` | Registry module integration tests (50 tests: definitions, queries, serialization) |
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
@@ -499,6 +500,84 @@ Cross-SDK compatibility tests for overlay types (13 tests, requires `overlay` fe
 **Vector Validation**
 - `test_overlay_types_vector_count` - Verifies minimum vector counts for all types
 
+### Registry Integration Tests (`registry_integration_tests.rs`)
+
+Registry module integration tests (50 tests, requires `registry` feature):
+
+**DefinitionType Tests**
+- `test_definition_type_as_str` - String conversion (basket, protocol, certificate)
+- `test_definition_type_try_from_str` - Case-insensitive parsing
+- `test_definition_type_from_str` - FromStr trait implementation
+- `test_definition_type_lookup_service` - Lookup service names (ls_basketmap, ls_protomap, ls_certmap)
+- `test_definition_type_broadcast_topic` - Broadcast topic names (tm_basketmap, tm_protomap, tm_certmap)
+- `test_definition_type_wallet_basket` - Wallet basket names
+- `test_definition_type_expected_field_count` - Field count (6 for basket/protocol, 7 for certificate)
+
+**BasketDefinitionData Tests**
+- `test_basket_definition_creation` - Builder pattern with all fields
+- `test_basket_definition_identifier` - Identifier is basket_id
+- `test_basket_definition_pushdrop_fields` - Encode to 6 PushDrop fields
+- `test_basket_definition_from_pushdrop_fields` - Decode from PushDrop fields
+- `test_basket_definition_from_pushdrop_fields_wrong_count` - Wrong field count rejected
+- `test_basket_definition_json_serialization` - JSON with Go SDK compatible field names
+
+**ProtocolDefinitionData Tests**
+- `test_protocol_definition_creation` - Builder pattern with Protocol and fields
+- `test_protocol_definition_identifier` - JSON identifier format ([level, "name"])
+- `test_protocol_definition_pushdrop_fields` - Encode to 6 PushDrop fields
+- `test_protocol_definition_all_security_levels` - Silent, App, Counterparty levels
+
+**CertificateDefinitionData Tests**
+- `test_certificate_definition_creation` - Builder pattern with field descriptors
+- `test_certificate_field_descriptor_types` - text(), image_url(), custom types
+- `test_certificate_definition_pushdrop_fields` - Encode to 7 PushDrop fields
+
+**DefinitionData Enum Tests**
+- `test_definition_data_from_basket` - Basket variant conversion and accessors
+- `test_definition_data_from_protocol` - Protocol variant conversion and accessors
+- `test_definition_data_from_certificate` - Certificate variant conversion and accessors
+- `test_definition_data_set_registry_operator` - Set/get registry operator
+- `test_definition_data_identifier` - Identifier dispatch by type
+
+**TokenData Tests**
+- `test_token_data_creation` - Basic creation with txid, output_index, satoshis, locking_script
+- `test_token_data_with_beef` - Creation with optional BEEF data
+- `test_token_data_outpoint` - Outpoint format (txid.vout)
+
+**RegistryRecord Tests**
+- `test_registry_record_basket` - Basket record with token data
+- `test_registry_record_protocol` - Protocol record with token data
+- `test_registry_record_certificate` - Certificate record with token data
+
+**Query Types Tests**
+- `test_basket_query_builder` - Builder with basket_id, operator, name
+- `test_basket_query_multiple_operators` - Multiple registry operators
+- `test_basket_query_json_serialization` - JSON with basketID field
+- `test_protocol_query_builder` - Builder with protocol_id, name, operator
+- `test_certificate_query_builder` - Builder with cert_type, name, operators
+- `test_certificate_query_json_serialization` - JSON with type field
+
+**Result Types Tests**
+- `test_register_definition_result` - Success/failure states and is_success()/is_failure()
+- `test_revoke_definition_result` - Revocation result states
+- `test_update_definition_result` - Update result states
+
+**RegistryClientConfig Tests**
+- `test_registry_client_config_defaults` - Default: Mainnet, no resolver, no originator
+- `test_registry_client_config_builder` - Builder with network, originator, delayed_broadcast
+- `test_registry_client_config_local_network` - Local network preset
+
+**Cross-SDK Compatibility Tests**
+- `test_pushdrop_field_format_basket_matches_go_sdk` - Basket field order matches Go SDK
+- `test_pushdrop_field_format_protocol_matches_go_sdk` - Protocol field order matches Go SDK
+- `test_pushdrop_field_format_certificate_matches_go_sdk` - Certificate field order matches Go SDK
+- `test_pushdrop_roundtrip_basket` - Basket encode/decode roundtrip
+- `test_pushdrop_roundtrip_protocol` - Protocol encode/decode roundtrip
+- `test_pushdrop_roundtrip_certificate` - Certificate encode/decode roundtrip
+
+**Constants Tests**
+- `test_registry_constants` - Verify LS_*, TM_*, REGISTRANT_* constants
+
 ### Overlay Integration Tests (`overlay_integration_tests.rs`)
 
 Overlay module integration tests (60 tests, requires `overlay` feature):
@@ -600,6 +679,7 @@ cargo test --test ec_tests
 cargo test --test integration_tests
 cargo test --test overlay_cross_sdk_tests --features overlay
 cargo test --test overlay_integration_tests --features overlay
+cargo test --test registry_integration_tests --features registry
 cargo test --test script_vectors_tests
 cargo test --test sighash_tests
 cargo test --test template_tests
@@ -619,6 +699,9 @@ cargo test --features auth
 
 # Run all tests with overlay feature
 cargo test --features overlay
+
+# Run all tests with registry feature
+cargo test --features registry
 
 # Run specific test
 cargo test --test integration_tests test_complete_payment_workflow
@@ -662,6 +745,17 @@ cargo test --test transaction_tests --features transaction -- beef
 - `FeeModel`, `SatoshisPerKilobyte`, `FixedFee` - Fee computation
 - `Broadcaster`, `BroadcastResponse`, `BroadcastFailure`, `BroadcastStatus` - Broadcast (async)
 - `ChainTracker`, `AlwaysValidChainTracker`, `MockChainTracker` - Chain tracking (async)
+
+**Registry** (`bsv_sdk::registry`, requires `registry` feature):
+- `DefinitionType` - Basket, Protocol, or Certificate
+- `BasketDefinitionData`, `ProtocolDefinitionData`, `CertificateDefinitionData` - Definition data types
+- `CertificateFieldDescriptor` - Field type definitions for certificates
+- `DefinitionData` - Enum wrapping all definition types
+- `TokenData` - Token/UTXO data for registry records
+- `RegistryRecord` - Definition with associated token data
+- `BasketQuery`, `ProtocolQuery`, `CertificateQuery` - Query builders
+- `RegisterDefinitionResult`, `RevokeDefinitionResult`, `UpdateDefinitionResult` - Operation results
+- `RegistryClientConfig` - Client configuration with network preset
 
 ## Utility Functions
 
@@ -728,6 +822,7 @@ Tests are organized by feature area:
 - **compat tests**: `compat_bip39_tests.rs`, `compat_integration_tests.rs` (requires `compat` feature)
 - **auth tests**: `auth_cross_sdk_tests.rs`, `auth_integration_tests.rs` (requires `auth` feature)
 - **overlay tests**: `overlay_cross_sdk_tests.rs`, `overlay_integration_tests.rs` (requires `overlay` feature)
+- **registry tests**: `registry_integration_tests.rs` (requires `registry` feature)
 
 The `transaction_tests.rs` file uses nested modules for organization:
 - `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)
@@ -742,4 +837,5 @@ The `transaction_tests.rs` file uses nested modules for organization:
 - `src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
 - `src/script/CLAUDE.md` - Script module documentation
 - `src/transaction/CLAUDE.md` - Transaction module documentation
+- `src/registry/CLAUDE.md` - Registry module documentation
 - `tests/transaction/vectors/CLAUDE.md` - Transaction test vectors documentation
