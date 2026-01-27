@@ -143,6 +143,11 @@ pub enum WordCount {
     Words18,  // 192 bits entropy, 6 checksum bits
     Words21,  // 224 bits entropy, 7 checksum bits
     Words24,  // 256 bits entropy, 8 checksum bits
+
+    // Methods
+    pub fn entropy_bytes(self) -> usize
+    pub fn word_count(self) -> usize
+    pub fn checksum_bits(self) -> usize
 }
 
 pub enum Language {

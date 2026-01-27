@@ -72,6 +72,8 @@ This SDK maintains byte-for-byte compatibility with:
 
 All implementations share test vectors to ensure cross-platform compatibility.
 
+See `CROSS_SDK_COMPATIBILITY.md` for detailed compatibility analysis and verification status.
+
 ## Related Documentation
 
 ### Module Documentation

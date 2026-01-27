@@ -5,11 +5,11 @@
 
 #![cfg(feature = "auth")]
 
+use bsv_sdk::auth::transports::{HttpRequest, HttpResponse, MockTransport, Transport};
 use bsv_sdk::auth::{
     AuthMessage, Certificate, MessageType, PeerSession, RequestedCertificateSet, SessionManager,
     VerifiableCertificate,
 };
-use bsv_sdk::auth::transports::{HttpRequest, HttpResponse, MockTransport, Transport};
 use bsv_sdk::primitives::PrivateKey;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -194,8 +194,15 @@ async fn test_mock_transport_multiple_responses() {
     let key2 = PrivateKey::random().public_key();
 
     // Queue multiple responses
-    transport.queue_response(AuthMessage::new(MessageType::InitialResponse, key1.clone())).await;
-    transport.queue_response(AuthMessage::new(MessageType::CertificateResponse, key2.clone())).await;
+    transport
+        .queue_response(AuthMessage::new(MessageType::InitialResponse, key1.clone()))
+        .await;
+    transport
+        .queue_response(AuthMessage::new(
+            MessageType::CertificateResponse,
+            key2.clone(),
+        ))
+        .await;
 
     // Set up callback to capture responses
     let received = Arc::new(RwLock::new(Vec::new()));
@@ -212,8 +219,17 @@ async fn test_mock_transport_multiple_responses() {
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
     // Send requests and get responses in order
-    transport.send(&AuthMessage::new(MessageType::InitialRequest, key1.clone())).await.unwrap();
-    transport.send(&AuthMessage::new(MessageType::CertificateRequest, key2.clone())).await.unwrap();
+    transport
+        .send(&AuthMessage::new(MessageType::InitialRequest, key1.clone()))
+        .await
+        .unwrap();
+    transport
+        .send(&AuthMessage::new(
+            MessageType::CertificateRequest,
+            key2.clone(),
+        ))
+        .await
+        .unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
@@ -316,8 +332,10 @@ fn test_certificate_creation_and_signing() {
     );
 
     // Add encrypted fields
-    cert.fields.insert("name".to_string(), b"encrypted_name".to_vec());
-    cert.fields.insert("email".to_string(), b"encrypted_email".to_vec());
+    cert.fields
+        .insert("name".to_string(), b"encrypted_name".to_vec());
+    cert.fields
+        .insert("email".to_string(), b"encrypted_email".to_vec());
 
     // Sign the certificate
     cert.sign(&certifier_key).unwrap();
@@ -385,7 +403,8 @@ fn test_verifiable_certificate_creation() {
         subject_key,
         certifier_key.public_key(),
     );
-    cert.fields.insert("name".to_string(), b"encrypted".to_vec());
+    cert.fields
+        .insert("name".to_string(), b"encrypted".to_vec());
     cert.sign(&certifier_key).unwrap();
 
     // Create verifiable certificate with keyring
@@ -495,7 +514,10 @@ fn test_invalid_auth_version() {
 
     let result = msg.validate();
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Invalid auth version"));
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("Invalid auth version"));
 }
 
 #[test]
@@ -550,7 +572,7 @@ fn test_http_request_unicode_values() {
         method: "POST".to_string(),
         url_postfix: "/api/users/test".to_string(), // URL
         headers: vec![("x-custom".to_string(), "unicode-value".to_string())], // Header value
-        body: "hello".as_bytes().to_vec(), // Body
+        body: "hello".as_bytes().to_vec(),          // Body
     };
 
     let payload = request.to_payload();

@@ -143,7 +143,9 @@ impl HttpRequest {
             let (val_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
             if cursor + val_len > payload.len() {
-                return Err(Error::AuthError("Payload too short for header value".into()));
+                return Err(Error::AuthError(
+                    "Payload too short for header value".into(),
+                ));
             }
             let value = String::from_utf8(payload[cursor..cursor + val_len].to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header value UTF-8: {}", e)))?;
@@ -573,8 +575,8 @@ impl Transport for SimplifiedFetchTransport {
                     }
 
                     if let Some(ref sig) = message.signature {
-                        request_builder =
-                            request_builder.header(headers::SIGNATURE, crate::primitives::to_hex(sig));
+                        request_builder = request_builder
+                            .header(headers::SIGNATURE, crate::primitives::to_hex(sig));
                     }
 
                     // Add request ID header
@@ -592,7 +594,8 @@ impl Transport for SimplifiedFetchTransport {
                         {
                             // Skip x-bsv-auth-* headers (we add our own)
                             if !lower_key.starts_with("x-bsv-auth") {
-                                request_builder = request_builder.header(key.as_str(), value.as_str());
+                                request_builder =
+                                    request_builder.header(key.as_str(), value.as_str());
                             }
                         }
                     }
@@ -618,7 +621,8 @@ impl Transport for SimplifiedFetchTransport {
                         .to_vec();
 
                     // Check for required auth headers
-                    let required_headers = [headers::VERSION, headers::IDENTITY_KEY, headers::SIGNATURE];
+                    let required_headers =
+                        [headers::VERSION, headers::IDENTITY_KEY, headers::SIGNATURE];
                     for header_name in &required_headers {
                         if response_headers.get(*header_name).is_none() {
                             return Err(Error::AuthError(format!(
@@ -629,14 +633,15 @@ impl Transport for SimplifiedFetchTransport {
                     }
 
                     // Extract request ID from response
-                    let response_request_id: [u8; 32] = if let Some(rid) = response_headers.get(headers::REQUEST_ID) {
-                        let rid_str = rid.to_str().unwrap_or_default();
-                        crate::primitives::from_base64(rid_str)?
-                            .try_into()
-                            .map_err(|_| Error::AuthError("Invalid request ID length".into()))?
-                    } else {
-                        http_request.request_id // Use original if not provided
-                    };
+                    let response_request_id: [u8; 32] =
+                        if let Some(rid) = response_headers.get(headers::REQUEST_ID) {
+                            let rid_str = rid.to_str().unwrap_or_default();
+                            crate::primitives::from_base64(rid_str)?
+                                .try_into()
+                                .map_err(|_| Error::AuthError("Invalid request ID length".into()))?
+                        } else {
+                            http_request.request_id // Use original if not provided
+                        };
 
                     // Extract non-auth headers (x-bsv-* except x-bsv-auth-*, authorization)
                     let mut included_headers: Vec<(String, String)> = Vec::new();
@@ -667,7 +672,8 @@ impl Transport for SimplifiedFetchTransport {
                         .and_then(|v| v.to_str().ok())
                         .ok_or_else(|| Error::AuthError("Missing identity key header".into()))?;
 
-                    let response_identity = crate::primitives::PublicKey::from_hex(resp_identity_key)?;
+                    let response_identity =
+                        crate::primitives::PublicKey::from_hex(resp_identity_key)?;
 
                     let mut response_message =
                         AuthMessage::new(MessageType::General, response_identity);
@@ -694,7 +700,8 @@ impl Transport for SimplifiedFetchTransport {
                     if let Some(msg_type) = response_headers.get(headers::MESSAGE_TYPE) {
                         if msg_type.to_str().ok() == Some("certificateRequest") {
                             // Handle certificate request in response
-                            if let Some(req_certs) = response_headers.get(headers::REQUESTED_CERTIFICATES)
+                            if let Some(req_certs) =
+                                response_headers.get(headers::REQUESTED_CERTIFICATES)
                             {
                                 if let Ok(requested) =
                                     serde_json::from_str(req_certs.to_str().unwrap_or("{}"))
@@ -1070,16 +1077,16 @@ mod tests {
         // Check headers exist
         let headers_map: std::collections::HashMap<_, _> = headers.into_iter().collect();
         assert_eq!(headers_map.get(headers::VERSION), Some(&"0.1".to_string()));
+        assert_eq!(headers_map.get(headers::IDENTITY_KEY), Some(&key.to_hex()));
         assert_eq!(
-            headers_map.get(headers::IDENTITY_KEY),
-            Some(&key.to_hex())
+            headers_map.get(headers::NONCE),
+            Some(&"test-nonce".to_string())
         );
-        assert_eq!(headers_map.get(headers::NONCE), Some(&"test-nonce".to_string()));
         assert_eq!(
             headers_map.get(headers::YOUR_NONCE),
             Some(&"peer-nonce".to_string())
         );
-        assert!(headers_map.get(headers::SIGNATURE).is_some());
+        assert!(headers_map.contains_key(headers::SIGNATURE));
     }
 
     #[test]

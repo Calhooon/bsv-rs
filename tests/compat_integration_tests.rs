@@ -5,7 +5,9 @@
 #![cfg(feature = "compat")]
 
 use bsv_sdk::compat::base58;
-use bsv_sdk::compat::bip32::{generate_hd_key_from_mnemonic, ExtendedKey, Network, HARDENED_KEY_START};
+use bsv_sdk::compat::bip32::{
+    generate_hd_key_from_mnemonic, ExtendedKey, Network, HARDENED_KEY_START,
+};
 use bsv_sdk::compat::bip39::{Language, Mnemonic, WordCount};
 use bsv_sdk::compat::bsm;
 use bsv_sdk::compat::ecies;
@@ -28,7 +30,8 @@ fn test_full_hd_wallet_generation_flow() {
     assert_eq!(seed.len(), 64);
 
     // Generate master key
-    let master = ExtendedKey::new_master(&seed, Network::Mainnet).expect("Failed to create master key");
+    let master =
+        ExtendedKey::new_master(&seed, Network::Mainnet).expect("Failed to create master key");
 
     // Verify it's a private key
     assert!(master.is_private());
@@ -63,7 +66,8 @@ fn test_mnemonic_to_hd_key_helper() {
 #[test]
 fn test_testnet_hd_key_derivation() {
     let seed = [0u8; 32];
-    let master = ExtendedKey::new_master(&seed, Network::Testnet).expect("Failed to create testnet master");
+    let master =
+        ExtendedKey::new_master(&seed, Network::Testnet).expect("Failed to create testnet master");
 
     assert!(master.to_string().starts_with("tprv"));
 
@@ -71,7 +75,9 @@ fn test_testnet_hd_key_derivation() {
     assert!(xpub.to_string().starts_with("tpub"));
 
     // Testnet address
-    let address = master.address(false).expect("Failed to get testnet address");
+    let address = master
+        .address(false)
+        .expect("Failed to get testnet address");
     assert!(address.starts_with('m') || address.starts_with('n'));
 }
 
@@ -166,7 +172,8 @@ fn test_bsm_compressed_and_uncompressed() {
 
     // Uncompressed signature
     let sig_uncompressed = bsm::sign_message_with_compression(&key, message, false).unwrap();
-    let recovered_uncomp = bsm::recover_public_key_from_signature(&sig_uncompressed, message).unwrap();
+    let recovered_uncomp =
+        bsm::recover_public_key_from_signature(&sig_uncompressed, message).unwrap();
     assert!(!recovered_uncomp.1, "Should be uncompressed");
 
     // Both should recover to the same public key
@@ -205,7 +212,8 @@ fn test_bsm_public_key_recovery() {
     let message = b"Recover me";
 
     let signature = bsm::sign_message(&key, message).unwrap();
-    let (recovered, _compressed) = bsm::recover_public_key_from_signature(&signature, message).unwrap();
+    let (recovered, _compressed) =
+        bsm::recover_public_key_from_signature(&signature, message).unwrap();
 
     assert_eq!(
         recovered.to_compressed(),
@@ -273,7 +281,10 @@ fn test_electrum_ecies_no_key_mode() {
 
     // Verify that trying to decrypt without sender's key fails (no embedded key to extract)
     let result = ecies::electrum_decrypt(&encrypted, &bob, None);
-    assert!(result.is_err(), "Should fail without sender's public key when no_key=true");
+    assert!(
+        result.is_err(),
+        "Should fail without sender's public key when no_key=true"
+    );
 }
 
 #[test]
@@ -349,12 +360,14 @@ fn test_ecies_empty_and_large_messages() {
 
     // Empty message
     let empty_encrypted = ecies::electrum_encrypt(b"", &bob.public_key(), &alice, false).unwrap();
-    let empty_decrypted = ecies::electrum_decrypt(&empty_encrypted, &bob, Some(&alice.public_key())).unwrap();
+    let empty_decrypted =
+        ecies::electrum_decrypt(&empty_encrypted, &bob, Some(&alice.public_key())).unwrap();
     assert_eq!(empty_decrypted, b"");
 
     // Large message (64KB)
     let large_message = vec![0xAB_u8; 65536];
-    let large_encrypted = ecies::bitcore_encrypt(&large_message, &bob.public_key(), &alice, None).unwrap();
+    let large_encrypted =
+        ecies::bitcore_encrypt(&large_message, &bob.public_key(), &alice, None).unwrap();
     let large_decrypted = ecies::bitcore_decrypt(&large_encrypted, &bob).unwrap();
     assert_eq!(large_decrypted, large_message);
 }
@@ -376,7 +389,12 @@ fn test_base58_roundtrip() {
     for data in test_data {
         let encoded = base58::encode(&data);
         let decoded = base58::decode(&encoded).expect("Decode failed");
-        assert_eq!(decoded, data, "Roundtrip failed for data of length {}", data.len());
+        assert_eq!(
+            decoded,
+            data,
+            "Roundtrip failed for data of length {}",
+            data.len()
+        );
     }
 }
 
@@ -385,7 +403,10 @@ fn test_base58_leading_zeros() {
     // Leading zeros should become leading '1's
     let data = [0x00, 0x00, 0x00, 0x01];
     let encoded = base58::encode(&data);
-    assert!(encoded.starts_with("111"), "Expected leading 1s for leading zeros");
+    assert!(
+        encoded.starts_with("111"),
+        "Expected leading 1s for leading zeros"
+    );
 
     let decoded = base58::decode(&encoded).unwrap();
     assert_eq!(decoded, data);
@@ -394,7 +415,8 @@ fn test_base58_leading_zeros() {
 #[test]
 fn test_base58_known_values() {
     // Bitcoin genesis block hash
-    let genesis_hash = from_hex("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f").unwrap();
+    let genesis_hash =
+        from_hex("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f").unwrap();
     let encoded = base58::encode(&genesis_hash);
     let decoded = base58::decode(&encoded).unwrap();
     assert_eq!(decoded, genesis_hash);
@@ -432,18 +454,29 @@ fn test_mnemonic_to_ecies_encryption() {
     let mnemonic_bob = Mnemonic::new(WordCount::Words12).unwrap();
 
     // Derive keys
-    let alice_master = generate_hd_key_from_mnemonic(&mnemonic_alice, "", Network::Mainnet).unwrap();
+    let alice_master =
+        generate_hd_key_from_mnemonic(&mnemonic_alice, "", Network::Mainnet).unwrap();
     let bob_master = generate_hd_key_from_mnemonic(&mnemonic_bob, "", Network::Mainnet).unwrap();
 
-    let alice_key = alice_master.derive_path("m/44'/0'/0'/0/0").unwrap().private_key().unwrap();
-    let bob_key = bob_master.derive_path("m/44'/0'/0'/0/0").unwrap().private_key().unwrap();
+    let alice_key = alice_master
+        .derive_path("m/44'/0'/0'/0/0")
+        .unwrap()
+        .private_key()
+        .unwrap();
+    let bob_key = bob_master
+        .derive_path("m/44'/0'/0'/0/0")
+        .unwrap()
+        .private_key()
+        .unwrap();
 
     // Alice encrypts for Bob
     let message = b"Secret from Alice to Bob using HD keys";
-    let encrypted = ecies::electrum_encrypt(message, &bob_key.public_key(), &alice_key, false).unwrap();
+    let encrypted =
+        ecies::electrum_encrypt(message, &bob_key.public_key(), &alice_key, false).unwrap();
 
     // Bob decrypts
-    let decrypted = ecies::electrum_decrypt(&encrypted, &bob_key, Some(&alice_key.public_key())).unwrap();
+    let decrypted =
+        ecies::electrum_decrypt(&encrypted, &bob_key, Some(&alice_key.public_key())).unwrap();
     assert_eq!(decrypted, message);
 }
 

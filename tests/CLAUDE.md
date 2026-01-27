@@ -9,20 +9,20 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Purpose |
 |------|---------|
-| `auth_cross_sdk_tests.rs` | Auth cross-SDK certificate serialization tests (11 tests) |
-| `auth_integration_tests.rs` | Auth module integration tests (certificates, sessions, transport) |
-| `compat_bip39_tests.rs` | BIP-39 mnemonic tests with official TREZOR vectors (22 vectors) |
+| `auth_cross_sdk_tests.rs` | Auth cross-SDK certificate serialization tests (13 tests) |
+| `auth_integration_tests.rs` | Auth module integration tests (24 tests: certificates, sessions, transport) |
+| `compat_bip39_tests.rs` | BIP-39 mnemonic tests with official TREZOR vectors (29 tests) |
 | `compat_integration_tests.rs` | Compat module integration tests (BIP-32/39, BSM, ECIES, 31 tests) |
-| `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs |
-| `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors (15 vectors) |
-| `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests |
-| `integration_tests.rs` | Full workflow tests across all modules |
+| `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs (17 tests) |
+| `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors (6 tests) |
+| `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests (10 tests) |
+| `integration_tests.rs` | Full workflow tests across all modules (22 tests) |
 | `overlay_cross_sdk_tests.rs` | Overlay cross-SDK admin token and type tests (13 tests) |
 | `overlay_integration_tests.rs` | Overlay module integration tests (60 tests) |
-| `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors |
-| `sighash_tests.rs` | Transaction sighash computation with 499 vectors |
-| `template_tests.rs` | Script template tests (P2PKH, RPuzzle) |
-| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models) |
+| `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
+| `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
+| `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
+| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 63 tests) |
 | `transaction/` | Transaction test vectors module |
 
 ## Test Vectors
@@ -60,7 +60,7 @@ Transaction test vectors are in `tests/transaction/vectors/`:
 
 ### BIP-39 Compatibility (`compat_bip39_tests.rs`)
 
-BIP-39 mnemonic phrase tests using official TREZOR vectors (requires `compat` feature):
+BIP-39 mnemonic phrase tests using official TREZOR vectors (29 tests, requires `compat` feature):
 
 **Entropy to Mnemonic**
 - `test_entropy_to_mnemonic` - 22 vectors converting entropy to mnemonic phrases
@@ -149,7 +149,7 @@ Full workflow integration tests for the compat module (31 tests, requires `compa
 
 ### Cross-SDK Compatibility (`cross_sdk_tests.rs`)
 
-Tests that verify the Rust implementation matches TypeScript and Go SDK output:
+Tests that verify the Rust implementation matches TypeScript and Go SDK output (17 tests):
 
 **BRC-42 Key Derivation**
 - `test_brc42_private_derivation_vectors` - Derives child private keys using sender public key
@@ -180,10 +180,10 @@ Tests that verify the Rust implementation matches TypeScript and Go SDK output:
 
 ### DRBG Tests (`drbg_tests.rs`)
 
-HMAC-DRBG (Deterministic Random Bit Generator) tests using NIST SP 800-90A vectors:
+HMAC-DRBG (Deterministic Random Bit Generator) tests using NIST SP 800-90A vectors (6 tests):
 
 **NIST Vector Tests**
-- `test_drbg_nist_vectors` - Runs all 15 NIST test vectors with SHA-256
+- `test_drbg_nist_vectors` - Runs 15 NIST test vectors with SHA-256
 
 **DRBG Variants**
 - `test_drbg_sha512_variant` - Tests SHA-512 HMAC-DRBG produces different output than SHA-256
@@ -196,7 +196,7 @@ HMAC-DRBG (Deterministic Random Bit Generator) tests using NIST SP 800-90A vecto
 
 ### EC Module Tests (`ec_tests.rs`)
 
-Focused tests for elliptic curve operations using BRC-42 test vectors:
+Focused tests for elliptic curve operations using BRC-42 test vectors (10 tests):
 
 **BRC-42 Key Derivation**
 - `test_brc42_private_derivation` - Recipient derives child private key from sender's public key using JSON vectors
@@ -218,7 +218,7 @@ Focused tests for elliptic curve operations using BRC-42 test vectors:
 
 ### Integration Tests (`integration_tests.rs`)
 
-Full workflow tests combining multiple modules (25 tests):
+Full workflow tests combining multiple modules (22 tests):
 
 **Key Derivation Workflows**
 - `test_full_key_derivation_workflow` - Complete BRC-42 key agreement between sender and recipient
@@ -264,7 +264,7 @@ Full workflow tests combining multiple modules (25 tests):
 
 ### Script Vectors Tests (`script_vectors_tests.rs`)
 
-Comprehensive script interpreter tests using TypeScript SDK vectors (716 lines):
+Comprehensive script interpreter tests using TypeScript SDK vectors (13 tests):
 
 **Spend Valid Vectors**
 - `test_spend_valid_vectors` - Runs ~570+ spend execution test vectors with SpendParams
@@ -289,7 +289,7 @@ Comprehensive script interpreter tests using TypeScript SDK vectors (716 lines):
 
 ### Sighash Tests (`sighash_tests.rs`)
 
-Transaction sighash computation tests (227 lines):
+Transaction sighash computation tests (3 tests, 499 vectors):
 
 - `test_sighash_vectors` - Runs all 499 sighash test vectors using `compute_sighash` and `parse_transaction`
 - `test_sighash_first_vector_detailed` - Detailed debugging output: raw_tx, script, hash_type, parsed inputs/outputs
@@ -297,7 +297,7 @@ Transaction sighash computation tests (227 lines):
 
 ### Template Tests (`template_tests.rs`)
 
-Script template integration tests (313 lines):
+Script template integration tests (10 tests):
 
 **P2PKH Template**
 - `test_p2pkh_end_to_end_spend` - Full P2PKH locking script creation (DUP HASH160 EQUALVERIFY CHECKSIG) and unlocking
@@ -317,7 +317,7 @@ Script template integration tests (313 lines):
 
 ### Transaction Tests (`transaction_tests.rs`)
 
-Transaction module tests (1027 lines, requires `transaction` feature flag):
+Transaction module tests (63 tests, requires `transaction` feature flag):
 
 **Transaction Parsing**
 - `test_transaction_from_hex` - Parse valid transaction from hex (version=1, locktime=0)
@@ -387,9 +387,42 @@ Transaction module tests (1027 lines, requires `transaction` feature flag):
 - ChainTracker verification: correct root passes, wrong root/height fails
 - Utility methods: contains, txids, compute_root(None), binary roundtrip
 
+### Auth Cross-SDK Tests (`auth_cross_sdk_tests.rs`)
+
+Certificate serialization tests for cross-SDK compatibility (13 tests, requires `auth` feature):
+
+**Certificate Parsing**
+- `test_certificate_vector_parsing` - Parses all certificate vectors, verifies fields match
+
+**Binary Serialization**
+- `test_certificate_binary_roundtrip` - Binary serialization roundtrip with and without signature
+- `test_certificate_deterministic_serialization` - Verifies binary output is deterministic
+- `test_certificate_binary_format_structure` - Verifies binary format matches TypeScript SDK layout
+
+**Field Handling**
+- `test_certificate_fields_sorted_alphabetically` - Fields sorted alphabetically for determinism
+- `test_certificate_empty_fields` - Empty fields serialize/deserialize correctly
+
+**Signature Tests**
+- `test_certificate_with_signature_has_valid_format` - DER-encoded signatures start with 0x30
+
+**JSON Serialization**
+- `test_certificate_json_roundtrip` - JSON serialization roundtrip for all fields
+
+**Type and Serial Number**
+- `test_certificate_type_base64` - type_base64() and serial_number_base64() methods
+
+**Outpoint Tests**
+- `test_certificate_outpoint_parsing` - Outpoint parsing helper (txid.vout format)
+- `test_certificate_without_revocation_outpoint` - None outpoint handles correctly
+- `test_certificate_no_outpoint_sentinel_value` - No-outpoint encoded as all-zeros
+
+**Vector Validation**
+- `test_certificate_vector_count` - Verifies at least 4 certificate vectors loaded
+
 ### Auth Integration Tests (`auth_integration_tests.rs`)
 
-Auth module integration tests (requires `auth` feature):
+Auth module integration tests (24 tests, requires `auth` feature):
 
 **Session Manager Tests**
 - `test_session_manager_lifecycle` - Session creation, lookup, removal, and clearing
@@ -432,6 +465,39 @@ Auth module integration tests (requires `auth` feature):
 - `test_invalid_auth_version` - Invalid version is rejected
 - `test_duplicate_session_nonce_rejected` - Duplicate nonces are rejected
 - `test_session_without_nonce_rejected` - Sessions without nonce are rejected
+
+### Overlay Cross-SDK Tests (`overlay_cross_sdk_tests.rs`)
+
+Cross-SDK compatibility tests for overlay types (13 tests, requires `overlay` feature):
+
+**Admin Token Tests**
+- `test_admin_token_creation_and_decoding` - Create/decode admin tokens, verify all fields match
+- `test_admin_token_protocol_detection` - Protocol detection (is_ship_token, is_slap_token, is_overlay_admin_token)
+- `test_admin_token_deterministic_encoding` - Token encoding is deterministic
+- `test_admin_token_vector_count` - Verifies at least 4 admin token vectors loaded
+
+**Protocol Tests**
+- `test_protocol_parsing` - Protocol string parsing case-insensitive
+
+**Network Preset Tests**
+- `test_network_presets` - Mainnet/Testnet/Local preset configuration (allow_http, slap_trackers)
+
+**LookupQuestion Tests**
+- `test_lookup_question_creation` - Question creation with service and query, JSON roundtrip
+
+**LookupAnswer Tests**
+- `test_lookup_answer_output_list_json` - OutputList variant with 2 outputs and context
+- `test_lookup_answer_freeform_json` - Freeform variant with status field
+- `test_lookup_answer_formula_json` - Formula variant with outpoint and history_fn
+
+**AdmittanceInstructions Tests**
+- `test_admittance_instructions_json` - has_activity() and JSON roundtrip
+
+**TaggedBEEF Tests**
+- `test_tagged_beef_creation` - Creation with and without off_chain_values, JSON roundtrip
+
+**Vector Validation**
+- `test_overlay_types_vector_count` - Verifies minimum vector counts for all types
 
 ### Overlay Integration Tests (`overlay_integration_tests.rs`)
 
@@ -524,6 +590,7 @@ Overlay module integration tests (60 tests, requires `overlay` feature):
 
 ```bash
 # Run all integration tests
+cargo test --test auth_cross_sdk_tests --features auth
 cargo test --test auth_integration_tests --features auth
 cargo test --test compat_bip39_tests --features compat
 cargo test --test compat_integration_tests --features compat
@@ -531,6 +598,7 @@ cargo test --test cross_sdk_tests
 cargo test --test drbg_tests
 cargo test --test ec_tests
 cargo test --test integration_tests
+cargo test --test overlay_cross_sdk_tests --features overlay
 cargo test --test overlay_integration_tests --features overlay
 cargo test --test script_vectors_tests
 cargo test --test sighash_tests
@@ -657,9 +725,9 @@ Tests are organized by feature area:
 - **primitives tests**: `cross_sdk_tests.rs`, `drbg_tests.rs`, `ec_tests.rs`, `integration_tests.rs`
 - **script tests**: `script_vectors_tests.rs`, `template_tests.rs`
 - **transaction tests**: `sighash_tests.rs`, `transaction_tests.rs`
-- **compat tests**: `compat_bip39_tests.rs` (requires `compat` feature)
-- **auth tests**: `auth_integration_tests.rs` (requires `auth` feature)
-- **overlay tests**: `overlay_integration_tests.rs` (requires `overlay` feature)
+- **compat tests**: `compat_bip39_tests.rs`, `compat_integration_tests.rs` (requires `compat` feature)
+- **auth tests**: `auth_cross_sdk_tests.rs`, `auth_integration_tests.rs` (requires `auth` feature)
+- **overlay tests**: `overlay_cross_sdk_tests.rs`, `overlay_integration_tests.rs` (requires `overlay` feature)
 
 The `transaction_tests.rs` file uses nested modules for organization:
 - `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)

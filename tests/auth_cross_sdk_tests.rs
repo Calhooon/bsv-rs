@@ -83,7 +83,10 @@ fn vector_to_certificate(v: &CertificateVector) -> Certificate {
         .collect();
 
     // Parse signature if present
-    let signature = v.signature.as_ref().map(|s| from_hex(s).expect("Invalid signature hex"));
+    let signature = v
+        .signature
+        .as_ref()
+        .map(|s| from_hex(s).expect("Invalid signature hex"));
 
     Certificate {
         cert_type,
@@ -159,8 +162,8 @@ fn test_certificate_binary_roundtrip() {
 
         // Test binary serialization without signature
         let binary_no_sig = cert.to_binary(false);
-        let parsed_no_sig =
-            Certificate::from_binary(&binary_no_sig).expect(&format!("Vector {}: failed to parse binary (no sig)", i));
+        let parsed_no_sig = Certificate::from_binary(&binary_no_sig)
+            .expect(&format!("Vector {}: failed to parse binary (no sig)", i));
 
         assert_eq!(cert.cert_type, parsed_no_sig.cert_type);
         assert_eq!(cert.serial_number, parsed_no_sig.serial_number);
@@ -177,8 +180,8 @@ fn test_certificate_binary_roundtrip() {
         // Test binary serialization with signature
         if cert.signature.is_some() {
             let binary_with_sig = cert.to_binary(true);
-            let parsed_with_sig =
-                Certificate::from_binary(&binary_with_sig).expect(&format!("Vector {}: failed to parse binary (with sig)", i));
+            let parsed_with_sig = Certificate::from_binary(&binary_with_sig)
+                .expect(&format!("Vector {}: failed to parse binary (with sig)", i));
 
             assert_eq!(cert.signature, parsed_with_sig.signature);
         }
@@ -198,7 +201,11 @@ fn test_certificate_deterministic_serialization() {
         let binary1 = cert.to_binary(false);
         let binary2 = cert.to_binary(false);
 
-        assert_eq!(binary1, binary2, "Vector {}: non-deterministic serialization", i);
+        assert_eq!(
+            binary1, binary2,
+            "Vector {}: non-deterministic serialization",
+            i
+        );
 
         // Parse and re-serialize
         let parsed = Certificate::from_binary(&binary1).unwrap();
@@ -313,7 +320,12 @@ fn test_certificate_json_roundtrip() {
             "Vector {}: certifier",
             i
         );
-        assert_eq!(cert.fields.len(), parsed.fields.len(), "Vector {}: fields count", i);
+        assert_eq!(
+            cert.fields.len(),
+            parsed.fields.len(),
+            "Vector {}: fields count",
+            i
+        );
         assert_eq!(cert.signature, parsed.signature, "Vector {}: signature", i);
 
         // Verify revocation outpoint
@@ -341,7 +353,12 @@ fn test_certificate_type_base64() {
     for (i, v) in vectors.iter().enumerate() {
         let cert = vector_to_certificate(v);
 
-        assert_eq!(cert.type_base64(), v.cert_type, "Vector {}: type_base64 mismatch", i);
+        assert_eq!(
+            cert.type_base64(),
+            v.cert_type,
+            "Vector {}: type_base64 mismatch",
+            i
+        );
         assert_eq!(
             cert.serial_number_base64(),
             v.serial_number,
@@ -358,14 +375,17 @@ fn test_certificate_type_base64() {
 #[test]
 fn test_certificate_outpoint_parsing() {
     // Test the outpoint parsing helper
-    let outpoint = parse_outpoint("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef.1");
+    let outpoint =
+        parse_outpoint("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef.1");
     assert_eq!(outpoint.vout, 1);
 
-    let expected_txid = from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef").unwrap();
+    let expected_txid =
+        from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef").unwrap();
     assert_eq!(outpoint.txid.to_vec(), expected_txid);
 
     // Test with vout 0
-    let outpoint0 = parse_outpoint("0245242bd144a85053b4c1e4a0ed5467c79a4d172680ca77a970ebabd682d564.0");
+    let outpoint0 =
+        parse_outpoint("0245242bd144a85053b4c1e4a0ed5467c79a4d172680ca77a970ebabd682d564.0");
     assert_eq!(outpoint0.vout, 0);
 }
 
@@ -431,20 +451,18 @@ fn test_certificate_binary_format_structure() {
     let serial_number = [0x02u8; 32];
 
     // Use generator point G for subject
-    let subject = PublicKey::from_hex(
-        "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-    )
-    .unwrap();
+    let subject =
+        PublicKey::from_hex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+            .unwrap();
 
     // Use 2*G for certifier
-    let certifier = PublicKey::from_hex(
-        "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
-    )
-    .unwrap();
+    let certifier =
+        PublicKey::from_hex("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9")
+            .unwrap();
 
     // Create outpoint with known txid
-    let txid = from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
-        .unwrap();
+    let txid =
+        from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef").unwrap();
     let mut txid_arr = [0u8; 32];
     txid_arr.copy_from_slice(&txid);
     let outpoint = Outpoint {
@@ -472,7 +490,11 @@ fn test_certificate_binary_format_structure() {
     assert_eq!(&binary[0..32], &cert_type, "Type bytes mismatch");
 
     // Offset 32-63: serial_number (32 bytes)
-    assert_eq!(&binary[32..64], &serial_number, "Serial number bytes mismatch");
+    assert_eq!(
+        &binary[32..64],
+        &serial_number,
+        "Serial number bytes mismatch"
+    );
 
     // Offset 64-96: subject pubkey (33 bytes compressed)
     assert_eq!(
@@ -508,14 +530,12 @@ fn test_certificate_binary_format_structure() {
 fn test_certificate_no_outpoint_sentinel_value() {
     let cert_type = [0x01u8; 32];
     let serial_number = [0x02u8; 32];
-    let subject = PublicKey::from_hex(
-        "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-    )
-    .unwrap();
-    let certifier = PublicKey::from_hex(
-        "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
-    )
-    .unwrap();
+    let subject =
+        PublicKey::from_hex("0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798")
+            .unwrap();
+    let certifier =
+        PublicKey::from_hex("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9")
+            .unwrap();
 
     let cert = Certificate {
         cert_type,
@@ -530,7 +550,11 @@ fn test_certificate_no_outpoint_sentinel_value() {
     let binary = cert.to_binary(false);
 
     // Offset 130-161: should be all zeros (sentinel value)
-    assert_eq!(&binary[130..162], &[0u8; 32], "No-outpoint sentinel TXID should be zeros");
+    assert_eq!(
+        &binary[130..162],
+        &[0u8; 32],
+        "No-outpoint sentinel TXID should be zeros"
+    );
 
     // Offset 162: vout should be 0
     assert_eq!(binary[162], 0x00, "No-outpoint sentinel vout should be 0");

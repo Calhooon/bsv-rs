@@ -9,8 +9,8 @@ This module implements identity certificates for the BSV authentication system, 
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, re-exports, protocol constants | ~43 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | ~490 |
+| `mod.rs` | Module root, re-exports, protocol constants | ~42 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | ~516 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | ~336 |
 | `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | ~287 |
 
@@ -140,23 +140,27 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 
 ## Binary Format
 
-The `Certificate::to_binary()` method produces a deterministic binary representation:
+The `Certificate::to_binary()` method produces a deterministic binary representation compatible with the TypeScript SDK:
 
 ```
 [cert_type: 32 bytes]
 [serial_number: 32 bytes]
 [subject_pubkey: 33 bytes compressed]
 [certifier_pubkey: 33 bytes compressed]
-[has_outpoint: 1 byte] [outpoint: 36 bytes if present]
+[revocation_txid: 32 bytes]     # All zeros if no outpoint
+[revocation_index: varint]       # 0 if no outpoint
 [field_count: varint]
 [for each field (sorted by name):
     [name_len: varint][name: bytes]
     [value_len: varint][value: bytes]
 ]
-[signature_len: varint][signature: bytes if included]
+[signature: raw DER bytes if included and present]  # No length prefix
 ```
 
-Fields are sorted alphabetically by name for deterministic serialization across implementations.
+**Notes:**
+- Revocation outpoint uses a sentinel value: all-zeros TXID with index 0 means "no outpoint"
+- Signature is appended as raw bytes without length prefix (matches TypeScript SDK)
+- Fields are sorted alphabetically by name for deterministic serialization across implementations
 
 ## Usage Examples
 

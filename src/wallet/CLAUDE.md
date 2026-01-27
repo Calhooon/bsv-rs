@@ -9,9 +9,9 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with feature-gated exports | ~254 |
+| `mod.rs` | Module root with feature-gated exports | ~253 |
 | `types.rs` | Core wallet type definitions (70+ types) | ~1550 |
-| `interface.rs` | WalletInterface trait (26 methods) | ~297 |
+| `interface.rs` | WalletInterface trait (28 methods) | ~297 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~641 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~491 |
 | `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1345 |
@@ -24,12 +24,14 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 ### substrates/
 Transport layer implementations for wallet communication:
+- `mod.rs` - Module definitions and re-exports
 - `http_json.rs` - JSON over HTTP substrate
 - `http_wire.rs` - Binary wire protocol over HTTP substrate
 - See `substrates/CLAUDE.md` for details
 
 ### wire/
 Wire protocol implementation:
+- `mod.rs` - Module definitions and re-exports
 - `encoding.rs` - Binary encoding/decoding
 - `calls.rs` - Call frame definitions
 - `transceiver.rs` - Protocol transceiver
@@ -40,7 +42,7 @@ Wire protocol implementation:
 
 ### WalletInterface Trait
 
-The `WalletInterface` trait defines all 26 wallet operations (async with `originator` parameter):
+The `WalletInterface` trait defines all 28 wallet operations (async with `originator` parameter):
 
 | Category | Methods |
 |----------|---------|
@@ -67,9 +69,18 @@ pub struct WalletClient {
     pub fn new(substrate_type: SubstrateType, originator: Option<String>) -> Self
     pub fn substrate_type(&self) -> SubstrateType
     pub fn originator(&self) -> Option<&str>
-    // Implements all wallet operations as async methods
+    // All 28 wallet operations as async methods
 }
 ```
+
+**Substrate Selection:**
+
+| Type | Protocol | Default Port | Use Case |
+|------|----------|--------------|----------|
+| `Auto` | Various | - | Production apps |
+| `JsonApi` | JSON | 3321 | Debugging, simple integration |
+| `Cicada` | Binary | 3301 | High performance |
+| `SecureJsonApi` | JSON/TLS | 2121 | Secure local communication |
 
 ### ProtoWallet
 
@@ -104,7 +115,7 @@ pub struct ProtoWallet {
     pub fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs) -> Result<RevealSpecificKeyLinkageResult>
 }
 
-// ProtoWallet implements WalletInterface
+// ProtoWallet implements WalletInterface (async trait)
 impl WalletInterface for ProtoWallet { ... }
 ```
 
@@ -116,7 +127,7 @@ ProtoWallet can:
 - Encrypt and decrypt data (AES-256-GCM via derived symmetric keys)
 - Create and verify HMACs (SHA-256)
 - Reveal key linkages for verification
-- Implement all 26 `WalletInterface` methods (unsupported methods return errors)
+- Implement all 28 `WalletInterface` methods (unsupported methods return errors)
 
 ProtoWallet does NOT:
 - Create transactions (returns error)
@@ -130,42 +141,53 @@ ProtoWallet does NOT:
 ProtoWallet implements `WalletInterface` with full support for cryptographic operations:
 - Key operations: All 9 methods fully implemented
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
-- Chain/Status operations: `is_authenticated` returns true, `get_network` returns mainnet, `get_version` returns SDK version, `get_height` returns 0
+- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns mainnet, `get_version` returns SDK version, `get_height` returns 0, `get_header_for_height` returns error
 
 ### Validation Module
 
-The `validation` module provides 40+ validation functions:
+The `validation` module provides 40+ validation functions for wallet API inputs:
 
 | Category | Functions |
 |----------|-----------|
 | Satoshis | `validate_satoshis` |
 | Integers | `validate_integer`, `validate_integer_u32`, `validate_positive_integer_or_zero` |
 | Strings | `validate_string_length`, `validate_optional_string_length`, `validate_hex_string`, `validate_optional_hex_string`, `validate_base64_string`, `validate_optional_base64_string`, `is_hex_string` |
-| Identifiers | `validate_basket`, `validate_optional_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase) |
+| Identifiers | `validate_basket`, `validate_optional_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase, trim whitespace) |
 | Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string`, `validate_optional_outpoint_string` |
 | Descriptions | `validate_description_5_2000`, `validate_description_5_50` |
 | Actions | `validate_create_action_args`, `validate_create_action_input`, `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend` |
 | Certificates | `validate_certificate_fields`, `validate_keyring_revealer` |
 | Protocol | `validate_protocol_tuple`, `validate_query_mode` |
 
+Validation structs for action inputs/outputs:
+- `ValidCreateActionInput`, `ValidCreateActionOutput`, `ValidCreateActionOptions`, `ValidCreateActionArgs`
+- `ValidSignActionSpend`, `ValidListOutputsArgs`, `ValidListActionsArgs`
+- Raw counterparts (`*Raw`) for unvalidated input
+
 ### Core Types
 
 **SecurityLevel** - User interaction level for key derivation:
-- `Silent` (0): No user interaction
-- `App` (1): Approval per application
-- `Counterparty` (2): Approval per counterparty per application
+- `Silent` (0): No user interaction required
+- `App` (1): Requires user approval per application
+- `Counterparty` (2): Requires user approval per counterparty per application
 
-**Protocol** - Combines `SecurityLevel` and `protocol_name` (5-400 chars, lowercase, no consecutive spaces).
+**Protocol** - Combines `SecurityLevel` and `protocol_name` (5-400 chars, or 430 for "specific linkage revelation" protocols; lowercase, no consecutive spaces, cannot end with " protocol").
 
 **Counterparty** - Key derivation target: `Self_`, `Anyone` (publicly derivable), or `Other(PublicKey)`.
 
-**Network** - Bitcoin network: `Mainnet` or `Testnet`.
+**Network** - Bitcoin network: `Mainnet` (default) or `Testnet`.
 
 **ActionStatus** - Transaction status: `Completed`, `Unprocessed`, `Sending`, `Unproven`, `Unsigned`, `NoSend`, `NonFinal`, `Failed`.
 
-**QueryMode** - Filter mode for lists: `Any` or `All`.
+**QueryMode** - Filter mode for lists: `Any` (default) or `All`.
 
 **OutputInclude** - What to include in output listings: `LockingScripts` or `EntireTransactions`.
+
+**Outpoint** - Transaction outpoint with `txid: TxId` and `vout: u32`. Parses from "txid.vout" string format.
+
+**TxId** - Type alias for `[u8; 32]`.
+
+**SatoshiValue** - Type alias for `u64`. Max: `MAX_SATOSHIS` (2.1 quadrillion).
 
 ### Key Derivation
 
@@ -173,15 +195,20 @@ The `validation` module provides 40+ validation functions:
 - `new(root_key: Option<PrivateKey>)` - Creates deriver; None uses "anyone" key
 - `anyone_key() -> (PrivateKey, PublicKey)` - Returns the special "anyone" key pair (scalar value 1)
 - `root_key() -> &PrivateKey` - Returns the root private key
-- `identity_key() -> PublicKey` - Returns the identity public key
-- `derive_public_key()`, `derive_private_key()`, `derive_symmetric_key()`
-- `reveal_specific_secret()`, `reveal_counterparty_secret()` for linkage revelation
+- `identity_key() -> PublicKey` - Returns the identity public key (root key's public key)
+- `identity_key_hex() -> String` - Returns identity key as hex string
+- `derive_public_key(protocol, key_id, counterparty, for_self)` - Derive public key
+- `derive_private_key(protocol, key_id, counterparty)` - Derive private key
+- `derive_symmetric_key(protocol, key_id, counterparty)` - Derive symmetric key for encryption
+- `reveal_specific_secret()`, `reveal_counterparty_secret()` - For linkage revelation
 
 **CachedKeyDeriver** - Thread-safe LRU-cached wrapper (default 1000 entries):
 - `new(root_key: Option<PrivateKey>, config: Option<CacheConfig>)`
 - `inner() -> &KeyDeriver` - Access underlying deriver
 - `root_key() -> &PrivateKey` - Returns the root private key
 - Implements same `KeyDeriverApi` trait as `KeyDeriver`
+- Maintains separate caches for public keys, private keys, and symmetric keys
+- Secrets (reveal_*) are NOT cached for security reasons
 
 **KeyDeriverApi** - Trait implemented by both `KeyDeriver` and `CachedKeyDeriver`:
 - `identity_key()`, `identity_key_hex()`
@@ -292,6 +319,24 @@ bsv-sdk = { version = "0.2", features = ["wallet"] }
 bsv-sdk = { version = "0.2", features = ["wallet", "http"] }
 ```
 
+## Argument and Result Types
+
+ProtoWallet operations use dedicated argument/result structs:
+
+| Operation | Args Type | Result Type |
+|-----------|-----------|-------------|
+| `get_public_key` | `GetPublicKeyArgs` | `GetPublicKeyResult` |
+| `encrypt` | `EncryptArgs` | `EncryptResult` |
+| `decrypt` | `DecryptArgs` | `DecryptResult` |
+| `create_hmac` | `CreateHmacArgs` | `CreateHmacResult` |
+| `verify_hmac` | `VerifyHmacArgs` | `VerifyHmacResult` |
+| `create_signature` | `CreateSignatureArgs` | `CreateSignatureResult` |
+| `verify_signature` | `VerifySignatureArgs` | `VerifySignatureResult` |
+| `reveal_counterparty_key_linkage` | `RevealCounterpartyKeyLinkageArgs` | `RevealCounterpartyKeyLinkageResult` |
+| `reveal_specific_key_linkage` | `RevealSpecificKeyLinkageArgs` | `RevealSpecificKeyLinkageResult` |
+
+Additional types in `types.rs` cover all wallet operations (actions, outputs, certificates, discovery).
+
 ## Error Types
 
 | Error | Description |
@@ -304,7 +349,7 @@ bsv-sdk = { version = "0.2", features = ["wallet", "http"] }
 ## Cross-SDK Compatibility
 
 This module maintains API compatibility with:
-- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `KeyDeriver`, `CachedKeyDeriver`, `ProtoWallet`, `WalletClient`
+- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `KeyDeriver`, `CachedKeyDeriver`, `ProtoWallet`, `WalletClient`, all 28 wallet methods
 - [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `KeyDeriver`, `ProtoWallet`
 
 Key derivation uses the same algorithm (BRC-42) and produces identical keys across all SDK implementations.
@@ -313,24 +358,25 @@ Key derivation uses the same algorithm (BRC-42) and produces identical keys acro
 
 | TypeScript | Rust |
 |------------|------|
-| `WalletProtocol` (tuple) | `Protocol` (struct) |
-| `SecurityLevel` (0\|1\|2) | `SecurityLevel` (enum) |
-| `Counterparty` (string\|PublicKey) | `Counterparty` (enum) |
+| `WalletProtocol` (tuple) | `Protocol` (struct with `from_tuple`/`to_tuple`) |
+| `SecurityLevel` (0\|1\|2) | `SecurityLevel` (enum with `from_u8`/`as_u8`) |
+| `Counterparty` (string\|PublicKey) | `Counterparty` (enum: `Self_`, `Anyone`, `Other(PublicKey)`) |
 | `KeyDeriverApi` (interface) | `KeyDeriverApi` (trait) |
-| `WalletInterface` (interface) | `WalletInterface` (trait) |
+| `WalletInterface` (interface) | `WalletInterface` (async trait) |
 | `ProtoWallet` (class) | `ProtoWallet` (struct, implements `WalletInterface`) |
-| `Wallet` (class) | `WalletClient` (struct) |
+| `Wallet` (class) | `WalletClient` (struct, multi-substrate) |
 | `validationHelpers.ts` functions | `validation` module functions |
 
 ## Dependencies
 
 The wallet module uses:
-- `PrivateKey`, `PublicKey`, `SymmetricKey`, `Signature` from primitives
+- `PrivateKey`, `PublicKey`, `SymmetricKey`, `Signature` from primitives module
 - `sha256`, `sha256_hmac` from hash module
-- `derive_child` methods for BRC-42 derivation
-- `subtle` crate for constant-time comparison
-- `async_trait` crate for async trait methods
-- `serde` for serialization of types
+- `derive_child`, `derive_shared_secret` methods for BRC-42 derivation
+- `subtle` crate for constant-time comparison (HMAC verification)
+- `async_trait` crate for async trait methods (WalletInterface)
+- `serde` for serialization of types (JSON API compatibility)
+- `reqwest` (optional, with `http` feature) for HTTP substrate communication
 
 ## Testing
 

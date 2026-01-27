@@ -823,11 +823,19 @@ fn test_is_ship_token() {
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
 
-    let ship_script =
-        create_overlay_admin_token(Protocol::Ship, &public_key, "https://example.com", "tm_test");
+    let ship_script = create_overlay_admin_token(
+        Protocol::Ship,
+        &public_key,
+        "https://example.com",
+        "tm_test",
+    );
 
-    let slap_script =
-        create_overlay_admin_token(Protocol::Slap, &public_key, "https://example.com", "ls_test");
+    let slap_script = create_overlay_admin_token(
+        Protocol::Slap,
+        &public_key,
+        "https://example.com",
+        "ls_test",
+    );
 
     assert!(is_ship_token(&ship_script));
     assert!(!is_ship_token(&slap_script));
@@ -838,11 +846,19 @@ fn test_is_slap_token() {
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
 
-    let ship_script =
-        create_overlay_admin_token(Protocol::Ship, &public_key, "https://example.com", "tm_test");
+    let ship_script = create_overlay_admin_token(
+        Protocol::Ship,
+        &public_key,
+        "https://example.com",
+        "tm_test",
+    );
 
-    let slap_script =
-        create_overlay_admin_token(Protocol::Slap, &public_key, "https://example.com", "ls_test");
+    let slap_script = create_overlay_admin_token(
+        Protocol::Slap,
+        &public_key,
+        "https://example.com",
+        "ls_test",
+    );
 
     assert!(is_slap_token(&slap_script));
     assert!(!is_slap_token(&ship_script));
@@ -853,8 +869,12 @@ fn test_is_overlay_admin_token() {
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
 
-    let admin_script =
-        create_overlay_admin_token(Protocol::Ship, &public_key, "https://example.com", "tm_test");
+    let admin_script = create_overlay_admin_token(
+        Protocol::Ship,
+        &public_key,
+        "https://example.com",
+        "tm_test",
+    );
 
     assert!(is_overlay_admin_token(&admin_script));
 
@@ -868,8 +888,12 @@ fn test_admin_token_identity_key_hex() {
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
 
-    let script =
-        create_overlay_admin_token(Protocol::Ship, &public_key, "https://example.com", "tm_test");
+    let script = create_overlay_admin_token(
+        Protocol::Ship,
+        &public_key,
+        "https://example.com",
+        "tm_test",
+    );
 
     let decoded = decode_overlay_admin_token(&script).unwrap();
     let hex = decoded.identity_key_hex();
@@ -878,7 +902,10 @@ fn test_admin_token_identity_key_hex() {
     assert_eq!(hex.len(), 66);
 
     // Should match original key
-    assert_eq!(hex, bsv_sdk::primitives::to_hex(&public_key.to_compressed()));
+    assert_eq!(
+        hex,
+        bsv_sdk::primitives::to_hex(&public_key.to_compressed())
+    );
 }
 
 #[test]
@@ -888,9 +915,7 @@ fn test_decode_invalid_admin_token() {
     assert!(decode_overlay_admin_token(&empty).is_err());
 
     // P2PKH script is not an admin token
-    let p2pkh = LockingScript::from_hex(
-        "76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac",
-    );
+    let p2pkh = LockingScript::from_hex("76a91489abcdefabbaabbaabbaabbaabbaabbaabbaabba88ac");
     if let Ok(script) = p2pkh {
         assert!(decode_overlay_admin_token(&script).is_err());
     }
@@ -1058,8 +1083,7 @@ fn test_ship_broadcaster_alias() {
         bsv_sdk::overlay::SHIPBroadcaster::new(vec!["tm_test".to_string()], Default::default());
     assert!(result.is_ok());
 
-    let result =
-        bsv_sdk::overlay::SHIPCast::new(vec!["tm_test".to_string()], Default::default());
+    let result = bsv_sdk::overlay::SHIPCast::new(vec!["tm_test".to_string()], Default::default());
     assert!(result.is_ok());
 }
 
