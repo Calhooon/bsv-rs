@@ -62,6 +62,9 @@ tokio = { version = "1", features = ["sync", "time", "rt"], optional = true }
 # Async futures (for overlay module parallel operations)
 futures = "0.3"
 
+# URL encoding (for storage module)
+urlencoding = "2.1"
+
 [dev-dependencies]
 criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros"] }
@@ -74,10 +77,12 @@ transaction = ["script"]
 wallet = ["transaction"]
 messages = ["wallet"]
 compat = ["primitives"]
+totp = ["primitives"]
 auth = ["wallet", "messages", "dep:tokio"]
 overlay = ["wallet", "dep:tokio"]
+storage = ["overlay"]
 wasm = ["getrandom/js"]
-full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "auth", "overlay"]
+full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage"]
 http = ["dep:reqwest"]
 
 [[bench]]

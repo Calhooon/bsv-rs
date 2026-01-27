@@ -30,6 +30,7 @@ pub use encoding::{
     to_base58_check, to_base64, to_hex, to_utf8_bytes, Reader, Writer,
 };
 pub use hash::{
-    hash160, pbkdf2_sha512, ripemd160, sha1, sha256, sha256_hmac, sha256d, sha512, sha512_hmac,
+    hash160, pbkdf2_sha512, ripemd160, sha1, sha1_hmac, sha256, sha256_hmac, sha256d, sha512,
+    sha512_hmac,
 };
 pub use symmetric::SymmetricKey;

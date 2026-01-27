@@ -60,11 +60,17 @@ pub mod messages;
 #[cfg(feature = "compat")]
 pub mod compat;
 
+#[cfg(feature = "totp")]
+pub mod totp;
+
 #[cfg(feature = "auth")]
 pub mod auth;
 
 #[cfg(feature = "overlay")]
 pub mod overlay;
+
+#[cfg(feature = "storage")]
+pub mod storage;
 
 // Convenience re-exports from primitives (most common items)
 #[cfg(feature = "primitives")]
@@ -96,6 +102,10 @@ pub use messages::{decrypt, encrypt, sign, verify};
 #[cfg(feature = "compat")]
 pub use compat::{Language, Mnemonic, WordCount};
 
+// Convenience re-exports from totp
+#[cfg(feature = "totp")]
+pub use totp::{Algorithm as TotpAlgorithm, Totp, TotpOptions, TotpValidateOptions};
+
 // Convenience re-exports from auth
 #[cfg(feature = "auth")]
 pub use auth::{
@@ -111,3 +121,10 @@ pub use overlay::{
     TopicBroadcaster,
 };
 // Note: overlay::Protocol is separate from wallet::Protocol
+
+// Convenience re-exports from storage
+#[cfg(feature = "storage")]
+pub use storage::{
+    get_hash_from_url, get_url_for_file, is_valid_url, DownloadResult, StorageDownloader,
+    StorageUploader, UploadFileResult, UploadableFile,
+};

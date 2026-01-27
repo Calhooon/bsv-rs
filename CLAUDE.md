@@ -13,6 +13,9 @@ This is the Rust implementation of the BSV SDK, providing a complete toolkit for
 | `script` | Complete | Script parsing, execution, templates |
 | `transaction` | Complete | Transaction construction and signing |
 | `wallet` | Complete | BRC-42 key derivation, ProtoWallet, WalletClient |
+| `totp` | Complete | RFC 6238 Time-based One-Time Passwords for 2FA |
+| `overlay` | Complete | SHIP/SLAP overlay network client |
+| `storage` | Complete | UHRP file storage via overlay network |
 
 ## Files
 
@@ -25,6 +28,9 @@ This is the Rust implementation of the BSV SDK, providing a complete toolkit for
 | `src/script/` | Script module |
 | `src/transaction/` | Transaction module |
 | `src/wallet/` | Wallet module |
+| `src/totp/` | TOTP (Time-based OTP) module |
+| `src/overlay/` | Overlay network module |
+| `src/storage/` | UHRP file storage module |
 
 ## Feature Flags
 
@@ -35,8 +41,11 @@ primitives = []
 script = ["primitives"]
 transaction = ["script"]
 wallet = ["transaction"]
+totp = ["primitives"]
+overlay = ["wallet", "dep:tokio"]
+storage = ["overlay"]
 wasm = ["getrandom/js"]
-full = ["primitives", "script", "transaction", "wallet"]
+full = ["primitives", "script", "transaction", "wallet", "totp", "overlay", "storage"]
 http = ["dep:reqwest"]
 ```
 
@@ -90,6 +99,9 @@ See `CROSS_SDK_COMPATIBILITY.md` for detailed compatibility analysis and verific
 - `src/wallet/CLAUDE.md` - Wallet module
 - `src/wallet/wire/CLAUDE.md` - Wire protocol types
 - `src/wallet/substrates/CLAUDE.md` - Wallet substrates (HTTP, etc.)
+- `src/totp/CLAUDE.md` - TOTP module
+- `src/overlay/CLAUDE.md` - Overlay network module
+- `src/storage/CLAUDE.md` - Storage module
 
 ### Test Documentation
 - `tests/CLAUDE.md` - Integration tests and cross-SDK vectors

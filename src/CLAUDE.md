@@ -22,6 +22,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | `wallet/` | `wallet` | Complete | BRC-42 key derivation, ProtoWallet, WalletClient |
 | `messages/` | `messages` | Complete | BRC-78 message signing, encryption, and verification |
 | `compat/` | `compat` | Complete | BIP-39/BIP-32 mnemonic and HD key compatibility (legacy wallet support) |
+| `totp/` | `totp` | Complete | RFC 6238 Time-based One-Time Passwords for 2FA |
 | `auth/` | `auth` | Complete | Mutual authentication, certificates, and peer sessions |
 | `overlay/` | `overlay` | Complete | Overlay network lookup, topic broadcasting, and STEAK protocol |
 
@@ -50,6 +51,9 @@ pub mod messages;
 
 #[cfg(feature = "compat")]
 pub mod compat;
+
+#[cfg(feature = "totp")]
+pub mod totp;
 
 #[cfg(feature = "auth")]
 pub mod auth;
@@ -102,6 +106,12 @@ pub mod overlay;
 - `Mnemonic` - BIP-39 mnemonic phrase for seed generation
 - `Language` - Wordlist language for mnemonic phrases
 - `WordCount` - Number of words in mnemonic (12, 15, 18, 21, or 24)
+
+**Convenience re-exports** from `totp`:
+- `Totp` - TOTP generation and validation
+- `TotpAlgorithm` - HMAC algorithm selection (Sha1, Sha256, Sha512)
+- `TotpOptions` - Configuration for TOTP generation
+- `TotpValidateOptions` - Configuration for TOTP validation with skew
 
 **Convenience re-exports** from `auth`:
 - `AuthMessage` - Authenticated message for peer communication
@@ -296,7 +306,7 @@ full
       └── transaction
 ```
 
-The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` feature only requires `primitives`. The `auth` feature requires `wallet`, and `overlay` requires `transaction`.
+The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` and `totp` features only require `primitives`. The `auth` feature requires `wallet`, and `overlay` requires `transaction`.
 
 Default features include `primitives` and `script`:
 ```rust
@@ -317,6 +327,9 @@ use bsv_sdk::messages;
 #[cfg(feature = "compat")]
 use bsv_sdk::compat;
 
+#[cfg(feature = "totp")]
+use bsv_sdk::totp;
+
 #[cfg(feature = "auth")]
 use bsv_sdk::auth;
 
@@ -327,7 +340,7 @@ use bsv_sdk::overlay;
 Additional optional features:
 - **`http`** - Enables HTTP clients for ARC broadcaster, WhatsOnChain chain tracker, and WalletClient substrate
 - **`wasm`** - Enables WebAssembly support via `getrandom/js`
-- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`, `auth`, `overlay`
+- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`, `totp`, `auth`, `overlay`
 
 ## Adding New Errors
 
@@ -366,6 +379,7 @@ thiserror = "1.0"
 - `wallet/CLAUDE.md` - Wallet module documentation
 - `messages/CLAUDE.md` - Messages module documentation
 - `compat/CLAUDE.md` - Compatibility module documentation
+- `totp/CLAUDE.md` - TOTP module documentation
 - `auth/CLAUDE.md` - Authentication module documentation
 - `overlay/CLAUDE.md` - Overlay network module documentation
 - `../CLAUDE.md` - Project root documentation

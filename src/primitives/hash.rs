@@ -221,6 +221,41 @@ pub fn hash160(data: &[u8]) -> [u8; 20] {
     ripemd160(&sha_hash)
 }
 
+/// Computes HMAC-SHA1.
+///
+/// # Warning
+///
+/// SHA-1 is cryptographically broken and should not be used for security-critical
+/// applications. It is provided for compatibility with legacy systems (e.g., TOTP
+/// which defaults to HMAC-SHA1 per RFC 6238).
+///
+/// # Arguments
+///
+/// * `key` - The secret key for HMAC
+/// * `data` - The message to authenticate
+///
+/// # Returns
+///
+/// A 20-byte array containing the HMAC-SHA1 result
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::primitives::hash::sha1_hmac;
+///
+/// let key = b"secret";
+/// let message = b"message";
+/// let mac = sha1_hmac(key, message);
+/// assert_eq!(mac.len(), 20);
+/// ```
+pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20] {
+    type HmacSha1 = Hmac<Sha1>;
+
+    let mut mac = HmacSha1::new_from_slice(key).expect("HMAC can take key of any size");
+    mac.update(data);
+    mac.finalize().into_bytes().into()
+}
+
 /// Computes HMAC-SHA256.
 ///
 /// # Arguments
@@ -698,5 +733,51 @@ mod tests {
         // Mixed character lengths
         let hash = sha256("hello привет 您好 👋!!!".as_bytes());
         assert_eq!(hash.len(), 32);
+    }
+
+    // HMAC-SHA1 test vectors (RFC 2202)
+    #[test]
+    fn test_sha1_hmac_rfc2202_1() {
+        // Test case 1 from RFC 2202
+        let key = hex::decode("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b").unwrap();
+        let data = b"Hi There";
+        let result = sha1_hmac(&key, data);
+        assert_eq!(
+            hex::encode(result),
+            "b617318655057264e28bc0b6fb378c8ef146be00"
+        );
+    }
+
+    #[test]
+    fn test_sha1_hmac_rfc2202_2() {
+        // Test case 2 from RFC 2202 ("Jefe" key)
+        let key = b"Jefe";
+        let data = b"what do ya want for nothing?";
+        let result = sha1_hmac(key, data);
+        assert_eq!(
+            hex::encode(result),
+            "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79"
+        );
+    }
+
+    #[test]
+    fn test_sha1_hmac_rfc2202_3() {
+        // Test case 3 from RFC 2202 (0xaa key repeated 20 times)
+        let key = hex::decode("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").unwrap();
+        let data = hex::decode("dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd").unwrap();
+        let result = sha1_hmac(&key, &data);
+        assert_eq!(
+            hex::encode(result),
+            "125d7342b9ac11cd91a39af48aa17b4f63f175d3"
+        );
+    }
+
+    #[test]
+    fn test_sha1_hmac_totp_vector() {
+        // TOTP RFC 6238 test vector with 20-byte secret
+        let key = b"12345678901234567890";
+        let data = [0u8, 0, 0, 0, 0, 0, 0, 1]; // counter = 1 as big-endian 8 bytes
+        let result = sha1_hmac(key, &data);
+        assert_eq!(result.len(), 20);
     }
 }
