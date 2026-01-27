@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn test_network_preset_slap_trackers() {
         let mainnet = NetworkPreset::Mainnet.slap_trackers();
-        assert!(mainnet.len() >= 1);
+        assert!(!mainnet.is_empty());
         assert!(mainnet[0].starts_with("https://"));
 
         let local = NetworkPreset::Local.slap_trackers();

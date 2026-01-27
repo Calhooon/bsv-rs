@@ -14,9 +14,9 @@ These utilities are used internally by the `Peer` implementation but are also ex
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | ~14 |
+| `mod.rs` | Module root with re-exports | ~16 |
 | `nonce.rs` | Cryptographic nonce creation and verification | ~204 |
-| `validation.rs` | Certificate validation and retrieval | ~410 |
+| `validation.rs` | Certificate validation and retrieval | ~423 |
 
 ## Key Exports
 

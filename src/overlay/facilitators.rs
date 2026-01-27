@@ -310,15 +310,11 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
                                 item.get("outputIndex").and_then(|v| v.as_u64())? as u32;
 
                             let context = item.get("context").and_then(|v| {
-                                if let Some(arr) = v.as_array() {
-                                    Some(
-                                        arr.iter()
-                                            .filter_map(|n| n.as_u64().map(|n| n as u8))
-                                            .collect(),
-                                    )
-                                } else {
-                                    None
-                                }
+                                v.as_array().map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|n| n.as_u64().map(|n| n as u8))
+                                        .collect()
+                                })
                             });
 
                             Some(OutputListItem {
@@ -374,7 +370,7 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
         let txid_bytes = reader
             .read_bytes(32)
             .map_err(|e| Error::OverlayError(format!("Failed to read txid: {}", e)))?;
-        let txid = to_hex(&txid_bytes);
+        let txid = to_hex(txid_bytes);
 
         // Read output index
         let output_index = reader
@@ -408,17 +404,17 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
     // Parse BEEF and create OutputListItems for each outpoint
     let outputs = outpoints
         .into_iter()
-        .filter_map(|(txid, output_index, context)| {
+        .map(|(_txid, output_index, context)| {
             // For each outpoint, we need to extract the relevant tx from BEEF
             // and create a standalone BEEF for it
             // For now, we return the full BEEF for each output
             // A more efficient implementation would parse the BEEF once
             // and extract individual transaction BEEFs
-            Some(OutputListItem {
+            OutputListItem {
                 beef: beef_data.clone(),
                 output_index,
                 context,
-            })
+            }
         })
         .collect();
 

@@ -17,6 +17,15 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 | `bsm` | Complete | Bitcoin Signed Message signing and verification |
 | `ecies` | Complete | ECIES encryption (Electrum and Bitcore variants) |
 
+## Re-exports
+
+The module re-exports key types for convenience:
+
+```rust
+pub use bip32::{ExtendedKey, Network, HARDENED_KEY_START};
+pub use bip39::{Language, Mnemonic, WordCount};
+```
+
 ## Base58 Encoding
 
 Thin wrapper over existing `primitives::encoding` functions using the Bitcoin alphabet.
@@ -36,31 +45,61 @@ let decoded = base58::decode("111233QC4").unwrap();
 
 Implements [BIP-32](https://github.com/bitcoin/bips/blob/master/bip-0032.mediawiki) for hierarchical deterministic wallets.
 
+### Constants
+
+```rust
+pub const HARDENED_KEY_START: u32 = 0x80000000;  // 2^31
+pub const MIN_SEED_BYTES: usize = 16;            // 128 bits minimum
+pub const MAX_SEED_BYTES: usize = 64;            // 512 bits maximum
+pub const RECOMMENDED_SEED_LEN: usize = 32;      // 256 bits recommended
+```
+
 ### Key Types
 
 ```rust
-pub const HARDENED_KEY_START: u32 = 0x80000000;
-
 pub enum Network {
     Mainnet,  // xprv/xpub
     Testnet,  // tprv/tpub
 }
 
 pub struct ExtendedKey {
+    // Construction
     pub fn new_master(seed: &[u8], network: Network) -> Result<Self>
     pub fn from_string(s: &str) -> Result<Self>
+
+    // Derivation
     pub fn derive_child(&self, index: u32) -> Result<Self>
     pub fn derive_path(&self, path: &str) -> Result<Self>
+    pub fn neuter(&self) -> Result<Self>  // Convert private to public
+
+    // Key extraction
     pub fn private_key(&self) -> Result<PrivateKey>
     pub fn public_key(&self) -> Result<PublicKey>
-    pub fn neuter(&self) -> Result<Self>
+
+    // Metadata
     pub fn is_private(&self) -> bool
+    pub fn depth(&self) -> u8
+    pub fn child_number(&self) -> u32
+    pub fn parent_fingerprint(&self) -> [u8; 4]
+    pub fn chain_code(&self) -> &[u8; 32]
     pub fn fingerprint(&self) -> Result<[u8; 4]>
+    pub fn network(&self) -> Option<Network>
+
+    // Address generation
+    pub fn address(&self, mainnet: bool) -> Result<String>
 }
 
+// Helper functions
 pub fn generate_hd_key(seed_length: usize, network: Network) -> Result<ExtendedKey>
 pub fn generate_hd_key_from_mnemonic(mnemonic: &Mnemonic, passphrase: &str, network: Network) -> Result<ExtendedKey>
 ```
+
+### Path Notation
+
+Derivation paths support multiple formats:
+- `m/44'/0'/0'/0/0` - Standard BIP-44 path
+- `m/0h/1` or `m/0H/1` - Alternative hardened notation
+- `0'/1` or `/0'/1` - Relative paths (without `m` prefix)
 
 ### Usage Example
 
@@ -86,6 +125,9 @@ let parsed = ExtendedKey::from_string(&xprv)?;
 // Get public extended key
 let xpub = master.neuter()?;
 assert!(xpub.to_string().starts_with("xpub"));
+
+// Generate Bitcoin address
+let address = master.address(true)?;  // mainnet
 ```
 
 ## BIP-39 (Mnemonic Phrases)
@@ -96,28 +138,44 @@ Implements [BIP-39](https://github.com/bitcoin/bips/blob/master/bip-0039.mediawi
 
 ```rust
 pub enum WordCount {
-    Words12,  // 128 bits entropy
-    Words15,  // 160 bits entropy
-    Words18,  // 192 bits entropy
-    Words21,  // 224 bits entropy
-    Words24,  // 256 bits entropy
+    Words12,  // 128 bits entropy, 4 checksum bits
+    Words15,  // 160 bits entropy, 5 checksum bits
+    Words18,  // 192 bits entropy, 6 checksum bits
+    Words21,  // 224 bits entropy, 7 checksum bits
+    Words24,  // 256 bits entropy, 8 checksum bits
 }
 
 pub enum Language {
-    English,
+    English,  // Default, only supported language
 }
 
 pub struct Mnemonic {
+    // Generation
     pub fn new(word_count: WordCount) -> Result<Self>
     pub fn from_entropy(entropy: &[u8]) -> Result<Self>
+    pub fn from_entropy_with_language(entropy: &[u8], language: Language) -> Result<Self>
     pub fn from_phrase(phrase: &str) -> Result<Self>
+    pub fn from_phrase_with_language(phrase: &str, language: Language) -> Result<Self>
+
+    // Accessors
     pub fn phrase(&self) -> String
     pub fn words(&self) -> &[String]
+    pub fn language(&self) -> Language
+
+    // Seed derivation
     pub fn to_seed(&self, passphrase: &str) -> [u8; 64]
-    pub fn to_seed_normalized(&self) -> [u8; 64]
+    pub fn to_seed_normalized(&self) -> [u8; 64]  // Empty passphrase
+
+    // Entropy extraction
     pub fn entropy(&self) -> Vec<u8>
+    pub fn entropy_with_checksum(&self) -> Vec<u8>  // Matches Go SDK's MnemonicToByteArray
+
+    // Validation
     pub fn is_valid(&self) -> bool
 }
+
+// Wordlist verification
+pub fn verify_english_wordlist() -> bool
 ```
 
 ### Usage Example
@@ -135,6 +193,9 @@ assert_eq!(mnemonic.phrase(), "abandon abandon abandon abandon abandon abandon a
 
 // Convert to seed
 let seed = mnemonic.to_seed("TREZOR");
+
+// Extract entropy with checksum
+let with_checksum = mnemonic.entropy_with_checksum();
 ```
 
 ## BSM (Bitcoin Signed Message)
@@ -263,6 +324,10 @@ Error::InvalidMnemonicWord(String)
 Error::InvalidExtendedKey(String)
 Error::HardenedFromPublic
 Error::InvalidDerivationPath(String)
+Error::InvalidChecksum  // Base58Check checksum mismatch
+
+// BSM errors
+Error::InvalidSignature(String)
 
 // ECIES errors
 Error::EciesDecryptionFailed(String)
@@ -323,12 +388,16 @@ cargo test --features compat ecies
 Uses existing SDK primitives:
 - `primitives::hash::sha256`, `sha256d`, `sha512` - Hashing
 - `primitives::hash::sha256_hmac`, `sha512_hmac` - HMAC
-- `primitives::hash::pbkdf2_sha512` - Seed derivation
-- `primitives::encoding::to_base58`, `from_base58` - Base58
-- `primitives::ec::PrivateKey`, `PublicKey` - EC operations
-- `primitives::ec::calculate_recovery_id`, `recover_public_key` - ECDSA recovery
+- `primitives::hash::hash160` - Address generation
+- `primitives::hash::pbkdf2_sha512` - Seed derivation (BIP-39)
+- `primitives::encoding::to_base58`, `from_base58`, `to_base58_check` - Base58 encoding
+- `primitives::encoding::Writer` - Varint encoding (BSM)
+- `primitives::ec::PrivateKey`, `PublicKey`, `Signature` - EC operations
+- `primitives::ec::calculate_recovery_id`, `recover_public_key` - ECDSA recovery (BSM)
+- `primitives::BigNumber` - Modular arithmetic (BIP-32)
 - `getrandom` - Random entropy generation
-- `aes`, `cbc` - AES-CBC encryption (for ECIES)
+- `aes`, `cbc` - AES-CBC encryption (ECIES)
+- `subtle` - Constant-time comparison (ECIES)
 
 ## Related Documentation
 

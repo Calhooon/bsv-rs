@@ -78,7 +78,7 @@ impl SimplifiedFetchTransport {
     /// Creates a new HTTP transport.
     ///
     /// # Arguments
-    /// * `base_url` - Base URL of the remote server (e.g., "https://example.com")
+    /// * `base_url` - Base URL of the remote server (e.g., `https://example.com`)
     pub fn new(base_url: &str) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
@@ -144,6 +144,7 @@ impl SimplifiedFetchTransport {
         &self,
         header_map: &[(String, String)],
     ) -> Result<(Option<String>, Option<String>, Option<Vec<u8>>)> {
+        #![allow(clippy::type_complexity)]
         let mut nonce = None;
         let mut your_nonce = None;
         let mut signature = None;
@@ -198,7 +199,7 @@ impl Transport for SimplifiedFetchTransport {
                     // Send as JSON POST to .well-known/auth
                     let response = self
                         .client
-                        .post(&self.auth_url())
+                        .post(self.auth_url())
                         .json(message)
                         .send()
                         .await
@@ -232,7 +233,7 @@ impl Transport for SimplifiedFetchTransport {
                     // as JSON to the auth endpoint as well
                     let response = self
                         .client
-                        .post(&self.auth_url())
+                        .post(self.auth_url())
                         .json(message)
                         .send()
                         .await

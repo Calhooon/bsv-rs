@@ -75,15 +75,15 @@ const ELECTRUM_MAGIC: &[u8] = b"BIE1";
 ///
 /// # Returns
 ///
-/// The encrypted message: "BIE1" || [pubkey] || ciphertext || mac
+/// The encrypted message: "BIE1" || \[pubkey\] || ciphertext || mac
 ///
 /// # Algorithm
 ///
 /// 1. Compute ECDH shared secret
-/// 2. Derive keys: SHA512(compressed_shared) → iv[0:16], aes_key[16:32], hmac_key[32:64]
+/// 2. Derive keys: SHA512(compressed_shared) → iv\[0:16\], aes_key\[16:32\], hmac_key\[32:64\]
 /// 3. Encrypt: AES-128-CBC(message, aes_key, iv) with PKCS7 padding
-/// 4. MAC: HMAC-SHA256(hmac_key, "BIE1" || [pubkey] || ciphertext)
-/// 5. Output: "BIE1" || [pubkey] || ciphertext || mac
+/// 4. MAC: HMAC-SHA256(hmac_key, "BIE1" || \[pubkey\] || ciphertext)
+/// 5. Output: "BIE1" || \[pubkey\] || ciphertext || mac
 ///
 /// # Example
 ///
@@ -140,7 +140,7 @@ pub fn electrum_encrypt(
 ///
 /// # Arguments
 ///
-/// * `data` - The encrypted data: "BIE1" || [pubkey] || ciphertext || mac
+/// * `data` - The encrypted data: "BIE1" || \[pubkey\] || ciphertext || mac
 /// * `to` - The recipient's private key
 /// * `from` - The sender's public key (if known/expected)
 ///
@@ -251,7 +251,7 @@ pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) 
 /// # Algorithm
 ///
 /// 1. Compute ECDH shared secret
-/// 2. Derive keys: SHA512(shared_secret.x) → key_e[0:32], key_m[32:64]
+/// 2. Derive keys: SHA512(shared_secret.x) → key_e\[0:32\], key_m\[32:64\]
 /// 3. Encrypt: AES-256-CBC(message, key_e, iv) with PKCS7 padding
 /// 4. MAC: HMAC-SHA256(key_m, iv || ciphertext)
 /// 5. Output: pubkey || iv || ciphertext || mac

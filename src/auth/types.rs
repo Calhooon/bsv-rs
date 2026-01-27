@@ -46,6 +46,7 @@ impl MessageType {
     }
 
     /// Parses a message type from its string representation.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "initialRequest" => Some(Self::InitialRequest),

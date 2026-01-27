@@ -158,7 +158,6 @@ impl Mnemonic {
     pub fn from_entropy_with_language(entropy: &[u8], language: Language) -> Result<Self> {
         // Validate entropy length
         let entropy_bits = entropy.len() * 8;
-        #[allow(clippy::manual_is_multiple_of)]
         if !(128..=256).contains(&entropy_bits) || entropy_bits % 32 != 0 {
             return Err(Error::InvalidEntropyLength {
                 expected: "128, 160, 192, 224, or 256 bits".to_string(),

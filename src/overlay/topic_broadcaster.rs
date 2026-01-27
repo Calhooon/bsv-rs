@@ -23,9 +23,10 @@ use std::sync::Arc;
 use std::time::Instant;
 
 /// Acknowledgment requirement for broadcast success.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum RequireAck {
     /// No acknowledgment required.
+    #[default]
     None,
     /// Acknowledgment from any host.
     Any,
@@ -33,12 +34,6 @@ pub enum RequireAck {
     Some(Vec<String>),
     /// Acknowledgment from all hosts.
     All,
-}
-
-impl Default for RequireAck {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Configuration for the topic broadcaster.

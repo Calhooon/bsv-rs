@@ -18,17 +18,19 @@ This module provides cryptographic primitives compatible with the BSV TypeScript
 | `bignum.rs` | Arbitrary-precision integers for EC scalars | 1550 |
 | `drbg.rs` | HMAC-DRBG for RFC 6979 deterministic signatures | 201 |
 | `p256.rs` | P-256 (secp256r1): P256PrivateKey, P256PublicKey, P256Signature | 910 |
-| `ec/` | secp256k1: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | (subdir) |
-| `bsv/` | Sighash, transaction signatures, Schnorr proofs, Shamir sharing | (subdir) |
+| `ec/` | secp256k1: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | ~2001 |
+| `bsv/` | Sighash, transaction signatures, Schnorr proofs, Shamir sharing | ~2507 |
 
 ## Key Exports (from mod.rs)
 
 ```rust
 // Hash functions
+pub fn sha1(data: &[u8]) -> [u8; 20]       // Legacy (cryptographically broken)
 pub fn sha256(data: &[u8]) -> [u8; 32]
 pub fn sha512(data: &[u8]) -> [u8; 64]
-pub fn sha256d(data: &[u8]) -> [u8; 32]   // Bitcoin double-SHA256
-pub fn hash160(data: &[u8]) -> [u8; 20]   // RIPEMD160(SHA256(x))
+pub fn ripemd160(data: &[u8]) -> [u8; 20]
+pub fn sha256d(data: &[u8]) -> [u8; 32]    // Bitcoin double-SHA256
+pub fn hash160(data: &[u8]) -> [u8; 20]    // RIPEMD160(SHA256(x))
 pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32]
 pub fn sha512_hmac(key: &[u8], data: &[u8]) -> [u8; 64]
 pub fn pbkdf2_sha512(password: &[u8], salt: &[u8], iterations: u32, key_len: usize) -> Vec<u8>
@@ -42,6 +44,8 @@ pub fn to_base58_check(payload: &[u8], version: &[u8]) -> String
 pub fn from_base58_check(s: &str) -> Result<(Vec<u8>, Vec<u8>)>
 pub fn to_base64(data: &[u8]) -> String
 pub fn from_base64(s: &str) -> Result<Vec<u8>>
+pub fn to_utf8_bytes(s: &str) -> Vec<u8>
+pub fn from_utf8_bytes(data: &[u8]) -> Result<String>
 
 // Binary serialization
 pub struct Reader<'a> { ... }  // read_u8, read_u32_le, read_var_int, read_var_bytes, etc.
@@ -54,7 +58,7 @@ pub struct SymmetricKey { ... }  // random(), from_bytes(), encrypt(), decrypt()
 pub struct BigNumber { ... }  // from_hex(), to_bytes_be(), add(), modulo(), secp256k1_order(), etc.
 
 // HMAC-DRBG
-pub struct HmacDrbg { ... }  // new(), generate(), reseed()
+pub struct HmacDrbg { ... }  // new(), new_with_hash(), generate(), reseed()
 
 // EC (secp256k1)
 pub struct PrivateKey { ... }  // random(), from_wif(), sign(), derive_child()
@@ -151,20 +155,61 @@ let count = reader.read_var_int()?;
 let data = reader.read_var_bytes()?;
 ```
 
+### P-256 Operations
+```rust
+use bsv_sdk::primitives::p256::{P256PrivateKey, P256PublicKey};
+
+let private_key = P256PrivateKey::random();
+let public_key = private_key.public_key();
+
+// Sign a message (will be hashed with SHA-256)
+let signature = private_key.sign(b"Hello, P-256!");
+assert!(public_key.verify(b"Hello, P-256!", &signature));
+```
+
+### Shamir Secret Sharing
+```rust
+use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_sdk::primitives::PrivateKey;
+
+let key = PrivateKey::random();
+
+// Split into 5 shares with threshold of 3
+let shares = split_private_key(&key, 3, 5)?;
+let backup = shares.to_backup_format();
+
+// Recover from any 3 shares
+let subset = KeyShares::from_backup_format(&backup[0..3])?;
+let recovered = subset.recover_private_key()?;
+assert_eq!(key.to_bytes(), recovered.to_bytes());
+```
+
 ## Submodule Structure
 
 ### ec/ (secp256k1 Elliptic Curve)
-- `private_key.rs` - PrivateKey: random generation, WIF, signing, BRC-42 derivation
-- `public_key.rs` - PublicKey: verification, addresses, BRC-42 derivation
-- `signature.rs` - Signature: DER/compact encoding, low-S normalization
-- `ecdsa.rs` - Core ECDSA sign/verify/recover functions
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `mod.rs` | 77 | Module exports |
+| `private_key.rs` | 529 | PrivateKey: random generation, WIF, signing, BRC-42 derivation |
+| `public_key.rs` | 610 | PublicKey: verification, addresses, BRC-42 derivation |
+| `signature.rs` | 479 | Signature: DER/compact encoding, low-S normalization |
+| `ecdsa.rs` | 306 | Core ECDSA sign/verify/recover functions |
+
+Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id`
 
 ### bsv/ (BSV-Specific Operations)
-- `sighash.rs` - BIP-143 style sighash computation (499 test vectors)
-- `tx_signature.rs` - Transaction signature encoding/decoding
-- `schnorr.rs` - Schnorr zero-knowledge proofs for ECDH verification
-- `shamir.rs` - Shamir secret sharing for private key backup/recovery
-- `polynomial.rs` - Polynomial operations for Shamir
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `mod.rs` | 75 | Module exports |
+| `sighash.rs` | 623 | BIP-143 style sighash computation |
+| `tx_signature.rs` | 309 | Transaction signature encoding/decoding with sighash scope |
+| `schnorr.rs` | 413 | Schnorr zero-knowledge proofs for ECDH verification |
+| `shamir.rs` | 693 | Shamir secret sharing for private key backup/recovery |
+| `polynomial.rs` | 394 | Polynomial operations over finite field (for Shamir) |
+
+Key exports: `compute_sighash`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_FORKID`, etc.)
 
 ## Error Handling
 

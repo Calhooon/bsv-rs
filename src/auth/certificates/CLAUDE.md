@@ -11,8 +11,8 @@ This module implements identity certificates for the BSV authentication system, 
 |------|---------|-------|
 | `mod.rs` | Module root, re-exports, protocol constants | ~43 |
 | `certificate.rs` | Base `Certificate` type with signing and binary serialization | ~490 |
-| `master.rs` | `MasterCertificate` with field encryption and keyring management | ~322 |
-| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | ~274 |
+| `master.rs` | `MasterCertificate` with field encryption and keyring management | ~336 |
+| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | ~287 |
 
 ## Certificate Flow
 
@@ -98,6 +98,11 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | `to_binary()` | Serialize to deterministic binary format |
 | `from_binary()` | Parse from binary format |
 | `signing_hash()` | Get SHA-256 hash for signing |
+| `type_base64()` | Get certificate type as base64 string |
+| `serial_number_base64()` | Get serial number as base64 string |
+| `set_field()` | Set an encrypted field value |
+| `get_field()` | Get an encrypted field value |
+| `field_names()` | Get all field names |
 | `get_field_encryption_key_id_master()` | Key ID for master encryption |
 | `get_field_encryption_key_id_verifiable()` | Key ID for verifiable encryption |
 | `to_wallet_certificate()` | Convert to wallet certificate format |
@@ -112,6 +117,7 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | `create_keyring_for_verifier()` | Create verifier-specific keyring (async) |
 | `decrypt_field()` | Decrypt single field (async) |
 | `decrypt_fields()` | Decrypt all fields (async) |
+| `verify()` | Verify underlying certificate signature |
 
 ### VerifiableCertificate
 
@@ -123,6 +129,13 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | `revealable_fields()` | List fields that can be decrypted |
 | `decrypt_field()` | Decrypt single field (async) |
 | `decrypt_fields()` | Decrypt all fields in keyring (async, cached) |
+| `get_decrypted_fields()` | Get cached decrypted fields if available |
+| `clear_decrypted_cache()` | Clear the cached decrypted fields |
+| `verify()` | Verify underlying certificate signature |
+| `subject()` | Get subject's public key |
+| `certifier()` | Get certifier's public key |
+| `cert_type()` | Get certificate type |
+| `serial_number()` | Get serial number |
 | `to_json_value()` | Convert to JSON with base64 encoding |
 
 ## Binary Format
@@ -206,16 +219,23 @@ assert!(decrypted.contains_key("name"));
 assert!(!decrypted.contains_key("email"));
 ```
 
-## Deref Behavior
+## Deref and Trait Implementations
 
-Both `MasterCertificate` and `VerifiableCertificate` implement `Deref<Target = Certificate>`, allowing direct access to base certificate fields:
+Both `MasterCertificate` and `VerifiableCertificate` implement `Deref<Target = Certificate>`, allowing direct access to base certificate fields. `MasterCertificate` also implements `DerefMut` for mutable access.
 
 ```rust
 let master_cert: MasterCertificate = /* ... */;
 
-// Access Certificate fields directly
+// Access Certificate fields directly via Deref
 let subject = &master_cert.subject;
 let cert_type = &master_cert.cert_type;
+```
+
+`VerifiableCertificate` additionally implements `From<Certificate>` for easy conversion:
+
+```rust
+let cert: Certificate = /* ... */;
+let verifiable: VerifiableCertificate = cert.into();
 ```
 
 ## Serialization

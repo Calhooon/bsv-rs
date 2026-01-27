@@ -12,7 +12,7 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module declaration, documentation, and public re-exports |
-| `mnemonic.rs` | `Mnemonic`, `WordCount`, and `Language` implementations |
+| `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, and `NfkdNormalize` trait implementations |
 | `wordlists/mod.rs` | Wordlist module declaration, re-exports, and `verify_english_wordlist()` |
 | `wordlists/english.rs` | English BIP-39 wordlist (2048 words as `[&str; 2048]`) |
 | `wordlists/CLAUDE.md` | Wordlist submodule documentation |
@@ -23,6 +23,7 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 
 ```rust
 /// A validated BIP-39 mnemonic phrase
+#[derive(Debug, Clone)]
 pub struct Mnemonic {
     words: Vec<String>,
     language: Language,
@@ -50,7 +51,7 @@ pub enum Language {
 }
 ```
 
-### Public API
+## Public API
 
 **Mnemonic Creation:**
 - `Mnemonic::new(word_count: WordCount) -> Result<Self>` - Generate random mnemonic
@@ -78,11 +79,17 @@ pub enum Language {
 - `word_count(self) -> usize` - Get number of words
 - `checksum_bits(self) -> usize` - Get checksum size in bits
 
+**Language Methods (internal):**
+- `wordlist(&self) -> &'static [&'static str; 2048]` - Returns the wordlist (internal)
+- `separator(&self) -> &'static str` - Returns word separator (internal)
+- `word_index(&self, word: &str) -> Option<usize>` - Finds word index (internal)
+
 **Wordlist Utilities:**
 - `verify_english_wordlist() -> bool` - Verify wordlist integrity (first/last words, 2048 count)
 
 **Trait Implementations:**
 - `Display` for `Mnemonic` - Displays the phrase via `phrase()` method
+- `Clone` for `Mnemonic` - Enables cloning mnemonic instances
 
 ## Usage
 
@@ -235,11 +242,11 @@ Error::CryptoError(String)
 
 ### NFKD Normalization
 
-The implementation includes a simplified NFKD normalization trait. The current behavior:
+The implementation includes a simplified `NfkdNormalize` trait for Unicode normalization. The current behavior:
 
 - **Go SDK**: Does NOT perform NFKD normalization (passes raw UTF-8 bytes)
 - **TypeScript SDK**: DOES perform NFKD normalization via `String.normalize('NFKD')`
-- **This implementation**: Matches Go SDK (no normalization)
+- **This implementation**: Matches Go SDK (no normalization, passes through unchanged)
 
 For ASCII passphrases (recommended), all SDKs produce identical seeds. For non-ASCII passphrases, this implementation matches Go SDK but may differ from TypeScript SDK.
 
@@ -288,7 +295,7 @@ Verified using official BIP-39 test vectors and TREZOR test vectors.
 
 ```bash
 # Run BIP-39 specific tests
-cargo test --features compat compat_bip39
+cargo test --features compat bip39
 
 # Run all compat module tests
 cargo test --features compat
@@ -300,10 +307,11 @@ Test coverage includes:
 - TREZOR seed derivation test vector
 - Entropy roundtrip validation
 - Invalid inputs (wrong word count, bad checksum, invalid words, invalid entropy length)
+- Wordlist integrity verification
 
 ## Related Documentation
 
 - `../CLAUDE.md` - Parent compatibility module documentation
+- `./wordlists/CLAUDE.md` - Wordlist submodule documentation
 - `../../primitives/CLAUDE.md` - Cryptographic primitives used for hashing and PBKDF2
 - `../../../tests/compat_bip39_tests.rs` - Integration test vectors
-- `../../CLAUDE.md` - Root SDK documentation

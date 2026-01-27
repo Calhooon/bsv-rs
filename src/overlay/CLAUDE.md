@@ -14,13 +14,13 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root; re-exports |
-| `types.rs` | Core types (Protocol, TaggedBEEF, Steak, LookupQuestion/Answer, etc.) |
-| `host_reputation_tracker.rs` | Host performance tracking with backoff |
-| `facilitators.rs` | HTTP lookup/broadcast facilitators |
-| `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding |
-| `historian.rs` | Transaction ancestry traversal |
-| `lookup_resolver.rs` | SLAP query resolution with host discovery |
-| `topic_broadcaster.rs` | SHIP topic broadcasting |
+| `types.rs` | Core types (Protocol, TaggedBEEF, Steak, LookupQuestion/Answer, etc.) and constants |
+| `host_reputation_tracker.rs` | Host performance tracking with exponential backoff |
+| `facilitators.rs` | HTTP lookup/broadcast facilitators with binary/JSON response parsing |
+| `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop |
+| `historian.rs` | Transaction ancestry traversal for building chronological history |
+| `lookup_resolver.rs` | SLAP query resolution with host discovery and caching |
+| `topic_broadcaster.rs` | SHIP topic broadcasting with acknowledgment requirements |
 
 ## Key Exports
 
@@ -30,6 +30,9 @@ pub use types::{
     Protocol, NetworkPreset, LookupQuestion, LookupAnswer, LookupAnswerType,
     OutputListItem, LookupFormula, TaggedBEEF, AdmittanceInstructions, Steak,
     HostResponse, ServiceMetadata,
+    // Constants
+    DEFAULT_HOSTS_CACHE_MAX_ENTRIES, DEFAULT_HOSTS_CACHE_TTL_MS,
+    MAX_SHIP_QUERY_TIMEOUT_MS, MAX_TRACKER_WAIT_TIME_MS,
 };
 
 // Lookup resolver
@@ -103,16 +106,30 @@ pub struct LookupQuestion {
     pub query: serde_json::Value,  // Service-specific query
 }
 
+impl LookupQuestion {
+    pub fn new(service: impl Into<String>, query: serde_json::Value) -> Self
+}
+
 pub enum LookupAnswer {
     OutputList { outputs: Vec<OutputListItem> },
     Freeform { result: serde_json::Value },
     Formula { formulas: Vec<LookupFormula> },
 }
 
+impl LookupAnswer {
+    pub fn answer_type(&self) -> LookupAnswerType
+    pub fn empty_output_list() -> Self
+}
+
 pub struct OutputListItem {
     pub beef: Vec<u8>,
     pub output_index: u32,
     pub context: Option<Vec<u8>>,
+}
+
+pub struct LookupFormula {
+    pub outpoint: String,
+    pub history_fn: String,
 }
 ```
 
@@ -125,14 +142,88 @@ pub struct TaggedBEEF {
     pub off_chain_values: Option<Vec<u8>>,
 }
 
+impl TaggedBEEF {
+    pub fn new(beef: Vec<u8>, topics: Vec<String>) -> Self
+    pub fn with_off_chain_values(beef: Vec<u8>, topics: Vec<String>, off_chain: Vec<u8>) -> Self
+}
+
 pub struct AdmittanceInstructions {
     pub outputs_to_admit: Vec<u32>,
     pub coins_to_retain: Vec<u32>,
     pub coins_removed: Option<Vec<u32>>,
 }
 
+impl AdmittanceInstructions {
+    pub fn has_activity(&self) -> bool  // True if any admits, retains, or removals
+}
+
+/// STEAK = Submitted Transaction Execution AcKnowledgment
 pub type Steak = HashMap<String, AdmittanceInstructions>;
 ```
+
+### HostResponse
+
+```rust
+pub struct HostResponse {
+    pub host: String,
+    pub success: bool,
+    pub steak: Option<Steak>,
+    pub error: Option<String>,
+}
+
+impl HostResponse {
+    pub fn success(host: String, steak: Steak) -> Self
+    pub fn failure(host: String, error: String) -> Self
+}
+```
+
+### ServiceMetadata
+
+```rust
+pub struct ServiceMetadata {
+    pub name: String,
+    pub description: Option<String>,
+    pub icon_url: Option<String>,
+    pub version: Option<String>,
+    pub info_url: Option<String>,
+}
+```
+
+## Facilitators
+
+Traits and implementations for HTTP communication with overlay services.
+
+```rust
+/// Trait for lookup operations
+#[async_trait(?Send)]
+pub trait OverlayLookupFacilitator: Send + Sync {
+    async fn lookup(&self, url: &str, question: &LookupQuestion, timeout_ms: Option<u64>) -> Result<LookupAnswer>;
+}
+
+/// Trait for broadcast operations
+#[async_trait(?Send)]
+pub trait OverlayBroadcastFacilitator: Send + Sync {
+    async fn send(&self, url: &str, tagged_beef: &TaggedBEEF) -> Result<Steak>;
+}
+
+/// HTTPS lookup facilitator - POST to /lookup endpoint
+pub struct HttpsOverlayLookupFacilitator { .. }
+
+impl HttpsOverlayLookupFacilitator {
+    pub fn new(allow_http: bool) -> Self
+}
+
+/// HTTPS broadcast facilitator - POST to /submit endpoint
+pub struct HttpsOverlayBroadcastFacilitator { .. }
+
+impl HttpsOverlayBroadcastFacilitator {
+    pub fn new(allow_http: bool) -> Self
+}
+```
+
+The lookup facilitator handles both JSON and binary response formats:
+- **JSON**: Standard output-list, freeform, or formula responses
+- **Binary**: Compact outpoints + BEEF format (octet-stream content type)
 
 ## LookupResolver
 
@@ -153,11 +244,15 @@ impl LookupResolver {
     pub fn new(config: LookupResolverConfig) -> Self
     pub async fn query(&self, question: &LookupQuestion, timeout_ms: Option<u64>) -> Result<LookupAnswer>
 }
+
+impl Default for LookupResolver { .. }
 ```
+
+**Validation**: Host override service names must start with `ls_` or the constructor will panic.
 
 ## TopicBroadcaster
 
-Broadcasts transactions to SHIP overlay topics. Implements the `Broadcaster` trait.
+Broadcasts transactions to SHIP overlay topics. Implements the `Broadcaster` trait from the transaction module.
 
 ```rust
 pub struct TopicBroadcasterConfig {
@@ -165,7 +260,7 @@ pub struct TopicBroadcasterConfig {
     pub facilitator: Option<Arc<dyn OverlayBroadcastFacilitator>>,
     pub resolver: Option<Arc<LookupResolver>>,
     pub require_ack_from_all_hosts: RequireAck,
-    pub require_ack_from_any_host: RequireAck,
+    pub require_ack_from_any_host: RequireAck,   // Default: RequireAck::All
     pub require_ack_from_specific_hosts: HashMap<String, RequireAck>,
 }
 
@@ -182,10 +277,18 @@ impl TopicBroadcaster {
     pub async fn find_interested_hosts(&self) -> Result<HashMap<String, HashSet<String>>>
 }
 
-// Type aliases for compatibility
+#[async_trait(?Send)]
+impl Broadcaster for TopicBroadcaster {
+    async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
+    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>
+}
+
+// Type aliases for TypeScript SDK compatibility
 pub type SHIPBroadcaster = TopicBroadcaster;
 pub type SHIPCast = TopicBroadcaster;
 ```
+
+**Validation**: At least one topic is required, and all topics must start with `tm_`.
 
 ## HostReputationTracker
 

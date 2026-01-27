@@ -8,8 +8,8 @@
 //!
 //! | Substrate | Protocol | Default Port | Description |
 //! |-----------|----------|--------------|-------------|
-//! | [`HttpWalletWire`] | Binary | 3301 | Wire protocol over HTTP |
-//! | [`HttpWalletJson`] | JSON | 3321 | JSON API over HTTP |
+//! | `HttpWalletWire` | Binary | 3301 | Wire protocol over HTTP |
+//! | `HttpWalletJson` | JSON | 3321 | JSON API over HTTP |
 //!
 //! # Platform-Specific Substrates (Not Included)
 //!

@@ -9,8 +9,8 @@ This module provides transport layer implementations for sending and receiving a
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with exports and documentation | ~40 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 headers | ~450 |
+| `mod.rs` | Module root with exports and usage examples | ~39 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 headers | ~447 |
 
 ## Key Exports
 
@@ -48,6 +48,13 @@ pub type TransportCallback =
 HTTP-based transport for production use:
 
 ```rust
+pub struct SimplifiedFetchTransport {
+    base_url: String,
+    #[cfg(feature = "http")]
+    client: reqwest::Client,
+    callback: Arc<RwLock<Option<Box<TransportCallback>>>>,
+}
+
 impl SimplifiedFetchTransport {
     /// Creates a new HTTP transport.
     pub fn new(base_url: &str) -> Self
@@ -59,16 +66,24 @@ impl SimplifiedFetchTransport {
 
 Features:
 - Sends handshake messages (InitialRequest, InitialResponse, CertificateRequest, CertificateResponse) as JSON POST to `/.well-known/auth`
-- Sends General messages with BRC-104 auth headers
+- Sends General messages as JSON POST with auth headers
 - Automatically strips trailing slashes from base URL
 - Uses `reqwest` client (requires `http` feature)
 - Invokes registered callback with response messages
+- Implements `Debug` trait with redacted internal fields
 
 ### MockTransport
 
 Testing transport for unit tests:
 
 ```rust
+#[derive(Default)]
+pub struct MockTransport {
+    sent_messages: Arc<RwLock<Vec<AuthMessage>>>,
+    response_queue: Arc<RwLock<Vec<AuthMessage>>>,
+    callback: Arc<RwLock<Option<Box<TransportCallback>>>>,
+}
+
 impl MockTransport {
     /// Creates a new mock transport.
     pub fn new() -> Self
@@ -89,9 +104,10 @@ impl MockTransport {
 
 Features:
 - Records all sent messages for assertion
-- Queues response messages to be returned
+- Queues response messages to be returned in order (FIFO)
 - Simulates incoming messages via `receive_message()`
 - Thread-safe with `Arc<RwLock<...>>` for concurrent access
+- Implements `Default` and `Debug` traits
 
 ### BRC-104 HTTP Headers
 
@@ -281,6 +297,16 @@ cargo test --features auth transports
 
 # With HTTP transport
 cargo test --features auth,http transports
+```
+
+## Thread Safety
+
+Both `SimplifiedFetchTransport` and `MockTransport` use `tokio::spawn` to set and clear callbacks asynchronously. This allows the synchronous `set_callback()` and `clear_callback()` methods to work with async-only storage. When testing, a small delay may be needed after setting callbacks:
+
+```rust
+transport.set_callback(callback);
+tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+// Now callback is guaranteed to be set
 ```
 
 ## Related Documentation
