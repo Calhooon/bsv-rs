@@ -11,6 +11,7 @@ This module contains Criterion-based benchmarks for measuring the performance of
 |------|---------|
 | `hash_bench.rs` | Standalone hash function benchmarks |
 | `primitives_bench.rs` | Comprehensive benchmarks for all primitives |
+| `memory_bench.rs` | Performance benchmarks with RSS memory tracking |
 
 ## Benchmark Groups
 
@@ -96,6 +97,7 @@ cargo bench
 # Run specific benchmark file
 cargo bench --bench primitives_bench
 cargo bench --bench hash_bench
+cargo bench --bench memory_bench
 
 # Run specific benchmark group
 cargo bench -- "Key Generation"
@@ -109,6 +111,32 @@ cargo bench -- --save-baseline main
 
 # Compare against baseline
 cargo bench -- --baseline main
+```
+
+## CI Benchmark Regression Detection
+
+The CI workflow performs relative benchmarking on pull requests:
+
+1. Checks out the base branch (main) and runs benchmarks
+2. Checks out the PR branch and runs benchmarks
+3. Compares results using `critcmp`
+
+This approach cancels out VM noise since both measurements happen on the same machine.
+
+### Local Comparison
+
+To compare benchmarks locally (e.g., before/after a change):
+
+```bash
+# Save baseline before changes
+cargo bench -- --save-baseline before
+
+# Make changes, then benchmark again
+cargo bench -- --save-baseline after
+
+# Compare results
+cargo install critcmp
+critcmp before after
 ```
 
 ## Output
@@ -138,11 +166,54 @@ fn bench_new_feature(c: &mut Criterion) {
 
 3. For throughput benchmarks, set `group.throughput(Throughput::Bytes(size))`.
 
+### memory_bench.rs
+
+Performance benchmarks with RSS (Resident Set Size) memory tracking:
+
+| Benchmark Group | Operations |
+|-----------------|------------|
+| Memory/Encryption | AES-GCM encrypt/decrypt at 64B, 1KB, 16KB |
+| Memory/KeyDerivation | BRC-42 derive_child, ECDH shared secret |
+| Memory/Shamir | split 3-of-5, split 5-of-10, recover 3-of-5 |
+| Memory/Signing | ECDSA sign, ECDSA verify |
+
+These benchmarks provide:
+- Standard Criterion timing measurements for performance regression detection
+- RSS memory delta tracking printed after each benchmark group
+- Cross-platform support (Linux, macOS, Windows)
+- Throughput measurements for encryption operations
+
+## Memory Profiling (Development)
+
+For detailed heap allocation analysis, use the dhat profiler tests:
+
+```bash
+# Run dhat profiling tests (requires dhat-profiling feature)
+cargo test --features dhat-profiling memory_profiling -- --nocapture --test-threads=1
+```
+
+Tests in `tests/memory_profiling.rs` provide:
+- Total allocations per operation
+- Peak heap usage
+- Bytes allocated per iteration
+- Allocation hotspot identification
+
+Covered operations:
+- `test_encryption_allocations` - AES-GCM at 5 payload sizes
+- `test_key_derivation_allocations` - BRC-42 and ECDH
+- `test_shamir_allocations` - Secret sharing splits and recovery
+- `test_signing_allocations` - ECDSA sign/verify cycles
+- `test_hashing_allocations` - SHA-256 and Hash160
+
 ## Dependencies
 
 The benchmarks use:
 - `criterion` - Benchmarking framework
+- `memory-stats` - Cross-platform RSS memory tracking
 - `bsv_sdk::primitives` - All cryptographic primitives being measured
+
+Optional:
+- `dhat` - Detailed heap allocation profiling (via `dhat-profiling` feature)
 
 ## Related Documentation
 

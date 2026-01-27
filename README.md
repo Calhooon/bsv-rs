@@ -8,10 +8,26 @@ The official Rust implementation of the BSV blockchain SDK, providing a complete
 
 ## Features
 
+**Core Modules**
 - **Primitives** - SHA-256, RIPEMD-160, HMAC, PBKDF2, AES-256-GCM, secp256k1, P-256, BigNumber
 - **Script** - Full Bitcoin Script interpreter with all BSV opcodes, P2PKH/RPuzzle/PushDrop templates
 - **Transaction** - Construction, signing, fee calculation, BEEF/MerklePath SPV proofs
 - **Wallet** - BRC-42 key derivation, ProtoWallet, WalletClient with HTTP substrates
+
+**Communication & Security**
+- **Messages** - BRC-77/78 signed and encrypted peer-to-peer messaging
+- **Auth** - BRC-31 mutual authentication with certificate-based identity (BRC-52/53)
+- **TOTP** - RFC 6238 Time-based One-Time Passwords for two-factor authentication
+
+**Overlay Network**
+- **Overlay** - SHIP/SLAP overlay network client for transaction broadcasting and lookup
+- **Storage** - UHRP content-addressed file storage via overlay network
+- **Registry** - On-chain definition registry for baskets, protocols, and certificates
+- **KVStore** - Blockchain-backed key-value storage (local encrypted, global public)
+- **Identity** - Certificate-based identity resolution and contact management
+
+**Compatibility**
+- **Compat** - BIP-32 HD keys, BIP-39 mnemonics, Bitcoin Signed Messages, ECIES encryption
 
 ## Installation
 
@@ -29,11 +45,17 @@ Or with specific features:
 # All modules
 bsv-sdk = { version = "0.2", features = ["full"] }
 
-# With HTTP client (for ARC broadcaster, WhatsOnChain, WalletClient)
+# With HTTP client (for ARC broadcaster, WhatsOnChain, WalletClient, storage)
 bsv-sdk = { version = "0.2", features = ["full", "http"] }
 
 # Just primitives and script (default)
 bsv-sdk = "0.2"
+
+# Common combinations
+bsv-sdk = { version = "0.2", features = ["wallet"] }           # Keys, transactions, signing
+bsv-sdk = { version = "0.2", features = ["auth", "http"] }     # Authentication with HTTP transport
+bsv-sdk = { version = "0.2", features = ["overlay", "http"] }  # Overlay network operations
+bsv-sdk = { version = "0.2", features = ["compat"] }           # BIP-32/39, BSM, ECIES
 ```
 
 ## Quick Start
@@ -179,6 +201,146 @@ let decrypted = bob.decrypt(DecryptArgs {
 }).unwrap();
 ```
 
+### BRC-77/78 Messages (Signed & Encrypted)
+
+```rust
+use bsv_sdk::primitives::PrivateKey;
+use bsv_sdk::messages::{sign, verify, encrypt, decrypt};
+
+let sender = PrivateKey::random();
+let recipient = PrivateKey::random();
+
+// Sign for specific recipient (only they can verify)
+let signature = sign(b"Hello!", &sender, Some(&recipient.public_key())).unwrap();
+let valid = verify(b"Hello!", &signature, Some(&recipient)).unwrap();
+
+// Sign for anyone to verify
+let signature = sign(b"Public announcement", &sender, None).unwrap();
+let valid = verify(b"Public announcement", &signature, None).unwrap();
+
+// Encrypt and decrypt
+let ciphertext = encrypt(b"Secret", &sender, &recipient.public_key()).unwrap();
+let plaintext = decrypt(&ciphertext, &recipient).unwrap();
+```
+
+### BIP-32/39 HD Keys and Mnemonics
+
+```rust
+use bsv_sdk::compat::bip32::{ExtendedKey, Network, generate_hd_key_from_mnemonic};
+use bsv_sdk::compat::bip39::{Mnemonic, WordCount};
+
+// Generate a new mnemonic
+let mnemonic = Mnemonic::new(WordCount::Words12).unwrap();
+println!("Mnemonic: {}", mnemonic.phrase());
+
+// Create HD key from mnemonic
+let master = generate_hd_key_from_mnemonic(&mnemonic, "", Network::Mainnet).unwrap();
+
+// Derive using BIP-44 path
+let derived = master.derive_path("m/44'/0'/0'/0/0").unwrap();
+let address = derived.address(true).unwrap();
+
+// Parse existing extended key
+let xprv = ExtendedKey::from_string("xprv9s21ZrQH143K...").unwrap();
+let xpub = xprv.neuter().unwrap();
+```
+
+### TOTP Two-Factor Authentication
+
+```rust
+use bsv_sdk::totp::{Totp, TotpOptions, TotpValidateOptions, Algorithm};
+
+// Shared secret (typically from base32-decoded QR code)
+let secret = b"12345678901234567890";
+
+// Generate a 6-digit code
+let code = Totp::generate(secret, None);
+
+// Validate with 1-period skew (handles clock drift)
+assert!(Totp::validate(secret, &code, None));
+
+// Use SHA-256 with 8 digits
+let options = TotpOptions {
+    digits: 8,
+    algorithm: Algorithm::Sha256,
+    ..Default::default()
+};
+let code = Totp::generate(secret, Some(options));
+```
+
+### Overlay Network Lookup and Broadcast
+
+```rust
+use bsv_sdk::overlay::{LookupResolver, LookupQuestion, TopicBroadcaster, TopicBroadcasterConfig};
+
+// Query a lookup service
+let resolver = LookupResolver::default();
+let question = LookupQuestion::new("ls_myservice", serde_json::json!({"key": "value"}));
+let answer = resolver.query(&question, Some(5000)).await?;
+
+// Broadcast to overlay topics
+let broadcaster = TopicBroadcaster::new(
+    vec!["tm_mytopic".to_string()],
+    TopicBroadcasterConfig::default(),
+)?;
+let result = broadcaster.broadcast_tx(&tx).await;
+```
+
+### UHRP File Storage
+
+```rust
+use bsv_sdk::storage::{StorageDownloader, get_url_for_file, get_hash_from_url};
+
+// Generate UHRP URL from file content
+let url = get_url_for_file(b"Hello, World!").unwrap();
+
+// Download file from UHRP URL (requires http feature)
+let downloader = StorageDownloader::default();
+let result = downloader.download(&url).await?;
+println!("Downloaded {} bytes", result.data.len());
+
+// Parse hash from URL
+let hash: [u8; 32] = get_hash_from_url(&url).unwrap();
+```
+
+### Key-Value Storage
+
+```rust
+use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
+use bsv_sdk::wallet::ProtoWallet;
+
+let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+let config = KVStoreConfig::new().with_protocol_id("my-app");
+let store = LocalKVStore::new(wallet, config)?;
+
+// Set and get values (encrypted by default)
+store.set("user:name", "Alice", None).await?;
+let name = store.get("user:name", "Unknown").await?;
+
+// List all keys
+let keys = store.keys().await?;
+```
+
+### Identity Resolution
+
+```rust
+use bsv_sdk::identity::{IdentityClient, IdentityClientConfig, IdentityQuery};
+
+let client = IdentityClient::new(wallet, IdentityClientConfig::default());
+
+// Resolve identity by public key
+let identity = client.resolve_by_identity_key("02abc123...", true).await?;
+
+// Discover certificates for an identity
+let certs = client.discover_certificates("02abc123...").await?;
+
+// Query by attribute (email, phone, etc.)
+let results = client.resolve_by_attributes(
+    [("email".to_string(), "user@example.com".to_string())].into(),
+    true
+).await?;
+```
+
 ### Broadcasting Transactions
 
 ```rust
@@ -270,19 +432,138 @@ if validation.valid {
 | `SecurityLevel` | Key derivation security levels (0, 1, 2) |
 | `Counterparty` | Key derivation counterparty specification |
 
+### Messages (`bsv_sdk::messages`)
+
+| Component | Description |
+|-----------|-------------|
+| `sign` | BRC-77 message signing for specific recipient or anyone |
+| `verify` | BRC-77 signature verification |
+| `encrypt` | BRC-78 message encryption using ECDH + AES-256-GCM |
+| `decrypt` | BRC-78 message decryption |
+
+### Compat (`bsv_sdk::compat`)
+
+| Component | Description |
+|-----------|-------------|
+| `Mnemonic`, `Language`, `WordCount` | BIP-39 mnemonic phrase generation and seed derivation |
+| `ExtendedKey`, `Network` | BIP-32 hierarchical deterministic key derivation |
+| `sign_message`, `verify_message` | Bitcoin Signed Message (BSM) format |
+| `electrum_encrypt`, `electrum_decrypt` | Electrum ECIES encryption |
+| `bitcore_encrypt`, `bitcore_decrypt` | Bitcore ECIES encryption |
+
+### TOTP (`bsv_sdk::totp`)
+
+| Component | Description |
+|-----------|-------------|
+| `Totp` | RFC 6238 TOTP generator and validator |
+| `TotpOptions` | Configuration for digits, algorithm, period |
+| `TotpValidateOptions` | Validation with clock drift skew tolerance |
+| `Algorithm` | HMAC algorithm selection (SHA-1, SHA-256, SHA-512) |
+
+### Auth (`bsv_sdk::auth`)
+
+| Component | Description |
+|-----------|-------------|
+| `Peer` | BRC-31 mutual authentication handler |
+| `PeerSession` | Session state between authenticated peers |
+| `SessionManager` | Concurrent session management with dual indexing |
+| `Certificate` | BRC-52 base certificate with signing/verification |
+| `MasterCertificate` | Certificate with master keyring for issuance |
+| `VerifiableCertificate` | Certificate with verifier-specific keyring |
+| `Transport`, `SimplifiedFetchTransport` | BRC-104 HTTP transport layer |
+| `RequestedCertificateSet` | Certificate request specification |
+
+### Overlay (`bsv_sdk::overlay`)
+
+| Component | Description |
+|-----------|-------------|
+| `LookupResolver` | SLAP query resolution with host discovery and caching |
+| `TopicBroadcaster` | SHIP topic broadcasting with acknowledgment requirements |
+| `LookupQuestion`, `LookupAnswer` | Lookup service query and response types |
+| `TaggedBEEF`, `Steak` | Transaction broadcast containers and acknowledgments |
+| `HostReputationTracker` | Host performance tracking with exponential backoff |
+| `Historian`, `SyncHistorian` | Transaction ancestry traversal |
+| `NetworkPreset` | Mainnet/Testnet/Local network configuration |
+
+### Storage (`bsv_sdk::storage`)
+
+| Component | Description |
+|-----------|-------------|
+| `StorageDownloader` | Download files from UHRP URLs via overlay lookup |
+| `StorageUploader` | Upload files with retention period management |
+| `get_url_for_file`, `get_url_for_hash` | Generate UHRP URLs from content |
+| `get_hash_from_url` | Extract SHA-256 hash from UHRP URL |
+| `is_valid_url`, `normalize_url` | URL validation and normalization |
+| `UploadableFile`, `DownloadResult` | File transfer types |
+
+### Registry (`bsv_sdk::registry`)
+
+| Component | Description |
+|-----------|-------------|
+| `RegistryClient` | On-chain definition registration and resolution |
+| `BasketDefinitionData` | Output basket definition |
+| `ProtocolDefinitionData` | Wallet protocol definition |
+| `CertificateDefinitionData` | Certificate type definition with field schema |
+| `RegistryRecord` | Combined definition and on-chain token reference |
+| `DefinitionType` | Basket, Protocol, or Certificate enum |
+
+### KVStore (`bsv_sdk::kvstore`)
+
+| Component | Description |
+|-----------|-------------|
+| `LocalKVStore` | Private encrypted key-value store using wallet baskets |
+| `GlobalKVStore` | Public key-value store via overlay network |
+| `KVStoreConfig` | Store configuration (protocol ID, encryption, topics) |
+| `KVStoreEntry`, `KVStoreQuery` | Entry and query types |
+| `KVStoreInterpreter` | PushDrop token interpreter |
+
+### Identity (`bsv_sdk::identity`)
+
+| Component | Description |
+|-----------|-------------|
+| `IdentityClient` | Identity resolution, revelation, and certificate discovery |
+| `ContactsManager` | Encrypted contact storage with caching and search |
+| `DisplayableIdentity` | User-friendly identity for UI display |
+| `Contact` | Stored contact with metadata and tags |
+| `KnownCertificateType` | 9 known certificate types (IdentiCert, XCert, EmailCert, etc.) |
+| `IdentityQuery` | Query builder for identity resolution |
+
 ## Feature Flags
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `primitives` | Yes | Cryptographic primitives |
-| `script` | Yes | Script parsing, execution, templates |
-| `transaction` | No | Transaction building, BEEF, fee models |
-| `wallet` | No | BRC-42 key derivation, ProtoWallet |
-| `full` | No | All of the above |
-| `http` | No | HTTP client for ARC, WhatsOnChain, WalletClient |
+| `primitives` | Yes | Cryptographic primitives (hash, EC, encoding, AES-256-GCM) |
+| `script` | Yes | Script parsing, execution, templates (P2PKH, RPuzzle, PushDrop) |
+| `transaction` | No | Transaction building, signing, BEEF/MerklePath, fee models |
+| `wallet` | No | BRC-42 key derivation, ProtoWallet, WalletClient |
+| `messages` | No | BRC-77/78 signed and encrypted messaging |
+| `compat` | No | BIP-32/39, Bitcoin Signed Messages, ECIES encryption |
+| `totp` | No | RFC 6238 Time-based One-Time Passwords |
+| `auth` | No | BRC-31 mutual authentication, certificates (BRC-52/53) |
+| `overlay` | No | SHIP/SLAP overlay network client |
+| `storage` | No | UHRP content-addressed file storage |
+| `registry` | No | On-chain definition registry |
+| `kvstore` | No | Blockchain-backed key-value storage |
+| `identity` | No | Certificate-based identity resolution |
+| `full` | No | All modules above |
+| `http` | No | HTTP client for network operations |
 | `wasm` | No | WebAssembly support |
 
-Features follow a dependency hierarchy: `wallet` → `transaction` → `script` → `primitives`
+### Feature Dependency Hierarchy
+
+```
+full
+ ├── wallet → transaction → script → primitives
+ ├── messages → wallet
+ ├── compat → primitives
+ ├── totp → primitives
+ ├── auth → wallet, messages
+ ├── overlay → wallet
+ ├── storage → overlay
+ ├── registry → overlay
+ ├── kvstore → overlay
+ └── identity → auth, overlay
+```
 
 ## Cross-SDK Compatibility
 
@@ -291,11 +572,22 @@ This SDK maintains byte-for-byte compatibility with:
 - [BSV Go SDK](https://github.com/bitcoin-sv/go-sdk)
 
 All implementations share test vectors to ensure cross-platform compatibility:
-- 100+ BRC-42 key derivation vectors
-- 499 sighash computation vectors
-- 570+ script execution vectors
-- Transaction serialization vectors
-- BEEF/MerklePath encoding vectors
+
+| Category | Test Count | Description |
+|----------|------------|-------------|
+| BRC-42 Key Derivation | 100+ | Invoice number generation, key pair derivation |
+| Sighash Computation | 499 | Transaction signature hash calculation |
+| Script Execution | 570+ | Full script interpreter test vectors |
+| Transaction Serialization | Multiple | Raw, BEEF, and MerklePath formats |
+| BIP-32/39 | Full suite | Official test vectors from BIP specifications |
+| Messages (BRC-77/78) | 33 | Sign/verify, encrypt/decrypt round-trips |
+| Storage/UHRP | 70 | URL encoding/decoding, download/upload |
+| KVStore | 74 | CRUD operations, encryption, queries |
+| Identity | 69 | Certificate handling, contact management |
+| Wallet | 56 | KeyDeriver, CachedKeyDeriver, ProtoWallet |
+| Compat | 36 | BIP-32/39 helpers, BSM, ECIES |
+
+Total test coverage: **1,470+ unit tests**, **21 integration test files**, **159+ doc tests**
 
 ## Development
 
@@ -314,6 +606,14 @@ cargo test primitives
 cargo test script --features script
 cargo test transaction --features transaction
 cargo test wallet --features wallet
+cargo test messages --features messages
+cargo test compat --features compat
+cargo test totp --features totp
+cargo test auth --features auth
+cargo test overlay --features overlay
+cargo test storage --features storage
+cargo test kvstore --features kvstore
+cargo test identity --features identity
 
 # Run benchmarks
 cargo bench
@@ -334,6 +634,25 @@ cargo doc --open --features full
 cargo build --target wasm32-unknown-unknown --features wasm
 ```
 
+## BRC Standards Implemented
+
+| BRC | Name | Module |
+|-----|------|--------|
+| BRC-42 | Key derivation from master key | `wallet` |
+| BRC-43 | Security levels and protocol ID | `wallet` |
+| BRC-52 | Identity certificates | `auth` |
+| BRC-53 | Certificate field encryption | `auth` |
+| BRC-31 | Authrite mutual authentication | `auth` |
+| BRC-62 | BEEF format | `transaction` |
+| BRC-74 | BUMP merkle proofs | `transaction` |
+| BRC-77 | Signed messages | `messages` |
+| BRC-78 | Encrypted messages | `messages` |
+| BRC-95/96 | Extended BEEF | `transaction` |
+| BRC-104 | HTTP transport | `auth` |
+| SHIP | Submit Hierarchical Information Protocol | `overlay` |
+| SLAP | Service Lookup Availability Protocol | `overlay` |
+| UHRP | Universal Hash Resolution Protocol | `storage` |
+
 ## License
 
 Licensed under either of:
@@ -342,6 +661,68 @@ Licensed under either of:
 
 at your option.
 
+## Architecture
+
+The SDK is organized into feature-gated modules with clear dependency boundaries:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         identity                                 │
+│                    (certificate-based ID)                        │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┴───────────────────┐
+          ▼                                       ▼
+┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+│      auth       │   │    registry     │   │     kvstore     │
+│   (BRC-31/52)   │   │ (definitions)   │   │  (key-value)    │
+└─────────────────┘   └─────────────────┘   └─────────────────┘
+          │                   │                     │
+          └───────────────────┼─────────────────────┘
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         overlay                                  │
+│                    (SHIP/SLAP network)                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+          ┌───────────────────┴───────────────────┐
+          ▼                                       ▼
+┌─────────────────┐                     ┌─────────────────┐
+│    messages     │                     │     storage     │
+│  (BRC-77/78)    │                     │     (UHRP)      │
+└─────────────────┘                     └─────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         wallet                                   │
+│              (BRC-42 keys, ProtoWallet, WalletClient)            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       transaction                                │
+│              (TX building, signing, BEEF, SPV)                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         script                                   │
+│              (interpreter, templates, opcodes)                   │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       primitives                                 │
+│        (hash, EC, encoding, AES-GCM, BigNumber, DRBG)           │
+└─────────────────────────────────────────────────────────────────┘
+
+Independent modules (depend only on primitives):
+┌─────────────────┐   ┌─────────────────┐
+│     compat      │   │      totp       │
+│ (BIP-32/39/BSM) │   │   (RFC 6238)    │
+└─────────────────┘   └─────────────────┘
+```
+
 ## Contributing
 
 Contributions are welcome. Please ensure that:
@@ -349,3 +730,4 @@ Contributions are welcome. Please ensure that:
 2. Code is formatted (`cargo fmt`)
 3. No clippy warnings (`cargo clippy --all-targets --all-features`)
 4. New functionality includes appropriate tests
+5. Cross-SDK compatibility is maintained where applicable

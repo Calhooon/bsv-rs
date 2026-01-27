@@ -121,8 +121,51 @@ jobs:
           RUSTDOCFLAGS: -Dwarnings
 
   benchmarks:
-    name: Benchmarks
+    name: Benchmark Regression Check
     runs-on: ubuntu-latest
+    # Only run on PRs to avoid redundant runs on main
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for branch checkout
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bench-
+
+      - name: Install critcmp
+        run: cargo install critcmp
+
+      - name: Benchmark main branch
+        run: |
+          git checkout ${{ github.base_ref }}
+          cargo bench --bench primitives_bench --bench hash_bench -- --save-baseline main
+
+      - name: Benchmark PR branch
+        run: |
+          git checkout ${{ github.head_ref }}
+          cargo bench --bench primitives_bench --bench hash_bench -- --save-baseline pr
+
+      - name: Compare benchmarks
+        run: |
+          critcmp main pr
+
+  benchmarks-build:
+    name: Benchmarks Build
+    runs-on: ubuntu-latest
+    # Run on push to main to ensure benchmarks compile
+    if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
@@ -136,9 +179,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ubuntu-bench-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ubuntu-bench-
+            ${{ runner.os }}-bench-
 
       - name: Build benchmarks
         run: cargo bench --no-run

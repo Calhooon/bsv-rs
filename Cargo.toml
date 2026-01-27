@@ -68,6 +68,11 @@ urlencoding = "2.1"
 [dev-dependencies]
 criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros"] }
+memory-stats = "1.2"
+
+[dependencies.dhat]
+version = "0.3"
+optional = true
 
 [features]
 default = ["primitives", "script"]
@@ -87,6 +92,7 @@ identity = ["auth", "overlay"]
 wasm = ["getrandom/js"]
 full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity"]
 http = ["dep:reqwest"]
+dhat-profiling = ["dep:dhat"]
 
 [[bench]]
 name = "hash_bench"
@@ -94,4 +100,8 @@ harness = false
 
 [[bench]]
 name = "primitives_bench"
+harness = false
+
+[[bench]]
+name = "memory_bench"
 harness = false
