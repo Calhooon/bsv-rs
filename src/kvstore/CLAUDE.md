@@ -14,11 +14,11 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | ~75 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options) | ~480 |
-| `local.rs` | LocalKVStore implementation | ~450 |
-| `global.rs` | GlobalKVStore implementation | ~420 |
-| `interpreter.rs` | PushDrop token interpreter | ~290 |
+| `mod.rs` | Module root with re-exports and documentation | ~120 |
+| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields) | ~746 |
+| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1393 |
+| `global.rs` | GlobalKVStore implementation | ~680 |
+| `interpreter.rs` | PushDrop token interpreter and KVStoreFields | ~438 |
 
 ## Key Exports
 
@@ -43,19 +43,28 @@ Private key-value store using wallet transactions and baskets.
 
 ### Features
 - **Encrypted storage**: Values encrypted using wallet-derived keys (AES-256-GCM)
-- **Wallet basket**: Entries stored in a namespaced basket
+- **Wallet basket**: Entries stored in a namespaced basket (protocol_id)
 - **Tag-based lookup**: Keys stored as tags for efficient retrieval
 - **Atomic operations**: Per-key locking prevents concurrent conflicts
+- **Validation**: Empty keys, values, and protocol_id are rejected
 
 ### Methods
 
 ```rust
-impl<W: WalletInterface> LocalKVStore<W> {
-    /// Create a new LocalKVStore
-    pub fn new(wallet: W, config: KVStoreConfig) -> Self;
+impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
+    /// Create a new LocalKVStore (returns error if protocol_id is empty)
+    pub fn new(wallet: W, config: KVStoreConfig) -> Result<Self>;
 
-    /// Get a value by key (returns None if not found)
-    pub async fn get(&self, key: &str, options: Option<KVStoreGetOptions>) -> Result<Option<KVStoreEntry>>;
+    /// Get a value by key (returns default_value if not found)
+    /// Matches Go SDK signature: Get(ctx, key, defaultValue string) (string, error)
+    pub async fn get(&self, key: &str, default_value: &str) -> Result<String>;
+
+    /// Get full entry with metadata (returns None if not found)
+    pub async fn get_entry(
+        &self,
+        key: &str,
+        options: Option<KVStoreGetOptions>,
+    ) -> Result<Option<KVStoreEntry>>;
 
     /// Set a key-value pair (creates or updates)
     pub async fn set(&self, key: &str, value: &str, options: Option<KVStoreSetOptions>) -> Result<String>;
@@ -102,12 +111,14 @@ Public key-value store using the overlay network.
 - **PushDrop tokens**: Entries stored as on-chain tokens
 - **Signature verification**: Entries signed by controller
 - **Tag filtering**: Query by tags with "all" or "any" mode
+- **Network presets**: Supports Mainnet and Testnet configurations
+- **Cached identity key**: Controller pubkey cached for performance
 
 ### Methods
 
 ```rust
 impl<W: WalletInterface> GlobalKVStore<W> {
-    /// Create a new GlobalKVStore
+    /// Create a new GlobalKVStore (uses default Mainnet network)
     pub fn new(wallet: W, config: KVStoreConfig) -> Self;
 
     /// Create with custom network preset
@@ -137,14 +148,31 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 
 Global entries use PushDrop tokens with the following field layout:
 
-| Index | Field | Description |
-|-------|-------|-------------|
-| 0 | Protocol ID | String identifier (e.g., "kvstore") |
-| 1 | Key | The key string |
-| 2 | Value | The value (plaintext for global, encrypted for local) |
-| 3 | Controller | 33-byte compressed public key |
-| 4 | Tags | JSON array of tag strings (optional, new format) |
-| 5 | Signature | Controller's signature over fields 0-4 |
+| Index | Constant | Field | Description |
+|-------|----------|-------|-------------|
+| 0 | `PROTOCOL_ID` | Protocol ID | String identifier (e.g., "kvstore") |
+| 1 | `KEY` | Key | The key string |
+| 2 | `VALUE` | Value | The value (plaintext for global, encrypted for local) |
+| 3 | `CONTROLLER` | Controller | 33-byte compressed public key |
+| 4 | `TAGS` | Tags | JSON array of tag strings (optional, new format) |
+| 5 | `SIGNATURE` | Signature | Controller's signature over fields 0-4 |
+
+### Field Constants (KvProtocolFields)
+
+```rust
+pub struct KvProtocolFields;
+
+impl KvProtocolFields {
+    pub const PROTOCOL_ID: usize = 0;
+    pub const KEY: usize = 1;
+    pub const VALUE: usize = 2;
+    pub const CONTROLLER: usize = 3;
+    pub const TAGS: usize = 4;
+    pub const SIGNATURE: usize = 5;
+    pub const MIN_FIELDS_OLD: usize = 5;  // Old format without tags
+    pub const MIN_FIELDS_NEW: usize = 6;  // New format with tags
+}
+```
 
 ### Old vs New Format
 
@@ -167,7 +195,7 @@ pub struct KVStoreConfig {
     pub topics: Vec<String>,
     /// Originator for wallet operations
     pub originator: Option<String>,
-    /// Whether to encrypt values (LocalKVStore only)
+    /// Whether to encrypt values (LocalKVStore only, default: true)
     pub encrypt: bool,
 }
 
@@ -200,10 +228,13 @@ impl KVStoreQuery {
     pub fn new() -> Self;
     pub fn with_key(self, key: impl Into<String>) -> Self;
     pub fn with_controller(self, controller: impl Into<String>) -> Self;
+    pub fn with_protocol_id(self, protocol_id: impl Into<String>) -> Self;
     pub fn with_tags(self, tags: Vec<String>) -> Self;
     pub fn with_tag_query_mode(self, mode: impl Into<String>) -> Self;
     pub fn with_limit(self, limit: u32) -> Self;
-    // ...
+    pub fn with_skip(self, skip: u32) -> Self;
+    pub fn with_sort_order(self, order: impl Into<String>) -> Self;
+    pub fn to_json(&self) -> serde_json::Value;
 }
 ```
 
@@ -226,6 +257,9 @@ impl KVStoreInterpreter {
         ctx: Option<&KVStoreContext>,
     ) -> Option<KVStoreEntry>;
 
+    /// Verify signature (placeholder - returns true)
+    pub fn verify_signature(pushdrop: &PushDrop, controller: &PublicKey) -> bool;
+
     /// Extract just the value
     pub fn extract_value(script: &LockingScript) -> Option<String>;
 
@@ -234,6 +268,32 @@ impl KVStoreInterpreter {
 
     /// Extract all raw fields
     pub fn extract_fields(script: &LockingScript) -> Option<KVStoreFields>;
+}
+```
+
+### KVStoreFields
+
+Raw field data extracted from a KVStore token:
+
+```rust
+pub struct KVStoreFields {
+    pub protocol_id: Vec<u8>,
+    pub key: Vec<u8>,
+    pub value: Vec<u8>,
+    pub controller: Vec<u8>,
+    pub tags: Option<Vec<u8>>,
+    pub signature: Option<Vec<u8>>,
+    pub locking_public_key: PublicKey,
+}
+
+impl KVStoreFields {
+    pub fn protocol_id_string(&self) -> Option<String>;
+    pub fn key_string(&self) -> Option<String>;
+    pub fn value_string(&self) -> Option<String>;
+    pub fn value_bytes(&self) -> &[u8];
+    pub fn controller_hex(&self) -> String;
+    pub fn tags_vec(&self) -> Vec<String>;
+    pub fn has_tags(&self) -> bool;
 }
 ```
 
@@ -251,15 +311,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create wallet and store
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
     let config = KVStoreConfig::default();
-    let store = LocalKVStore::new(wallet, config);
+    let store = LocalKVStore::new(wallet, config)?;  // Note: returns Result
 
     // Set a value
     let outpoint = store.set("user:name", "Alice", None).await?;
     println!("Stored at: {}", outpoint);
 
-    // Get a value
-    if let Some(entry) = store.get("user:name", None).await? {
-        println!("Name: {}", entry.value);
+    // Get a value with default
+    let name = store.get("user:name", "Unknown").await?;
+    println!("Name: {}", name);
+
+    // Get full entry with metadata
+    if let Some(entry) = store.get_entry("user:name", None).await? {
+        println!("Entry: {} = {}", entry.key, entry.value);
     }
 
     // List all keys
@@ -326,9 +390,27 @@ The module uses specific error types:
 ```rust
 use bsv_sdk::Error;
 
-match store.get("nonexistent", None).await {
-    Ok(None) => println!("Key not found"),
-    Ok(Some(entry)) => println!("Found: {}", entry.value),
+// LocalKVStore creation can fail
+match LocalKVStore::new(wallet, config) {
+    Ok(store) => { /* use store */ }
+    Err(Error::KvStoreEmptyContext) => println!("Protocol ID cannot be empty"),
+    Err(e) => println!("Failed to create store: {}", e),
+}
+
+// Operations validate keys and values
+match store.set("", "value", None).await {
+    Err(Error::KvStoreInvalidKey) => println!("Key cannot be empty"),
+    _ => {}
+}
+
+match store.set("key", "", None).await {
+    Err(Error::KvStoreInvalidValue) => println!("Value cannot be empty"),
+    _ => {}
+}
+
+// General error handling
+match store.get("key", "default").await {
+    Ok(value) => println!("Value: {}", value),
     Err(Error::KvStoreError(msg)) => println!("Store error: {}", msg),
     Err(Error::KvStoreKeyNotFound(key)) => println!("Key not found: {}", key),
     Err(Error::KvStoreCorruptedState(msg)) => println!("Corrupted: {}", msg),
@@ -364,6 +446,18 @@ This module maintains API compatibility with:
 | `LocalKVStore` | `LocalKVStore<W>` |
 | `GlobalKVStore` | `GlobalKVStore<W>` |
 | `kvStoreInterpreter` | `KVStoreInterpreter` |
+
+### Go SDK Method Compatibility
+
+The `LocalKVStore::get()` method signature matches the Go SDK:
+```go
+// Go SDK
+func (l *LocalKVStore) Get(ctx context.Context, key, defaultValue string) (string, error)
+```
+```rust
+// Rust SDK
+pub async fn get(&self, key: &str, default_value: &str) -> Result<String>
+```
 
 ## Related Documentation
 

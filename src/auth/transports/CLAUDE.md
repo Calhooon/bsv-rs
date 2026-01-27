@@ -9,8 +9,8 @@ This module provides transport layer implementations for sending and receiving a
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with exports and usage examples | ~42 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1100 |
+| `mod.rs` | Module root with exports and usage examples | ~43 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1110 |
 
 ## Key Exports
 
@@ -97,7 +97,7 @@ Features:
 - Records all sent messages for assertion
 - Queues response messages to be returned in order (FIFO)
 - Simulates incoming messages via `receive_message()`
-- Thread-safe with `Arc<RwLock<...>>` for concurrent access
+- Thread-safe with `Arc<RwLock<...>>` for concurrent access (uses `tokio::sync::RwLock`)
 - Implements `Default` and `Debug` traits
 
 ### HttpRequest
@@ -224,6 +224,8 @@ use bsv_sdk::auth::transports::{Transport, TransportCallback};
 use bsv_sdk::auth::types::AuthMessage;
 use bsv_sdk::Result;
 use async_trait::async_trait;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 struct MyTransport {
     callback: Arc<RwLock<Option<Box<TransportCallback>>>>,
@@ -257,9 +259,11 @@ impl Transport for MyTransport {
 ### Using MockTransport in Tests
 
 ```rust
-use bsv_sdk::auth::transports::MockTransport;
+use bsv_sdk::auth::transports::{MockTransport, Transport};
 use bsv_sdk::auth::types::{AuthMessage, MessageType};
 use bsv_sdk::primitives::PrivateKey;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 #[tokio::test]
 async fn test_auth_flow() {
@@ -361,7 +365,7 @@ Error::AuthError("HTTP transport requires the 'http' feature".into())
 - `async_trait` - Async trait support for `Transport`
 - `tokio::sync::RwLock` - Thread-safe callback storage
 - `reqwest` - HTTP client (optional, requires `http` feature)
-- `serde_json` - JSON serialization for certificate requests
+- `serde_json` - JSON serialization for certificate requests and auth messages
 
 ## Error Handling
 
@@ -401,6 +405,17 @@ Both `SimplifiedFetchTransport` and `MockTransport` use `tokio::spawn` to set an
 transport.set_callback(callback);
 tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 // Now callback is guaranteed to be set
+```
+
+## Exports
+
+From `mod.rs`:
+
+```rust
+pub use http::{
+    headers, HttpRequest, HttpResponse, MockTransport, SimplifiedFetchTransport, Transport,
+    TransportCallback,
+};
 ```
 
 ## Related Documentation

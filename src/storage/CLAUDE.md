@@ -3,19 +3,19 @@
 
 ## Overview
 
-This module provides decentralized file storage using content-addressed UHRP URLs. Files are identified by their SHA-256 hash and stored on overlay network hosts.
+This module provides decentralized file storage using content-addressed UHRP URLs. Files are identified by their SHA-256 hash and stored on overlay network hosts. The storage system uses the overlay network's `ls_uhrp` lookup service to discover hosts that store specific files.
 
 **Status**: Complete - UHRP URL utilities, downloader, and uploader implemented.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module root; re-exports |
-| `types.rs` | Core types (UploadableFile, DownloadResult, etc.) |
-| `utils.rs` | UHRP URL generation, parsing, and validation |
-| `downloader.rs` | Download files from UHRP URLs via overlay lookup |
-| `uploader.rs` | Upload files to storage services |
+| File | Lines | Purpose |
+|------|-------|---------|
+| `mod.rs` | 98 | Module root; re-exports public API |
+| `types.rs` | 202 | Core types (UploadableFile, DownloadResult, etc.) |
+| `utils.rs` | 503 | UHRP URL generation, parsing, validation, and cross-SDK test vectors |
+| `downloader.rs` | 337 | Download files from UHRP URLs via overlay lookup |
+| `uploader.rs` | 445 | Upload files to storage services with retention management |
 
 ## Key Exports
 
@@ -85,14 +85,22 @@ pub struct DownloadResult {
     pub data: Vec<u8>,      // File content
     pub mime_type: String,  // MIME type from server
 }
+
+impl DownloadResult {
+    pub fn new(data: Vec<u8>, mime_type: impl Into<String>) -> Self
+}
 ```
 
 ### UploadFileResult
 
 ```rust
 pub struct UploadFileResult {
-    pub uhrp_url: String,  // UHRP URL for the file
+    pub uhrp_url: String,  // UHRP URL for the file (JSON: "uhrpUrl")
     pub published: bool,   // Whether upload succeeded
+}
+
+impl UploadFileResult {
+    pub fn new(uhrp_url: impl Into<String>, published: bool) -> Self
 }
 ```
 
@@ -101,9 +109,18 @@ pub struct UploadFileResult {
 ```rust
 pub struct FindFileData {
     pub name: Option<String>,  // File name (if provided)
-    pub size: String,          // File size
-    pub mime_type: String,     // MIME type
-    pub expiry_time: i64,      // Expiration timestamp (Unix seconds)
+    pub size: String,          // File size as string
+    pub mime_type: String,     // MIME type (JSON: "mimeType")
+    pub expiry_time: i64,      // Expiration timestamp (Unix seconds, JSON: "expiryTime")
+}
+```
+
+### UploadMetadata
+
+```rust
+pub struct UploadMetadata {
+    pub uhrp_url: String,   // UHRP URL (JSON: "uhrpUrl")
+    pub expiry_time: i64,   // Expiration timestamp (Unix seconds, JSON: "expiryTime")
 }
 ```
 
@@ -112,9 +129,13 @@ pub struct FindFileData {
 ```rust
 pub struct RenewFileResult {
     pub status: String,       // "success" or "error"
-    pub previous_expiry: i64, // Previous expiration
-    pub new_expiry: i64,      // New expiration
+    pub previous_expiry: i64, // Previous expiration (JSON: "prevExpiryTime")
+    pub new_expiry: i64,      // New expiration (JSON: "newExpiryTime")
     pub amount: i64,          // Amount charged
+}
+
+impl RenewFileResult {
+    pub fn is_success(&self) -> bool  // Returns true if status == "success"
 }
 ```
 
@@ -161,15 +182,15 @@ assert!(!is_valid_url("https://example.com"));
 
 ## StorageDownloader
 
-Downloads files from UHRP URLs via overlay network lookup.
+Downloads files from UHRP URLs via overlay network lookup. Uses the `ls_uhrp` lookup service to discover storage hosts.
 
 ### Configuration
 
 ```rust
 pub struct StorageDownloaderConfig {
-    pub network_preset: NetworkPreset,       // Mainnet/Testnet/Local
-    pub resolver: Option<Arc<LookupResolver>>, // Custom resolver
-    pub timeout_ms: Option<u64>,             // Download timeout
+    pub network_preset: NetworkPreset,         // Mainnet/Testnet/Local
+    pub resolver: Option<Arc<LookupResolver>>, // Custom resolver (optional)
+    pub timeout_ms: Option<u64>,               // Download timeout in ms
 }
 
 impl Default for StorageDownloaderConfig {
@@ -177,9 +198,23 @@ impl Default for StorageDownloaderConfig {
         Self {
             network_preset: NetworkPreset::Mainnet,
             resolver: None,
-            timeout_ms: Some(30000),
+            timeout_ms: Some(30000),  // 30 seconds
         }
     }
+}
+```
+
+### Methods
+
+```rust
+impl StorageDownloader {
+    pub fn new(config: StorageDownloaderConfig) -> Self
+    pub async fn resolve(&self, uhrp_url: &str) -> Result<Vec<String>>
+    pub async fn download(&self, uhrp_url: &str) -> Result<DownloadResult>  // requires 'http' feature
+}
+
+impl Default for StorageDownloader {
+    fn default() -> Self  // Uses default config
 }
 ```
 
@@ -203,32 +238,50 @@ println!("Downloaded {} bytes", result.data.len());
 
 1. Query `ls_uhrp` lookup service with the UHRP URL
 2. Parse BEEF outputs to get PushDrop advertisement tokens
-3. Extract host URLs and expiry times from token fields
-4. Filter out expired advertisements
-5. Return list of available host URLs
+3. Extract host URLs and expiry times from token fields (fields: protocol, identity, domain, expiry)
+4. Filter out expired advertisements (compares expiry time against current time)
+5. Validate host URLs (must start with `http://` or `https://`)
+6. Return list of available host URLs
 
 ### How Download Works
 
-1. Resolve hosts for the UHRP URL
-2. Try each host in order until success
-3. Verify downloaded content hash matches URL
-4. Return content with MIME type
+1. Validate the UHRP URL format and checksum
+2. Extract expected hash from URL
+3. Resolve hosts for the UHRP URL
+4. Try each host in order until success
+5. Verify downloaded content hash matches URL (SHA-256)
+6. Return content with MIME type from response headers
 
 ## StorageUploader
 
-Uploads files to storage services.
+Uploads files to storage services with retention period management.
 
 ### Configuration
 
 ```rust
 pub struct StorageUploaderConfig {
     pub storage_url: String,             // Base URL of storage service
-    pub default_retention_minutes: u32,  // Default retention (7 days)
+    pub default_retention_minutes: u32,  // Default retention (7 days = 10080 minutes)
 }
 
 impl StorageUploaderConfig {
     pub fn new(storage_url: impl Into<String>) -> Self
     pub fn with_retention_minutes(self, minutes: u32) -> Self
+}
+```
+
+### Methods
+
+```rust
+impl StorageUploader {
+    pub fn new(config: StorageUploaderConfig) -> Self
+    pub fn base_url(&self) -> &str
+
+    // All async methods require 'http' feature
+    pub async fn publish_file(&self, file: &UploadableFile, retention_minutes: Option<u32>) -> Result<UploadFileResult>
+    pub async fn find_file(&self, uhrp_url: &str) -> Result<Option<FindFileData>>
+    pub async fn list_uploads(&self) -> Result<serde_json::Value>
+    pub async fn renew_file(&self, uhrp_url: &str, additional_minutes: u32) -> Result<RenewFileResult>
 }
 ```
 
@@ -262,10 +315,19 @@ println!("New expiry: {}", renewal.new_expiry);
 
 ### Upload Flow
 
-1. Request upload info from `/upload` endpoint
-2. Receive presigned URL and required headers
-3. PUT file to presigned URL
-4. Generate UHRP URL from file content hash
+1. Request upload info from `/upload` endpoint (POST with `fileSize` and `retentionPeriod`)
+2. Receive presigned URL and required headers from response
+3. PUT file to presigned URL with content-type header and any required headers
+4. Generate UHRP URL from file content hash using `get_url_for_file`
+
+### API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/upload` | POST | Get upload URL and required headers |
+| `/find` | GET | Find file metadata by UHRP URL |
+| `/list` | GET | List uploaded files |
+| `/renew` | POST | Extend file retention period |
 
 ## Feature Requirements
 
@@ -296,7 +358,34 @@ UHRP URL encoding is compatible with TypeScript and Go SDKs:
 - Same checksum algorithm (double SHA-256)
 - Same URL format (`uhrp://` or `web+uhrp://`)
 
-### Test Vectors
+### Test Vectors from TypeScript SDK
+
+```rust
+// Known test vector
+const HASH_HEX: &str = "1a5ec49a3f32cd56d19732e89bde5d81755ddc0fd8515dc8b226d47654139dca";
+const FILE_HEX: &str = "687da27f04a112aa48f1cab2e7949f1eea4f7ba28319c1e999910cd561a634a05a3516e6db";
+const URL_BASE58: &str = "XUT6PqWb3GP3LR7dmBMCJwZ3oo5g1iGCF3CrpzyuJCemkGu1WGoq";
+
+// Hash to URL
+let hash = hex::decode(HASH_HEX).unwrap();
+let url = get_url_for_hash(&hash).unwrap();
+assert_eq!(normalize_url(&url), URL_BASE58);
+
+// File to URL (verifies SHA-256 produces expected hash)
+let file = hex::decode(FILE_HEX).unwrap();
+let url = get_url_for_file(&file).unwrap();
+assert_eq!(normalize_url(&url), URL_BASE58);
+
+// URL to Hash
+let hash = get_hash_from_url(URL_BASE58).unwrap();
+assert_eq!(hex::encode(hash), HASH_HEX);
+
+// Invalid URL detection (bad checksum)
+let bad_url = "XUU7cTfy6fA6q2neLDmzPqJnGB6o18PXKoGaWLPrH1SeWLKgdCKq";
+assert!(!is_valid_url(bad_url));
+```
+
+### Round-Trip Examples
 
 ```rust
 // Empty file
@@ -307,7 +396,7 @@ assert_eq!(
     "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 );
 
-// Round-trip
+// Arbitrary data
 let data = b"test data";
 let url = get_url_for_file(data).unwrap();
 let recovered = get_hash_from_url(&url).unwrap();
@@ -320,6 +409,43 @@ assert_eq!(recovered, sha256(data));
 |----------|-------|-------------|
 | `UHRP_PREFIX` | `"uhrp://"` | Standard URL prefix |
 | `WEB_UHRP_PREFIX` | `"web+uhrp://"` | Alternative web prefix |
+
+## Internal Types
+
+These types are used internally (`pub(crate)`) and not exported:
+
+### UploadInfo
+
+```rust
+pub(crate) struct UploadInfo {
+    pub status: String,
+    pub upload_url: String,                           // JSON: "uploadURL"
+    pub required_headers: HashMap<String, String>,    // JSON: "requiredHeaders"
+    pub amount: Option<i64>,
+}
+```
+
+### Status Constants
+
+```rust
+pub(crate) const STATUS_SUCCESS: &str = "success";
+pub(crate) const STATUS_ERROR: &str = "error";
+```
+
+## Dependencies
+
+| Crate | Purpose |
+|-------|---------|
+| `serde` | JSON serialization for API types |
+| `hex` | Hash encoding for `get_hash_hex_from_url` |
+| `reqwest` | HTTP client (with `http` feature) |
+| `urlencoding` | URL parameter encoding |
+
+Internal dependencies:
+- `crate::overlay` - `LookupResolver`, `LookupQuestion`, `LookupAnswer`, `NetworkPreset`
+- `crate::primitives` - `sha256`, `sha256d`, `to_base58`, `from_base58`, `Reader`
+- `crate::script::templates` - `PushDrop` for parsing advertisement tokens
+- `crate::transaction` - `Transaction::from_beef` for parsing BEEF outputs
 
 ## Related Documentation
 

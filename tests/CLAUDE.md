@@ -10,7 +10,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | File | Purpose |
 |------|---------|
 | `auth_cross_sdk_tests.rs` | Auth cross-SDK certificate serialization tests (13 tests) |
-| `auth_integration_tests.rs` | Auth module integration tests (24 tests: certificates, sessions, transport) |
+| `auth_integration_tests.rs` | Auth module integration tests (26 tests: certificates, sessions, transport) |
 | `compat_bip39_tests.rs` | BIP-39 mnemonic tests with official TREZOR vectors (29 tests) |
 | `compat_integration_tests.rs` | Compat module integration tests (BIP-32/39, BSM, ECIES, 31 tests) |
 | `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs (17 tests) |
@@ -22,7 +22,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
-| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 63 tests) |
+| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 71 tests) |
 | `transaction/` | Transaction test vectors module |
 
 ## Test Vectors
@@ -317,7 +317,7 @@ Script template integration tests (10 tests):
 
 ### Transaction Tests (`transaction_tests.rs`)
 
-Transaction module tests (63 tests, requires `transaction` feature flag):
+Transaction module tests (71 tests, requires `transaction` feature flag):
 
 **Transaction Parsing**
 - `test_transaction_from_hex` - Parse valid transaction from hex (version=1, locktime=0)
@@ -370,14 +370,14 @@ Transaction module tests (63 tests, requires `transaction` feature flag):
 - `test_add_change_output` - TransactionOutput::new_change with change=true flag
 - `test_metadata` - update_metadata with serde_json::json!
 
-**Extended BEEF Tests** (in `beef_extended_tests` submodule, 16 tests)
+**Extended BEEF Tests** (in `beef_extended_tests` submodule, 17 tests)
 - Transaction merging: parent/child, two BEEFs, duplicate deduplication, raw tx
 - Sorting: `sort_txs` orders by dependency (grandparent → parent → child)
 - Serialization: atomic (with target txid), V1/V2 roundtrip, hex/binary roundtrip
 - Validation: empty BEEF, txid-only (strict vs lenient), verify_valid result structure
 - MerklePaths: multiple bumps at heights 100-1000000
 
-**Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule, 10 tests)
+**Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule, 13 tests)
 - BRC-74 MerklePath: parse, hex roundtrip, compute root for 3 TXIDs
 - Single-tx block: root equals coinbase txid
 - BRC-62 BEEF: V1/V2 empty serialization, parse from Go SDK, find transactions
@@ -422,7 +422,7 @@ Certificate serialization tests for cross-SDK compatibility (13 tests, requires 
 
 ### Auth Integration Tests (`auth_integration_tests.rs`)
 
-Auth module integration tests (24 tests, requires `auth` feature):
+Auth module integration tests (26 tests, requires `auth` feature):
 
 **Session Manager Tests**
 - `test_session_manager_lifecycle` - Session creation, lookup, removal, and clearing

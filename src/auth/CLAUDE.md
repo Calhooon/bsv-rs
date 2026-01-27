@@ -9,10 +9,10 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | ~80 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | ~455 |
-| `session_manager.rs` | Session management with dual indexing | ~445 |
-| `peer.rs` | Core Peer implementation | ~815 |
+| `mod.rs` | Module root with re-exports | 81 |
+| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 456 |
+| `session_manager.rs` | Session management with dual indexing | 444 |
+| `peer.rs` | Core Peer implementation | 813 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations | - |
 | `utils/` | Utility functions | - |
@@ -30,6 +30,7 @@ Certificate types for BRC-52/53 selective disclosure:
 Transport layer implementations for auth messages:
 - `mod.rs` - Transport trait and re-exports
 - `http.rs` - SimplifiedFetchTransport for HTTP (BRC-104), MockTransport for testing, HttpRequest/HttpResponse types
+- See `transports/CLAUDE.md` for detailed transport documentation
 
 ### utils/
 Utility functions:
@@ -62,6 +63,8 @@ impl MessageType {
     pub fn is_handshake(&self) -> bool       // InitialRequest or InitialResponse
     pub fn is_certificate(&self) -> bool     // CertificateRequest or CertificateResponse
 }
+
+impl Display for MessageType { ... }         // Outputs as_str() format
 ```
 
 **AuthMessage** - Full authentication message structure:
@@ -564,6 +567,6 @@ cargo test --features auth,http
 
 ## Related Documentation
 
+- `transports/CLAUDE.md` - Transport layer implementations
 - `../wallet/CLAUDE.md` - Wallet module (WalletInterface)
-- `../messages/CLAUDE.md` - Messages module (BRC-77/78)
 - `../primitives/CLAUDE.md` - Cryptographic primitives

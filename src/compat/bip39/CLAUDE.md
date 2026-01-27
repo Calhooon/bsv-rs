@@ -80,9 +80,9 @@ pub enum Language {
 - `checksum_bits(self) -> usize` - Get checksum size in bits
 
 **Language Methods (internal):**
-- `wordlist(&self) -> &'static [&'static str; 2048]` - Returns the wordlist (internal)
-- `separator(&self) -> &'static str` - Returns word separator (internal)
-- `word_index(&self, word: &str) -> Option<usize>` - Finds word index (internal)
+- `wordlist(&self) -> &'static [&'static str; 2048]` - Returns the wordlist
+- `separator(&self) -> &'static str` - Returns word separator
+- `word_index(&self, word: &str) -> Option<usize>` - Finds word index
 
 **Wordlist Utilities:**
 - `verify_english_wordlist() -> bool` - Verify wordlist integrity (first/last words, 2048 count)
@@ -202,8 +202,8 @@ assert!(verify_english_wordlist());
 
 ### Mnemonic to Seed
 
-1. Normalize mnemonic phrase (NFKD normalization for Unicode)
-2. Normalize passphrase (NFKD normalization)
+1. Normalize mnemonic phrase (see NFKD Normalization notes below)
+2. Normalize passphrase
 3. Apply PBKDF2-HMAC-SHA512:
    - Password: normalized mnemonic phrase
    - Salt: "mnemonic" + normalized passphrase

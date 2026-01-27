@@ -25,6 +25,10 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | `totp/` | `totp` | Complete | RFC 6238 Time-based One-Time Passwords for 2FA |
 | `auth/` | `auth` | Complete | Mutual authentication, certificates, and peer sessions |
 | `overlay/` | `overlay` | Complete | Overlay network lookup, topic broadcasting, and STEAK protocol |
+| `storage/` | `storage` | Complete | UHRP file storage via overlay network |
+| `registry/` | `registry` | Complete | Definition registry for baskets, certificates, and protocols |
+| `kvstore/` | `kvstore` | Complete | Key-value store with global and local implementations |
+| `identity/` | `identity` | Complete | Identity resolution and contacts management |
 
 ## Key Exports
 
@@ -60,6 +64,18 @@ pub mod auth;
 
 #[cfg(feature = "overlay")]
 pub mod overlay;
+
+#[cfg(feature = "storage")]
+pub mod storage;
+
+#[cfg(feature = "registry")]
+pub mod registry;
+
+#[cfg(feature = "kvstore")]
+pub mod kvstore;
+
+#[cfg(feature = "identity")]
+pub mod identity;
 ```
 
 **Convenience re-exports** from `primitives`:
@@ -137,6 +153,56 @@ pub mod overlay;
 - `TopicBroadcaster` - Broadcaster for topic-based overlay networks
 
 Note: `overlay::Protocol` is a separate type from `wallet::Protocol` and is not re-exported to avoid name collision.
+
+**Convenience re-exports** from `storage`:
+- `get_hash_from_url` - Extract UHRP hash from a storage URL
+- `get_url_for_file` - Generate UHRP URL for file content
+- `is_valid_url` - Validate UHRP URL format
+- `DownloadResult` - Result of a file download operation
+- `StorageDownloader` - Client for downloading files from UHRP storage
+- `StorageUploader` - Client for uploading files to UHRP storage
+- `UploadFileResult` - Result of a file upload operation
+- `UploadableFile` - File prepared for upload to storage
+
+**Convenience re-exports** from `registry`:
+- `BasketDefinitionData` - Data for basket definitions
+- `BasketQuery` - Query parameters for basket lookups
+- `BroadcastFailure` - Information about a failed broadcast
+- `BroadcastSuccess` - Information about a successful broadcast
+- `CertificateDefinitionData` - Data for certificate definitions
+- `CertificateFieldDescriptor` - Descriptor for certificate fields
+- `CertificateQuery` - Query parameters for certificate lookups
+- `DefinitionData` - Union type for all definition data types
+- `DefinitionType` - Discriminator for definition types (basket, certificate, protocol)
+- `ProtocolDefinitionData` - Data for protocol definitions
+- `ProtocolQuery` - Query parameters for protocol lookups
+- `RegisterDefinitionResult` - Result of registering a definition
+- `RegistryClient` - Client for interacting with the definition registry
+- `RegistryClientConfig` - Configuration for registry client
+- `RegistryRecord` - Record stored in the registry
+- `RevokeDefinitionResult` - Result of revoking a definition
+- `TokenData` - Token data associated with definitions
+
+**Convenience re-exports** from `kvstore`:
+- `GlobalKVStore` - Global key-value store backed by overlay network
+- `KVStoreConfig` - Configuration for KVStore instances
+- `KVStoreEntry` - Entry stored in the key-value store
+- `KVStoreGetOptions` - Options for get operations
+- `KVStoreQuery` - Query parameters for listing entries
+- `KVStoreRemoveOptions` - Options for remove operations
+- `KVStoreSetOptions` - Options for set operations
+- `KVStoreToken` - Token for KVStore authentication
+- `LocalKVStore` - Local in-memory key-value store
+
+**Convenience re-exports** from `identity`:
+- `Contact` - Contact information for an identity
+- `ContactsManager` - Manager for contact list operations
+- `ContactsManagerConfig` - Configuration for contacts manager
+- `DisplayableIdentity` - Identity with display-friendly fields
+- `IdentityClient` - Client for identity resolution
+- `IdentityClientConfig` - Configuration for identity client
+- `IdentityQuery` - Query parameters for identity lookups
+- `KnownCertificateType` - Well-known certificate types for identity
 
 ### Error Types (`error.rs`)
 
@@ -222,6 +288,30 @@ The `Error` enum provides unified error handling across all modules. It uses `th
 | `NoHostsFound` | `(String)` | No hosts found for the specified service |
 | `OverlayBroadcastFailed` | `(String)` | Failed to broadcast to overlay network |
 
+**Registry errors** (requires `registry` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `RegistryError` | `(String)` | General registry error |
+| `DefinitionNotFound` | `(String)` | Definition not found in registry |
+| `InvalidDefinitionData` | `(String)` | Invalid definition data format |
+
+**KVStore errors** (requires `kvstore` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `KvStoreError` | `(String)` | General kvstore error |
+| `KvStoreKeyNotFound` | `(String)` | Key not found in kvstore |
+| `KvStoreCorruptedState` | `(String)` | Corrupted kvstore state |
+| `KvStoreEmptyContext` | — | Empty context (protocol_id) provided |
+| `KvStoreInvalidKey` | — | Invalid key provided (empty) |
+| `KvStoreInvalidValue` | — | Invalid value provided (empty) |
+
+**Identity errors** (requires `identity` feature):
+| Variant | Fields | Description |
+|---------|--------|-------------|
+| `IdentityError` | `(String)` | General identity error |
+| `IdentityNotFound` | `(String)` | Identity not found |
+| `ContactNotFound` | `(String)` | Contact not found |
+
 **Result alias**:
 ```rust
 pub type Result<T> = std::result::Result<T, Error>;
@@ -300,13 +390,23 @@ full
  │    └── wallet
  ├── compat
  │    └── primitives
+ ├── totp
+ │    └── primitives
  ├── auth
  │    └── wallet
- └── overlay
-      └── transaction
+ ├── overlay
+ │    └── wallet
+ ├── storage
+ │    └── overlay
+ ├── registry
+ │    └── overlay
+ ├── kvstore
+ │    └── overlay
+ └── identity
+      └── overlay
 ```
 
-The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` and `totp` features only require `primitives`. The `auth` feature requires `wallet`, and `overlay` requires `transaction`.
+The `script` feature automatically enables `primitives`, `transaction` enables `script`, `wallet` enables `transaction`, and `messages` enables `wallet`. The `compat` and `totp` features only require `primitives`. The `auth` feature requires `wallet`. The `overlay` feature requires `wallet`. The `storage`, `registry`, `kvstore`, and `identity` features all require `overlay`.
 
 Default features include `primitives` and `script`:
 ```rust
@@ -335,12 +435,24 @@ use bsv_sdk::auth;
 
 #[cfg(feature = "overlay")]
 use bsv_sdk::overlay;
+
+#[cfg(feature = "storage")]
+use bsv_sdk::storage;
+
+#[cfg(feature = "registry")]
+use bsv_sdk::registry;
+
+#[cfg(feature = "kvstore")]
+use bsv_sdk::kvstore;
+
+#[cfg(feature = "identity")]
+use bsv_sdk::identity;
 ```
 
 Additional optional features:
 - **`http`** - Enables HTTP clients for ARC broadcaster, WhatsOnChain chain tracker, and WalletClient substrate
 - **`wasm`** - Enables WebAssembly support via `getrandom/js`
-- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`, `totp`, `auth`, `overlay`
+- **`full`** - Enables all modules: `primitives`, `script`, `transaction`, `wallet`, `messages`, `compat`, `totp`, `auth`, `overlay`, `storage`, `registry`, `kvstore`, `identity`
 
 ## Adding New Errors
 
@@ -382,4 +494,8 @@ thiserror = "1.0"
 - `totp/CLAUDE.md` - TOTP module documentation
 - `auth/CLAUDE.md` - Authentication module documentation
 - `overlay/CLAUDE.md` - Overlay network module documentation
+- `storage/CLAUDE.md` - Storage module documentation
+- `registry/CLAUDE.md` - Registry module documentation
+- `kvstore/CLAUDE.md` - KVStore module documentation
+- `identity/CLAUDE.md` - Identity module documentation
 - `../CLAUDE.md` - Project root documentation

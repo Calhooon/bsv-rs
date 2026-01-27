@@ -11,8 +11,8 @@ This module provides cryptographic primitives compatible with the BSV TypeScript
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module declarations and re-exports | 35 |
-| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 702 |
+| `mod.rs` | Module declarations and re-exports | 36 |
+| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 783 |
 | `symmetric.rs` | AES-256-GCM encryption (32-byte nonce for BSV SDK compatibility) | 972 |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer | 1696 |
 | `bignum.rs` | Arbitrary-precision integers for EC scalars | 1550 |
@@ -31,6 +31,7 @@ pub fn sha512(data: &[u8]) -> [u8; 64]
 pub fn ripemd160(data: &[u8]) -> [u8; 20]
 pub fn sha256d(data: &[u8]) -> [u8; 32]    // Bitcoin double-SHA256
 pub fn hash160(data: &[u8]) -> [u8; 20]    // RIPEMD160(SHA256(x))
+pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20]   // HMAC-SHA1
 pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32]
 pub fn sha512_hmac(key: &[u8], data: &[u8]) -> [u8; 64]
 pub fn pbkdf2_sha512(password: &[u8], salt: &[u8], iterations: u32, key_len: usize) -> Vec<u8>

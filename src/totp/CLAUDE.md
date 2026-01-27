@@ -11,8 +11,8 @@ This module provides Time-based One-Time Password (TOTP) functionality following
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `mod.rs` | ~40 | Module root with documentation and re-exports |
-| `totp.rs` | ~550 | Core TOTP implementation with tests |
+| `mod.rs` | ~42 | Module root with documentation and re-exports |
+| `core.rs` | ~870 | Core TOTP implementation with extensive tests |
 
 ## Key Exports
 
@@ -226,9 +226,18 @@ cargo test --features totp totp
 cargo test --features full totp
 ```
 
+## Internal Functions
+
+The module includes private helper functions used internally:
+
+| Function | Purpose |
+|----------|---------|
+| `generate_hotp` | RFC 4226 HOTP algorithm implementation |
+| `current_unix_seconds` | Gets current Unix timestamp |
+| `constant_time_eq` | Timing-attack-resistant string comparison |
+
 ## Related Documentation
 
-- [Primitives Module](../primitives/CLAUDE.md) - HMAC functions used by TOTP
-- [Auth Module](../auth/CLAUDE.md) - Authentication that may incorporate TOTP for 2FA
+- [Primitives Module](../primitives/CLAUDE.md) - HMAC functions used by TOTP (`sha1_hmac`, `sha256_hmac`, `sha512_hmac`)
 - [RFC 6238](https://datatracker.ietf.org/doc/html/rfc6238) - TOTP specification
 - [RFC 4226](https://datatracker.ietf.org/doc/html/rfc4226) - HOTP specification

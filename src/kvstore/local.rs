@@ -57,17 +57,10 @@ impl<W: WalletInterface + std::fmt::Debug> std::fmt::Debug for LocalKVStore<W> {
     }
 }
 
+#[derive(Default)]
 struct LocalKVStoreState {
     /// Lock queue for atomic key operations.
     key_locks: HashMap<String, Vec<tokio::sync::oneshot::Sender<()>>>,
-}
-
-impl Default for LocalKVStoreState {
-    fn default() -> Self {
-        Self {
-            key_locks: HashMap::new(),
-        }
-    }
 }
 
 impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
@@ -274,8 +267,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         let token_amount = options.token_amount.unwrap_or(self.config.token_amount);
         let description = options
             .description
-            .as_ref()
-            .map(|d| d.clone())
+            .clone()
             .unwrap_or_else(|| format!("Update {} in {}", key, self.config.protocol_id));
 
         let tags = options
@@ -315,42 +307,43 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             .await?;
 
         // If we had inputs, we need to sign
-        if !inputs.is_empty() && create_result.signable_transaction.is_some() {
-            let signable = create_result.signable_transaction.as_ref().unwrap();
-            let reference_str = to_hex(&signable.reference);
+        if let Some(signable) = create_result.signable_transaction.as_ref() {
+            if !inputs.is_empty() {
+                let reference_str = to_hex(&signable.reference);
 
-            // Prepare spends (unlocking scripts)
-            let spends = self
-                .prepare_spends(key, &lookup_result.outputs, &signable.tx, input_beef)
-                .await?;
+                // Prepare spends (unlocking scripts)
+                let spends = self
+                    .prepare_spends(key, &lookup_result.outputs, &signable.tx, input_beef)
+                    .await?;
 
-            let sign_result = self
-                .wallet
-                .sign_action(
-                    SignActionArgs {
-                        reference: reference_str,
-                        spends,
-                        options: None,
-                    },
-                    self.originator(),
-                )
-                .await;
+                let sign_result = self
+                    .wallet
+                    .sign_action(
+                        SignActionArgs {
+                            reference: reference_str,
+                            spends,
+                            options: None,
+                        },
+                        self.originator(),
+                    )
+                    .await;
 
-            if let Err(e) = sign_result {
-                // Relinquish inputs on failure
-                for input in &inputs {
-                    let _ = self
-                        .wallet
-                        .relinquish_output(
-                            RelinquishOutputArgs {
-                                basket: self.config.protocol_id.clone(),
-                                output: input.outpoint.clone(),
-                            },
-                            self.originator(),
-                        )
-                        .await;
+                if let Err(e) = sign_result {
+                    // Relinquish inputs on failure
+                    for input in &inputs {
+                        let _ = self
+                            .wallet
+                            .relinquish_output(
+                                RelinquishOutputArgs {
+                                    basket: self.config.protocol_id.clone(),
+                                    output: input.outpoint.clone(),
+                                },
+                                self.originator(),
+                            )
+                            .await;
+                    }
+                    return Err(e);
                 }
-                return Err(e);
             }
         }
 
@@ -401,8 +394,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
 
             let description = options
                 .description
-                .as_ref()
-                .map(|d| d.clone())
+                .clone()
                 .unwrap_or_else(|| format!("Remove {} from {}", key, self.config.protocol_id));
 
             // Create action with inputs but no outputs (spending only)
@@ -577,11 +569,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
 
         // Apply tag filtering if specified
         if let Some(filter_tags) = &query.tags {
-            let mode = query
-                .tag_query_mode
-                .as_ref()
-                .map(|m| m.as_str())
-                .unwrap_or("all");
+            let mode = query.tag_query_mode.as_deref().unwrap_or("all");
             entries.retain(|e| {
                 if mode == "any" {
                     filter_tags.iter().any(|t| e.tags.contains(t))
@@ -898,17 +886,15 @@ mod tests {
     // Import all wallet types needed for mock implementation
     use crate::wallet::{
         AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
-        CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureResult,
-        DecryptResult, DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs,
-        DiscoverCertificatesResult, EncryptResult, GetHeaderArgs, GetHeaderResult,
-        GetHeightResult, GetNetworkResult, GetPublicKeyResult, GetVersionResult,
-        InternalizeActionArgs, InternalizeActionResult, ListActionsArgs, ListActionsResult,
-        ListCertificatesArgs, ListCertificatesResult, ListOutputsResult,
-        ProveCertificateArgs, ProveCertificateResult, RelinquishCertificateArgs,
-        RelinquishCertificateResult, RelinquishOutputResult,
-        RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult, SignActionResult,
-        VerifyHmacArgs, VerifyHmacResult, WalletCertificate,
-        WalletRevealCounterpartyArgs, WalletRevealSpecificArgs,
+        CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureResult, DecryptResult,
+        DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs, DiscoverCertificatesResult,
+        EncryptResult, GetHeaderArgs, GetHeaderResult, GetHeightResult, GetNetworkResult,
+        GetPublicKeyResult, GetVersionResult, InternalizeActionArgs, InternalizeActionResult,
+        ListActionsArgs, ListActionsResult, ListCertificatesArgs, ListCertificatesResult,
+        ListOutputsResult, ProveCertificateArgs, ProveCertificateResult, RelinquishCertificateArgs,
+        RelinquishCertificateResult, RelinquishOutputResult, RevealCounterpartyKeyLinkageResult,
+        RevealSpecificKeyLinkageResult, SignActionResult, VerifyHmacArgs, VerifyHmacResult,
+        WalletCertificate, WalletRevealCounterpartyArgs, WalletRevealSpecificArgs,
     };
 
     // =========================================================================
@@ -1174,10 +1160,7 @@ mod tests {
             })
         }
 
-        async fn wait_for_authentication(
-            &self,
-            _originator: &str,
-        ) -> Result<AuthenticatedResult> {
+        async fn wait_for_authentication(&self, _originator: &str) -> Result<AuthenticatedResult> {
             Ok(AuthenticatedResult {
                 authenticated: true,
             })

@@ -12,14 +12,14 @@ use crate::wallet::{ProveCertificateArgs, WalletCertificate, WalletInterface};
 use crate::{Error, Result};
 
 use super::contacts::ContactsManager;
+#[cfg(test)]
+use super::types::BroadcastSuccess;
 use super::types::{
     BroadcastFailure, BroadcastResult, CertificateFieldNameUnder50Bytes, CertifierInfo, Contact,
     ContactsManagerConfig, DefaultIdentityValues, DisplayableIdentity, IdentityCertificate,
     IdentityClientConfig, IdentityQuery, IdentityResolutionResult, KnownCertificateType,
     StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
-#[cfg(test)]
-use super::types::BroadcastSuccess;
 
 use std::collections::HashMap;
 use std::sync::Arc;
