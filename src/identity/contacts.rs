@@ -12,8 +12,8 @@ use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
-    CreateSignatureArgs, DecryptArgs, EncryptArgs, ListOutputsArgs, OutputInclude,
-    Protocol, SecurityLevel, SignActionArgs, SignActionOptions, SignActionSpend, WalletInterface,
+    CreateSignatureArgs, DecryptArgs, EncryptArgs, ListOutputsArgs, OutputInclude, Protocol,
+    SecurityLevel, SignActionArgs, SignActionOptions, SignActionSpend, WalletInterface,
 };
 use crate::{Error, Result};
 
@@ -664,9 +664,10 @@ impl<W: WalletInterface> ContactsManager<W> {
                     let source_satoshis = parsed_tx.outputs[output_index].satoshis;
 
                     // Parse the signable transaction
-                    let partial_tx = Transaction::from_beef(&signable_tx.tx, None).map_err(|e| {
-                        Error::IdentityError(format!("Failed to parse signable tx: {}", e))
-                    })?;
+                    let partial_tx =
+                        Transaction::from_beef(&signable_tx.tx, None).map_err(|e| {
+                            Error::IdentityError(format!("Failed to parse signable tx: {}", e))
+                        })?;
 
                     let partial_raw = partial_tx.to_binary();
                     let partial_parsed = parse_transaction(&partial_raw).map_err(|e| {

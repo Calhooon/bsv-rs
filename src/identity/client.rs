@@ -1882,8 +1882,14 @@ mod tests {
         assert_eq!(identity.name, DefaultIdentityValues::NAME);
         assert_eq!(identity.avatar_url, DefaultIdentityValues::AVATAR_URL);
         assert_eq!(identity.badge_label, DefaultIdentityValues::BADGE_LABEL);
-        assert_eq!(identity.badge_icon_url, DefaultIdentityValues::BADGE_ICON_URL);
-        assert_eq!(identity.badge_click_url, DefaultIdentityValues::BADGE_CLICK_URL);
+        assert_eq!(
+            identity.badge_icon_url,
+            DefaultIdentityValues::BADGE_ICON_URL
+        );
+        assert_eq!(
+            identity.badge_click_url,
+            DefaultIdentityValues::BADGE_CLICK_URL
+        );
         assert!(identity.identity_key.is_empty());
     }
 
@@ -2017,7 +2023,10 @@ mod tests {
         assert_eq!(config.key_id, "1");
         assert_eq!(config.token_amount, 1);
         assert_eq!(config.output_index, 0);
-        assert_eq!(config.network_preset, crate::overlay::NetworkPreset::Mainnet);
+        assert_eq!(
+            config.network_preset,
+            crate::overlay::NetworkPreset::Mainnet
+        );
         assert!(config.originator.is_none());
     }
 
@@ -2028,10 +2037,7 @@ mod tests {
             .with_token_amount(5);
 
         // Verify builder methods applied correctly
-        assert_eq!(
-            config.originator,
-            Some("test-app.example.com".to_string())
-        );
+        assert_eq!(config.originator, Some("test-app.example.com".to_string()));
         assert_eq!(
             config.network_preset,
             crate::overlay::NetworkPreset::Testnet
