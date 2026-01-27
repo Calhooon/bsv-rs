@@ -509,15 +509,19 @@ fn test_storage_downloader_config_default() {
 
 #[test]
 fn test_storage_downloader_config_custom_timeout() {
-    let mut config = StorageDownloaderConfig::default();
-    config.timeout_ms = Some(60000);
+    let config = StorageDownloaderConfig {
+        timeout_ms: Some(60000),
+        ..Default::default()
+    };
     assert_eq!(config.timeout_ms, Some(60000));
 }
 
 #[test]
 fn test_storage_downloader_config_no_timeout() {
-    let mut config = StorageDownloaderConfig::default();
-    config.timeout_ms = None;
+    let config = StorageDownloaderConfig {
+        timeout_ms: None,
+        ..Default::default()
+    };
     assert!(config.timeout_ms.is_none());
 }
 
@@ -824,8 +828,8 @@ fn test_summary() {
 
     // 3. Hash extraction
     let hash = get_hash_from_url(&url).unwrap();
-    assert_eq!(hex::encode(&hash), TS_EXAMPLE_HASH_HEX);
-    println!("  - Extracted hash: {}", hex::encode(&hash));
+    assert_eq!(hex::encode(hash), TS_EXAMPLE_HASH_HEX);
+    println!("  - Extracted hash: {}", hex::encode(hash));
 
     // 4. Cross-SDK compatibility
     assert_eq!(normalize_url(&url), TS_EXAMPLE_URL_BASE58);
