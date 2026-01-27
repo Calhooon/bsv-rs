@@ -78,6 +78,19 @@ impl Certificate {
 
     /// Serializes the certificate to binary format.
     ///
+    /// Binary format (compatible with TypeScript SDK):
+    /// ```text
+    /// [type: 32 bytes]
+    /// [serial_number: 32 bytes]
+    /// [subject: 33 bytes compressed pubkey]
+    /// [certifier: 33 bytes compressed pubkey]
+    /// [revocation_txid: 32 bytes]
+    /// [revocation_index: varint]
+    /// [field_count: varint]
+    /// [fields: sorted by name, each with varint-prefixed name and value]
+    /// [signature: raw DER bytes if included and present]
+    /// ```
+    ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
     pub fn to_binary(&self, include_signature: bool) -> Vec<u8> {
@@ -95,13 +108,16 @@ impl Certificate {
         // Certifier pubkey (33 bytes)
         buf.extend_from_slice(&self.certifier.to_compressed());
 
-        // Revocation outpoint (36 bytes or 0 byte marker)
+        // Revocation outpoint: TXID (32 bytes) + index (varint)
+        // No marker byte - matches TypeScript SDK format
+        // If no outpoint, use all-zeros TXID and index 0 as sentinel
         if let Some(ref outpoint) = self.revocation_outpoint {
-            buf.push(1); // has outpoint
             buf.extend_from_slice(&outpoint.txid);
-            buf.extend_from_slice(&outpoint.vout.to_le_bytes());
+            write_varint(&mut buf, outpoint.vout as u64);
         } else {
-            buf.push(0); // no outpoint
+            // Sentinel value for "no outpoint": all zeros
+            buf.extend_from_slice(&[0u8; 32]);
+            write_varint(&mut buf, 0);
         }
 
         // Fields count (varint)
@@ -121,20 +137,31 @@ impl Certificate {
             buf.extend_from_slice(value);
         }
 
-        // Signature (if included and present)
+        // Signature: raw bytes, no length prefix (matches TypeScript SDK)
         if include_signature {
             if let Some(ref sig) = self.signature {
-                write_varint(&mut buf, sig.len() as u64);
                 buf.extend_from_slice(sig);
-            } else {
-                buf.push(0); // no signature
             }
+            // If no signature, write nothing (not even a marker byte)
         }
 
         buf
     }
 
     /// Parses a certificate from binary format.
+    ///
+    /// Binary format (compatible with TypeScript SDK):
+    /// ```text
+    /// [type: 32 bytes]
+    /// [serial_number: 32 bytes]
+    /// [subject: 33 bytes compressed pubkey]
+    /// [certifier: 33 bytes compressed pubkey]
+    /// [revocation_txid: 32 bytes]
+    /// [revocation_index: varint]
+    /// [field_count: varint]
+    /// [fields: sorted by name, each with varint-prefixed name and value]
+    /// [signature: remaining bytes if present]
+    /// ```
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let mut reader = BinaryReader::new(data);
 
@@ -152,15 +179,18 @@ impl Certificate {
         // Certifier pubkey (33 bytes)
         let certifier = PublicKey::from_bytes(reader.read_bytes(33)?)?;
 
-        // Revocation outpoint
-        let has_outpoint = reader.read_u8()?;
-        let revocation_outpoint = if has_outpoint == 1 {
-            let mut txid = [0u8; 32];
-            txid.copy_from_slice(reader.read_bytes(32)?);
-            let vout = reader.read_u32_le()?;
-            Some(Outpoint::new(txid, vout))
-        } else {
+        // Revocation outpoint: TXID (32 bytes) + index (varint)
+        // No marker byte - matches TypeScript SDK format
+        // All-zeros TXID with index 0 is treated as "no outpoint"
+        let mut txid = [0u8; 32];
+        txid.copy_from_slice(reader.read_bytes(32)?);
+        let vout = reader.read_varint()? as u32;
+
+        // Treat all-zeros TXID with index 0 as "no outpoint"
+        let revocation_outpoint = if txid == [0u8; 32] && vout == 0 {
             None
+        } else {
+            Some(Outpoint::new(txid, vout))
         };
 
         // Fields
@@ -175,14 +205,9 @@ impl Certificate {
             fields.insert(name, value);
         }
 
-        // Signature (optional)
+        // Signature: remaining bytes (no length prefix) - matches TypeScript SDK
         let signature = if reader.remaining() > 0 {
-            let sig_len = reader.read_varint()? as usize;
-            if sig_len > 0 {
-                Some(reader.read_bytes(sig_len)?.to_vec())
-            } else {
-                None
-            }
+            Some(reader.read_remaining())
         } else {
             None
         };
@@ -335,9 +360,10 @@ impl<'a> BinaryReader<'a> {
         Ok(self.read_bytes(1)?[0])
     }
 
-    fn read_u32_le(&mut self) -> Result<u32> {
-        let bytes = self.read_bytes(4)?;
-        Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+    fn read_remaining(&mut self) -> Vec<u8> {
+        let remaining = self.data[self.pos..].to_vec();
+        self.pos = self.data.len();
+        remaining
     }
 
     fn read_varint(&mut self) -> Result<u64> {

@@ -418,6 +418,134 @@ fn test_certificate_without_revocation_outpoint() {
 }
 
 // =================
+// Binary Format Structure Tests
+// =================
+
+/// Tests that the binary format matches TypeScript SDK format:
+/// [type: 32 bytes][serial: 32 bytes][subject: 33 bytes][certifier: 33 bytes]
+/// [txid: 32 bytes][vout: varint][field_count: varint][fields...][signature...]
+#[test]
+fn test_certificate_binary_format_structure() {
+    // Create a simple certificate with known values
+    let cert_type = [0x01u8; 32];
+    let serial_number = [0x02u8; 32];
+
+    // Use generator point G for subject
+    let subject = PublicKey::from_hex(
+        "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    )
+    .unwrap();
+
+    // Use 2*G for certifier
+    let certifier = PublicKey::from_hex(
+        "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+    )
+    .unwrap();
+
+    // Create outpoint with known txid
+    let txid = from_hex("deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef")
+        .unwrap();
+    let mut txid_arr = [0u8; 32];
+    txid_arr.copy_from_slice(&txid);
+    let outpoint = Outpoint {
+        txid: txid_arr,
+        vout: 1,
+    };
+
+    let subject_compressed = subject.to_compressed();
+    let certifier_compressed = certifier.to_compressed();
+
+    let cert = Certificate {
+        cert_type,
+        serial_number,
+        subject,
+        certifier,
+        revocation_outpoint: Some(outpoint),
+        fields: std::collections::HashMap::new(), // No fields for simpler verification
+        signature: None,
+    };
+
+    let binary = cert.to_binary(false);
+
+    // Verify structure:
+    // Offset 0-31: type (32 bytes)
+    assert_eq!(&binary[0..32], &cert_type, "Type bytes mismatch");
+
+    // Offset 32-63: serial_number (32 bytes)
+    assert_eq!(&binary[32..64], &serial_number, "Serial number bytes mismatch");
+
+    // Offset 64-96: subject pubkey (33 bytes compressed)
+    assert_eq!(
+        &binary[64..97],
+        &subject_compressed,
+        "Subject pubkey mismatch"
+    );
+
+    // Offset 97-129: certifier pubkey (33 bytes compressed)
+    assert_eq!(
+        &binary[97..130],
+        &certifier_compressed,
+        "Certifier pubkey mismatch"
+    );
+
+    // Offset 130-161: TXID (32 bytes) - TypeScript format: no marker byte!
+    assert_eq!(&binary[130..162], &txid_arr, "TXID mismatch");
+
+    // Offset 162: vout as varint (value 1 = single byte 0x01)
+    assert_eq!(binary[162], 0x01, "Vout varint mismatch");
+
+    // Offset 163: field count as varint (value 0 = single byte 0x00)
+    assert_eq!(binary[163], 0x00, "Field count mismatch");
+
+    // Total length should be: 32 + 32 + 33 + 33 + 32 + 1 + 1 = 164 bytes
+    assert_eq!(binary.len(), 164, "Binary length mismatch");
+
+    println!("Binary format structure matches TypeScript SDK format");
+}
+
+/// Tests that "no revocation outpoint" is encoded as all-zeros TXID + index 0
+#[test]
+fn test_certificate_no_outpoint_sentinel_value() {
+    let cert_type = [0x01u8; 32];
+    let serial_number = [0x02u8; 32];
+    let subject = PublicKey::from_hex(
+        "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    )
+    .unwrap();
+    let certifier = PublicKey::from_hex(
+        "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+    )
+    .unwrap();
+
+    let cert = Certificate {
+        cert_type,
+        serial_number,
+        subject,
+        certifier,
+        revocation_outpoint: None, // No outpoint
+        fields: std::collections::HashMap::new(),
+        signature: None,
+    };
+
+    let binary = cert.to_binary(false);
+
+    // Offset 130-161: should be all zeros (sentinel value)
+    assert_eq!(&binary[130..162], &[0u8; 32], "No-outpoint sentinel TXID should be zeros");
+
+    // Offset 162: vout should be 0
+    assert_eq!(binary[162], 0x00, "No-outpoint sentinel vout should be 0");
+
+    // Parse it back and verify outpoint is None
+    let parsed = Certificate::from_binary(&binary).unwrap();
+    assert!(
+        parsed.revocation_outpoint.is_none(),
+        "Parsed certificate should have no outpoint"
+    );
+
+    println!("No-outpoint sentinel value encoding works correctly");
+}
+
+// =================
 // Cross-SDK Compatibility Notes
 // =================
 

@@ -3,16 +3,16 @@
 
 ## Overview
 
-This module provides peer-to-peer authentication using the BRC-31 (Authrite) protocol, with certificate-based identity verification implementing BRC-52/53.
+This module provides peer-to-peer authentication using the BRC-31 (Authrite) protocol, with certificate-based identity verification implementing BRC-52/53 and HTTP transport via BRC-104.
 
 ## Files
 
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports | ~80 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | ~450 |
-| `session_manager.rs` | Session management with dual indexing | ~440 |
-| `peer.rs` | Core Peer implementation | ~790 |
+| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | ~455 |
+| `session_manager.rs` | Session management with dual indexing | ~445 |
+| `peer.rs` | Core Peer implementation | ~815 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations | - |
 | `utils/` | Utility functions | - |
@@ -20,19 +20,22 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 ## Submodules
 
 ### certificates/
-Certificate types for BRC-52/53:
-- `certificate.rs` - Base Certificate type
-- `master.rs` - MasterCertificate with field encryption
-- `verifiable.rs` - VerifiableCertificate with keyring
+Certificate types for BRC-52/53 selective disclosure:
+- `mod.rs` - Re-exports and constants
+- `certificate.rs` - Base Certificate type with signing/verification
+- `master.rs` - MasterCertificate with field encryption and keyring management
+- `verifiable.rs` - VerifiableCertificate with verifier-specific keyring
 
 ### transports/
-Transport layer implementations:
-- `http.rs` - SimplifiedFetchTransport for HTTP, MockTransport for testing
+Transport layer implementations for auth messages:
+- `mod.rs` - Transport trait and re-exports
+- `http.rs` - SimplifiedFetchTransport for HTTP (BRC-104), MockTransport for testing, HttpRequest/HttpResponse types
 
 ### utils/
 Utility functions:
+- `mod.rs` - Re-exports
 - `nonce.rs` - Nonce creation and verification
-- `validation.rs` - Certificate validation
+- `validation.rs` - Certificate validation and matching
 
 ## Constants
 
@@ -169,10 +172,10 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub fn new(options: PeerOptions<W, T>) -> Self
 
     // Sending messages
-    pub async fn to_peer(&self, message: &[u8], identity_key: Option<&str>, max_wait: Option<u64>) -> Result<()>
-    pub async fn get_authenticated_session(&self, identity_key: Option<&str>, max_wait: Option<u64>) -> Result<PeerSession>
-    pub async fn request_certificates(&self, requested: RequestedCertificateSet, identity_key: Option<&str>, max_wait: Option<u64>) -> Result<()>
-    pub async fn send_certificate_response(&self, verifier_key: &str, certs: Vec<VerifiableCertificate>) -> Result<()>
+    pub async fn to_peer(&self, message: &[u8], identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<()>
+    pub async fn get_authenticated_session(&self, identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<PeerSession>
+    pub async fn request_certificates(&self, requested: RequestedCertificateSet, identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<()>
+    pub async fn send_certificate_response(&self, verifier_identity_key: &str, certificates: Vec<VerifiableCertificate>) -> Result<()>
 
     // Listening for general messages
     pub async fn listen_for_general_messages<F>(&self, callback: F) -> u32
@@ -218,11 +221,20 @@ pub struct Certificate {
 }
 
 impl Certificate {
-    pub fn new(...) -> Self
+    pub fn new(cert_type: [u8; 32], serial_number: [u8; 32], subject: PublicKey, certifier: PublicKey) -> Self
+    pub fn type_base64(&self) -> String
+    pub fn serial_number_base64(&self) -> String
     pub fn sign(&mut self, certifier_key: &PrivateKey) -> Result<()>
     pub fn verify(&self) -> Result<bool>
     pub fn to_binary(&self, include_signature: bool) -> Vec<u8>
     pub fn from_binary(data: &[u8]) -> Result<Self>
+    pub fn signing_hash(&self) -> [u8; 32]
+    pub fn get_field_encryption_key_id_master(field_name: &str) -> String
+    pub fn get_field_encryption_key_id_verifiable(field_name: &str, serial_number: &[u8; 32]) -> String
+    pub fn set_field(&mut self, name: impl Into<String>, encrypted_value: Vec<u8>)
+    pub fn get_field(&self, name: &str) -> Option<&Vec<u8>>
+    pub fn field_names(&self) -> Vec<&String>
+    pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate
 }
 ```
 
@@ -234,12 +246,17 @@ pub struct MasterCertificate {
 }
 
 impl MasterCertificate {
-    pub async fn create_certificate_fields<W: WalletInterface>(...) -> Result<(fields, keyring)>
+    pub fn new(certificate: Certificate, master_keyring: HashMap<String, Vec<u8>>) -> Self
+    pub async fn create_certificate_fields<W: WalletInterface>(...) -> Result<(HashMap<String, Vec<u8>>, HashMap<String, Vec<u8>>)>
     pub async fn create_keyring_for_verifier<W: WalletInterface>(...) -> Result<HashMap<String, Vec<u8>>>
     pub async fn issue_for_subject<W: WalletInterface>(...) -> Result<Self>
     pub async fn decrypt_field<W: WalletInterface>(...) -> Result<String>
     pub async fn decrypt_fields<W: WalletInterface>(...) -> Result<HashMap<String, String>>
+    pub fn verify(&self) -> Result<bool>
 }
+
+impl Deref for MasterCertificate { type Target = Certificate; }
+impl DerefMut for MasterCertificate { }
 ```
 
 **VerifiableCertificate** - Certificate with verifier keyring:
@@ -251,10 +268,23 @@ pub struct VerifiableCertificate {
 
 impl VerifiableCertificate {
     pub fn new(certificate: Certificate, keyring: HashMap<String, Vec<u8>>) -> Self
+    pub fn from_certificate(certificate: Certificate) -> Self
+    pub fn has_keyring(&self) -> bool
+    pub fn revealable_fields(&self) -> Vec<&String>
     pub async fn decrypt_field<W: WalletInterface>(...) -> Result<String>
     pub async fn decrypt_fields<W: WalletInterface>(...) -> Result<HashMap<String, String>>
+    pub fn get_decrypted_fields(&self) -> Option<&HashMap<String, String>>
+    pub fn clear_decrypted_cache(&mut self)
     pub fn verify(&self) -> Result<bool>
+    pub fn subject(&self) -> &PublicKey
+    pub fn certifier(&self) -> &PublicKey
+    pub fn cert_type(&self) -> &[u8; 32]
+    pub fn serial_number(&self) -> &[u8; 32]
+    pub fn to_json_value(&self) -> serde_json::Value
 }
+
+impl Deref for VerifiableCertificate { type Target = Certificate; }
+impl From<Certificate> for VerifiableCertificate { }
 ```
 
 **Certificate Constants**:
@@ -273,13 +303,17 @@ pub trait Transport: Send + Sync {
     fn set_callback(&self, callback: Box<TransportCallback>);
     fn clear_callback(&self);
 }
+
+pub type TransportCallback = dyn Fn(AuthMessage) -> Pin<Box<dyn Future<Output = Result<()>> + Send>> + Send + Sync;
 ```
 
-**SimplifiedFetchTransport** - HTTP transport:
+**SimplifiedFetchTransport** - HTTP transport (BRC-104):
 ```rust
 impl SimplifiedFetchTransport {
     pub fn new(base_url: &str) -> Self
     pub fn base_url(&self) -> &str
+    pub fn message_to_headers(&self, message: &AuthMessage) -> Vec<(String, String)>
+    pub fn headers_to_message_fields(&self, header_map: &[(String, String)]) -> Result<(Option<String>, Option<String>, Option<Vec<u8>>)>
 }
 ```
 
@@ -289,7 +323,36 @@ impl MockTransport {
     pub fn new() -> Self
     pub async fn queue_response(&self, message: AuthMessage)
     pub async fn get_sent_messages(&self) -> Vec<AuthMessage>
+    pub async fn clear_sent(&self)
     pub async fn receive_message(&self, message: AuthMessage) -> Result<()>
+}
+```
+
+**HttpRequest** / **HttpResponse** - BRC-104 HTTP payload types:
+```rust
+pub struct HttpRequest {
+    pub request_id: [u8; 32],
+    pub method: String,
+    pub url_postfix: String,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+impl HttpRequest {
+    pub fn from_payload(payload: &[u8]) -> Result<Self>
+    pub fn to_payload(&self) -> Vec<u8>
+}
+
+pub struct HttpResponse {
+    pub request_id: [u8; 32],
+    pub status: u16,
+    pub headers: Vec<(String, String)>,
+    pub body: Vec<u8>,
+}
+
+impl HttpResponse {
+    pub fn from_payload(payload: &[u8]) -> Result<Self>
+    pub fn to_payload(&self) -> Vec<u8>
 }
 ```
 
@@ -307,9 +370,9 @@ pub fn get_nonce_random(nonce: &str) -> Result<Vec<u8>>
 
 **Validation functions**:
 ```rust
-pub async fn validate_certificates<W: WalletInterface>(verifier_wallet: &W, message: &AuthMessage, requested: Option<&RequestedCertificateSet>, originator: &str) -> Result<()>
-pub async fn validate_certificate<W: WalletInterface>(verifier_wallet: &W, cert: &VerifiableCertificate, requested: &RequestedCertificateSet, sender_key: &PublicKey, originator: &str) -> Result<()>
-pub async fn get_verifiable_certificates<W: WalletInterface>(wallet: &W, requested: &RequestedCertificateSet, verifier_key: &PublicKey, originator: &str) -> Result<Vec<VerifiableCertificate>>
+pub async fn validate_certificates<W: WalletInterface>(verifier_wallet: &W, message: &AuthMessage, certificates_requested: Option<&RequestedCertificateSet>, originator: &str) -> Result<()>
+pub async fn validate_certificate<W: WalletInterface>(verifier_wallet: &W, cert: &VerifiableCertificate, sender_key: &PublicKey, certificates_requested: Option<&RequestedCertificateSet>, originator: &str) -> Result<()>
+pub async fn get_verifiable_certificates<W: WalletInterface>(wallet: &W, requested: &RequestedCertificateSet, verifier_identity_key: &PublicKey, originator: &str) -> Result<Vec<VerifiableCertificate>>
 pub fn certificates_match_request(certs: &[VerifiableCertificate], requested: &RequestedCertificateSet) -> bool
 ```
 
@@ -433,7 +496,16 @@ For HTTP transport:
 - `x-bsv-auth-your-nonce`: Peer's previous nonce
 - `x-bsv-auth-signature`: Message signature (base64)
 - `x-bsv-auth-message-type`: Message type
+- `x-bsv-auth-request-id`: Request ID for correlation (base64)
 - `x-bsv-auth-requested-certificates`: Certificate requirements (JSON)
+
+### BRC-104 Payload Format
+
+For General messages, the payload encodes HTTP request/response data:
+
+**Request payload**: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
+
+**Response payload**: `[request_id: 32][status: varint][headers: varint+pairs][body: varint+bytes]`
 
 ## Error Types
 
@@ -443,6 +515,7 @@ For HTTP transport:
 | `SessionNotFound(String)` | Session not found by identifier |
 | `CertificateValidationError(String)` | Certificate validation failed |
 | `TransportError(String)` | Transport layer error |
+| `InvalidNonce(String)` | Nonce format or verification error |
 
 ## Feature Flags
 
@@ -469,6 +542,9 @@ Authentication messages and certificates are wire-compatible across all SDK impl
 The auth module uses:
 - `tokio` - Async runtime (sync primitives, time)
 - `async_trait` - Async trait support
+- `serde`, `serde_json` - Serialization
+- `rand` - Random number generation
+- `reqwest` - HTTP client (with `http` feature)
 - Wallet module for key operations
 - Primitives module for cryptography
 
@@ -491,6 +567,3 @@ cargo test --features auth,http
 - `../wallet/CLAUDE.md` - Wallet module (WalletInterface)
 - `../messages/CLAUDE.md` - Messages module (BRC-77/78)
 - `../primitives/CLAUDE.md` - Cryptographic primitives
-- `certificates/CLAUDE.md` - Certificate submodule
-- `transports/CLAUDE.md` - Transport submodule
-- `utils/CLAUDE.md` - Utils submodule
