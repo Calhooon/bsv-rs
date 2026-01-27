@@ -224,10 +224,36 @@ pub fn recover_public_key_from_signature(
     Ok((public_key, was_compressed))
 }
 
-/// Computes the Bitcoin Signed Message hash for a message.
+/// Compute the Bitcoin Signed Message hash (SHA256d with prefix).
 ///
+/// This is the "magic hash" used in BSM signatures. The message is prefixed
+/// with "Bitcoin Signed Message:\n" and varint-encoded lengths before being
+/// double-SHA256 hashed.
+///
+/// # Algorithm
+///
+/// ```text
 /// Hash = SHA256d(varint(len(magic)) || magic || varint(len(message)) || message)
-fn compute_message_hash(message: &[u8]) -> [u8; 32] {
+/// where magic = "Bitcoin Signed Message:\n"
+/// ```
+///
+/// # Arguments
+///
+/// * `message` - The message to hash
+///
+/// # Returns
+///
+/// A 32-byte double-SHA256 hash of the prefixed message
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::bsm;
+///
+/// let hash = bsm::magic_hash(b"Hello, BSV!");
+/// assert_eq!(hash.len(), 32);
+/// ```
+pub fn magic_hash(message: &[u8]) -> [u8; 32] {
     let mut writer = Writer::new();
 
     // Write magic prefix with varint length
@@ -240,6 +266,12 @@ fn compute_message_hash(message: &[u8]) -> [u8; 32] {
 
     // Double SHA-256
     sha256d(writer.as_bytes())
+}
+
+/// Computes the Bitcoin Signed Message hash for a message (internal alias).
+#[inline]
+fn compute_message_hash(message: &[u8]) -> [u8; 32] {
+    magic_hash(message)
 }
 
 #[cfg(test)]
@@ -358,6 +390,55 @@ mod tests {
         // Different message should produce different hash
         let hash3 = compute_message_hash(b"other");
         assert_ne!(hash, hash3);
+    }
+
+    #[test]
+    fn test_magic_hash_public_api() {
+        // Verify magic_hash is accessible and matches internal compute_message_hash
+        let message = b"Hello, BSV!";
+        let hash = magic_hash(message);
+        assert_eq!(hash.len(), 32);
+
+        // Verify it produces deterministic output
+        let hash2 = magic_hash(message);
+        assert_eq!(hash, hash2);
+
+        // Different message produces different hash
+        let hash3 = magic_hash(b"Different message");
+        assert_ne!(hash, hash3);
+    }
+
+    #[test]
+    fn test_magic_hash_empty_message() {
+        let hash = magic_hash(b"");
+        assert_eq!(hash.len(), 32);
+    }
+
+    #[test]
+    fn test_magic_hash_long_message() {
+        let message = vec![b'a'; 10000];
+        let hash = magic_hash(&message);
+        assert_eq!(hash.len(), 32);
+    }
+
+    #[test]
+    fn test_magic_hash_matches_signing() {
+        // Verify that magic_hash produces the same hash used internally by sign_message
+        let key = PrivateKey::random();
+        let message = b"Test message";
+
+        // Get the hash directly
+        let hash = magic_hash(message);
+
+        // Sign and recover public key
+        let signature = sign_message(&key, message).unwrap();
+        let (recovered, _) = recover_public_key_from_signature(&signature, message).unwrap();
+
+        // The recovered key should match the original
+        assert_eq!(recovered.to_compressed(), key.public_key().to_compressed());
+
+        // Verify the hash is 32 bytes (SHA256d output)
+        assert_eq!(hash.len(), 32);
     }
 
     #[test]

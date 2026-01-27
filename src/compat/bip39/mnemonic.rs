@@ -509,6 +509,57 @@ impl Mnemonic {
 
         self.validate_checksum(&indices).unwrap_or(false)
     }
+
+    /// Serialize mnemonic to binary format (UTF-8 encoded phrase).
+    ///
+    /// This returns the mnemonic phrase as UTF-8 bytes, which can be used
+    /// for storage or transmission.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use bsv_sdk::compat::bip39::Mnemonic;
+    ///
+    /// let entropy = [0u8; 16];
+    /// let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
+    /// let binary = mnemonic.to_binary();
+    /// let restored = Mnemonic::from_binary(&binary).unwrap();
+    /// assert_eq!(mnemonic.phrase(), restored.phrase());
+    /// ```
+    pub fn to_binary(&self) -> Vec<u8> {
+        self.phrase().into_bytes()
+    }
+
+    /// Deserialize mnemonic from binary format (UTF-8 encoded phrase).
+    ///
+    /// This parses a mnemonic from UTF-8 bytes that were produced by `to_binary()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The UTF-8 encoded mnemonic phrase
+    ///
+    /// # Returns
+    ///
+    /// A validated `Mnemonic` instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is not valid UTF-8 or if the phrase is invalid.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// use bsv_sdk::compat::bip39::Mnemonic;
+    ///
+    /// let phrase = b"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+    /// let mnemonic = Mnemonic::from_binary(phrase).unwrap();
+    /// assert!(mnemonic.is_valid());
+    /// ```
+    pub fn from_binary(data: &[u8]) -> Result<Self> {
+        let phrase = std::str::from_utf8(data)
+            .map_err(|e| Error::InvalidMnemonic(format!("invalid UTF-8: {}", e)))?;
+        Self::from_phrase(phrase)
+    }
 }
 
 impl std::fmt::Display for Mnemonic {
@@ -661,5 +712,69 @@ mod tests {
 
         let result = Mnemonic::from_entropy(&[0u8; 33]); // 264 bits - invalid
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_to_binary_from_binary_roundtrip() {
+        let entropy = [0u8; 16];
+        let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
+        let binary = mnemonic.to_binary();
+        let restored = Mnemonic::from_binary(&binary).unwrap();
+        assert_eq!(mnemonic.phrase(), restored.phrase());
+    }
+
+    #[test]
+    fn test_to_binary_format() {
+        let entropy = [0u8; 16];
+        let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
+        let binary = mnemonic.to_binary();
+        // Binary should be UTF-8 encoded phrase
+        let phrase = mnemonic.phrase();
+        assert_eq!(binary, phrase.as_bytes());
+    }
+
+    #[test]
+    fn test_from_binary_valid() {
+        let phrase = b"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+        let mnemonic = Mnemonic::from_binary(phrase).unwrap();
+        assert!(mnemonic.is_valid());
+        assert_eq!(mnemonic.words().len(), 12);
+    }
+
+    #[test]
+    fn test_from_binary_invalid_utf8() {
+        // Invalid UTF-8 sequence
+        let invalid_utf8 = [0xff, 0xfe, 0xfd];
+        let result = Mnemonic::from_binary(&invalid_utf8);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_binary_invalid_phrase() {
+        let invalid_phrase = b"not a valid mnemonic phrase";
+        let result = Mnemonic::from_binary(invalid_phrase);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_binary_roundtrip_all_word_counts() {
+        for word_count in [
+            WordCount::Words12,
+            WordCount::Words15,
+            WordCount::Words18,
+            WordCount::Words21,
+            WordCount::Words24,
+        ] {
+            let mnemonic = Mnemonic::new(word_count).unwrap();
+            let binary = mnemonic.to_binary();
+            let restored = Mnemonic::from_binary(&binary).unwrap();
+            assert_eq!(mnemonic.phrase(), restored.phrase());
+            assert_eq!(
+                mnemonic.words().len(),
+                restored.words().len(),
+                "Word count mismatch for {:?}",
+                word_count
+            );
+        }
     }
 }

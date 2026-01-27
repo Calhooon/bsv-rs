@@ -47,6 +47,8 @@
 //! assert_eq!(decrypted, message);
 //! ```
 
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
+
 use crate::error::{Error, Result};
 use crate::primitives::ec::{PrivateKey, PublicKey};
 use crate::primitives::hash::{sha256_hmac, sha512};
@@ -413,6 +415,162 @@ pub fn decrypt_single(data: &[u8], key: &PrivateKey) -> Result<Vec<u8>> {
     electrum_decrypt(data, key, None)
 }
 
+/// Self-encrypt a message and return base64-encoded result.
+///
+/// This is a convenience wrapper around `encrypt_single` that returns the
+/// encrypted data as a base64 string, matching the Go SDK's `EncryptSingle` API.
+///
+/// # Arguments
+///
+/// * `message` - The plaintext message
+/// * `key` - The private key (used as both sender and recipient)
+///
+/// # Returns
+///
+/// Base64-encoded encrypted data (Electrum ECIES format)
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::ecies;
+/// use bsv_sdk::primitives::ec::PrivateKey;
+///
+/// let key = PrivateKey::random();
+/// let encrypted = ecies::encrypt_single_base64(b"Hello!", &key).unwrap();
+/// let decrypted = ecies::decrypt_single_base64(&encrypted, &key).unwrap();
+/// assert_eq!(decrypted, b"Hello!");
+/// ```
+pub fn encrypt_single_base64(message: &[u8], key: &PrivateKey) -> Result<String> {
+    let encrypted = encrypt_single(message, key)?;
+    Ok(BASE64.encode(&encrypted))
+}
+
+/// Decrypt base64-encoded self-encrypted data.
+///
+/// This is a convenience wrapper around `decrypt_single` that accepts
+/// base64-encoded input, matching the Go SDK's `DecryptSingle` API.
+///
+/// # Arguments
+///
+/// * `data` - Base64-encoded encrypted data
+/// * `key` - The private key used during encryption
+///
+/// # Returns
+///
+/// The decrypted plaintext
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::ecies;
+/// use bsv_sdk::primitives::ec::PrivateKey;
+///
+/// let key = PrivateKey::random();
+/// let encrypted = ecies::encrypt_single_base64(b"Hello!", &key).unwrap();
+/// let decrypted = ecies::decrypt_single_base64(&encrypted, &key).unwrap();
+/// assert_eq!(decrypted, b"Hello!");
+/// ```
+pub fn decrypt_single_base64(data: &str, key: &PrivateKey) -> Result<Vec<u8>> {
+    let encrypted = BASE64
+        .decode(data)
+        .map_err(|e| Error::EciesDecryptionFailed(format!("invalid base64: {}", e)))?;
+    decrypt_single(&encrypted, key)
+}
+
+/// Two-party encrypt a message and return base64-encoded result.
+///
+/// This is a convenience wrapper around `electrum_encrypt` that returns the
+/// encrypted data as a base64 string, matching the Go SDK's `EncryptShared` API.
+///
+/// # Arguments
+///
+/// * `message` - The plaintext message
+/// * `to_public_key` - The recipient's public key
+/// * `from_private_key` - The sender's private key
+///
+/// # Returns
+///
+/// Base64-encoded encrypted data (Electrum ECIES format)
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::ecies;
+/// use bsv_sdk::primitives::ec::PrivateKey;
+///
+/// let alice = PrivateKey::random();
+/// let bob = PrivateKey::random();
+///
+/// let encrypted = ecies::encrypt_shared_base64(
+///     b"Hello Bob!",
+///     &bob.public_key(),
+///     &alice
+/// ).unwrap();
+///
+/// let decrypted = ecies::decrypt_shared_base64(
+///     &encrypted,
+///     &bob,
+///     &alice.public_key()
+/// ).unwrap();
+/// assert_eq!(decrypted, b"Hello Bob!");
+/// ```
+pub fn encrypt_shared_base64(
+    message: &[u8],
+    to_public_key: &PublicKey,
+    from_private_key: &PrivateKey,
+) -> Result<String> {
+    let encrypted = electrum_encrypt(message, to_public_key, from_private_key, false)?;
+    Ok(BASE64.encode(&encrypted))
+}
+
+/// Decrypt base64-encoded two-party encrypted data.
+///
+/// This is a convenience wrapper around `electrum_decrypt` that accepts
+/// base64-encoded input, matching the Go SDK's `DecryptShared` API.
+///
+/// # Arguments
+///
+/// * `data` - Base64-encoded encrypted data
+/// * `to_private_key` - The recipient's private key
+/// * `from_public_key` - The sender's public key
+///
+/// # Returns
+///
+/// The decrypted plaintext
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::ecies;
+/// use bsv_sdk::primitives::ec::PrivateKey;
+///
+/// let alice = PrivateKey::random();
+/// let bob = PrivateKey::random();
+///
+/// let encrypted = ecies::encrypt_shared_base64(
+///     b"Hello Bob!",
+///     &bob.public_key(),
+///     &alice
+/// ).unwrap();
+///
+/// let decrypted = ecies::decrypt_shared_base64(
+///     &encrypted,
+///     &bob,
+///     &alice.public_key()
+/// ).unwrap();
+/// assert_eq!(decrypted, b"Hello Bob!");
+/// ```
+pub fn decrypt_shared_base64(
+    data: &str,
+    to_private_key: &PrivateKey,
+    from_public_key: &PublicKey,
+) -> Result<Vec<u8>> {
+    let encrypted = BASE64
+        .decode(data)
+        .map_err(|e| Error::EciesDecryptionFailed(format!("invalid base64: {}", e)))?;
+    electrum_decrypt(&encrypted, to_private_key, Some(from_public_key))
+}
+
 // =============================================================================
 // AES-CBC Helper Functions
 // =============================================================================
@@ -731,5 +889,153 @@ mod tests {
         // Verify we can decrypt
         let decrypted = electrum_decrypt(&encrypted, &recipient, None).unwrap();
         assert_eq!(decrypted, message);
+    }
+
+    // =========================================================================
+    // Base64 Wrapper Tests
+    // =========================================================================
+
+    #[test]
+    fn test_encrypt_single_base64_roundtrip() {
+        let key = PrivateKey::random();
+        let message = b"Hello, self-encryption!";
+
+        let encrypted = encrypt_single_base64(message, &key).unwrap();
+        let decrypted = decrypt_single_base64(&encrypted, &key).unwrap();
+        assert_eq!(decrypted, message);
+    }
+
+    #[test]
+    fn test_encrypt_single_base64_is_valid_base64() {
+        let key = PrivateKey::random();
+        let message = b"Test message";
+
+        let encrypted = encrypt_single_base64(message, &key).unwrap();
+
+        // Should be valid base64
+        let decoded = BASE64.decode(&encrypted);
+        assert!(decoded.is_ok());
+
+        // Decoded should start with BIE1 magic bytes
+        let bytes = decoded.unwrap();
+        assert_eq!(&bytes[0..4], b"BIE1");
+    }
+
+    #[test]
+    fn test_decrypt_single_base64_invalid_base64() {
+        let key = PrivateKey::random();
+        let invalid_base64 = "not valid base64!!!";
+
+        let result = decrypt_single_base64(invalid_base64, &key);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_encrypt_shared_base64_roundtrip() {
+        let alice = PrivateKey::random();
+        let bob = PrivateKey::random();
+        let message = b"Hello Bob, from Alice!";
+
+        let encrypted =
+            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+        let decrypted =
+            decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
+        assert_eq!(decrypted, message);
+    }
+
+    #[test]
+    fn test_encrypt_shared_base64_is_valid_base64() {
+        let alice = PrivateKey::random();
+        let bob = PrivateKey::random();
+        let message = b"Test shared message";
+
+        let encrypted =
+            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+
+        // Should be valid base64
+        let decoded = BASE64.decode(&encrypted);
+        assert!(decoded.is_ok());
+
+        // Decoded should start with BIE1 magic bytes
+        let bytes = decoded.unwrap();
+        assert_eq!(&bytes[0..4], b"BIE1");
+    }
+
+    #[test]
+    fn test_decrypt_shared_base64_invalid_base64() {
+        let alice = PrivateKey::random();
+        let bob = PrivateKey::random();
+        let invalid_base64 = "!!!invalid!!!";
+
+        let result = decrypt_shared_base64(invalid_base64, &bob, &alice.public_key());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_base64_wrappers_empty_message() {
+        let key = PrivateKey::random();
+        let message = b"";
+
+        // Single encryption
+        let encrypted = encrypt_single_base64(message, &key).unwrap();
+        let decrypted = decrypt_single_base64(&encrypted, &key).unwrap();
+        assert_eq!(decrypted, message);
+
+        // Shared encryption
+        let alice = PrivateKey::random();
+        let bob = PrivateKey::random();
+        let encrypted =
+            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+        let decrypted =
+            decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
+        assert_eq!(decrypted, message);
+    }
+
+    #[test]
+    fn test_base64_wrappers_large_message() {
+        let key = PrivateKey::random();
+        let message = vec![0xab; 10000];
+
+        // Single encryption
+        let encrypted = encrypt_single_base64(&message, &key).unwrap();
+        let decrypted = decrypt_single_base64(&encrypted, &key).unwrap();
+        assert_eq!(decrypted, message);
+
+        // Shared encryption
+        let alice = PrivateKey::random();
+        let bob = PrivateKey::random();
+        let encrypted =
+            encrypt_shared_base64(&message, &bob.public_key(), &alice).unwrap();
+        let decrypted =
+            decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
+        assert_eq!(decrypted, message);
+    }
+
+    #[test]
+    fn test_base64_wrapper_wrong_key() {
+        let key1 = PrivateKey::random();
+        let key2 = PrivateKey::random();
+        let message = b"Secret message";
+
+        // Encrypt with key1, try to decrypt with key2
+        let encrypted = encrypt_single_base64(message, &key1).unwrap();
+        let result = decrypt_single_base64(&encrypted, &key2);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_shared_base64_wrapper_wrong_recipient() {
+        let alice = PrivateKey::random();
+        let bob = PrivateKey::random();
+        let charlie = PrivateKey::random();
+        let message = b"Secret for Bob";
+
+        // Alice encrypts for Bob
+        let encrypted =
+            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+
+        // Charlie tries to decrypt (should fail)
+        let result = decrypt_shared_base64(&encrypted, &charlie, &alice.public_key());
+        assert!(result.is_err());
     }
 }

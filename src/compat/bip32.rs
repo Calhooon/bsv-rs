@@ -702,6 +702,148 @@ pub fn generate_hd_key_from_mnemonic(
     ExtendedKey::new_master(&seed, network)
 }
 
+/// Generates a new HD keypair and returns the serialized (xpriv, xpub) strings.
+///
+/// This is a convenience function that generates a new random master key
+/// and returns both the extended private key and extended public key as strings.
+///
+/// # Arguments
+///
+/// * `seed_length` - The seed length in bytes (16-64, 32 recommended)
+/// * `network` - The network for version bytes (Mainnet or Testnet)
+///
+/// # Returns
+///
+/// A tuple of (xpriv_string, xpub_string)
+///
+/// # Errors
+///
+/// Returns an error if the seed length is invalid or key generation fails.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::bip32::{generate_key_pair_strings, Network};
+///
+/// let (xpriv, xpub) = generate_key_pair_strings(32, Network::Mainnet).unwrap();
+/// assert!(xpriv.starts_with("xprv"));
+/// assert!(xpub.starts_with("xpub"));
+/// ```
+pub fn generate_key_pair_strings(seed_length: usize, network: Network) -> Result<(String, String)> {
+    let master = generate_hd_key(seed_length, network)?;
+    let xpriv = master.to_string();
+    let xpub = master.neuter()?.to_string();
+    Ok((xpriv, xpub))
+}
+
+/// Derives multiple addresses from a base path, incrementing the last index.
+///
+/// Given a base path like "m/44'/0'/0'/0", this function derives addresses
+/// for indices [start, start+count) appended to the base path.
+///
+/// # Arguments
+///
+/// * `key` - The extended key to derive from
+/// * `base_path` - The base derivation path (e.g., "m/44'/0'/0'/0")
+/// * `start` - The starting index
+/// * `count` - The number of addresses to derive
+/// * `mainnet` - Whether to generate mainnet (true) or testnet (false) addresses
+///
+/// # Returns
+///
+/// A vector of Bitcoin addresses
+///
+/// # Errors
+///
+/// Returns an error if derivation fails or the path is invalid.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::bip32::{derive_addresses_for_path, ExtendedKey, Network};
+///
+/// let seed = [0u8; 32];
+/// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+///
+/// // Derive 10 addresses starting from index 0
+/// let addresses = derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 10, true).unwrap();
+/// assert_eq!(addresses.len(), 10);
+/// ```
+pub fn derive_addresses_for_path(
+    key: &ExtendedKey,
+    base_path: &str,
+    start: u32,
+    count: u32,
+    mainnet: bool,
+) -> Result<Vec<String>> {
+    // First derive to the base path
+    let base_key = key.derive_path(base_path)?;
+
+    let mut addresses = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let index = start.checked_add(i).ok_or_else(|| {
+            Error::InvalidDerivationPath("Index overflow during address derivation".to_string())
+        })?;
+        let child = base_key.derive_child(index)?;
+        addresses.push(child.address(mainnet)?);
+    }
+
+    Ok(addresses)
+}
+
+/// Derives multiple public keys from a base path, incrementing the last index.
+///
+/// Given a base path like "m/44'/0'/0'/0", this function derives public keys
+/// for indices [start, start+count) appended to the base path.
+///
+/// # Arguments
+///
+/// * `key` - The extended key to derive from
+/// * `base_path` - The base derivation path (e.g., "m/44'/0'/0'/0")
+/// * `start` - The starting index
+/// * `count` - The number of public keys to derive
+///
+/// # Returns
+///
+/// A vector of public keys
+///
+/// # Errors
+///
+/// Returns an error if derivation fails or the path is invalid.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::bip32::{derive_public_keys_for_path, ExtendedKey, Network};
+///
+/// let seed = [0u8; 32];
+/// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+///
+/// // Derive 5 public keys starting from index 0
+/// let pubkeys = derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 5).unwrap();
+/// assert_eq!(pubkeys.len(), 5);
+/// ```
+pub fn derive_public_keys_for_path(
+    key: &ExtendedKey,
+    base_path: &str,
+    start: u32,
+    count: u32,
+) -> Result<Vec<PublicKey>> {
+    // First derive to the base path
+    let base_key = key.derive_path(base_path)?;
+
+    let mut pubkeys = Vec::with_capacity(count as usize);
+    for i in 0..count {
+        let index = start.checked_add(i).ok_or_else(|| {
+            Error::InvalidDerivationPath("Index overflow during public key derivation".to_string())
+        })?;
+        let child = base_key.derive_child(index)?;
+        pubkeys.push(child.public_key()?);
+    }
+
+    Ok(pubkeys)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -946,5 +1088,205 @@ mod tests {
 
         // Different passwords should produce different keys
         assert_ne!(master.to_string(), master_with_pass.to_string());
+    }
+
+    #[test]
+    fn test_generate_key_pair_strings() {
+        // Test mainnet
+        let (xpriv, xpub) = generate_key_pair_strings(32, Network::Mainnet).unwrap();
+        assert!(xpriv.starts_with("xprv"));
+        assert!(xpub.starts_with("xpub"));
+
+        // Verify the keys are valid by parsing them
+        let parsed_priv = ExtendedKey::from_string(&xpriv).unwrap();
+        let parsed_pub = ExtendedKey::from_string(&xpub).unwrap();
+        assert!(parsed_priv.is_private());
+        assert!(!parsed_pub.is_private());
+
+        // Verify the xpub matches the neutered xpriv
+        assert_eq!(parsed_priv.neuter().unwrap().to_string(), xpub);
+
+        // Test testnet
+        let (tpriv, tpub) = generate_key_pair_strings(32, Network::Testnet).unwrap();
+        assert!(tpriv.starts_with("tprv"));
+        assert!(tpub.starts_with("tpub"));
+    }
+
+    #[test]
+    fn test_generate_key_pair_strings_invalid_seed_length() {
+        // Too short
+        let result = generate_key_pair_strings(15, Network::Mainnet);
+        assert!(result.is_err());
+
+        // Too long
+        let result = generate_key_pair_strings(65, Network::Mainnet);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_derive_addresses_for_path() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive 5 addresses from BIP-44 path
+        let addresses =
+            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 5, true).unwrap();
+
+        assert_eq!(addresses.len(), 5);
+
+        // All addresses should be valid mainnet addresses (start with '1')
+        for addr in &addresses {
+            assert!(addr.starts_with('1'), "Address should start with '1': {}", addr);
+        }
+
+        // Addresses should all be different
+        for i in 0..addresses.len() {
+            for j in (i + 1)..addresses.len() {
+                assert_ne!(addresses[i], addresses[j], "Addresses should be unique");
+            }
+        }
+    }
+
+    #[test]
+    fn test_derive_addresses_for_path_testnet() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive testnet addresses
+        let addresses =
+            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 3, false).unwrap();
+
+        assert_eq!(addresses.len(), 3);
+
+        // Testnet addresses start with 'm' or 'n'
+        for addr in &addresses {
+            assert!(
+                addr.starts_with('m') || addr.starts_with('n'),
+                "Testnet address should start with 'm' or 'n': {}",
+                addr
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_addresses_for_path_with_offset() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive addresses starting at index 5
+        let addresses_offset =
+            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 5, 3, true).unwrap();
+
+        // Derive address at index 5 individually
+        let child_5 = master.derive_path("m/44'/0'/0'/0/5").unwrap();
+        let addr_5 = child_5.address(true).unwrap();
+
+        // First address from offset derivation should match
+        assert_eq!(addresses_offset[0], addr_5);
+    }
+
+    #[test]
+    fn test_derive_public_keys_for_path() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive 5 public keys
+        let pubkeys =
+            derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 5).unwrap();
+
+        assert_eq!(pubkeys.len(), 5);
+
+        // All public keys should be valid (33 bytes compressed)
+        for pk in &pubkeys {
+            let compressed = pk.to_compressed();
+            assert_eq!(compressed.len(), 33);
+            assert!(compressed[0] == 0x02 || compressed[0] == 0x03);
+        }
+
+        // Public keys should all be different
+        for i in 0..pubkeys.len() {
+            for j in (i + 1)..pubkeys.len() {
+                assert_ne!(
+                    pubkeys[i].to_compressed(),
+                    pubkeys[j].to_compressed(),
+                    "Public keys should be unique"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_derive_public_keys_matches_individual_derivation() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive public keys using the batch function
+        let pubkeys =
+            derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 3).unwrap();
+
+        // Derive individually and compare
+        for (i, pk) in pubkeys.iter().enumerate() {
+            let path = format!("m/44'/0'/0'/0/{}", i);
+            let derived = master.derive_path(&path).unwrap();
+            let expected_pk = derived.public_key().unwrap();
+            assert_eq!(
+                pk.to_compressed(),
+                expected_pk.to_compressed(),
+                "Public key at index {} should match",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_public_keys_from_xpub() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Get xpub at m/44'/0'/0'
+        let account_key = master.derive_path("m/44'/0'/0'").unwrap();
+        let xpub = account_key.neuter().unwrap();
+
+        // Derive public keys from xpub (non-hardened derivation)
+        let pubkeys_from_xpub =
+            derive_public_keys_for_path(&xpub, "0", 0, 3).unwrap();
+
+        // Derive from xprv for comparison
+        let pubkeys_from_xprv =
+            derive_public_keys_for_path(&account_key, "0", 0, 3).unwrap();
+
+        // Should produce the same public keys
+        for i in 0..3 {
+            assert_eq!(
+                pubkeys_from_xpub[i].to_compressed(),
+                pubkeys_from_xprv[i].to_compressed(),
+                "Public key at index {} should match between xpub and xprv derivation",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_derive_addresses_empty_count() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive 0 addresses
+        let addresses =
+            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 0, true).unwrap();
+
+        assert!(addresses.is_empty());
+    }
+
+    #[test]
+    fn test_derive_public_keys_empty_count() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive 0 public keys
+        let pubkeys =
+            derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 0).unwrap();
+
+        assert!(pubkeys.is_empty());
     }
 }

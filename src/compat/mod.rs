@@ -18,5 +18,9 @@ pub mod bsm;
 pub mod ecies;
 
 // Re-exports for convenience
-pub use bip32::{ExtendedKey, Network, HARDENED_KEY_START};
+pub use bip32::{
+    derive_addresses_for_path, derive_public_keys_for_path, generate_hd_key,
+    generate_hd_key_from_mnemonic, generate_key_pair_strings, ExtendedKey, Network,
+    HARDENED_KEY_START,
+};
 pub use bip39::{Language, Mnemonic, WordCount};
