@@ -22,6 +22,7 @@ use super::types::{
     KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions,
     KVStoreSetOptions, KVStoreToken,
 };
+use crate::overlay::SyncHistorian;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -562,6 +563,28 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                         Err(_) => continue,
                     };
 
+                    // Get the output's locking script
+                    let locking_script = match tx.outputs.get(output.output_index as usize) {
+                        Some(out) => &out.locking_script,
+                        None => continue,
+                    };
+
+                    // Extract fields for signature verification
+                    let fields = match KVStoreInterpreter::extract_fields(locking_script) {
+                        Some(f) => f,
+                        None => continue,
+                    };
+
+                    // Get protocol ID from fields or query
+                    let protocol_id = fields
+                        .protocol_id_string()
+                        .unwrap_or_else(|| self.config.protocol_id.clone());
+
+                    // Verify signature - skip invalid entries
+                    if !KVStoreInterpreter::verify_signature(&fields, &protocol_id) {
+                        continue;
+                    }
+
                     // Interpret the output
                     let ctx = query.key.as_ref().map(|k| {
                         KVStoreContext::new(
@@ -582,6 +605,14 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                             let token = KVStoreToken::new(&txid, output.output_index, 1)
                                 .with_beef(output.beef.clone());
                             entry = entry.with_token(token);
+                        }
+
+                        // Build history if requested
+                        if options.history {
+                            let history = build_entry_history(&tx, &entry.key, &entry.protocol_id);
+                            if !history.is_empty() {
+                                entry = entry.with_history(history);
+                            }
                         }
 
                         entries.push(entry);
@@ -642,6 +673,55 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             }
         }
     }
+}
+
+// =============================================================================
+// History Building
+// =============================================================================
+
+/// Build the history of values for a key from transaction ancestry.
+///
+/// Uses `SyncHistorian` to traverse the transaction's input ancestry and extract
+/// all previous values for the same key/protocol combination.
+///
+/// # Arguments
+///
+/// * `tx` - The current transaction containing the entry
+/// * `key` - The key to track history for
+/// * `protocol_id` - The protocol ID to match
+///
+/// # Returns
+///
+/// A vector of historical values in chronological order (oldest first).
+fn build_entry_history(tx: &Transaction, key: &str, protocol_id: &str) -> Vec<String> {
+    let ctx = KVStoreContext::new(key, protocol_id);
+    let protocol_id_owned = protocol_id.to_string();
+
+    let historian = SyncHistorian::<String, KVStoreContext>::new(
+        move |tx: &Transaction, output_idx: u32, ctx: Option<&KVStoreContext>| {
+            ctx.and_then(|c| {
+                let output = tx.outputs.get(output_idx as usize)?;
+                let fields = KVStoreInterpreter::extract_fields(&output.locking_script)?;
+                let field_protocol_id = fields.protocol_id_string()?;
+
+                // Match key and protocol_id
+                let field_key = fields.key_string()?;
+                if field_key != c.key || field_protocol_id != c.protocol_id {
+                    return None;
+                }
+
+                // Verify signature
+                if !KVStoreInterpreter::verify_signature(&fields, &protocol_id_owned) {
+                    return None;
+                }
+
+                // Return the value
+                fields.value_string()
+            })
+        },
+    );
+
+    historian.build_history(tx, Some(&ctx))
 }
 
 // =============================================================================

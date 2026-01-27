@@ -16,7 +16,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields) | ~746 |
-| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1393 |
+| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1376 |
 | `global.rs` | GlobalKVStore implementation | ~680 |
 | `interpreter.rs` | PushDrop token interpreter and KVStoreFields | ~438 |
 
@@ -257,8 +257,9 @@ impl KVStoreInterpreter {
         ctx: Option<&KVStoreContext>,
     ) -> Option<KVStoreEntry>;
 
-    /// Verify signature (placeholder - returns true)
-    pub fn verify_signature(pushdrop: &PushDrop, controller: &PublicKey) -> bool;
+    /// Verify signature of a KVStore token
+    /// Returns true if signature is valid, false if invalid/missing
+    pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool;
 
     /// Extract just the value
     pub fn extract_value(script: &LockingScript) -> Option<String>;

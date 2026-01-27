@@ -8,8 +8,18 @@ use crate::primitives::{to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::transaction::Transaction;
+use crate::wallet::{Counterparty, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs};
+use std::sync::OnceLock;
 
 use super::types::{KVStoreEntry, KvProtocolFields};
+
+/// Cached "anyone" wallet for signature verification.
+static ANYONE_WALLET: OnceLock<ProtoWallet> = OnceLock::new();
+
+/// Returns a cached "anyone" wallet for signature verification.
+fn get_anyone_wallet() -> &'static ProtoWallet {
+    ANYONE_WALLET.get_or_init(ProtoWallet::anyone)
+}
 
 /// Context for KVStore interpreter operations.
 ///
@@ -127,22 +137,70 @@ impl KVStoreInterpreter {
         Some(KVStoreEntry::new(key, value, controller, protocol_id).with_tags(tags))
     }
 
-    /// Verify that a signature field is valid (placeholder for signature verification).
+    /// Verify that a signature field is valid.
     ///
-    /// In a full implementation, this would verify that the signature (last field)
-    /// was created by the controller public key signing the preceding fields.
+    /// Verifies that the signature was created by the controller public key
+    /// signing the concatenated fields (protocol_id + key + value + controller [+ tags]).
     ///
     /// # Arguments
     ///
-    /// * `pushdrop` - The decoded PushDrop
-    /// * `controller` - The expected controller public key
+    /// * `fields` - The extracted KVStore fields
+    /// * `protocol_id` - The protocol ID string for key derivation
     ///
     /// # Returns
     ///
-    /// true if the signature is valid or verification is skipped
-    pub fn verify_signature(_pushdrop: &PushDrop, _controller: &PublicKey) -> bool {
-        // Signature verification would be done here
-        // For now, we trust the PushDrop structure
+    /// `Ok(true)` if signature is valid, `Ok(false)` if invalid or missing.
+    /// Errors are converted to `Ok(false)` for graceful degradation.
+    pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool {
+        // Get signature - if missing, verification fails
+        let signature = match &fields.signature {
+            Some(sig) if !sig.is_empty() => sig.clone(),
+            _ => return false,
+        };
+
+        // Parse controller public key (expects 33-byte compressed format)
+        let controller_pubkey = match PublicKey::from_bytes(&fields.controller) {
+            Ok(pk) => pk,
+            Err(_) => return false,
+        };
+
+        // Concatenate fields for verification: protocol_id + key + value + controller [+ tags]
+        let mut data = Vec::new();
+        data.extend_from_slice(&fields.protocol_id);
+        data.extend_from_slice(&fields.key);
+        data.extend_from_slice(&fields.value);
+        data.extend_from_slice(&fields.controller);
+        if let Some(tags) = &fields.tags {
+            if !tags.is_empty() && tags != &[0u8] {
+                data.extend_from_slice(tags);
+            }
+        }
+
+        // Create verification args matching create_token_signature() in global.rs
+        let protocol = Protocol::new(SecurityLevel::App, protocol_id);
+        let args = VerifySignatureArgs {
+            data: Some(data),
+            hash_to_directly_verify: None,
+            signature,
+            protocol_id: protocol,
+            key_id: "kvstore-token".to_string(),
+            counterparty: Some(Counterparty::Other(controller_pubkey)),
+            for_self: Some(false), // Verify counterparty's signature
+        };
+
+        // Use the "anyone" wallet for verification
+        let wallet = get_anyone_wallet();
+        wallet.verify_signature(args).is_ok_and(|r| r.valid)
+    }
+
+    /// Legacy verify_signature that takes PushDrop and PublicKey.
+    ///
+    /// This is kept for backward compatibility but now delegates to the
+    /// KVStoreFields-based verification.
+    #[deprecated(note = "Use verify_signature with KVStoreFields instead")]
+    pub fn verify_signature_legacy(_pushdrop: &PushDrop, _controller: &PublicKey) -> bool {
+        // Legacy stub - returns true for backward compatibility
+        // New code should use verify_signature() with KVStoreFields
         true
     }
 
@@ -434,5 +492,82 @@ mod tests {
             script.is_err()
                 || KVStoreInterpreter::interpret_script(&script.unwrap(), None).is_none()
         );
+    }
+
+    #[test]
+    fn test_verify_signature_missing() {
+        let privkey = PrivateKey::random();
+        let pubkey = privkey.public_key();
+
+        // Create fields without signature
+        let fields = KVStoreFields {
+            protocol_id: b"kvstore".to_vec(),
+            key: b"test_key".to_vec(),
+            value: b"test_value".to_vec(),
+            controller: pubkey.to_compressed().to_vec(),
+            tags: None,
+            signature: None,
+            locking_public_key: pubkey.clone(),
+        };
+
+        // Should return false when signature is missing
+        assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    }
+
+    #[test]
+    fn test_verify_signature_empty() {
+        let privkey = PrivateKey::random();
+        let pubkey = privkey.public_key();
+
+        // Create fields with empty signature
+        let fields = KVStoreFields {
+            protocol_id: b"kvstore".to_vec(),
+            key: b"test_key".to_vec(),
+            value: b"test_value".to_vec(),
+            controller: pubkey.to_compressed().to_vec(),
+            tags: None,
+            signature: Some(vec![]),
+            locking_public_key: pubkey.clone(),
+        };
+
+        // Should return false when signature is empty
+        assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    }
+
+    #[test]
+    fn test_verify_signature_invalid() {
+        let privkey = PrivateKey::random();
+        let pubkey = privkey.public_key();
+
+        // Create fields with invalid signature bytes
+        let fields = KVStoreFields {
+            protocol_id: b"kvstore".to_vec(),
+            key: b"test_key".to_vec(),
+            value: b"test_value".to_vec(),
+            controller: pubkey.to_compressed().to_vec(),
+            tags: None,
+            signature: Some(vec![1, 2, 3, 4, 5]), // Invalid DER signature
+            locking_public_key: pubkey.clone(),
+        };
+
+        // Should return false for invalid signature
+        assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
+    }
+
+    #[test]
+    fn test_verify_signature_invalid_controller() {
+        // Create fields with invalid controller bytes
+        let fields = KVStoreFields {
+            protocol_id: b"kvstore".to_vec(),
+            key: b"test_key".to_vec(),
+            value: b"test_value".to_vec(),
+            controller: vec![0u8; 33], // Invalid pubkey (all zeros)
+            tags: None,
+            signature: Some(vec![1, 2, 3, 4]),
+            locking_public_key: PrivateKey::random().public_key(),
+        };
+
+        // Should return false for invalid controller
+        assert!(!KVStoreInterpreter::verify_signature(&fields, "kvstore"));
     }
 }

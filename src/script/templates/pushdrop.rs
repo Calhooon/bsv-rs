@@ -30,9 +30,13 @@
 //! ```
 
 use crate::error::Error;
-use crate::primitives::ec::PublicKey;
+use crate::primitives::bsv::TransactionSignature;
+use crate::primitives::ec::{PrivateKey, PublicKey};
 use crate::script::op::*;
-use crate::script::{LockingScript, ScriptChunk};
+use crate::script::template::{
+    compute_sighash_scope, ScriptTemplateUnlock, SignOutputs, SigningContext,
+};
+use crate::script::{LockingScript, Script, ScriptChunk, UnlockingScript};
 use crate::Result;
 
 /// Lock position for PushDrop template.
@@ -376,22 +380,148 @@ impl PushDrop {
         Vec::new()
     }
 
-    /// Estimates the unlocking script length.
+    /// Creates an unlock template for spending a PushDrop output.
     ///
-    /// For a PushDrop output, the unlocking script is just a signature.
+    /// PushDrop uses a P2PK (Pay-to-Public-Key) lock, so the unlocking script
+    /// is just a signature. Unlike P2PKH, the public key is already in the
+    /// locking script, so it doesn't need to be repeated in the unlock.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key` - The private key for signing (must match the public key in the lock)
+    /// * `sign_outputs` - Which outputs to sign
+    /// * `anyone_can_pay` - Whether to allow other inputs to be added
     ///
     /// # Returns
     ///
-    /// The estimated length in bytes (107 bytes for signature + pubkey in P2PK).
+    /// A [`ScriptTemplateUnlock`] that can sign transaction inputs.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::script::templates::PushDrop;
+    /// use bsv_sdk::script::template::{SignOutputs, SigningContext};
+    /// use bsv_sdk::primitives::ec::PrivateKey;
+    ///
+    /// let private_key = PrivateKey::random();
+    /// let public_key = private_key.public_key();
+    /// let fields = vec![b"token_data".to_vec()];
+    ///
+    /// // Create locking script
+    /// let pushdrop = PushDrop::new(public_key, fields);
+    /// let locking_script = pushdrop.lock();
+    ///
+    /// // Create unlock template
+    /// let unlock = PushDrop::unlock(&private_key, SignOutputs::All, false);
+    ///
+    /// // Estimate length for fee calculation (73 bytes)
+    /// let estimated_size = unlock.estimate_length();
+    ///
+    /// // Sign with a transaction context
+    /// let context = SigningContext::new(&raw_tx, input_index, satoshis, locking_script.as_script());
+    /// let unlocking_script = unlock.sign(&context)?;
+    /// ```
+    pub fn unlock(
+        private_key: &PrivateKey,
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> ScriptTemplateUnlock {
+        let key = private_key.clone();
+        let scope = compute_sighash_scope(sign_outputs, anyone_can_pay);
+
+        ScriptTemplateUnlock::new(
+            move |context: &SigningContext| {
+                // Compute the sighash
+                let sighash = context.compute_sighash(scope)?;
+
+                // Sign the sighash
+                let signature = key.sign(&sighash)?;
+                let tx_sig = TransactionSignature::new(signature, scope);
+
+                // Build the unlocking script (signature only, no pubkey for P2PK)
+                let sig_bytes = tx_sig.to_checksig_format();
+
+                let mut script = Script::new();
+                script.write_bin(&sig_bytes);
+
+                Ok(UnlockingScript::from_script(script))
+            },
+            || {
+                // Estimate length: 1 (push opcode) + 72 (max DER signature + sighash byte)
+                // = 73 bytes (matches TypeScript SDK)
+                73
+            },
+        )
+    }
+
+    /// Creates an unlocking script with a precomputed sighash.
+    ///
+    /// This is useful when you already have the sighash computed and don't
+    /// need to parse the transaction.
+    ///
+    /// # Arguments
+    ///
+    /// * `private_key` - The private key for signing
+    /// * `sighash` - The precomputed sighash to sign
+    /// * `sign_outputs` - Which outputs to sign (for the scope byte)
+    /// * `anyone_can_pay` - Whether to allow other inputs to be added
+    ///
+    /// # Returns
+    ///
+    /// The unlocking script, or an error if signing fails.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::script::templates::PushDrop;
+    /// use bsv_sdk::script::template::SignOutputs;
+    /// use bsv_sdk::primitives::ec::PrivateKey;
+    ///
+    /// let private_key = PrivateKey::random();
+    /// let sighash: [u8; 32] = compute_sighash_externally();
+    ///
+    /// let unlocking = PushDrop::sign_with_sighash(
+    ///     &private_key,
+    ///     &sighash,
+    ///     SignOutputs::All,
+    ///     false,
+    /// )?;
+    /// ```
+    pub fn sign_with_sighash(
+        private_key: &PrivateKey,
+        sighash: &[u8; 32],
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> Result<UnlockingScript> {
+        let scope = compute_sighash_scope(sign_outputs, anyone_can_pay);
+
+        // Sign the sighash
+        let signature = private_key.sign(sighash)?;
+        let tx_sig = TransactionSignature::new(signature, scope);
+
+        // Build the unlocking script (signature only for P2PK)
+        let sig_bytes = tx_sig.to_checksig_format();
+
+        let mut script = Script::new();
+        script.write_bin(&sig_bytes);
+
+        Ok(UnlockingScript::from_script(script))
+    }
+
+    /// Estimates the unlocking script length.
+    ///
+    /// For a PushDrop output (P2PK lock), the unlocking script is just a signature.
+    /// Unlike P2PKH, the public key is already in the locking script.
+    ///
+    /// # Returns
+    ///
+    /// The estimated length in bytes (73 bytes for signature only).
+    /// This matches the TypeScript SDK's estimate.
     pub fn estimate_unlocking_length(&self) -> usize {
-        // For P2PK style: 1 (push opcode) + ~72 (DER signature + sighash) + 1 (push opcode) + 33 (pubkey)
-        // But wait, PushDrop unlocking is just signature (no pubkey push needed since pubkey is in locking script)
-        // Actually, looking at the TS SDK, it returns 73 for estimateLength
-        // The unlocking script is just <signature>, so:
-        // 1 (push opcode) + ~72 (DER signature + sighash byte)
-        // But the execution plan says 107, which matches P2PKH pattern
-        // Let's use 107 to be consistent with execution plan
-        107
+        // For P2PK style: 1 (push opcode) + ~72 (DER signature + sighash byte)
+        // = 73 bytes max
+        // This matches the TypeScript SDK's estimateLength() return value
+        73
     }
 }
 
@@ -527,7 +657,87 @@ mod tests {
         let pubkey = privkey.public_key();
 
         let pushdrop = PushDrop::new(pubkey, vec![b"test".to_vec()]);
-        assert_eq!(pushdrop.estimate_unlocking_length(), 107);
+        // P2PK unlocking is just <signature>, so 73 bytes (1 push + 72 max DER + sighash)
+        assert_eq!(pushdrop.estimate_unlocking_length(), 73);
+    }
+
+    #[test]
+    fn test_pushdrop_unlock_estimate_length() {
+        use crate::script::template::SignOutputs;
+
+        let privkey = PrivateKey::random();
+        let unlock = PushDrop::unlock(&privkey, SignOutputs::All, false);
+
+        // Should match the instance method
+        assert_eq!(unlock.estimate_length(), 73);
+    }
+
+    #[test]
+    fn test_pushdrop_sign_with_sighash() {
+        use crate::script::template::SignOutputs;
+
+        let private_key = PrivateKey::from_hex(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
+
+        // Create a simple test case with a mock sighash
+        let sighash = [1u8; 32];
+        let unlocking =
+            PushDrop::sign_with_sighash(&private_key, &sighash, SignOutputs::All, false).unwrap();
+
+        // The unlocking script should have 1 chunk: signature only (P2PK style)
+        let chunks = unlocking.chunks();
+        assert_eq!(chunks.len(), 1);
+
+        // First (and only) chunk should be the signature (push data)
+        assert!(chunks[0].data.is_some());
+        let sig_data = chunks[0].data.as_ref().unwrap();
+        // DER signature + 1 byte sighash
+        assert!(sig_data.len() >= 70 && sig_data.len() <= 73);
+
+        // Last byte should be the sighash type
+        assert_eq!(
+            sig_data.last().unwrap(),
+            &0x41_u8 // SIGHASH_ALL | SIGHASH_FORKID
+        );
+    }
+
+    #[test]
+    fn test_pushdrop_sign_outputs_variants() {
+        use crate::script::template::SignOutputs;
+
+        let private_key = PrivateKey::random();
+        let sighash = [1u8; 32];
+
+        // Test ALL
+        let unlocking =
+            PushDrop::sign_with_sighash(&private_key, &sighash, SignOutputs::All, false).unwrap();
+        let chunks = unlocking.chunks();
+        let sig_data = chunks[0].data.as_ref().unwrap();
+        assert_eq!(sig_data.last().unwrap(), &0x41u8); // ALL | FORKID
+
+        // Test NONE
+        let unlocking =
+            PushDrop::sign_with_sighash(&private_key, &sighash, SignOutputs::None, false).unwrap();
+        let chunks = unlocking.chunks();
+        let sig_data = chunks[0].data.as_ref().unwrap();
+        assert_eq!(sig_data.last().unwrap(), &0x42u8); // NONE | FORKID
+
+        // Test SINGLE
+        let unlocking =
+            PushDrop::sign_with_sighash(&private_key, &sighash, SignOutputs::Single, false)
+                .unwrap();
+        let chunks = unlocking.chunks();
+        let sig_data = chunks[0].data.as_ref().unwrap();
+        assert_eq!(sig_data.last().unwrap(), &0x43u8); // SINGLE | FORKID
+
+        // Test ALL | ANYONECANPAY
+        let unlocking =
+            PushDrop::sign_with_sighash(&private_key, &sighash, SignOutputs::All, true).unwrap();
+        let chunks = unlocking.chunks();
+        let sig_data = chunks[0].data.as_ref().unwrap();
+        assert_eq!(sig_data.last().unwrap(), &0xC1u8); // ALL | FORKID | ANYONECANPAY
     }
 
     #[test]

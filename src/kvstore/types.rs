@@ -154,6 +154,9 @@ pub struct KVStoreEntry {
     /// Associated token (if available).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub token: Option<KVStoreToken>,
+    /// Historical values (oldest first, if requested).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub history: Option<Vec<String>>,
 }
 
 impl KVStoreEntry {
@@ -171,6 +174,7 @@ impl KVStoreEntry {
             protocol_id: protocol_id.into(),
             tags: Vec::new(),
             token: None,
+            history: None,
         }
     }
 
@@ -183,6 +187,12 @@ impl KVStoreEntry {
     /// Sets the token.
     pub fn with_token(mut self, token: KVStoreToken) -> Self {
         self.token = Some(token);
+        self
+    }
+
+    /// Sets the history.
+    pub fn with_history(mut self, history: Vec<String>) -> Self {
+        self.history = Some(history);
         self
     }
 }
@@ -614,6 +624,37 @@ mod tests {
         assert_eq!(decoded.controller, "02abc...");
         assert_eq!(decoded.protocol_id, "kvstore");
         assert_eq!(decoded.tags, vec!["tag1"]);
+    }
+
+    #[test]
+    fn test_kvstore_entry_with_history() {
+        let history = vec![
+            "old_value".to_string(),
+            "middle_value".to_string(),
+            "current_value".to_string(),
+        ];
+        let entry = KVStoreEntry::new("test_key", "current_value", "02abc...", "kvstore")
+            .with_history(history.clone());
+
+        assert_eq!(entry.history, Some(history.clone()));
+
+        // Verify serialization includes history
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("history"));
+        assert!(json.contains("old_value"));
+
+        let decoded: KVStoreEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.history, Some(history));
+    }
+
+    #[test]
+    fn test_kvstore_entry_without_history_omits_field() {
+        let entry = KVStoreEntry::new("test_key", "test_value", "02abc...", "kvstore");
+        assert!(entry.history.is_none());
+
+        // Verify serialization omits history when None
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(!json.contains("history"));
     }
 
     #[test]

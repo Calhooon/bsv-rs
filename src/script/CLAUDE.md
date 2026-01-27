@@ -312,11 +312,14 @@ impl PushDrop {
     pub fn with_position(self, position: LockPosition) -> Self
     pub fn lock(&self) -> LockingScript
     pub fn decode(script: &LockingScript) -> Result<Self>  // Parse existing script
-    pub fn estimate_unlocking_length(&self) -> usize  // 107 bytes
+    pub fn unlock(private_key: &PrivateKey, sign_outputs: SignOutputs, anyone_can_pay: bool) -> ScriptTemplateUnlock
+    pub fn sign_with_sighash(private_key: &PrivateKey, sighash: &[u8; 32], sign_outputs: SignOutputs, anyone_can_pay: bool) -> Result<UnlockingScript>
+    pub fn estimate_unlocking_length(&self) -> usize  // 73 bytes (signature only)
 }
 
 // Lock-Before pattern: <pubkey> OP_CHECKSIG <field1> <field2> ... OP_2DROP... OP_DROP
 // Lock-After pattern:  <field1> <field2> ... OP_2DROP... OP_DROP <pubkey> OP_CHECKSIG
+// Unlock pattern: <signature> (no pubkey needed, already in locking script)
 ```
 
 ## Transaction Interface Traits

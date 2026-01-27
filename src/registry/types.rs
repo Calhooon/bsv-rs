@@ -416,10 +416,12 @@ impl ProtocolDefinitionData {
 
     /// Builds PushDrop fields for this definition.
     pub fn to_pushdrop_fields(&self, registry_operator: &str) -> crate::Result<Vec<Vec<u8>>> {
-        // Serialize protocolID as JSON: [securityLevel, "protocolName"]
-        let protocol_json = serde_json::to_string(&self.protocol_id).map_err(|e| {
-            crate::Error::RegistryError(format!("Failed to serialize protocolID: {}", e))
-        })?;
+        // Serialize protocolID as JSON array: [securityLevel, "protocolName"]
+        // Must match the format expected by deserialize_wallet_protocol()
+        let protocol_json = format!(
+            "[{}, \"{}\"]",
+            self.protocol_id.security_level as u8, self.protocol_id.protocol_name
+        );
 
         Ok(vec![
             protocol_json.as_bytes().to_vec(),
@@ -1161,6 +1163,30 @@ impl RevokeDefinitionResult {
     }
 }
 
+/// Result of an update definition operation.
+///
+/// Updates an existing registry entry by spending its UTXO and creating
+/// a new one with updated data in a single transaction.
+#[derive(Debug, Clone)]
+pub struct UpdateDefinitionResult {
+    /// Broadcast success information (if successful).
+    pub success: Option<BroadcastSuccess>,
+    /// Broadcast failure information (if failed).
+    pub failure: Option<BroadcastFailure>,
+}
+
+impl UpdateDefinitionResult {
+    /// Returns true if the update was successful.
+    pub fn is_success(&self) -> bool {
+        self.success.is_some()
+    }
+
+    /// Returns true if the update failed.
+    pub fn is_failure(&self) -> bool {
+        self.failure.is_some()
+    }
+}
+
 // =============================================================================
 // Tests
 // =============================================================================
@@ -1582,6 +1608,52 @@ mod tests {
         assert!(!success_result.is_failure());
 
         let failure_result = RegisterDefinitionResult {
+            success: None,
+            failure: Some(BroadcastFailure {
+                code: "ERR".to_string(),
+                description: "Failed".to_string(),
+            }),
+        };
+        assert!(!failure_result.is_success());
+        assert!(failure_result.is_failure());
+    }
+
+    #[test]
+    fn test_update_definition_result() {
+        let success_result = UpdateDefinitionResult {
+            success: Some(BroadcastSuccess {
+                txid: "abc123".to_string(),
+                message: "success".to_string(),
+            }),
+            failure: None,
+        };
+        assert!(success_result.is_success());
+        assert!(!success_result.is_failure());
+
+        let failure_result = UpdateDefinitionResult {
+            success: None,
+            failure: Some(BroadcastFailure {
+                code: "ERR".to_string(),
+                description: "Failed".to_string(),
+            }),
+        };
+        assert!(!failure_result.is_success());
+        assert!(failure_result.is_failure());
+    }
+
+    #[test]
+    fn test_revoke_definition_result() {
+        let success_result = RevokeDefinitionResult {
+            success: Some(BroadcastSuccess {
+                txid: "abc123".to_string(),
+                message: "success".to_string(),
+            }),
+            failure: None,
+        };
+        assert!(success_result.is_success());
+        assert!(!success_result.is_failure());
+
+        let failure_result = RevokeDefinitionResult {
             success: None,
             failure: Some(BroadcastFailure {
                 code: "ERR".to_string(),

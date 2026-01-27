@@ -36,6 +36,7 @@ pub use types::{
 pub use types::{
     RegisterDefinitionResult,    // Result from register_definition()
     RevokeDefinitionResult,      // Result from revoke_own_registry_entry()
+    UpdateDefinitionResult,      // Result from update_definition()
     BroadcastSuccess,            // Success info with txid and message
     BroadcastFailure,            // Failure info with code and description
 };
@@ -249,6 +250,17 @@ impl RevokeDefinitionResult {
     pub fn is_failure(&self) -> bool
 }
 
+/// Result of an update definition operation.
+pub struct UpdateDefinitionResult {
+    pub success: Option<BroadcastSuccess>,
+    pub failure: Option<BroadcastFailure>,
+}
+
+impl UpdateDefinitionResult {
+    pub fn is_success(&self) -> bool
+    pub fn is_failure(&self) -> bool
+}
+
 /// Broadcast success information (matches Go SDK transaction.BroadcastSuccess).
 pub struct BroadcastSuccess {
     pub txid: String,    // Transaction ID
@@ -329,6 +341,9 @@ impl<W: WalletInterface> RegistryClient<W> {
     // Management methods (Go SDK compatible signatures)
     pub async fn list_own_registry_entries(&self, definition_type: DefinitionType) -> Result<Vec<RegistryRecord>>
     pub async fn revoke_own_registry_entry(&self, record: &RegistryRecord) -> Result<RevokeDefinitionResult>
+
+    // Update method (TypeScript SDK compatible)
+    pub async fn update_definition(&self, record: &RegistryRecord, updated_data: DefinitionData) -> Result<UpdateDefinitionResult>
 }
 ```
 
@@ -341,6 +356,7 @@ impl<W: WalletInterface> RegistryClient<W> {
 | `register_certificate(data)` | `register_definition(data.into())` |
 | `list_own_entries()` | `list_own_registry_entries(definition_type)` |
 | `revoke_entry(txid, output_index)` | `revoke_own_registry_entry(&record)` |
+| (not available) | `update_definition(&record, new_data)` |
 
 ### RegistryClientConfig
 
@@ -423,6 +439,27 @@ if let Some(entry) = entries.first() {
     let result = client.revoke_own_registry_entry(entry).await?;
     if result.is_success() {
         println!("Entry revoked");
+    }
+}
+```
+
+### Update an Entry (TypeScript SDK Compatible)
+
+```rust
+use bsv_sdk::registry::{RegistryClient, DefinitionType, BasketDefinitionData};
+
+// Get existing entry
+let entries = client.list_own_registry_entries(DefinitionType::Basket).await?;
+if let Some(entry) = entries.first() {
+    // Create updated data (must be same type as original)
+    let updated_data = BasketDefinitionData::new("my_basket", "Updated Basket Name")
+        .with_description("New description for my basket")
+        .with_icon_url("https://example.com/new-icon.png");
+
+    // Update the entry
+    let result = client.update_definition(entry, updated_data.into()).await?;
+    if result.is_success() {
+        println!("Entry updated: {}", result.success.unwrap().txid);
     }
 }
 ```
@@ -531,6 +568,7 @@ This module maintains **1:1 API compatibility** with:
 | `RegistryRecord` | `RegistryRecord` |
 | `RegisterDefinitionResult` | `RegisterDefinitionResult` |
 | `RevokeDefinitionResult` | `RevokeDefinitionResult` |
+| (TypeScript: BroadcastResponse) | `UpdateDefinitionResult` |
 | `transaction.BroadcastSuccess` | `BroadcastSuccess` |
 | `transaction.BroadcastFailure` | `BroadcastFailure` |
 
@@ -544,6 +582,7 @@ This module maintains **1:1 API compatibility** with:
 | `ResolveCertificate(ctx, query)` | `resolve_certificate(query)` |
 | `ListOwnRegistryEntries(ctx, defType)` | `list_own_registry_entries(def_type)` |
 | `RevokeOwnRegistryEntry(ctx, record)` | `revoke_own_registry_entry(record)` |
+| (TypeScript: updateDefinition) | `update_definition(record, data)` |
 
 ## Feature Flag
 

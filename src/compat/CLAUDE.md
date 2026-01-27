@@ -7,6 +7,17 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 
 **Status**: Complete
 
+## Files
+
+| File | Purpose |
+|------|---------|
+| `mod.rs` | Module declaration and re-exports |
+| `base58.rs` | Base58 encoding wrapper (~133 lines) |
+| `bip32.rs` | BIP-32 HD key derivation (~950 lines) |
+| `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
+| `bsm.rs` | Bitcoin Signed Message (~402 lines) |
+| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~735 lines) |
+
 ## Submodules
 
 | Submodule | Status | Description |
@@ -377,17 +388,6 @@ cargo test --features compat bsm
 cargo test --features compat ecies
 ```
 
-## Files
-
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module declaration and re-exports |
-| `base58.rs` | Base58 encoding wrapper |
-| `bip32.rs` | BIP-32 HD key derivation |
-| `bip39/` | BIP-39 mnemonic submodule |
-| `bsm.rs` | Bitcoin Signed Message |
-| `ecies.rs` | ECIES encryption (Electrum + Bitcore) |
-
 ## Dependencies
 
 Uses existing SDK primitives:
@@ -408,4 +408,5 @@ Uses existing SDK primitives:
 
 - `../primitives/CLAUDE.md` - Cryptographic primitives
 - `../primitives/ec/CLAUDE.md` - EC operations
-- `bip39/CLAUDE.md` - BIP-39 submodule details
+- `bip39/CLAUDE.md` - BIP-39 mnemonic submodule details
+- `bip39/wordlists/CLAUDE.md` - BIP-39 wordlists documentation

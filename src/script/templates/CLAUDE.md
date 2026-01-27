@@ -166,6 +166,13 @@ PushDrop is a data envelope template that embeds arbitrary data fields in a tran
 <field1> <field2> ... OP_2DROP ... OP_DROP <pubkey> OP_CHECKSIG
 ```
 
+**Unlocking Script Pattern:**
+```text
+<signature>
+```
+
+Note: Unlike P2PKH, the public key is already in the locking script, so only the signature is needed in the unlock.
+
 The script pushes data fields onto the stack, then drops them using `OP_2DROP` (for pairs) and `OP_DROP` (for remaining single field), leaving only the P2PK signature check.
 
 ```rust
@@ -197,7 +204,22 @@ impl PushDrop {
     /// Decodes a PushDrop locking script back into its components
     pub fn decode(script: &LockingScript) -> Result<Self>
 
-    /// Estimates unlocking script length (returns 107 bytes)
+    /// Creates an unlock template for spending a PushDrop output
+    pub fn unlock(
+        private_key: &PrivateKey,
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> ScriptTemplateUnlock
+
+    /// Signs with a precomputed sighash (useful when transaction is already parsed)
+    pub fn sign_with_sighash(
+        private_key: &PrivateKey,
+        sighash: &[u8; 32],
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> Result<UnlockingScript>
+
+    /// Estimates unlocking script length (returns 73 bytes)
     pub fn estimate_unlocking_length(&self) -> usize
 }
 ```
@@ -353,6 +375,44 @@ println!("Fields: {:?}", decoded.fields);
 println!("Lock position: {:?}", decoded.lock_position);
 ```
 
+### PushDrop: Spend with Signature
+
+```rust
+use bsv_sdk::script::templates::PushDrop;
+use bsv_sdk::script::template::{SignOutputs, SigningContext};
+use bsv_sdk::primitives::ec::PrivateKey;
+
+let private_key = PrivateKey::from_hex("...")?;
+
+// Create unlock template
+let unlock = PushDrop::unlock(&private_key, SignOutputs::All, false);
+
+// Estimated length for fee calculation (73 bytes: signature only)
+let estimated_size = unlock.estimate_length();
+
+// Sign with a transaction context
+let context = SigningContext::new(&raw_tx, input_index, satoshis, locking_script.as_script());
+let unlocking = unlock.sign(&context)?;
+// Produces: <signature>
+```
+
+### PushDrop: Sign with Precomputed Sighash
+
+```rust
+use bsv_sdk::script::templates::PushDrop;
+use bsv_sdk::script::template::SignOutputs;
+
+// When you already have the sighash computed
+let sighash: [u8; 32] = compute_sighash_externally();
+
+let unlocking = PushDrop::sign_with_sighash(
+    &private_key,
+    &sighash,
+    SignOutputs::All,
+    false,  // anyone_can_pay
+)?;
+```
+
 ### Sighash Types
 
 The `SignOutputs` enum and `anyone_can_pay` flag control which parts of the transaction are signed:
@@ -379,10 +439,13 @@ Both templates produce DER-encoded ECDSA signatures with:
 ### Estimated Lengths
 
 The `estimate_length()` method returns 108 bytes for P2PKH and RPuzzle:
-- Signature push: 1 + 73 bytes (max DER + sighash byte)
+- Signature push: 1 + 72 bytes (max DER + sighash byte)
 - Public key push: 1 + 33 bytes (compressed)
 
-PushDrop's `estimate_unlocking_length()` returns 107 bytes (signature only, since public key is in the locking script).
+PushDrop's `estimate_unlocking_length()` returns 73 bytes (signature only, since public key is in the locking script):
+- Signature push: 1 + 72 bytes (max DER + sighash byte)
+
+This matches the TypeScript SDK's `estimateLength()` return value for PushDrop.
 
 These are worst-case estimates; actual signatures may be 1-2 bytes shorter.
 

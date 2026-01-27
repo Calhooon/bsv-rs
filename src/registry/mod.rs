@@ -68,7 +68,7 @@ pub use types::{
     BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
     CertificateDefinitionData, CertificateFieldDescriptor, CertificateQuery, DefinitionData,
     DefinitionType, ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult,
-    RegistryRecord, RevokeDefinitionResult, TokenData,
+    RegistryRecord, RevokeDefinitionResult, TokenData, UpdateDefinitionResult,
 };
 
 // Re-exports from client

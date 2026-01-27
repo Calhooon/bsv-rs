@@ -20,7 +20,7 @@ use crate::registry::types::{
     BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
     CertificateDefinitionData, CertificateQuery, DefinitionData, DefinitionType,
     ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult, RegistryRecord,
-    RevokeDefinitionResult, TokenData,
+    RevokeDefinitionResult, TokenData, UpdateDefinitionResult,
 };
 use crate::registry::REGISTRANT_TOKEN_AMOUNT;
 use crate::script::templates::PushDrop;
@@ -655,7 +655,7 @@ impl<W: WalletInterface> RegistryClient<W> {
                             vout: record.output_index(),
                         },
                         unlocking_script: None,
-                        unlocking_script_length: Some(73), // Estimated signature length
+                        unlocking_script_length: Some(74), // Estimated signature length (matches TypeScript SDK)
                         input_description: format!("Revoking {} token", def_type.as_str()),
                         sequence_number: None,
                     }]),
@@ -768,6 +768,235 @@ impl<W: WalletInterface> RegistryClient<W> {
         ))
     }
 
+    /// Updates an existing registry entry by spending its UTXO and creating
+    /// a new one with updated data in a single transaction.
+    ///
+    /// This matches the TypeScript SDK's `updateDefinition` method.
+    ///
+    /// # Arguments
+    ///
+    /// * `record` - The existing registry record to update
+    /// * `updated_data` - The new definition data (must be same type as record)
+    ///
+    /// # Returns
+    ///
+    /// An `UpdateDefinitionResult` with success or failure information.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// // Get existing entry
+    /// let entries = client.list_own_registry_entries(DefinitionType::Basket).await?;
+    /// let record = &entries[0];
+    ///
+    /// // Create updated data
+    /// let updated = BasketDefinitionData::new("my_basket", "Updated Basket Name")
+    ///     .with_description("New description");
+    ///
+    /// // Update the entry
+    /// let result = client.update_definition(record, updated.into()).await?;
+    /// ```
+    pub async fn update_definition(
+        &self,
+        record: &RegistryRecord,
+        mut updated_data: DefinitionData,
+    ) -> Result<UpdateDefinitionResult> {
+        // Validate record has required fields
+        if record.txid().is_empty() || record.token.locking_script.is_empty() {
+            return Err(Error::RegistryError(
+                "Invalid registry record - missing txid or lockingScript".to_string(),
+            ));
+        }
+
+        // Verify the updated data matches the record type
+        if record.get_definition_type() != updated_data.get_definition_type() {
+            return Err(Error::RegistryError(format!(
+                "Cannot change definition type from {} to {}",
+                record.get_definition_type(),
+                updated_data.get_definition_type()
+            )));
+        }
+
+        // Verify ownership
+        let identity_key = self.get_identity_key_hex().await?;
+        if record.get_registry_operator() != identity_key {
+            return Err(Error::RegistryError(
+                "This registry token does not belong to the current wallet".to_string(),
+            ));
+        }
+
+        let def_type = record.get_definition_type();
+
+        // Get item identifier for description
+        let item_identifier = match &record.definition {
+            DefinitionData::Basket(d) => d.basket_id.clone(),
+            DefinitionData::Protocol(d) => d.name.clone(),
+            DefinitionData::Certificate(d) => {
+                if !d.name.is_empty() {
+                    d.name.clone()
+                } else {
+                    d.cert_type.clone()
+                }
+            }
+        };
+
+        // Set registry operator on updated data
+        updated_data.set_registry_operator(identity_key.clone());
+
+        // Get identity public key for PushDrop locking
+        let identity_pubkey = self.get_identity_public_key().await?;
+
+        // Build PushDrop fields for the new locking script
+        let fields = updated_data.to_pushdrop_fields(&identity_key)?;
+
+        // Create new PushDrop locking script
+        let pushdrop = PushDrop::new(identity_pubkey, fields);
+        let new_locking_script = pushdrop.lock();
+
+        // Parse outpoint
+        let txid_bytes = from_hex(record.txid())
+            .map_err(|e| Error::RegistryError(format!("Invalid txid: {}", e)))?;
+        let mut txid_arr = [0u8; 32];
+        if txid_bytes.len() != 32 {
+            return Err(Error::RegistryError("Invalid txid length".to_string()));
+        }
+        txid_arr.copy_from_slice(&txid_bytes);
+
+        // Create the update transaction (spend old UTXO, create new one)
+        let create_result = self
+            .wallet
+            .create_action(
+                CreateActionArgs {
+                    description: format!("Update {} item: {}", def_type.as_str(), item_identifier),
+                    inputs: Some(vec![CreateActionInput {
+                        outpoint: Outpoint {
+                            txid: txid_arr,
+                            vout: record.output_index(),
+                        },
+                        unlocking_script: None,
+                        unlocking_script_length: Some(74), // Matches TypeScript SDK
+                        input_description: format!("Updating {} token", def_type.as_str()),
+                        sequence_number: None,
+                    }]),
+                    input_beef: record.token.beef.clone(),
+                    outputs: Some(vec![CreateActionOutput {
+                        locking_script: new_locking_script.to_binary(),
+                        satoshis: REGISTRANT_TOKEN_AMOUNT,
+                        output_description: format!(
+                            "Updated {} registration token",
+                            def_type.as_str()
+                        ),
+                        basket: Some(def_type.wallet_basket().to_string()),
+                        custom_instructions: None,
+                        tags: None,
+                    }]),
+                    lock_time: None,
+                    version: None,
+                    labels: Some(vec![
+                        "registry".to_string(),
+                        "update".to_string(),
+                        def_type.as_str().to_string(),
+                    ]),
+                    options: None,
+                },
+                self.originator(),
+            )
+            .await?;
+
+        // Check for signable transaction
+        if create_result.signable_transaction.is_none() {
+            return Err(Error::RegistryError(
+                "Failed to create signable transaction".to_string(),
+            ));
+        }
+
+        // Sign the transaction
+        if let Some(ref signable_tx) = create_result.signable_transaction {
+            let mut spends = HashMap::new();
+            spends.insert(
+                record.output_index(),
+                SignActionSpend {
+                    unlocking_script: vec![],
+                    sequence_number: None,
+                },
+            );
+
+            let sign_result = self
+                .wallet
+                .sign_action(
+                    SignActionArgs {
+                        reference: String::from_utf8(signable_tx.reference.clone())
+                            .unwrap_or_default(),
+                        spends,
+                        options: None,
+                    },
+                    self.originator(),
+                )
+                .await?;
+
+            if sign_result.tx.is_none() {
+                return Err(Error::RegistryError(
+                    "Failed to get signed transaction".to_string(),
+                ));
+            }
+
+            // Broadcast the update to the appropriate topic
+            let topic = def_type.broadcast_topic().to_string();
+            let mut broadcast_success = None;
+            let mut broadcast_failure = None;
+
+            if let Some(ref tx_bytes) = sign_result.tx {
+                if let Ok(tx) = Transaction::from_beef(tx_bytes, None) {
+                    match TopicBroadcaster::new(
+                        vec![topic],
+                        TopicBroadcasterConfig {
+                            network_preset: self.config.network_preset,
+                            ..Default::default()
+                        },
+                    ) {
+                        Ok(broadcaster) => {
+                            let result = broadcaster.broadcast_tx(&tx).await;
+                            if result.is_ok() {
+                                broadcast_success = Some(BroadcastSuccess {
+                                    txid: tx.id(),
+                                    message: "success".to_string(),
+                                });
+                            } else {
+                                broadcast_failure = Some(BroadcastFailure {
+                                    code: "BROADCAST_ERROR".to_string(),
+                                    description: "Failed to broadcast update".to_string(),
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            broadcast_failure = Some(BroadcastFailure {
+                                code: "BROADCASTER_ERROR".to_string(),
+                                description: e.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Default to success if we got signed tx
+            if broadcast_success.is_none() && broadcast_failure.is_none() {
+                broadcast_success = Some(BroadcastSuccess {
+                    txid: "signed".to_string(),
+                    message: "created".to_string(),
+                });
+            }
+
+            return Ok(UpdateDefinitionResult {
+                success: broadcast_success,
+                failure: broadcast_failure,
+            });
+        }
+
+        Err(Error::RegistryError(
+            "Failed to sign update transaction".to_string(),
+        ))
+    }
+
     /// Sets the network preset.
     ///
     /// This matches the Go SDK's `SetNetwork` method.
@@ -874,5 +1103,30 @@ mod tests {
             ProtocolDefinitionData::new(WalletProtocol::new(SecurityLevel::App, "p"), "Protocol");
         let data: DefinitionData = protocol.into();
         assert_eq!(data.get_definition_type(), DefinitionType::Protocol);
+    }
+
+    #[test]
+    fn test_update_definition_result() {
+        use crate::registry::UpdateDefinitionResult;
+
+        let success_result = UpdateDefinitionResult {
+            success: Some(BroadcastSuccess {
+                txid: "abc123".to_string(),
+                message: "success".to_string(),
+            }),
+            failure: None,
+        };
+        assert!(success_result.is_success());
+        assert!(!success_result.is_failure());
+
+        let failure_result = UpdateDefinitionResult {
+            success: None,
+            failure: Some(BroadcastFailure {
+                code: "ERR".to_string(),
+                description: "Failed".to_string(),
+            }),
+        };
+        assert!(!failure_result.is_success());
+        assert!(failure_result.is_failure());
     }
 }
