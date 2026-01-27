@@ -63,7 +63,10 @@ fn test_sign_and_verify_roundtrip_anyone() {
 
     // Verify without recipient
     let valid = verify(message, &signature, None).unwrap();
-    assert!(valid, "Anyone signature should verify without recipient key");
+    assert!(
+        valid,
+        "Anyone signature should verify without recipient key"
+    );
 }
 
 #[test]
@@ -78,7 +81,10 @@ fn test_verify_with_different_key_fails() {
 
     // Try to verify with wrong recipient - should return error
     let result = verify(message, &signature, Some(&wrong_recipient));
-    assert!(result.is_err(), "Verification with wrong recipient should fail");
+    assert!(
+        result.is_err(),
+        "Verification with wrong recipient should fail"
+    );
 
     match result {
         Err(Error::MessageRecipientMismatch { expected, actual }) => {

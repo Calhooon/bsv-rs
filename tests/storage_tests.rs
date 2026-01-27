@@ -238,7 +238,10 @@ fn test_is_valid_url_accepts_valid_urls() {
     assert!(is_valid_url(&format!("uhrp://{}", TS_EXAMPLE_URL_BASE58)));
 
     // With web+uhrp:// prefix
-    assert!(is_valid_url(&format!("web+uhrp://{}", TS_EXAMPLE_URL_BASE58)));
+    assert!(is_valid_url(&format!(
+        "web+uhrp://{}",
+        TS_EXAMPLE_URL_BASE58
+    )));
 }
 
 #[test]
@@ -465,7 +468,10 @@ fn test_cross_sdk_is_valid_url() {
     // Valid URLs should return true
     assert!(is_valid_url(TS_EXAMPLE_URL_BASE58));
     assert!(is_valid_url(&format!("uhrp://{}", TS_EXAMPLE_URL_BASE58)));
-    assert!(is_valid_url(&format!("web+uhrp://{}", TS_EXAMPLE_URL_BASE58)));
+    assert!(is_valid_url(&format!(
+        "web+uhrp://{}",
+        TS_EXAMPLE_URL_BASE58
+    )));
 
     // Invalid checksum URL from TypeScript tests should return false
     assert!(!is_valid_url(TS_BAD_CHECKSUM_URL));
@@ -535,7 +541,10 @@ fn test_storage_downloader_config_local() {
         resolver: None,
         timeout_ms: Some(5000),
     };
-    assert_eq!(config.network_preset, bsv_sdk::overlay::NetworkPreset::Local);
+    assert_eq!(
+        config.network_preset,
+        bsv_sdk::overlay::NetworkPreset::Local
+    );
 }
 
 #[test]

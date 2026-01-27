@@ -1129,14 +1129,17 @@ mod tests {
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
         // Derive 5 addresses from BIP-44 path
-        let addresses =
-            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 5, true).unwrap();
+        let addresses = derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 5, true).unwrap();
 
         assert_eq!(addresses.len(), 5);
 
         // All addresses should be valid mainnet addresses (start with '1')
         for addr in &addresses {
-            assert!(addr.starts_with('1'), "Address should start with '1': {}", addr);
+            assert!(
+                addr.starts_with('1'),
+                "Address should start with '1': {}",
+                addr
+            );
         }
 
         // Addresses should all be different
@@ -1153,8 +1156,7 @@ mod tests {
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
         // Derive testnet addresses
-        let addresses =
-            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 3, false).unwrap();
+        let addresses = derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 3, false).unwrap();
 
         assert_eq!(addresses.len(), 3);
 
@@ -1191,8 +1193,7 @@ mod tests {
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
         // Derive 5 public keys
-        let pubkeys =
-            derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 5).unwrap();
+        let pubkeys = derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 5).unwrap();
 
         assert_eq!(pubkeys.len(), 5);
 
@@ -1221,8 +1222,7 @@ mod tests {
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
         // Derive public keys using the batch function
-        let pubkeys =
-            derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 3).unwrap();
+        let pubkeys = derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 3).unwrap();
 
         // Derive individually and compare
         for (i, pk) in pubkeys.iter().enumerate() {
@@ -1248,12 +1248,10 @@ mod tests {
         let xpub = account_key.neuter().unwrap();
 
         // Derive public keys from xpub (non-hardened derivation)
-        let pubkeys_from_xpub =
-            derive_public_keys_for_path(&xpub, "0", 0, 3).unwrap();
+        let pubkeys_from_xpub = derive_public_keys_for_path(&xpub, "0", 0, 3).unwrap();
 
         // Derive from xprv for comparison
-        let pubkeys_from_xprv =
-            derive_public_keys_for_path(&account_key, "0", 0, 3).unwrap();
+        let pubkeys_from_xprv = derive_public_keys_for_path(&account_key, "0", 0, 3).unwrap();
 
         // Should produce the same public keys
         for i in 0..3 {
@@ -1272,8 +1270,7 @@ mod tests {
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
         // Derive 0 addresses
-        let addresses =
-            derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 0, true).unwrap();
+        let addresses = derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 0, true).unwrap();
 
         assert!(addresses.is_empty());
     }
@@ -1284,8 +1281,7 @@ mod tests {
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
         // Derive 0 public keys
-        let pubkeys =
-            derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 0).unwrap();
+        let pubkeys = derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 0).unwrap();
 
         assert!(pubkeys.is_empty());
     }

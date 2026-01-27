@@ -118,7 +118,10 @@ mod key_deriver_tests {
             .unwrap();
 
         // Private key's public key should match derived public key
-        assert_eq!(priv_key.public_key().to_compressed(), pub_key.to_compressed());
+        assert_eq!(
+            priv_key.public_key().to_compressed(),
+            pub_key.to_compressed()
+        );
     }
 
     #[test]
@@ -172,7 +175,10 @@ mod key_deriver_tests {
             .derive_public_key(&protocol, key_id, &alice_cp, false)
             .unwrap();
 
-        assert_eq!(alice_pub.to_compressed(), alice_pub_from_bob.to_compressed());
+        assert_eq!(
+            alice_pub.to_compressed(),
+            alice_pub_from_bob.to_compressed()
+        );
     }
 
     #[test]
@@ -1045,7 +1051,10 @@ mod wire_protocol_tests {
 
         assert_eq!(reader.read_string().unwrap(), "Hello, Wire!");
         assert_eq!(reader.read_string().unwrap(), "");
-        assert_eq!(reader.read_string().unwrap(), "Unicode: \u{00fc}\u{00f1}\u{00ee}");
+        assert_eq!(
+            reader.read_string().unwrap(),
+            "Unicode: \u{00fc}\u{00f1}\u{00ee}"
+        );
     }
 
     #[test]
@@ -1058,7 +1067,10 @@ mod wire_protocol_tests {
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);
 
-        assert_eq!(reader.read_optional_string().unwrap(), Some("present".to_string()));
+        assert_eq!(
+            reader.read_optional_string().unwrap(),
+            Some("present".to_string())
+        );
         assert_eq!(reader.read_optional_string().unwrap(), None);
         assert_eq!(reader.read_optional_string().unwrap(), Some("".to_string()));
     }
@@ -1091,8 +1103,14 @@ mod wire_protocol_tests {
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);
 
-        assert_eq!(reader.read_counterparty().unwrap(), Some(Counterparty::Self_));
-        assert_eq!(reader.read_counterparty().unwrap(), Some(Counterparty::Anyone));
+        assert_eq!(
+            reader.read_counterparty().unwrap(),
+            Some(Counterparty::Self_)
+        );
+        assert_eq!(
+            reader.read_counterparty().unwrap(),
+            Some(Counterparty::Anyone)
+        );
         assert_eq!(reader.read_counterparty().unwrap(), None);
 
         match reader.read_counterparty().unwrap() {
@@ -1194,7 +1212,10 @@ mod wire_protocol_tests {
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);
 
-        assert_eq!(reader.read_optional_bytes().unwrap(), Some(vec![1, 2, 3, 4, 5]));
+        assert_eq!(
+            reader.read_optional_bytes().unwrap(),
+            Some(vec![1, 2, 3, 4, 5])
+        );
         assert_eq!(reader.read_optional_bytes().unwrap(), None);
         assert_eq!(reader.read_optional_bytes().unwrap(), Some(vec![]));
     }
@@ -1214,7 +1235,10 @@ mod wire_protocol_tests {
 
         assert_eq!(reader.read_query_mode().unwrap(), QueryMode::Any);
         assert_eq!(reader.read_query_mode().unwrap(), QueryMode::All);
-        assert_eq!(reader.read_optional_query_mode().unwrap(), Some(QueryMode::Any));
+        assert_eq!(
+            reader.read_optional_query_mode().unwrap(),
+            Some(QueryMode::Any)
+        );
         assert_eq!(reader.read_optional_query_mode().unwrap(), None);
     }
 
@@ -1231,9 +1255,18 @@ mod wire_protocol_tests {
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);
 
-        assert_eq!(reader.read_output_include().unwrap(), OutputInclude::LockingScripts);
-        assert_eq!(reader.read_output_include().unwrap(), OutputInclude::EntireTransactions);
-        assert_eq!(reader.read_optional_output_include().unwrap(), Some(OutputInclude::LockingScripts));
+        assert_eq!(
+            reader.read_output_include().unwrap(),
+            OutputInclude::LockingScripts
+        );
+        assert_eq!(
+            reader.read_output_include().unwrap(),
+            OutputInclude::EntireTransactions
+        );
+        assert_eq!(
+            reader.read_optional_output_include().unwrap(),
+            Some(OutputInclude::LockingScripts)
+        );
         assert_eq!(reader.read_optional_output_include().unwrap(), None);
     }
 
@@ -1280,10 +1313,22 @@ mod wire_protocol_tests {
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);
 
-        assert_eq!(reader.read_action_status().unwrap(), Some(ActionStatus::Completed));
-        assert_eq!(reader.read_action_status().unwrap(), Some(ActionStatus::Unprocessed));
-        assert_eq!(reader.read_action_status().unwrap(), Some(ActionStatus::Sending));
-        assert_eq!(reader.read_action_status().unwrap(), Some(ActionStatus::Failed));
+        assert_eq!(
+            reader.read_action_status().unwrap(),
+            Some(ActionStatus::Completed)
+        );
+        assert_eq!(
+            reader.read_action_status().unwrap(),
+            Some(ActionStatus::Unprocessed)
+        );
+        assert_eq!(
+            reader.read_action_status().unwrap(),
+            Some(ActionStatus::Sending)
+        );
+        assert_eq!(
+            reader.read_action_status().unwrap(),
+            Some(ActionStatus::Failed)
+        );
         assert_eq!(reader.read_action_status().unwrap(), None);
     }
 }

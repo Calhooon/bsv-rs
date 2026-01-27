@@ -116,10 +116,7 @@ fn test_known_certificate_type_from_unknown_id() {
 #[test]
 fn test_known_certificate_type_equality() {
     assert_eq!(KnownCertificateType::XCert, KnownCertificateType::XCert);
-    assert_ne!(
-        KnownCertificateType::XCert,
-        KnownCertificateType::EmailCert
-    );
+    assert_ne!(KnownCertificateType::XCert, KnownCertificateType::EmailCert);
 }
 
 #[test]
@@ -143,7 +140,10 @@ fn test_displayable_identity_from_key_long() {
     assert_eq!(identity.abbreviated_key, "02abc1...abcd");
     assert_eq!(identity.name, "02abc1...abcd"); // Name defaults to abbreviated key
     assert_eq!(identity.avatar_url, DefaultIdentityValues::AVATAR_URL);
-    assert_eq!(identity.badge_icon_url, DefaultIdentityValues::BADGE_ICON_URL);
+    assert_eq!(
+        identity.badge_icon_url,
+        DefaultIdentityValues::BADGE_ICON_URL
+    );
     assert_eq!(identity.badge_label, DefaultIdentityValues::BADGE_LABEL);
     assert_eq!(
         identity.badge_click_url,
@@ -508,7 +508,8 @@ fn test_identity_client_config_with_originator() {
 
 #[test]
 fn test_identity_client_config_with_network() {
-    let config = IdentityClientConfig::with_originator("myapp.com").with_network(NetworkPreset::Testnet);
+    let config =
+        IdentityClientConfig::with_originator("myapp.com").with_network(NetworkPreset::Testnet);
 
     assert_eq!(config.network_preset, NetworkPreset::Testnet);
     assert_eq!(config.originator, Some("myapp.com".to_string()));
@@ -516,8 +517,7 @@ fn test_identity_client_config_with_network() {
 
 #[test]
 fn test_identity_client_config_with_token_amount() {
-    let config =
-        IdentityClientConfig::with_originator("myapp.com").with_token_amount(100);
+    let config = IdentityClientConfig::with_originator("myapp.com").with_token_amount(100);
 
     assert_eq!(config.token_amount, 100);
 }
@@ -1059,11 +1059,20 @@ fn test_certificate_type_ids_are_base64() {
 
         // Should be valid base64
         let decoded = bsv_sdk::primitives::from_base64(type_id);
-        assert!(decoded.is_ok(), "Type ID for {:?} is not valid base64", cert_type);
+        assert!(
+            decoded.is_ok(),
+            "Type ID for {:?} is not valid base64",
+            cert_type
+        );
 
         // Should decode to 32 bytes (SHA-256 hash)
         let bytes = decoded.unwrap();
-        assert_eq!(bytes.len(), 32, "Type ID for {:?} should be 32 bytes", cert_type);
+        assert_eq!(
+            bytes.len(),
+            32,
+            "Type ID for {:?} should be 32 bytes",
+            cert_type
+        );
     }
 }
 

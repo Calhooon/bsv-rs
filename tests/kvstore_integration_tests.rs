@@ -796,7 +796,9 @@ fn test_interpreter_is_kvstore_token() {
 
     // Invalid: too few fields
     let small_pushdrop = PushDrop::new(pubkey.clone(), vec![b"only".to_vec(), b"two".to_vec()]);
-    assert!(!KVStoreInterpreter::is_kvstore_token(&small_pushdrop.lock()));
+    assert!(!KVStoreInterpreter::is_kvstore_token(
+        &small_pushdrop.lock()
+    ));
 }
 
 #[test]
@@ -841,8 +843,8 @@ fn test_kvstore_fields_empty_tags() {
         b"key".to_vec(),
         b"value".to_vec(),
         pubkey.to_compressed().to_vec(),
-        vec![],         // Empty tags field
-        vec![0u8; 64],  // Signature at index 5 for new format
+        vec![],        // Empty tags field
+        vec![0u8; 64], // Signature at index 5 for new format
     ];
 
     let pushdrop = PushDrop::new(pubkey.clone(), fields);
@@ -868,8 +870,8 @@ fn test_kvstore_fields_single_zero_byte_tags() {
         b"key".to_vec(),
         b"value".to_vec(),
         pubkey.to_compressed().to_vec(),
-        vec![0u8],      // Single zero byte tags (no tags marker)
-        vec![0u8; 64],  // Signature at index 5 for new format
+        vec![0u8],     // Single zero byte tags (no tags marker)
+        vec![0u8; 64], // Signature at index 5 for new format
     ];
 
     let pushdrop = PushDrop::new(pubkey.clone(), fields);
@@ -1111,7 +1113,9 @@ async fn test_local_kvstore_set_with_options() {
         .with_token_amount(50)
         .with_tags(vec!["test".to_string()]);
 
-    let result = store.set("key_with_opts", "value_with_opts", Some(opts)).await;
+    let result = store
+        .set("key_with_opts", "value_with_opts", Some(opts))
+        .await;
     assert!(result.is_ok());
 }
 
@@ -1202,9 +1206,7 @@ async fn test_local_kvstore_list_with_query() {
     let wallet = MockWallet::new();
     let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
 
-    let query = KVStoreQuery::new()
-        .with_key("specific_key")
-        .with_limit(10);
+    let query = KVStoreQuery::new().with_key("specific_key").with_limit(10);
 
     let result = store.list(Some(query)).await;
     assert!(result.is_ok());
@@ -1330,7 +1332,7 @@ fn test_kvstore_error_types() {
 #[test]
 fn test_kvstore_entry_with_unicode_values() {
     let entry = KVStoreEntry::new(
-        "unicode_key_\u{1F600}",      // Emoji in key
+        "unicode_key_\u{1F600}",       // Emoji in key
         "value_with_\u{4E2D}\u{6587}", // Chinese characters
         "controller",
         "proto",

@@ -936,10 +936,8 @@ mod tests {
         let bob = PrivateKey::random();
         let message = b"Hello Bob, from Alice!";
 
-        let encrypted =
-            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
-        let decrypted =
-            decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
+        let encrypted = encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+        let decrypted = decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
         assert_eq!(decrypted, message);
     }
 
@@ -949,8 +947,7 @@ mod tests {
         let bob = PrivateKey::random();
         let message = b"Test shared message";
 
-        let encrypted =
-            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+        let encrypted = encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
 
         // Should be valid base64
         let decoded = BASE64.decode(&encrypted);
@@ -984,10 +981,8 @@ mod tests {
         // Shared encryption
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let encrypted =
-            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
-        let decrypted =
-            decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
+        let encrypted = encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+        let decrypted = decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
         assert_eq!(decrypted, message);
     }
 
@@ -1004,10 +999,8 @@ mod tests {
         // Shared encryption
         let alice = PrivateKey::random();
         let bob = PrivateKey::random();
-        let encrypted =
-            encrypt_shared_base64(&message, &bob.public_key(), &alice).unwrap();
-        let decrypted =
-            decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
+        let encrypted = encrypt_shared_base64(&message, &bob.public_key(), &alice).unwrap();
+        let decrypted = decrypt_shared_base64(&encrypted, &bob, &alice.public_key()).unwrap();
         assert_eq!(decrypted, message);
     }
 
@@ -1031,8 +1024,7 @@ mod tests {
         let message = b"Secret for Bob";
 
         // Alice encrypts for Bob
-        let encrypted =
-            encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
+        let encrypted = encrypt_shared_base64(message, &bob.public_key(), &alice).unwrap();
 
         // Charlie tries to decrypt (should fail)
         let result = decrypt_shared_base64(&encrypted, &charlie, &alice.public_key());
