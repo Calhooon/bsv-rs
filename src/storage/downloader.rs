@@ -3,7 +3,9 @@
 //! Downloads files from UHRP URLs by resolving storage hosts via the overlay
 //! network lookup service and fetching content with hash verification.
 
-use crate::overlay::{LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset};
+use crate::overlay::{
+    LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
+};
 use crate::primitives::Reader;
 use crate::script::templates::PushDrop;
 use crate::transaction::Transaction;
@@ -15,9 +17,9 @@ use super::types::DownloadResult;
 use super::utils::is_valid_url;
 
 #[cfg(feature = "http")]
-use crate::primitives::hash::sha256;
-#[cfg(feature = "http")]
 use super::utils::get_hash_from_url;
+#[cfg(feature = "http")]
+use crate::primitives::hash::sha256;
 
 /// Configuration for StorageDownloader.
 #[derive(Clone)]
@@ -92,10 +94,7 @@ impl StorageDownloader {
             return Err(Error::InvalidBase58("Invalid UHRP URL".to_string()));
         }
 
-        let question = LookupQuestion::new(
-            "ls_uhrp",
-            serde_json::json!({ "uhrpUrl": uhrp_url }),
-        );
+        let question = LookupQuestion::new("ls_uhrp", serde_json::json!({ "uhrpUrl": uhrp_url }));
 
         let answer = self.resolver.query(&question, self.timeout_ms).await?;
 

@@ -16,8 +16,8 @@
 
 use crate::primitives::hash::{sha256, sha256d};
 use crate::primitives::{from_base58, to_base58};
-use crate::Result;
 use crate::Error;
+use crate::Result;
 
 /// UHRP URL prefix.
 pub const UHRP_PREFIX: &str = "uhrp://";
@@ -195,8 +195,7 @@ pub fn get_hash_from_url(url: &str) -> Result<[u8; 32]> {
     if prefix != UHRP_VERSION_PREFIX {
         return Err(Error::InvalidBase58(format!(
             "Bad prefix: expected {:02x}{:02x}, got {:02x}{:02x}",
-            UHRP_VERSION_PREFIX[0], UHRP_VERSION_PREFIX[1],
-            prefix[0], prefix[1]
+            UHRP_VERSION_PREFIX[0], UHRP_VERSION_PREFIX[1], prefix[0], prefix[1]
         )));
     }
 
@@ -432,9 +431,11 @@ mod tests {
     // =========================================================================
 
     /// TypeScript SDK test vector - known hash
-    const TS_EXAMPLE_HASH_HEX: &str = "1a5ec49a3f32cd56d19732e89bde5d81755ddc0fd8515dc8b226d47654139dca";
+    const TS_EXAMPLE_HASH_HEX: &str =
+        "1a5ec49a3f32cd56d19732e89bde5d81755ddc0fd8515dc8b226d47654139dca";
     /// TypeScript SDK test vector - known file content
-    const TS_EXAMPLE_FILE_HEX: &str = "687da27f04a112aa48f1cab2e7949f1eea4f7ba28319c1e999910cd561a634a05a3516e6db";
+    const TS_EXAMPLE_FILE_HEX: &str =
+        "687da27f04a112aa48f1cab2e7949f1eea4f7ba28319c1e999910cd561a634a05a3516e6db";
     /// TypeScript SDK test vector - expected URL (without uhrp:// prefix)
     const TS_EXAMPLE_URL_BASE58: &str = "XUT6PqWb3GP3LR7dmBMCJwZ3oo5g1iGCF3CrpzyuJCemkGu1WGoq";
 
@@ -490,7 +491,10 @@ mod tests {
         // Verify: isValidURL returns true for valid URLs
         assert!(is_valid_url(TS_EXAMPLE_URL_BASE58));
         assert!(is_valid_url(&format!("uhrp://{}", TS_EXAMPLE_URL_BASE58)));
-        assert!(is_valid_url(&format!("web+uhrp://{}", TS_EXAMPLE_URL_BASE58)));
+        assert!(is_valid_url(&format!(
+            "web+uhrp://{}",
+            TS_EXAMPLE_URL_BASE58
+        )));
 
         // Known bad URL from TypeScript tests (invalid checksum)
         let bad_url = "XUU7cTfy6fA6q2neLDmzPqJnGB6o18PXKoGaWLPrH1SeWLKgdCKq";

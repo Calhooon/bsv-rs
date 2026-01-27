@@ -199,11 +199,7 @@ impl Totp {
     /// // Invalid codes are rejected
     /// assert!(!Totp::validate(secret, "000000", None));
     /// ```
-    pub fn validate(
-        secret: &[u8],
-        passcode: &str,
-        options: Option<TotpValidateOptions>,
-    ) -> bool {
+    pub fn validate(secret: &[u8], passcode: &str, options: Option<TotpValidateOptions>) -> bool {
         let options = options.unwrap_or_default();
         let passcode = passcode.trim();
 
@@ -212,7 +208,10 @@ impl Totp {
             return false;
         }
 
-        let timestamp = options.options.timestamp.unwrap_or_else(current_unix_seconds);
+        let timestamp = options
+            .options
+            .timestamp
+            .unwrap_or_else(current_unix_seconds);
         let counter = timestamp / options.options.period;
 
         // Check current counter and adjacent counters within skew window
@@ -572,10 +571,7 @@ mod tests {
         };
         let code = Totp::generate(SHA1_SECRET, Some(options.clone()));
 
-        let validate_options = TotpValidateOptions {
-            options,
-            skew: 1,
-        };
+        let validate_options = TotpValidateOptions { options, skew: 1 };
         assert!(Totp::validate(SHA1_SECRET, &code, Some(validate_options)));
     }
 
@@ -587,7 +583,11 @@ mod tests {
             ..Default::default()
         };
         let validate_options = TotpValidateOptions { options, skew: 1 };
-        assert!(!Totp::validate(SHA1_SECRET, "000000", Some(validate_options)));
+        assert!(!Totp::validate(
+            SHA1_SECRET,
+            "000000",
+            Some(validate_options)
+        ));
     }
 
     #[test]
@@ -668,10 +668,18 @@ mod tests {
         };
 
         // Too short
-        assert!(!Totp::validate(SHA1_SECRET, "12345", Some(validate_options.clone())));
+        assert!(!Totp::validate(
+            SHA1_SECRET,
+            "12345",
+            Some(validate_options.clone())
+        ));
 
         // Too long
-        assert!(!Totp::validate(SHA1_SECRET, "1234567", Some(validate_options)));
+        assert!(!Totp::validate(
+            SHA1_SECRET,
+            "1234567",
+            Some(validate_options)
+        ));
     }
 
     #[test]
@@ -687,7 +695,11 @@ mod tests {
 
         // Should accept code with leading/trailing whitespace
         let padded_code = format!("  {}  ", code);
-        assert!(Totp::validate(SHA1_SECRET, &padded_code, Some(validate_options)));
+        assert!(Totp::validate(
+            SHA1_SECRET,
+            &padded_code,
+            Some(validate_options)
+        ));
     }
 
     #[test]

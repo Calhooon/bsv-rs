@@ -139,7 +139,11 @@ impl StorageUploader {
     /// File metadata if found.
     #[cfg(feature = "http")]
     pub async fn find_file(&self, uhrp_url: &str) -> Result<Option<FindFileData>> {
-        let url = format!("{}/find?uhrpUrl={}", self.base_url, urlencoding::encode(uhrp_url));
+        let url = format!(
+            "{}/find?uhrpUrl={}",
+            self.base_url,
+            urlencoding::encode(uhrp_url)
+        );
 
         let response = self
             .client
@@ -165,16 +169,16 @@ impl StorageUploader {
             description: Option<String>,
         }
 
-        let resp: FindResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::OverlayError(format!("Failed to parse findFile response: {}", e)))?;
+        let resp: FindResponse = response.json().await.map_err(|e| {
+            Error::OverlayError(format!("Failed to parse findFile response: {}", e))
+        })?;
 
         if resp.status == STATUS_ERROR {
             return Err(Error::OverlayError(format!(
                 "findFile returned an error: {} - {}",
                 resp.code.unwrap_or_else(|| "unknown-code".to_string()),
-                resp.description.unwrap_or_else(|| "no-description".to_string())
+                resp.description
+                    .unwrap_or_else(|| "no-description".to_string())
             )));
         }
 
@@ -223,16 +227,16 @@ impl StorageUploader {
             description: Option<String>,
         }
 
-        let resp: ListResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::OverlayError(format!("Failed to parse listUploads response: {}", e)))?;
+        let resp: ListResponse = response.json().await.map_err(|e| {
+            Error::OverlayError(format!("Failed to parse listUploads response: {}", e))
+        })?;
 
         if resp.status == STATUS_ERROR {
             return Err(Error::OverlayError(format!(
                 "listUploads returned an error: {} - {}",
                 resp.code.unwrap_or_else(|| "unknown-code".to_string()),
-                resp.description.unwrap_or_else(|| "no-description".to_string())
+                resp.description
+                    .unwrap_or_else(|| "no-description".to_string())
             )));
         }
 
@@ -300,16 +304,16 @@ impl StorageUploader {
             description: Option<String>,
         }
 
-        let resp: RenewResponse = response
-            .json()
-            .await
-            .map_err(|e| Error::OverlayError(format!("Failed to parse renewFile response: {}", e)))?;
+        let resp: RenewResponse = response.json().await.map_err(|e| {
+            Error::OverlayError(format!("Failed to parse renewFile response: {}", e))
+        })?;
 
         if resp.status == STATUS_ERROR {
             return Err(Error::OverlayError(format!(
                 "renewFile returned an error: {} - {}",
                 resp.code.unwrap_or_else(|| "unknown-code".to_string()),
-                resp.description.unwrap_or_else(|| "no-description".to_string())
+                resp.description
+                    .unwrap_or_else(|| "no-description".to_string())
             )));
         }
 
@@ -335,7 +339,11 @@ impl StorageUploader {
     }
 
     #[cfg(feature = "http")]
-    async fn get_upload_info(&self, file_size: usize, retention_minutes: u32) -> Result<UploadInfo> {
+    async fn get_upload_info(
+        &self,
+        file_size: usize,
+        retention_minutes: u32,
+    ) -> Result<UploadInfo> {
         let url = format!("{}/upload", self.base_url);
 
         let body = serde_json::json!({
@@ -399,8 +407,7 @@ impl StorageUploader {
             let body = response.text().await.unwrap_or_default();
             return Err(Error::OverlayError(format!(
                 "File upload failed: HTTP {} - {}",
-                status,
-                body
+                status, body
             )));
         }
 
@@ -424,8 +431,8 @@ mod tests {
 
     #[test]
     fn test_config_with_retention() {
-        let config = StorageUploaderConfig::new("https://storage.example.com")
-            .with_retention_minutes(1440);
+        let config =
+            StorageUploaderConfig::new("https://storage.example.com").with_retention_minutes(1440);
         assert_eq!(config.default_retention_minutes, 1440);
     }
 
