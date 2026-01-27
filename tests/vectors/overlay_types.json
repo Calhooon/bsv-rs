@@ -1,0 +1,130 @@
+{
+  "lookupQuestions": [
+    {
+      "description": "Basic SLAP lookup",
+      "service": "ls_slap",
+      "query": {
+        "protocol": "SHIP",
+        "domain": "https://example.com"
+      }
+    },
+    {
+      "description": "SHIP host discovery",
+      "service": "ls_ship",
+      "query": {
+        "topics": ["tm_mytopic"]
+      }
+    },
+    {
+      "description": "Custom service lookup",
+      "service": "ls_myservice",
+      "query": {
+        "key": "value",
+        "nested": {
+          "a": 1,
+          "b": "two"
+        }
+      }
+    }
+  ],
+  "lookupAnswers": {
+    "outputList": {
+      "type": "output-list",
+      "outputs": [
+        {
+          "beef": [1, 0, 190, 239],
+          "outputIndex": 0
+        },
+        {
+          "beef": [2, 0, 190, 239],
+          "outputIndex": 1,
+          "context": [99, 111, 110, 116, 101, 120, 116]
+        }
+      ]
+    },
+    "freeform": {
+      "type": "freeform",
+      "result": {
+        "status": "ok",
+        "data": [1, 2, 3]
+      }
+    },
+    "formula": {
+      "type": "formula",
+      "formulas": [
+        {
+          "outpoint": "abc123def456.0",
+          "historyFn": "getLatest"
+        }
+      ]
+    }
+  },
+  "admittanceInstructions": [
+    {
+      "description": "Outputs admitted",
+      "outputsToAdmit": [0, 1],
+      "coinsToRetain": [],
+      "coinsRemoved": null
+    },
+    {
+      "description": "Coins retained",
+      "outputsToAdmit": [],
+      "coinsToRetain": [0],
+      "coinsRemoved": null
+    },
+    {
+      "description": "Coins removed",
+      "outputsToAdmit": [0],
+      "coinsToRetain": [1],
+      "coinsRemoved": [2, 3]
+    },
+    {
+      "description": "Empty instructions",
+      "outputsToAdmit": [],
+      "coinsToRetain": [],
+      "coinsRemoved": null
+    }
+  ],
+  "taggedBeef": [
+    {
+      "description": "Single topic",
+      "beef": "0100beef",
+      "topics": ["tm_test"],
+      "offChainValues": null
+    },
+    {
+      "description": "Multiple topics",
+      "beef": "0200beef",
+      "topics": ["tm_topic1", "tm_topic2", "tm_topic3"],
+      "offChainValues": null
+    },
+    {
+      "description": "With off-chain values",
+      "beef": "0300beef",
+      "topics": ["tm_offchain"],
+      "offChainValues": "6f6666636861696e64617461"
+    }
+  ],
+  "protocols": [
+    {"input": "SHIP", "expected": "SHIP"},
+    {"input": "ship", "expected": "SHIP"},
+    {"input": "Ship", "expected": "SHIP"},
+    {"input": "SLAP", "expected": "SLAP"},
+    {"input": "slap", "expected": "SLAP"},
+    {"input": "Slap", "expected": "SLAP"}
+  ],
+  "networkPresets": {
+    "mainnet": {
+      "allowHttp": false,
+      "slapTrackerCount": 4
+    },
+    "testnet": {
+      "allowHttp": false,
+      "slapTrackerCount": 1
+    },
+    "local": {
+      "allowHttp": true,
+      "slapTrackerCount": 1
+    }
+  }
+}

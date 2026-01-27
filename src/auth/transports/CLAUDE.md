@@ -3,14 +3,14 @@
 
 ## Overview
 
-This module provides transport layer implementations for sending and receiving authentication messages in the BRC-31 (Authrite) protocol. It defines the `Transport` trait for pluggable transports and includes HTTP-based and mock implementations.
+This module provides transport layer implementations for sending and receiving authentication messages in the BRC-31 (Authrite) protocol. It defines the `Transport` trait for pluggable transports and includes HTTP-based and mock implementations. The HTTP transport implements BRC-104 for authenticated HTTP communication.
 
 ## Files
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with exports and usage examples | ~39 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 headers | ~447 |
+| `mod.rs` | Module root with exports and usage examples | ~42 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1100 |
 
 ## Key Exports
 
@@ -56,17 +56,17 @@ pub struct SimplifiedFetchTransport {
 }
 
 impl SimplifiedFetchTransport {
-    /// Creates a new HTTP transport.
     pub fn new(base_url: &str) -> Self
-
-    /// Returns the base URL.
     pub fn base_url(&self) -> &str
+    pub fn message_to_headers(&self, message: &AuthMessage) -> Vec<(String, String)>
+    pub fn headers_to_message_fields(&self, header_map: &[(String, String)])
+        -> Result<(Option<String>, Option<String>, Option<Vec<u8>>)>
 }
 ```
 
 Features:
 - Sends handshake messages (InitialRequest, InitialResponse, CertificateRequest, CertificateResponse) as JSON POST to `/.well-known/auth`
-- Sends General messages as JSON POST with auth headers
+- Sends General messages via BRC-104: deserializes payload as `HttpRequest`, makes actual HTTP request with auth headers, wraps response in `HttpResponse` payload
 - Automatically strips trailing slashes from base URL
 - Uses `reqwest` client (requires `http` feature)
 - Invokes registered callback with response messages
@@ -85,19 +85,10 @@ pub struct MockTransport {
 }
 
 impl MockTransport {
-    /// Creates a new mock transport.
     pub fn new() -> Self
-
-    /// Queues a response message.
     pub async fn queue_response(&self, message: AuthMessage)
-
-    /// Gets all sent messages.
     pub async fn get_sent_messages(&self) -> Vec<AuthMessage>
-
-    /// Clears sent messages.
     pub async fn clear_sent(&self)
-
-    /// Simulates receiving a message from the remote peer.
     pub async fn receive_message(&self, message: AuthMessage) -> Result<()>
 }
 ```
@@ -108,6 +99,47 @@ Features:
 - Simulates incoming messages via `receive_message()`
 - Thread-safe with `Arc<RwLock<...>>` for concurrent access
 - Implements `Default` and `Debug` traits
+
+### HttpRequest
+
+Deserialized HTTP request from General message payload (BRC-104):
+
+```rust
+pub struct HttpRequest {
+    pub request_id: [u8; 32],   // Request correlation ID
+    pub method: String,          // HTTP method (GET, POST, etc.)
+    pub url_postfix: String,     // URL path (e.g., "/api/users")
+    pub headers: Vec<(String, String)>,  // HTTP headers
+    pub body: Vec<u8>,           // Request body
+}
+
+impl HttpRequest {
+    pub fn from_payload(payload: &[u8]) -> Result<Self>
+    pub fn to_payload(&self) -> Vec<u8>
+}
+```
+
+Payload format: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
+
+### HttpResponse
+
+HTTP response to be serialized as General message payload (BRC-104):
+
+```rust
+pub struct HttpResponse {
+    pub request_id: [u8; 32],   // Request ID from response header
+    pub status: u16,             // HTTP status code
+    pub headers: Vec<(String, String)>,  // x-bsv-* and authorization headers
+    pub body: Vec<u8>,           // Response body
+}
+
+impl HttpResponse {
+    pub fn from_payload(payload: &[u8]) -> Result<Self>
+    pub fn to_payload(&self) -> Vec<u8>
+}
+```
+
+Payload format: `[request_id: 32][status: varint][headers: varint+pairs][body: varint+bytes]`
 
 ### BRC-104 HTTP Headers
 
@@ -132,9 +164,9 @@ pub mod headers {
 | `x-bsv-auth-identity-key` | Sender's public key | hex |
 | `x-bsv-auth-nonce` | Sender's nonce | base64 |
 | `x-bsv-auth-your-nonce` | Peer's previous nonce | base64 |
-| `x-bsv-auth-signature` | Message signature | base64 (DER) |
+| `x-bsv-auth-signature` | Message signature | base64 or hex |
 | `x-bsv-auth-message-type` | Message type | string |
-| `x-bsv-auth-request-id` | Request correlation ID | string |
+| `x-bsv-auth-request-id` | Request correlation ID | base64 |
 | `x-bsv-auth-requested-certificates` | Certificate requirements | JSON |
 
 ## Usage
@@ -146,6 +178,43 @@ use bsv_sdk::auth::transports::SimplifiedFetchTransport;
 
 let transport = SimplifiedFetchTransport::new("https://example.com");
 assert_eq!(transport.base_url(), "https://example.com");
+```
+
+### Creating HTTP Request Payloads
+
+```rust
+use bsv_sdk::auth::transports::HttpRequest;
+
+let request = HttpRequest {
+    request_id: [42u8; 32],
+    method: "POST".to_string(),
+    url_postfix: "/api/v1/users".to_string(),
+    headers: vec![
+        ("content-type".to_string(), "application/json".to_string()),
+    ],
+    body: b"{\"name\":\"Alice\"}".to_vec(),
+};
+
+let payload = request.to_payload();
+let decoded = HttpRequest::from_payload(&payload).unwrap();
+```
+
+### Creating HTTP Response Payloads
+
+```rust
+use bsv_sdk::auth::transports::HttpResponse;
+
+let response = HttpResponse {
+    request_id: [42u8; 32],
+    status: 200,
+    headers: vec![
+        ("content-type".to_string(), "application/json".to_string()),
+    ],
+    body: b"{\"id\":123}".to_vec(),
+};
+
+let payload = response.to_payload();
+let decoded = HttpResponse::from_payload(&payload).unwrap();
 ```
 
 ### Implementing a Custom Transport
@@ -168,7 +237,6 @@ impl Transport for MyTransport {
     }
 
     fn set_callback(&self, callback: Box<TransportCallback>) {
-        // Store the callback for incoming messages
         let store = self.callback.clone();
         tokio::spawn(async move {
             let mut cb = store.write().await;
@@ -177,7 +245,6 @@ impl Transport for MyTransport {
     }
 
     fn clear_callback(&self) {
-        // Clear the callback
         let store = self.callback.clone();
         tokio::spawn(async move {
             let mut cb = store.write().await;
@@ -193,8 +260,6 @@ impl Transport for MyTransport {
 use bsv_sdk::auth::transports::MockTransport;
 use bsv_sdk::auth::types::{AuthMessage, MessageType};
 use bsv_sdk::primitives::PrivateKey;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 #[tokio::test]
 async fn test_auth_flow() {
@@ -206,8 +271,7 @@ async fn test_auth_flow() {
     transport.set_callback(Box::new(move |msg| {
         let received = received_clone.clone();
         Box::pin(async move {
-            let mut r = received.write().await;
-            r.push(msg);
+            received.write().await.push(msg);
             Ok(())
         })
     }));
@@ -230,8 +294,7 @@ async fn test_auth_flow() {
     transport.send(&request).await.unwrap();
 
     // Verify sent messages
-    let sent = transport.get_sent_messages().await;
-    assert_eq!(sent.len(), 1);
+    assert_eq!(transport.get_sent_messages().await.len(), 1);
 }
 ```
 
@@ -243,8 +306,19 @@ async fn test_auth_flow() {
 |--------|---------|
 | `auth_url()` | Returns `{base_url}/.well-known/auth` |
 | `message_to_headers()` | Converts AuthMessage to HTTP header pairs |
-| `headers_to_message_fields()` | Parses HTTP headers into message fields |
+| `headers_to_message_fields()` | Parses HTTP headers into nonce, your_nonce, signature |
 | `invoke_callback()` | Invokes the registered callback with a message |
+
+### Varint Encoding (Internal)
+
+The module uses varint encoding for efficient payload serialization:
+
+| Function | Purpose |
+|----------|---------|
+| `read_varint(bytes)` | Reads a varint, returns `(value, bytes_consumed)` |
+| `write_varint(value)` | Writes a value as varint bytes |
+
+Varint sizes: 0-127 = 1 byte, 128-16383 = 2 bytes, 16384-2097151 = 3 bytes
 
 ## Message Routing
 
@@ -256,7 +330,18 @@ async fn test_auth_flow() {
 | `InitialResponse` | POST to `/.well-known/auth` as JSON |
 | `CertificateRequest` | POST to `/.well-known/auth` as JSON |
 | `CertificateResponse` | POST to `/.well-known/auth` as JSON |
-| `General` | POST to `/.well-known/auth` as JSON (with auth headers) |
+| `General` | BRC-104: Parse payload as `HttpRequest`, make HTTP request with auth headers, wrap response in `HttpResponse` payload |
+
+### General Message Flow (BRC-104)
+
+1. Deserialize `AuthMessage.payload` as `HttpRequest`
+2. Build HTTP request to `{base_url}{url_postfix}` with method from payload
+3. Add auth headers (version, identity_key, nonce, your_nonce, signature, request_id)
+4. Include original headers (`x-bsv-*`, `authorization`, `content-type`) excluding `x-bsv-auth-*`
+5. Send request with body from payload
+6. Parse response headers for required auth fields (version, identity_key, signature)
+7. Build `HttpResponse` payload with status, filtered headers, body
+8. Create response `AuthMessage` with payload and invoke callback
 
 ## Feature Flags
 
@@ -286,6 +371,15 @@ Error::AuthError("HTTP transport requires the 'http' feature".into())
 | `AuthError("HTTP request failed: {}")` | Network error from reqwest |
 | `AuthError("Auth endpoint returned {status}: {body}")` | Non-2xx HTTP response |
 | `AuthError("Failed to parse auth response: {}")` | Invalid JSON response |
+| `AuthError("General message must have payload")` | General message missing payload |
+| `AuthError("Payload too short for ...")` | Malformed payload during deserialization |
+| `AuthError("Invalid ... UTF-8: {}")` | Non-UTF8 string in payload |
+| `AuthError("Empty varint")` | Empty bytes when reading varint |
+| `AuthError("Varint too large")` | Varint exceeds 64-bit limit |
+| `AuthError("Incomplete varint")` | Truncated varint encoding |
+| `AuthError("Response missing required auth header: {}")` | Response lacks required BRC-104 header |
+| `AuthError("Invalid request ID length")` | Request ID not 32 bytes |
+| `AuthError("Missing identity key header")` | Response missing x-bsv-auth-identity-key |
 
 ## Testing
 
@@ -314,4 +408,4 @@ tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 - `../CLAUDE.md` - Auth module overview
 - `../types.rs` - AuthMessage and MessageType definitions
 - `../../wallet/CLAUDE.md` - Wallet module (WalletInterface)
-- `../../primitives/CLAUDE.md` - PublicKey, base64 encoding
+- `../../primitives/CLAUDE.md` - PublicKey, base64/hex encoding

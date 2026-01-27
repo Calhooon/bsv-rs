@@ -9,11 +9,16 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Purpose |
 |------|---------|
+| `auth_cross_sdk_tests.rs` | Auth cross-SDK certificate serialization tests (11 tests) |
+| `auth_integration_tests.rs` | Auth module integration tests (certificates, sessions, transport) |
 | `compat_bip39_tests.rs` | BIP-39 mnemonic tests with official TREZOR vectors (22 vectors) |
+| `compat_integration_tests.rs` | Compat module integration tests (BIP-32/39, BSM, ECIES, 31 tests) |
 | `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs |
 | `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors (15 vectors) |
 | `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests |
 | `integration_tests.rs` | Full workflow tests across all modules |
+| `overlay_cross_sdk_tests.rs` | Overlay cross-SDK admin token and type tests (13 tests) |
+| `overlay_integration_tests.rs` | Overlay module integration tests (60 tests) |
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle) |
@@ -26,7 +31,10 @@ Test vectors are stored in `tests/vectors/` and shared with the TypeScript and G
 
 | Vector File | Contents |
 |-------------|----------|
+| `auth_certificate.json` | Auth certificate serialization vectors (4 vectors) |
 | `brc42_private.json` | BRC-42 private key derivation vectors |
+| `overlay_admin_token.json` | Overlay SHIP/SLAP admin token vectors (4 vectors) |
+| `overlay_types.json` | Overlay type serialization vectors |
 | `brc42_public.json` | BRC-42 public key derivation vectors |
 | `symmetric_key.json` | Symmetric encryption test vectors |
 | `drbg.json` | HMAC-DRBG vectors (15 vectors for RFC 6979) |
@@ -89,6 +97,55 @@ BIP-39 mnemonic phrase tests using official TREZOR vectors (requires `compat` fe
 - `test_language_default` - Default language is English
 - `test_mnemonic_display` - Display trait implementation
 - `test_zero_leading_entropy` - Zero-leading entropy roundtrips correctly
+
+### Compat Integration Tests (`compat_integration_tests.rs`)
+
+Full workflow integration tests for the compat module (31 tests, requires `compat` feature):
+
+**BIP-39 + BIP-32 HD Wallet Integration**
+- `test_full_hd_wallet_generation_flow` - Generate mnemonic, create master key, derive child keys, generate addresses
+- `test_mnemonic_to_hd_key_helper` - Test generate_hd_key_from_mnemonic helper function
+- `test_extended_key_serialization_roundtrip` - xprv/xpub string serialization roundtrip
+- `test_hardened_derivation` - Hardened child key derivation (m/0')
+- `test_public_key_derivation_only` - Derive public children from public extended key
+- `test_testnet_hd_key_derivation` - Testnet network (tprv/tpub) derivation
+
+**Bitcoin Signed Message (BSM)**
+- `test_bsm_sign_verify_roundtrip` - Sign message, verify against address
+- `test_bsm_public_key_recovery` - Recover public key from signature
+- `test_bsm_compressed_and_uncompressed` - Both compressed and uncompressed signatures
+- `test_bsm_different_messages_different_signatures` - Different messages produce different signatures
+- `test_bsm_empty_and_long_messages` - Empty and 10KB message handling
+
+**ECIES Encryption**
+- `test_electrum_ecies_roundtrip` - Electrum-style ECIES encrypt/decrypt
+- `test_electrum_ecies_no_key_mode` - Electrum ECIES with no_key=true (omit ephemeral pubkey)
+- `test_bitcore_ecies_roundtrip` - Bitcore-style ECIES encrypt/decrypt
+- `test_bitcore_ecies_with_fixed_iv` - Deterministic encryption with fixed IV
+- `test_ecies_self_encryption` - Encrypt/decrypt with same key pair
+- `test_ecies_empty_and_large_messages` - Empty and 1MB message handling
+- `test_ecies_wrong_key_fails` - Decryption with wrong key fails
+
+**Base58 Encoding**
+- `test_base58_roundtrip` - Encode/decode roundtrip
+- `test_base58_leading_zeros` - Leading zero preservation
+- `test_base58_known_values` - Known Bitcoin Base58 test vectors
+
+**Cross-Module Integration**
+- `test_mnemonic_to_signed_message` - Generate mnemonic, derive key, sign message
+- `test_mnemonic_to_ecies_encryption` - Generate mnemonic, derive key, encrypt/decrypt
+
+**Error Handling**
+- `test_invalid_mnemonic_phrase` - Invalid mnemonic phrase rejected
+- `test_invalid_extended_key_string` - Invalid xprv/xpub strings rejected
+- `test_invalid_derivation_path` - Invalid BIP-32 paths rejected
+- `test_invalid_bsm_signature` - Invalid BSM signature format rejected
+- `test_invalid_ecies_ciphertext` - Truncated/corrupted ciphertext rejected
+
+**Type and Enum Tests**
+- `test_word_count_enum` - WordCount enum methods
+- `test_language_enum` - Language enum values
+- `test_network_enum` - Network (Mainnet/Testnet) enum
 
 ### Cross-SDK Compatibility (`cross_sdk_tests.rs`)
 
@@ -330,25 +387,170 @@ Transaction module tests (1027 lines, requires `transaction` feature flag):
 - ChainTracker verification: correct root passes, wrong root/height fails
 - Utility methods: contains, txids, compute_root(None), binary roundtrip
 
+### Auth Integration Tests (`auth_integration_tests.rs`)
+
+Auth module integration tests (requires `auth` feature):
+
+**Session Manager Tests**
+- `test_session_manager_lifecycle` - Session creation, lookup, removal, and clearing
+- `test_session_manager_identity_lookup` - Lookup by identity key, prefer authenticated sessions
+- `test_session_manager_prune_stale` - Prune sessions older than specified age
+
+**AuthMessage Tests**
+- `test_auth_message_validation` - Validation for different message types
+- `test_auth_message_signing_data` - Signing data construction for InitialResponse and General
+- `test_auth_message_key_id` - Key ID generation from nonces
+
+**Mock Transport Tests**
+- `test_mock_transport_multiple_responses` - Queue and receive multiple responses
+- `test_mock_transport_receive_message` - Receive messages via callback
+
+**HTTP Payload Tests**
+- `test_http_request_payload_complex` - Complex HTTP request roundtrip
+- `test_http_response_payload_with_headers` - HTTP response with headers roundtrip
+- `test_http_request_empty_values` - Empty values handling
+- `test_http_request_unicode_values` - Unicode content handling
+- `test_http_request_large_header_count` - 100 headers roundtrip
+
+**Certificate Tests**
+- `test_certificate_creation_and_signing` - Create, sign, and verify certificate
+- `test_certificate_binary_roundtrip` - Binary serialization roundtrip
+- `test_certificate_wrong_signer_fails` - Signing with wrong key fails
+- `test_verifiable_certificate_creation` - VerifiableCertificate with keyring
+- `test_certificate_json_roundtrip` - JSON serialization roundtrip
+- `test_verifiable_certificate_json_roundtrip` - VerifiableCertificate JSON roundtrip
+
+**RequestedCertificateSet Tests**
+- `test_requested_certificate_set_matching` - Certifier and type matching
+- `test_requested_certificate_set_json_roundtrip` - JSON serialization roundtrip
+
+**Peer Session Tests**
+- `test_peer_session_ready_states` - Ready state logic based on authentication and certificates
+- `test_peer_session_touch` - Touch updates last_update timestamp
+
+**Error Handling Tests**
+- `test_invalid_auth_version` - Invalid version is rejected
+- `test_duplicate_session_nonce_rejected` - Duplicate nonces are rejected
+- `test_session_without_nonce_rejected` - Sessions without nonce are rejected
+
+### Overlay Integration Tests (`overlay_integration_tests.rs`)
+
+Overlay module integration tests (60 tests, requires `overlay` feature):
+
+**Network Preset Tests**
+- `test_network_preset_slap_trackers` - SLAP tracker URLs for each preset
+- `test_network_preset_allow_http` - HTTP allowed only for Local preset
+- `test_network_preset_default_is_mainnet` - Default preset is Mainnet
+
+**Protocol Tests**
+- `test_protocol_parsing_case_insensitive` - SHIP/SLAP parsing case-insensitive
+- `test_protocol_str_roundtrip` - Protocol string roundtrip
+- `test_protocol_display` - Display trait implementation
+- `test_protocol_json_roundtrip` - JSON serialization roundtrip
+
+**LookupQuestion/Answer Tests**
+- `test_lookup_question_creation` - Question creation with service and query
+- `test_lookup_answer_output_list` - OutputList variant
+- `test_lookup_answer_freeform` - Freeform variant
+- `test_lookup_answer_empty_output_list` - Empty output list creation
+
+**TaggedBEEF Tests**
+- `test_tagged_beef_creation` - Basic creation with beef and topics
+- `test_tagged_beef_with_off_chain_values` - Creation with off-chain values
+- `test_tagged_beef_json_roundtrip` - JSON serialization roundtrip
+
+**AdmittanceInstructions Tests**
+- `test_admittance_instructions_empty` - Empty instructions has no activity
+- `test_admittance_instructions_with_activity` - Various activity combinations
+- `test_admittance_instructions_json_roundtrip` - JSON serialization roundtrip
+
+**TopicBroadcaster Tests**
+- `test_topic_broadcaster_valid_topics` - Valid topics accepted
+- `test_topic_broadcaster_invalid_topic_prefix` - Topics must start with "tm_"
+- `test_topic_broadcaster_empty_topics` - At least one topic required
+- `test_topic_broadcaster_mixed_valid_invalid` - Mixed valid/invalid rejected
+- `test_topic_broadcaster_config_defaults` - Default configuration values
+- `test_ship_broadcaster_alias` - SHIPBroadcaster and SHIPCast aliases work
+
+**RequireAck Tests**
+- `test_require_ack_variants` - All RequireAck variants
+- `test_require_ack_default_is_none` - Default is None
+
+**LookupResolverConfig Tests**
+- `test_lookup_resolver_default_config` - Default configuration values
+- `test_lookup_resolver_config_custom_values` - Custom configuration values
+- `test_lookup_resolver_config_with_host_overrides` - Host overrides
+- `test_lookup_resolver_config_with_additional_hosts` - Additional hosts
+
+**HostReputationTracker Tests**
+- `test_host_reputation_tracker_basic` - Record success, verify metrics
+- `test_host_reputation_tracker_failure` - Record failures, verify metrics
+- `test_host_reputation_tracker_success_resets_consecutive_failures` - Success resets failures
+- `test_host_reputation_tracker_ranking` - Host ranking by latency and failures
+- `test_host_reputation_tracker_config` - Custom config affects EMA calculation
+- `test_host_reputation_tracker_reset` - Reset clears all entries
+- `test_host_reputation_tracker_with_storage` - Storage persistence
+- `test_host_reputation_tracker_json_export_import` - JSON export/import
+- `test_host_reputation_tracker_json_import_invalid` - Invalid JSON rejected
+- `test_global_reputation_tracker` - Global singleton tracker
+
+**SyncHistorian Tests**
+- `test_sync_historian_single_transaction` - Single transaction processing
+- `test_sync_historian_chain_traversal` - Chain traversal in chronological order
+- `test_sync_historian_filtering` - Interpreter filtering
+- `test_sync_historian_with_context` - Context passing to interpreter
+- `test_sync_historian_cycle_prevention` - Cycle detection prevents infinite loops
+- `test_sync_historian_with_debug` - Debug and version configuration
+
+**Admin Token Tests**
+- `test_create_and_decode_ship_token` - SHIP token creation and decoding
+- `test_create_and_decode_slap_token` - SLAP token creation and decoding
+- `test_is_ship_token` - SHIP token detection
+- `test_is_slap_token` - SLAP token detection
+- `test_is_overlay_admin_token` - Admin token detection
+- `test_admin_token_identity_key_hex` - Identity key hex extraction
+- `test_decode_invalid_admin_token` - Invalid tokens rejected
+
+**HostResponse/ServiceMetadata Tests**
+- `test_host_response_success` - Success response creation
+- `test_host_response_failure` - Failure response creation
+- `test_service_metadata_default` - Default metadata values
+- `test_service_metadata_creation` - Custom metadata values
+
+**Constants Tests**
+- `test_overlay_constants` - Verify constants have reasonable values
+
 ## Running Tests
 
 ```bash
 # Run all integration tests
+cargo test --test auth_integration_tests --features auth
 cargo test --test compat_bip39_tests --features compat
+cargo test --test compat_integration_tests --features compat
 cargo test --test cross_sdk_tests
 cargo test --test drbg_tests
 cargo test --test ec_tests
 cargo test --test integration_tests
+cargo test --test overlay_integration_tests --features overlay
 cargo test --test script_vectors_tests
 cargo test --test sighash_tests
 cargo test --test template_tests
 cargo test --test transaction_tests --features transaction
+
+# Run all tests with full feature (includes all modules)
+cargo test --features full
 
 # Run all tests with transaction feature
 cargo test --features transaction
 
 # Run all tests with compat feature (includes BIP-39)
 cargo test --features compat
+
+# Run all tests with auth feature
+cargo test --features auth
+
+# Run all tests with overlay feature
+cargo test --features overlay
 
 # Run specific test
 cargo test --test integration_tests test_complete_payment_workflow
@@ -456,6 +658,8 @@ Tests are organized by feature area:
 - **script tests**: `script_vectors_tests.rs`, `template_tests.rs`
 - **transaction tests**: `sighash_tests.rs`, `transaction_tests.rs`
 - **compat tests**: `compat_bip39_tests.rs` (requires `compat` feature)
+- **auth tests**: `auth_integration_tests.rs` (requires `auth` feature)
+- **overlay tests**: `overlay_integration_tests.rs` (requires `overlay` feature)
 
 The `transaction_tests.rs` file uses nested modules for organization:
 - `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)

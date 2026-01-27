@@ -2,13 +2,53 @@
 //!
 //! Tracks success/failure rates and latency for overlay hosts,
 //! enabling intelligent host selection and automatic backoff.
+//!
+//! ## Persistence
+//!
+//! The tracker supports optional persistence via the `ReputationStorage` trait.
+//! This allows reputation data to survive application restarts.
+//!
+//! ```rust,ignore
+//! use bsv_sdk::overlay::host_reputation_tracker::{HostReputationTracker, ReputationStorage};
+//!
+//! // Custom storage implementation
+//! struct MyStorage { /* ... */ }
+//!
+//! impl ReputationStorage for MyStorage {
+//!     fn get(&self, key: &str) -> Option<String> { /* ... */ }
+//!     fn set(&self, key: &str, value: &str) { /* ... */ }
+//! }
+//!
+//! let storage = Box::new(MyStorage { /* ... */ });
+//! let tracker = HostReputationTracker::with_storage(storage);
+//! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+/// Storage trait for persisting reputation data.
+///
+/// Implement this trait to provide custom storage backends for reputation data.
+/// The default implementation uses in-memory storage only.
+pub trait ReputationStorage: Send + Sync {
+    /// Get a value by key.
+    fn get(&self, key: &str) -> Option<String>;
+
+    /// Set a value by key.
+    fn set(&self, key: &str, value: &str);
+
+    /// Remove a value by key.
+    fn remove(&self, key: &str);
+}
+
+/// Storage key for reputation data.
+const REPUTATION_STORAGE_KEY: &str = "bsv_overlay_host_reputation";
+
 /// Reputation entry for a single host.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HostReputationEntry {
     /// Host URL.
     pub host: String,
@@ -92,9 +132,12 @@ impl Default for ReputationConfig {
 ///
 /// Thread-safe implementation that records success/failure metrics
 /// and provides host ranking for optimal selection.
+///
+/// Supports optional persistence via the `ReputationStorage` trait.
 pub struct HostReputationTracker {
     entries: RwLock<HashMap<String, HostReputationEntry>>,
     config: ReputationConfig,
+    storage: Option<Box<dyn ReputationStorage>>,
 }
 
 impl Default for HostReputationTracker {
@@ -104,19 +147,66 @@ impl Default for HostReputationTracker {
 }
 
 impl HostReputationTracker {
-    /// Create a new tracker with default config.
+    /// Create a new tracker with default config and no persistence.
     pub fn new() -> Self {
         Self {
             entries: RwLock::new(HashMap::new()),
             config: ReputationConfig::default(),
+            storage: None,
         }
     }
 
-    /// Create with custom config.
+    /// Create with custom config and no persistence.
     pub fn with_config(config: ReputationConfig) -> Self {
         Self {
             entries: RwLock::new(HashMap::new()),
             config,
+            storage: None,
+        }
+    }
+
+    /// Create with storage backend for persistence.
+    ///
+    /// On creation, loads existing reputation data from storage if available.
+    pub fn with_storage(storage: Box<dyn ReputationStorage>) -> Self {
+        let entries = Self::load_from_storage(&*storage);
+        Self {
+            entries: RwLock::new(entries),
+            config: ReputationConfig::default(),
+            storage: Some(storage),
+        }
+    }
+
+    /// Create with custom config and storage backend.
+    ///
+    /// On creation, loads existing reputation data from storage if available.
+    pub fn with_config_and_storage(
+        config: ReputationConfig,
+        storage: Box<dyn ReputationStorage>,
+    ) -> Self {
+        let entries = Self::load_from_storage(&*storage);
+        Self {
+            entries: RwLock::new(entries),
+            config,
+            storage: Some(storage),
+        }
+    }
+
+    /// Load entries from storage.
+    fn load_from_storage(storage: &dyn ReputationStorage) -> HashMap<String, HostReputationEntry> {
+        storage
+            .get(REPUTATION_STORAGE_KEY)
+            .and_then(|json| serde_json::from_str(&json).ok())
+            .unwrap_or_default()
+    }
+
+    /// Save entries to storage (if storage is configured).
+    fn save_to_storage(&self) {
+        if let Some(ref storage) = self.storage {
+            let entries = self.entries.read().unwrap();
+            if let Ok(json) = serde_json::to_string(&*entries) {
+                storage.set(REPUTATION_STORAGE_KEY, &json);
+            }
         }
     }
 
@@ -151,6 +241,9 @@ impl HostReputationTracker {
             }
             None => safe_latency,
         });
+
+        drop(entries);
+        self.save_to_storage();
     }
 
     /// Record a failed request.
@@ -194,6 +287,9 @@ impl HostReputationTracker {
         } else {
             entry.backoff_until = 0;
         }
+
+        drop(entries);
+        self.save_to_storage();
     }
 
     /// Rank hosts by reputation.
@@ -261,8 +357,49 @@ impl HostReputationTracker {
     }
 
     /// Reset all tracking data.
+    ///
+    /// If storage is configured, clears stored data as well.
     pub fn reset(&self) {
         self.entries.write().unwrap().clear();
+        if let Some(ref storage) = self.storage {
+            storage.remove(REPUTATION_STORAGE_KEY);
+        }
+    }
+
+    /// Check if storage is configured.
+    pub fn has_storage(&self) -> bool {
+        self.storage.is_some()
+    }
+
+    /// Force save to storage.
+    ///
+    /// Normally, the tracker auto-saves after each update. Use this method
+    /// if you need to ensure data is persisted immediately.
+    pub fn flush(&self) {
+        self.save_to_storage();
+    }
+
+    /// Export all entries as JSON.
+    ///
+    /// Useful for debugging or manual persistence.
+    pub fn to_json(&self) -> String {
+        let entries = self.entries.read().unwrap();
+        serde_json::to_string(&*entries).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Import entries from JSON.
+    ///
+    /// Replaces all existing entries with the imported data.
+    pub fn from_json(&self, json: &str) -> bool {
+        if let Ok(entries) = serde_json::from_str::<HashMap<String, HostReputationEntry>>(json) {
+            let mut current = self.entries.write().unwrap();
+            *current = entries;
+            drop(current);
+            self.save_to_storage();
+            true
+        } else {
+            false
+        }
     }
 
     /// Compute reputation score for a host.
@@ -464,5 +601,137 @@ mod tests {
         let same_tracker = get_overlay_host_reputation_tracker();
         let entry = same_tracker.snapshot("global_test");
         assert!(entry.is_some());
+    }
+
+    #[test]
+    fn test_has_storage() {
+        let tracker = HostReputationTracker::new();
+        assert!(!tracker.has_storage());
+    }
+
+    #[test]
+    fn test_to_json() {
+        let tracker = HostReputationTracker::new();
+        tracker.record_success("host1", 100);
+
+        let json = tracker.to_json();
+        assert!(json.contains("host1"));
+        assert!(json.contains("totalSuccesses"));
+    }
+
+    #[test]
+    fn test_from_json_valid() {
+        let tracker = HostReputationTracker::new();
+        tracker.record_success("original", 50);
+
+        let json = r#"{"imported":{"host":"imported","totalSuccesses":10,"totalFailures":0,"consecutiveFailures":0,"avgLatencyMs":100.0,"lastLatencyMs":100,"backoffUntil":0,"lastUpdatedAt":0,"lastError":null}}"#;
+        let result = tracker.from_json(json);
+
+        assert!(result);
+        assert!(tracker.snapshot("imported").is_some());
+        // Original data should be replaced
+        assert!(tracker.snapshot("original").is_none());
+    }
+
+    #[test]
+    fn test_from_json_invalid() {
+        let tracker = HostReputationTracker::new();
+        tracker.record_success("original", 50);
+
+        let result = tracker.from_json("invalid json");
+
+        assert!(!result);
+        // Original data should be preserved
+        assert!(tracker.snapshot("original").is_some());
+    }
+
+    #[test]
+    fn test_serialization_roundtrip() {
+        let tracker = HostReputationTracker::new();
+        tracker.record_success("host1", 100);
+        tracker.record_success("host1", 150);
+        tracker.record_failure("host2", Some("test error"));
+
+        let json = tracker.to_json();
+
+        let tracker2 = HostReputationTracker::new();
+        tracker2.from_json(&json);
+
+        let entry1 = tracker2.snapshot("host1").unwrap();
+        assert_eq!(entry1.total_successes, 2);
+
+        let entry2 = tracker2.snapshot("host2").unwrap();
+        assert_eq!(entry2.total_failures, 1);
+        assert_eq!(entry2.last_error, Some("test error".to_string()));
+    }
+
+    /// Mock storage for testing persistence
+    struct MockStorage {
+        data: std::sync::Mutex<HashMap<String, String>>,
+    }
+
+    impl MockStorage {
+        fn new() -> Self {
+            Self {
+                data: std::sync::Mutex::new(HashMap::new()),
+            }
+        }
+    }
+
+    impl ReputationStorage for MockStorage {
+        fn get(&self, key: &str) -> Option<String> {
+            self.data.lock().unwrap().get(key).cloned()
+        }
+
+        fn set(&self, key: &str, value: &str) {
+            self.data
+                .lock()
+                .unwrap()
+                .insert(key.to_string(), value.to_string());
+        }
+
+        fn remove(&self, key: &str) {
+            self.data.lock().unwrap().remove(key);
+        }
+    }
+
+    #[test]
+    fn test_storage_persistence() {
+        let storage = Box::new(MockStorage::new());
+        let tracker = HostReputationTracker::with_storage(storage);
+
+        assert!(tracker.has_storage());
+
+        tracker.record_success("host1", 100);
+
+        // Check that data was saved
+        let entry = tracker.snapshot("host1").unwrap();
+        assert_eq!(entry.total_successes, 1);
+    }
+
+    #[test]
+    fn test_storage_load_on_create() {
+        // Create storage with pre-existing data
+        let storage = MockStorage::new();
+        let json = r#"{"preexisting":{"host":"preexisting","totalSuccesses":5,"totalFailures":0,"consecutiveFailures":0,"avgLatencyMs":50.0,"lastLatencyMs":50,"backoffUntil":0,"lastUpdatedAt":0,"lastError":null}}"#;
+        storage.set(REPUTATION_STORAGE_KEY, json);
+
+        // Create tracker with storage - should load existing data
+        let tracker = HostReputationTracker::with_storage(Box::new(storage));
+
+        let entry = tracker.snapshot("preexisting").unwrap();
+        assert_eq!(entry.total_successes, 5);
+    }
+
+    #[test]
+    fn test_storage_reset_clears_data() {
+        let storage = Box::new(MockStorage::new());
+        let tracker = HostReputationTracker::with_storage(storage);
+
+        tracker.record_success("host1", 100);
+        assert!(tracker.snapshot("host1").is_some());
+
+        tracker.reset();
+        assert!(tracker.snapshot("host1").is_none());
     }
 }

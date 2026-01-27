@@ -227,7 +227,7 @@ The lookup facilitator handles both JSON and binary response formats:
 
 ## LookupResolver
 
-Resolves lookup queries by discovering competent hosts via SLAP trackers.
+Resolves lookup queries by discovering competent hosts via SLAP trackers. Includes TX memoization cache for efficient deduplication of outputs across multiple hosts.
 
 ```rust
 pub struct LookupResolverConfig {
@@ -238,15 +238,29 @@ pub struct LookupResolverConfig {
     pub additional_hosts: Option<HashMap<String, Vec<String>>>,
     pub hosts_cache_ttl_ms: u64,
     pub hosts_cache_max_entries: usize,
+    pub tx_memo_ttl_ms: u64,            // TX memoization TTL (default 10 min)
+    pub tx_memo_max_entries: usize,      // TX memoization max entries (default 4096)
 }
 
 impl LookupResolver {
     pub fn new(config: LookupResolverConfig) -> Self
     pub async fn query(&self, question: &LookupQuestion, timeout_ms: Option<u64>) -> Result<LookupAnswer>
+
+    // TX memoization cache management
+    pub async fn prune_tx_memo_cache(&self) -> usize    // Remove expired entries
+    pub async fn tx_memo_cache_size(&self) -> usize     // Get current cache size
 }
 
 impl Default for LookupResolver { .. }
 ```
+
+**TX Memoization**: The resolver caches parsed transaction IDs from BEEF to avoid repeated parsing of the same transaction data. This improves performance when:
+- Multiple hosts return the same outputs
+- The same transaction is queried multiple times within the TTL window
+
+Outputs are deduplicated using `txId.outputIndex` as the unique key, matching TypeScript SDK behavior.
+
+**Request Coalescing**: Concurrent requests for the same service share a single SLAP tracker query. This prevents redundant network calls when multiple components simultaneously query the same lookup service. The implementation uses `tokio::sync::watch` channels to broadcast results to all waiting callers.
 
 **Validation**: Host override service names must start with `ls_` or the constructor will panic.
 
@@ -292,7 +306,7 @@ pub type SHIPCast = TopicBroadcaster;
 
 ## HostReputationTracker
 
-Tracks host performance for intelligent selection.
+Tracks host performance for intelligent selection. Thread-safe with `RwLock`.
 
 ```rust
 pub struct ReputationConfig {
@@ -305,45 +319,98 @@ pub struct ReputationConfig {
     pub success_bonus_ms: f64,      // Bonus per success (default: 30)
 }
 
+pub struct HostReputationEntry {
+    pub host: String,
+    pub total_successes: u64,
+    pub total_failures: u64,
+    pub consecutive_failures: u32,
+    pub avg_latency_ms: Option<f64>,
+    pub last_latency_ms: Option<u64>,
+    pub backoff_until: u64,
+    pub last_updated_at: u64,
+    pub last_error: Option<String>,
+}
+
+pub struct RankedHost {
+    pub entry: HostReputationEntry,
+    pub score: f64,  // Lower = better
+}
+
+/// Trait for custom storage backends
+pub trait ReputationStorage: Send + Sync {
+    fn get(&self, key: &str) -> Option<String>;
+    fn set(&self, key: &str, value: &str);
+    fn remove(&self, key: &str);
+}
+
 impl HostReputationTracker {
     pub fn new() -> Self
     pub fn with_config(config: ReputationConfig) -> Self
+    pub fn with_storage(storage: Box<dyn ReputationStorage>) -> Self
+    pub fn with_config_and_storage(config: ReputationConfig, storage: Box<dyn ReputationStorage>) -> Self
     pub fn record_success(&self, host: &str, latency_ms: u64)
     pub fn record_failure(&self, host: &str, reason: Option<&str>)
     pub fn rank_hosts(&self, hosts: &[String]) -> Vec<RankedHost>
+    pub fn rank_hosts_at(&self, hosts: &[String], now: u64) -> Vec<RankedHost>  // For testing
     pub fn snapshot(&self, host: &str) -> Option<HostReputationEntry>
     pub fn reset(&self)
+    pub fn has_storage(&self) -> bool
+    pub fn flush(&self)           // Force save to storage
+    pub fn to_json(&self) -> String    // Export as JSON
+    pub fn from_json(&self, json: &str) -> bool  // Import from JSON
 }
 
-// Global singleton
+// Global singleton (OnceLock)
 pub fn get_overlay_host_reputation_tracker() -> &'static HostReputationTracker
 ```
 
+**Persistence**: Implement `ReputationStorage` trait for custom storage backends. Data is automatically saved after each `record_success()` or `record_failure()` call. Use `with_storage()` to enable persistence.
+
+**Immediate backoff** is triggered for DNS errors (ERR_NAME_NOT_RESOLVED, ENOTFOUND, etc.).
+
 ## Historian
 
-Traverses transaction ancestry to build chronological history.
+Traverses transaction ancestry to build chronological history. Useful for protocols that track state changes over time (token transfers, key-value stores).
 
 ```rust
+/// Async interpreter function type
 pub type InterpreterFn<T, C> = Box<
-    dyn Fn(&Transaction, u32, Option<&C>) -> Pin<Box<dyn Future<Output = Option<T>> + Send>>
+    dyn Fn(&Transaction, u32, Option<&C>) -> Pin<Box<dyn Future<Output = Option<T>>>>
         + Send + Sync
 >;
 
-impl Historian<T, C> {
+pub struct HistorianConfig<T, C> {
+    pub debug: bool,
+    pub history_cache: Option<HashMap<String, Vec<T>>>,
+    pub interpreter_version: Option<String>,  // For cache invalidation
+    pub ctx_key_fn: Option<Box<dyn Fn(Option<&C>) -> String + Send + Sync>>,
+}
+
+impl<T, C> Historian<T, C> {
     pub fn new(interpreter: InterpreterFn<T, C>, config: HistorianConfig<T, C>) -> Self
     pub async fn build_history(&self, tx: &Transaction, ctx: Option<&C>) -> Result<Vec<T>>
 }
+```
 
-// Synchronous version
-impl SyncHistorian<T, C> {
+### SyncHistorian
+
+Synchronous version for simpler use cases that don't require async.
+
+```rust
+impl<T, C> SyncHistorian<T, C> {
     pub fn new<F>(interpreter: F) -> Self
+    where F: Fn(&Transaction, u32, Option<&C>) -> Option<T> + Send + Sync + 'static
+    pub fn with_debug(self, debug: bool) -> Self
+    pub fn with_version(self, version: impl Into<String>) -> Self
     pub fn build_history(&self, tx: &Transaction, ctx: Option<&C>) -> Vec<T>
 }
 ```
 
+Both versions return values in **chronological order** (oldest first) and prevent cycles via visited set.
+
 ## Admin Token Template
 
-Create and decode SHIP/SLAP advertisement tokens.
+Create and decode SHIP/SLAP advertisement tokens using PushDrop format.
 
 ```rust
 pub struct OverlayAdminTokenData {
@@ -351,6 +418,10 @@ pub struct OverlayAdminTokenData {
     pub identity_key: PublicKey,
     pub domain: String,
     pub topic_or_service: String,
+}
+
+impl OverlayAdminTokenData {
+    pub fn identity_key_hex(&self) -> String
 }
 
 pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdminTokenData>
@@ -365,6 +436,8 @@ pub fn is_overlay_admin_token(script: &LockingScript) -> bool
 pub fn is_ship_token(script: &LockingScript) -> bool
 pub fn is_slap_token(script: &LockingScript) -> bool
 ```
+
+**PushDrop Format**: 4 fields - protocol ("SHIP"/"SLAP"), identity key (33-byte pubkey), domain, topic/service.
 
 ## Usage Examples
 
@@ -503,22 +576,30 @@ The `TopicBroadcaster` supports flexible acknowledgment requirements:
 The `http` feature enables actual HTTP communication via `reqwest`.
 Without it, facilitators return errors indicating HTTP is not available.
 
-## Error Types
+## Error Handling
 
-| Error | Description |
-|-------|-------------|
-| `OverlayError(String)` | General overlay operation error |
-| `NoHostsFound(String)` | No hosts found for the requested service |
-| `OverlayBroadcastFailed(String)` | Broadcast operation failed |
+Overlay operations use `Error::OverlayError(String)` for failures. The `TopicBroadcaster` returns `BroadcastResult` (from the transaction module) with specific error codes:
+
+| Error Code | Description |
+|------------|-------------|
+| `ERR_BEEF_SERIALIZATION` | Transaction cannot be serialized to BEEF |
+| `ERR_HOST_DISCOVERY` | Failed to discover interested hosts |
+| `ERR_NO_HOSTS_INTERESTED` | No hosts want the transaction |
+| `ERR_ALL_HOSTS_REJECTED` | All hosts rejected the broadcast |
+| `ERR_REQUIRE_ACK_FAILED` | Acknowledgment requirements not met |
 
 ## Constants
 
-| Constant | Default | Description |
-|----------|---------|-------------|
-| `MAX_TRACKER_WAIT_TIME_MS` | 5000 | SLAP tracker query timeout |
-| `MAX_SHIP_QUERY_TIMEOUT_MS` | 5000 | SHIP host discovery timeout |
+All constants are exported from `types.rs`:
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `MAX_TRACKER_WAIT_TIME_MS` | 5000 | SLAP tracker query timeout (ms) |
+| `MAX_SHIP_QUERY_TIMEOUT_MS` | 5000 | SHIP host discovery timeout (ms) |
 | `DEFAULT_HOSTS_CACHE_TTL_MS` | 300000 | Hosts cache TTL (5 minutes) |
-| `DEFAULT_HOSTS_CACHE_MAX_ENTRIES` | 128 | Max cached services |
+| `DEFAULT_HOSTS_CACHE_MAX_ENTRIES` | 128 | Max cached service entries |
+| `DEFAULT_TX_MEMO_TTL_MS` | 600000 | TX memoization cache TTL (10 minutes) |
+| `DEFAULT_TX_MEMO_MAX_ENTRIES` | 4096 | Max TX memoization cache entries |
 
 ## Related Documentation
 

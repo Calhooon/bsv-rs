@@ -1,0 +1,30 @@
+[
+  {
+    "description": "SHIP admin token for topic tm_test",
+    "protocol": "SHIP",
+    "identityKeyHex": "028e2e075e1e57ba4c62c90125468109f9b4e2a7741da3dd76ccd0c73b2a8a37ad",
+    "domain": "https://example.com",
+    "topicOrService": "tm_test"
+  },
+  {
+    "description": "SLAP admin token for service ls_lookup",
+    "protocol": "SLAP",
+    "identityKeyHex": "03c644fe2fd97673a5d86555a58587e7936390be6582ece262bc387014bcff6fe4",
+    "domain": "https://lookup.bsvb.tech",
+    "topicOrService": "ls_lookup"
+  },
+  {
+    "description": "SHIP admin token with localhost domain",
+    "protocol": "SHIP",
+    "identityKeyHex": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+    "domain": "http://localhost:8080",
+    "topicOrService": "tm_local_topic"
+  },
+  {
+    "description": "SLAP admin token for SLAP tracker service",
+    "protocol": "SLAP",
+    "identityKeyHex": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+    "domain": "https://overlay-us-1.bsvb.tech",
+    "topicOrService": "ls_slap"
+  }
+]

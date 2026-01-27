@@ -314,4 +314,5 @@ Test coverage includes:
 - `../CLAUDE.md` - Parent compatibility module documentation
 - `./wordlists/CLAUDE.md` - Wordlist submodule documentation
 - `../../primitives/CLAUDE.md` - Cryptographic primitives used for hashing and PBKDF2
-- `../../../tests/compat_bip39_tests.rs` - Integration test vectors
+- `../../../tests/compat_bip39_tests.rs` - BIP-39 test vectors and cross-SDK compatibility tests
+- `../../../tests/compat_integration_tests.rs` - Full workflow integration tests (BIP-39 + BIP-32)

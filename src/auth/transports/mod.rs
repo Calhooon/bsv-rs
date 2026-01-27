@@ -36,4 +36,7 @@
 
 pub mod http;
 
-pub use http::{headers, MockTransport, SimplifiedFetchTransport, Transport, TransportCallback};
+pub use http::{
+    headers, HttpRequest, HttpResponse, MockTransport, SimplifiedFetchTransport, Transport,
+    TransportCallback,
+};

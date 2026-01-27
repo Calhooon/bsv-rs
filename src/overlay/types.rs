@@ -316,6 +316,12 @@ pub const DEFAULT_HOSTS_CACHE_TTL_MS: u64 = 5 * 60 * 1000;
 /// Default maximum entries in hosts cache.
 pub const DEFAULT_HOSTS_CACHE_MAX_ENTRIES: usize = 128;
 
+/// Default TTL for TX memoization cache (milliseconds) - 10 minutes.
+pub const DEFAULT_TX_MEMO_TTL_MS: u64 = 10 * 60 * 1000;
+
+/// Default maximum entries in TX memoization cache.
+pub const DEFAULT_TX_MEMO_MAX_ENTRIES: usize = 4096;
+
 #[cfg(test)]
 mod tests {
     use super::*;

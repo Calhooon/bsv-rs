@@ -71,7 +71,7 @@ pub use historian::{Historian, HistorianConfig, InterpreterFn, SyncHistorian};
 // Re-exports from host_reputation_tracker
 pub use host_reputation_tracker::{
     get_overlay_host_reputation_tracker, HostReputationEntry, HostReputationTracker, RankedHost,
-    ReputationConfig,
+    ReputationConfig, ReputationStorage,
 };
 
 // Re-exports from lookup_resolver
@@ -92,6 +92,6 @@ pub use topic_broadcaster::{
 pub use types::{
     AdmittanceInstructions, HostResponse, LookupAnswer, LookupAnswerType, LookupFormula,
     LookupQuestion, NetworkPreset, OutputListItem, Protocol, ServiceMetadata, Steak, TaggedBEEF,
-    DEFAULT_HOSTS_CACHE_MAX_ENTRIES, DEFAULT_HOSTS_CACHE_TTL_MS, MAX_SHIP_QUERY_TIMEOUT_MS,
-    MAX_TRACKER_WAIT_TIME_MS,
+    DEFAULT_HOSTS_CACHE_MAX_ENTRIES, DEFAULT_HOSTS_CACHE_TTL_MS, DEFAULT_TX_MEMO_MAX_ENTRIES,
+    DEFAULT_TX_MEMO_TTL_MS, MAX_SHIP_QUERY_TIMEOUT_MS, MAX_TRACKER_WAIT_TIME_MS,
 };

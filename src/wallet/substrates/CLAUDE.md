@@ -9,10 +9,10 @@ This module provides transport substrates for communicating with BSV wallets ove
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, constants, re-exports | ~65 |
-| `http_wire.rs` | Binary wire protocol over HTTP | ~240 |
-| `http_json.rs` | JSON API over HTTP | ~810 |
-| `CLAUDE.md` | This documentation | ~280 |
+| `mod.rs` | Module root, constants, re-exports | ~64 |
+| `http_wire.rs` | Binary wire protocol over HTTP | ~238 |
+| `http_json.rs` | JSON API over HTTP | ~811 |
+| `CLAUDE.md` | This documentation | ~260 |
 
 ## Available Substrates
 
