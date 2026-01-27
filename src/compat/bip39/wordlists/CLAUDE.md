@@ -9,7 +9,7 @@ This module provides the official BIP-39 wordlists used for encoding entropy as 
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module declaration, re-exports, and verification function |
+| `mod.rs` | Module declaration, re-exports, verification function, and tests |
 | `english.rs` | Official BIP-39 English wordlist (2048 words) |
 
 ## Key Exports
@@ -27,13 +27,19 @@ A static array containing the 2048 words from the official BIP-39 English wordli
 ### `verify_english_wordlist()`
 
 ```rust
+#[inline]
 pub fn verify_english_wordlist() -> bool
 ```
 
-Runtime verification function that checks the English wordlist matches the BIP-39 specification. Returns `true` if:
+Runtime verification function that checks the English wordlist matches the BIP-39 specification. The function is marked `#[inline]` for performance. Returns `true` if:
 - Array contains exactly 2048 words (also enforced at compile-time by the type)
 - First word is "abandon"
 - Last word is "zoo"
+
+Implementation:
+```rust
+ENGLISH.len() == 2048 && ENGLISH[0] == "abandon" && ENGLISH[2047] == "zoo"
+```
 
 ## Wordlist Integrity
 
@@ -114,8 +120,10 @@ Last 10 words (indices 2038-2047):
 
 The module includes tests in `mod.rs`:
 
-- `test_english_wordlist_integrity`: Verifies correct word count and boundary words (checks indices 0, 1, 2046, 2047)
-- `test_wordlist_is_sorted_first_chars`: Confirms alphabetical ordering by comparing first and last words
+| Test | Purpose |
+|------|---------|
+| `test_english_wordlist_integrity` | Verifies correct word count (2048) and boundary words at indices 0, 1, 2046, 2047 |
+| `test_wordlist_is_sorted_first_chars` | Confirms alphabetical ordering by comparing first and last words ("abandon" < "zoo") |
 
 ## Adding New Languages
 

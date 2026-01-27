@@ -71,7 +71,7 @@ pub mod private_key;
 pub mod public_key;
 pub mod signature;
 
-pub use ecdsa::{recover_public_key, sign, verify};
+pub use ecdsa::{calculate_recovery_id, recover_public_key, sign, verify};
 pub use private_key::PrivateKey;
 pub use public_key::PublicKey;
 pub use signature::Signature;

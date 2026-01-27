@@ -60,6 +60,12 @@ pub mod messages;
 #[cfg(feature = "compat")]
 pub mod compat;
 
+#[cfg(feature = "auth")]
+pub mod auth;
+
+#[cfg(feature = "overlay")]
+pub mod overlay;
+
 // Convenience re-exports from primitives (most common items)
 #[cfg(feature = "primitives")]
 pub use primitives::{
@@ -89,3 +95,19 @@ pub use messages::{decrypt, encrypt, sign, verify};
 // Convenience re-exports from compat
 #[cfg(feature = "compat")]
 pub use compat::{Language, Mnemonic, WordCount};
+
+// Convenience re-exports from auth
+#[cfg(feature = "auth")]
+pub use auth::{
+    AuthMessage, Certificate, MasterCertificate, MessageType, Peer, PeerOptions, PeerSession,
+    RequestedCertificateSet, SessionManager, SimplifiedFetchTransport, Transport,
+    VerifiableCertificate,
+};
+
+// Convenience re-exports from overlay
+#[cfg(feature = "overlay")]
+pub use overlay::{
+    LookupAnswer, LookupQuestion, LookupResolver, NetworkPreset, Steak, TaggedBEEF,
+    TopicBroadcaster,
+};
+// Note: overlay::Protocol is separate from wallet::Protocol

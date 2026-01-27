@@ -9,7 +9,7 @@ This module provides secp256k1 elliptic curve operations for Bitcoin SV, includi
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key` |
+| `mod.rs` | Module root; re-exports `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id` |
 | `private_key.rs` | secp256k1 private key: generation, WIF encoding, signing, ECDH, BRC-42 child derivation |
 | `public_key.rs` | secp256k1 public key: serialization, address generation, verification, point arithmetic, BRC-42 child derivation |
 | `signature.rs` | ECDSA signature: DER/compact encoding, low-S normalization (BIP 62) |
@@ -291,7 +291,7 @@ The HMAC uses compressed shared secret as the key and invoice number bytes as th
 - Deserializes from any valid hex public key (compressed or uncompressed)
 
 ```rust
-use bsv_sdk::primitives::ec::PublicKey;
+use bsv_sdk::primitives::ec::{PrivateKey, PublicKey};
 
 // Serializes to JSON as a hex string
 let pubkey = PrivateKey::random().public_key();
@@ -315,6 +315,28 @@ let recovered: PublicKey = serde_json::from_str(&json).unwrap();
 - `k256` - secp256k1 elliptic curve operations (RustCrypto)
 - `subtle` - Constant-time operations
 - Internal: `BigNumber` for BRC-42 scalar arithmetic, `hash::sha256_hmac` for HMAC
+
+## Trait Implementations
+
+### PrivateKey
+- `Clone` - Deep copy
+- `Debug` - Shows public key only (security)
+- `PartialEq`, `Eq` - Constant-time comparison via `subtle::ConstantTimeEq`
+- `Drop` - k256::SecretKey auto-zeros on drop
+
+### PublicKey
+- `Clone` - Deep copy
+- `Debug` - Shows compressed hex
+- `Display` - Outputs compressed hex
+- `PartialEq`, `Eq` - Compares compressed bytes
+- `Hash` - Hash of compressed bytes
+- `Serialize`, `Deserialize` - Hex string format
+
+### Signature
+- `Clone` - Deep copy
+- `Debug` - Shows r and s as hex
+- `Display` - Outputs DER hex
+- `PartialEq`, `Eq` - Compares r and s
 
 ## Related
 

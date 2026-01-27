@@ -186,6 +186,72 @@ pub enum Error {
     #[cfg(feature = "compat")]
     #[error("invalid word in mnemonic: {0}")]
     InvalidMnemonicWord(String),
+
+    /// Invalid extended key.
+    #[cfg(feature = "compat")]
+    #[error("invalid extended key: {0}")]
+    InvalidExtendedKey(String),
+
+    /// Cannot derive hardened child from public key.
+    #[cfg(feature = "compat")]
+    #[error("cannot derive hardened child from public key")]
+    HardenedFromPublic,
+
+    /// Invalid derivation path.
+    #[cfg(feature = "compat")]
+    #[error("invalid derivation path: {0}")]
+    InvalidDerivationPath(String),
+
+    /// ECIES decryption failed.
+    #[cfg(feature = "compat")]
+    #[error("ECIES decryption failed: {0}")]
+    EciesDecryptionFailed(String),
+
+    /// ECIES HMAC verification failed.
+    #[cfg(feature = "compat")]
+    #[error("ECIES HMAC verification failed")]
+    EciesHmacMismatch,
+
+    // ===================
+    // Auth errors
+    // ===================
+    /// General authentication error.
+    #[cfg(feature = "auth")]
+    #[error("authentication error: {0}")]
+    AuthError(String),
+
+    /// Session not found.
+    #[cfg(feature = "auth")]
+    #[error("session not found: {0}")]
+    SessionNotFound(String),
+
+    /// Certificate validation failed.
+    #[cfg(feature = "auth")]
+    #[error("certificate validation failed: {0}")]
+    CertificateValidationError(String),
+
+    /// Transport error.
+    #[cfg(feature = "auth")]
+    #[error("transport error: {0}")]
+    TransportError(String),
+
+    // ===================
+    // Overlay errors
+    // ===================
+    /// General overlay error.
+    #[cfg(feature = "overlay")]
+    #[error("overlay error: {0}")]
+    OverlayError(String),
+
+    /// No hosts found for service.
+    #[cfg(feature = "overlay")]
+    #[error("no hosts found for service: {0}")]
+    NoHostsFound(String),
+
+    /// Broadcast to overlay failed.
+    #[cfg(feature = "overlay")]
+    #[error("overlay broadcast failed: {0}")]
+    OverlayBroadcastFailed(String),
 }
 
 /// Result type alias for BSV SDK operations.

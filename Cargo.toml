@@ -22,6 +22,8 @@ p256 = "0.13"
 
 # Symmetric Encryption (for later phases)
 aes-gcm = "0.10"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
 
 # Big Integers
 num-bigint = "0.4"
@@ -54,6 +56,12 @@ lazy_static = "1.4"
 # HTTP client (optional, for broadcasters and chain trackers)
 reqwest = { version = "0.12", features = ["json"], optional = true }
 
+# Async runtime (optional, for auth module)
+tokio = { version = "1", features = ["sync", "time", "rt"], optional = true }
+
+# Async futures (for overlay module parallel operations)
+futures = "0.3"
+
 [dev-dependencies]
 criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros"] }
@@ -66,8 +74,10 @@ transaction = ["script"]
 wallet = ["transaction"]
 messages = ["wallet"]
 compat = ["primitives"]
+auth = ["wallet", "messages", "dep:tokio"]
+overlay = ["wallet", "dep:tokio"]
 wasm = ["getrandom/js"]
-full = ["primitives", "script", "transaction", "wallet", "messages", "compat"]
+full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "auth", "overlay"]
 http = ["dep:reqwest"]
 
 [[bench]]
