@@ -414,7 +414,7 @@ impl Script {
         } else if len < 65536 {
             op = OP_PUSHDATA2;
             data = Some(bin.to_vec());
-        } else if len < 0x100000000 {
+        } else if (len as u64) < 0x100000000 {
             op = OP_PUSHDATA4;
             data = Some(bin.to_vec());
         } else {

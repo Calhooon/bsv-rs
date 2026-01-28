@@ -4,13 +4,14 @@
 //! Provides parsing, serialization, signing, and fee computation functionality.
 
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use serde_json::Value;
 
 use super::beef::Beef;
 use super::beef_tx::BEEF_V2;
 use super::input::TransactionInput;
+use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
 use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
@@ -57,6 +58,12 @@ pub struct Transaction {
     /// This is not included in the serialized transaction.
     pub metadata: HashMap<String, Value>,
 
+    /// Merkle path (BRC-74 BUMP) proving this transaction is in a block.
+    ///
+    /// When set, indicates this transaction has been mined and has SPV proof.
+    /// Used by `to_beef()` to determine when to stop walking the ancestry chain.
+    pub merkle_path: Option<MerklePath>,
+
     // Caches for serialization and hashing
     cached_hash: RefCell<Option<[u8; 32]>>,
     raw_bytes_cache: RefCell<Option<Vec<u8>>>,
@@ -101,6 +108,7 @@ impl Transaction {
             outputs: Vec::new(),
             lock_time: 0,
             metadata: HashMap::new(),
+            merkle_path: None,
             cached_hash: RefCell::new(None),
             raw_bytes_cache: RefCell::new(None),
             hex_cache: RefCell::new(None),
@@ -120,6 +128,7 @@ impl Transaction {
             outputs,
             lock_time,
             metadata: HashMap::new(),
+            merkle_path: None,
             cached_hash: RefCell::new(None),
             raw_bytes_cache: RefCell::new(None),
             hex_cache: RefCell::new(None),
@@ -451,33 +460,195 @@ impl Transaction {
 
     /// Serializes this transaction to BEEF format.
     ///
+    /// This method walks the `source_transaction` chain for each input,
+    /// collecting all ancestor transactions and their merkle proofs until
+    /// it reaches transactions that are proven (have a `merkle_path`).
+    ///
     /// # Arguments
     ///
-    /// * `allow_partial` - If true, allows incomplete proofs
+    /// * `allow_partial` - If true, skips inputs with missing source transactions.
+    ///   If false, returns an error if any source transaction is missing.
     ///
     /// # Returns
     ///
-    /// The BEEF binary data.
-    pub fn to_beef(&self, _allow_partial: bool) -> Result<Vec<u8>> {
+    /// The BEEF binary data containing this transaction and all required ancestors.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `allow_partial` is false and any input is missing
+    /// its source transaction.
+    pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>> {
         let mut beef = Beef::with_version(BEEF_V2);
-        beef.merge_transaction(self.clone());
+
+        // Collect all ancestors in dependency order
+        let mut seen_txids: HashSet<String> = HashSet::new();
+        let mut ancestors: Vec<Transaction> = Vec::new();
+        let mut bumps: Vec<MerklePath> = Vec::new();
+        let mut bump_index_by_root: HashMap<String, usize> = HashMap::new();
+
+        self.collect_ancestors(
+            allow_partial,
+            &mut seen_txids,
+            &mut ancestors,
+            &mut bumps,
+            &mut bump_index_by_root,
+        )?;
+
+        // Add all collected merkle paths to the BEEF
+        for bump in bumps {
+            beef.merge_bump(bump);
+        }
+
+        // Add all ancestor transactions in dependency order (oldest first)
+        for ancestor in ancestors {
+            beef.merge_transaction(ancestor);
+        }
+
         Ok(beef.to_binary())
     }
 
     /// Serializes this transaction to Atomic BEEF format.
     ///
+    /// The Atomic BEEF format (BRC-95) includes a 4-byte prefix `0x01010101`,
+    /// followed by this transaction's TXID, and then the BEEF data containing
+    /// only this transaction and its dependencies.
+    ///
     /// # Arguments
     ///
-    /// * `allow_partial` - If true, allows incomplete proofs
+    /// * `allow_partial` - If true, skips inputs with missing source transactions.
+    ///   If false, returns an error if any source transaction is missing.
     ///
     /// # Returns
     ///
     /// The Atomic BEEF binary data.
-    pub fn to_atomic_beef(&self, _allow_partial: bool) -> Result<Vec<u8>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `allow_partial` is false and any input is missing
+    /// its source transaction.
+    pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>> {
         let mut beef = Beef::with_version(BEEF_V2);
-        beef.merge_transaction(self.clone());
+
+        // Collect all ancestors in dependency order
+        let mut seen_txids: HashSet<String> = HashSet::new();
+        let mut ancestors: Vec<Transaction> = Vec::new();
+        let mut bumps: Vec<MerklePath> = Vec::new();
+        let mut bump_index_by_root: HashMap<String, usize> = HashMap::new();
+
+        self.collect_ancestors(
+            allow_partial,
+            &mut seen_txids,
+            &mut ancestors,
+            &mut bumps,
+            &mut bump_index_by_root,
+        )?;
+
+        // Add all collected merkle paths to the BEEF
+        for bump in bumps {
+            beef.merge_bump(bump);
+        }
+
+        // Add all ancestor transactions in dependency order (oldest first)
+        for ancestor in ancestors {
+            beef.merge_transaction(ancestor);
+        }
+
         let txid = self.id();
         beef.to_binary_atomic(&txid)
+    }
+
+    /// Recursively collects ancestor transactions and their merkle proofs.
+    ///
+    /// This implements the same algorithm as the TypeScript and Go SDKs:
+    /// - If this transaction has a merkle_path (is proven), add it and stop recursion
+    /// - Otherwise, recursively collect ancestors from each input's source_transaction
+    /// - Ancestors are returned in dependency order (oldest first)
+    /// - Merkle proofs are deduplicated by block height and computed root
+    ///
+    /// # Arguments
+    ///
+    /// * `allow_partial` - If true, skip inputs with missing source transactions
+    /// * `seen_txids` - Set of already-processed txids (for cycle detection)
+    /// * `ancestors` - Output vector of ancestor transactions in dependency order
+    /// * `bumps` - Output vector of deduplicated merkle paths
+    /// * `bump_index_by_root` - Map from "height:root" to bump index for deduplication
+    fn collect_ancestors(
+        &self,
+        allow_partial: bool,
+        seen_txids: &mut HashSet<String>,
+        ancestors: &mut Vec<Transaction>,
+        bumps: &mut Vec<MerklePath>,
+        bump_index_by_root: &mut HashMap<String, usize>,
+    ) -> Result<()> {
+        let txid = self.id();
+
+        // Check for cycles - if we've already seen this transaction, skip it
+        if seen_txids.contains(&txid) {
+            return Ok(());
+        }
+
+        // If this transaction has a merkle proof, it's proven (mined)
+        // Add the proof and transaction, then stop recursion
+        if let Some(ref merkle_path) = self.merkle_path {
+            // Deduplicate merkle proofs by block height and computed root
+            let root = merkle_path.compute_root(Some(&txid)).unwrap_or_default();
+            let key = format!("{}:{}", merkle_path.block_height, root);
+
+            if let Some(&existing_idx) = bump_index_by_root.get(&key) {
+                // Combine with existing bump at same height/root
+                if bumps[existing_idx].combine(merkle_path).is_err() {
+                    // If combine fails, just add as new
+                    let new_idx = bumps.len();
+                    bumps.push(merkle_path.clone());
+                    bump_index_by_root.insert(key, new_idx);
+                }
+            } else {
+                // Add as new bump
+                let new_idx = bumps.len();
+                bumps.push(merkle_path.clone());
+                bump_index_by_root.insert(key, new_idx);
+            }
+
+            // Mark as seen and add to ancestors
+            seen_txids.insert(txid);
+            ancestors.push(self.clone());
+            return Ok(());
+        }
+
+        // Transaction is not proven - recursively collect ancestors from inputs
+        // Process inputs in reverse order (like TypeScript SDK) for correct dependency order
+        for i in (0..self.inputs.len()).rev() {
+            let input = &self.inputs[i];
+
+            if let Some(ref source_tx) = input.source_transaction {
+                // Recursively collect ancestors from this source transaction
+                source_tx.collect_ancestors(
+                    allow_partial,
+                    seen_txids,
+                    ancestors,
+                    bumps,
+                    bump_index_by_root,
+                )?;
+            } else if !allow_partial {
+                // Missing source transaction and not allowing partial
+                let source_txid = input
+                    .source_txid
+                    .as_deref()
+                    .unwrap_or("unknown");
+                return Err(crate::Error::TransactionError(format!(
+                    "Missing source transaction for input {} (txid: {}). \
+                     Set allow_partial=true to skip missing source transactions.",
+                    i, source_txid
+                )));
+            }
+            // If allow_partial and source_transaction is None, just skip this input
+        }
+
+        // After processing all ancestors, add this transaction
+        seen_txids.insert(txid);
+        ancestors.push(self.clone());
+
+        Ok(())
     }
 
     /// Invalidates all serialization caches.

@@ -244,6 +244,28 @@ impl Beef {
         &self.txs[idx]
     }
 
+    /// Converts an existing transaction to txid-only format.
+    ///
+    /// This is used to trim known transactions from BEEF before returning to caller,
+    /// reducing the BEEF size when the recipient already has the full transaction.
+    ///
+    /// Returns the modified BeefTx if found, None if txid not in BEEF.
+    pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx> {
+        let idx = *self.txid_index.get(txid)?;
+
+        // If already txid-only, just return it
+        if self.txs[idx].is_txid_only() {
+            return Some(&self.txs[idx]);
+        }
+
+        // Replace with txid-only version
+        let new_tx = BeefTx::from_txid(txid.to_string());
+        self.txs[idx] = new_tx;
+        self.mark_mutated();
+
+        Some(&self.txs[idx])
+    }
+
     /// Removes an existing transaction by txid.
     fn remove_existing_txid(&mut self, txid: &str) {
         if let Some(&idx) = self.txid_index.get(txid) {
@@ -713,6 +735,51 @@ mod tests {
         assert_eq!(beef.txs.len(), 1);
         assert!(beef.txs[0].is_txid_only());
         assert!(beef.find_txid(&txid).is_some());
+    }
+
+    #[test]
+    fn test_make_txid_only() {
+        let mut beef = Beef::new();
+
+        // Create a simple raw transaction (minimal valid tx)
+        // Version (4) + input count (1) + input (41) + output count (1) + output (9) + locktime (4)
+        let raw_tx = vec![
+            0x01, 0x00, 0x00, 0x00, // version
+            0x01, // input count
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // prev txid (32 bytes)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, // vout
+            0x00, // script length
+            0xff, 0xff, 0xff, 0xff, // sequence
+            0x01, // output count
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // satoshis
+            0x00, // script length
+            0x00, 0x00, 0x00, 0x00, // locktime
+        ];
+
+        let beef_tx = beef.merge_raw_tx(raw_tx, None);
+        let txid = beef_tx.txid();
+
+        // Verify it's not txid-only
+        assert!(!beef.txs[0].is_txid_only());
+
+        // Convert to txid-only
+        let result = beef.make_txid_only(&txid);
+        assert!(result.is_some());
+        assert!(beef.txs[0].is_txid_only());
+
+        // Verify the txid is still findable
+        assert!(beef.find_txid(&txid).is_some());
+
+        // Converting again should succeed (already txid-only)
+        let result2 = beef.make_txid_only(&txid);
+        assert!(result2.is_some());
+
+        // Non-existent txid should return None
+        let fake_txid = "b".repeat(64);
+        assert!(beef.make_txid_only(&fake_txid).is_none());
     }
 
     #[test]

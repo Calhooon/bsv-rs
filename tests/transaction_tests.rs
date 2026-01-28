@@ -780,6 +780,356 @@ mod transaction_tests {
     }
 
     // ===================
+    // BEEF Ancestry Collection Tests (BRC-62/95)
+    // Tests for Transaction::to_beef() walking the sourceTransaction chain
+    // ===================
+
+    mod beef_ancestry_tests {
+        use super::*;
+        use bsv_sdk::transaction::{Beef, MerklePath};
+
+        /// Creates a test transaction with a unique version number
+        fn create_test_tx(version: u32) -> Transaction {
+            let mut tx = Transaction::new();
+            tx.version = version;
+            tx.add_output(TransactionOutput::new(1000, LockingScript::new()))
+                .unwrap();
+            tx
+        }
+
+        /// Creates a transaction that spends from source transaction's output
+        fn create_child_tx(source: &Transaction, vout: u32) -> Transaction {
+            let mut tx = Transaction::new();
+            tx.add_input(TransactionInput::with_source_transaction(
+                source.clone(),
+                vout,
+            ))
+            .unwrap();
+            tx.add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+            tx
+        }
+
+        /// Creates a transaction with merkle proof (simulating a mined transaction)
+        fn create_proven_tx(version: u32, block_height: u32) -> Transaction {
+            let mut tx = create_test_tx(version);
+            let txid = tx.id();
+            tx.merkle_path = Some(MerklePath::from_coinbase_txid(&txid, block_height));
+            tx
+        }
+
+        #[test]
+        fn test_to_beef_single_transaction_no_ancestors() {
+            // Single transaction with no inputs should produce valid BEEF
+            let tx = create_test_tx(1);
+            let beef_bytes = tx.to_beef(true).unwrap();
+
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+            assert_eq!(beef.txs.len(), 1, "Should have 1 transaction");
+            assert!(beef.find_txid(&tx.id()).is_some(), "Should find the transaction");
+        }
+
+        #[test]
+        fn test_to_beef_walks_two_level_ancestry() {
+            // Create: grandparent -> parent -> child
+            let grandparent = create_proven_tx(1, 100);
+            let parent = create_child_tx(&grandparent, 0);
+            let child = create_child_tx(&parent, 0);
+
+            // to_beef on child should include all ancestors
+            let beef_bytes = child.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            assert_eq!(beef.txs.len(), 3, "Should have 3 transactions");
+            assert!(
+                beef.find_txid(&grandparent.id()).is_some(),
+                "Should include grandparent"
+            );
+            assert!(
+                beef.find_txid(&parent.id()).is_some(),
+                "Should include parent"
+            );
+            assert!(
+                beef.find_txid(&child.id()).is_some(),
+                "Should include child"
+            );
+        }
+
+        #[test]
+        fn test_to_beef_walks_three_level_ancestry() {
+            // Create: great-grandparent -> grandparent -> parent -> child
+            let great_grandparent = create_proven_tx(1, 100);
+            let grandparent = create_child_tx(&great_grandparent, 0);
+            let parent = create_child_tx(&grandparent, 0);
+            let child = create_child_tx(&parent, 0);
+
+            let beef_bytes = child.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            assert_eq!(beef.txs.len(), 4, "Should have 4 transactions");
+            assert!(
+                beef.find_txid(&great_grandparent.id()).is_some(),
+                "Should include great-grandparent"
+            );
+            assert!(
+                beef.find_txid(&grandparent.id()).is_some(),
+                "Should include grandparent"
+            );
+            assert!(
+                beef.find_txid(&parent.id()).is_some(),
+                "Should include parent"
+            );
+            assert!(
+                beef.find_txid(&child.id()).is_some(),
+                "Should include child"
+            );
+        }
+
+        #[test]
+        fn test_to_beef_stops_at_proven_transaction() {
+            // Create: grandparent (proven) -> parent -> child
+            // BEEF should only go back to grandparent, not further
+            let grandparent = create_proven_tx(1, 100);
+            let parent = create_child_tx(&grandparent, 0);
+            let child = create_child_tx(&parent, 0);
+
+            let beef_bytes = child.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            // Should have grandparent's merkle proof
+            assert!(!beef.bumps.is_empty(), "Should have merkle proofs");
+            assert_eq!(beef.bumps[0].block_height, 100, "Proof should be at height 100");
+        }
+
+        #[test]
+        fn test_to_beef_collects_merkle_proofs() {
+            // Create two proven ancestors at different heights
+            let ancestor1 = create_proven_tx(1, 100);
+            let ancestor2 = create_proven_tx(2, 200);
+
+            // Create tx spending from both
+            let mut child = Transaction::new();
+            child
+                .add_input(TransactionInput::with_source_transaction(
+                    ancestor1.clone(),
+                    0,
+                ))
+                .unwrap();
+            child
+                .add_input(TransactionInput::with_source_transaction(
+                    ancestor2.clone(),
+                    0,
+                ))
+                .unwrap();
+            child
+                .add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+
+            let beef_bytes = child.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            // Should have merkle proofs at both heights
+            assert!(beef.bumps.len() >= 2, "Should have at least 2 merkle proofs");
+        }
+
+        #[test]
+        fn test_to_beef_allow_partial_false_fails_on_missing() {
+            // Create child with only TXID reference (no source transaction)
+            let mut child = Transaction::new();
+            let fake_txid = "a".repeat(64);
+            child
+                .add_input(TransactionInput::new(fake_txid, 0))
+                .unwrap();
+            child
+                .add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+
+            // Should fail with allow_partial=false
+            let result = child.to_beef(false);
+            assert!(
+                result.is_err(),
+                "Should fail when source transaction is missing and allow_partial=false"
+            );
+
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains("Missing source transaction"),
+                "Error should mention missing source transaction"
+            );
+        }
+
+        #[test]
+        fn test_to_beef_allow_partial_true_skips_missing() {
+            // Create child with only TXID reference (no source transaction)
+            let mut child = Transaction::new();
+            let fake_txid = "a".repeat(64);
+            child
+                .add_input(TransactionInput::new(fake_txid, 0))
+                .unwrap();
+            child
+                .add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+
+            // Should succeed with allow_partial=true
+            let result = child.to_beef(true);
+            assert!(
+                result.is_ok(),
+                "Should succeed when allow_partial=true even with missing source"
+            );
+
+            let beef = Beef::from_binary(&result.unwrap()).unwrap();
+            assert_eq!(beef.txs.len(), 1, "Should only have the child transaction");
+        }
+
+        #[test]
+        fn test_to_beef_handles_diamond_dependency() {
+            // Create diamond: A (with 2 outputs) -> B (from output 0), A -> C (from output 1), B -> D, C -> D
+            // D should only include A once despite A being ancestor of both B and C
+            let mut a = Transaction::new();
+            a.version = 1;
+            a.merkle_path = Some(MerklePath::from_coinbase_txid(&"a".repeat(64), 100));
+            // A needs two outputs so B and C can each spend different ones
+            a.add_output(TransactionOutput::new(1000, LockingScript::new()))
+                .unwrap();
+            a.add_output(TransactionOutput::new(1000, LockingScript::new()))
+                .unwrap();
+            // Update merkle path with actual txid
+            let a_txid = a.id();
+            a.merkle_path = Some(MerklePath::from_coinbase_txid(&a_txid, 100));
+
+            let b = create_child_tx(&a, 0); // B spends A's output 0
+            let c = create_child_tx(&a, 1); // C spends A's output 1
+
+            // D spends from both B and C
+            let mut d = Transaction::new();
+            d.add_input(TransactionInput::with_source_transaction(b.clone(), 0))
+                .unwrap();
+            d.add_input(TransactionInput::with_source_transaction(c.clone(), 0))
+                .unwrap();
+            d.add_output(TransactionOutput::new(200, LockingScript::new()))
+                .unwrap();
+
+            let beef_bytes = d.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            // Count how many times A appears (should be exactly once)
+            let a_count = beef.txs.iter().filter(|t| t.txid() == a.id()).count();
+            assert_eq!(a_count, 1, "Transaction A should appear exactly once (deduplication)");
+
+            // Total should be 4: A, B, C, D
+            assert_eq!(beef.txs.len(), 4, "Should have 4 unique transactions");
+        }
+
+        #[test]
+        fn test_to_beef_dependency_order() {
+            // Verify transactions are in dependency order (ancestors before descendants)
+            let grandparent = create_proven_tx(1, 100);
+            let parent = create_child_tx(&grandparent, 0);
+            let child = create_child_tx(&parent, 0);
+
+            let beef_bytes = child.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+
+            let gp_idx = txids.iter().position(|t| t == &grandparent.id()).unwrap();
+            let p_idx = txids.iter().position(|t| t == &parent.id()).unwrap();
+            let c_idx = txids.iter().position(|t| t == &child.id()).unwrap();
+
+            assert!(
+                gp_idx < p_idx,
+                "Grandparent must come before parent in BEEF"
+            );
+            assert!(p_idx < c_idx, "Parent must come before child in BEEF");
+        }
+
+        #[test]
+        fn test_to_atomic_beef_includes_ancestry() {
+            // Verify to_atomic_beef also walks ancestry correctly
+            let grandparent = create_proven_tx(1, 100);
+            let parent = create_child_tx(&grandparent, 0);
+            let child = create_child_tx(&parent, 0);
+
+            let atomic_beef_bytes = child.to_atomic_beef(true).unwrap();
+            let beef = Beef::from_binary(&atomic_beef_bytes).unwrap();
+
+            // Should be atomic BEEF
+            assert!(beef.is_atomic(), "Should be atomic BEEF");
+            assert_eq!(
+                beef.atomic_txid,
+                Some(child.id()),
+                "Atomic txid should be child's txid"
+            );
+
+            // Should include full ancestry
+            assert_eq!(beef.txs.len(), 3, "Atomic BEEF should include all ancestors");
+        }
+
+        #[test]
+        fn test_to_beef_with_proven_child() {
+            // If the child itself is proven, BEEF should just contain the child
+            let proven_tx = create_proven_tx(1, 100);
+
+            let beef_bytes = proven_tx.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            assert_eq!(beef.txs.len(), 1, "Proven tx with no unproven ancestors should have 1 tx");
+            assert!(!beef.bumps.is_empty(), "Should have merkle proof");
+        }
+
+        #[test]
+        fn test_merkle_path_field_works() {
+            // Verify the merkle_path field can be set and checked
+            let mut tx = create_test_tx(1);
+            assert!(tx.merkle_path.is_none(), "New tx should have no merkle_path");
+
+            let txid = tx.id();
+            tx.merkle_path = Some(MerklePath::from_coinbase_txid(&txid, 12345));
+            assert!(tx.merkle_path.is_some(), "Should have merkle_path after setting");
+            assert_eq!(tx.merkle_path.as_ref().unwrap().block_height, 12345);
+        }
+
+        #[test]
+        fn test_to_beef_multiple_inputs_different_chains() {
+            // Create two separate chains and merge at one transaction
+            let chain1_root = create_proven_tx(1, 100);
+            let chain1_child = create_child_tx(&chain1_root, 0);
+
+            let chain2_root = create_proven_tx(2, 200);
+            let chain2_child = create_child_tx(&chain2_root, 0);
+
+            // Merge transaction spends from both chains
+            let mut merge_tx = Transaction::new();
+            merge_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain1_child.clone(),
+                    0,
+                ))
+                .unwrap();
+            merge_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain2_child.clone(),
+                    0,
+                ))
+                .unwrap();
+            merge_tx
+                .add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+
+            let beef_bytes = merge_tx.to_beef(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            // Should have all 5 transactions: 2 roots + 2 children + 1 merge
+            assert_eq!(beef.txs.len(), 5, "Should include both chains");
+
+            // Should have proofs at both heights
+            let heights: Vec<u32> = beef.bumps.iter().map(|b| b.block_height).collect();
+            assert!(heights.contains(&100), "Should have proof at height 100");
+            assert!(heights.contains(&200), "Should have proof at height 200");
+        }
+    }
+
+    // ===================
     // Cross-SDK Compatibility Tests
     // ===================
 
