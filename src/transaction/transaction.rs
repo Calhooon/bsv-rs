@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 use serde_json::Value;
 
 use super::beef::Beef;
-use super::beef_tx::BEEF_V2;
+use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
@@ -479,6 +479,54 @@ impl Transaction {
     /// its source transaction.
     pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>> {
         let mut beef = Beef::with_version(BEEF_V2);
+
+        // Collect all ancestors in dependency order
+        let mut seen_txids: HashSet<String> = HashSet::new();
+        let mut ancestors: Vec<Transaction> = Vec::new();
+        let mut bumps: Vec<MerklePath> = Vec::new();
+        let mut bump_index_by_root: HashMap<String, usize> = HashMap::new();
+
+        self.collect_ancestors(
+            allow_partial,
+            &mut seen_txids,
+            &mut ancestors,
+            &mut bumps,
+            &mut bump_index_by_root,
+        )?;
+
+        // Add all collected merkle paths to the BEEF
+        for bump in bumps {
+            beef.merge_bump(bump);
+        }
+
+        // Add all ancestor transactions in dependency order (oldest first)
+        for ancestor in ancestors {
+            beef.merge_transaction(ancestor);
+        }
+
+        Ok(beef.to_binary())
+    }
+
+    /// Serializes this transaction and its ancestors to BEEF V1 format.
+    ///
+    /// BEEF V1 (BRC-62) is the format required by ARC and most broadcast services.
+    /// This method is identical to `to_beef()` but produces V1 format output.
+    ///
+    /// # Arguments
+    ///
+    /// * `allow_partial` - If true, skips inputs with missing source transactions.
+    ///   If false, returns an error if any source transaction is missing.
+    ///
+    /// # Returns
+    ///
+    /// The BEEF V1 binary data containing all ancestor transactions and merkle proofs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `allow_partial` is false and any input is missing
+    /// its source transaction.
+    pub fn to_beef_v1(&self, allow_partial: bool) -> Result<Vec<u8>> {
+        let mut beef = Beef::with_version(BEEF_V1);
 
         // Collect all ancestors in dependency order
         let mut seen_txids: HashSet<String> = HashSet::new();
