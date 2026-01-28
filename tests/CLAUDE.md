@@ -16,14 +16,20 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs (17 tests) |
 | `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors (6 tests) |
 | `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests (10 tests) |
+| `identity_tests.rs` | Identity module tests (50+ tests: certificates, contacts, queries) |
 | `integration_tests.rs` | Full workflow tests across all modules (22 tests) |
+| `kvstore_integration_tests.rs` | KVStore module tests (70+ tests: LocalKVStore, interpreter, queries) |
+| `memory_profiling.rs` | Heap allocation profiling with dhat (requires `dhat-profiling` feature) |
+| `messages_tests.rs` | BRC-77/BRC-78 message signing/encryption tests (35+ tests) |
 | `overlay_cross_sdk_tests.rs` | Overlay cross-SDK admin token and type tests (13 tests) |
 | `overlay_integration_tests.rs` | Overlay module integration tests (60 tests) |
 | `registry_integration_tests.rs` | Registry module integration tests (50 tests: definitions, queries, serialization) |
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
+| `storage_tests.rs` | UHRP storage module tests (60+ tests: URLs, downloader, uploader) |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
 | `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 71 tests) |
+| `wallet_tests.rs` | Wallet module tests (60+ tests: KeyDeriver, ProtoWallet, wire protocol) |
 | `transaction/` | Transaction test vectors module |
 
 ## Test Vectors
@@ -467,6 +473,266 @@ Auth module integration tests (26 tests, requires `auth` feature):
 - `test_duplicate_session_nonce_rejected` - Duplicate nonces are rejected
 - `test_session_without_nonce_rejected` - Sessions without nonce are rejected
 
+### Identity Tests (`identity_tests.rs`)
+
+Identity module integration tests (50+ tests, requires `identity` feature):
+
+**KnownCertificateType Tests**
+- `test_known_certificate_type_all_types` - All 9 certificate types (IdentiCert, DiscordCert, PhoneCert, XCert, Registrant, EmailCert, Anyone, SelfCert, CoolCert)
+- `test_known_certificate_type_names` - Type name strings match expected values
+- `test_known_certificate_type_ids_cross_sdk_compatible` - Base64 type IDs match TypeScript/Go SDKs
+- `test_known_certificate_type_from_type_id` - Recover type from type ID
+- `test_known_certificate_type_from_unknown_id` - Unknown IDs return None
+
+**DisplayableIdentity Tests**
+- `test_displayable_identity_from_key_long` - Abbreviation for 66-char public keys
+- `test_displayable_identity_from_key_short` - No abbreviation for short keys
+- `test_displayable_identity_unknown` - Default unknown identity values
+- `test_displayable_identity_json_serialization` - camelCase JSON roundtrip
+
+**Contact Tests**
+- `test_contact_creation` - Contact with tags and metadata
+- `test_contact_from_identity` - Create from DisplayableIdentity
+- `test_contact_to_displayable_identity` - Convert back to DisplayableIdentity
+- `test_contact_json_serialization` - JSON roundtrip with camelCase
+
+**IdentityQuery Tests**
+- `test_identity_query_by_identity_key` - Query by public key
+- `test_identity_query_by_attribute` - Query by single attribute
+- `test_identity_query_by_attributes` - Query by multiple attributes
+- `test_identity_query_builder_pattern` - Fluent builder with limit, offset, certifier
+
+**ContactsManager Tests** (async)
+- `test_add_and_get_contact` - Add contact, retrieve by identity key
+- `test_update_contact` - Update existing contact
+- `test_remove_contact` - Remove contact by identity key
+- `test_list_contacts` - List all contacts
+- `test_search_contacts_by_name` - Case-insensitive name search
+- `test_get_contacts_by_tag` - Filter by tag
+- `test_cache_management` - Cache initialization, count, clearing
+
+**Configuration Tests**
+- `test_identity_client_config_default` - Default: Mainnet, protocol (1, "identity"), token_amount=1
+- `test_contacts_manager_config_default` - Default: protocol (2, "contact"), basket="contacts"
+
+### KVStore Tests (`kvstore_integration_tests.rs`)
+
+KVStore module integration tests (70+ tests, requires `kvstore` feature):
+
+**KVStoreConfig Tests**
+- `test_kvstore_config_default_values` - Default: protocol_id="kvstore", service_name="ls_kvstore", encrypt=true
+- `test_kvstore_config_builder_all_fields` - Builder pattern with all options
+- `test_kvstore_config_clone` - Clone implementation
+
+**KVStoreEntry Tests**
+- `test_kvstore_entry_creation` - Entry with key, value, controller, protocol_id
+- `test_kvstore_entry_with_tags` - Entry with tags array
+- `test_kvstore_entry_with_token` - Entry with KVStoreToken
+- `test_kvstore_entry_with_history` - Entry with value history
+- `test_kvstore_entry_json_roundtrip` - JSON serialization roundtrip
+
+**KVStoreToken Tests**
+- `test_kvstore_token_creation` - Token with txid, output_index, satoshis
+- `test_kvstore_token_with_beef` - Token with BEEF data
+- `test_kvstore_token_outpoint_string` - "txid.vout" format
+
+**KVStoreQuery Tests**
+- `test_kvstore_query_builder_all_fields` - key, controller, protocol_id, tags, limit, skip, sort_order
+- `test_kvstore_query_to_json` - JSON output for query parameters
+
+**KVStoreInterpreter Tests**
+- `test_interpreter_extract_basic_token` - Extract entry from PushDrop script
+- `test_interpreter_extract_token_with_tags` - Extract entry with tags
+- `test_interpreter_with_matching_context` - Context filtering
+- `test_interpreter_is_kvstore_token` - Token format validation
+- `test_interpreter_extract_fields` - Extract all KVStoreFields
+
+**LocalKVStore Tests** (async)
+- `test_local_kvstore_new_success` - Creation with MockWallet
+- `test_local_kvstore_get_returns_default_when_not_found` - Default value fallback
+- `test_local_kvstore_set_success` - Set key-value, returns outpoint
+- `test_local_kvstore_remove_not_found_returns_empty` - Remove non-existent key
+- `test_local_kvstore_has_not_found` - Existence check
+- `test_local_kvstore_keys_empty` - List all keys
+- `test_local_kvstore_count_empty` - Entry count
+- `test_local_kvstore_clear_empty` - Clear all entries
+
+**Signature Verification Tests**
+- `test_verify_signature_missing` - Missing signature returns false
+- `test_verify_signature_invalid_bytes` - Invalid DER signature returns false
+- `test_verify_signature_invalid_controller` - Invalid pubkey returns false
+
+**Cross-SDK Compatibility**
+- `test_kvstore_config_matches_go_sdk_defaults` - Config defaults match Go SDK
+- `test_kvstore_entry_json_field_names_match_typescript` - camelCase field names
+- `test_pushdrop_field_order_matches_spec` - Field indices match specification
+
+### Messages Tests (`messages_tests.rs`)
+
+BRC-77 signed message and BRC-78 encrypted message tests (35+ tests, requires `messages` feature):
+
+**BRC-77 Signed Message Tests**
+- `test_sign_and_verify_roundtrip_specific_recipient` - Sign for specific recipient, verify
+- `test_sign_and_verify_roundtrip_anyone` - Sign for anyone (recipient marker 0x00)
+- `test_verify_with_different_key_fails` - Wrong recipient returns MessageRecipientMismatch
+- `test_sign_and_verify_empty_message` - Empty message handling
+- `test_sign_and_verify_large_message` - 100KB message handling
+- `test_tampered_message_returns_false_not_error` - Tampered message returns false, not error
+- `test_verify_without_recipient_when_required` - Missing recipient key error
+- `test_signature_wrong_version` - Invalid version returns MessageVersionMismatch
+
+**BRC-78 Encrypted Message Tests**
+- `test_encrypt_and_decrypt_roundtrip` - Encrypt for recipient, decrypt
+- `test_decrypt_with_wrong_key_fails` - Wrong key returns MessageRecipientMismatch
+- `test_encrypt_and_decrypt_empty_message` - Empty message handling
+- `test_encrypt_and_decrypt_large_message` - 1MB message handling
+- `test_tampered_ciphertext_fails_decryption` - GCM authentication failure
+- `test_encrypted_message_wrong_version` - Invalid version error
+- `test_message_too_short` - Short message error
+- `test_same_plaintext_different_ciphertext` - Random keyID/IV produces different output
+- `test_different_senders_same_recipient` - Different senders, same recipient decrypts
+
+**Cross-SDK Compatibility**
+- `test_cross_sdk_sign_verify_specific_recipient` - Sender=15, recipient=21 vector
+- `test_cross_sdk_sign_verify_anyone` - Sender=15, no recipient vector
+- `test_cross_sdk_encrypt_decrypt` - Encrypt/decrypt with scalar keys
+- `test_cross_sdk_wrong_version_signed_error_format` - Error format: "Expected 42423301, received..."
+- `test_cross_sdk_rare_key_length_encrypted` - TypeScript test vector with rare key length
+
+**Version Constants**
+- `test_version_constants` - SIGNED_VERSION=0x42423301, ENCRYPTED_VERSION=0x42421033
+
+### Storage Tests (`storage_tests.rs`)
+
+UHRP storage module tests (60+ tests, requires `storage` feature):
+
+**UHRP URL Generation**
+- `test_get_url_for_file_known_data` - TypeScript SDK test vector
+- `test_get_url_for_file_empty` - Empty file produces valid URL
+- `test_get_url_for_file_hello_world` - Hello World roundtrip
+- `test_get_url_for_hash_known_hash` - Known hash to URL
+- `test_get_url_for_hash_invalid_length` - 16/64 byte hashes rejected
+
+**UHRP URL Parsing**
+- `test_get_hash_from_url_extracts_correct_hash` - Extract hash from Base58Check
+- `test_get_hash_from_url_with_uhrp_prefix` - Handle uhrp:// prefix
+- `test_get_hash_from_url_with_web_prefix` - Handle web+uhrp:// prefix
+- `test_get_hash_from_url_invalid_checksum` - Bad checksum rejected
+- `test_get_hash_from_url_invalid_base58` - Invalid characters (0, O, l, I) rejected
+
+**UHRP URL Validation**
+- `test_is_valid_url_accepts_valid_urls` - Base58Check, uhrp://, web+uhrp://
+- `test_is_valid_url_rejects_invalid_checksum` - Bad checksum rejected
+- `test_is_valid_url_rejects_non_uhrp_urls` - https://, http://, file://, data: rejected
+- `test_normalize_url_removes_uhrp_prefix` - Strip uhrp:// prefix
+- `test_normalize_url_case_insensitive` - UHRP:// and uhrp:// handled
+
+**Roundtrip Tests**
+- `test_roundtrip_file_to_url_to_hash` - File → URL → Hash matches SHA256(file)
+- `test_roundtrip_hash_to_url_to_hash` - Hash → URL → Hash identical
+- `test_roundtrip_various_files` - Empty, short, 1000 bytes tests
+- `test_roundtrip_with_different_prefixes` - All prefix formats
+
+**StorageDownloader Configuration**
+- `test_storage_downloader_config_default` - Default: Mainnet, timeout 30000ms
+- `test_storage_downloader_config_testnet` - Testnet preset
+- `test_storage_downloader_creation` - Create with default config
+- `test_storage_downloader_creation_with_config` - Create with custom config
+
+**StorageUploader Configuration**
+- `test_storage_uploader_config_new` - Default retention 7 days
+- `test_storage_uploader_config_with_retention` - Custom retention
+- `test_storage_uploader_base_url` - URL accessor
+
+**UploadableFile Tests**
+- `test_uploadable_file_creation` - Data and MIME type
+- `test_uploadable_file_empty` - Empty file
+- `test_uploadable_file_large` - 1MB file
+
+**Cross-SDK Compatibility**
+- `test_cross_sdk_hash_to_url` - Hash→URL matches TypeScript SDK
+- `test_cross_sdk_file_to_url` - File→URL matches TypeScript SDK
+- `test_cross_sdk_url_to_hash` - URL→Hash matches TypeScript SDK
+
+### Wallet Tests (`wallet_tests.rs`)
+
+Wallet module tests (60+ tests, requires `wallet` feature):
+
+**KeyDeriver Tests**
+- `test_key_deriver_with_known_key` - PrivateKey(42) pattern from TypeScript SDK
+- `test_anyone_key_is_scalar_one` - Anyone key is PrivateKey(1)
+- `test_invoice_number_format` - Invoice format: "level-protocol-keyID"
+- `test_derive_public_key_with_counterparty` - BRC-42 derivation with counterparty
+- `test_derive_private_key_matches_public` - Private key's public matches derived public
+- `test_derive_symmetric_key_consistency` - Deterministic symmetric keys
+- `test_two_party_key_derivation` - Alice and Bob derive matching keys
+- `test_reveal_counterparty_secret_fails_for_self` - Self counterparty rejected
+- `test_different_security_levels_different_keys` - Silent/App/Counterparty produce unique keys
+- `test_protocol_validation` - Protocol name < 5 chars rejected
+- `test_key_id_validation` - Empty or > 800 chars rejected
+
+**CachedKeyDeriver Tests**
+- `test_cached_deriver_same_identity` - Identity key matches inner deriver
+- `test_cache_hit_returns_same_value` - Cached values returned
+- `test_lru_eviction` - LRU eviction with max_size=3
+- `test_lru_access_updates_recentness` - Access refreshes LRU order
+- `test_secrets_not_cached` - reveal_* methods not cached for security
+- `test_private_and_symmetric_key_caching` - Both key types cached
+
+**ProtoWallet Tests**
+- `test_proto_wallet_creation` - Create with random key
+- `test_proto_wallet_anyone` - Anyone wallets have identical identity
+- `test_get_public_key_identity` - identity_key=true returns identity
+- `test_get_public_key_derived` - Derived key differs from identity
+- `test_encrypt_decrypt_roundtrip` - Self-encryption roundtrip
+- `test_two_party_encryption` - Alice encrypts for Bob, Bob decrypts
+- `test_decrypt_fails_with_wrong_protocol` - Protocol mismatch fails
+- `test_create_verify_hmac_roundtrip` - HMAC create and verify
+- `test_hmac_verification_fails_with_wrong_data` - Tampered data fails
+- `test_hmac_cross_party_verification` - Alice creates, Bob verifies
+- `test_create_verify_signature_roundtrip` - Signature create and verify
+- `test_signature_with_direct_hash` - Sign pre-hashed data
+- `test_cross_party_signature_verification` - Alice signs, Bob verifies
+
+**Cross-SDK Compatibility**
+- `test_brc3_signature_compliance` - BRC-3 signature vector from TypeScript SDK
+- `test_brc2_hmac_compliance` - BRC-2 HMAC vector from TypeScript SDK
+- `test_brc2_encryption_compliance` - BRC-2 encryption vector from TypeScript SDK
+- `test_key_derivation_ts_pattern` - PrivateKey(42), PrivateKey(69) pattern
+
+**Wire Protocol Tests**
+- `test_varint_roundtrip` - VarInt encoding 0 to u64::MAX
+- `test_signed_varint_roundtrip` - Signed VarInt including negatives
+- `test_string_roundtrip` - UTF-8 string encoding
+- `test_optional_string_roundtrip` - Optional string (Some/None)
+- `test_counterparty_roundtrip` - Self_, Anyone, Other encoding
+- `test_protocol_id_roundtrip` - Protocol with security level
+- `test_outpoint_roundtrip` - Txid + vout encoding
+- `test_string_array_roundtrip` - String array encoding
+- `test_query_mode_roundtrip` - Any/All query mode
+- `test_output_include_roundtrip` - LockingScripts/EntireTransactions
+- `test_string_map_roundtrip` - HashMap<String, String> encoding
+- `test_action_status_roundtrip` - Completed/Unprocessed/Sending/Failed
+
+### Memory Profiling (`memory_profiling.rs`)
+
+Heap allocation profiling tests (requires `dhat-profiling` feature):
+
+**Encryption Profiling**
+- `test_encryption_allocations` - AES-GCM encrypt/decrypt at 64/256/1024/4096/16384 bytes
+
+**Key Derivation Profiling**
+- `test_key_derivation_allocations` - BRC-42 and ECDH shared secret
+
+**Shamir Profiling**
+- `test_shamir_allocations` - 3-of-5 and 5-of-10 split/recover
+
+**Signing Profiling**
+- `test_signing_allocations` - ECDSA sign, verify, and sign+verify cycle
+
+**Hashing Profiling**
+- `test_hashing_allocations` - SHA-256 and Hash160 at 1KB/16KB
+
 ### Overlay Cross-SDK Tests (`overlay_cross_sdk_tests.rs`)
 
 Cross-SDK compatibility tests for overlay types (13 tests, requires `overlay` feature):
@@ -676,14 +942,19 @@ cargo test --test compat_integration_tests --features compat
 cargo test --test cross_sdk_tests
 cargo test --test drbg_tests
 cargo test --test ec_tests
+cargo test --test identity_tests --features identity
 cargo test --test integration_tests
+cargo test --test kvstore_integration_tests --features kvstore
+cargo test --test messages_tests --features messages
 cargo test --test overlay_cross_sdk_tests --features overlay
 cargo test --test overlay_integration_tests --features overlay
 cargo test --test registry_integration_tests --features registry
 cargo test --test script_vectors_tests
 cargo test --test sighash_tests
+cargo test --test storage_tests --features storage
 cargo test --test template_tests
 cargo test --test transaction_tests --features transaction
+cargo test --test wallet_tests --features wallet
 
 # Run all tests with full feature (includes all modules)
 cargo test --features full
@@ -702,6 +973,24 @@ cargo test --features overlay
 
 # Run all tests with registry feature
 cargo test --features registry
+
+# Run all tests with identity feature
+cargo test --features identity
+
+# Run all tests with kvstore feature
+cargo test --features kvstore
+
+# Run all tests with messages feature
+cargo test --features messages
+
+# Run all tests with storage feature
+cargo test --features storage
+
+# Run all tests with wallet feature
+cargo test --features wallet
+
+# Run memory profiling tests (requires dhat-profiling feature)
+cargo test --test memory_profiling --features dhat-profiling -- --test-threads=1 --nocapture
 
 # Run specific test
 cargo test --test integration_tests test_complete_payment_workflow
@@ -735,7 +1024,7 @@ cargo test --test transaction_tests --features transaction -- beef
 **Script** (`bsv_sdk::script`):
 - `Script`, `LockingScript`, `UnlockingScript` - Script types
 - `Spend`, `SpendParams` - Script spend validator
-- `templates::{P2PKH, RPuzzle, RPuzzleType}` - Script templates
+- `templates::{P2PKH, RPuzzle, RPuzzleType, PushDrop}` - Script templates
 - `ScriptTemplate`, `SignOutputs` - Template trait and sighash selection
 
 **Transaction** (`bsv_sdk::transaction`):
@@ -745,6 +1034,43 @@ cargo test --test transaction_tests --features transaction -- beef
 - `FeeModel`, `SatoshisPerKilobyte`, `FixedFee` - Fee computation
 - `Broadcaster`, `BroadcastResponse`, `BroadcastFailure`, `BroadcastStatus` - Broadcast (async)
 - `ChainTracker`, `AlwaysValidChainTracker`, `MockChainTracker` - Chain tracking (async)
+
+**Wallet** (`bsv_sdk::wallet`, requires `wallet` feature):
+- `KeyDeriver`, `CachedKeyDeriver`, `KeyDeriverApi` - BRC-42 key derivation
+- `ProtoWallet` - Lightweight wallet implementation
+- `Protocol`, `SecurityLevel` - Protocol identification (Silent=0, App=1, Counterparty=2)
+- `Counterparty` - Self_, Anyone, or Other(PublicKey)
+- `wire::{WireReader, WireWriter}` - Binary protocol encoding
+- `Outpoint`, `QueryMode`, `OutputInclude`, `ActionStatus` - Wire protocol types
+
+**Identity** (`bsv_sdk::identity`, requires `identity` feature):
+- `KnownCertificateType` - IdentiCert, DiscordCert, PhoneCert, XCert, etc.
+- `DisplayableIdentity` - Identity with name, avatar, badge
+- `Contact`, `ContactsManager`, `ContactsManagerConfig` - Contact management
+- `IdentityQuery`, `IdentityClientConfig` - Identity queries and configuration
+- `BroadcastResult`, `BroadcastSuccess`, `BroadcastFailure` - Broadcast results
+
+**KVStore** (`bsv_sdk::kvstore`, requires `kvstore` feature):
+- `LocalKVStore` - Local key-value store with wallet backend
+- `KVStoreConfig` - Configuration (protocol_id, service_name, encrypt)
+- `KVStoreEntry`, `KVStoreToken`, `KVStoreFields` - Entry and token types
+- `KVStoreQuery`, `KVStoreContext` - Query and filtering
+- `KVStoreGetOptions`, `KVStoreSetOptions`, `KVStoreRemoveOptions` - Operation options
+- `KVStoreInterpreter` - PushDrop script interpretation
+
+**Messages** (`bsv_sdk::messages`, requires `messages` feature):
+- `sign`, `verify` - BRC-77 message signing/verification
+- `encrypt`, `decrypt` - BRC-78 message encryption/decryption
+- `SIGNED_VERSION`, `ENCRYPTED_VERSION` - Protocol version constants
+
+**Storage** (`bsv_sdk::storage`, requires `storage` feature):
+- `get_url_for_file`, `get_url_for_hash` - Generate UHRP URLs
+- `get_hash_from_url`, `get_hash_hex_from_url` - Extract hash from URL
+- `is_valid_url`, `normalize_url` - URL validation and normalization
+- `StorageDownloader`, `StorageDownloaderConfig` - Download from overlay
+- `StorageUploader`, `StorageUploaderConfig` - Upload to storage provider
+- `UploadableFile`, `DownloadResult`, `UploadFileResult` - File types
+- `UHRP_PREFIX`, `WEB_UHRP_PREFIX` - URL prefix constants
 
 **Registry** (`bsv_sdk::registry`, requires `registry` feature):
 - `DefinitionType` - Basket, Protocol, or Certificate
@@ -792,6 +1118,38 @@ cargo test --test transaction_tests --features transaction -- beef
 4. Implement `Broadcaster` with `#[async_trait(?Send)]`
 5. Group related tests in submodules (e.g., `beef_extended_tests`, `cross_sdk_tests`)
 
+**Wallet Module Tests:**
+1. Use `#[cfg(feature = "wallet")]` gate for all wallet tests
+2. Use TypeScript SDK patterns: `PrivateKey(42)`, `PrivateKey(69)` for test keys
+3. Test KeyDeriver, CachedKeyDeriver, and ProtoWallet separately in nested modules
+4. Use `Protocol::new(SecurityLevel::*, "name")` with 5+ char protocol names
+5. Wire protocol tests should verify roundtrip encoding/decoding
+
+**Identity Module Tests:**
+1. Use `#[cfg(feature = "identity")]` gate for all identity tests
+2. Use `#[tokio::test]` for ContactsManager async operations
+3. Test KnownCertificateType type IDs match TypeScript/Go SDKs
+4. Verify camelCase JSON serialization for cross-SDK compatibility
+
+**KVStore Module Tests:**
+1. Use `#[cfg(feature = "kvstore")]` gate for all kvstore tests
+2. Create MockWallet implementing WalletInterface for testing
+3. Test KVStoreInterpreter with manually constructed PushDrop scripts
+4. Verify field order matches specification (protocol_id, key, value, controller, tags, signature)
+
+**Messages Module Tests:**
+1. Use `#[cfg(feature = "messages")]` gate for all messages tests
+2. Use `key_from_scalar(n)` helper for deterministic test keys
+3. Test BRC-77 signing with specific recipient and "anyone" modes
+4. Test BRC-78 encryption roundtrips and error conditions
+5. Verify error format matches TypeScript/Go SDKs (MessageVersionMismatch, MessageRecipientMismatch)
+
+**Storage Module Tests:**
+1. Use `#[cfg(feature = "storage")]` gate for all storage tests
+2. Use TypeScript SDK test vectors (TS_EXAMPLE_HASH_HEX, TS_EXAMPLE_FILE_HEX, TS_EXAMPLE_URL_BASE58)
+3. Test URL generation, parsing, validation, and normalization
+4. Verify roundtrip: file → URL → hash matches SHA256(file)
+
 **Script Tests:**
 1. Use `SpendParams` struct for Spend constructor
 2. Set `source_satoshis: 1` for basic tests (or 0 for legacy sighash)
@@ -802,6 +1160,12 @@ cargo test --test transaction_tests --features transaction -- beef
 1. `HmacDrbg::new()` for SHA-256, `new_with_hash(..., true)` for SHA-512
 2. Generate multiple times if required by vector specification (e.g., `add.len()` times)
 3. Expected output is from the final generate call
+
+**Memory Profiling Tests:**
+1. Use `#[cfg(feature = "dhat-profiling")]` gate
+2. Only one dhat profiler can be active at a time (use `--test-threads=1`)
+3. Use `dhat::Profiler::new_heap()` to start profiling a section
+4. Print `dhat::HeapStats::get()` for allocation metrics
 
 ## Notes on BSV vs BTC Script Vectors
 
@@ -819,16 +1183,33 @@ Tests are organized by feature area:
 - **primitives tests**: `cross_sdk_tests.rs`, `drbg_tests.rs`, `ec_tests.rs`, `integration_tests.rs`
 - **script tests**: `script_vectors_tests.rs`, `template_tests.rs`
 - **transaction tests**: `sighash_tests.rs`, `transaction_tests.rs`
+- **wallet tests**: `wallet_tests.rs` (requires `wallet` feature)
+- **identity tests**: `identity_tests.rs` (requires `identity` feature)
+- **kvstore tests**: `kvstore_integration_tests.rs` (requires `kvstore` feature)
+- **messages tests**: `messages_tests.rs` (requires `messages` feature)
+- **storage tests**: `storage_tests.rs` (requires `storage` feature)
 - **compat tests**: `compat_bip39_tests.rs`, `compat_integration_tests.rs` (requires `compat` feature)
 - **auth tests**: `auth_cross_sdk_tests.rs`, `auth_integration_tests.rs` (requires `auth` feature)
 - **overlay tests**: `overlay_cross_sdk_tests.rs`, `overlay_integration_tests.rs` (requires `overlay` feature)
 - **registry tests**: `registry_integration_tests.rs` (requires `registry` feature)
+- **profiling tests**: `memory_profiling.rs` (requires `dhat-profiling` feature)
 
 The `transaction_tests.rs` file uses nested modules for organization:
 - `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)
 - `beef_extended_tests` - Extended BEEF format tests
 - `cross_sdk_tests` - Cross-SDK compatibility using `beef_cross_sdk.rs` vectors
 - `merkle_path_advanced_tests` - Advanced MerklePath verification with ChainTracker
+
+The `wallet_tests.rs` file uses nested modules for organization:
+- `key_deriver_tests` - KeyDeriver unit tests
+- `cached_key_deriver_tests` - CachedKeyDeriver caching tests
+- `proto_wallet_tests` - ProtoWallet cryptographic operations
+- `cross_sdk_tests` - BRC-2/BRC-3 compliance vectors from TypeScript SDK
+- `wire_protocol_tests` - Wire protocol encoding/decoding
+
+The `identity_tests.rs` file uses nested modules for organization:
+- `contacts_manager_tests` - ContactsManager async operations
+- `identity_client_tests` - IdentityClient configuration tests
 
 ## Related Documentation
 
@@ -837,5 +1218,8 @@ The `transaction_tests.rs` file uses nested modules for organization:
 - `src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
 - `src/script/CLAUDE.md` - Script module documentation
 - `src/transaction/CLAUDE.md` - Transaction module documentation
+- `src/wallet/CLAUDE.md` - Wallet module documentation
+- `src/storage/CLAUDE.md` - Storage module documentation
+- `src/overlay/CLAUDE.md` - Overlay module documentation
 - `src/registry/CLAUDE.md` - Registry module documentation
 - `tests/transaction/vectors/CLAUDE.md` - Transaction test vectors documentation

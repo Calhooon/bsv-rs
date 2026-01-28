@@ -67,6 +67,10 @@ pub enum Language {
 - `entropy(&self) -> Vec<u8>` - Extract original entropy bytes
 - `entropy_with_checksum(&self) -> Vec<u8>` - Extract entropy with checksum (Go SDK compatible)
 
+**Serialization:**
+- `to_binary(&self) -> Vec<u8>` - Serialize mnemonic to UTF-8 encoded phrase bytes
+- `from_binary(data: &[u8]) -> Result<Self>` - Deserialize mnemonic from UTF-8 encoded phrase bytes
+
 **Seed Derivation:**
 - `to_seed(&self, passphrase: &str) -> [u8; 64]` - Convert to 64-byte seed with passphrase
 - `to_seed_normalized(&self) -> [u8; 64]` - Convert to seed with empty passphrase
@@ -179,6 +183,27 @@ assert_eq!(original, extracted);
 let with_checksum = mnemonic.entropy_with_checksum();
 // 128 bits entropy + 4 bits checksum = 132 bits = 17 bytes
 assert_eq!(with_checksum.len(), 17);
+```
+
+### Binary Serialization
+
+```rust
+use bsv_sdk::compat::bip39::Mnemonic;
+
+let entropy = [0u8; 16];
+let mnemonic = Mnemonic::from_entropy(&entropy)?;
+
+// Serialize to binary (UTF-8 encoded phrase)
+let binary = mnemonic.to_binary();
+
+// Restore from binary
+let restored = Mnemonic::from_binary(&binary)?;
+assert_eq!(mnemonic.phrase(), restored.phrase());
+
+// Parse directly from byte literal
+let phrase = b"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+let mnemonic = Mnemonic::from_binary(phrase)?;
+assert!(mnemonic.is_valid());
 ```
 
 ### Verify Wordlist Integrity
@@ -306,7 +331,9 @@ Test coverage includes:
 - Known test vectors (all zeros, all ones)
 - TREZOR seed derivation test vector
 - Entropy roundtrip validation
+- Binary serialization roundtrip for all word counts
 - Invalid inputs (wrong word count, bad checksum, invalid words, invalid entropy length)
+- Invalid binary inputs (invalid UTF-8, invalid phrase)
 - Wordlist integrity verification
 
 ## Related Documentation

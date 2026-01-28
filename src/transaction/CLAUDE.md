@@ -10,7 +10,7 @@ This module provides complete Bitcoin transaction functionality:
 - Signing with script templates
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
-- BEEF format (BRC-62/95/96) for SPV proofs
+- BEEF format (BRC-62/95/96) for SPV proofs with ancestry collection
 - Async Broadcaster trait with ARC and WhatsOnChain implementations
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
 
@@ -23,9 +23,9 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `mod.rs` | Module root; re-exports |
 | `input.rs` | `TransactionInput` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
-| `transaction.rs` | `Transaction` with parsing, serialization, signing |
+| `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF export |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) |
-| `beef.rs` | `Beef` (BRC-62/95/96) |
+| `beef.rs` | `Beef` (BRC-62/95/96) with validation and merging |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy` |
@@ -88,6 +88,7 @@ pub struct Transaction {
     pub outputs: Vec<TransactionOutput>,
     pub lock_time: u32,                   // Default: 0
     pub metadata: HashMap<String, Value>, // Not serialized
+    pub merkle_path: Option<MerklePath>,  // SPV proof (stops BEEF ancestry walk)
 }
 
 impl Transaction {
@@ -193,70 +194,29 @@ pub trait Broadcaster: Send + Sync {
     async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>;
 }
 
-pub struct BroadcastResponse {
-    pub status: BroadcastStatus,
-    pub txid: String,
-    pub message: String,
-    pub competing_txs: Option<Vec<String>>,
-}
-
-pub struct BroadcastFailure {
-    pub status: BroadcastStatus,
-    pub code: String,
-    pub txid: Option<String>,
-    pub description: String,
-    pub more: Option<Value>,
-}
-
+pub struct BroadcastResponse { pub status: BroadcastStatus, pub txid: String, pub message: String, pub competing_txs: Option<Vec<String>> }
+pub struct BroadcastFailure { pub status: BroadcastStatus, pub code: String, pub txid: Option<String>, pub description: String, pub more: Option<Value> }
 pub enum BroadcastStatus { Success, Error }
 pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
-
-// Helper functions
 pub fn is_broadcast_success(result: &BroadcastResult) -> bool
 pub fn is_broadcast_failure(result: &BroadcastResult) -> bool
-```
 
-### ARC Broadcaster
-
-```rust
-pub struct ArcBroadcaster { /* ... */ }
-
+// ARC Broadcaster (requires http feature)
+pub struct ArcBroadcaster { url: String, api_key: Option<String>, timeout_ms: u64 }
 impl ArcBroadcaster {
     pub fn new(url: &str, api_key: Option<String>) -> Self
     pub fn with_config(config: ArcConfig) -> Self
-    pub fn default() -> Self             // Uses https://arc.taal.com
-    pub fn url(&self) -> &str
-    pub fn api_key(&self) -> Option<&str>
+    pub fn default() -> Self  // Uses https://arc.taal.com
 }
 
-pub struct ArcConfig {
-    pub url: String,
-    pub api_key: Option<String>,
-    pub timeout_ms: u64,                 // Default: 30_000
-}
-```
-
-### WhatsOnChain Broadcaster
-
-```rust
-pub struct WhatsOnChainBroadcaster { /* ... */ }
-
+// WhatsOnChain Broadcaster (requires http feature)
+pub struct WhatsOnChainBroadcaster { network: WocBroadcastNetwork, api_key: Option<String> }
 impl WhatsOnChainBroadcaster {
     pub fn mainnet() -> Self
     pub fn testnet() -> Self
-    pub fn stn() -> Self                 // Scaling Test Network
-    pub fn new(network: WocBroadcastNetwork, api_key: Option<String>) -> Self
-    pub fn with_config(config: WocBroadcastConfig) -> Self
-    pub fn network(&self) -> WocBroadcastNetwork
-    pub fn api_key(&self) -> Option<&str>
+    pub fn stn() -> Self
 }
-
 pub enum WocBroadcastNetwork { Mainnet, Testnet, Stn }
-pub struct WocBroadcastConfig {
-    pub network: WocBroadcastNetwork,
-    pub api_key: Option<String>,
-    pub timeout_ms: u64,
-}
 ```
 
 ## Chain Tracking
@@ -268,81 +228,28 @@ pub trait ChainTracker: Send + Sync {
     async fn current_height(&self) -> Result<u32, ChainTrackerError>;
 }
 
-pub enum ChainTrackerError {
-    NetworkError(String),
-    InvalidResponse(String),
-    BlockNotFound(u32),
-    Other(String),
-}
+pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), BlockNotFound(u32), Other(String) }
 
 // Mock implementations for testing
 pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String> }
-impl MockChainTracker {
-    pub fn new(height: u32) -> Self
-    pub fn add_root(&mut self, height: u32, root: String)
-    pub fn always_valid(height: u32) -> AlwaysValidChainTracker
-}
-
 pub struct AlwaysValidChainTracker { pub height: u32 }
-impl AlwaysValidChainTracker {
-    pub fn new(height: u32) -> Self
-}
-```
 
-### WhatsOnChain Tracker
-
-```rust
-pub struct WhatsOnChainTracker { /* ... */ }
-
-impl WhatsOnChainTracker {
-    pub fn mainnet() -> Self
-    pub fn testnet() -> Self
-    pub fn new(network: WocNetwork) -> Self
-    pub fn network(&self) -> WocNetwork
-}
-
+// WhatsOnChain Tracker (requires http feature)
+pub struct WhatsOnChainTracker { network: WocNetwork }
+impl WhatsOnChainTracker { pub fn mainnet() -> Self; pub fn testnet() -> Self }
 pub enum WocNetwork { Mainnet, Testnet }
-impl WocNetwork {
-    pub fn base_url(&self) -> &'static str
-}
-```
 
-### Block Headers Service Tracker
-
-```rust
-pub struct BlockHeadersServiceTracker { /* ... */ }
-
-impl BlockHeadersServiceTracker {
-    pub fn new() -> Self                 // Uses DEFAULT_HEADERS_URL
-    pub fn with_url(base_url: &str) -> Self
-    pub fn with_config(config: BlockHeadersServiceConfig) -> Self
-    pub fn base_url(&self) -> &str
-    pub fn auth_token(&self) -> Option<&str>
-}
-
-pub struct BlockHeadersServiceConfig {
-    pub base_url: String,
-    pub auth_token: Option<String>,
-    pub timeout_ms: u64,
-}
-
+// Block Headers Service Tracker (requires http feature)
+pub struct BlockHeadersServiceTracker { base_url: String, auth_token: Option<String> }
+impl BlockHeadersServiceTracker { pub fn new() -> Self; pub fn with_url(base_url: &str) -> Self }
 pub const DEFAULT_HEADERS_URL: &str = "https://headers.spv.money";
 ```
 
 ## MerklePath (BUMP - BRC-74)
 
 ```rust
-pub struct MerklePath {
-    pub block_height: u32,
-    pub path: Vec<Vec<MerklePathLeaf>>,
-}
-
-pub struct MerklePathLeaf {
-    pub offset: u64,
-    pub hash: Option<String>,
-    pub txid: bool,
-    pub duplicate: bool,
-}
+pub struct MerklePath { pub block_height: u32, pub path: Vec<Vec<MerklePathLeaf>> }
+pub struct MerklePathLeaf { pub offset: u64, pub hash: Option<String>, pub txid: bool, pub duplicate: bool }
 
 impl MerklePathLeaf {
     pub fn new(offset: u64, hash: String) -> Self
@@ -352,14 +259,11 @@ impl MerklePathLeaf {
 
 impl MerklePath {
     pub fn new(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>
-    pub fn new_unchecked(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_binary(bin: &[u8]) -> Result<Self>
-    pub fn from_reader(reader: &mut Reader) -> Result<Self>
     pub fn from_coinbase_txid(txid: &str, height: u32) -> Self
     pub fn to_hex(&self) -> String
     pub fn to_binary(&self) -> Vec<u8>
-    pub fn to_writer(&self, writer: &mut Writer)
     pub fn compute_root(&self, txid: Option<&str>) -> Result<String>
     pub fn contains(&self, txid: &str) -> bool
     pub fn txids(&self) -> Vec<String>
@@ -375,64 +279,57 @@ pub struct Beef {
     pub bumps: Vec<MerklePath>,
     pub txs: Vec<BeefTx>,
     pub version: u32,
-    pub atomic_txid: Option<String>,
+    pub atomic_txid: Option<String>,  // Internal: also has txid_index, needs_sort
 }
 
 impl Beef {
+    // Constructors & Parsing
     pub fn new() -> Self                 // V2 by default
     pub fn with_version(version: u32) -> Self
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_binary(bin: &[u8]) -> Result<Self>
-    pub fn from_reader(reader: &mut Reader) -> Result<Self>
+
+    // Serialization
     pub fn to_hex(&mut self) -> String
     pub fn to_binary(&mut self) -> Vec<u8>
-    pub fn to_writer(&self, writer: &mut Writer)
     pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>>
+
+    // Validation
     pub fn is_valid(&mut self, allow_txid_only: bool) -> bool
     pub fn verify_valid(&mut self, allow_txid_only: bool) -> BeefValidationResult
+    pub fn sort_txs(&mut self) -> SortResult
+
+    // Lookup
     pub fn find_txid(&self, txid: &str) -> Option<&BeefTx>
-    pub fn find_txid_mut(&mut self, txid: &str) -> Option<&mut BeefTx>
     pub fn find_bump(&self, txid: &str) -> Option<&MerklePath>
-    pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction>
     pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction>
+
+    // Merging
     pub fn merge_bump(&mut self, bump: MerklePath) -> usize
     pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx
     pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx
     pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx
+    pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx>  // Trim to txid-only
     pub fn merge_beef(&mut self, other: &Beef)
-    pub fn sort_txs(&mut self) -> SortResult
+
     pub fn is_atomic(&self) -> bool
-    pub fn clone_shallow(&self) -> Self
     pub fn to_log_string(&mut self) -> String
 }
 
 pub struct BeefValidationResult { pub valid: bool, pub roots: HashMap<u32, String> }
-pub struct SortResult {
-    pub missing_inputs: Vec<String>,
-    pub not_valid: Vec<String>,
-    pub valid: Vec<String>,
-    pub with_missing_inputs: Vec<String>,
-    pub txid_only: Vec<String>,
-}
+pub struct SortResult { pub missing_inputs: Vec<String>, pub not_valid: Vec<String>, pub valid: Vec<String>, pub with_missing_inputs: Vec<String>, pub txid_only: Vec<String> }
 
-pub struct BeefTx {
-    pub input_txids: Vec<String>,
-    pub is_valid: Option<bool>,
-}
-
+pub struct BeefTx { pub input_txids: Vec<String>, pub is_valid: Option<bool> }
 impl BeefTx {
     pub fn from_tx(tx: Transaction, bump_index: Option<usize>) -> Self
     pub fn from_raw_tx(raw_tx: Vec<u8>, bump_index: Option<usize>) -> Self
     pub fn from_txid(txid: String) -> Self
     pub fn bump_index(&self) -> Option<usize>
-    pub fn set_bump_index(&mut self, index: Option<usize>)
     pub fn has_proof(&self) -> bool
     pub fn is_txid_only(&self) -> bool
     pub fn txid(&self) -> String
     pub fn tx(&self) -> Option<&Transaction>
-    pub fn tx_mut(&mut self) -> Option<&mut Transaction>
     pub fn raw_tx(&self) -> Option<&[u8]>
-    pub fn raw_tx_or_compute(&mut self) -> Option<Vec<u8>>
 }
 
 pub enum TxDataFormat { RawTx = 0, RawTxAndBumpIndex = 1, TxidOnly = 2 }
@@ -443,62 +340,29 @@ pub const ATOMIC_BEEF: u32 = 0x01010101;
 
 ## Usage Examples
 
-### Building and Signing
-
 ```rust
+// Building and Signing
 let mut tx = Transaction::new();
 tx.add_input(TransactionInput::with_source_transaction(source_tx, 0))?;
 tx.add_output(TransactionOutput::new(100_000, locking_script))?;
 tx.add_p2pkh_output("1MyChange...", None)?;  // Change output
 tx.fee(None, ChangeDistribution::Equal).await?;
 tx.sign().await?;
-let hex = tx.to_hex();
-```
 
-### Broadcasting with ARC
+// Broadcasting
+let broadcaster = ArcBroadcaster::default();
+let result = broadcaster.broadcast(&tx).await;
 
-```rust
-let broadcaster = ArcBroadcaster::new("https://arc.taal.com", Some(api_key));
-match broadcaster.broadcast(&tx).await {
-    Ok(response) => println!("Success: {}", response.txid),
-    Err(failure) => println!("Failed: {}", failure.description),
-}
-```
-
-### Broadcasting with WhatsOnChain
-
-```rust
-let broadcaster = WhatsOnChainBroadcaster::mainnet();
-match broadcaster.broadcast(&tx).await {
-    Ok(response) => println!("Success: {}", response.txid),
-    Err(failure) => println!("Failed: {}", failure.description),
-}
-```
-
-### SPV Verification with WhatsOnChain
-
-```rust
+// SPV Verification
 let tracker = WhatsOnChainTracker::mainnet();
-let mut beef = Beef::from_hex("...")?;
 let validation = beef.verify_valid(false);
-if validation.valid {
-    for (height, root) in validation.roots {
-        let valid = tracker.is_valid_root_for_height(&root, height).await?;
-    }
+for (height, root) in validation.roots {
+    tracker.is_valid_root_for_height(&root, height).await?;
 }
-```
 
-### Fee Computation
-
-```rust
-// Fixed fee rate
-let fee_model = SatoshisPerKilobyte::new(100);  // 100 sat/KB
-let fee = fee_model.compute_fee(&tx)?;
-
-// Live fee rate from ARC
-let fee_model = LivePolicy::default();
-fee_model.refresh().await?;  // Fetch current rate
-let fee = fee_model.compute_fee(&tx)?;
+// Fee Models
+let fee = SatoshisPerKilobyte::new(100).compute_fee(&tx)?;  // Fixed rate
+let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 ```
 
 ## Implementation Notes
@@ -509,6 +373,8 @@ let fee = fee_model.compute_fee(&tx)?;
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
 - **HTTP feature**: `ArcBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
+- **BEEF ancestry**: `to_beef()` walks `source_transaction` chain, stops at txs with `merkle_path`
+- **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by block height and computed root
 
 ## Error Types
 

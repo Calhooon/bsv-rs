@@ -826,7 +826,10 @@ mod transaction_tests {
 
             let beef = Beef::from_binary(&beef_bytes).unwrap();
             assert_eq!(beef.txs.len(), 1, "Should have 1 transaction");
-            assert!(beef.find_txid(&tx.id()).is_some(), "Should find the transaction");
+            assert!(
+                beef.find_txid(&tx.id()).is_some(),
+                "Should find the transaction"
+            );
         }
 
         #[test]
@@ -898,7 +901,10 @@ mod transaction_tests {
 
             // Should have grandparent's merkle proof
             assert!(!beef.bumps.is_empty(), "Should have merkle proofs");
-            assert_eq!(beef.bumps[0].block_height, 100, "Proof should be at height 100");
+            assert_eq!(
+                beef.bumps[0].block_height, 100,
+                "Proof should be at height 100"
+            );
         }
 
         #[test]
@@ -929,7 +935,10 @@ mod transaction_tests {
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
             // Should have merkle proofs at both heights
-            assert!(beef.bumps.len() >= 2, "Should have at least 2 merkle proofs");
+            assert!(
+                beef.bumps.len() >= 2,
+                "Should have at least 2 merkle proofs"
+            );
         }
 
         #[test]
@@ -1014,7 +1023,10 @@ mod transaction_tests {
 
             // Count how many times A appears (should be exactly once)
             let a_count = beef.txs.iter().filter(|t| t.txid() == a.id()).count();
-            assert_eq!(a_count, 1, "Transaction A should appear exactly once (deduplication)");
+            assert_eq!(
+                a_count, 1,
+                "Transaction A should appear exactly once (deduplication)"
+            );
 
             // Total should be 4: A, B, C, D
             assert_eq!(beef.txs.len(), 4, "Should have 4 unique transactions");
@@ -1062,7 +1074,11 @@ mod transaction_tests {
             );
 
             // Should include full ancestry
-            assert_eq!(beef.txs.len(), 3, "Atomic BEEF should include all ancestors");
+            assert_eq!(
+                beef.txs.len(),
+                3,
+                "Atomic BEEF should include all ancestors"
+            );
         }
 
         #[test]
@@ -1073,7 +1089,11 @@ mod transaction_tests {
             let beef_bytes = proven_tx.to_beef(true).unwrap();
             let beef = Beef::from_binary(&beef_bytes).unwrap();
 
-            assert_eq!(beef.txs.len(), 1, "Proven tx with no unproven ancestors should have 1 tx");
+            assert_eq!(
+                beef.txs.len(),
+                1,
+                "Proven tx with no unproven ancestors should have 1 tx"
+            );
             assert!(!beef.bumps.is_empty(), "Should have merkle proof");
         }
 
@@ -1081,11 +1101,17 @@ mod transaction_tests {
         fn test_merkle_path_field_works() {
             // Verify the merkle_path field can be set and checked
             let mut tx = create_test_tx(1);
-            assert!(tx.merkle_path.is_none(), "New tx should have no merkle_path");
+            assert!(
+                tx.merkle_path.is_none(),
+                "New tx should have no merkle_path"
+            );
 
             let txid = tx.id();
             tx.merkle_path = Some(MerklePath::from_coinbase_txid(&txid, 12345));
-            assert!(tx.merkle_path.is_some(), "Should have merkle_path after setting");
+            assert!(
+                tx.merkle_path.is_some(),
+                "Should have merkle_path after setting"
+            );
             assert_eq!(tx.merkle_path.as_ref().unwrap().block_height, 12345);
         }
 

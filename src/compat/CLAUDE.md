@@ -13,10 +13,10 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 |------|---------|
 | `mod.rs` | Module declaration and re-exports |
 | `base58.rs` | Base58 encoding wrapper (~133 lines) |
-| `bip32.rs` | BIP-32 HD key derivation (~950 lines) |
+| `bip32.rs` | BIP-32 HD key derivation (~1288 lines) |
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
-| `bsm.rs` | Bitcoin Signed Message (~402 lines) |
-| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~735 lines) |
+| `bsm.rs` | Bitcoin Signed Message (~483 lines) |
+| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1033 lines) |
 
 ## Submodules
 
@@ -30,10 +30,14 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 
 ## Re-exports
 
-The module re-exports key types for convenience:
+The module re-exports key types and functions for convenience:
 
 ```rust
-pub use bip32::{ExtendedKey, Network, HARDENED_KEY_START};
+pub use bip32::{
+    derive_addresses_for_path, derive_public_keys_for_path, generate_hd_key,
+    generate_hd_key_from_mnemonic, generate_key_pair_strings, ExtendedKey, Network,
+    HARDENED_KEY_START,
+};
 pub use bip39::{Language, Mnemonic, WordCount};
 ```
 
@@ -103,6 +107,9 @@ pub struct ExtendedKey {
 // Helper functions
 pub fn generate_hd_key(seed_length: usize, network: Network) -> Result<ExtendedKey>
 pub fn generate_hd_key_from_mnemonic(mnemonic: &Mnemonic, passphrase: &str, network: Network) -> Result<ExtendedKey>
+pub fn generate_key_pair_strings(seed_length: usize, network: Network) -> Result<(String, String)>
+pub fn derive_addresses_for_path(key: &ExtendedKey, base_path: &str, start: u32, count: u32, mainnet: bool) -> Result<Vec<String>>
+pub fn derive_public_keys_for_path(key: &ExtendedKey, base_path: &str, start: u32, count: u32) -> Result<Vec<PublicKey>>
 ```
 
 ### Path Notation
@@ -139,6 +146,15 @@ assert!(xpub.to_string().starts_with("xpub"));
 
 // Generate Bitcoin address
 let address = master.address(true)?;  // mainnet
+
+// Generate xpriv/xpub pair directly
+let (xpriv, xpub) = generate_key_pair_strings(32, Network::Mainnet)?;
+
+// Batch derive addresses
+let addresses = derive_addresses_for_path(&master, "m/44'/0'/0'/0", 0, 10, true)?;
+
+// Batch derive public keys
+let pubkeys = derive_public_keys_for_path(&master, "m/44'/0'/0'/0", 0, 10)?;
 ```
 
 ## BIP-39 (Mnemonic Phrases)
@@ -225,6 +241,7 @@ pub fn sign_message(private_key: &PrivateKey, message: &[u8]) -> Result<Vec<u8>>
 pub fn sign_message_with_compression(private_key: &PrivateKey, message: &[u8], compressed: bool) -> Result<Vec<u8>>
 pub fn verify_message(address: &str, signature: &[u8], message: &[u8]) -> Result<bool>
 pub fn recover_public_key_from_signature(signature: &[u8], message: &[u8]) -> Result<(PublicKey, bool)>
+pub fn magic_hash(message: &[u8]) -> [u8; 32]
 ```
 
 ### Message Format
@@ -260,6 +277,9 @@ assert!(bsm::verify_message(&address, &signature, message)?);
 
 // Recover public key
 let (recovered, compressed) = bsm::recover_public_key_from_signature(&signature, message)?;
+
+// Compute magic hash directly
+let hash = bsm::magic_hash(message);
 ```
 
 ## ECIES (Encryption)
@@ -299,8 +319,15 @@ pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>>
 ### Convenience Functions
 
 ```rust
+// Binary format
 pub fn encrypt_single(message: &[u8], key: &PrivateKey) -> Result<Vec<u8>>
 pub fn decrypt_single(data: &[u8], key: &PrivateKey) -> Result<Vec<u8>>
+
+// Base64 format (matches Go SDK API)
+pub fn encrypt_single_base64(message: &[u8], key: &PrivateKey) -> Result<String>
+pub fn decrypt_single_base64(data: &str, key: &PrivateKey) -> Result<Vec<u8>>
+pub fn encrypt_shared_base64(message: &[u8], to: &PublicKey, from: &PrivateKey) -> Result<String>
+pub fn decrypt_shared_base64(data: &str, to: &PrivateKey, from: &PublicKey) -> Result<Vec<u8>>
 ```
 
 ### Usage Example
@@ -326,6 +353,14 @@ assert_eq!(decrypted, message);
 // Self-encryption
 let encrypted = ecies::encrypt_single(message, &alice)?;
 let decrypted = ecies::decrypt_single(&encrypted, &alice)?;
+
+// Base64 format (Go SDK compatible)
+let encrypted_b64 = ecies::encrypt_single_base64(message, &alice)?;
+let decrypted = ecies::decrypt_single_base64(&encrypted_b64, &alice)?;
+
+// Shared encryption with base64
+let encrypted_b64 = ecies::encrypt_shared_base64(message, &bob.public_key(), &alice)?;
+let decrypted = ecies::decrypt_shared_base64(&encrypted_b64, &bob, &alice.public_key())?;
 ```
 
 ## Error Types
@@ -403,6 +438,7 @@ Uses existing SDK primitives:
 - `getrandom` - Random entropy generation
 - `aes`, `cbc` - AES-CBC encryption (ECIES)
 - `subtle` - Constant-time comparison (ECIES)
+- `base64` - Base64 encoding/decoding (ECIES convenience functions)
 
 ## Related Documentation
 

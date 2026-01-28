@@ -20,7 +20,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root; submodule declarations and public re-exports |
-| `op.rs` | Opcode constants (u8) and name/value lookup functions |
+| `op.rs` | Opcode constants (u8) and name/value lookup functions via `LazyLock` HashMaps |
 | `chunk.rs` | `ScriptChunk` type representing individual script elements |
 | `script.rs` | Core `Script` class with parsing, serialization, builder methods, and type detection |
 | `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) |
@@ -66,7 +66,7 @@ pub use templates::{P2PKH, RPuzzle, RPuzzleType, PushDrop, LockPosition};
 
 ### Opcodes (`op` module)
 
-All Bitcoin Script opcodes defined as `u8` constants with LazyLock HashMaps for lookup:
+All Bitcoin Script opcodes defined as `u8` constants with `LazyLock` HashMaps for lookup:
 
 ```rust
 // Push values: OP_0, OP_1..OP_16, OP_1NEGATE, OP_PUSHDATA1/2/4
@@ -76,6 +76,7 @@ All Bitcoin Script opcodes defined as `u8` constants with LazyLock HashMaps for 
 // Bitwise: OP_INVERT, OP_AND, OP_OR, OP_XOR, OP_LSHIFT, OP_RSHIFT
 // Crypto: OP_HASH160, OP_HASH256, OP_SHA256, OP_RIPEMD160, OP_SHA1
 // Signature: OP_CHECKSIG, OP_CHECKSIGVERIFY, OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY
+// Expansion NOPs: OP_NOP1..OP_NOP77 (0xb0-0xfc range)
 
 pub fn name_to_opcode(name: &str) -> Option<u8>      // "OP_DUP" -> Some(0x76)
 pub fn opcode_to_name(op: u8) -> Option<&'static str>   // 0x76 -> Some("OP_DUP")
@@ -99,7 +100,7 @@ impl ScriptChunk {
 
 ### Script
 
-Core script type with lazy parsing and serialization caching:
+Core script type with lazy parsing and serialization caching using `RefCell`:
 
 ```rust
 impl Script {
@@ -476,3 +477,4 @@ const REQUIRE_CLEAN_STACK: bool = true;
 - `../CLAUDE.md` - Root SDK documentation
 - `../primitives/CLAUDE.md` - Primitives module (encoding, hashing)
 - `../primitives/bsv/CLAUDE.md` - BSV primitives (sighash, transaction signatures)
+- `templates/CLAUDE.md` - Templates module documentation (if present)

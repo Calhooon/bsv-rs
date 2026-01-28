@@ -631,10 +631,7 @@ impl Transaction {
                 )?;
             } else if !allow_partial {
                 // Missing source transaction and not allowing partial
-                let source_txid = input
-                    .source_txid
-                    .as_deref()
-                    .unwrap_or("unknown");
+                let source_txid = input.source_txid.as_deref().unwrap_or("unknown");
                 return Err(crate::Error::TransactionError(format!(
                     "Missing source transaction for input {} (txid: {}). \
                      Set allow_partial=true to skip missing source transactions.",
