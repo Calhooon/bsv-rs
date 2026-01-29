@@ -604,6 +604,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             no_send_change,
             send_with_results,
             signable_transaction,
+            input_type: None,
+            inputs: None,
+            reference_number: None,
         })
     }
 

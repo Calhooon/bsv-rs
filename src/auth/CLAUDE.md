@@ -336,7 +336,8 @@ impl MockTransport {
 pub struct HttpRequest {
     pub request_id: [u8; 32],
     pub method: String,
-    pub url_postfix: String,
+    pub path: String,           // URL path (e.g., "/api/users")
+    pub search: String,         // URL query string (e.g., "?foo=bar")
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
 }
@@ -344,6 +345,7 @@ pub struct HttpRequest {
 impl HttpRequest {
     pub fn from_payload(payload: &[u8]) -> Result<Self>
     pub fn to_payload(&self) -> Vec<u8>
+    pub fn url_postfix(&self) -> String    // Returns path + search
 }
 
 pub struct HttpResponse {

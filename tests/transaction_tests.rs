@@ -10,11 +10,11 @@
 
 mod transaction;
 
-use transaction::vectors::{bigtx::*, bump_invalid::*, bump_valid::*, tx_invalid::*, tx_valid::*};
-
 #[cfg(feature = "transaction")]
 mod transaction_tests {
-    use super::*;
+    use crate::transaction::vectors::{
+        bigtx::*, bump_invalid::*, bump_valid::*, tx_invalid::*, tx_valid::*,
+    };
     use async_trait::async_trait;
     use bsv_sdk::script::LockingScript;
     use bsv_sdk::transaction::{
@@ -1152,6 +1152,173 @@ mod transaction_tests {
             let heights: Vec<u32> = beef.bumps.iter().map(|b| b.block_height).collect();
             assert!(heights.contains(&100), "Should have proof at height 100");
             assert!(heights.contains(&200), "Should have proof at height 200");
+        }
+
+        #[test]
+        fn test_to_beef_tip_is_last_transaction() {
+            // Regression test: The tip transaction (the one calling to_beef) must be
+            // the LAST transaction in the serialized BEEF. This is required by BRC-62
+            // so that ARC (and other consumers) can identify which TX to broadcast.
+            //
+            // Bug scenario: When inputs are created via with_source_transaction(),
+            // the input_txids tracking was broken, causing the tip to be sorted
+            // incorrectly and not appear last.
+
+            // Create multiple chains merging at a consolidation TX
+            let chain1_root = create_proven_tx(1, 100);
+            let chain1_child = create_child_tx(&chain1_root, 0);
+
+            let chain2_root = create_proven_tx(2, 200);
+            let chain2_child = create_child_tx(&chain2_root, 0);
+
+            let chain3_root = create_proven_tx(3, 300);
+            let chain3_child = create_child_tx(&chain3_root, 0);
+
+            // Consolidation TX spends from all three chains using with_source_transaction
+            let mut consolidation_tx = Transaction::new();
+            consolidation_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain1_child.clone(),
+                    0,
+                ))
+                .unwrap();
+            consolidation_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain2_child.clone(),
+                    0,
+                ))
+                .unwrap();
+            consolidation_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain3_child.clone(),
+                    0,
+                ))
+                .unwrap();
+            consolidation_tx
+                .add_output(TransactionOutput::new(1500, LockingScript::new()))
+                .unwrap();
+
+            let consolidation_txid = consolidation_tx.id();
+
+            // Test both to_beef (V2) and to_beef_v1 (V1)
+            for (name, beef_bytes) in [
+                ("V2", consolidation_tx.to_beef(true).unwrap()),
+                ("V1", consolidation_tx.to_beef_v1(true).unwrap()),
+            ] {
+                let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+                // The consolidation TX must be the LAST transaction
+                let last_tx = beef.txs.last().expect("BEEF should have transactions");
+                assert_eq!(
+                    last_tx.txid(),
+                    consolidation_txid,
+                    "{}: Consolidation TX must be LAST in BEEF, but last TX is {}",
+                    name,
+                    last_tx.txid()
+                );
+
+                // Verify the order: proven roots should come before their children
+                let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+                let last_idx = txids.len() - 1;
+                let consolidation_idx = txids
+                    .iter()
+                    .position(|t| t == &consolidation_txid)
+                    .unwrap();
+                assert_eq!(
+                    consolidation_idx, last_idx,
+                    "{}: Consolidation TX at index {} but should be at {} (last)",
+                    name, consolidation_idx, last_idx
+                );
+            }
+        }
+
+        #[test]
+        fn test_to_beef_tip_last_with_deep_chains() {
+            // Regression test for the bug where consolidation TX ends up NOT last.
+            //
+            // Bug mechanism:
+            // 1. Consolidation TX built with with_source_transaction() has empty input_txids
+            // 2. In sort_txs(), it passes .all() on empty iterator and is added to sorted_pending FIRST
+            // 3. Other chain TXs with populated input_txids must wait for dependencies
+            // 4. Result: consolidation TX ends up FIRST in sorted_pending instead of LAST
+            //
+            // This test uses deeper chains to ensure chain TXs have dependencies
+            // that aren't immediately satisfied by proven ancestors alone.
+
+            // Create chain: proven_root -> middle -> terminal
+            // The middle TX depends on the root, terminal depends on middle
+            let chain1_root = create_proven_tx(1, 100);
+            let chain1_middle = create_child_tx(&chain1_root, 0);
+            let chain1_terminal = create_child_tx(&chain1_middle, 0);
+
+            let chain2_root = create_proven_tx(2, 200);
+            let chain2_middle = create_child_tx(&chain2_root, 0);
+            let chain2_terminal = create_child_tx(&chain2_middle, 0);
+
+            // Consolidation TX spends from both terminal TXs
+            let mut consolidation_tx = Transaction::new();
+            consolidation_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain1_terminal.clone(),
+                    0,
+                ))
+                .unwrap();
+            consolidation_tx
+                .add_input(TransactionInput::with_source_transaction(
+                    chain2_terminal.clone(),
+                    0,
+                ))
+                .unwrap();
+            consolidation_tx
+                .add_output(TransactionOutput::new(500, LockingScript::new()))
+                .unwrap();
+
+            let consolidation_txid = consolidation_tx.id();
+            let beef_bytes = consolidation_tx.to_beef_v1(true).unwrap();
+            let beef = Beef::from_binary(&beef_bytes).unwrap();
+
+            // We should have 7 TXs: 2 roots + 2 middles + 2 terminals + 1 consolidation
+            assert_eq!(beef.txs.len(), 7, "Should have 7 transactions");
+
+            // The consolidation TX MUST be last
+            let last_tx = beef.txs.last().expect("BEEF should have transactions");
+            let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
+            assert_eq!(
+                last_tx.txid(),
+                consolidation_txid,
+                "Consolidation TX must be LAST in BEEF. Got {} at last position, expected {}. \
+                 TX order (first 8 chars): {:?}",
+                &last_tx.txid()[..8],
+                &consolidation_txid[..8],
+                txids.iter().map(|t| &t[..8]).collect::<Vec<_>>()
+            );
+
+            // Verify dependency order: each TX should come after its parent
+            let chain1_root_idx = txids.iter().position(|t| t == &chain1_root.id()).unwrap();
+            let chain1_middle_idx = txids.iter().position(|t| t == &chain1_middle.id()).unwrap();
+            let chain1_terminal_idx = txids
+                .iter()
+                .position(|t| t == &chain1_terminal.id())
+                .unwrap();
+
+            assert!(
+                chain1_root_idx < chain1_middle_idx,
+                "Root must come before middle"
+            );
+            assert!(
+                chain1_middle_idx < chain1_terminal_idx,
+                "Middle must come before terminal"
+            );
+
+            let consolidation_idx = txids
+                .iter()
+                .position(|t| t == &consolidation_txid)
+                .unwrap();
+            assert_eq!(
+                consolidation_idx,
+                txids.len() - 1,
+                "Consolidation must be at the last index"
+            );
         }
     }
 

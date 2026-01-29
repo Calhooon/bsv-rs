@@ -213,9 +213,12 @@ impl BeefTx {
         if let Some(ref tx) = self.tx {
             let mut seen = std::collections::HashSet::new();
             for input in &tx.inputs {
-                if let Some(ref txid) = input.source_txid {
+                // Use get_source_txid() which falls back to source_transaction
+                // when source_txid is None (e.g., when input was created via
+                // TransactionInput::with_source_transaction())
+                if let Ok(txid) = input.get_source_txid() {
                     if !txid.is_empty() && seen.insert(txid.clone()) {
-                        self.input_txids.push(txid.clone());
+                        self.input_txids.push(txid);
                     }
                 }
             }

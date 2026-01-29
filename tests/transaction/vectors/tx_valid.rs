@@ -3,6 +3,8 @@
 //! These vectors are derived from the TypeScript SDK and test serialization/deserialization
 //! of valid transactions.
 
+#![allow(dead_code)]
+
 /// A valid serialized transaction (basic P2PKH spend)
 pub const TX_VALID_1: &str = "0100000001b14bdcbc3e01bdaad36cc08e81e69c82e1060bc14e518db2b49aa43ad90ba26000000000490047304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01ffffffff0140420f00000000001976a914660d4ef3a743e3e696ad990364e555c271ad504b88ac00000000";
 

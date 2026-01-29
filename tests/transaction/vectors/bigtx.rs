@@ -4,6 +4,8 @@
 //! The full transaction hex is too large to include here,
 //! but the test verifies we can handle large transactions.
 
+#![allow(dead_code)]
+
 /// Expected TXID for the 1MB transaction from TypeScript SDK
 pub const BIG_TX_TXID: &str = "bb41a757f405890fb0f5856228e23b715702d714d59bf2b1feb70d8b2b4e3e08";
 

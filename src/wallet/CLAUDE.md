@@ -9,12 +9,12 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with feature-gated exports | ~253 |
-| `types.rs` | Core wallet type definitions (70+ types) | ~1550 |
-| `interface.rs` | WalletInterface trait (28 methods) | ~297 |
+| `mod.rs` | Module root with feature-gated exports | ~254 |
+| `types.rs` | Core wallet type definitions (70+ types) | ~1625 |
+| `interface.rs` | WalletInterface trait (26 methods) | ~297 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~641 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~491 |
-| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1345 |
+| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1348 |
 | `validation.rs` | 40+ input validation helpers | ~1170 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
@@ -42,7 +42,7 @@ Wire protocol implementation:
 
 ### WalletInterface Trait
 
-The `WalletInterface` trait defines all 28 wallet operations (async with `originator` parameter):
+The `WalletInterface` trait defines all 26 wallet operations (async with `originator` parameter):
 
 | Category | Methods |
 |----------|---------|
@@ -69,7 +69,7 @@ pub struct WalletClient {
     pub fn new(substrate_type: SubstrateType, originator: Option<String>) -> Self
     pub fn substrate_type(&self) -> SubstrateType
     pub fn originator(&self) -> Option<&str>
-    // All 28 wallet operations as async methods
+    // All wallet operations as async methods
 }
 ```
 
@@ -122,12 +122,12 @@ impl WalletInterface for ProtoWallet { ... }
 #### ProtoWallet Capabilities
 
 ProtoWallet can:
-- Derive keys using BRC-42 (via internal CachedKeyDeriver)
+- Derive keys using BRC-42 (via internal CachedKeyDeriver wrapped in Arc)
 - Create and verify ECDSA signatures
 - Encrypt and decrypt data (AES-256-GCM via derived symmetric keys)
-- Create and verify HMACs (SHA-256)
+- Create and verify HMACs (SHA-256 with constant-time comparison)
 - Reveal key linkages for verification
-- Implement all 28 `WalletInterface` methods (unsupported methods return errors)
+- Implement all `WalletInterface` methods (unsupported methods return errors)
 
 ProtoWallet does NOT:
 - Create transactions (returns error)
@@ -141,7 +141,7 @@ ProtoWallet does NOT:
 ProtoWallet implements `WalletInterface` with full support for cryptographic operations:
 - Key operations: All 9 methods fully implemented
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
-- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns mainnet, `get_version` returns SDK version, `get_height` returns 0, `get_header_for_height` returns error
+- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns mainnet, `get_version` returns "bsv-sdk-0.1.0", `get_height` returns 0, `get_header_for_height` returns error
 
 ### Validation Module
 
@@ -183,7 +183,7 @@ Validation structs for action inputs/outputs:
 
 **OutputInclude** - What to include in output listings: `LockingScripts` or `EntireTransactions`.
 
-**Outpoint** - Transaction outpoint with `txid: TxId` and `vout: u32`. Parses from "txid.vout" string format.
+**Outpoint** - Transaction outpoint with `txid: TxId` and `vout: u32`. Parses from "txid.vout" string format. Supports both string and object serialization for cross-SDK compatibility.
 
 **TxId** - Type alias for `[u8; 32]`.
 
@@ -349,7 +349,7 @@ Additional types in `types.rs` cover all wallet operations (actions, outputs, ce
 ## Cross-SDK Compatibility
 
 This module maintains API compatibility with:
-- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `KeyDeriver`, `CachedKeyDeriver`, `ProtoWallet`, `WalletClient`, all 28 wallet methods
+- [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `KeyDeriver`, `CachedKeyDeriver`, `ProtoWallet`, `WalletClient`, all wallet methods
 - [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `KeyDeriver`, `ProtoWallet`
 
 Key derivation uses the same algorithm (BRC-42) and produces identical keys across all SDK implementations.

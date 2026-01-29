@@ -280,6 +280,41 @@ impl KeyDeriverApi for CachedKeyDeriver {
         Ok(derived)
     }
 
+    fn derive_private_key_raw(
+        &self,
+        invoice_number: &str,
+        counterparty: &Counterparty,
+    ) -> Result<PrivateKey> {
+        // For raw derivation, we use invoice_number as the cache key component
+        // We create a synthetic protocol just for caching purposes
+        let cache_key = format!(
+            "priv_raw:{}:{}",
+            invoice_number,
+            match counterparty {
+                Counterparty::Self_ => "self".to_string(),
+                Counterparty::Anyone => "anyone".to_string(),
+                Counterparty::Other(pk) => pk.to_hex(),
+            }
+        );
+
+        // Check cache first
+        {
+            let mut cache = self.private_key_cache.lock().unwrap();
+            if let Some(cached) = cache.get(&cache_key) {
+                return Ok(cached);
+            }
+        }
+
+        // Derive and cache
+        let derived = self.inner.derive_private_key_raw(invoice_number, counterparty)?;
+        {
+            let mut cache = self.private_key_cache.lock().unwrap();
+            cache.put(cache_key, derived.clone());
+        }
+
+        Ok(derived)
+    }
+
     fn derive_symmetric_key(
         &self,
         protocol: &Protocol,

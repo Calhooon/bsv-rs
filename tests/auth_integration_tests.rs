@@ -275,7 +275,8 @@ fn test_http_request_payload_complex() {
     let request = HttpRequest {
         request_id: [0xAB; 32],
         method: "POST".to_string(),
-        url_postfix: "/api/v2/transactions".to_string(),
+        path: "/api/v2/transactions".to_string(),
+        search: String::new(),
         headers: vec![
             ("content-type".to_string(), "application/json".to_string()),
             ("x-bsv-topic".to_string(), "tm_test".to_string()),
@@ -289,7 +290,7 @@ fn test_http_request_payload_complex() {
 
     assert_eq!(decoded.request_id, [0xAB; 32]);
     assert_eq!(decoded.method, "POST");
-    assert_eq!(decoded.url_postfix, "/api/v2/transactions");
+    assert_eq!(decoded.url_postfix(), "/api/v2/transactions");
     assert_eq!(decoded.headers.len(), 3);
     assert_eq!(decoded.body, br#"{"txid":"abc123"}"#.to_vec());
 }
@@ -551,7 +552,8 @@ fn test_http_request_empty_values() {
     let request = HttpRequest {
         request_id: [0u8; 32],
         method: String::new(), // Empty method should default to GET
-        url_postfix: String::new(),
+        path: String::new(),
+        search: String::new(),
         headers: vec![],
         body: vec![],
     };
@@ -560,7 +562,7 @@ fn test_http_request_empty_values() {
     let decoded = HttpRequest::from_payload(&payload).unwrap();
 
     assert!(decoded.method.is_empty() || decoded.method == "GET");
-    assert!(decoded.url_postfix.is_empty());
+    assert!(decoded.url_postfix().is_empty());
     assert!(decoded.headers.is_empty());
     assert!(decoded.body.is_empty());
 }
@@ -570,7 +572,8 @@ fn test_http_request_unicode_values() {
     let request = HttpRequest {
         request_id: [0u8; 32],
         method: "POST".to_string(),
-        url_postfix: "/api/users/test".to_string(), // URL
+        path: "/api/users/test".to_string(), // URL
+        search: String::new(),
         headers: vec![("x-custom".to_string(), "unicode-value".to_string())], // Header value
         body: "hello".as_bytes().to_vec(),          // Body
     };
@@ -578,7 +581,7 @@ fn test_http_request_unicode_values() {
     let payload = request.to_payload();
     let decoded = HttpRequest::from_payload(&payload).unwrap();
 
-    assert_eq!(decoded.url_postfix, "/api/users/test");
+    assert_eq!(decoded.url_postfix(), "/api/users/test");
     assert_eq!(decoded.headers[0].1, "unicode-value");
     assert_eq!(decoded.body, "hello".as_bytes());
 }
@@ -593,7 +596,8 @@ fn test_http_request_large_header_count() {
     let request = HttpRequest {
         request_id: [0u8; 32],
         method: "GET".to_string(),
-        url_postfix: "/test".to_string(),
+        path: "/test".to_string(),
+        search: String::new(),
         headers,
         body: vec![],
     };

@@ -10,7 +10,7 @@ This module provides complete Bitcoin transaction functionality:
 - Signing with script templates
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
-- BEEF format (BRC-62/95/96) for SPV proofs with ancestry collection
+- BEEF format (BRC-62/95/96) for SPV proofs with recursive ancestry collection
 - Async Broadcaster trait with ARC and WhatsOnChain implementations
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
 
@@ -20,19 +20,19 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports |
+| `mod.rs` | Module root; re-exports all public types |
 | `input.rs` | `TransactionInput` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
-| `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF export |
-| `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) |
-| `beef.rs` | `Beef` (BRC-62/95/96) with validation and merging |
+| `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF ancestry collection |
+| `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
+| `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, and merging |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
-| `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy` |
+| `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig` |
 | `broadcaster.rs` | `Broadcaster` trait, response/failure types |
-| `broadcasters/` | `ArcBroadcaster`, `WhatsOnChainBroadcaster` |
+| `broadcasters/` | `ArcBroadcaster`, `ArcConfig`, `WhatsOnChainBroadcaster`, `WocBroadcastConfig` |
 | `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker`, `AlwaysValidChainTracker` |
-| `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker` |
+| `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, `BlockHeadersServiceConfig` |
 
 ## Core Types
 
@@ -40,7 +40,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 
 ```rust
 pub struct TransactionInput {
-    pub source_transaction: Option<Box<Transaction>>,  // Full source tx (preferred)
+    pub source_transaction: Option<Box<Transaction>>,  // Full source tx (preferred for BEEF)
     pub source_txid: Option<String>,                   // TXID if source tx unavailable
     pub source_output_index: u32,
     pub unlocking_script: Option<UnlockingScript>,     // Populated after signing
@@ -51,8 +51,8 @@ pub struct TransactionInput {
 impl TransactionInput {
     pub fn new(source_txid: String, source_output_index: u32) -> Self
     pub fn with_source_transaction(tx: Transaction, output_index: u32) -> Self
-    pub fn get_source_txid(&self) -> Result<String>
-    pub fn get_source_txid_bytes(&self) -> Result<[u8; 32]>
+    pub fn get_source_txid(&self) -> Result<String>      // Falls back to source_transaction
+    pub fn get_source_txid_bytes(&self) -> Result<[u8; 32]>  // Internal byte order
     pub fn source_satoshis(&self) -> Option<u64>
     pub fn source_locking_script(&self) -> Option<&LockingScript>
     pub fn set_unlocking_script_template(&mut self, template: ScriptTemplateUnlock)
@@ -60,6 +60,8 @@ impl TransactionInput {
     pub fn has_source_transaction(&self) -> bool
 }
 ```
+
+Note: `unlocking_script_template` is not cloned when cloning `TransactionInput` (templates contain closures).
 
 ### TransactionOutput
 
@@ -73,9 +75,9 @@ pub struct TransactionOutput {
 impl TransactionOutput {
     pub fn new(satoshis: u64, locking_script: LockingScript) -> Self
     pub fn new_change(locking_script: LockingScript) -> Self
-    pub fn get_satoshis(&self) -> u64
+    pub fn get_satoshis(&self) -> u64      // Returns 0 if None
     pub fn has_satoshis(&self) -> bool
-    pub fn serialized_size(&self) -> usize
+    pub fn serialized_size(&self) -> usize // 8 + varint + script_len
 }
 ```
 
@@ -89,6 +91,7 @@ pub struct Transaction {
     pub lock_time: u32,                   // Default: 0
     pub metadata: HashMap<String, Value>, // Not serialized
     pub merkle_path: Option<MerklePath>,  // SPV proof (stops BEEF ancestry walk)
+    // Internal caches: cached_hash, raw_bytes_cache, hex_cache
 }
 
 impl Transaction {
@@ -110,7 +113,8 @@ impl Transaction {
     pub fn to_hex(&self) -> String
     pub fn to_ef(&self) -> Result<Vec<u8>>
     pub fn to_hex_ef(&self) -> Result<String>
-    pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>>
+    pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>>      // BEEF V2
+    pub fn to_beef_v1(&self, allow_partial: bool) -> Result<Vec<u8>>   // BEEF V1 for ARC
     pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>>
 
     // Hashing
@@ -133,7 +137,7 @@ impl Transaction {
     pub fn estimate_size(&self) -> usize
 }
 
-pub enum ChangeDistribution { Equal, Random }
+pub enum ChangeDistribution { Equal, Random }  // Random uses Benford's law
 pub struct ScriptOffsets { pub inputs: Vec<ScriptOffset>, pub outputs: Vec<ScriptOffset> }
 pub struct ScriptOffset { pub index: usize, pub offset: usize, pub length: usize }
 ```
@@ -198,25 +202,8 @@ pub struct BroadcastResponse { pub status: BroadcastStatus, pub txid: String, pu
 pub struct BroadcastFailure { pub status: BroadcastStatus, pub code: String, pub txid: Option<String>, pub description: String, pub more: Option<Value> }
 pub enum BroadcastStatus { Success, Error }
 pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
-pub fn is_broadcast_success(result: &BroadcastResult) -> bool
-pub fn is_broadcast_failure(result: &BroadcastResult) -> bool
 
-// ARC Broadcaster (requires http feature)
-pub struct ArcBroadcaster { url: String, api_key: Option<String>, timeout_ms: u64 }
-impl ArcBroadcaster {
-    pub fn new(url: &str, api_key: Option<String>) -> Self
-    pub fn with_config(config: ArcConfig) -> Self
-    pub fn default() -> Self  // Uses https://arc.taal.com
-}
-
-// WhatsOnChain Broadcaster (requires http feature)
-pub struct WhatsOnChainBroadcaster { network: WocBroadcastNetwork, api_key: Option<String> }
-impl WhatsOnChainBroadcaster {
-    pub fn mainnet() -> Self
-    pub fn testnet() -> Self
-    pub fn stn() -> Self
-}
-pub enum WocBroadcastNetwork { Mainnet, Testnet, Stn }
+// Implementations (require http feature): ArcBroadcaster, WhatsOnChainBroadcaster
 ```
 
 ## Chain Tracking
@@ -230,26 +217,24 @@ pub trait ChainTracker: Send + Sync {
 
 pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), BlockNotFound(u32), Other(String) }
 
-// Mock implementations for testing
-pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String> }
-pub struct AlwaysValidChainTracker { pub height: u32 }
-
-// WhatsOnChain Tracker (requires http feature)
-pub struct WhatsOnChainTracker { network: WocNetwork }
-impl WhatsOnChainTracker { pub fn mainnet() -> Self; pub fn testnet() -> Self }
-pub enum WocNetwork { Mainnet, Testnet }
-
-// Block Headers Service Tracker (requires http feature)
-pub struct BlockHeadersServiceTracker { base_url: String, auth_token: Option<String> }
-impl BlockHeadersServiceTracker { pub fn new() -> Self; pub fn with_url(base_url: &str) -> Self }
-pub const DEFAULT_HEADERS_URL: &str = "https://headers.spv.money";
+// Test mocks: MockChainTracker, AlwaysValidChainTracker
+// HTTP implementations: WhatsOnChainTracker, BlockHeadersServiceTracker
 ```
 
 ## MerklePath (BUMP - BRC-74)
 
 ```rust
-pub struct MerklePath { pub block_height: u32, pub path: Vec<Vec<MerklePathLeaf>> }
-pub struct MerklePathLeaf { pub offset: u64, pub hash: Option<String>, pub txid: bool, pub duplicate: bool }
+pub struct MerklePath {
+    pub block_height: u32,
+    pub path: Vec<Vec<MerklePathLeaf>>,  // Tree structure, level 0 = txids
+}
+
+pub struct MerklePathLeaf {
+    pub offset: u64,            // Position in tree level
+    pub hash: Option<String>,   // None if duplicate
+    pub txid: bool,             // True if this is a transaction ID
+    pub duplicate: bool,        // True if hash duplicated from sibling
+}
 
 impl MerklePathLeaf {
     pub fn new(offset: u64, hash: String) -> Self
@@ -258,40 +243,53 @@ impl MerklePathLeaf {
 }
 
 impl MerklePath {
-    pub fn new(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>
+    // Constructors
+    pub fn new(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>  // Full validation
+    pub fn new_unchecked(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>  // Skips offset validation
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_binary(bin: &[u8]) -> Result<Self>
-    pub fn from_coinbase_txid(txid: &str, height: u32) -> Self
+    pub fn from_reader(reader: &mut Reader) -> Result<Self>
+    pub fn from_coinbase_txid(txid: &str, height: u32) -> Self  // Single-tx block
+
+    // Serialization
     pub fn to_hex(&self) -> String
     pub fn to_binary(&self) -> Vec<u8>
+    pub fn to_writer(&self, writer: &mut Writer)
+
+    // Verification
     pub fn compute_root(&self, txid: Option<&str>) -> Result<String>
     pub fn contains(&self, txid: &str) -> bool
-    pub fn txids(&self) -> Vec<String>
-    pub fn combine(&mut self, other: &MerklePath) -> Result<()>
-    pub fn trim(&mut self)
+    pub fn txids(&self) -> Vec<String>  // All txids marked with txid=true
+
+    // Merging
+    pub fn combine(&mut self, other: &MerklePath) -> Result<()>  // Same height/root required
+    pub fn trim(&mut self)  // Remove unnecessary internal nodes
 }
 ```
+
+Validation in `new()`:
+- Level 0 must not be empty
+- No duplicate offsets at same level
+- All higher-level offsets must be derivable from level 0 txids
+- All txids must compute to the same root
 
 ## BEEF Format (BRC-62/95/96)
 
 ```rust
 pub struct Beef {
-    pub bumps: Vec<MerklePath>,
-    pub txs: Vec<BeefTx>,
-    pub version: u32,
-    pub atomic_txid: Option<String>,  // Internal: also has txid_index, needs_sort
+    pub bumps: Vec<MerklePath>,       // Merkle proofs
+    pub txs: Vec<BeefTx>,             // Transactions (sorted by dependency)
+    pub version: u32,                 // BEEF_V1 or BEEF_V2
+    pub atomic_txid: Option<String>,  // Target txid for Atomic BEEF
 }
 
 impl Beef {
-    // Constructors & Parsing
     pub fn new() -> Self                 // V2 by default
     pub fn with_version(version: u32) -> Self
     pub fn from_hex(hex: &str) -> Result<Self>
     pub fn from_binary(bin: &[u8]) -> Result<Self>
-
-    // Serialization
     pub fn to_hex(&mut self) -> String
-    pub fn to_binary(&mut self) -> Vec<u8>
+    pub fn to_binary(&mut self) -> Vec<u8>         // Auto-sorts txs
     pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>>
 
     // Validation
@@ -302,40 +300,33 @@ impl Beef {
     // Lookup
     pub fn find_txid(&self, txid: &str) -> Option<&BeefTx>
     pub fn find_bump(&self, txid: &str) -> Option<&MerklePath>
-    pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction>
 
     // Merging
-    pub fn merge_bump(&mut self, bump: MerklePath) -> usize
+    pub fn merge_bump(&mut self, bump: MerklePath) -> usize  // Combines same height/root
     pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx
-    pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx
     pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx
-    pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx>  // Trim to txid-only
+    pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx>
     pub fn merge_beef(&mut self, other: &Beef)
-
-    pub fn is_atomic(&self) -> bool
-    pub fn to_log_string(&mut self) -> String
 }
 
 pub struct BeefValidationResult { pub valid: bool, pub roots: HashMap<u32, String> }
-pub struct SortResult { pub missing_inputs: Vec<String>, pub not_valid: Vec<String>, pub valid: Vec<String>, pub with_missing_inputs: Vec<String>, pub txid_only: Vec<String> }
+pub struct SortResult { pub missing_inputs, not_valid, valid, with_missing_inputs, txid_only: Vec<String> }
 
 pub struct BeefTx { pub input_txids: Vec<String>, pub is_valid: Option<bool> }
 impl BeefTx {
     pub fn from_tx(tx: Transaction, bump_index: Option<usize>) -> Self
     pub fn from_raw_tx(raw_tx: Vec<u8>, bump_index: Option<usize>) -> Self
     pub fn from_txid(txid: String) -> Self
-    pub fn bump_index(&self) -> Option<usize>
-    pub fn has_proof(&self) -> bool
-    pub fn is_txid_only(&self) -> bool
+    pub fn has_proof(&self) -> bool      // bump_index.is_some()
+    pub fn is_txid_only(&self) -> bool   // Has txid but no tx data
     pub fn txid(&self) -> String
     pub fn tx(&self) -> Option<&Transaction>
-    pub fn raw_tx(&self) -> Option<&[u8]>
 }
 
 pub enum TxDataFormat { RawTx = 0, RawTxAndBumpIndex = 1, TxidOnly = 2 }
-pub const BEEF_V1: u32 = 0xEFBE0001;
-pub const BEEF_V2: u32 = 0xEFBE0002;
-pub const ATOMIC_BEEF: u32 = 0x01010101;
+pub const BEEF_V1: u32 = 0xEFBE0001;  // BRC-62
+pub const BEEF_V2: u32 = 0xEFBE0002;  // BRC-96 with txid-only
+pub const ATOMIC_BEEF: u32 = 0x01010101;  // BRC-95
 ```
 
 ## Usage Examples
@@ -353,6 +344,11 @@ tx.sign().await?;
 let broadcaster = ArcBroadcaster::default();
 let result = broadcaster.broadcast(&tx).await;
 
+// Serializing to BEEF (recursively collects ancestors)
+let beef_v1 = tx.to_beef_v1(false)?;  // For ARC
+let beef_v2 = tx.to_beef(false)?;     // V2 format
+let atomic = tx.to_atomic_beef(false)?;
+
 // SPV Verification
 let tracker = WhatsOnChainTracker::mainnet();
 let validation = beef.verify_valid(false);
@@ -367,26 +363,43 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 
 ## Implementation Notes
 
-- **Caching**: Transaction hash/serialization cached; invalidates on modification
-- **Inputs**: Must have `source_txid` or `source_transaction`; fee calc/signing need full source tx
-- **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()`
+- **Caching**: Transaction hash/serialization cached in RefCell; invalidates on modification via `add_input()`, `add_output()`, `sign()`, `fee()`
+- **Inputs**: Must have `source_txid` or `source_transaction`; fee calc/signing need full source tx with satoshis/locking_script
+- **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()` using Benford's law for Random distribution
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
 - **HTTP feature**: `ArcBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
-- **BEEF ancestry**: `to_beef()` walks `source_transaction` chain, stops at txs with `merkle_path`
-- **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by block height and computed root
+- **BEEF ancestry**: `to_beef()` and `to_beef_v1()` recursively walk `source_transaction` chain via `collect_ancestors()`, stops at txs with `merkle_path`
+- **BEEF V1 vs V2**: Use `to_beef_v1()` for ARC compatibility (BRC-62), `to_beef()` for V2 with TXID-only support (BRC-96)
+- **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by `"height:root"` key; combines proofs at same height/root
+- **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
+- **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker` implement `Default`
+- **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
+
+## BEEF Ancestry Collection Algorithm
+
+The `collect_ancestors()` method implements the same algorithm as TypeScript/Go SDKs:
+
+1. **Cycle detection**: Skip transactions already seen (by txid)
+2. **Proven transactions**: If tx has `merkle_path`, add proof (deduplicated by height:root) and stop recursion
+3. **Unproven transactions**: Recursively process each input's `source_transaction` in reverse order
+4. **Dependency order**: After processing all ancestors, add current transaction
+5. **Partial support**: `allow_partial=true` skips inputs with missing source transactions
 
 ## Error Types
 
 | Error Type | Conditions |
 |------------|------------|
-| `TransactionError` | Missing source, satoshis, uncomputed change, EF issues |
+| `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing |
 | `FeeModelError` | Input missing unlocking script or template |
-| `BeefError` | Invalid version, missing atomic txid |
-| `MerklePathError` | Empty path, duplicate/invalid offset, mismatched roots |
-| `ChainTrackerError` | Network error, invalid response, block not found |
+| `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
+| `MerklePathError` | Empty path, duplicate offset, invalid offset at height, mismatched roots |
+| `ChainTrackerError` | `NetworkError`, `InvalidResponse`, `BlockNotFound(height)`, `Other` |
 
 ## Related Documentation
 
 - `../script/CLAUDE.md` - LockingScript, UnlockingScript, templates
-- `../primitives/CLAUDE.md` - Reader, Writer, sha256d
+- `../primitives/CLAUDE.md` - Reader, Writer, sha256d, from_hex, to_hex
+- `fee_models/CLAUDE.md` - SatoshisPerKilobyte, LivePolicy
+- `broadcasters/CLAUDE.md` - ArcBroadcaster, WhatsOnChainBroadcaster
+- `chain_trackers/CLAUDE.md` - WhatsOnChainTracker, BlockHeadersServiceTracker

@@ -18,7 +18,9 @@ use crate::wallet::{
     Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, SecurityLevel,
     VerifySignatureArgs, WalletInterface,
 };
+use crate::primitives::to_base64;
 use crate::{Error, Result};
+use rand::RngCore;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -124,6 +126,9 @@ pub struct Peer<W: WalletInterface, T: Transport> {
 
 impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     /// Creates a new Peer with the given options.
+    ///
+    /// Note: After creating the Peer, you should call `start()` to set up
+    /// the transport callback for receiving messages.
     pub fn new(options: PeerOptions<W, T>) -> Self {
         let originator = options.originator.unwrap_or_else(|| "unknown".to_string());
 
@@ -141,6 +146,114 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             originator,
             identity_key: Arc::new(RwLock::new(None)),
         }
+    }
+
+    /// Sets up the transport callback to receive and process incoming messages.
+    ///
+    /// This must be called after creating the Peer for it to receive responses.
+    /// The callback is automatically set up for processing InitialResponse,
+    /// CertificateRequest/Response, and General messages.
+    pub fn start(&self) {
+        // Clone all the Arc references we need for the callback
+        let session_manager = self.session_manager.clone();
+        let pending_handshakes = self.pending_handshakes.clone();
+        let general_message_callbacks = self.general_message_callbacks.clone();
+        let certificate_callbacks = self.certificate_callbacks.clone();
+        let certificate_request_callbacks = self.certificate_request_callbacks.clone();
+
+        // Set up the transport callback
+        self.transport.set_callback(Box::new(move |message| {
+            let session_manager = session_manager.clone();
+            let pending_handshakes = pending_handshakes.clone();
+            let general_message_callbacks = general_message_callbacks.clone();
+            let certificate_callbacks = certificate_callbacks.clone();
+            let certificate_request_callbacks = certificate_request_callbacks.clone();
+
+            Box::pin(async move {
+                // Process the message based on type
+                match message.message_type {
+                    MessageType::InitialResponse => {
+                        // Process InitialResponse - complete the handshake
+                        // yourNonce is the client's session nonce (echoed back by server)
+                        let client_nonce = message
+                            .your_nonce
+                            .as_ref()
+                            .ok_or_else(|| Error::AuthError("InitialResponse missing your_nonce".into()))?;
+
+                        // initialNonce is the server's session nonce
+                        let server_nonce = message
+                            .initial_nonce
+                            .as_ref()
+                            .ok_or_else(|| Error::AuthError("InitialResponse missing initial_nonce".into()))?;
+
+                        // Find and update the existing session (created in initiate_handshake)
+                        let session = {
+                            let mut mgr = session_manager.write().await;
+                            if let Some(session) = mgr.get_session_mut(client_nonce) {
+                                // Update the existing session
+                                session.peer_identity_key = Some(message.identity_key.clone());
+                                session.peer_nonce = Some(server_nonce.clone());
+                                session.is_authenticated = true;
+                                session.touch();
+                                session.clone()
+                            } else {
+                                // No existing session - create a new one
+                                let mut session = PeerSession::with_nonce(client_nonce.clone());
+                                session.peer_identity_key = Some(message.identity_key.clone());
+                                session.peer_nonce = Some(server_nonce.clone());
+                                session.is_authenticated = true;
+                                session.touch();
+                                mgr.add_session(session.clone())?;
+                                session
+                            }
+                        };
+
+                        // Resolve pending handshake using client's nonce
+                        {
+                            let mut pending = pending_handshakes.write().await;
+                            if let Some(tx) = pending.remove(client_nonce) {
+                                let _ = tx.send(Ok(session));
+                            }
+                        }
+                    }
+                    MessageType::General => {
+                        // Route to general message callbacks
+                        let payload = message.payload.clone().unwrap_or_default();
+                        let sender = message.identity_key.clone();
+
+                        let cbs = general_message_callbacks.read().await;
+                        for (_, callback) in cbs.iter() {
+                            callback(sender.clone(), payload.clone()).await?;
+                        }
+                    }
+                    MessageType::CertificateRequest => {
+                        // Route to certificate request callbacks
+                        let sender = message.identity_key.clone();
+                        let requested = message.requested_certificates.clone().unwrap_or_default();
+
+                        let cbs = certificate_request_callbacks.read().await;
+                        for (_, callback) in cbs.iter() {
+                            callback(sender.clone(), requested.clone()).await?;
+                        }
+                    }
+                    MessageType::CertificateResponse => {
+                        // Route to certificate response callbacks
+                        let sender = message.identity_key.clone();
+                        let certs = message.certificates.clone().unwrap_or_default();
+
+                        let cbs = certificate_callbacks.read().await;
+                        for (_, callback) in cbs.iter() {
+                            callback(sender.clone(), certs.clone()).await?;
+                        }
+                    }
+                    _ => {
+                        // Ignore other message types (InitialRequest is server-side only)
+                    }
+                }
+
+                Ok(())
+            })
+        }));
     }
 
     /// Sends a message to a peer.
@@ -165,14 +278,14 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // Build general message
         let my_identity = self.get_identity_key().await?;
         let mut msg = AuthMessage::new(MessageType::General, my_identity);
-        msg.nonce = Some(
-            create_nonce(
-                &self.wallet,
-                session.peer_identity_key.as_ref(),
-                &self.originator,
-            )
-            .await?,
-        );
+
+        // Use simple random bytes for message nonce (not HMAC-based)
+        // This matches TypeScript's behavior: Utils.toBase64(Random(32))
+        let mut random_bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
+        let msg_nonce = to_base64(&random_bytes);
+        msg.nonce = Some(msg_nonce);
+
         msg.your_nonce = session.peer_nonce.clone();
         msg.payload = Some(message.to_vec());
 
@@ -227,14 +340,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         let my_identity = self.get_identity_key().await?;
         let mut msg = AuthMessage::new(MessageType::CertificateRequest, my_identity);
-        msg.nonce = Some(
-            create_nonce(
-                &self.wallet,
-                session.peer_identity_key.as_ref(),
-                &self.originator,
-            )
-            .await?,
-        );
+
+        // Use simple random bytes for message nonce
+        let mut random_bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
+        msg.nonce = Some(to_base64(&random_bytes));
+
         msg.your_nonce = session.peer_nonce.clone();
         msg.requested_certificates = Some(requested);
 
@@ -261,14 +372,12 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         let my_identity = self.get_identity_key().await?;
         let mut msg = AuthMessage::new(MessageType::CertificateResponse, my_identity);
-        msg.nonce = Some(
-            create_nonce(
-                &self.wallet,
-                session.peer_identity_key.as_ref(),
-                &self.originator,
-            )
-            .await?,
-        );
+
+        // Use simple random bytes for message nonce
+        let mut random_bytes = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut random_bytes);
+        msg.nonce = Some(to_base64(&random_bytes));
+
         msg.your_nonce = session.peer_nonce.clone();
         msg.certificates = Some(certificates);
 
@@ -421,19 +530,20 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let key_id = message.get_key_id(session.peer_nonce.as_deref());
 
         let protocol = Protocol::new(SecurityLevel::Counterparty, AUTH_PROTOCOL_ID);
+        let counterparty = session
+            .peer_identity_key
+            .as_ref()
+            .map(|k| Counterparty::Other(k.clone()));
 
         let result = self
             .wallet
             .create_signature(
                 CreateSignatureArgs {
-                    data: Some(data),
+                    data: Some(data.clone()),
                     hash_to_directly_sign: None,
                     protocol_id: protocol,
-                    key_id,
-                    counterparty: session
-                        .peer_identity_key
-                        .as_ref()
-                        .map(|k| Counterparty::Other(k.clone())),
+                    key_id: key_id.clone(),
+                    counterparty,
                 },
                 &self.originator,
             )
@@ -495,8 +605,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         }
 
         // Build InitialRequest message
+        // Note: InitialRequest uses initial_nonce (not nonce) for the session nonce
         let mut msg = AuthMessage::new(MessageType::InitialRequest, my_identity);
-        msg.nonce = Some(session_nonce.clone());
+        msg.initial_nonce = Some(session_nonce.clone());
         if let Some(ref req) = self.certificates_to_request {
             msg.requested_certificates = Some(req.clone());
         }

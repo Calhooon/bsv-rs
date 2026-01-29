@@ -26,9 +26,9 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `registry_integration_tests.rs` | Registry module integration tests (50 tests: definitions, queries, serialization) |
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
-| `storage_tests.rs` | UHRP storage module tests (60+ tests: URLs, downloader, uploader) |
+| `storage_tests.rs` | UHRP storage module tests (70 tests: URLs, downloader, uploader) |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
-| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 71 tests) |
+| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 84 tests) |
 | `wallet_tests.rs` | Wallet module tests (60+ tests: KeyDeriver, ProtoWallet, wire protocol) |
 | `transaction/` | Transaction test vectors module |
 
@@ -324,7 +324,7 @@ Script template integration tests (10 tests):
 
 ### Transaction Tests (`transaction_tests.rs`)
 
-Transaction module tests (71 tests, requires `transaction` feature flag):
+Transaction module tests (90+ tests, requires `transaction` feature flag):
 
 **Transaction Parsing**
 - `test_transaction_from_hex` - Parse valid transaction from hex (version=1, locktime=0)
@@ -383,6 +383,23 @@ Transaction module tests (71 tests, requires `transaction` feature flag):
 - Serialization: atomic (with target txid), V1/V2 roundtrip, hex/binary roundtrip
 - Validation: empty BEEF, txid-only (strict vs lenient), verify_valid result structure
 - MerklePaths: multiple bumps at heights 100-1000000
+
+**BEEF Ancestry Collection Tests** (in `beef_ancestry_tests` submodule, 15 tests)
+- `test_to_beef_single_transaction_no_ancestors` - Single tx with no inputs produces valid BEEF
+- `test_to_beef_walks_two_level_ancestry` - grandparent → parent → child chain collection
+- `test_to_beef_walks_three_level_ancestry` - great-grandparent → grandparent → parent → child
+- `test_to_beef_stops_at_proven_transaction` - Stops walking at tx with merkle proof
+- `test_to_beef_collects_merkle_proofs` - Collects proofs from multiple proven ancestors
+- `test_to_beef_allow_partial_false_fails_on_missing` - Fails when source tx missing
+- `test_to_beef_allow_partial_true_skips_missing` - Succeeds with missing source when partial allowed
+- `test_to_beef_handles_diamond_dependency` - Deduplicates common ancestor in diamond pattern
+- `test_to_beef_dependency_order` - Ancestors ordered before descendants in output
+- `test_to_atomic_beef_includes_ancestry` - Atomic BEEF includes full ancestry
+- `test_to_beef_with_proven_child` - Proven tx alone in BEEF with its proof
+- `test_merkle_path_field_works` - Set and check merkle_path field on Transaction
+- `test_to_beef_multiple_inputs_different_chains` - Merges two separate ancestry chains
+- `test_to_beef_tip_is_last_transaction` - Tip transaction is always last in BEEF (BRC-62 requirement)
+- `test_to_beef_tip_last_with_deep_chains` - Consolidation TX is last with deep ancestry chains
 
 **Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule, 13 tests)
 - BRC-74 MerklePath: parse, hex roundtrip, compute root for 3 TXIDs
@@ -604,7 +621,7 @@ BRC-77 signed message and BRC-78 encrypted message tests (35+ tests, requires `m
 
 ### Storage Tests (`storage_tests.rs`)
 
-UHRP storage module tests (60+ tests, requires `storage` feature):
+UHRP storage module tests (70 tests, requires `storage` feature):
 
 **UHRP URL Generation**
 - `test_get_url_for_file_known_data` - TypeScript SDK test vector
@@ -1029,6 +1046,10 @@ cargo test --test transaction_tests --features transaction -- beef
 
 **Transaction** (`bsv_sdk::transaction`):
 - `Transaction`, `TransactionInput`, `TransactionOutput` - Transaction types
+- `Transaction::to_beef(allow_partial)` - Serialize tx with ancestry to BEEF V2 format
+- `Transaction::to_beef_v1(allow_partial)` - Serialize tx with ancestry to BEEF V1 format
+- `Transaction::to_atomic_beef(allow_partial)` - Serialize as atomic BEEF with target txid
+- `TransactionInput::with_source_transaction(tx, vout)` - Input with source tx for ancestry
 - `MerklePath` - BRC-74 BUMP merkle proof
 - `Beef`, `BEEF_V1`, `BEEF_V2` - BRC-62 BEEF container
 - `FeeModel`, `SatoshisPerKilobyte`, `FixedFee` - Fee computation
@@ -1197,6 +1218,7 @@ Tests are organized by feature area:
 The `transaction_tests.rs` file uses nested modules for organization:
 - `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)
 - `beef_extended_tests` - Extended BEEF format tests
+- `beef_ancestry_tests` - BEEF ancestry collection tests for `to_beef()` method
 - `cross_sdk_tests` - Cross-SDK compatibility using `beef_cross_sdk.rs` vectors
 - `merkle_path_advanced_tests` - Advanced MerklePath verification with ChainTracker
 

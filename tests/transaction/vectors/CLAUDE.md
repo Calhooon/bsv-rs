@@ -21,17 +21,17 @@ This module provides test vectors for the transaction subsystem. Vectors include
 
 ### Transaction Vectors
 
-**`TX_VALID_VECTORS: &[&str]`** - Array of valid transaction hex strings for roundtrip testing.
+**`TX_VALID_VECTORS: &[&str]`** - Array of 5 valid transaction hex strings for roundtrip testing. Includes `TX_VALID_1`, `TX_VALID_2`, `TX_SIMPLE`, plus two additional coinbase and multi-input transactions.
 
 **`TX_VALID_1: &str`** - Basic P2PKH spend transaction.
 
-**`TX_VALID_2: &str`** - Complex transaction with multiple inputs.
+**`TX_VALID_2: &str`** - Complex transaction with multiple inputs (same as `MULTI_IO_TX_HEX` in `bigtx.rs`).
 
 **`TX_VALID_2_TXID: &str`** - Expected TXID for `TX_VALID_2`.
 
 **`TX_SIMPLE: &str`** - Minimal transaction for basic testing.
 
-**`TX_INVALID_VECTORS: &[(&str, &str)]`** - Array of 10 (hex, description) tuples for invalid transactions. Includes:
+**`TX_INVALID_VECTORS: &[(&str, &str)]`** - Array of 11 (hex, description) tuples for invalid transactions. Includes:
 - Extra junk in scriptPubKey
 - Non-standard pushdata prefix
 - Invalid P2SH script hash
@@ -177,15 +177,15 @@ assert_eq!(merkle_path.root().to_hex(), BRC74_ROOT);
 
 ## Invalid Transaction Categories
 
-The `TX_INVALID_VECTORS` cover 10 failure modes:
+The `TX_INVALID_VECTORS` cover 11 failure modes:
 
 | Category | Description |
 |----------|-------------|
 | Script Structure | Extra junk in scriptPubKey, non-standard pushdata prefix |
-| P2SH | Invalid script hashes |
+| P2SH | Invalid script hash |
 | Output Count | Missing outputs (zero outputs) |
 | Coinbase | Size violations (must be 2-100 bytes): size 1 and size 101 |
-| Signatures | CHECKMULTISIG missing dummy, empty stack for CHECKSIG, non-standard DER |
+| Signatures | CHECKMULTISIG missing dummy, empty stack for CHECKSIG, non-standard DER (3 vectors) |
 | Timelocks | CHECKLOCKTIMEVERIFY locked input, CHECKSEQUENCEVERIFY argument missing |
 
 Note: These vectors test serialization/deserialization parsing, not script verification. The `tx_invalid.rs` file includes a unit test (`test_invalid_tx_can_be_parsed`) that verifies all vectors have non-empty hex strings.

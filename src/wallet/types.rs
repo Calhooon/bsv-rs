@@ -18,6 +18,136 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 // =============================================================================
+// Hex Serialization Helpers
+// =============================================================================
+
+/// Serde helper module for serializing Vec<u8> as hex strings.
+/// Use with `#[serde(with = "hex_bytes")]` on Vec<u8> fields.
+pub mod hex_bytes {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode(bytes))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        hex::decode(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Serde helper module for serializing Option<Vec<u8>> as optional hex strings.
+/// Use with `#[serde(with = "hex_bytes_option", skip_serializing_if = "Option::is_none")]`
+/// on Option<Vec<u8>> fields.
+pub mod hex_bytes_option {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &Option<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match bytes {
+            Some(b) => serializer.serialize_str(&hex::encode(b)),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let opt: Option<String> = Option::deserialize(deserializer)?;
+        match opt {
+            Some(s) => hex::decode(&s)
+                .map(Some)
+                .map_err(serde::de::Error::custom),
+            None => Ok(None),
+        }
+    }
+}
+
+/// Serde helper module for serializing [u8; 32] TxId as hex strings.
+/// Use with `#[serde(with = "hex_txid")]` on TxId fields.
+pub mod hex_txid {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&hex::encode(bytes))
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
+        if bytes.len() != 32 {
+            return Err(serde::de::Error::custom(format!(
+                "expected 32 bytes for txid, got {}",
+                bytes.len()
+            )));
+        }
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&bytes);
+        Ok(arr)
+    }
+}
+
+/// Serde helper module for serializing Option<Vec<[u8; 32]>> as optional array of hex strings.
+/// Use with `#[serde(with = "hex_txid_vec_option", skip_serializing_if = "Option::is_none", default)]`
+pub mod hex_txid_vec_option {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(txids: &Option<Vec<[u8; 32]>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match txids {
+            Some(vec) => {
+                let hex_strings: Vec<String> = vec.iter().map(|b| hex::encode(b)).collect();
+                hex_strings.serialize(serializer)
+            }
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<[u8; 32]>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let opt: Option<Vec<String>> = Option::deserialize(deserializer)?;
+        match opt {
+            Some(vec) => {
+                let mut result = Vec::with_capacity(vec.len());
+                for s in vec {
+                    let bytes = hex::decode(&s).map_err(serde::de::Error::custom)?;
+                    if bytes.len() != 32 {
+                        return Err(serde::de::Error::custom(format!(
+                            "expected 32 bytes for txid, got {}",
+                            bytes.len()
+                        )));
+                    }
+                    let mut arr = [0u8; 32];
+                    arr.copy_from_slice(&bytes);
+                    result.push(arr);
+                }
+                Ok(Some(result))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
+// =============================================================================
 // Primitive Type Aliases
 // =============================================================================
 
@@ -210,13 +340,87 @@ impl Counterparty {
 // =============================================================================
 
 /// A transaction outpoint (txid + output index).
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+///
+/// Serializes to/from string format "txid.vout" (e.g., "abc123...def.0") for cross-SDK compatibility.
+/// Deserialization also accepts object format { "txid": "hex...", "vout": N } for flexibility.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Outpoint {
     /// The transaction ID.
     pub txid: TxId,
     /// The output index within the transaction.
     pub vout: u32,
+}
+
+impl serde::Serialize for Outpoint {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        // Serialize as string format "txid.vout" for cross-SDK compatibility
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Outpoint {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::{self, MapAccess, Visitor};
+
+        struct OutpointVisitor;
+
+        impl<'de> Visitor<'de> for OutpointVisitor {
+            type Value = Outpoint;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a string like 'txid.vout' or an object with txid and vout fields")
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Outpoint::from_string(s).map_err(de::Error::custom)
+            }
+
+            fn visit_map<M>(self, mut map: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut txid: Option<TxId> = None;
+                let mut vout: Option<u32> = None;
+
+                while let Some(key) = map.next_key::<String>()? {
+                    match key.as_str() {
+                        "txid" => {
+                            let hex: String = map.next_value()?;
+                            let bytes = crate::primitives::from_hex(&hex)
+                                .map_err(de::Error::custom)?;
+                            if bytes.len() != 32 {
+                                return Err(de::Error::custom("txid must be 32 bytes"));
+                            }
+                            let mut arr = [0u8; 32];
+                            arr.copy_from_slice(&bytes);
+                            txid = Some(arr);
+                        }
+                        "vout" => {
+                            vout = Some(map.next_value()?);
+                        }
+                        _ => {
+                            let _: serde::de::IgnoredAny = map.next_value()?;
+                        }
+                    }
+                }
+
+                let txid = txid.ok_or_else(|| de::Error::missing_field("txid"))?;
+                let vout = vout.ok_or_else(|| de::Error::missing_field("vout"))?;
+                Ok(Outpoint { txid, vout })
+            }
+        }
+
+        deserializer.deserialize_any(OutpointVisitor)
+    }
 }
 
 impl Outpoint {
@@ -318,7 +522,11 @@ pub struct CreateActionInput {
     /// A description of this input (5-50 characters).
     pub input_description: String,
     /// Optional unlocking script (hex encoded).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub unlocking_script: Option<Vec<u8>>,
     /// Optional length of the unlocking script (for deferred signing).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -332,7 +540,8 @@ pub struct CreateActionInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateActionOutput {
-    /// The locking script (serialized).
+    /// The locking script (serialized, hex encoded).
+    #[serde(with = "hex_bytes")]
     pub locking_script: Vec<u8>,
     /// The satoshi value.
     pub satoshis: SatoshiValue,
@@ -410,7 +619,8 @@ pub enum SendWithResultStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendWithResult {
-    /// The transaction ID.
+    /// The transaction ID (hex encoded in JSON).
+    #[serde(with = "hex_txid")]
     pub txid: TxId,
     /// The status of the send operation.
     pub status: SendWithResultStatus,
@@ -434,15 +644,20 @@ pub enum ReviewActionResultStatus {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewActionResult {
-    /// The transaction ID.
+    /// The transaction ID (hex encoded in JSON).
+    #[serde(with = "hex_txid")]
     pub txid: TxId,
     /// The status of the review.
     pub status: ReviewActionResultStatus,
-    /// Competing transaction IDs (for double spend).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Competing transaction IDs (hex encoded in JSON).
+    #[serde(with = "hex_txid_vec_option", skip_serializing_if = "Option::is_none", default)]
     pub competing_txs: Option<Vec<TxId>>,
-    /// Merged BEEF of competing transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Merged BEEF of competing transactions (hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub competing_beef: Option<Vec<u8>>,
 }
 
@@ -450,21 +665,27 @@ pub struct ReviewActionResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignableTransaction {
-    /// The transaction in atomic BEEF format.
+    /// The transaction in atomic BEEF format (hex encoded).
+    #[serde(with = "hex_bytes")]
     pub tx: Vec<u8>,
-    /// Reference for signing.
+    /// Reference for signing (hex encoded).
+    #[serde(with = "hex_bytes")]
     pub reference: Vec<u8>,
 }
 
 /// Result of creating an action.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct CreateActionResult {
     /// The transaction ID (if available).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub txid: Option<TxId>,
-    /// The transaction in atomic BEEF format (if available).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The transaction in atomic BEEF format (if available, hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub tx: Option<Vec<u8>>,
     /// Change outpoints for noSend transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -475,6 +696,15 @@ pub struct CreateActionResult {
     /// Transaction needing signatures (if sign_and_process is false).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signable_transaction: Option<SignableTransaction>,
+    /// The input type (e.g., "P2PKH").
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_type: Option<String>,
+    /// Spendable inputs for the action (server-managed UTXOs).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub inputs: Option<Vec<CreateActionInput>>,
+    /// Reference number for the action.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reference_number: Option<String>,
 }
 
 // =============================================================================
@@ -509,7 +739,11 @@ pub struct Certificate {
     /// Certificate fields.
     pub fields: HashMap<String, String>,
     /// Signature (hex encoded).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub signature: Option<Vec<u8>>,
 }
 
@@ -535,11 +769,19 @@ pub struct WalletActionInput {
     pub source_outpoint: Outpoint,
     /// The source satoshi value.
     pub source_satoshis: SatoshiValue,
-    /// The source locking script (optional).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The source locking script (optional, hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub source_locking_script: Option<Vec<u8>>,
-    /// The unlocking script (optional).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The unlocking script (optional, hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub unlocking_script: Option<Vec<u8>>,
     /// Description of this input.
     pub input_description: String,
@@ -553,8 +795,12 @@ pub struct WalletActionInput {
 pub struct WalletActionOutput {
     /// The satoshi value.
     pub satoshis: SatoshiValue,
-    /// The locking script (optional).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The locking script (optional, hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub locking_script: Option<Vec<u8>>,
     /// Whether this output is spendable by the wallet.
     pub spendable: bool,
@@ -575,10 +821,11 @@ pub struct WalletActionOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WalletAction {
-    /// The transaction ID.
+    /// The transaction ID (hex encoded in JSON).
+    #[serde(with = "hex_txid")]
     pub txid: TxId,
-    /// The total satoshi value.
-    pub satoshis: SatoshiValue,
+    /// The net satoshi value (negative for outgoing transactions).
+    pub satoshis: i64,
     /// The action status.
     pub status: ActionStatus,
     /// Whether this is an outgoing action.
@@ -610,8 +857,12 @@ pub struct WalletAction {
 pub struct WalletOutput {
     /// The satoshi value.
     pub satoshis: SatoshiValue,
-    /// The locking script (optional).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The locking script (optional, hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub locking_script: Option<Vec<u8>>,
     /// Whether this output is spendable.
     pub spendable: bool,
@@ -636,9 +887,11 @@ pub struct WalletOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyLinkageResult {
-    /// Encrypted linkage data.
+    /// Encrypted linkage data (hex encoded).
+    #[serde(with = "hex_bytes")]
     pub encrypted_linkage: Vec<u8>,
-    /// Proof of encrypted linkage.
+    /// Proof of encrypted linkage (hex encoded).
+    #[serde(with = "hex_bytes")]
     pub encrypted_linkage_proof: Vec<u8>,
     /// The prover's public key.
     pub prover: PublicKey,
@@ -762,8 +1015,12 @@ impl std::str::FromStr for OutputInclude {
 pub struct CreateActionArgs {
     /// A human-readable description of the action (5-50 characters).
     pub description: String,
-    /// Optional BEEF data for input transactions.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional BEEF data for input transactions (hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub input_beef: Option<Vec<u8>>,
     /// Optional array of inputs for the transaction.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -793,7 +1050,8 @@ pub struct CreateActionArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignActionSpend {
-    /// The unlocking script for the input.
+    /// The unlocking script for the input (hex encoded).
+    #[serde(with = "hex_bytes")]
     pub unlocking_script: Vec<u8>,
     /// Optional sequence number for the input.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -838,8 +1096,12 @@ pub struct SignActionResult {
     /// The transaction ID (if available).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub txid: Option<TxId>,
-    /// The transaction in atomic BEEF format (if available).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The transaction in atomic BEEF format (if available, hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub tx: Option<Vec<u8>>,
     /// Results of transactions sent with this action.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -968,7 +1230,8 @@ pub struct InternalizeOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalizeActionArgs {
-    /// Transaction in atomic BEEF format.
+    /// Transaction in atomic BEEF format (hex encoded).
+    #[serde(with = "hex_bytes")]
     pub tx: Vec<u8>,
     /// Metadata about outputs to internalize.
     pub outputs: Vec<InternalizeOutput>,
@@ -1035,8 +1298,12 @@ pub struct ListOutputsArgs {
 pub struct ListOutputsResult {
     /// Total number of matching outputs.
     pub total_outputs: u32,
-    /// Optional aggregated BEEF data.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Optional aggregated BEEF data (hex encoded).
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub beef: Option<Vec<u8>>,
     /// The matching outputs.
     pub outputs: Vec<WalletOutput>,
@@ -1546,5 +1813,93 @@ mod tests {
         assert!(!cp_anyone.is_self());
         assert!(cp_anyone.is_anyone());
         assert!(cp_anyone.public_key().is_none());
+    }
+
+    #[test]
+    fn test_hex_bytes_serialization() {
+        // Test that Vec<u8> fields serialize as hex strings, not JSON arrays
+        let output = CreateActionOutput {
+            locking_script: vec![0x76, 0xa9, 0x14], // OP_DUP OP_HASH160 OP_PUSH20
+            satoshis: 1000,
+            output_description: "Test output description".to_string(),
+            basket: None,
+            custom_instructions: None,
+            tags: None,
+        };
+
+        let json = serde_json::to_string(&output).unwrap();
+        // Should contain hex string "76a914", not array [118, 169, 20]
+        assert!(json.contains("\"76a914\""), "Expected hex string in JSON: {}", json);
+        assert!(!json.contains("[118"), "Should not contain int array: {}", json);
+
+        // Test deserialization from hex string
+        let json_input = r#"{"lockingScript":"76a914","satoshis":1000,"outputDescription":"Test output description"}"#;
+        let parsed: CreateActionOutput = serde_json::from_str(json_input).unwrap();
+        assert_eq!(parsed.locking_script, vec![0x76, 0xa9, 0x14]);
+    }
+
+    #[test]
+    fn test_hex_bytes_option_serialization() {
+        // Test that Option<Vec<u8>> fields serialize as hex strings when present
+        let txid_hex = "0000000000000000000000000000000000000000000000000000000000000001";
+        let outpoint = Outpoint::from_string(&format!("{}.0", txid_hex)).unwrap();
+
+        let input_with_script = CreateActionInput {
+            outpoint: outpoint.clone(),
+            input_description: "Test input description".to_string(),
+            unlocking_script: Some(vec![0x48, 0x30, 0x45]), // Signature prefix
+            unlocking_script_length: None,
+            sequence_number: None,
+        };
+
+        let json = serde_json::to_string(&input_with_script).unwrap();
+        // Should contain hex string "483045", not array [72, 48, 69]
+        assert!(json.contains("\"483045\""), "Expected hex string in JSON: {}", json);
+        assert!(!json.contains("[72"), "Should not contain int array: {}", json);
+
+        // Test that None serializes correctly (field should be absent)
+        let input_without_script = CreateActionInput {
+            outpoint,
+            input_description: "Test input description".to_string(),
+            unlocking_script: None,
+            unlocking_script_length: None,
+            sequence_number: None,
+        };
+
+        let json = serde_json::to_string(&input_without_script).unwrap();
+        assert!(!json.contains("unlockingScript"), "Field should be absent when None: {}", json);
+
+        // Test deserialization from hex string
+        let json_input = format!(
+            r#"{{"outpoint":"{}.0","inputDescription":"Test input description","unlockingScript":"483045"}}"#,
+            txid_hex
+        );
+        let parsed: CreateActionInput = serde_json::from_str(&json_input).unwrap();
+        assert_eq!(parsed.unlocking_script, Some(vec![0x48, 0x30, 0x45]));
+    }
+
+    #[test]
+    fn test_create_action_args_hex_serialization() {
+        // Test the main CreateActionArgs struct
+        let args = CreateActionArgs {
+            description: "Test action description".to_string(),
+            input_beef: Some(vec![0xBE, 0xEF, 0x00, 0x01]),
+            inputs: None,
+            outputs: None,
+            lock_time: None,
+            version: None,
+            labels: None,
+            options: None,
+        };
+
+        let json = serde_json::to_string(&args).unwrap();
+        // Should contain hex string "beef0001"
+        assert!(json.contains("\"beef0001\""), "Expected hex string for inputBeef: {}", json);
+        assert!(!json.contains("[190"), "Should not contain int array: {}", json);
+
+        // Test deserialization
+        let json_input = r#"{"description":"Test action description","inputBeef":"beef0001"}"#;
+        let parsed: CreateActionArgs = serde_json::from_str(json_input).unwrap();
+        assert_eq!(parsed.input_beef, Some(vec![0xBE, 0xEF, 0x00, 0x01]));
     }
 }

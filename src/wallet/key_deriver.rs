@@ -200,6 +200,29 @@ impl KeyDeriver {
             .derive_child(&counterparty_key, &invoice_number)
     }
 
+    /// Derives a private key using a raw invoice number (no protocol validation).
+    ///
+    /// This method bypasses BRC-43 protocol name validation, allowing any string
+    /// as the invoice number. Use this when working with pre-computed derivation
+    /// paths from storage servers or other sources that use non-standard formats.
+    ///
+    /// # Arguments
+    ///
+    /// * `invoice_number` - Any string to use as the invoice number
+    /// * `counterparty` - The counterparty (self, anyone, or specific public key)
+    ///
+    /// # Returns
+    ///
+    /// The derived private key, or an error if derivation fails.
+    pub fn derive_private_key_raw(
+        &self,
+        invoice_number: &str,
+        counterparty: &Counterparty,
+    ) -> Result<PrivateKey> {
+        let counterparty_key = self.normalize_counterparty(counterparty)?;
+        self.root_key.derive_child(&counterparty_key, invoice_number)
+    }
+
     /// Derives a symmetric key for encryption/decryption.
     ///
     /// The symmetric key is derived using ECDH between the derived private and
@@ -378,6 +401,13 @@ pub trait KeyDeriverApi {
         counterparty: &Counterparty,
     ) -> Result<PrivateKey>;
 
+    /// Derives a private key using a raw invoice number (no protocol validation).
+    fn derive_private_key_raw(
+        &self,
+        invoice_number: &str,
+        counterparty: &Counterparty,
+    ) -> Result<PrivateKey>;
+
     /// Derives a symmetric key.
     fn derive_symmetric_key(
         &self,
@@ -420,6 +450,14 @@ impl KeyDeriverApi for KeyDeriver {
         counterparty: &Counterparty,
     ) -> Result<PrivateKey> {
         self.derive_private_key(protocol, key_id, counterparty)
+    }
+
+    fn derive_private_key_raw(
+        &self,
+        invoice_number: &str,
+        counterparty: &Counterparty,
+    ) -> Result<PrivateKey> {
+        self.derive_private_key_raw(invoice_number, counterparty)
     }
 
     fn derive_symmetric_key(

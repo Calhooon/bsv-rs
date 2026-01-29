@@ -22,6 +22,7 @@ use crate::auth::types::MessageType;
 use crate::{Error, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
+use std::sync::RwLock as StdRwLock;
 use tokio::sync::RwLock;
 
 /// Transport trait for sending/receiving auth messages.
@@ -71,8 +72,10 @@ pub struct HttpRequest {
     pub request_id: [u8; 32],
     /// HTTP method (GET, POST, PUT, DELETE, etc.).
     pub method: String,
-    /// URL path/postfix (e.g., "/api/users").
-    pub url_postfix: String,
+    /// URL path (e.g., "/api/users").
+    pub path: String,
+    /// URL query/search string (e.g., "?foo=bar").
+    pub search: String,
     /// HTTP headers (key-value pairs).
     pub headers: Vec<(String, String)>,
     /// Request body.
@@ -80,9 +83,16 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
+    /// Returns the combined URL postfix (path + search).
+    pub fn url_postfix(&self) -> String {
+        format!("{}{}", self.path, self.search)
+    }
+}
+
+impl HttpRequest {
     /// Deserializes an HTTP request from payload bytes.
     ///
-    /// Format: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
+    /// Format: `[request_id: 32][method: varint+str][path: varint+str][search: varint+str][headers: varint+pairs][body: varint+bytes]`
     pub fn from_payload(payload: &[u8]) -> Result<Self> {
         let mut cursor = 0;
 
@@ -98,27 +108,45 @@ impl HttpRequest {
         let (method_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let method = if method_len > 0 {
-            if cursor + method_len > payload.len() {
+            let len = method_len as usize;
+            if cursor + len > payload.len() {
                 return Err(Error::AuthError("Payload too short for method".into()));
             }
-            let s = String::from_utf8(payload[cursor..cursor + method_len].to_vec())
+            let s = String::from_utf8(payload[cursor..cursor + len].to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid method UTF-8: {}", e)))?;
-            cursor += method_len;
+            cursor += len;
             s
         } else {
             "GET".to_string()
         };
 
-        // Read URL postfix (varint length + string)
-        let (url_len, bytes_read) = read_varint(&payload[cursor..])?;
+        // Read path (varint length + string, -1 means empty)
+        let (path_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
-        let url_postfix = if url_len > 0 {
-            if cursor + url_len > payload.len() {
-                return Err(Error::AuthError("Payload too short for URL".into()));
+        let path = if path_len > 0 {
+            let len = path_len as usize;
+            if cursor + len > payload.len() {
+                return Err(Error::AuthError("Payload too short for path".into()));
             }
-            let s = String::from_utf8(payload[cursor..cursor + url_len].to_vec())
-                .map_err(|e| Error::AuthError(format!("Invalid URL UTF-8: {}", e)))?;
-            cursor += url_len;
+            let s = String::from_utf8(payload[cursor..cursor + len].to_vec())
+                .map_err(|e| Error::AuthError(format!("Invalid path UTF-8: {}", e)))?;
+            cursor += len;
+            s
+        } else {
+            String::new()
+        };
+
+        // Read search (varint length + string, -1 means empty)
+        let (search_len, bytes_read) = read_varint(&payload[cursor..])?;
+        cursor += bytes_read;
+        let search = if search_len > 0 {
+            let len = search_len as usize;
+            if cursor + len > payload.len() {
+                return Err(Error::AuthError("Payload too short for search".into()));
+            }
+            let s = String::from_utf8(payload[cursor..cursor + len].to_vec())
+                .map_err(|e| Error::AuthError(format!("Invalid search UTF-8: {}", e)))?;
+            cursor += len;
             s
         } else {
             String::new()
@@ -127,41 +155,45 @@ impl HttpRequest {
         // Read headers (varint count, then pairs of varint+string)
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
-        let mut headers = Vec::with_capacity(header_count);
-        for _ in 0..header_count {
+        let count = if header_count > 0 { header_count as usize } else { 0 };
+        let mut headers = Vec::with_capacity(count);
+        for _ in 0..count {
             // Read key
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            if cursor + key_len > payload.len() {
+            let klen = if key_len > 0 { key_len as usize } else { 0 };
+            if cursor + klen > payload.len() {
                 return Err(Error::AuthError("Payload too short for header key".into()));
             }
-            let key = String::from_utf8(payload[cursor..cursor + key_len].to_vec())
+            let key = String::from_utf8(payload[cursor..cursor + klen].to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header key UTF-8: {}", e)))?;
-            cursor += key_len;
+            cursor += klen;
 
             // Read value
             let (val_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            if cursor + val_len > payload.len() {
+            let vlen = if val_len > 0 { val_len as usize } else { 0 };
+            if cursor + vlen > payload.len() {
                 return Err(Error::AuthError(
                     "Payload too short for header value".into(),
                 ));
             }
-            let value = String::from_utf8(payload[cursor..cursor + val_len].to_vec())
+            let value = String::from_utf8(payload[cursor..cursor + vlen].to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header value UTF-8: {}", e)))?;
-            cursor += val_len;
+            cursor += vlen;
 
             headers.push((key, value));
         }
 
-        // Read body (varint length + bytes)
+        // Read body (varint length + bytes, -1 means empty)
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
         let body = if body_len > 0 {
-            if cursor + body_len > payload.len() {
+            let len = body_len as usize;
+            if cursor + len > payload.len() {
                 return Err(Error::AuthError("Payload too short for body".into()));
             }
-            payload[cursor..cursor + body_len].to_vec()
+            payload[cursor..cursor + len].to_vec()
         } else {
             Vec::new()
         };
@@ -169,13 +201,17 @@ impl HttpRequest {
         Ok(Self {
             request_id,
             method,
-            url_postfix,
+            path,
+            search,
             headers,
             body,
         })
     }
 
     /// Serializes this HTTP request into payload bytes.
+    ///
+    /// Format: `[request_id: 32][method: varint+str][path: varint+str][search: varint+str][headers: varint+pairs][body: varint+bytes]`
+    /// Empty strings use varint(-1) convention to match TypeScript SDK format.
     pub fn to_payload(&self) -> Vec<u8> {
         let mut payload = Vec::new();
 
@@ -184,28 +220,45 @@ impl HttpRequest {
 
         // Write method (varint length + string)
         let method_bytes = self.method.as_bytes();
-        payload.extend(write_varint(method_bytes.len()));
+        payload.extend(write_varint(method_bytes.len() as i64));
         payload.extend_from_slice(method_bytes);
 
-        // Write URL postfix (varint length + string)
-        let url_bytes = self.url_postfix.as_bytes();
-        payload.extend(write_varint(url_bytes.len()));
-        payload.extend_from_slice(url_bytes);
+        // Write path (varint length + string, or -1 if empty)
+        if self.path.is_empty() {
+            payload.extend(write_varint(-1));
+        } else {
+            let path_bytes = self.path.as_bytes();
+            payload.extend(write_varint(path_bytes.len() as i64));
+            payload.extend_from_slice(path_bytes);
+        }
+
+        // Write search (varint length + string, or -1 if empty)
+        if self.search.is_empty() {
+            payload.extend(write_varint(-1));
+        } else {
+            let search_bytes = self.search.as_bytes();
+            payload.extend(write_varint(search_bytes.len() as i64));
+            payload.extend_from_slice(search_bytes);
+        }
 
         // Write headers (varint count, then pairs)
-        payload.extend(write_varint(self.headers.len()));
+        payload.extend(write_varint(self.headers.len() as i64));
         for (key, value) in &self.headers {
             let key_bytes = key.as_bytes();
-            payload.extend(write_varint(key_bytes.len()));
+            payload.extend(write_varint(key_bytes.len() as i64));
             payload.extend_from_slice(key_bytes);
             let val_bytes = value.as_bytes();
-            payload.extend(write_varint(val_bytes.len()));
+            payload.extend(write_varint(val_bytes.len() as i64));
             payload.extend_from_slice(val_bytes);
         }
 
-        // Write body (varint length + bytes)
-        payload.extend(write_varint(self.body.len()));
-        payload.extend_from_slice(&self.body);
+        // Write body (varint length + bytes, or -1 if empty)
+        if self.body.is_empty() {
+            payload.extend(write_varint(-1));
+        } else {
+            payload.extend(write_varint(self.body.len() as i64));
+            payload.extend_from_slice(&self.body);
+        }
 
         payload
     }
@@ -235,22 +288,26 @@ impl HttpResponse {
         payload.extend_from_slice(&self.request_id);
 
         // Write status (varint)
-        payload.extend(write_varint(self.status as usize));
+        payload.extend(write_varint(self.status as i64));
 
         // Write headers (varint count, then pairs)
-        payload.extend(write_varint(self.headers.len()));
+        payload.extend(write_varint(self.headers.len() as i64));
         for (key, value) in &self.headers {
             let key_bytes = key.as_bytes();
-            payload.extend(write_varint(key_bytes.len()));
+            payload.extend(write_varint(key_bytes.len() as i64));
             payload.extend_from_slice(key_bytes);
             let val_bytes = value.as_bytes();
-            payload.extend(write_varint(val_bytes.len()));
+            payload.extend(write_varint(val_bytes.len() as i64));
             payload.extend_from_slice(val_bytes);
         }
 
-        // Write body (varint length + bytes)
-        payload.extend(write_varint(self.body.len()));
-        payload.extend_from_slice(&self.body);
+        // Write body (varint length + bytes, or -1 if empty)
+        if self.body.is_empty() {
+            payload.extend(write_varint(-1));
+        } else {
+            payload.extend(write_varint(self.body.len() as i64));
+            payload.extend_from_slice(&self.body);
+        }
 
         payload
     }
@@ -277,38 +334,46 @@ impl HttpResponse {
         // Read headers (varint count, then pairs)
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
-        let mut headers = Vec::with_capacity(header_count);
-        for _ in 0..header_count {
+        let count = if header_count > 0 { header_count as usize } else { 0 };
+        let mut headers = Vec::with_capacity(count);
+        for _ in 0..count {
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            if cursor + key_len > payload.len() {
+            let klen = if key_len > 0 { key_len as usize } else { 0 };
+            if cursor + klen > payload.len() {
                 return Err(Error::AuthError(
                     "Response payload too short for header key".into(),
                 ));
             }
-            let key = String::from_utf8(payload[cursor..cursor + key_len].to_vec())
+            let key = String::from_utf8(payload[cursor..cursor + klen].to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header key UTF-8: {}", e)))?;
-            cursor += key_len;
+            cursor += klen;
 
             let (val_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;
-            if cursor + val_len > payload.len() {
+            let vlen = if val_len > 0 { val_len as usize } else { 0 };
+            if cursor + vlen > payload.len() {
                 return Err(Error::AuthError(
                     "Response payload too short for header value".into(),
                 ));
             }
-            let value = String::from_utf8(payload[cursor..cursor + val_len].to_vec())
+            let value = String::from_utf8(payload[cursor..cursor + vlen].to_vec())
                 .map_err(|e| Error::AuthError(format!("Invalid header value UTF-8: {}", e)))?;
-            cursor += val_len;
+            cursor += vlen;
 
             headers.push((key, value));
         }
 
-        // Read body (varint length + bytes)
+        // Read body (varint length + bytes, -1 means empty)
         let (body_len, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
-        let body = if body_len > 0 && cursor + body_len <= payload.len() {
-            payload[cursor..cursor + body_len].to_vec()
+        let body = if body_len > 0 {
+            let len = body_len as usize;
+            if cursor + len <= payload.len() {
+                payload[cursor..cursor + len].to_vec()
+            } else {
+                Vec::new()
+            }
         } else {
             Vec::new()
         };
@@ -323,45 +388,71 @@ impl HttpResponse {
 }
 
 /// Reads a varint from the given bytes, returning (value, bytes_consumed).
-fn read_varint(bytes: &[u8]) -> Result<(usize, usize)> {
+/// Reads a Bitcoin-style varint from bytes.
+/// Returns (value, bytes_consumed).
+/// Note: Returns i64 to handle the -1 (0xFFFFFFFFFFFFFFFF) convention for empty fields.
+fn read_varint(bytes: &[u8]) -> Result<(i64, usize)> {
     if bytes.is_empty() {
         return Err(Error::AuthError("Empty varint".into()));
     }
 
-    let mut value: usize = 0;
-    let mut shift = 0;
-    let mut consumed = 0;
-
-    for &byte in bytes {
-        consumed += 1;
-        value |= ((byte & 0x7F) as usize) << shift;
-        if byte & 0x80 == 0 {
-            return Ok((value, consumed));
+    let first = bytes[0];
+    if first < 253 {
+        Ok((first as i64, 1))
+    } else if first == 253 {
+        // 0xFD: 2 bytes little-endian
+        if bytes.len() < 3 {
+            return Err(Error::AuthError("Incomplete varint (fd)".into()));
         }
-        shift += 7;
-        if shift >= 64 {
-            return Err(Error::AuthError("Varint too large".into()));
+        let value = u16::from_le_bytes([bytes[1], bytes[2]]);
+        Ok((value as i64, 3))
+    } else if first == 254 {
+        // 0xFE: 4 bytes little-endian
+        if bytes.len() < 5 {
+            return Err(Error::AuthError("Incomplete varint (fe)".into()));
+        }
+        let value = u32::from_le_bytes([bytes[1], bytes[2], bytes[3], bytes[4]]);
+        Ok((value as i64, 5))
+    } else {
+        // 0xFF: 8 bytes little-endian
+        if bytes.len() < 9 {
+            return Err(Error::AuthError("Incomplete varint (ff)".into()));
+        }
+        let value = u64::from_le_bytes([
+            bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7], bytes[8],
+        ]);
+        // Check if this is -1 (all 1s) which is used for "empty/missing"
+        if value == u64::MAX {
+            Ok((-1, 9))
+        } else {
+            Ok((value as i64, 9))
         }
     }
-
-    Err(Error::AuthError("Incomplete varint".into()))
 }
 
-/// Writes a value as a varint.
-fn write_varint(mut value: usize) -> Vec<u8> {
-    let mut result = Vec::new();
-    loop {
-        let mut byte = (value & 0x7F) as u8;
-        value >>= 7;
-        if value != 0 {
-            byte |= 0x80;
-        }
-        result.push(byte);
-        if value == 0 {
-            break;
-        }
+/// Writes a value as a Bitcoin-style varint.
+/// Use value = -1 for "empty/missing" convention (writes 0xFF followed by 8 bytes of 0xFF).
+fn write_varint(value: i64) -> Vec<u8> {
+    if value < 0 {
+        // -1 means "empty/missing" - write as 0xFF followed by 8 bytes of 0xFF
+        vec![0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]
+    } else if value < 253 {
+        vec![value as u8]
+    } else if value < 0x10000 {
+        let v = value as u16;
+        let bytes = v.to_le_bytes();
+        vec![0xFD, bytes[0], bytes[1]]
+    } else if value < 0x100000000 {
+        let v = value as u32;
+        let bytes = v.to_le_bytes();
+        vec![0xFE, bytes[0], bytes[1], bytes[2], bytes[3]]
+    } else {
+        let v = value as u64;
+        let bytes = v.to_le_bytes();
+        vec![
+            0xFF, bytes[0], bytes[1], bytes[2], bytes[3], bytes[4], bytes[5], bytes[6], bytes[7],
+        ]
     }
-    result
 }
 
 /// HTTP-based transport for authentication.
@@ -374,8 +465,8 @@ pub struct SimplifiedFetchTransport {
     /// HTTP client (only available with `http` feature).
     #[cfg(feature = "http")]
     client: reqwest::Client,
-    /// Callback for incoming messages.
-    callback: Arc<RwLock<Option<Box<TransportCallback>>>>,
+    /// Callback for incoming messages (uses std RwLock for synchronous access).
+    callback: Arc<StdRwLock<Option<Box<TransportCallback>>>>,
 }
 
 impl std::fmt::Debug for SimplifiedFetchTransport {
@@ -396,7 +487,7 @@ impl SimplifiedFetchTransport {
             base_url: base_url.trim_end_matches('/').to_string(),
             #[cfg(feature = "http")]
             client: reqwest::Client::new(),
-            callback: Arc::new(RwLock::new(None)),
+            callback: Arc::new(StdRwLock::new(None)),
         }
     }
 
@@ -480,9 +571,21 @@ impl SimplifiedFetchTransport {
     /// Invokes the callback with a message.
     #[cfg_attr(not(feature = "http"), allow(dead_code))]
     async fn invoke_callback(&self, message: AuthMessage) -> Result<()> {
-        let callback = self.callback.read().await;
-        if let Some(ref cb) = *callback {
-            cb(message).await?;
+        // Get a future to execute from the callback (while holding lock briefly)
+        let future_opt = {
+            let guard = self.callback.read().map_err(|_| {
+                Error::AuthError("Failed to acquire callback lock".into())
+            })?;
+            if let Some(ref cb) = *guard {
+                Some(cb(message))
+            } else {
+                None
+            }
+        };
+
+        // Execute the future outside the lock
+        if let Some(future) = future_opt {
+            future.await?;
         }
         Ok(())
     }
@@ -525,8 +628,12 @@ impl Transport for SimplifiedFetchTransport {
                     }
 
                     // Parse response as AuthMessage
-                    let response_message: AuthMessage = response.json().await.map_err(|e| {
-                        Error::AuthError(format!("Failed to parse auth response: {}", e))
+                    let response_text = response.text().await.map_err(|e| {
+                        Error::AuthError(format!("Failed to read auth response: {}", e))
+                    })?;
+
+                    let response_message: AuthMessage = serde_json::from_str(&response_text).map_err(|e| {
+                        Error::AuthError(format!("Failed to parse auth response: {} - body: {}", e, response_text))
                     })?;
 
                     // Invoke callback with response
@@ -544,7 +651,7 @@ impl Transport for SimplifiedFetchTransport {
                     let http_request = HttpRequest::from_payload(payload)?;
 
                     // Build URL
-                    let url = format!("{}{}", self.base_url, http_request.url_postfix);
+                    let url = format!("{}{}", self.base_url, http_request.url_postfix());
 
                     // Build request with auth headers
                     let mut request_builder = match http_request.method.to_uppercase().as_str() {
@@ -620,17 +727,8 @@ impl Transport for SimplifiedFetchTransport {
                         .map_err(|e| Error::AuthError(format!("Failed to read response: {}", e)))?
                         .to_vec();
 
-                    // Check for required auth headers
-                    let required_headers =
-                        [headers::VERSION, headers::IDENTITY_KEY, headers::SIGNATURE];
-                    for header_name in &required_headers {
-                        if response_headers.get(*header_name).is_none() {
-                            return Err(Error::AuthError(format!(
-                                "Response missing required auth header: {}",
-                                header_name
-                            )));
-                        }
-                    }
+                    // Note: Auth headers on response are optional - not all servers return them
+                    // The caller can verify response authenticity if headers are present
 
                     // Extract request ID from response
                     let response_request_id: [u8; 32] =
@@ -667,13 +765,15 @@ impl Transport for SimplifiedFetchTransport {
                     };
 
                     // Build response AuthMessage
-                    let resp_identity_key = response_headers
-                        .get(headers::IDENTITY_KEY)
-                        .and_then(|v| v.to_str().ok())
-                        .ok_or_else(|| Error::AuthError("Missing identity key header".into()))?;
-
-                    let response_identity =
-                        crate::primitives::PublicKey::from_hex(resp_identity_key)?;
+                    // Note: Identity key header is optional - server may not return it
+                    let response_identity = if let Some(resp_identity_key) =
+                        response_headers.get(headers::IDENTITY_KEY).and_then(|v| v.to_str().ok())
+                    {
+                        crate::primitives::PublicKey::from_hex(resp_identity_key)?
+                    } else {
+                        // Use the identity key from the original request message
+                        message.identity_key.clone()
+                    };
 
                     let mut response_message =
                         AuthMessage::new(MessageType::General, response_identity);
@@ -722,21 +822,17 @@ impl Transport for SimplifiedFetchTransport {
     }
 
     fn set_callback(&self, callback: Box<TransportCallback>) {
-        // We need to spawn a task to set the callback since we can't
-        // make this method async
-        let callback_store = self.callback.clone();
-        tokio::spawn(async move {
-            let mut cb = callback_store.write().await;
+        // Use synchronous RwLock to avoid race conditions
+        if let Ok(mut cb) = self.callback.write() {
             *cb = Some(callback);
-        });
+        }
     }
 
     fn clear_callback(&self) {
-        let callback_store = self.callback.clone();
-        tokio::spawn(async move {
-            let mut cb = callback_store.write().await;
+        // Use synchronous RwLock to avoid race conditions
+        if let Ok(mut cb) = self.callback.write() {
             *cb = None;
-        });
+        }
     }
 }
 
@@ -905,33 +1001,41 @@ mod tests {
     }
 
     // =================
-    // BRC-104 Varint tests
+    // BRC-104 Varint tests (Bitcoin-style)
     // =================
 
     #[test]
     fn test_varint_roundtrip() {
-        let test_values: Vec<usize> = vec![0, 1, 127, 128, 255, 256, 16383, 16384, 65535, 1000000];
+        let test_values: Vec<i64> = vec![0, 1, 127, 128, 252, 253, 255, 256, 65535, 65536, 1000000];
 
         for value in test_values {
             let encoded = write_varint(value);
             let (decoded, _bytes_read) = read_varint(&encoded).unwrap();
             assert_eq!(decoded, value, "Varint roundtrip failed for {}", value);
         }
+
+        // Test -1 (empty field convention)
+        let encoded = write_varint(-1);
+        let (decoded, _bytes_read) = read_varint(&encoded).unwrap();
+        assert_eq!(decoded, -1, "Varint roundtrip failed for -1");
     }
 
     #[test]
     fn test_varint_encoding_sizes() {
-        // 0-127: 1 byte
+        // 0-252: 1 byte (Bitcoin-style)
         assert_eq!(write_varint(0).len(), 1);
         assert_eq!(write_varint(127).len(), 1);
+        assert_eq!(write_varint(252).len(), 1);
 
-        // 128-16383: 2 bytes
-        assert_eq!(write_varint(128).len(), 2);
-        assert_eq!(write_varint(16383).len(), 2);
+        // 253-65535: 3 bytes (0xFD prefix + 2 bytes)
+        assert_eq!(write_varint(253).len(), 3);
+        assert_eq!(write_varint(65535).len(), 3);
 
-        // 16384-2097151: 3 bytes
-        assert_eq!(write_varint(16384).len(), 3);
-        assert_eq!(write_varint(2097151).len(), 3);
+        // 65536-4294967295: 5 bytes (0xFE prefix + 4 bytes)
+        assert_eq!(write_varint(65536).len(), 5);
+
+        // -1 (empty convention): 9 bytes (0xFF prefix + 8 bytes)
+        assert_eq!(write_varint(-1).len(), 9);
     }
 
     #[test]
@@ -949,7 +1053,8 @@ mod tests {
         let request = HttpRequest {
             request_id: [42u8; 32],
             method: "POST".to_string(),
-            url_postfix: "/api/v1/users".to_string(),
+            path: "/api/v1/users".to_string(),
+            search: "?foo=bar".to_string(),
             headers: vec![
                 ("content-type".to_string(), "application/json".to_string()),
                 ("x-bsv-custom".to_string(), "value".to_string()),
@@ -962,7 +1067,9 @@ mod tests {
 
         assert_eq!(decoded.request_id, request.request_id);
         assert_eq!(decoded.method, request.method);
-        assert_eq!(decoded.url_postfix, request.url_postfix);
+        assert_eq!(decoded.path, request.path);
+        assert_eq!(decoded.search, request.search);
+        assert_eq!(decoded.url_postfix(), "/api/v1/users?foo=bar");
         assert_eq!(decoded.headers, request.headers);
         assert_eq!(decoded.body, request.body);
     }
@@ -971,10 +1078,11 @@ mod tests {
     fn test_http_request_get_default() {
         // Empty method should default to GET
         let mut payload = vec![0u8; 32]; // request_id
-        payload.extend(write_varint(0)); // empty method
-        payload.extend(write_varint(0)); // empty url
+        payload.extend(write_varint(0)); // empty method → defaults to GET
+        payload.extend(write_varint(-1)); // empty path (uses -1 convention)
+        payload.extend(write_varint(-1)); // empty search (uses -1 convention)
         payload.extend(write_varint(0)); // no headers
-        payload.extend(write_varint(0)); // no body
+        payload.extend(write_varint(-1)); // no body (uses -1 convention)
 
         let request = HttpRequest::from_payload(&payload).unwrap();
         assert_eq!(request.method, "GET");
@@ -985,7 +1093,8 @@ mod tests {
         let request = HttpRequest {
             request_id: [1u8; 32],
             method: "PUT".to_string(),
-            url_postfix: "/data".to_string(),
+            path: "/data".to_string(),
+            search: String::new(),
             headers: vec![],
             body: vec![0xAB; 10000], // 10KB body
         };

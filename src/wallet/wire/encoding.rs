@@ -626,7 +626,8 @@ impl<'a> WireReader<'a> {
         let txid_bytes = self.read_bytes(32)?;
         let mut txid = [0u8; 32];
         txid.copy_from_slice(txid_bytes);
-        let satoshis = self.read_var_int()?;
+        // satoshis can be negative for outgoing transactions
+        let satoshis = self.read_signed_var_int()?;
         let status = self
             .read_action_status()?
             .unwrap_or(ActionStatus::Unprocessed);
@@ -1229,7 +1230,8 @@ impl WireWriter {
     /// Writes a WalletAction.
     pub fn write_wallet_action(&mut self, action: &WalletAction) -> &mut Self {
         self.write_bytes(&action.txid);
-        self.write_var_int(action.satoshis);
+        // satoshis can be negative for outgoing transactions
+        self.write_signed_var_int(action.satoshis);
         self.write_action_status(Some(action.status));
         self.write_optional_bool(Some(action.is_outgoing));
         self.write_string(&action.description);

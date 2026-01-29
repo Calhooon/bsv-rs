@@ -137,24 +137,28 @@ Features follow a dependency hierarchy:
 
 ```
 full
- ├── wallet → transaction → script → primitives
+ ├── primitives (no dependencies)
+ ├── script → primitives
+ ├── transaction → script
+ ├── wallet → transaction
  ├── messages → wallet
  ├── compat → primitives
  ├── totp → primitives
- ├── auth → wallet
- ├── overlay → wallet
+ ├── auth → wallet + messages + tokio
+ ├── overlay → wallet + tokio
  ├── storage → overlay
  ├── registry → overlay
  ├── kvstore → overlay
- └── identity → overlay
+ └── identity → auth + overlay
 ```
 
 **Default features**: `primitives`, `script`
 
-**Additional features**:
+**Optional features**:
 - `http` - HTTP clients for ARC broadcaster, WhatsOnChain, WalletClient substrate
 - `wasm` - WebAssembly support via `getrandom/js`
 - `full` - All modules enabled
+- `dhat-profiling` - Memory profiling support for benchmarks
 
 ## Adding New Errors
 

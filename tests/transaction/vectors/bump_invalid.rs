@@ -3,6 +3,8 @@
 //! These vectors are derived from the TypeScript SDK and contain
 //! malformed merkle paths that should fail validation.
 
+#![allow(dead_code)]
+
 /// Invalid BUMP vector with expected error
 pub struct InvalidBumpVector {
     /// The invalid BUMP hex

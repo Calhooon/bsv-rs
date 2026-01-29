@@ -108,7 +108,8 @@ Deserialized HTTP request from General message payload (BRC-104):
 pub struct HttpRequest {
     pub request_id: [u8; 32],   // Request correlation ID
     pub method: String,          // HTTP method (GET, POST, etc.)
-    pub url_postfix: String,     // URL path (e.g., "/api/users")
+    pub path: String,            // URL path (e.g., "/api/users")
+    pub search: String,          // URL query string (e.g., "?foo=bar")
     pub headers: Vec<(String, String)>,  // HTTP headers
     pub body: Vec<u8>,           // Request body
 }
@@ -116,10 +117,11 @@ pub struct HttpRequest {
 impl HttpRequest {
     pub fn from_payload(payload: &[u8]) -> Result<Self>
     pub fn to_payload(&self) -> Vec<u8>
+    pub fn url_postfix(&self) -> String  // Returns path + search
 }
 ```
 
-Payload format: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
+Payload format: `[request_id: 32][method: varint+str][path: varint+str][search: varint+str][headers: varint+pairs][body: varint+bytes]`
 
 ### HttpResponse
 
@@ -188,7 +190,8 @@ use bsv_sdk::auth::transports::HttpRequest;
 let request = HttpRequest {
     request_id: [42u8; 32],
     method: "POST".to_string(),
-    url_postfix: "/api/v1/users".to_string(),
+    path: "/api/v1/users".to_string(),
+    search: String::new(),
     headers: vec![
         ("content-type".to_string(), "application/json".to_string()),
     ],
@@ -197,6 +200,7 @@ let request = HttpRequest {
 
 let payload = request.to_payload();
 let decoded = HttpRequest::from_payload(&payload).unwrap();
+assert_eq!(decoded.url_postfix(), "/api/v1/users");
 ```
 
 ### Creating HTTP Response Payloads

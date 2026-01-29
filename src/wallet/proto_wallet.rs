@@ -32,6 +32,8 @@
 //! let anyone_wallet = ProtoWallet::anyone();
 //! ```
 
+use std::sync::Arc;
+
 use crate::error::{Error, Result};
 use crate::primitives::hash::sha256_hmac;
 use crate::primitives::{sha256, PrivateKey, PublicKey, Signature};
@@ -282,9 +284,10 @@ pub struct RevealSpecificKeyLinkageResult {
 ///     counterparty: None,
 /// }).unwrap();
 /// ```
+#[derive(Clone)]
 pub struct ProtoWallet {
-    /// The internal key deriver.
-    key_deriver: CachedKeyDeriver,
+    /// The internal key deriver (wrapped in Arc for clonability).
+    key_deriver: Arc<CachedKeyDeriver>,
 }
 
 impl ProtoWallet {
@@ -305,7 +308,7 @@ impl ProtoWallet {
     /// ```
     pub fn new(root_key: Option<PrivateKey>) -> Self {
         Self {
-            key_deriver: CachedKeyDeriver::new(root_key, None),
+            key_deriver: Arc::new(CachedKeyDeriver::new(root_key, None)),
         }
     }
 
@@ -318,7 +321,7 @@ impl ProtoWallet {
 
     /// Returns a reference to the internal key deriver.
     pub fn key_deriver(&self) -> &CachedKeyDeriver {
-        &self.key_deriver
+        &*self.key_deriver
     }
 
     /// Returns the identity public key.
