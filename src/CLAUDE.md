@@ -20,7 +20,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | `script/` | `script` | Script parsing, execution, and templates (P2PKH, RPuzzle, PushDrop) |
 | `transaction/` | `transaction` | Transaction construction, signing, BEEF/MerklePath SPV proofs |
 | `wallet/` | `wallet` | BRC-42 key derivation, ProtoWallet, WalletClient |
-| `messages/` | `messages` | BRC-78 message signing, encryption, and verification |
+| `messages/` | `messages` | BRC-77/78 message signing, encryption, and verification |
 | `compat/` | `compat` | BIP-39/BIP-32 mnemonic and HD key compatibility |
 | `totp/` | `totp` | RFC 6238 Time-based One-Time Passwords for 2FA |
 | `auth/` | `auth` | Mutual authentication, certificates, and peer sessions |
@@ -39,7 +39,7 @@ The crate root re-exports commonly used types for ergonomic imports:
 | Module | Re-exports |
 |--------|------------|
 | `primitives` | `PrivateKey`, `PublicKey`, `Signature`, `SymmetricKey`, `BigNumber`, `sha256`, `sha256d`, `hash160`, `to_hex`, `from_hex` |
-| `script` | `Script`, `ScriptChunk`, `LockingScript`, `UnlockingScript` |
+| `script` | `Script`, `ScriptChunk`, `Address`, `LockingScript`, `UnlockingScript` |
 | `transaction` | `Transaction`, `TransactionInput`, `TransactionOutput`, `ChangeDistribution` |
 | `wallet` | `KeyDeriver`, `KeyDeriverApi`, `CachedKeyDeriver`, `CacheConfig`, `ProtoWallet`, `Protocol`, `Counterparty`, `SecurityLevel` |
 | `messages` | `sign`, `verify`, `encrypt`, `decrypt` |
@@ -63,7 +63,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 | Feature | Error Variants |
 |---------|----------------|
 | (core) | `InvalidKeyLength`, `InvalidDataLength`, `InvalidHex`, `InvalidBase58`, `InvalidBase64`, `CryptoError`, `InvalidSignature`, `InvalidPublicKey`, `InvalidPrivateKey`, `PointAtInfinity`, `DecryptionFailed`, `InvalidNonce`, `InvalidTag`, `InvalidUtf8`, `ReaderUnderflow`, `InvalidChecksum` |
-| `script` | `ScriptParseError`, `ScriptExecutionError`, `InvalidOpcode`, `DisabledOpcode`, `StackUnderflow`, `StackOverflow` |
+| `script` | `ScriptParseError`, `ScriptExecutionError`, `InvalidOpcode`, `DisabledOpcode`, `StackUnderflow`, `StackOverflow`, `Bip276Error`, `InvalidAddress`, `InvalidAddressLength`, `UnsupportedAddress` |
 | `transaction` | `TransactionError`, `MerklePathError`, `BeefError`, `FeeModelError` |
 | `wallet` | `WalletError`, `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
 | `messages` | `MessageVersionMismatch`, `MessageError`, `MessageRecipientMismatch` |

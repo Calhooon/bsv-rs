@@ -9,8 +9,10 @@ This module provides complete Bitcoin Script functionality for the BSV SDK:
 - Specialized types for locking (output) and unlocking (input) scripts
 - Script number encoding for stack operations
 - Full script interpreter with spend validation
-- Script templates for common transaction types (P2PKH, R-Puzzle, PushDrop)
+- Script templates for common transaction types (P2PKH, P2PK, Multisig, R-Puzzle, PushDrop)
 - Script type detection (P2PKH, P2PK, P2SH, multisig, data, safe data carrier)
+- Bitcoin P2PKH address encoding/decoding (Base58Check)
+- BIP-276 typed script encoding
 - Transaction interface traits for Script/Transaction module integration
 
 Compatible with the TypeScript and Go SDKs through shared opcode values, serialization formats, and execution semantics.
@@ -23,8 +25,10 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `op.rs` | Opcode constants (u8) and name/value lookup functions via `LazyLock` HashMaps |
 | `chunk.rs` | `ScriptChunk` type representing individual script elements |
 | `script.rs` | Core `Script` class with parsing, serialization, builder methods, and type detection |
-| `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) |
+| `locking_script.rs` | `LockingScript` newtype wrapper for output scripts (scriptPubKey) with `to_address()` |
 | `unlocking_script.rs` | `UnlockingScript` newtype wrapper for input scripts (scriptSig) |
+| `address.rs` | `Address` type for P2PKH address parsing, creation, and Base58Check encoding |
+| `bip276.rs` | BIP-276 typed script encoding (`encode_bip276` / `decode_bip276`) |
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding |
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging |
 | `spend.rs` | `Spend` interpreter for validating transaction spends |
@@ -32,6 +36,8 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
 | `templates/mod.rs` | Templates module declarations and re-exports |
 | `templates/p2pkh.rs` | P2PKH (Pay-to-Public-Key-Hash) template |
+| `templates/p2pk.rs` | P2PK (Pay-to-Public-Key) template |
+| `templates/multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
 | `templates/rpuzzle.rs` | R-Puzzle template for knowledge-based locking |
 | `templates/pushdrop.rs` | PushDrop template for data envelope scripts with P2PK lock |
 
@@ -44,6 +50,10 @@ pub use script::Script;
 pub use locking_script::LockingScript;
 pub use unlocking_script::UnlockingScript;
 pub use script_num::ScriptNum;
+
+// Address and BIP-276
+pub use address::Address;
+pub use bip276::*;  // encode_bip276, decode_bip276, BIP276_PREFIX, NETWORK_MAINNET, NETWORK_TESTNET
 
 // Evaluation types
 pub use evaluation_error::{ExecutionContext, ScriptEvaluationError};
@@ -59,7 +69,7 @@ pub use transaction::{
 };
 
 // Templates (via templates module)
-pub use templates::{P2PKH, RPuzzle, RPuzzleType, PushDrop, LockPosition};
+pub use templates::{P2PKH, P2PK, Multisig, RPuzzle, RPuzzleType, PushDrop, LockPosition};
 ```
 
 ## Core Types
@@ -163,12 +173,56 @@ pub struct UnlockingScript(Script);
 // LockingScript::is_locking_script() -> true
 // UnlockingScript::is_unlocking_script() -> true
 
+// LockingScript-specific:
+impl LockingScript {
+    pub fn to_address(&self) -> Option<Address>  // Extracts P2PKH address (mainnet), None for non-P2PKH
+}
+
 // Conversions via From trait:
 impl From<Script> for LockingScript
 impl From<LockingScript> for Script
 impl From<Script> for UnlockingScript
 impl From<UnlockingScript> for Script
 ```
+
+### Address
+
+Bitcoin P2PKH address representation with Base58Check encoding:
+
+```rust
+pub struct Address {
+    pub_key_hash: [u8; 20],  // RIPEMD160(SHA256(compressed_pubkey))
+    prefix: u8,               // 0x00 mainnet, 0x6f testnet
+}
+
+impl Address {
+    pub fn new_from_string(address: &str) -> Result<Self>           // Parse Base58Check address
+    pub fn new_from_public_key_hash(hash: &[u8], mainnet: bool) -> Result<Self>
+    pub fn new_from_public_key(public_key: &PublicKey, mainnet: bool) -> Result<Self>
+    pub fn public_key_hash(&self) -> &[u8]
+    pub fn prefix(&self) -> u8
+    pub fn is_mainnet(&self) -> bool
+    pub fn is_valid_address(address: &str) -> bool                  // Static validation
+}
+
+impl Display for Address { ... }   // Base58Check encoding
+impl FromStr for Address { ... }   // "1BgGZ9...".parse::<Address>()
+```
+
+### BIP-276
+
+Typed bitcoin script encoding (`bitcoin-script:<network><type><script><checksum>`):
+
+```rust
+pub const BIP276_PREFIX: &str = "bitcoin-script";
+pub const NETWORK_MAINNET: u8 = 1;
+pub const NETWORK_TESTNET: u8 = 2;
+
+pub fn encode_bip276(network: u8, script_type: u8, script: &[u8]) -> String
+pub fn decode_bip276(encoded: &str) -> Result<(u8, u8, Vec<u8>)>  // -> (network, type, data)
+```
+
+Checksum is the first 4 bytes of SHA256d of the payload (everything before the checksum).
 
 ### ScriptNum
 
@@ -279,6 +333,39 @@ impl ScriptTemplate for P2PKH {
     fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = 20-byte pubkey hash
 }
 ```
+
+### P2PK (Pay-to-Public-Key)
+
+Simpler than P2PKH - locks directly to a public key. Locking script: `<pubkey> OP_CHECKSIG`
+
+```rust
+impl P2PK {
+    pub fn new() -> Self
+    pub fn unlock(private_key: &PrivateKey, sign_outputs: SignOutputs, anyone_can_pay: bool) -> ScriptTemplateUnlock
+    pub fn sign_with_sighash(private_key: &PrivateKey, sighash: &[u8; 32], sign_outputs: SignOutputs, anyone_can_pay: bool) -> Result<UnlockingScript>
+}
+impl ScriptTemplate for P2PK {
+    fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = 33-byte compressed or 65-byte uncompressed key
+}
+```
+
+### Multisig (M-of-N)
+
+Requires M signatures from N public keys. Locking: `OP_M <pubkey1>...<pubkeyN> OP_N OP_CHECKMULTISIG`
+
+```rust
+impl Multisig {
+    pub fn new(threshold: u8) -> Self
+    pub fn lock_from_keys(&self, pubkeys: &[PublicKey]) -> Result<LockingScript>  // Recommended API
+    pub fn unlock(signers: &[PrivateKey], sign_outputs: SignOutputs, anyone_can_pay: bool) -> ScriptTemplateUnlock
+    pub fn sign_with_sighash(signers: &[PrivateKey], sighash: &[u8; 32], sign_outputs: SignOutputs, anyone_can_pay: bool) -> Result<UnlockingScript>
+}
+impl ScriptTemplate for Multisig {
+    fn lock(&self, params: &[u8]) -> Result<LockingScript>  // params = concatenated 33-byte compressed keys
+}
+```
+
+Signatures in the unlock must appear in the same order as their corresponding public keys in the lock. The leading `OP_0` in the unlocking script is required by a historical off-by-one bug in OP_CHECKMULTISIG.
 
 ### RPuzzle
 
@@ -395,23 +482,53 @@ if script.is_p2pkh() {
 }
 ```
 
+### Working with Addresses
+
+```rust
+use bsv_sdk::script::Address;
+
+// Parse from string
+let addr = Address::new_from_string("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH")?;
+let addr: Address = "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH".parse()?;
+
+// Create from public key
+let addr = Address::new_from_public_key(&public_key, true)?;  // mainnet
+let addr = Address::new_from_public_key_hash(&hash, false)?;  // testnet
+
+// Extract from locking script
+let locking = P2PKH::lock_from_address("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH")?;
+if let Some(addr) = locking.to_address() {
+    println!("Address: {}", addr);
+}
+```
+
+### BIP-276 Encoding
+
+```rust
+use bsv_sdk::script::bip276::{encode_bip276, decode_bip276, NETWORK_MAINNET};
+
+let encoded = encode_bip276(NETWORK_MAINNET, 1, &script_bytes);
+// -> "bitcoin-script:0101<hex><checksum>"
+
+let (network, script_type, data) = decode_bip276(&encoded)?;
+```
+
 ### Using Templates
 
 ```rust
-use bsv_sdk::script::templates::{P2PKH, PushDrop, LockPosition};
+use bsv_sdk::script::templates::{P2PKH, P2PK, Multisig, PushDrop, LockPosition};
 use bsv_sdk::script::{ScriptTemplate, SignOutputs, SigningContext};
 
-// Create locking script from address
+// P2PKH from address
 let locking = P2PKH::lock_from_address("1BvBMSEY...")?;
 
-// Or from pubkey hash
-let template = P2PKH::new();
-let locking = template.lock(&pubkey_hash)?;
+// P2PK from public key
+let template = P2PK::new();
+let locking = template.lock(&pubkey_compressed)?;
 
-// Create unlock and sign
-let unlock = P2PKH::unlock(&private_key, SignOutputs::All, false);
-let context = SigningContext::new(&raw_tx, 0, 100_000, locking.as_script());
-let unlocking = unlock.sign(&context)?;
+// 2-of-3 Multisig
+let template = Multisig::new(2);
+let locking = template.lock_from_keys(&[pk1, pk2, pk3])?;
 
 // PushDrop for token data
 let fields = vec![b"BSV20".to_vec(), b"transfer".to_vec()];

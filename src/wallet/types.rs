@@ -113,7 +113,7 @@ pub mod hex_txid_vec_option {
     {
         match txids {
             Some(vec) => {
-                let hex_strings: Vec<String> = vec.iter().map(|b| hex::encode(b)).collect();
+                let hex_strings: Vec<String> = vec.iter().map(hex::encode).collect();
                 hex_strings.serialize(serializer)
             }
             None => serializer.serialize_none(),

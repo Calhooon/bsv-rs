@@ -15,9 +15,9 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields) | ~787 |
-| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1406 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~760 |
+| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~849 |
+| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1737 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~826 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
 
 ## Key Exports
@@ -47,6 +47,8 @@ Private key-value store using wallet transactions and baskets.
 - **Tag-based lookup**: Keys stored as tags for efficient retrieval
 - **Atomic operations**: Per-key locking prevents concurrent conflicts
 - **Validation**: Empty keys, values, and protocol_id are rejected
+- **TTL support**: Optional time-to-live with client-side expiration
+- **Batch operations**: `batch_get`, `batch_set`, `batch_remove` for multi-key operations
 
 ### Methods
 
@@ -55,11 +57,11 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     /// Create a new LocalKVStore (returns error if protocol_id is empty)
     pub fn new(wallet: W, config: KVStoreConfig) -> Result<Self>;
 
-    /// Get a value by key (returns default_value if not found)
+    /// Get a value by key (returns default_value if not found or TTL-expired)
     /// Matches Go SDK signature: Get(ctx, key, defaultValue string) (string, error)
     pub async fn get(&self, key: &str, default_value: &str) -> Result<String>;
 
-    /// Get full entry with metadata (returns None if not found)
+    /// Get full entry with metadata (returns None if not found or TTL-expired)
     pub async fn get_entry(
         &self,
         key: &str,
@@ -83,6 +85,15 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
 
     /// Get the entry count
     pub async fn count(&self) -> Result<usize>;
+
+    /// Get multiple values by key (None for missing keys)
+    pub async fn batch_get(&self, keys: &[&str]) -> Result<Vec<Option<String>>>;
+
+    /// Set multiple key-value pairs sequentially
+    pub async fn batch_set(&self, entries: &[(&str, &str)]) -> Result<()>;
+
+    /// Remove multiple key-value pairs sequentially
+    pub async fn batch_remove(&self, keys: &[&str]) -> Result<()>;
 
     /// Clear all entries
     pub async fn clear(&self) -> Result<()>;
@@ -115,6 +126,7 @@ Public key-value store using the overlay network.
 - **Cached identity key**: Controller pubkey cached via `Arc<Mutex<Option<String>>>`
 - **History building**: Uses `SyncHistorian` to traverse transaction ancestry for entry history
 - **Overlay broadcast**: Broadcasts tokens via `TopicBroadcaster`
+- **Batch operations**: `batch_get`, `batch_set`, `batch_remove` for multi-key operations
 
 ### Methods
 
@@ -143,6 +155,15 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 
     /// Get entries by tags
     pub async fn get_by_tags(&self, tags: &[String], mode: Option<&str>) -> Result<Vec<KVStoreEntry>>;
+
+    /// Get multiple values by key (None for missing keys)
+    pub async fn batch_get(&self, keys: &[&str]) -> Result<Vec<Option<KVStoreEntry>>>;
+
+    /// Set multiple key-value pairs sequentially
+    pub async fn batch_set(&self, entries: &[(&str, &str)]) -> Result<()>;
+
+    /// Remove multiple key-value pairs sequentially
+    pub async fn batch_remove(&self, keys: &[&str]) -> Result<()>;
 }
 ```
 
@@ -237,6 +258,63 @@ impl KVStoreQuery {
     pub fn with_skip(self, skip: u32) -> Self;
     pub fn with_sort_order(self, order: impl Into<String>) -> Self;
     pub fn to_json(&self) -> serde_json::Value;
+}
+```
+
+## TTL (Time-to-Live) Support
+
+LocalKVStore supports optional TTL on entries via `KVStoreSetOptions::with_ttl()`. TTL is enforced client-side; on-chain data remains immutable.
+
+### How It Works
+
+1. When `ttl` is set, the value is wrapped in a JSON envelope: `{"v":"<value>","e":<unix_ts>}`
+2. On `get()` / `get_entry()`, the envelope is decoded and the expiration timestamp is checked
+3. Expired entries return the default value (for `get()`) or `None` (for `get_entry()`)
+
+### Internal Functions
+
+```rust
+// Encode a value with expiration timestamp
+pub(crate) fn encode_value_with_ttl(value: &str, ttl: Duration) -> String;
+
+// Decode a potentially TTL-wrapped value, returns (value, is_expired)
+pub(crate) fn decode_value_with_ttl(stored: &str) -> (String, bool);
+```
+
+### Usage
+
+```rust
+use std::time::Duration;
+use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig, KVStoreSetOptions};
+
+let opts = KVStoreSetOptions::new()
+    .with_ttl(Duration::from_secs(3600)); // Expires in 1 hour
+store.set("session", "token_abc", Some(opts)).await?;
+
+// After 1 hour, get() returns default_value
+let val = store.get("session", "expired").await?;
+```
+
+## Operation Options
+
+```rust
+pub struct KVStoreSetOptions {
+    pub protocol_id: Option<String>,     // Override protocol ID
+    pub description: Option<String>,     // Operation description
+    pub token_amount: Option<u64>,       // Token amount override
+    pub tags: Option<Vec<String>>,       // Tags to attach
+    pub ttl: Option<std::time::Duration>, // Time-to-live (client-side expiration)
+}
+
+pub struct KVStoreGetOptions {
+    pub history: bool,                   // Include full history chain
+    pub include_token: bool,             // Include token data in result
+    pub service_name: Option<String>,    // Override service name
+}
+
+pub struct KVStoreRemoveOptions {
+    pub protocol_id: Option<String>,     // Override protocol ID
+    pub description: Option<String>,     // Operation description
 }
 ```
 
@@ -342,6 +420,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Batch Operations
+
+```rust
+use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
+
+// Batch set multiple values
+let entries = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+store.batch_set(&entries).await?;
+
+// Batch get (returns Vec<Option<String>>)
+let values = store.batch_get(&["key1", "key2", "missing"]).await?;
+// values[0] = Some("value1"), values[2] = None
+
+// Batch remove
+store.batch_remove(&["key1", "key2"]).await?;
+```
+
+### TTL (Time-to-Live)
+
+```rust
+use std::time::Duration;
+use bsv_sdk::kvstore::KVStoreSetOptions;
+
+// Set with 5-minute TTL
+let opts = KVStoreSetOptions::new()
+    .with_ttl(Duration::from_secs(300));
+store.set("session:token", "abc123", Some(opts)).await?;
+
+// Value is available immediately
+let val = store.get("session:token", "").await?;
+assert_eq!(val, "abc123");
+
+// After 5 minutes, get() returns the default value
+// let val = store.get("session:token", "expired").await?;
+// assert_eq!(val, "expired");
+```
+
 ### GlobalKVStore with Tags
 
 ```rust
@@ -442,6 +557,12 @@ it after completion.
 
 `GlobalKVStore` uses the overlay module's `SyncHistorian` to traverse transaction input ancestry
 and extract all previous values for a key/protocol combination, returned in chronological order (oldest first).
+
+### TTL Encoding
+
+TTL values are stored as JSON envelopes wrapping the original value: `{"v":"<value>","e":<expiry_unix_ts>}`.
+On read, `decode_value_with_ttl()` transparently checks expiration. Plain (non-TTL) values pass through unchanged.
+Expiration is client-side only; on-chain data remains immutable.
 
 ## Feature Flag
 

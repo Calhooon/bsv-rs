@@ -11,6 +11,7 @@ This module provides complete Bitcoin transaction functionality:
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs with recursive ancestry collection
+- JSON serialization matching Go SDK format for cross-SDK compatibility
 - Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
 
@@ -24,6 +25,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `input.rs` | `TransactionInput` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF ancestry collection |
+| `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
 | `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, merging, and logging |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
@@ -106,6 +108,7 @@ impl Transaction {
     pub fn from_hex_ef(hex: &str) -> Result<Self>
     pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self>
     pub fn from_atomic_beef(beef: &[u8]) -> Result<Self>
+    pub fn from_json(json: &str) -> Result<Self>         // Go SDK-compatible JSON
     pub fn parse_script_offsets(bin: &[u8]) -> Result<ScriptOffsets>
 
     // Serialization
@@ -116,6 +119,8 @@ impl Transaction {
     pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>>      // BEEF V2
     pub fn to_beef_v1(&self, allow_partial: bool) -> Result<Vec<u8>>   // BEEF V1 for ARC
     pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>>
+    pub fn to_json(&self) -> Result<String>              // Go SDK-compatible JSON
+    pub fn to_json_pretty(&self) -> Result<String>       // Pretty-printed JSON
 
     // Hashing
     pub fn hash(&self) -> [u8; 32]        // Double SHA-256 (internal byte order)
@@ -145,6 +150,33 @@ pub enum ChangeDistribution { Equal, Random }  // Random uses Benford's law
 pub struct ScriptOffsets { pub inputs: Vec<ScriptOffset>, pub outputs: Vec<ScriptOffset> }
 pub struct ScriptOffset { pub index: usize, pub offset: usize, pub length: usize }
 ```
+
+## JSON Serialization (tx_json.rs)
+
+Cross-SDK compatible JSON format matching Go SDK's `MarshalJSON`/`UnmarshalJSON`:
+
+```rust
+// Serialize to JSON
+let json = tx.to_json()?;          // Compact JSON
+let json = tx.to_json_pretty()?;   // Pretty-printed
+
+// Deserialize from JSON (supports hex-only or field-based)
+let tx = Transaction::from_json(&json)?;
+```
+
+JSON format:
+```json
+{
+    "txid": "hex...",
+    "hex": "full_serialized_tx_hex",
+    "inputs": [{ "unlockingScript": "hex", "txid": "hex", "vout": 0, "sequence": 4294967295 }],
+    "outputs": [{ "satoshis": 1000, "lockingScript": "hex" }],
+    "version": 1,
+    "lockTime": 0
+}
+```
+
+Deserialization priority: if `hex` field is present and non-empty, reconstructs from hex (matching Go SDK). Otherwise builds from individual fields (`inputs`, `outputs`, `version`, `lockTime`).
 
 ## Fee Models
 
@@ -220,15 +252,21 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 
 pub fn is_broadcast_success(result: &BroadcastResult) -> bool
 pub fn is_broadcast_failure(result: &BroadcastResult) -> bool
-
-// Implementations (require http feature):
-// - ArcBroadcaster: BEEF V1 format via ARC API (JSON)
-// - TeranodeBroadcaster: Extended Format (EF) binary via Teranode API
-// - WhatsOnChainBroadcaster: Raw tx hex via WhatsOnChain API
 ```
 
-### TeranodeBroadcaster
+### Broadcaster Implementations (require `http` feature)
 
+**ArcBroadcaster** - BEEF V1 format via ARC API (JSON):
+```rust
+pub struct ArcBroadcaster { /* ... */ }
+impl ArcBroadcaster {
+    pub fn new(url: &str, api_key: Option<String>) -> Self
+    pub fn with_config(config: ArcConfig) -> Self
+    pub fn default() -> Self  // Uses gorillapool.io ARC
+}
+```
+
+**TeranodeBroadcaster** - Extended Format (EF) binary via Teranode API:
 ```rust
 pub struct TeranodeBroadcaster { /* ... */ }
 impl TeranodeBroadcaster {
@@ -237,15 +275,25 @@ impl TeranodeBroadcaster {
     pub fn url(&self) -> &str
     pub fn api_key(&self) -> Option<&str>
 }
-
-pub struct TeranodeConfig {
-    pub url: String,
-    pub api_key: Option<String>,
-    pub timeout_ms: u64,   // Default: 30_000
-}
+pub struct TeranodeConfig { pub url: String, pub api_key: Option<String>, pub timeout_ms: u64 }
 ```
 
-Teranode differs from ARC by accepting EF binary (`application/octet-stream`) rather than JSON with BEEF hex. No default URL is provided (must be configured).
+**WhatsOnChainBroadcaster** - Raw tx hex via WhatsOnChain API:
+```rust
+pub struct WhatsOnChainBroadcaster { /* ... */ }
+impl WhatsOnChainBroadcaster {
+    pub fn mainnet() -> Self
+    pub fn testnet() -> Self
+    pub fn stn() -> Self                // Scaling Test Network
+    pub fn new(network: WocBroadcastNetwork, api_key: Option<String>) -> Self
+    pub fn with_config(config: WocBroadcastConfig) -> Self
+    pub fn with_base_url(base_url: &str, network: WocBroadcastNetwork, api_key: Option<String>) -> Self
+    pub fn network(&self) -> WocBroadcastNetwork
+    pub fn api_key(&self) -> Option<&str>
+}
+pub enum WocBroadcastNetwork { Mainnet, Testnet, Stn }
+pub struct WocBroadcastConfig { pub network, pub api_key, pub timeout_ms, pub base_url }
+```
 
 ## Chain Tracking
 
@@ -259,7 +307,28 @@ pub trait ChainTracker: Send + Sync {
 pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), BlockNotFound(u32), Other(String) }
 
 // Test mocks: MockChainTracker, AlwaysValidChainTracker
-// HTTP implementations: WhatsOnChainTracker, BlockHeadersServiceTracker
+```
+
+### Chain Tracker Implementations (require `http` feature)
+
+**WhatsOnChainTracker**:
+```rust
+pub struct WhatsOnChainTracker { /* ... */ }
+impl WhatsOnChainTracker {
+    pub fn mainnet() -> Self
+    pub fn testnet() -> Self
+    pub fn new(network: WocNetwork) -> Self
+    pub fn with_base_url(base_url: &str, network: WocNetwork) -> Self
+    pub fn network(&self) -> WocNetwork
+}
+pub enum WocNetwork { Mainnet, Testnet }
+```
+
+**BlockHeadersServiceTracker**:
+```rust
+pub struct BlockHeadersServiceTracker { /* ... */ }
+pub struct BlockHeadersServiceConfig { pub url: String, pub auth_token: Option<String>, pub timeout_ms: u64 }
+pub const DEFAULT_HEADERS_URL: &str;
 ```
 
 ## MerklePath (BUMP - BRC-74)
@@ -406,8 +475,17 @@ tx.sign().await?;
 assert!(!tx.is_coinbase());
 assert!(tx.has_data_outputs());  // If any OP_RETURN outputs exist
 
+// JSON serialization (cross-SDK compatible with Go SDK)
+let json = tx.to_json()?;
+let tx2 = Transaction::from_json(&json)?;
+assert_eq!(tx.to_hex(), tx2.to_hex());
+
 // Broadcasting
 let broadcaster = ArcBroadcaster::default();
+let result = broadcaster.broadcast(&tx).await;
+
+// Broadcasting via WhatsOnChain (supports mainnet/testnet/STN)
+let broadcaster = WhatsOnChainBroadcaster::mainnet();
 let result = broadcaster.broadcast(&tx).await;
 
 // Broadcasting via Teranode (EF binary format)
@@ -444,7 +522,8 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **BEEF indexing**: Beef maintains an internal `txid_index` HashMap for O(1) transaction lookup by txid
 - **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by `"height:root"` key; combines proofs at same height/root
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
-- **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker` implement `Default`
+- **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
+- **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker` implement `Default`
 - **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
 
 ## BEEF Ancestry Collection Algorithm
@@ -461,7 +540,7 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 
 | Error Type | Conditions |
 |------------|------------|
-| `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing |
+| `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing, JSON serialization |
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
 | `MerklePathError` | Empty path, duplicate offset, invalid offset at height, mismatched roots |

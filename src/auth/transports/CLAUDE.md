@@ -10,7 +10,7 @@ This module provides transport layer implementations for sending and receiving a
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~42 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1219 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1215 |
 
 ## Key Exports
 

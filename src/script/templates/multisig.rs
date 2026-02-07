@@ -56,7 +56,7 @@ use crate::Result;
 
 /// Converts a small integer (1-16) to its opcode (OP_1 through OP_16).
 fn small_int_to_opcode(n: u8) -> Result<u8> {
-    if n >= 1 && n <= 16 {
+    if (1..=16).contains(&n) {
         Ok(OP_1 + n - 1)
     } else {
         Err(Error::CryptoError(format!(

@@ -390,6 +390,10 @@ pub struct KVStoreSetOptions {
     pub token_amount: Option<u64>,
     /// Tags to attach.
     pub tags: Option<Vec<String>>,
+    /// Optional time-to-live duration. When set, the entry will be treated as
+    /// expired after this duration elapses. Expiration is enforced client-side
+    /// on `get()` — the on-chain data remains immutable.
+    pub ttl: Option<std::time::Duration>,
 }
 
 impl KVStoreSetOptions {
@@ -421,6 +425,12 @@ impl KVStoreSetOptions {
         self.tags = Some(tags);
         self
     }
+
+    /// Set time-to-live. The entry will be treated as expired after this duration.
+    pub fn with_ttl(mut self, ttl: std::time::Duration) -> Self {
+        self.ttl = Some(ttl);
+        self
+    }
 }
 
 /// Options for remove operations.
@@ -448,6 +458,58 @@ impl KVStoreRemoveOptions {
     pub fn with_description(mut self, desc: impl Into<String>) -> Self {
         self.description = Some(desc.into());
         self
+    }
+}
+
+// =============================================================================
+// TTL Value Encoding
+// =============================================================================
+
+/// JSON envelope for values with TTL expiration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TtlEnvelope {
+    /// The actual value.
+    v: String,
+    /// Expiration timestamp (seconds since UNIX epoch).
+    e: u64,
+}
+
+/// Encode a value with a TTL expiration timestamp.
+///
+/// The value is wrapped in a JSON envelope: `{"v":"<value>","e":<unix_ts>}`
+pub(crate) fn encode_value_with_ttl(value: &str, ttl: std::time::Duration) -> String {
+    let expiration = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+        + ttl.as_secs();
+
+    let envelope = TtlEnvelope {
+        v: value.to_string(),
+        e: expiration,
+    };
+
+    serde_json::to_string(&envelope).unwrap_or_else(|_| value.to_string())
+}
+
+/// Decode a value that may or may not have a TTL envelope.
+///
+/// Returns `(actual_value, is_expired)`:
+/// - If the stored string is a valid TTL envelope, extracts the value and checks expiration.
+/// - If it's not a TTL envelope, returns the raw string as-is (not expired).
+pub(crate) fn decode_value_with_ttl(stored: &str) -> (String, bool) {
+    // Try to parse as TTL envelope
+    if let Ok(envelope) = serde_json::from_str::<TtlEnvelope>(stored) {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let is_expired = now >= envelope.e;
+        (envelope.v, is_expired)
+    } else {
+        // Not a TTL envelope — plain value, never expires
+        (stored.to_string(), false)
     }
 }
 

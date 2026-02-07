@@ -15,8 +15,9 @@ use crate::{Error, Result};
 
 use super::interpreter::KVStoreInterpreter;
 use super::types::{
-    KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions,
-    KVStoreSetOptions, KVStoreToken, LookupValueResult, WalletOutput,
+    decode_value_with_ttl, encode_value_with_ttl, KVStoreConfig, KVStoreEntry, KVStoreGetOptions,
+    KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken, LookupValueResult,
+    WalletOutput,
 };
 
 use std::collections::HashMap;
@@ -119,7 +120,13 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             return Ok(default_value.to_string());
         }
 
-        Ok(result.value)
+        // Check for TTL expiration
+        let (value, is_expired) = decode_value_with_ttl(&result.value);
+        if is_expired {
+            return Ok(default_value.to_string());
+        }
+
+        Ok(value)
     }
 
     /// Get a value by key with additional options.
@@ -150,6 +157,12 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             return Ok(None);
         }
 
+        // Check for TTL expiration
+        let (value, is_expired) = decode_value_with_ttl(&result.value);
+        if is_expired {
+            return Ok(None);
+        }
+
         let options = options.unwrap_or_default();
         let protocol_id = &self.config.protocol_id;
 
@@ -171,7 +184,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         // public_key is already a hex string
         let controller = pubkey_result.public_key.clone();
 
-        let mut entry = KVStoreEntry::new(&result.value, &result.value, &controller, protocol_id);
+        let mut entry = KVStoreEntry::new(&value, &value, &controller, protocol_id);
 
         // Include token if requested
         if options.include_token && !result.outpoints.is_empty() {
@@ -238,12 +251,19 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         _protocol_id: &str,
         options: &KVStoreSetOptions,
     ) -> Result<String> {
+        // Encode value with TTL if specified
+        let stored_value = if let Some(ttl) = options.ttl {
+            encode_value_with_ttl(value, ttl)
+        } else {
+            value.to_string()
+        };
+
         // Look up existing value
         let lookup_result = self.lookup_value(key, 10).await?;
 
         // Optimization: if value is the same, return existing outpoint
         if lookup_result.value_exists
-            && lookup_result.value == value
+            && lookup_result.value == stored_value
             && !lookup_result.outpoints.is_empty()
         {
             // Safe: guarded by !lookup_result.outpoints.is_empty() above
@@ -252,9 +272,9 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
 
         // Prepare value (encrypt if needed)
         let value_bytes = if self.config.encrypt {
-            self.encrypt_value(key, value.as_bytes()).await?
+            self.encrypt_value(key, stored_value.as_bytes()).await?
         } else {
-            value.as_bytes().to_vec()
+            stored_value.as_bytes().to_vec()
         };
 
         // Create PushDrop locking script with encrypted value
@@ -627,6 +647,80 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             .await?;
 
         Ok(list_result.total_outputs as usize)
+    }
+
+    /// Get multiple values by key.
+    ///
+    /// Returns a vector of optional values, one per key. Keys that do not exist
+    /// will have `None` in their position. This is equivalent to calling `get()`
+    /// for each key, but conveniently returns `None` instead of a default value
+    /// for missing keys.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - The keys to retrieve
+    ///
+    /// # Returns
+    ///
+    /// A vector of `Option<String>` in the same order as the input keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any key is empty or if wallet operations fail.
+    pub async fn batch_get(&self, keys: &[&str]) -> Result<Vec<Option<String>>> {
+        let mut results = Vec::with_capacity(keys.len());
+        for key in keys {
+            if key.is_empty() {
+                return Err(Error::KvStoreInvalidKey);
+            }
+            let lookup = self.lookup_value(key, 5).await?;
+            if lookup.value_exists {
+                results.push(Some(lookup.value));
+            } else {
+                results.push(None);
+            }
+        }
+        Ok(results)
+    }
+
+    /// Set multiple key-value pairs.
+    ///
+    /// Creates or updates each entry. This is equivalent to calling `set()`
+    /// for each key-value pair sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - Slice of `(key, value)` pairs to set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any key or value is empty, or if wallet operations fail.
+    /// If an error occurs partway through, earlier entries will already be set.
+    pub async fn batch_set(&self, entries: &[(&str, &str)]) -> Result<()> {
+        for (key, value) in entries {
+            self.set(key, value, None).await?;
+        }
+        Ok(())
+    }
+
+    /// Remove multiple key-value pairs.
+    ///
+    /// Spends the UTXOs backing each entry. This is equivalent to calling
+    /// `remove()` for each key sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - The keys to remove
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any key is empty or if wallet operations fail.
+    /// If an error occurs partway through, earlier entries will already be removed.
+    pub async fn batch_remove(&self, keys: &[&str]) -> Result<()> {
+        for key in keys {
+            self.remove(key, None).await?;
+        }
+        Ok(())
     }
 
     /// Clear all entries.
@@ -1402,5 +1496,242 @@ mod tests {
         );
         assert!(result.value_exists);
         assert_eq!(result.value, "my_value");
+    }
+
+    // =========================================================================
+    // Batch Operation Tests
+    // =========================================================================
+
+    #[tokio::test]
+    async fn test_local_batch_set_and_get() {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        // Batch set multiple values
+        let entries = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+        let result = store.batch_set(&entries).await;
+        assert!(result.is_ok(), "batch_set should succeed: {:?}", result);
+
+        // Batch get them back - MockWallet returns empty outputs so all will be None
+        let keys = vec!["key1", "key2", "key3"];
+        let result = store.batch_get(&keys).await;
+        assert!(result.is_ok(), "batch_get should succeed: {:?}", result);
+
+        let values = result.unwrap();
+        assert_eq!(values.len(), 3);
+        // With MockWallet returning empty list_outputs, get sees no existing values
+        // so batch_get returns None for each key
+        for v in &values {
+            assert!(v.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_remove() {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        // Batch set then batch remove
+        let entries = vec![("key1", "value1"), ("key2", "value2")];
+        store.batch_set(&entries).await.unwrap();
+
+        let keys = vec!["key1", "key2"];
+        let result = store.batch_remove(&keys).await;
+        assert!(result.is_ok(), "batch_remove should succeed: {:?}", result);
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_get_missing_keys() {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        // Set only key1
+        store.set("key1", "value1", None).await.unwrap();
+
+        // Batch get key1 (exists but returns None from mock) and key2 (doesn't exist)
+        let keys = vec!["key1", "key2", "key3"];
+        let result = store.batch_get(&keys).await;
+        assert!(result.is_ok());
+
+        let values = result.unwrap();
+        assert_eq!(values.len(), 3);
+        // MockWallet's list_outputs returns empty, so all are None
+        assert!(values[0].is_none());
+        assert!(values[1].is_none());
+        assert!(values[2].is_none());
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_empty() {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        // Empty batch operations should succeed
+        let empty_get: Vec<&str> = vec![];
+        let result = store.batch_get(&empty_get).await;
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+
+        let empty_set: Vec<(&str, &str)> = vec![];
+        let result = store.batch_set(&empty_set).await;
+        assert!(result.is_ok());
+
+        let empty_remove: Vec<&str> = vec![];
+        let result = store.batch_remove(&empty_remove).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_get_invalid_key() {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        // batch_get with an empty key should fail
+        let keys = vec!["valid_key", ""];
+        let result = store.batch_get(&keys).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::KvStoreInvalidKey));
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_get_wallet_error() {
+        let wallet = MockWallet::new().with_list_outputs_error();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        let keys = vec!["key1", "key2"];
+        let result = store.batch_get(&keys).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_set_wallet_error() {
+        let wallet = MockWallet::new().with_create_action_error();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        let entries = vec![("key1", "value1"), ("key2", "value2")];
+        let result = store.batch_set(&entries).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_local_batch_remove_wallet_error() {
+        let wallet = MockWallet::new().with_list_outputs_error();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        let keys = vec!["key1", "key2"];
+        let result = store.batch_remove(&keys).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+    }
+
+    // =========================================================================
+    // TTL Tests
+    // =========================================================================
+
+    #[test]
+    fn test_ttl_encode_decode_roundtrip() {
+        use super::super::types::{decode_value_with_ttl, encode_value_with_ttl};
+
+        // Encode with a large TTL (1 hour) - should not be expired
+        let encoded = encode_value_with_ttl("hello", std::time::Duration::from_secs(3600));
+        let (decoded, is_expired) = decode_value_with_ttl(&encoded);
+        assert_eq!(decoded, "hello");
+        assert!(!is_expired, "Entry with 1 hour TTL should not be expired");
+    }
+
+    #[test]
+    fn test_ttl_expired_value() {
+        use super::super::types::decode_value_with_ttl;
+
+        // Manually construct an expired envelope (expiration in the past)
+        let envelope = r#"{"v":"old_value","e":1000000}"#;
+        let (decoded, is_expired) = decode_value_with_ttl(envelope);
+        assert_eq!(decoded, "old_value");
+        assert!(is_expired, "Entry with past expiration should be expired");
+    }
+
+    #[test]
+    fn test_ttl_plain_value_not_expired() {
+        use super::super::types::decode_value_with_ttl;
+
+        // Plain string values (no TTL envelope) should never expire
+        let (decoded, is_expired) = decode_value_with_ttl("plain_value");
+        assert_eq!(decoded, "plain_value");
+        assert!(!is_expired, "Plain values should never be expired");
+    }
+
+    #[test]
+    fn test_ttl_json_that_is_not_envelope() {
+        use super::super::types::decode_value_with_ttl;
+
+        // A JSON string that doesn't match the TtlEnvelope schema
+        let (decoded, is_expired) = decode_value_with_ttl(r#"{"name":"Alice"}"#);
+        assert_eq!(decoded, r#"{"name":"Alice"}"#);
+        assert!(!is_expired, "Non-envelope JSON should not be expired");
+    }
+
+    #[test]
+    fn test_ttl_zero_duration() {
+        use super::super::types::{decode_value_with_ttl, encode_value_with_ttl};
+
+        // TTL of 0 seconds means the entry expires immediately
+        let encoded = encode_value_with_ttl("ephemeral", std::time::Duration::from_secs(0));
+        let (decoded, is_expired) = decode_value_with_ttl(&encoded);
+        assert_eq!(decoded, "ephemeral");
+        assert!(is_expired, "Zero-TTL entry should be expired immediately");
+    }
+
+    #[test]
+    fn test_ttl_set_options_builder() {
+        let opts = KVStoreSetOptions::new()
+            .with_ttl(std::time::Duration::from_secs(300));
+        assert_eq!(opts.ttl, Some(std::time::Duration::from_secs(300)));
+    }
+
+    #[test]
+    fn test_ttl_set_options_default_no_ttl() {
+        let opts = KVStoreSetOptions::default();
+        assert!(opts.ttl.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_set_with_ttl_success() {
+        let wallet = MockWallet::new();
+        let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+        let opts = KVStoreSetOptions::new()
+            .with_ttl(std::time::Duration::from_secs(3600));
+        let result = store.set("ttl_key", "ttl_value", Some(opts)).await;
+        assert!(result.is_ok(), "Set with TTL should succeed: {:?}", result);
+    }
+
+    #[test]
+    fn test_ttl_value_with_special_characters() {
+        use super::super::types::{decode_value_with_ttl, encode_value_with_ttl};
+
+        // Value containing JSON-special characters
+        let value = r#"{"key": "val\"ue", "num": 42}"#;
+        let encoded = encode_value_with_ttl(value, std::time::Duration::from_secs(3600));
+        let (decoded, is_expired) = decode_value_with_ttl(&encoded);
+        assert_eq!(decoded, value);
+        assert!(!is_expired);
+    }
+
+    #[test]
+    fn test_ttl_future_expiration() {
+        use super::super::types::decode_value_with_ttl;
+
+        // Manually construct an envelope with expiration far in the future
+        let future_ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + 999_999;
+        let envelope = format!(r#"{{"v":"future","e":{}}}"#, future_ts);
+        let (decoded, is_expired) = decode_value_with_ttl(&envelope);
+        assert_eq!(decoded, "future");
+        assert!(!is_expired, "Future expiration should not be expired");
     }
 }

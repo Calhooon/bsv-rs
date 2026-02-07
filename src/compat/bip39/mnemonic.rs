@@ -59,23 +59,55 @@ impl WordCount {
 /// Supported languages for BIP-39 wordlists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Language {
+    /// Chinese Simplified wordlist
+    ChineseSimplified,
+    /// Chinese Traditional wordlist
+    ChineseTraditional,
+    /// Czech wordlist
+    Czech,
     /// English wordlist (default)
     #[default]
     English,
+    /// French wordlist
+    French,
+    /// Italian wordlist
+    Italian,
+    /// Japanese wordlist
+    Japanese,
+    /// Korean wordlist
+    Korean,
+    /// Spanish wordlist
+    Spanish,
 }
 
 impl Language {
     /// Returns the wordlist for this language.
     fn wordlist(&self) -> &'static [&'static str; 2048] {
         match self {
+            Language::ChineseSimplified => &wordlists::CHINESE_SIMPLIFIED,
+            Language::ChineseTraditional => &wordlists::CHINESE_TRADITIONAL,
+            Language::Czech => &wordlists::CZECH,
             Language::English => &wordlists::ENGLISH,
+            Language::French => &wordlists::FRENCH,
+            Language::Italian => &wordlists::ITALIAN,
+            Language::Japanese => &wordlists::JAPANESE,
+            Language::Korean => &wordlists::KOREAN,
+            Language::Spanish => &wordlists::SPANISH,
         }
     }
 
     /// Returns the word separator for this language.
+    ///
+    /// Per BIP-39 specification, Japanese uses the ideographic space (U+3000)
+    /// as the word separator. All other languages use a regular ASCII space.
+    ///
+    /// Note: The Go SDK uses regular space for all languages including Japanese.
+    /// This implementation follows the BIP-39 spec, which specifies ideographic
+    /// space for Japanese mnemonics.
     fn separator(&self) -> &'static str {
         match self {
-            Language::English => " ",
+            Language::Japanese => "\u{3000}",
+            _ => " ",
         }
     }
 
@@ -774,6 +806,166 @@ mod tests {
                 restored.words().len(),
                 "Word count mismatch for {:?}",
                 word_count
+            );
+        }
+    }
+
+    #[test]
+    fn test_generate_mnemonic_each_language() {
+        let languages = [
+            Language::ChineseSimplified,
+            Language::ChineseTraditional,
+            Language::Czech,
+            Language::English,
+            Language::French,
+            Language::Italian,
+            Language::Japanese,
+            Language::Korean,
+            Language::Spanish,
+        ];
+
+        for lang in &languages {
+            let entropy = [0u8; 16]; // 128 bits = 12 words
+            let mnemonic =
+                Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
+            assert_eq!(
+                mnemonic.words().len(),
+                12,
+                "Expected 12 words for {:?}",
+                lang
+            );
+            assert_eq!(mnemonic.language(), *lang);
+            // Verify the phrase is non-empty
+            assert!(!mnemonic.phrase().is_empty(), "Empty phrase for {:?}", lang);
+        }
+    }
+
+    #[test]
+    fn test_roundtrip_seed_non_english() {
+        let languages = [
+            Language::ChineseSimplified,
+            Language::ChineseTraditional,
+            Language::Czech,
+            Language::French,
+            Language::Italian,
+            Language::Japanese,
+            Language::Korean,
+            Language::Spanish,
+        ];
+
+        for lang in &languages {
+            let entropy = [0xABu8; 16]; // 128 bits
+            let mnemonic =
+                Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
+
+            // Generate seed
+            let seed1 = mnemonic.to_seed("");
+            assert_eq!(seed1.len(), 64, "Seed length wrong for {:?}", lang);
+
+            // Generate seed with passphrase
+            let seed2 = mnemonic.to_seed("test passphrase");
+            assert_eq!(seed2.len(), 64);
+
+            // Different passphrases should produce different seeds
+            assert_ne!(
+                seed1, seed2,
+                "Seeds should differ with different passphrases for {:?}",
+                lang
+            );
+
+            // Same mnemonic + same passphrase should produce same seed
+            let seed3 = mnemonic.to_seed("");
+            assert_eq!(
+                seed1, seed3,
+                "Seeds should be deterministic for {:?}",
+                lang
+            );
+        }
+    }
+
+    #[test]
+    fn test_japanese_mnemonic_with_ideographic_space() {
+        // BIP-39 specifies that Japanese mnemonics use ideographic space (U+3000)
+        // as the word separator.
+        let entropy = [0u8; 16]; // 128 bits = 12 words
+        let mnemonic =
+            Mnemonic::from_entropy_with_language(&entropy, Language::Japanese).unwrap();
+
+        let phrase = mnemonic.phrase();
+
+        // The phrase should contain ideographic spaces (U+3000), not regular spaces
+        assert!(
+            phrase.contains('\u{3000}'),
+            "Japanese mnemonic should use ideographic space separator"
+        );
+        assert!(
+            !phrase.contains(' '),
+            "Japanese mnemonic should not contain regular spaces"
+        );
+
+        // Verify word count by splitting on ideographic space
+        let words: Vec<&str> = phrase.split('\u{3000}').collect();
+        assert_eq!(words.len(), 12);
+
+        // Each word should be a valid Japanese BIP-39 word
+        let wordlist = &wordlists::JAPANESE;
+        for word in &words {
+            assert!(
+                wordlist.iter().any(|&w| w == *word),
+                "Word '{}' not found in Japanese wordlist",
+                word
+            );
+        }
+    }
+
+    #[test]
+    fn test_language_word_count() {
+        // Verify each wordlist has exactly 2048 words
+        assert_eq!(wordlists::CHINESE_SIMPLIFIED.len(), 2048);
+        assert_eq!(wordlists::CHINESE_TRADITIONAL.len(), 2048);
+        assert_eq!(wordlists::CZECH.len(), 2048);
+        assert_eq!(wordlists::ENGLISH.len(), 2048);
+        assert_eq!(wordlists::FRENCH.len(), 2048);
+        assert_eq!(wordlists::ITALIAN.len(), 2048);
+        assert_eq!(wordlists::JAPANESE.len(), 2048);
+        assert_eq!(wordlists::KOREAN.len(), 2048);
+        assert_eq!(wordlists::SPANISH.len(), 2048);
+    }
+
+    #[test]
+    fn test_language_default_is_english() {
+        let default_lang = Language::default();
+        assert_eq!(default_lang, Language::English);
+    }
+
+    #[test]
+    fn test_non_english_from_phrase_roundtrip() {
+        // Test that from_phrase_with_language can parse back what from_entropy generates
+        let languages = [
+            Language::ChineseSimplified,
+            Language::ChineseTraditional,
+            Language::Czech,
+            Language::French,
+            Language::Italian,
+            Language::Japanese,
+            Language::Korean,
+            Language::Spanish,
+        ];
+
+        for lang in &languages {
+            let entropy = [0x42u8; 16];
+            let mnemonic =
+                Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
+            let phrase = mnemonic.phrase();
+
+            // Parse the phrase back
+            let restored =
+                Mnemonic::from_phrase_with_language(&phrase, *lang).unwrap();
+            assert_eq!(
+                mnemonic.entropy(),
+                restored.entropy(),
+                "Entropy mismatch for {:?}",
+                lang
             );
         }
     }

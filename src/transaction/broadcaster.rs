@@ -151,6 +151,7 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 ///     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
 ///         // Async HTTP POST to endpoint
 ///     }
+///     // broadcast_many() has a default sequential implementation
 /// }
 /// ```
 #[async_trait(?Send)]
@@ -168,6 +169,9 @@ pub trait Broadcaster: Send + Sync {
 
     /// Broadcasts multiple transactions to the network asynchronously.
     ///
+    /// The default implementation broadcasts each transaction sequentially.
+    /// Implementations may override this to use batch endpoints.
+    ///
     /// # Arguments
     ///
     /// * `txs` - The transactions to broadcast
@@ -175,7 +179,13 @@ pub trait Broadcaster: Send + Sync {
     /// # Returns
     ///
     /// A vector of results, one per transaction.
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>;
+    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult> {
+        let mut results = Vec::with_capacity(txs.len());
+        for tx in &txs {
+            results.push(self.broadcast(tx).await);
+        }
+        results
+    }
 }
 
 /// Convenience function to check if a result is a successful broadcast.

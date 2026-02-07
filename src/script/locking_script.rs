@@ -3,6 +3,7 @@
 //! The LockingScript class represents a locking script in a Bitcoin SV transaction.
 //! It extends the Script class and is used specifically for output scripts that lock funds.
 
+use super::address::Address;
 use super::chunk::ScriptChunk;
 use super::script::Script;
 use crate::Result;
@@ -98,6 +99,26 @@ impl LockingScript {
     /// Returns false (this is not an unlocking script).
     pub fn is_unlocking_script(&self) -> bool {
         false
+    }
+
+    /// Extracts a P2PKH address from this locking script, if it matches the
+    /// P2PKH pattern: `OP_DUP OP_HASH160 <20 bytes> OP_EQUALVERIFY OP_CHECKSIG`.
+    ///
+    /// Returns `None` for non-P2PKH scripts.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::script::LockingScript;
+    ///
+    /// let script = LockingScript::from_hex("76a914...88ac")?;
+    /// if let Some(address) = script.to_address() {
+    ///     println!("Address: {}", address);
+    /// }
+    /// ```
+    pub fn to_address(&self) -> Option<Address> {
+        let hash = self.0.extract_pubkey_hash()?;
+        Address::new_from_public_key_hash(&hash, true).ok()
     }
 }
 

@@ -15,6 +15,14 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 | `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, and `NfkdNormalize` trait implementations |
 | `wordlists/mod.rs` | Wordlist module declaration, re-exports, and `verify_english_wordlist()` |
 | `wordlists/english.rs` | English BIP-39 wordlist (2048 words as `[&str; 2048]`) |
+| `wordlists/chinese_simplified.rs` | Chinese Simplified wordlist |
+| `wordlists/chinese_traditional.rs` | Chinese Traditional wordlist |
+| `wordlists/czech.rs` | Czech wordlist |
+| `wordlists/french.rs` | French wordlist |
+| `wordlists/italian.rs` | Italian wordlist |
+| `wordlists/japanese.rs` | Japanese wordlist |
+| `wordlists/korean.rs` | Korean wordlist |
+| `wordlists/spanish.rs` | Spanish wordlist |
 | `wordlists/CLAUDE.md` | Wordlist submodule documentation |
 
 ## Key Exports
@@ -46,8 +54,16 @@ pub enum WordCount {
 /// Supported languages for wordlists
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Language {
+    ChineseSimplified,
+    ChineseTraditional,
+    Czech,
     #[default]
-    English,  // Default, currently the only supported language
+    English,
+    French,
+    Italian,
+    Japanese,   // Uses ideographic space (U+3000) as separator per BIP-39 spec
+    Korean,
+    Spanish,
 }
 ```
 
@@ -61,7 +77,7 @@ pub enum Language {
 - `Mnemonic::from_phrase_with_language(phrase: &str, language: Language) -> Result<Self>`
 
 **Mnemonic Access:**
-- `phrase(&self) -> String` - Get the full phrase as space-separated string
+- `phrase(&self) -> String` - Get the full phrase (space-separated; Japanese uses ideographic space U+3000)
 - `words(&self) -> &[String]` - Get individual words
 - `language(&self) -> Language` - Get the language
 - `entropy(&self) -> Vec<u8>` - Extract original entropy bytes
@@ -206,6 +222,26 @@ let mnemonic = Mnemonic::from_binary(phrase)?;
 assert!(mnemonic.is_valid());
 ```
 
+### Multi-Language Mnemonics
+
+```rust
+use bsv_sdk::compat::bip39::{Mnemonic, Language};
+
+// Generate a Japanese mnemonic from entropy
+let entropy = [0u8; 16];
+let mnemonic = Mnemonic::from_entropy_with_language(&entropy, Language::Japanese)?;
+// Japanese phrases use ideographic space (U+3000) as separator per BIP-39 spec
+assert!(mnemonic.phrase().contains('\u{3000}'));
+
+// Parse a non-English phrase back
+let phrase = mnemonic.phrase();
+let restored = Mnemonic::from_phrase_with_language(&phrase, Language::Japanese)?;
+assert_eq!(mnemonic.entropy(), restored.entropy());
+
+// All 9 languages supported: ChineseSimplified, ChineseTraditional, Czech,
+// English (default), French, Italian, Japanese, Korean, Spanish
+```
+
 ### Verify Wordlist Integrity
 
 ```rust
@@ -283,14 +319,20 @@ use unicode_normalization::UnicodeNormalization;
 let normalized: String = input.nfkd().collect();
 ```
 
-### Wordlist
+### Wordlists
 
-The English wordlist is embedded as a static array of 2048 strings (`wordlists::ENGLISH`). Words are indexed 0-2047, corresponding to their 11-bit binary representation.
+Nine language wordlists are embedded as static arrays of 2048 strings (`[&str; 2048]`). Words are indexed 0-2047, corresponding to their 11-bit binary representation.
 
-Wordlist integrity can be verified at runtime using `verify_english_wordlist()`, which checks:
+Supported wordlists: `CHINESE_SIMPLIFIED`, `CHINESE_TRADITIONAL`, `CZECH`, `ENGLISH`, `FRENCH`, `ITALIAN`, `JAPANESE`, `KOREAN`, `SPANISH`.
+
+English wordlist integrity can be verified at runtime using `verify_english_wordlist()`, which checks:
 - Array contains exactly 2048 words (enforced by type system: `[&str; 2048]`)
 - First word is "abandon"
 - Last word is "zoo"
+
+### Japanese Separator
+
+Per the BIP-39 specification, Japanese mnemonics use the ideographic space (U+3000) as the word separator instead of a regular ASCII space. The `Language::separator()` method handles this automatically. Note: the Go SDK uses regular space for all languages including Japanese; this implementation follows the BIP-39 spec.
 
 ### Thread Safety
 
@@ -334,7 +376,12 @@ Test coverage includes:
 - Binary serialization roundtrip for all word counts
 - Invalid inputs (wrong word count, bad checksum, invalid words, invalid entropy length)
 - Invalid binary inputs (invalid UTF-8, invalid phrase)
-- Wordlist integrity verification
+- Wordlist integrity verification (all 9 languages verified to have 2048 words)
+- Multi-language mnemonic generation for all 9 languages
+- Multi-language seed derivation (determinism, passphrase differentiation)
+- Japanese ideographic space separator validation
+- Non-English from_phrase roundtrip (entropy preservation across languages)
+- Language default is English
 
 ## Related Documentation
 

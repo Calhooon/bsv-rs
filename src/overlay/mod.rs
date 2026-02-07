@@ -72,7 +72,7 @@ pub use historian::{Historian, HistorianConfig, InterpreterFn, SyncHistorian};
 // Re-exports from host_reputation_tracker
 pub use host_reputation_tracker::{
     get_overlay_host_reputation_tracker, HostReputationEntry, HostReputationTracker, RankedHost,
-    ReputationConfig, ReputationStorage,
+    RankChangeEvent, ReputationConfig, ReputationStorage,
 };
 
 // Re-exports from lookup_resolver

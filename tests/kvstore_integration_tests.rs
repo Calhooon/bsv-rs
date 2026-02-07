@@ -1380,3 +1380,145 @@ fn test_kvstore_entry_empty_tags() {
     let entry = KVStoreEntry::new("key", "value", "ctrl", "proto").with_tags(vec![]);
     assert!(entry.tags.is_empty());
 }
+
+// =============================================================================
+// LocalKVStore Batch Operation Tests
+// =============================================================================
+
+#[tokio::test]
+async fn test_local_batch_set_and_get() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Batch set multiple values (each calls set() under the hood)
+    let entries = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
+    let result = store.batch_set(&entries).await;
+    assert!(result.is_ok(), "batch_set should succeed: {:?}", result);
+
+    // Batch get them back
+    let keys = vec!["key1", "key2", "key3"];
+    let result = store.batch_get(&keys).await;
+    assert!(result.is_ok(), "batch_get should succeed: {:?}", result);
+
+    let values = result.unwrap();
+    assert_eq!(values.len(), 3);
+    // MockWallet returns empty list_outputs, so lookup_value returns not_found
+    for v in &values {
+        assert!(v.is_none());
+    }
+}
+
+#[tokio::test]
+async fn test_local_batch_remove() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Batch set then remove
+    let entries = vec![("key1", "value1"), ("key2", "value2")];
+    store.batch_set(&entries).await.unwrap();
+
+    let keys = vec!["key1", "key2"];
+    let result = store.batch_remove(&keys).await;
+    assert!(result.is_ok(), "batch_remove should succeed: {:?}", result);
+}
+
+#[tokio::test]
+async fn test_local_batch_get_missing_keys() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set only key1 (mock wallet won't persist, but the operation succeeds)
+    store.set("key1", "value1", None).await.unwrap();
+
+    // Batch get key1, key2, key3 - all will be None since MockWallet has no persistence
+    let keys = vec!["key1", "key2", "key3"];
+    let result = store.batch_get(&keys).await;
+    assert!(result.is_ok());
+
+    let values = result.unwrap();
+    assert_eq!(values.len(), 3);
+    // All None because mock wallet returns empty outputs
+    assert!(values[0].is_none());
+    assert!(values[1].is_none());
+    assert!(values[2].is_none());
+}
+
+#[tokio::test]
+async fn test_local_batch_empty() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Empty batch operations should succeed with no-ops
+    let empty_get: Vec<&str> = vec![];
+    let result = store.batch_get(&empty_get).await;
+    assert!(result.is_ok());
+    assert!(result.unwrap().is_empty());
+
+    let empty_set: Vec<(&str, &str)> = vec![];
+    let result = store.batch_set(&empty_set).await;
+    assert!(result.is_ok());
+
+    let empty_remove: Vec<&str> = vec![];
+    let result = store.batch_remove(&empty_remove).await;
+    assert!(result.is_ok());
+}
+
+#[tokio::test]
+async fn test_local_batch_get_invalid_key_fails() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // batch_get with an empty key should return KvStoreInvalidKey error
+    let keys = vec!["valid_key", ""];
+    let result = store.batch_get(&keys).await;
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), Error::KvStoreInvalidKey));
+}
+
+#[tokio::test]
+async fn test_local_batch_set_wallet_error() {
+    let wallet = MockWallet::new().with_create_action_error();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    let entries = vec![("key1", "value1"), ("key2", "value2")];
+    let result = store.batch_set(&entries).await;
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+}
+
+#[tokio::test]
+async fn test_local_batch_remove_wallet_error() {
+    let wallet = MockWallet::new().with_list_outputs_error();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    let keys = vec!["key1", "key2"];
+    let result = store.batch_remove(&keys).await;
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), Error::WalletError(_)));
+}
+
+#[tokio::test]
+async fn test_local_batch_get_single_key() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Single key batch should work the same as multi-key
+    let keys = vec!["single_key"];
+    let result = store.batch_get(&keys).await;
+    assert!(result.is_ok());
+
+    let values = result.unwrap();
+    assert_eq!(values.len(), 1);
+    assert!(values[0].is_none());
+}
+
+#[tokio::test]
+async fn test_local_batch_set_single_entry() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Single entry batch should work
+    let entries = vec![("only_key", "only_value")];
+    let result = store.batch_set(&entries).await;
+    assert!(result.is_ok());
+}

@@ -461,6 +461,72 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         self.query(query).await
     }
 
+    /// Get multiple values by key.
+    ///
+    /// Returns a vector of optional entries, one per key. Keys that do not exist
+    /// will have `None` in their position. This is equivalent to calling `get()`
+    /// for each key sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - The keys to retrieve
+    ///
+    /// # Returns
+    ///
+    /// A vector of `Option<KVStoreEntry>` in the same order as the input keys.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any key is empty or if overlay operations fail.
+    pub async fn batch_get(&self, keys: &[&str]) -> Result<Vec<Option<KVStoreEntry>>> {
+        let mut results = Vec::with_capacity(keys.len());
+        for key in keys {
+            let entry = self.get(key, None).await?;
+            results.push(entry);
+        }
+        Ok(results)
+    }
+
+    /// Set multiple key-value pairs.
+    ///
+    /// Creates or updates each entry on the overlay network. This is equivalent
+    /// to calling `set()` for each key-value pair sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - Slice of `(key, value)` pairs to set
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any key is empty, or if wallet/overlay operations fail.
+    /// If an error occurs partway through, earlier entries will already be set.
+    pub async fn batch_set(&self, entries: &[(&str, &str)]) -> Result<()> {
+        for (key, value) in entries {
+            self.set(key, value, None).await?;
+        }
+        Ok(())
+    }
+
+    /// Remove multiple key-value pairs.
+    ///
+    /// Spends the tokens backing each entry on the overlay network. This is
+    /// equivalent to calling `remove()` for each key sequentially.
+    ///
+    /// # Arguments
+    ///
+    /// * `keys` - The keys to remove
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any key is empty or if wallet/overlay operations fail.
+    /// If an error occurs partway through, earlier entries will already be removed.
+    pub async fn batch_remove(&self, keys: &[&str]) -> Result<()> {
+        for key in keys {
+            self.remove(key, None).await?;
+        }
+        Ok(())
+    }
+
     /// Get entries with specific tags.
     ///
     /// # Arguments

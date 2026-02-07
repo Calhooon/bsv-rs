@@ -27,6 +27,26 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::broadcast;
+
+/// Default capacity for the rank change broadcast channel.
+const DEFAULT_BROADCAST_CHANNEL_CAPACITY: usize = 64;
+
+/// Event emitted when a host's reputation score changes.
+///
+/// Subscribers receive this event whenever `record_success()` or `record_failure()`
+/// causes a change in a host's computed reputation score.
+#[derive(Debug, Clone)]
+pub struct RankChangeEvent {
+    /// The host whose rank changed.
+    pub host: String,
+    /// The previous reputation score (lower = better).
+    pub old_rank: f64,
+    /// The new reputation score (lower = better).
+    pub new_rank: f64,
+    /// Human-readable reason for the change.
+    pub reason: String,
+}
 
 /// Storage trait for persisting reputation data.
 ///
@@ -138,6 +158,7 @@ pub struct HostReputationTracker {
     entries: RwLock<HashMap<String, HostReputationEntry>>,
     config: ReputationConfig,
     storage: Option<Box<dyn ReputationStorage>>,
+    rank_change_tx: broadcast::Sender<RankChangeEvent>,
 }
 
 impl Default for HostReputationTracker {
@@ -149,19 +170,23 @@ impl Default for HostReputationTracker {
 impl HostReputationTracker {
     /// Create a new tracker with default config and no persistence.
     pub fn new() -> Self {
+        let (rank_change_tx, _) = broadcast::channel(DEFAULT_BROADCAST_CHANNEL_CAPACITY);
         Self {
             entries: RwLock::new(HashMap::new()),
             config: ReputationConfig::default(),
             storage: None,
+            rank_change_tx,
         }
     }
 
     /// Create with custom config and no persistence.
     pub fn with_config(config: ReputationConfig) -> Self {
+        let (rank_change_tx, _) = broadcast::channel(DEFAULT_BROADCAST_CHANNEL_CAPACITY);
         Self {
             entries: RwLock::new(HashMap::new()),
             config,
             storage: None,
+            rank_change_tx,
         }
     }
 
@@ -170,10 +195,12 @@ impl HostReputationTracker {
     /// On creation, loads existing reputation data from storage if available.
     pub fn with_storage(storage: Box<dyn ReputationStorage>) -> Self {
         let entries = Self::load_from_storage(&*storage);
+        let (rank_change_tx, _) = broadcast::channel(DEFAULT_BROADCAST_CHANNEL_CAPACITY);
         Self {
             entries: RwLock::new(entries),
             config: ReputationConfig::default(),
             storage: Some(storage),
+            rank_change_tx,
         }
     }
 
@@ -185,10 +212,12 @@ impl HostReputationTracker {
         storage: Box<dyn ReputationStorage>,
     ) -> Self {
         let entries = Self::load_from_storage(&*storage);
+        let (rank_change_tx, _) = broadcast::channel(DEFAULT_BROADCAST_CHANNEL_CAPACITY);
         Self {
             entries: RwLock::new(entries),
             config,
             storage: Some(storage),
+            rank_change_tx,
         }
     }
 
@@ -213,12 +242,17 @@ impl HostReputationTracker {
     /// Record a successful request.
     ///
     /// Updates the latency average, resets failure counters, and
-    /// clears any backoff status.
+    /// clears any backoff status. Emits a `RankChangeEvent` if the
+    /// host's computed reputation score changes.
     pub fn record_success(&self, host: &str, latency_ms: u64) {
+        let now = now_ms();
         let mut entries = self.entries.write().unwrap();
         let entry = entries
             .entry(host.to_string())
             .or_insert_with(|| HostReputationEntry::new(host.to_string()));
+
+        // Compute old score before mutation
+        let old_rank = self.compute_score(entry, now);
 
         let safe_latency = if latency_ms > 0 {
             latency_ms as f64
@@ -230,7 +264,7 @@ impl HostReputationTracker {
         entry.consecutive_failures = 0;
         entry.backoff_until = 0;
         entry.last_latency_ms = Some(latency_ms);
-        entry.last_updated_at = now_ms();
+        entry.last_updated_at = now;
         entry.last_error = None;
 
         // Update EMA
@@ -242,23 +276,42 @@ impl HostReputationTracker {
             None => safe_latency,
         });
 
+        // Compute new score after mutation
+        let new_rank = self.compute_score(entry, now);
+        let host_name = host.to_string();
+
         drop(entries);
         self.save_to_storage();
+
+        // Emit rank change event (ignore send errors - no receivers is fine)
+        if (old_rank - new_rank).abs() > f64::EPSILON {
+            let _ = self.rank_change_tx.send(RankChangeEvent {
+                host: host_name,
+                old_rank,
+                new_rank,
+                reason: format!("success (latency: {}ms)", latency_ms),
+            });
+        }
     }
 
     /// Record a failed request.
     ///
     /// Increments failure counters and applies exponential backoff
-    /// after the grace period is exceeded.
+    /// after the grace period is exceeded. Emits a `RankChangeEvent`
+    /// if the host's computed reputation score changes.
     pub fn record_failure(&self, host: &str, reason: Option<&str>) {
+        let now = now_ms();
         let mut entries = self.entries.write().unwrap();
         let entry = entries
             .entry(host.to_string())
             .or_insert_with(|| HostReputationEntry::new(host.to_string()));
 
+        // Compute old score before mutation
+        let old_rank = self.compute_score(entry, now);
+
         entry.total_failures += 1;
         entry.consecutive_failures += 1;
-        entry.last_updated_at = now_ms();
+        entry.last_updated_at = now;
         entry.last_error = reason.map(String::from);
 
         // Check for immediate backoff on certain errors (DNS failures, etc.)
@@ -283,13 +336,28 @@ impl HostReputationTracker {
                 self.config.backoff_base_ms * (1 << (penalty_level - 1).min(10)),
                 self.config.backoff_max_ms,
             );
-            entry.backoff_until = now_ms() + backoff_time;
+            entry.backoff_until = now + backoff_time;
         } else {
             entry.backoff_until = 0;
         }
 
+        // Compute new score after mutation
+        let new_rank = self.compute_score(entry, now);
+        let host_name = host.to_string();
+        let reason_str = reason.unwrap_or("unknown").to_string();
+
         drop(entries);
         self.save_to_storage();
+
+        // Emit rank change event (ignore send errors - no receivers is fine)
+        if (old_rank - new_rank).abs() > f64::EPSILON {
+            let _ = self.rank_change_tx.send(RankChangeEvent {
+                host: host_name,
+                old_rank,
+                new_rank,
+                reason: format!("failure ({})", reason_str),
+            });
+        }
     }
 
     /// Rank hosts by reputation.
@@ -377,6 +445,62 @@ impl HostReputationTracker {
     /// if you need to ensure data is persisted immediately.
     pub fn flush(&self) {
         self.save_to_storage();
+    }
+
+    /// Subscribe to rank change events.
+    ///
+    /// Returns a `broadcast::Receiver` that receives `RankChangeEvent` whenever
+    /// a host's reputation score changes due to `record_success()` or `record_failure()`.
+    ///
+    /// Dropping the receiver naturally unsubscribes. If the receiver falls behind,
+    /// older messages are dropped (lagged).
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::overlay::host_reputation_tracker::{HostReputationTracker, RankChangeEvent};
+    ///
+    /// let tracker = HostReputationTracker::new();
+    /// let mut rx = tracker.subscribe();
+    ///
+    /// // In an async context:
+    /// tokio::spawn(async move {
+    ///     while let Ok(event) = rx.recv().await {
+    ///         println!("{}: {} -> {} ({})", event.host, event.old_rank, event.new_rank, event.reason);
+    ///     }
+    /// });
+    /// ```
+    pub fn subscribe(&self) -> broadcast::Receiver<RankChangeEvent> {
+        self.rank_change_tx.subscribe()
+    }
+
+    /// Register a callback for rank change events.
+    ///
+    /// Spawns a tokio task that listens for `RankChangeEvent`s and invokes the
+    /// provided callback for each one. The task runs until the tracker is dropped
+    /// or the channel closes.
+    ///
+    /// Returns a `tokio::task::JoinHandle` that can be used to abort the listener.
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::overlay::host_reputation_tracker::HostReputationTracker;
+    ///
+    /// let tracker = HostReputationTracker::new();
+    /// let handle = tracker.on_rank_change(|event| {
+    ///     println!("Host {} rank changed: {} -> {}", event.host, event.old_rank, event.new_rank);
+    /// });
+    ///
+    /// // To stop listening:
+    /// handle.abort();
+    /// ```
+    pub fn on_rank_change(
+        &self,
+        callback: impl Fn(RankChangeEvent) + Send + Sync + 'static,
+    ) -> tokio::task::JoinHandle<()> {
+        let mut rx = self.subscribe();
+        tokio::spawn(async move {
+            while let Ok(event) = rx.recv().await {
+                callback(event);
+            }
+        })
     }
 
     /// Export all entries as JSON.
@@ -733,5 +857,113 @@ mod tests {
 
         tracker.reset();
         assert!(tracker.snapshot("host1").is_none());
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_receives_rank_change() {
+        let tracker = HostReputationTracker::new();
+        let mut rx = tracker.subscribe();
+
+        // Record a success which should change the rank from default
+        tracker.record_success("host1", 100);
+
+        // We should receive the rank change event
+        let event = tokio::time::timeout(std::time::Duration::from_secs(1), rx.recv())
+            .await
+            .expect("timed out waiting for event")
+            .expect("channel closed");
+
+        assert_eq!(event.host, "host1");
+        assert!(event.reason.contains("success"));
+    }
+
+    #[tokio::test]
+    async fn test_multiple_subscribers_reputation() {
+        let tracker = HostReputationTracker::new();
+        let mut rx1 = tracker.subscribe();
+        let mut rx2 = tracker.subscribe();
+
+        // Record a failure which should change the rank
+        tracker.record_failure("host1", Some("timeout"));
+
+        let timeout = std::time::Duration::from_secs(1);
+
+        // Both subscribers should receive the same event
+        let event1 = tokio::time::timeout(timeout, rx1.recv())
+            .await
+            .expect("rx1 timed out")
+            .expect("rx1 channel closed");
+
+        let event2 = tokio::time::timeout(timeout, rx2.recv())
+            .await
+            .expect("rx2 timed out")
+            .expect("rx2 channel closed");
+
+        assert_eq!(event1.host, event2.host);
+        assert_eq!(event1.host, "host1");
+        assert!((event1.old_rank - event2.old_rank).abs() < f64::EPSILON);
+        assert!((event1.new_rank - event2.new_rank).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn test_rank_change_event_fields() {
+        let tracker = HostReputationTracker::new();
+        let mut rx = tracker.subscribe();
+
+        // First record a success to establish a baseline
+        tracker.record_success("host1", 100);
+        let event1 = tokio::time::timeout(std::time::Duration::from_secs(1), rx.recv())
+            .await
+            .expect("timed out")
+            .expect("channel closed");
+
+        assert_eq!(event1.host, "host1");
+        // For a brand new host, old_rank is the default latency score (1500ms)
+        // and new_rank should be based on the recorded latency (100ms) minus success bonus
+        assert!(event1.old_rank > event1.new_rank, "success should improve rank");
+        assert!(event1.reason.contains("success"));
+        assert!(event1.reason.contains("100ms"));
+
+        // Now record a failure and check fields
+        tracker.record_failure("host1", Some("connection refused"));
+        let event2 = tokio::time::timeout(std::time::Duration::from_secs(1), rx.recv())
+            .await
+            .expect("timed out")
+            .expect("channel closed");
+
+        assert_eq!(event2.host, "host1");
+        assert!(event2.new_rank > event2.old_rank, "failure should worsen rank");
+        assert!(event2.reason.contains("failure"));
+        assert!(event2.reason.contains("connection refused"));
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe_reputation() {
+        let tracker = HostReputationTracker::new();
+
+        // Subscribe and then immediately drop the receiver
+        let rx = tracker.subscribe();
+        drop(rx);
+
+        // Recording should still work fine without panicking
+        tracker.record_success("host1", 100);
+        tracker.record_failure("host2", Some("error"));
+
+        // Verify data is still recorded
+        let entry1 = tracker.snapshot("host1").unwrap();
+        assert_eq!(entry1.total_successes, 1);
+        let entry2 = tracker.snapshot("host2").unwrap();
+        assert_eq!(entry2.total_failures, 1);
+
+        // Subscribe again after drop - should only get new events
+        let mut rx2 = tracker.subscribe();
+        tracker.record_success("host3", 50);
+
+        let event = tokio::time::timeout(std::time::Duration::from_secs(1), rx2.recv())
+            .await
+            .expect("timed out")
+            .expect("channel closed");
+
+        assert_eq!(event.host, "host3");
     }
 }

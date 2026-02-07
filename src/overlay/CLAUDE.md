@@ -54,8 +54,8 @@ pub use overlay_admin_token_template::{
 
 // Host reputation
 pub use host_reputation_tracker::{
-    HostReputationTracker, HostReputationEntry, RankedHost, ReputationConfig,
-    ReputationStorage, get_overlay_host_reputation_tracker,
+    HostReputationTracker, HostReputationEntry, RankedHost, RankChangeEvent,
+    ReputationConfig, ReputationStorage, get_overlay_host_reputation_tracker,
 };
 
 // Retry helper
@@ -153,7 +153,7 @@ impl TopicBroadcaster {
 
 ## HostReputationTracker
 
-Tracks host performance for intelligent selection. Thread-safe with `RwLock`.
+Tracks host performance for intelligent selection. Thread-safe with `RwLock`. Emits `RankChangeEvent` notifications via `tokio::sync::broadcast`.
 
 ```rust
 impl HostReputationTracker {
@@ -164,11 +164,15 @@ impl HostReputationTracker {
     pub fn record_success(&self, host: &str, latency_ms: u64)
     pub fn record_failure(&self, host: &str, reason: Option<&str>)
     pub fn rank_hosts(&self, hosts: &[String]) -> Vec<RankedHost>
+    pub fn rank_hosts_at(&self, hosts: &[String], now: u64) -> Vec<RankedHost>
     pub fn snapshot(&self, host: &str) -> Option<HostReputationEntry>
     pub fn reset(&self)
+    pub fn has_storage(&self) -> bool
     pub fn flush(&self)
     pub fn to_json(&self) -> String
     pub fn from_json(&self, json: &str) -> bool
+    pub fn subscribe(&self) -> broadcast::Receiver<RankChangeEvent>
+    pub fn on_rank_change(&self, callback: impl Fn(RankChangeEvent) + Send + Sync + 'static) -> JoinHandle<()>
 }
 
 // Global singleton (OnceLock)
@@ -179,6 +183,24 @@ pub fn get_overlay_host_reputation_tracker() -> &'static HostReputationTracker
 - **ReputationStorage** trait: `get/set/remove` for custom persistence backends; auto-saves after each update
 - **Immediate backoff** for DNS errors (ERR_NAME_NOT_RESOLVED, ENOTFOUND, etc.)
 - **Scoring**: latency + failure_penalty + backoff_penalty - success_bonus (lower = better)
+
+### Rank Change Events
+
+The tracker emits `RankChangeEvent` via `tokio::sync::broadcast` whenever `record_success()` or `record_failure()` causes a change in a host's computed reputation score.
+
+```rust
+pub struct RankChangeEvent {
+    pub host: String,      // The host whose rank changed
+    pub old_rank: f64,     // Previous score (lower = better)
+    pub new_rank: f64,     // New score (lower = better)
+    pub reason: String,    // Human-readable reason (e.g. "success (latency: 100ms)")
+}
+```
+
+- **`subscribe()`** returns a `broadcast::Receiver<RankChangeEvent>` for manual async polling
+- **`on_rank_change(callback)`** spawns a tokio task that invokes the callback for each event; returns `JoinHandle` for cancellation
+- Dropping all receivers is safe — send errors are silently ignored
+- Channel capacity: 64 events (older events dropped if receiver falls behind)
 
 ## Historian
 

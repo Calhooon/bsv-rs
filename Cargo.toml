@@ -67,8 +67,9 @@ urlencoding = "2.1"
 
 [dev-dependencies]
 criterion = "0.5"
-tokio = { version = "1", features = ["rt", "macros"] }
+tokio = { version = "1", features = ["rt", "macros", "net"] }
 memory-stats = "1.2"
+wiremock = "=0.6.2"
 
 [dependencies.dhat]
 version = "0.3"

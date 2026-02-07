@@ -105,6 +105,26 @@ pub enum Error {
     #[error("stack overflow")]
     StackOverflow,
 
+    /// BIP-276 encoding/decoding error.
+    #[cfg(feature = "script")]
+    #[error("BIP-276 error: {0}")]
+    Bip276Error(String),
+
+    /// Invalid address.
+    #[cfg(feature = "script")]
+    #[error("invalid address: {0}")]
+    InvalidAddress(String),
+
+    /// Invalid address length.
+    #[cfg(feature = "script")]
+    #[error("invalid address length for '{0}'")]
+    InvalidAddressLength(String),
+
+    /// Unsupported address type.
+    #[cfg(feature = "script")]
+    #[error("address not supported {0}")]
+    UnsupportedAddress(String),
+
     // ===================
     // Transaction errors
     // ===================

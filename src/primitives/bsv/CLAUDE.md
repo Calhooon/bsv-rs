@@ -7,14 +7,14 @@ This module provides BSV blockchain-specific operations including transaction si
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `mod.rs` | Module declarations and re-exports |
-| `sighash.rs` | BIP-143 style sighash computation for transaction signing |
-| `tx_signature.rs` | Transaction signatures with sighash scope (checksig format) |
-| `schnorr.rs` | Schnorr ZK proofs for ECDH shared secret verification |
-| `polynomial.rs` | Polynomial operations for Lagrange interpolation |
-| `shamir.rs` | Shamir Secret Sharing for private key backup |
+| File | Lines | Purpose |
+|------|-------|---------|
+| `mod.rs` | 75 | Module declarations and re-exports |
+| `sighash.rs` | 623 | BIP-143 style sighash computation for transaction signing |
+| `tx_signature.rs` | 309 | Transaction signatures with sighash scope (checksig format) |
+| `schnorr.rs` | 413 | Schnorr ZK proofs for ECDH shared secret verification |
+| `polynomial.rs` | 394 | Polynomial operations for Lagrange interpolation |
+| `shamir.rs` | 1007 | Shamir Secret Sharing for private key backup |
 
 ## Key Exports
 
@@ -31,7 +31,7 @@ pub const SIGHASH_ANYONECANPAY: u32 = 0x80; // Sign only this input
 ### Sighash Computation
 
 ```rust
-/// Parameters for computing a sighash
+/// Parameters for computing a sighash (derives Debug)
 pub struct SighashParams<'a> {
     pub version: i32,
     pub inputs: &'a [TxInput],
@@ -65,7 +65,7 @@ pub fn compute_sighash_from_raw(
 ### Transaction Structures
 
 ```rust
-/// A transaction input
+/// A transaction input (derives Debug, Clone)
 pub struct TxInput {
     pub txid: [u8; 32],      // Previous tx ID (internal byte order)
     pub output_index: u32,
@@ -73,13 +73,13 @@ pub struct TxInput {
     pub sequence: u32,
 }
 
-/// A transaction output
+/// A transaction output (derives Debug, Clone)
 pub struct TxOutput {
     pub satoshis: u64,
     pub script: Vec<u8>,      // scriptPubKey
 }
 
-/// A parsed raw transaction
+/// A parsed raw transaction (derives Debug, Clone)
 pub struct RawTransaction {
     pub version: i32,
     pub inputs: Vec<TxInput>,
@@ -95,14 +95,15 @@ pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction>
 
 ```rust
 /// ECDSA signature with sighash scope for OP_CHECKSIG
+/// Derives Clone, PartialEq, Eq. Implements Debug (hex-formatted) and Display.
 pub struct TransactionSignature {
-    // Private fields: signature, scope
+    // Private fields: signature (Signature), scope (u32)
 }
 
 impl TransactionSignature {
     pub fn new(signature: Signature, scope: u32) -> Self
     pub fn from_components(r: [u8; 32], s: [u8; 32], scope: u32) -> Self
-    pub fn from_checksig_format(data: &[u8]) -> Result<Self>
+    pub fn from_checksig_format(data: &[u8]) -> Result<Self>  // Empty data → blank sig
 
     pub fn signature(&self) -> &Signature
     pub fn scope(&self) -> u32
@@ -116,12 +117,20 @@ impl TransactionSignature {
     pub fn to_der(&self) -> Vec<u8>
     pub fn to_compact(&self) -> [u8; 64]         // R || S
 }
+
+// Display outputs hex-encoded checksig format
+impl Display for TransactionSignature { ... }
+
+// Debug outputs struct with hex-encoded R, S, and scope
+impl Debug for TransactionSignature { ... }
 ```
+
+**Blank signature handling**: `from_checksig_format(&[])` creates a placeholder signature with R=1, S=1, scope=1. This is used for unsigned inputs during transaction construction.
 
 ### Schnorr ZK Proofs
 
 ```rust
-/// A Schnorr zero-knowledge proof
+/// A Schnorr zero-knowledge proof (derives Clone, Debug)
 pub struct SchnorrProof {
     pub r: PublicKey,       // R = r*G (nonce commitment)
     pub s_prime: PublicKey, // S' = r*B (blinded shared secret)
@@ -150,10 +159,17 @@ impl Schnorr {
 }
 ```
 
+**Verification algorithm**:
+1. Recompute challenge `e = SHA256(A || B || S || S' || R) mod n` (Fiat-Shamir)
+2. Check `z*G == R + e*A`
+3. Check `z*B == S' + e*S`
+
+All points serialized in 33-byte compressed format for the challenge hash.
+
 ### Shamir Secret Sharing
 
 ```rust
-/// A collection of key shares for recovery
+/// A collection of key shares for recovery (derives Clone, Debug)
 pub struct KeyShares {
     pub points: Vec<PointInFiniteField>,
     pub threshold: usize,
@@ -170,27 +186,38 @@ impl KeyShares {
 /// Split a private key into shares
 pub fn split_private_key(
     key: &PrivateKey,
-    threshold: usize,  // Minimum shares needed (>= 2)
-    total: usize,      // Total shares to generate
+    threshold: usize,  // Minimum shares needed (2..=255)
+    total: usize,      // Total shares to generate (>= threshold)
 ) -> Result<KeyShares>
 ```
+
+**Parameter constraints**:
+- `threshold` must be >= 2 (1-of-N is just copying the secret)
+- `threshold` must be <= 255
+- `total` must be >= `threshold`
+
+**Recovery validation**:
+- `from_backup_format` validates that all shares have matching threshold and integrity values
+- `recover_private_key` checks that `points.len() >= threshold` before interpolation
+- After recovery, the integrity checksum is verified against the recovered key
 
 ### Polynomial Operations
 
 ```rust
 /// A point in a finite field (for Shamir shares)
+/// Derives Clone, Debug, PartialEq, Eq. Implements Display (same as to_point_string).
 pub struct PointInFiniteField {
     pub x: BigNumber,
     pub y: BigNumber,
 }
 
 impl PointInFiniteField {
-    pub fn new(x: BigNumber, y: BigNumber) -> Self
-    pub fn from_string(s: &str) -> Result<Self>   // "base58(x).base58(y)"
+    pub fn new(x: BigNumber, y: BigNumber) -> Self   // Reduces mod secp256k1 prime
+    pub fn from_string(s: &str) -> Result<Self>       // "base58(x).base58(y)"
     pub fn to_point_string(&self) -> String
 }
 
-/// Polynomial for Lagrange interpolation
+/// Polynomial for Lagrange interpolation (derives Clone, Debug)
 pub struct Polynomial {
     pub points: Vec<PointInFiniteField>,
     pub threshold: usize,
@@ -201,6 +228,22 @@ impl Polynomial {
     pub fn value_at(&self, x: &BigNumber) -> BigNumber  // Lagrange interpolation
 }
 ```
+
+**Lagrange interpolation formula**: `y = Σ(i=0..t-1) y_i * Π(j≠i) (x - x_j) / (x_i - x_j)`, all arithmetic mod secp256k1 prime. Uses modular inverse for division; returns zero if inverse fails (e.g., duplicate x coordinates).
+
+## Internal Functions
+
+These are not publicly exported but are key to understanding the implementation:
+
+| Function | File | Purpose |
+|----------|------|---------|
+| `compute_hash_prevouts()` | sighash.rs | SHA256d of all input outpoints (zeros if ANYONECANPAY) |
+| `compute_hash_sequence()` | sighash.rs | SHA256d of all input sequences (zeros if ANYONECANPAY/SINGLE/NONE) |
+| `compute_hash_outputs()` | sighash.rs | SHA256d of outputs (all, single, or zeros depending on scope) |
+| `compute_challenge()` | schnorr.rs | Fiat-Shamir challenge: `SHA256(A\|\|B\|\|S\|\|S'\|\|R) mod n` |
+| `evaluate_polynomial()` | shamir.rs | Horner's method polynomial evaluation mod prime |
+| `compute_integrity()` | shamir.rs | First 4 chars of `base58(sha256(key_bytes))` |
+| `decode_share()` | shamir.rs | Parse backup format string into point + threshold + integrity |
 
 ## Usage
 
@@ -253,6 +296,9 @@ let normalized = tx_sig.to_low_s();
 
 // Encode back to checksig format for use in scripts
 let encoded = normalized.to_checksig_format();
+
+// Display as hex string
+println!("{}", tx_sig);  // Outputs hex-encoded checksig format
 ```
 
 ### Proving ECDH Computation with Schnorr
@@ -309,6 +355,23 @@ let recovered = subset.recover_private_key().unwrap();
 assert_eq!(key.to_bytes(), recovered.to_bytes());
 ```
 
+## BIP-143 Preimage Format
+
+The sighash preimage follows this exact layout (used by `build_sighash_preimage`):
+
+| Field | Size | Description |
+|-------|------|-------------|
+| nVersion | 4 bytes LE | Transaction version |
+| hashPrevouts | 32 bytes | SHA256d of all outpoints (or zeros) |
+| hashSequence | 32 bytes | SHA256d of all sequences (or zeros) |
+| outpoint | 36 bytes | txid (32) + output index (4) of the input being signed |
+| scriptCode | varint + N bytes | The subscript for signing |
+| value | 8 bytes LE | Satoshi value of the input being spent |
+| nSequence | 4 bytes LE | Sequence of the input being signed |
+| hashOutputs | 32 bytes | SHA256d of outputs (all, single, or zeros) |
+| nLocktime | 4 bytes LE | Transaction locktime |
+| sighash type | 4 bytes LE | Sighash scope flags |
+
 ## Sighash Types Explained
 
 | Type | Value | Description |
@@ -322,6 +385,8 @@ assert_eq!(key.to_bytes(), recovered.to_bytes());
 Common combinations:
 - `SIGHASH_ALL | SIGHASH_FORKID` (0x41) - Standard BSV signature
 - `SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_ANYONECANPAY` (0xC1) - Crowdfunding
+
+Base type extraction uses `SIGHASH_BASE_MASK` (0x1F) internally.
 
 ## Backup Format
 
@@ -338,27 +403,46 @@ Example: `2.8hKJ7vP...3.ABCD`
 - `3`: threshold (minimum shares needed)
 - `ABCD`: integrity checksum (first 4 chars of base58(sha256(secret)))
 
-The integrity field allows verification that shares belong together and that recovery succeeded.
+The integrity field allows verification that shares belong together and that recovery succeeded. `from_backup_format` validates that all shares have consistent threshold and integrity values.
 
 ## Security Notes
 
 ### Sighash
 - Always include `SIGHASH_FORKID` for BSV transactions
-- `compute_sighash` returns display order; use `compute_sighash_for_signing` for ECDSA
+- `compute_sighash` returns display order (reversed); use `compute_sighash_for_signing` for ECDSA
+- `compute_sighash_from_raw` validates input_index is within range
 
 ### Transaction Signatures
-- Always normalize to low-S form for BIP-62 compliance
-- The `to_checksig_format` method handles this automatically
+- Always normalize to low-S form for BIP-62 compliance using `to_low_s()`
+- Check with `has_low_s()` before broadcasting
+- `from_checksig_format` re-exports sighash constants for convenience
 
 ### Schnorr Proofs
-- Proofs are non-transferable (bound to specific public keys)
+- Proofs are non-transferable (bound to specific public keys A and B)
 - Uses Fiat-Shamir heuristic for non-interactive verification
+- Challenge hash: `SHA256(A || B || S || S' || R) mod n` (5 compressed points, 165 bytes)
+- Both parties can independently generate and verify proofs for the same shared secret
 
 ### Shamir Secret Sharing
-- Threshold must be >= 2 (1-of-N is just copying)
+- Threshold must be >= 2 and <= 255 (1-of-N is just copying)
 - All arithmetic is modulo the secp256k1 field prime
+- Polynomial coefficients generated from `PrivateKey::random()` for cryptographic randomness
 - Store shares in separate secure locations
 - Never store more than (threshold - 1) shares together
+- Duplicate shares in recovery cause failure (Lagrange interpolation requires unique x-coordinates)
+- Providing more shares than threshold works (only first `threshold` points are used)
+
+## Testing
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `sighash.rs` | 7 unit tests | Parsing, constants, hash component conditions |
+| `tx_signature.rs` | 6 unit tests | Roundtrip, blank sig, scope values, low-S |
+| `schnorr.rs` | 7 unit tests | Roundtrip, wrong inputs, mutual verification, deterministic challenge |
+| `polynomial.rs` | 6 unit tests | Linear/quadratic/constant polys, large numbers, string roundtrip |
+| `shamir.rs` | 21 unit tests | Split/recover, backup format, edge cases, parameter validation |
+
+Cross-SDK sighash test vectors (500 vectors) are in `tests/vectors/` and exercised by integration tests.
 
 ## Related Documentation
 

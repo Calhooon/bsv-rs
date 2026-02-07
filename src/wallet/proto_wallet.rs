@@ -322,7 +322,7 @@ impl ProtoWallet {
 
     /// Returns a reference to the internal key deriver.
     pub fn key_deriver(&self) -> &CachedKeyDeriver {
-        &*self.key_deriver
+        &self.key_deriver
     }
 
     /// Returns the identity public key.

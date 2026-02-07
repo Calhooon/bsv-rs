@@ -576,11 +576,7 @@ impl SimplifiedFetchTransport {
             let guard = self.callback.read().map_err(|_| {
                 Error::AuthError("Failed to acquire callback lock".into())
             })?;
-            if let Some(ref cb) = *guard {
-                Some(cb(message))
-            } else {
-                None
-            }
+            (*guard).as_ref().map(|cb| cb(message))
         };
 
         // Execute the future outside the lock

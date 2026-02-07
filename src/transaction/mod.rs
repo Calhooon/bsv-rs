@@ -97,6 +97,7 @@ pub mod merkle_path;
 pub mod output;
 #[allow(clippy::module_inception)]
 pub mod transaction;
+pub mod tx_json;
 
 // Re-exports for convenience
 pub use beef::{Beef, BeefValidationResult, SortResult};

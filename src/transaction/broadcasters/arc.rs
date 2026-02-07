@@ -218,13 +218,6 @@ impl Broadcaster for ArcBroadcaster {
         })
     }
 
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult> {
-        let mut results = Vec::with_capacity(txs.len());
-        for tx in &txs {
-            results.push(self.broadcast(tx).await);
-        }
-        results
-    }
 }
 
 #[cfg(test)]

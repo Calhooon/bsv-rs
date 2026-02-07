@@ -76,6 +76,9 @@ pub struct WocBroadcastConfig {
     pub api_key: Option<String>,
     /// Request timeout in milliseconds
     pub timeout_ms: u64,
+    /// Optional base URL override (for testing with mock servers).
+    /// When set, this replaces the standard WhatsOnChain API URL.
+    pub base_url: Option<String>,
 }
 
 impl Default for WocBroadcastConfig {
@@ -84,6 +87,7 @@ impl Default for WocBroadcastConfig {
             network: WocBroadcastNetwork::Mainnet,
             api_key: None,
             timeout_ms: 30_000,
+            base_url: None,
         }
     }
 }
@@ -164,6 +168,28 @@ impl WhatsOnChainBroadcaster {
         }
     }
 
+    /// Create a new broadcaster with a custom base URL.
+    ///
+    /// This is primarily useful for testing with a mock HTTP server.
+    ///
+    /// # Arguments
+    ///
+    /// * `base_url` - The base URL to use instead of the standard WhatsOnChain API URL
+    /// * `network` - The network to broadcast to (used for URL path segment)
+    /// * `api_key` - Optional API key
+    pub fn with_base_url(base_url: &str, network: WocBroadcastNetwork, api_key: Option<String>) -> Self {
+        Self {
+            config: WocBroadcastConfig {
+                network,
+                api_key,
+                timeout_ms: 30_000,
+                base_url: Some(base_url.to_string()),
+            },
+            #[cfg(feature = "http")]
+            client: reqwest::Client::new(),
+        }
+    }
+
     /// Get the configured network.
     pub fn network(&self) -> WocBroadcastNetwork {
         self.config.network
@@ -179,7 +205,10 @@ impl WhatsOnChainBroadcaster {
 impl Broadcaster for WhatsOnChainBroadcaster {
     #[cfg(feature = "http")]
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
-        let url = self.config.network.broadcast_url();
+        let url = match &self.config.base_url {
+            Some(base) => format!("{}/v1/bsv/{}/tx/raw", base, self.config.network.path_segment()),
+            None => self.config.network.broadcast_url(),
+        };
         let raw_tx = tx.to_hex();
         let txid = tx.id();
 
@@ -249,13 +278,6 @@ impl Broadcaster for WhatsOnChainBroadcaster {
         })
     }
 
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult> {
-        let mut results = Vec::with_capacity(txs.len());
-        for tx in &txs {
-            results.push(self.broadcast(tx).await);
-        }
-        results
-    }
 }
 
 #[cfg(test)]
@@ -331,6 +353,7 @@ mod tests {
             network: WocBroadcastNetwork::Testnet,
             api_key: Some("custom-key".to_string()),
             timeout_ms: 60_000,
+            base_url: None,
         };
         let broadcaster = WhatsOnChainBroadcaster::with_config(config);
         assert_eq!(broadcaster.network(), WocBroadcastNetwork::Testnet);

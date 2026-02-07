@@ -55,6 +55,8 @@
 //! let locking = P2PKH::lock_from_address("1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2")?;
 //! ```
 
+pub mod address;
+pub mod bip276;
 pub mod chunk;
 pub mod evaluation_error;
 pub mod locking_script;
@@ -69,6 +71,8 @@ pub mod transaction;
 pub mod unlocking_script;
 
 // Re-exports for convenience
+pub use address::Address;
+pub use bip276::*;
 pub use chunk::ScriptChunk;
 pub use evaluation_error::{ExecutionContext, ScriptEvaluationError};
 pub use locking_script::LockingScript;

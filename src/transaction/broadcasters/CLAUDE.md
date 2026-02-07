@@ -120,6 +120,10 @@ pub enum WocBroadcastNetwork {
     Testnet,   // https://api.whatsonchain.com/v1/bsv/test/tx/raw
     Stn,       // https://api.whatsonchain.com/v1/bsv/stn/tx/raw
 }
+
+impl WocBroadcastNetwork {
+    pub fn broadcast_url(&self) -> String  // Full URL for this network
+}
 ```
 
 ### WocBroadcastConfig
@@ -131,6 +135,7 @@ pub struct WocBroadcastConfig {
     pub network: WocBroadcastNetwork,  // Network to broadcast to
     pub api_key: Option<String>,       // Optional API key for higher rate limits
     pub timeout_ms: u64,               // Request timeout (default: 30,000 ms)
+    pub base_url: Option<String>,      // Optional URL override (for testing with mock servers)
 }
 ```
 
@@ -150,6 +155,7 @@ impl WhatsOnChainBroadcaster {
     pub fn stn() -> Self              // Create STN broadcaster
     pub fn new(network: WocBroadcastNetwork, api_key: Option<String>) -> Self
     pub fn with_config(config: WocBroadcastConfig) -> Self
+    pub fn with_base_url(base_url: &str, network: WocBroadcastNetwork, api_key: Option<String>) -> Self
     pub fn network(&self) -> WocBroadcastNetwork
     pub fn api_key(&self) -> Option<&str>
 }
@@ -214,7 +220,7 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 
 ### WhatsOnChain API
 
-**Endpoint**: `POST https://api.whatsonchain.com/v1/bsv/{network}/tx/raw`
+**Endpoint**: `POST https://api.whatsonchain.com/v1/bsv/{network}/tx/raw` (or `{base_url}/v1/bsv/{network}/tx/raw` if `base_url` is set)
 
 **Request**: Raw transaction hex as body (Content-Type: application/json)
 
@@ -330,6 +336,20 @@ match broadcaster.broadcast(&tx).await {
 }
 ```
 
+### WhatsOnChain with Custom Base URL (Testing)
+
+```rust
+use bsv_sdk::transaction::{WhatsOnChainBroadcaster, WocBroadcastNetwork};
+
+// Use a mock server for testing
+let broadcaster = WhatsOnChainBroadcaster::with_base_url(
+    "http://localhost:3000",
+    WocBroadcastNetwork::Mainnet,
+    None,
+);
+// Broadcasts to: http://localhost:3000/v1/bsv/main/tx/raw
+```
+
 ### Broadcasting Multiple Transactions
 
 ```rust
@@ -351,7 +371,7 @@ for (i, result) in results.iter().enumerate() {
 ## Implementation Notes
 
 - **Async Trait**: Uses `#[async_trait(?Send)]` because `Transaction` contains `RefCell` which is not `Send`
-- **Sequential Batching**: `broadcast_many()` broadcasts sequentially on all three implementations; none have batch endpoints
+- **Sequential Batching**: `broadcast_many()` is a default trait method that broadcasts sequentially; none of the three implementations override it
 - **Timeout Handling**: Default 30-second timeout on all broadcasters; increase for slow networks or large transactions
 - **TXID Computation**: All broadcasters compute the TXID locally via `tx.id()` before sending
 - **Response Parsing**: ARC parses structured JSON; Teranode and WoC use plain text responses

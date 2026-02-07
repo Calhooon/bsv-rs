@@ -71,6 +71,7 @@ impl WocNetwork {
 /// ```
 pub struct WhatsOnChainTracker {
     network: WocNetwork,
+    base_url_override: Option<String>,
     #[cfg(feature = "http")]
     client: reqwest::Client,
 }
@@ -90,6 +91,17 @@ impl WhatsOnChainTracker {
     pub fn new(network: WocNetwork) -> Self {
         Self {
             network,
+            base_url_override: None,
+            #[cfg(feature = "http")]
+            client: reqwest::Client::new(),
+        }
+    }
+
+    /// Create a tracker with a custom base URL (useful for testing).
+    pub fn with_base_url(base_url: &str, network: WocNetwork) -> Self {
+        Self {
+            network,
+            base_url_override: Some(base_url.to_string()),
             #[cfg(feature = "http")]
             client: reqwest::Client::new(),
         }
@@ -99,11 +111,28 @@ impl WhatsOnChainTracker {
     pub fn network(&self) -> WocNetwork {
         self.network
     }
+
+    /// Get the effective base URL.
+    #[cfg(feature = "http")]
+    fn base_url(&self) -> &str {
+        self.base_url_override
+            .as_deref()
+            .unwrap_or_else(|| self.network.base_url())
+    }
 }
 
 impl Default for WhatsOnChainTracker {
     fn default() -> Self {
         Self::mainnet()
+    }
+}
+
+impl std::fmt::Debug for WhatsOnChainTracker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("WhatsOnChainTracker")
+            .field("network", &self.network)
+            .field("base_url_override", &self.base_url_override)
+            .finish()
     }
 }
 
@@ -122,7 +151,7 @@ impl ChainTracker for WhatsOnChainTracker {
             merkleroot: String,
         }
 
-        let url = format!("{}/block/{}/header", self.network.base_url(), height);
+        let url = format!("{}/block/{}/header", self.base_url(), height);
 
         let response = self
             .client
@@ -171,7 +200,7 @@ impl ChainTracker for WhatsOnChainTracker {
             blocks: u32,
         }
 
-        let url = format!("{}/chain/info", self.network.base_url());
+        let url = format!("{}/chain/info", self.base_url());
 
         let response = self
             .client

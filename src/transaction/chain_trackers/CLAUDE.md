@@ -65,19 +65,26 @@ impl WocNetwork {
 ```rust
 pub struct WhatsOnChainTracker {
     network: WocNetwork,
+    base_url_override: Option<String>,
     #[cfg(feature = "http")]
     client: reqwest::Client,
 }
 
 impl WhatsOnChainTracker {
-    pub fn mainnet() -> Self                 // Create mainnet tracker
-    pub fn testnet() -> Self                 // Create testnet tracker
-    pub fn new(network: WocNetwork) -> Self  // Create with specific network
-    pub fn network(&self) -> WocNetwork      // Get configured network
+    pub fn mainnet() -> Self                                      // Create mainnet tracker
+    pub fn testnet() -> Self                                      // Create testnet tracker
+    pub fn new(network: WocNetwork) -> Self                       // Create with specific network
+    pub fn with_base_url(base_url: &str, network: WocNetwork) -> Self  // Create with custom URL (for testing)
+    pub fn network(&self) -> WocNetwork                           // Get configured network
+    fn base_url(&self) -> &str                                    // (http only) Resolve effective base URL
 }
 
 impl Default for WhatsOnChainTracker {
     fn default() -> Self  // Returns mainnet tracker
+}
+
+impl Debug for WhatsOnChainTracker {
+    // Custom impl: shows network and base_url_override, omits reqwest::Client
 }
 ```
 
@@ -101,6 +108,9 @@ let tracker = WhatsOnChainTracker::testnet();
 
 // Or with explicit network
 let tracker = WhatsOnChainTracker::new(WocNetwork::Testnet);
+
+// Or with a custom base URL (useful for testing against a mock server)
+let tracker = WhatsOnChainTracker::with_base_url("http://localhost:8080", WocNetwork::Mainnet);
 
 // Get current blockchain height
 let height = tracker.current_height().await?;
@@ -267,6 +277,10 @@ Ok(header.merkleroot.to_lowercase() == root.to_lowercase())
 
 This ensures compatibility regardless of whether the caller provides uppercase or lowercase hex strings.
 
+### Base URL Override (WhatsOnChainTracker)
+
+`WhatsOnChainTracker::with_base_url()` allows overriding the network-derived URL. When set, the override takes precedence over the network's default URL. This is useful for integration testing against mock HTTP servers. The override is stored in `base_url_override: Option<String>` and resolved by the private `base_url()` method.
+
 ### HTTP Client
 
 When the `http` feature is enabled, each tracker instance creates its own `reqwest::Client`. For high-volume applications, consider reusing tracker instances rather than creating new ones for each verification.
@@ -298,6 +312,8 @@ Tests verify:
 - `BlockHeadersServiceConfig` default values
 - `BlockHeadersServiceTracker` construction with various configurations
 - Network/URL getter methods return correct values
+
+Integration tests using `with_base_url` (WoC) or `with_url` (BHS) to point at mock HTTP servers are in `tests/chaintracker_http_tests.rs`.
 
 Note: Integration tests against the live APIs are marked `ignore` to avoid network dependencies in CI.
 
