@@ -1,9 +1,9 @@
 # Benchmarks
-> Performance measurement suite for BSV SDK cryptographic operations
+> Performance measurement suite for BSV SDK cryptographic and script operations
 
 ## Overview
 
-This module contains Criterion-based benchmarks for measuring the performance of cryptographic primitives in the BSV SDK. The benchmarks cover hash functions, key operations, signing/verification, encryption, encoding, and BSV-specific protocols like Schnorr proofs, Shamir secret sharing, and sighash computation.
+This module contains Criterion-based benchmarks for measuring the performance of cryptographic primitives and script operations in the BSV SDK. The benchmarks cover hash functions, key operations, signing/verification, encryption, encoding, BSV-specific protocols (Schnorr proofs, Shamir secret sharing, sighash computation), script parsing/serialization, template construction/signing, and script type detection.
 
 ## Files
 
@@ -11,6 +11,7 @@ This module contains Criterion-based benchmarks for measuring the performance of
 |------|---------|
 | `hash_bench.rs` | Standalone hash function benchmarks |
 | `primitives_bench.rs` | Comprehensive benchmarks for all primitives |
+| `script_bench.rs` | Script parsing, templates, signing, and serialization benchmarks |
 | `memory_bench.rs` | Performance benchmarks with RSS memory tracking |
 
 ## Benchmark Groups
@@ -88,6 +89,38 @@ Throughput benchmarks on 1KB payloads:
 - `PublicKey::to_address` - Generate Bitcoin address from public key
 - `PublicKey::hash160` - Compute hash160 of public key
 
+### script_bench.rs
+
+Benchmarks for script parsing, template construction, signing, and serialization, organized into 5 groups:
+
+#### Script Parsing
+- `Script::from_hex (P2PKH)` - Parse P2PKH script from hex string
+- `Script::from_binary (P2PKH)` - Parse P2PKH script from binary
+- `Script::from_asm (P2PKH)` - Parse P2PKH script from ASM string
+
+#### Script Type Detection
+- `is_p2pkh` - Detect P2PKH script type
+- `is_p2pk` - Detect P2PK script type
+- `is_multisig (2-of-3)` - Detect multisig script type
+
+#### Template Lock
+- `P2PKH::lock` - Construct P2PKH locking script from pubkey hash
+- `P2PK::lock` - Construct P2PK locking script from compressed pubkey
+- `Multisig::lock_from_keys (2-of-3)` - Construct 2-of-3 multisig locking script
+- `PushDrop::lock (3 fields)` - Construct PushDrop script with 3 data fields
+
+#### Template Sign
+- `P2PKH::sign_with_sighash` - Sign P2PKH unlocking script
+- `P2PK::sign_with_sighash` - Sign P2PK unlocking script
+- `Multisig::sign_with_sighash (2 sigs)` - Sign multisig with 2 keys
+
+#### Script Serialization
+- `to_hex (P2PKH)` - Serialize P2PKH script to hex
+- `to_binary (P2PKH)` - Serialize P2PKH script to binary
+- `to_asm (P2PKH)` - Serialize P2PKH script to ASM
+- `to_hex (PushDrop 10 fields)` - Serialize large PushDrop script to hex
+- `to_binary (PushDrop 10 fields)` - Serialize large PushDrop script to binary
+
 ## Running Benchmarks
 
 ```bash
@@ -98,10 +131,12 @@ cargo bench
 cargo bench --bench primitives_bench
 cargo bench --bench hash_bench
 cargo bench --bench memory_bench
+cargo bench --bench script_bench
 
 # Run specific benchmark group
 cargo bench -- "Key Generation"
 cargo bench -- "Hashing"
+cargo bench -- "Template Lock"
 
 # Run with detailed output
 cargo bench -- --verbose
@@ -211,6 +246,7 @@ The benchmarks use:
 - `criterion` - Benchmarking framework
 - `memory-stats` - Cross-platform RSS memory tracking
 - `bsv_sdk::primitives` - All cryptographic primitives being measured
+- `bsv_sdk::script` - Script parsing, templates (P2PKH, P2PK, Multisig, PushDrop), and serialization
 
 Optional:
 - `dhat` - Detailed heap allocation profiling (via `dhat-profiling` feature)
@@ -220,3 +256,5 @@ Optional:
 - `../CLAUDE.md` - Root SDK documentation
 - `../src/primitives/CLAUDE.md` - Primitives module documentation
 - `../src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
+- `../src/script/CLAUDE.md` - Script module documentation
+- `../src/script/templates/CLAUDE.md` - Script templates documentation

@@ -246,7 +246,8 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             && lookup_result.value == value
             && !lookup_result.outpoints.is_empty()
         {
-            return Ok(lookup_result.outpoints.last().unwrap().clone());
+            // Safe: guarded by !lookup_result.outpoints.is_empty() above
+            return Ok(lookup_result.outpoints.last().expect("outpoints non-empty").clone());
         }
 
         // Prepare value (encrypt if needed)
@@ -260,7 +261,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         let locking_script = self.create_locking_script(key, &value_bytes).await?;
 
         // Build inputs from existing outputs (to collapse them)
-        let inputs = self.build_inputs(&lookup_result);
+        let inputs = self.build_inputs(&lookup_result)?;
         let input_beef = lookup_result.input_beef.clone();
 
         // Build output
@@ -385,7 +386,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 break;
             }
 
-            let inputs = self.build_inputs(&lookup_result);
+            let inputs = self.build_inputs(&lookup_result)?;
             let input_beef = lookup_result.input_beef.clone();
 
             if inputs.is_empty() {
@@ -743,7 +744,8 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         }
 
         // Get the most recent output (last in the list)
-        let last_output = list_result.outputs.last().unwrap();
+        // Safe: guarded by is_empty() check above
+        let last_output = list_result.outputs.last().expect("outputs non-empty");
 
         // Parse the locking script - it's Option<Vec<u8>>
         let locking_script_bytes = last_output
@@ -801,26 +803,50 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         ))
     }
 
-    fn build_inputs(&self, lookup_result: &LookupValueResult) -> Vec<CreateActionInput> {
+    fn build_inputs(&self, lookup_result: &LookupValueResult) -> Result<Vec<CreateActionInput>> {
         lookup_result
             .outputs
             .iter()
             .map(|output| {
                 let parts: Vec<&str> = output.outpoint.split('.').collect();
-                let txid_bytes = from_hex(parts[0]).unwrap_or_default();
-                let mut txid = [0u8; 32];
-                if txid_bytes.len() == 32 {
-                    txid.copy_from_slice(&txid_bytes);
+                let txid_bytes = from_hex(parts[0]).map_err(|_| {
+                    Error::KvStoreCorruptedState(format!(
+                        "invalid txid hex in outpoint: {}",
+                        output.outpoint
+                    ))
+                })?;
+                if txid_bytes.len() != 32 {
+                    return Err(Error::KvStoreCorruptedState(format!(
+                        "txid must be 32 bytes, got {} in outpoint: {}",
+                        txid_bytes.len(),
+                        output.outpoint
+                    )));
                 }
-                let vout: u32 = parts.get(1).and_then(|v| v.parse().ok()).unwrap_or(0);
+                let mut txid = [0u8; 32];
+                txid.copy_from_slice(&txid_bytes);
+                let vout: u32 = parts
+                    .get(1)
+                    .ok_or_else(|| {
+                        Error::KvStoreCorruptedState(format!(
+                            "missing vout in outpoint: {}",
+                            output.outpoint
+                        ))
+                    })?
+                    .parse()
+                    .map_err(|_| {
+                        Error::KvStoreCorruptedState(format!(
+                            "invalid vout in outpoint: {}",
+                            output.outpoint
+                        ))
+                    })?;
 
-                CreateActionInput {
+                Ok(CreateActionInput {
                     outpoint: crate::wallet::Outpoint::new(txid, vout),
                     input_description: "KV entry input".to_string(),
                     unlocking_script: None,
                     unlocking_script_length: Some(107), // PushDrop unlock estimate
                     sequence_number: None,
-                }
+                })
             })
             .collect()
     }
@@ -854,7 +880,8 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         if state.key_locks.contains_key(key) {
             // Create a oneshot channel and wait
             let (tx, rx) = tokio::sync::oneshot::channel();
-            state.key_locks.get_mut(key).unwrap().push(tx);
+            // Safe: guarded by contains_key(key) check above
+            state.key_locks.get_mut(key).expect("key exists in key_locks").push(tx);
             drop(state);
             let _ = rx.await;
         } else {

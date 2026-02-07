@@ -1,0 +1,39 @@
+[package]
+name = "bsv-sdk-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.bsv-sdk]
+path = ".."
+features = ["full"]
+
+[[bin]]
+name = "fuzz_script_parser"
+path = "fuzz_targets/fuzz_script_parser.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_transaction_parser"
+path = "fuzz_targets/fuzz_transaction_parser.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_wire_protocol"
+path = "fuzz_targets/fuzz_wire_protocol.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_base58"
+path = "fuzz_targets/fuzz_base58.rs"
+test = false
+doc = false

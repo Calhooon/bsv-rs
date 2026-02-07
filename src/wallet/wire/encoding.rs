@@ -278,6 +278,12 @@ impl<'a> WireReader<'a> {
         Ok(to_hex(bytes))
     }
 
+    /// Reads a 33-byte compressed public key as hex string.
+    pub fn read_pubkey_hex(&mut self) -> Result<String, Error> {
+        let bytes = self.read_bytes(33)?;
+        Ok(to_hex(bytes))
+    }
+
     // =========================================================================
     // New type encoding methods
     // =========================================================================
@@ -435,9 +441,9 @@ impl<'a> WireReader<'a> {
     /// Reads a WalletCertificate.
     pub fn read_wallet_certificate(&mut self) -> Result<WalletCertificate, Error> {
         let certificate_type = self.read_string()?;
-        let subject = self.read_txid_hex()?; // 33-byte pubkey as hex
+        let subject = self.read_pubkey_hex()?; // 33-byte compressed pubkey as hex
         let serial_number = self.read_string()?;
-        let certifier = self.read_txid_hex()?; // 33-byte pubkey as hex
+        let certifier = self.read_pubkey_hex()?; // 33-byte compressed pubkey as hex
         let revocation_outpoint = self.read_outpoint_string()?;
         let signature_len = self.read_var_int()? as usize;
         let signature = to_hex(self.read_bytes(signature_len)?);
@@ -1472,5 +1478,982 @@ mod tests {
 
         let mut reader = WireReader::new(writer.as_bytes());
         assert_eq!(reader.read_string_array().unwrap(), strings);
+    }
+
+    // =========================================================================
+    // Wire Protocol Complex Type Roundtrip Tests
+    // =========================================================================
+
+    #[test]
+    fn test_optional_bytes_roundtrip() {
+        // Some bytes
+        let mut writer = WireWriter::new();
+        writer.write_optional_bytes(Some(&[1, 2, 3, 4, 5]));
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(
+            reader.read_optional_bytes().unwrap(),
+            Some(vec![1, 2, 3, 4, 5])
+        );
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_bytes(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_optional_bytes().unwrap(), None);
+
+        // Empty bytes
+        let mut writer = WireWriter::new();
+        writer.write_optional_bytes(Some(&[]));
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_optional_bytes().unwrap(), Some(vec![]));
+    }
+
+    #[test]
+    fn test_optional_string_array_roundtrip() {
+        // Some array
+        let strings = vec!["alpha".to_string(), "beta".to_string()];
+        let mut writer = WireWriter::new();
+        writer.write_optional_string_array(Some(&strings));
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string_array().unwrap(), strings);
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_string_array(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string_array().unwrap(), Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_optional_protocol_id_roundtrip() {
+        // Some protocol
+        let protocol = Protocol::new(SecurityLevel::Counterparty, "linkage protocol");
+        let mut writer = WireWriter::new();
+        writer.write_optional_protocol_id(Some(&protocol));
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_optional_protocol_id().unwrap();
+        assert!(read.is_some());
+        let read = read.unwrap();
+        assert_eq!(read.security_level, SecurityLevel::Counterparty);
+        assert_eq!(read.protocol_name, "linkage protocol");
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_protocol_id(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_optional_protocol_id().unwrap(), None);
+    }
+
+    #[test]
+    fn test_query_mode_roundtrip() {
+        for mode in [QueryMode::Any, QueryMode::All] {
+            let mut writer = WireWriter::new();
+            writer.write_query_mode(mode);
+            let mut reader = WireReader::new(writer.as_bytes());
+            assert_eq!(reader.read_query_mode().unwrap(), mode);
+        }
+    }
+
+    #[test]
+    fn test_optional_query_mode_roundtrip() {
+        for mode in [None, Some(QueryMode::Any), Some(QueryMode::All)] {
+            let mut writer = WireWriter::new();
+            writer.write_optional_query_mode(mode);
+            let mut reader = WireReader::new(writer.as_bytes());
+            assert_eq!(reader.read_optional_query_mode().unwrap(), mode);
+        }
+    }
+
+    #[test]
+    fn test_output_include_roundtrip() {
+        for mode in [OutputInclude::LockingScripts, OutputInclude::EntireTransactions] {
+            let mut writer = WireWriter::new();
+            writer.write_output_include(mode);
+            let mut reader = WireReader::new(writer.as_bytes());
+            assert_eq!(reader.read_output_include().unwrap(), mode);
+        }
+    }
+
+    #[test]
+    fn test_optional_output_include_roundtrip() {
+        for mode in [
+            None,
+            Some(OutputInclude::LockingScripts),
+            Some(OutputInclude::EntireTransactions),
+        ] {
+            let mut writer = WireWriter::new();
+            writer.write_optional_output_include(mode);
+            let mut reader = WireReader::new(writer.as_bytes());
+            assert_eq!(reader.read_optional_output_include().unwrap(), mode);
+        }
+    }
+
+    #[test]
+    fn test_string_map_roundtrip() {
+        let mut map = HashMap::new();
+        map.insert("key1".to_string(), "value1".to_string());
+        map.insert("key2".to_string(), "value2".to_string());
+        map.insert("key3".to_string(), "value3".to_string());
+
+        let mut writer = WireWriter::new();
+        writer.write_string_map(&map);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string_map().unwrap(), map);
+
+        // Empty map
+        let empty_map = HashMap::new();
+        let mut writer = WireWriter::new();
+        writer.write_string_map(&empty_map);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string_map().unwrap(), empty_map);
+    }
+
+    #[test]
+    fn test_optional_string_map_roundtrip() {
+        // Some map
+        let mut map = HashMap::new();
+        map.insert("a".to_string(), "b".to_string());
+
+        let mut writer = WireWriter::new();
+        writer.write_optional_string_map(Some(&map));
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_optional_string_map().unwrap(), Some(map));
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_string_map(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_optional_string_map().unwrap(), None);
+    }
+
+    #[test]
+    fn test_send_with_result_status_roundtrip() {
+        for status in [
+            SendWithResultStatus::Unproven,
+            SendWithResultStatus::Sending,
+            SendWithResultStatus::Failed,
+        ] {
+            let mut writer = WireWriter::new();
+            writer.write_send_with_result_status(status);
+            let mut reader = WireReader::new(writer.as_bytes());
+            assert_eq!(reader.read_send_with_result_status().unwrap(), status);
+        }
+    }
+
+    #[test]
+    fn test_send_with_result_roundtrip() {
+        let result = SendWithResult {
+            txid: [0xaa; 32],
+            status: SendWithResultStatus::Sending,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_send_with_result(&result);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_send_with_result().unwrap();
+
+        assert_eq!(read.txid, result.txid);
+        assert_eq!(read.status, result.status);
+    }
+
+    #[test]
+    fn test_send_with_result_array_roundtrip() {
+        // Some array
+        let results = vec![
+            SendWithResult {
+                txid: [0x11; 32],
+                status: SendWithResultStatus::Unproven,
+            },
+            SendWithResult {
+                txid: [0x22; 32],
+                status: SendWithResultStatus::Failed,
+            },
+        ];
+
+        let mut writer = WireWriter::new();
+        writer.write_send_with_result_array(Some(&results));
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_send_with_result_array().unwrap().unwrap();
+        assert_eq!(read.len(), 2);
+        assert_eq!(read[0].txid, results[0].txid);
+        assert_eq!(read[0].status, results[0].status);
+        assert_eq!(read[1].txid, results[1].txid);
+        assert_eq!(read[1].status, results[1].status);
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_send_with_result_array(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert!(reader.read_send_with_result_array().unwrap().is_none());
+
+        // Empty array
+        let mut writer = WireWriter::new();
+        writer.write_send_with_result_array(Some(&[]));
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_send_with_result_array().unwrap().unwrap();
+        assert!(read.is_empty());
+    }
+
+    #[test]
+    fn test_sign_action_spend_roundtrip() {
+        // With sequence number
+        let spend = SignActionSpend {
+            unlocking_script: vec![0x48, 0x30, 0x45, 0x02, 0x21],
+            sequence_number: Some(0xfffffffe),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_sign_action_spend(&spend);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_sign_action_spend().unwrap();
+        assert_eq!(read.unlocking_script, spend.unlocking_script);
+        assert_eq!(read.sequence_number, spend.sequence_number);
+
+        // Without sequence number
+        let spend_no_seq = SignActionSpend {
+            unlocking_script: vec![0x00],
+            sequence_number: None,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_sign_action_spend(&spend_no_seq);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_sign_action_spend().unwrap();
+        assert_eq!(read.unlocking_script, spend_no_seq.unlocking_script);
+        assert_eq!(read.sequence_number, None);
+    }
+
+    #[test]
+    fn test_sign_action_spends_map_roundtrip() {
+        let mut spends = HashMap::new();
+        spends.insert(
+            0,
+            SignActionSpend {
+                unlocking_script: vec![0x01, 0x02, 0x03],
+                sequence_number: Some(0xffffffff),
+            },
+        );
+        spends.insert(
+            3,
+            SignActionSpend {
+                unlocking_script: vec![0xaa, 0xbb],
+                sequence_number: None,
+            },
+        );
+
+        let mut writer = WireWriter::new();
+        writer.write_sign_action_spends(&spends);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_sign_action_spends().unwrap();
+        assert_eq!(read.len(), spends.len());
+        for (key, val) in &spends {
+            let read_val = read.get(key).unwrap();
+            assert_eq!(read_val.unlocking_script, val.unlocking_script);
+            assert_eq!(read_val.sequence_number, val.sequence_number);
+        }
+
+        // Empty map
+        let empty: HashMap<u32, SignActionSpend> = HashMap::new();
+        let mut writer = WireWriter::new();
+        writer.write_sign_action_spends(&empty);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_sign_action_spends().unwrap();
+        assert!(read.is_empty());
+    }
+
+    fn make_test_certificate() -> WalletCertificate {
+        // Use valid 33-byte hex strings (compressed pubkey format)
+        let pubkey = PrivateKey::random().public_key();
+        let certifier = PrivateKey::random().public_key();
+        let mut fields = HashMap::new();
+        fields.insert("name".to_string(), "encrypted_value_1".to_string());
+        fields.insert("email".to_string(), "encrypted_value_2".to_string());
+
+        WalletCertificate {
+            certificate_type: "z8nzALhCLnLbi4p6iCDW4oiFd6jd".to_string(),
+            subject: pubkey.to_hex(),
+            serial_number: "cert-serial-12345".to_string(),
+            certifier: certifier.to_hex(),
+            revocation_outpoint: format!("{}.0", crate::primitives::to_hex(&[0xcc; 32])),
+            signature: crate::primitives::to_hex(&[0xdd; 72]),
+            fields,
+        }
+    }
+
+    #[test]
+    fn test_wallet_certificate_roundtrip() {
+        let cert = make_test_certificate();
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_certificate(&cert).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_certificate().unwrap();
+
+        assert_eq!(read.certificate_type, cert.certificate_type);
+        assert_eq!(read.serial_number, cert.serial_number);
+        assert_eq!(read.revocation_outpoint, cert.revocation_outpoint);
+        assert_eq!(read.signature, cert.signature);
+        assert_eq!(read.fields, cert.fields);
+    }
+
+    #[test]
+    fn test_optional_wallet_certificate_roundtrip() {
+        // Some certificate
+        let cert = make_test_certificate();
+        let mut writer = WireWriter::new();
+        writer.write_optional_wallet_certificate(Some(&cert)).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_optional_wallet_certificate().unwrap();
+        assert!(read.is_some());
+        let read = read.unwrap();
+        assert_eq!(read.certificate_type, cert.certificate_type);
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_wallet_certificate(None).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert!(reader.read_optional_wallet_certificate().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_identity_certifier_roundtrip() {
+        // Full certifier
+        let certifier = IdentityCertifier {
+            name: "Test CA".to_string(),
+            icon_url: Some("https://example.com/icon.png".to_string()),
+            description: Some("A test certificate authority".to_string()),
+            trust: 3,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_identity_certifier(&certifier);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_identity_certifier().unwrap();
+        assert_eq!(read.name, certifier.name);
+        assert_eq!(read.icon_url, certifier.icon_url);
+        assert_eq!(read.description, certifier.description);
+        assert_eq!(read.trust, certifier.trust);
+
+        // Minimal certifier (no optional fields)
+        let minimal = IdentityCertifier {
+            name: "Minimal CA".to_string(),
+            icon_url: None,
+            description: None,
+            trust: 1,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_identity_certifier(&minimal);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_identity_certifier().unwrap();
+        assert_eq!(read.name, minimal.name);
+        assert_eq!(read.icon_url, None);
+        assert_eq!(read.description, None);
+        assert_eq!(read.trust, minimal.trust);
+    }
+
+    #[test]
+    fn test_optional_identity_certifier_roundtrip() {
+        // Some
+        let certifier = IdentityCertifier {
+            name: "Some CA".to_string(),
+            icon_url: None,
+            description: None,
+            trust: 5,
+        };
+        let mut writer = WireWriter::new();
+        writer.write_optional_identity_certifier(Some(&certifier));
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_optional_identity_certifier().unwrap().unwrap();
+        assert_eq!(read.name, certifier.name);
+        assert_eq!(read.trust, certifier.trust);
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_identity_certifier(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert!(reader.read_optional_identity_certifier().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_identity_certificate_roundtrip() {
+        let mut keyring = HashMap::new();
+        keyring.insert("name".to_string(), "revealed_key_1".to_string());
+
+        let mut decrypted = HashMap::new();
+        decrypted.insert("name".to_string(), "John Doe".to_string());
+        decrypted.insert("email".to_string(), "john@example.com".to_string());
+
+        let cert = IdentityCertificate {
+            certificate: make_test_certificate(),
+            certifier_info: Some(IdentityCertifier {
+                name: "Trusted CA".to_string(),
+                icon_url: Some("https://ca.example.com/icon.png".to_string()),
+                description: None,
+                trust: 4,
+            }),
+            publicly_revealed_keyring: Some(keyring),
+            decrypted_fields: Some(decrypted),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_identity_certificate(&cert).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_identity_certificate().unwrap();
+
+        assert_eq!(
+            read.certificate.certificate_type,
+            cert.certificate.certificate_type
+        );
+        assert!(read.certifier_info.is_some());
+        assert_eq!(read.certifier_info.unwrap().name, "Trusted CA");
+        assert_eq!(read.publicly_revealed_keyring, cert.publicly_revealed_keyring);
+        assert_eq!(read.decrypted_fields, cert.decrypted_fields);
+
+        // Minimal: no optional fields
+        let minimal_cert = IdentityCertificate {
+            certificate: make_test_certificate(),
+            certifier_info: None,
+            publicly_revealed_keyring: None,
+            decrypted_fields: None,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_identity_certificate(&minimal_cert).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_identity_certificate().unwrap();
+        assert!(read.certifier_info.is_none());
+        assert_eq!(read.publicly_revealed_keyring, None);
+        assert_eq!(read.decrypted_fields, None);
+    }
+
+    #[test]
+    fn test_wallet_payment_roundtrip() {
+        let payment = WalletPayment {
+            derivation_prefix: "prefix_abc123".to_string(),
+            derivation_suffix: "suffix_xyz789".to_string(),
+            sender_identity_key: PrivateKey::random().public_key().to_hex(),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_payment(&payment);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_payment().unwrap();
+        assert_eq!(read.derivation_prefix, payment.derivation_prefix);
+        assert_eq!(read.derivation_suffix, payment.derivation_suffix);
+        assert_eq!(read.sender_identity_key, payment.sender_identity_key);
+    }
+
+    #[test]
+    fn test_optional_wallet_payment_roundtrip() {
+        // Some
+        let payment = WalletPayment {
+            derivation_prefix: "pfx".to_string(),
+            derivation_suffix: "sfx".to_string(),
+            sender_identity_key: "deadbeef".to_string(),
+        };
+        let mut writer = WireWriter::new();
+        writer.write_optional_wallet_payment(Some(&payment));
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_optional_wallet_payment().unwrap().unwrap();
+        assert_eq!(read.derivation_prefix, payment.derivation_prefix);
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_wallet_payment(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert!(reader.read_optional_wallet_payment().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_basket_insertion_roundtrip() {
+        // Full basket insertion
+        let insertion = BasketInsertion {
+            basket: "my-basket".to_string(),
+            custom_instructions: Some("special instructions".to_string()),
+            tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_basket_insertion(&insertion);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_basket_insertion().unwrap();
+        assert_eq!(read.basket, insertion.basket);
+        assert_eq!(read.custom_instructions, insertion.custom_instructions);
+        assert_eq!(read.tags, insertion.tags);
+
+        // Minimal basket insertion
+        let minimal = BasketInsertion {
+            basket: "simple".to_string(),
+            custom_instructions: None,
+            tags: None,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_basket_insertion(&minimal);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_basket_insertion().unwrap();
+        assert_eq!(read.basket, minimal.basket);
+        assert_eq!(read.custom_instructions, None);
+        assert_eq!(read.tags, None);
+    }
+
+    #[test]
+    fn test_optional_basket_insertion_roundtrip() {
+        let insertion = BasketInsertion {
+            basket: "test-basket".to_string(),
+            custom_instructions: None,
+            tags: None,
+        };
+
+        // Some
+        let mut writer = WireWriter::new();
+        writer.write_optional_basket_insertion(Some(&insertion));
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_optional_basket_insertion().unwrap().unwrap();
+        assert_eq!(read.basket, "test-basket");
+
+        // None
+        let mut writer = WireWriter::new();
+        writer.write_optional_basket_insertion(None);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert!(reader.read_optional_basket_insertion().unwrap().is_none());
+    }
+
+    #[test]
+    fn test_internalize_output_roundtrip() {
+        // With payment
+        let output = InternalizeOutput {
+            output_index: 0,
+            protocol: "wallet payment".to_string(),
+            payment_remittance: Some(WalletPayment {
+                derivation_prefix: "prefix".to_string(),
+                derivation_suffix: "suffix".to_string(),
+                sender_identity_key: "sender_key_hex".to_string(),
+            }),
+            insertion_remittance: None,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_internalize_output(&output);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_internalize_output().unwrap();
+        assert_eq!(read.output_index, 0);
+        assert_eq!(read.protocol, "wallet payment");
+        assert!(read.payment_remittance.is_some());
+        assert!(read.insertion_remittance.is_none());
+
+        // With basket insertion
+        let output2 = InternalizeOutput {
+            output_index: 5,
+            protocol: "basket insertion".to_string(),
+            payment_remittance: None,
+            insertion_remittance: Some(BasketInsertion {
+                basket: "tokens".to_string(),
+                custom_instructions: Some("mint".to_string()),
+                tags: Some(vec!["nft".to_string()]),
+            }),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_internalize_output(&output2);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_internalize_output().unwrap();
+        assert_eq!(read.output_index, 5);
+        assert!(read.payment_remittance.is_none());
+        assert!(read.insertion_remittance.is_some());
+        assert_eq!(read.insertion_remittance.unwrap().basket, "tokens");
+    }
+
+    #[test]
+    fn test_wallet_action_input_roundtrip() {
+        // Full input
+        let input = WalletActionInput {
+            source_outpoint: Outpoint::new([0xab; 32], 0),
+            source_satoshis: 50_000,
+            source_locking_script: Some(vec![0x76, 0xa9, 0x14]),
+            unlocking_script: Some(vec![0x48, 0x30, 0x45]),
+            input_description: "spending utxo".to_string(),
+            sequence_number: 0xfffffffe,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action_input(&input);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_action_input().unwrap();
+        assert_eq!(read.source_outpoint.txid, input.source_outpoint.txid);
+        assert_eq!(read.source_outpoint.vout, input.source_outpoint.vout);
+        assert_eq!(read.source_satoshis, input.source_satoshis);
+        assert_eq!(read.source_locking_script, input.source_locking_script);
+        assert_eq!(read.unlocking_script, input.unlocking_script);
+        assert_eq!(read.input_description, input.input_description);
+        assert_eq!(read.sequence_number, input.sequence_number);
+
+        // Minimal input (no optional scripts)
+        let minimal = WalletActionInput {
+            source_outpoint: Outpoint::new([0x00; 32], 42),
+            source_satoshis: 0,
+            source_locking_script: None,
+            unlocking_script: None,
+            input_description: "".to_string(),
+            sequence_number: 0xffffffff,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action_input(&minimal);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_action_input().unwrap();
+        assert_eq!(read.source_locking_script, None);
+        assert_eq!(read.unlocking_script, None);
+        assert_eq!(read.source_satoshis, 0);
+    }
+
+    #[test]
+    fn test_wallet_action_output_roundtrip() {
+        // Full output
+        let output = WalletActionOutput {
+            satoshis: 100_000,
+            locking_script: Some(vec![0x76, 0xa9, 0x14, 0x00, 0x88, 0xac]),
+            spendable: true,
+            custom_instructions: Some("custom data here".to_string()),
+            tags: vec!["payment".to_string(), "invoice".to_string()],
+            output_index: 0,
+            output_description: "payment to recipient".to_string(),
+            basket: "payments".to_string(),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action_output(&output);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_action_output().unwrap();
+        assert_eq!(read.satoshis, output.satoshis);
+        assert_eq!(read.locking_script, output.locking_script);
+        assert_eq!(read.spendable, output.spendable);
+        assert_eq!(read.custom_instructions, output.custom_instructions);
+        assert_eq!(read.tags, output.tags);
+        assert_eq!(read.output_index, output.output_index);
+        assert_eq!(read.output_description, output.output_description);
+        assert_eq!(read.basket, output.basket);
+
+        // Minimal output
+        let minimal = WalletActionOutput {
+            satoshis: 0,
+            locking_script: None,
+            spendable: false,
+            custom_instructions: None,
+            tags: vec![],
+            output_index: 1,
+            output_description: "".to_string(),
+            basket: "".to_string(),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action_output(&minimal);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_action_output().unwrap();
+        assert_eq!(read.satoshis, 0);
+        assert_eq!(read.locking_script, None);
+        assert!(!read.spendable);
+        assert_eq!(read.custom_instructions, None);
+        assert!(read.tags.is_empty());
+    }
+
+    #[test]
+    fn test_wallet_action_roundtrip() {
+        // Full action with inputs and outputs
+        let action = WalletAction {
+            txid: [0xab; 32],
+            satoshis: 50_000,
+            status: ActionStatus::Completed,
+            is_outgoing: true,
+            description: "sent payment".to_string(),
+            labels: Some(vec!["outgoing".to_string(), "payment".to_string()]),
+            version: 1,
+            lock_time: 0,
+            inputs: Some(vec![WalletActionInput {
+                source_outpoint: Outpoint::new([0xcc; 32], 0),
+                source_satoshis: 100_000,
+                source_locking_script: Some(vec![0x76, 0xa9]),
+                unlocking_script: Some(vec![0x48, 0x30]),
+                input_description: "funding utxo".to_string(),
+                sequence_number: 0xffffffff,
+            }]),
+            outputs: Some(vec![WalletActionOutput {
+                satoshis: 50_000,
+                locking_script: Some(vec![0x76, 0xa9, 0x14]),
+                spendable: false,
+                custom_instructions: None,
+                tags: vec!["payment".to_string()],
+                output_index: 0,
+                output_description: "recipient output".to_string(),
+                basket: "".to_string(),
+            }]),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action(&action);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_action().unwrap();
+        assert_eq!(read.txid, action.txid);
+        assert_eq!(read.satoshis, action.satoshis);
+        assert_eq!(read.status, action.status);
+        assert_eq!(read.is_outgoing, action.is_outgoing);
+        assert_eq!(read.description, action.description);
+        assert_eq!(read.labels, action.labels);
+        assert_eq!(read.version, action.version);
+        assert_eq!(read.lock_time, action.lock_time);
+        assert!(read.inputs.is_some());
+        assert_eq!(read.inputs.as_ref().unwrap().len(), 1);
+        assert!(read.outputs.is_some());
+        assert_eq!(read.outputs.as_ref().unwrap().len(), 1);
+
+        // Negative satoshis (outgoing tx)
+        let outgoing = WalletAction {
+            txid: [0x11; 32],
+            satoshis: -25_000,
+            status: ActionStatus::Sending,
+            is_outgoing: true,
+            description: "outgoing".to_string(),
+            labels: None,
+            version: 1,
+            lock_time: 500_000,
+            inputs: None,
+            outputs: None,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action(&outgoing);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_action().unwrap();
+        assert_eq!(read.satoshis, -25_000);
+        assert_eq!(read.status, ActionStatus::Sending);
+        assert!(read.inputs.is_none());
+        assert!(read.outputs.is_none());
+        assert_eq!(read.labels, None);
+    }
+
+    #[test]
+    fn test_wallet_output_roundtrip() {
+        // Full output
+        let output = WalletOutput {
+            satoshis: 75_000,
+            locking_script: Some(vec![0x76, 0xa9, 0x14, 0x00, 0x88, 0xac]),
+            spendable: true,
+            custom_instructions: Some("custom".to_string()),
+            tags: Some(vec!["utxo".to_string()]),
+            outpoint: Outpoint::new([0xdd; 32], 1),
+            labels: Some(vec!["label1".to_string(), "label2".to_string()]),
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_output(&output);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_output().unwrap();
+        assert_eq!(read.satoshis, output.satoshis);
+        assert_eq!(read.locking_script, output.locking_script);
+        assert_eq!(read.spendable, output.spendable);
+        assert_eq!(read.custom_instructions, output.custom_instructions);
+        assert_eq!(read.tags, output.tags);
+        assert_eq!(read.outpoint.txid, output.outpoint.txid);
+        assert_eq!(read.outpoint.vout, output.outpoint.vout);
+        assert_eq!(read.labels, output.labels);
+
+        // Minimal output
+        let minimal = WalletOutput {
+            satoshis: 546,
+            locking_script: None,
+            spendable: false,
+            custom_instructions: None,
+            tags: None,
+            outpoint: Outpoint::new([0x00; 32], 0),
+            labels: None,
+        };
+
+        let mut writer = WireWriter::new();
+        writer.write_wallet_output(&minimal);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_wallet_output().unwrap();
+        assert_eq!(read.satoshis, 546);
+        assert_eq!(read.locking_script, None);
+        assert!(!read.spendable);
+        assert_eq!(read.custom_instructions, None);
+        assert_eq!(read.tags, None);
+        assert_eq!(read.labels, None);
+    }
+
+    #[test]
+    fn test_txid_hex_roundtrip() {
+        let txid = crate::primitives::to_hex(&[0xab; 32]);
+        let mut writer = WireWriter::new();
+        writer.write_txid_hex(&txid).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_txid_hex().unwrap();
+        assert_eq!(read, txid);
+    }
+
+    #[test]
+    fn test_outpoint_string_roundtrip() {
+        let outpoint_str = format!("{}.42", crate::primitives::to_hex(&[0xee; 32]));
+        let mut writer = WireWriter::new();
+        writer.write_outpoint_string(&outpoint_str).unwrap();
+        let mut reader = WireReader::new(writer.as_bytes());
+        let read = reader.read_outpoint_string().unwrap();
+        assert_eq!(read, outpoint_str);
+    }
+
+    #[test]
+    fn test_multiple_types_sequential() {
+        // Write multiple different types into a single buffer, then read them all back
+        let mut writer = WireWriter::new();
+
+        writer.write_u8(42);
+        writer.write_signed_var_int(-100);
+        writer.write_string("hello");
+        writer.write_optional_string(None);
+        writer.write_optional_bool(Some(true));
+        writer.write_outpoint(&Outpoint::new([0xff; 32], 7));
+        writer.write_counterparty(Some(&Counterparty::Self_));
+        writer.write_protocol_id(&Protocol::new(SecurityLevel::App, "test protocol"));
+        writer.write_action_status(Some(ActionStatus::Completed));
+        writer.write_query_mode(QueryMode::All);
+        writer.write_output_include(OutputInclude::EntireTransactions);
+
+        let mut reader = WireReader::new(writer.as_bytes());
+
+        assert_eq!(reader.read_u8().unwrap(), 42);
+        assert_eq!(reader.read_signed_var_int().unwrap(), -100);
+        assert_eq!(reader.read_string().unwrap(), "hello");
+        assert_eq!(reader.read_optional_string().unwrap(), None);
+        assert_eq!(reader.read_optional_bool().unwrap(), Some(true));
+        let op = reader.read_outpoint().unwrap();
+        assert_eq!(op.txid, [0xff; 32]);
+        assert_eq!(op.vout, 7);
+        assert_eq!(
+            reader.read_counterparty().unwrap(),
+            Some(Counterparty::Self_)
+        );
+        let proto = reader.read_protocol_id().unwrap();
+        assert_eq!(proto.security_level, SecurityLevel::App);
+        assert_eq!(proto.protocol_name, "test protocol");
+        assert_eq!(
+            reader.read_action_status().unwrap(),
+            Some(ActionStatus::Completed)
+        );
+        assert_eq!(reader.read_query_mode().unwrap(), QueryMode::All);
+        assert_eq!(
+            reader.read_output_include().unwrap(),
+            OutputInclude::EntireTransactions
+        );
+
+        assert!(reader.is_empty());
+    }
+
+    #[test]
+    fn test_empty_collections() {
+        // Empty string
+        let mut writer = WireWriter::new();
+        writer.write_string("");
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string().unwrap(), "");
+
+        // Empty string array
+        let mut writer = WireWriter::new();
+        writer.write_string_array(&[]);
+        let mut reader = WireReader::new(writer.as_bytes());
+        let arr = reader.read_string_array().unwrap();
+        assert!(arr.is_empty());
+
+        // Empty string map
+        let empty_map: HashMap<String, String> = HashMap::new();
+        let mut writer = WireWriter::new();
+        writer.write_string_map(&empty_map);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string_map().unwrap(), empty_map);
+    }
+
+    #[test]
+    fn test_unicode_strings_roundtrip() {
+        let unicode_strings = [
+            "日本語テスト",
+            "Ü̈ñîcödé",
+            "🚀💰🔐",
+            "mixed ASCII and 中文",
+        ];
+
+        for s in unicode_strings {
+            let mut writer = WireWriter::new();
+            writer.write_string(s);
+            let mut reader = WireReader::new(writer.as_bytes());
+            assert_eq!(reader.read_string().unwrap(), s);
+        }
+    }
+
+    #[test]
+    fn test_large_data_roundtrip() {
+        // Large string (1000 chars)
+        let large_string: String = "x".repeat(1000);
+        let mut writer = WireWriter::new();
+        writer.write_string(&large_string);
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_string().unwrap(), large_string);
+
+        // Large byte array
+        let large_bytes: Vec<u8> = (0..=255).cycle().take(4096).collect();
+        let mut writer = WireWriter::new();
+        writer.write_optional_bytes(Some(&large_bytes));
+        let mut reader = WireReader::new(writer.as_bytes());
+        assert_eq!(reader.read_optional_bytes().unwrap().unwrap(), large_bytes);
+    }
+
+    #[test]
+    fn test_protocol_id_all_security_levels() {
+        for level in [
+            SecurityLevel::Silent,
+            SecurityLevel::App,
+            SecurityLevel::Counterparty,
+        ] {
+            let protocol = Protocol::new(level, "test protocol for level");
+            let mut writer = WireWriter::new();
+            writer.write_protocol_id(&protocol);
+            let mut reader = WireReader::new(writer.as_bytes());
+            let read = reader.read_protocol_id().unwrap();
+            assert_eq!(read.security_level, level);
+            assert_eq!(read.protocol_name, "test protocol for level");
+        }
+    }
+
+    #[test]
+    fn test_wallet_action_all_statuses() {
+        let statuses = [
+            ActionStatus::Completed,
+            ActionStatus::Unprocessed,
+            ActionStatus::Sending,
+            ActionStatus::Unproven,
+            ActionStatus::Unsigned,
+            ActionStatus::NoSend,
+            ActionStatus::NonFinal,
+            ActionStatus::Failed,
+        ];
+
+        for status in statuses {
+            let action = WalletAction {
+                txid: [0x00; 32],
+                satoshis: 0,
+                status,
+                is_outgoing: false,
+                description: "test".to_string(),
+                labels: None,
+                version: 1,
+                lock_time: 0,
+                inputs: None,
+                outputs: None,
+            };
+
+            let mut writer = WireWriter::new();
+            writer.write_wallet_action(&action);
+            let mut reader = WireReader::new(writer.as_bytes());
+            let read = reader.read_wallet_action().unwrap();
+            assert_eq!(read.status, status);
+        }
     }
 }

@@ -88,11 +88,15 @@
 //! let decoded = PushDrop::decode(&locking)?;
 //! ```
 
+pub mod multisig;
+pub mod p2pk;
 pub mod p2pkh;
 pub mod pushdrop;
 pub mod rpuzzle;
 
 // Re-export main types
+pub use multisig::Multisig;
+pub use p2pk::P2PK;
 pub use p2pkh::P2PKH;
 pub use pushdrop::{LockPosition, PushDrop};
 pub use rpuzzle::{RPuzzle, RPuzzleType};

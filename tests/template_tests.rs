@@ -6,7 +6,7 @@
 use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
 use bsv_sdk::primitives::ec::PrivateKey;
 use bsv_sdk::primitives::BigNumber;
-use bsv_sdk::script::templates::{RPuzzle, RPuzzleType, P2PKH};
+use bsv_sdk::script::templates::{Multisig, P2PK, RPuzzle, RPuzzleType, P2PKH};
 use bsv_sdk::script::ScriptTemplate;
 
 /// Test that P2PKH locking script can be spent with the correct key.
@@ -310,4 +310,290 @@ fn test_compute_r_from_k_known_values() {
     let k2 = BigNumber::from_i64(2);
     let r2 = RPuzzle::compute_r_from_k(&k2).unwrap();
     assert_ne!(r1, r2);
+}
+
+// ===========================
+// P2PK Template Tests
+// ===========================
+
+/// Test P2PK end-to-end lock and unlock.
+#[test]
+fn test_p2pk_end_to_end() {
+    let private_key = PrivateKey::random();
+    let public_key = private_key.public_key();
+    let pubkey_bytes = public_key.to_compressed();
+
+    // Create locking script
+    let template = P2PK::new();
+    let locking = template.lock(&pubkey_bytes).unwrap();
+
+    // Verify structure: <pubkey> OP_CHECKSIG
+    let asm = locking.to_asm();
+    assert!(asm.contains("OP_CHECKSIG"));
+    assert!(!asm.contains("OP_DUP"));
+    assert!(!asm.contains("OP_HASH160"));
+
+    // Verify script type detection
+    assert!(locking.as_script().is_p2pk());
+    assert!(!locking.as_script().is_p2pkh());
+
+    // Create unlocking script
+    let mock_sighash = [1u8; 32];
+    let unlocking = P2PK::sign_with_sighash(
+        &private_key,
+        &mock_sighash,
+        bsv_sdk::script::SignOutputs::All,
+        false,
+    )
+    .unwrap();
+
+    // Verify: only 1 chunk (signature), no pubkey
+    let chunks = unlocking.chunks();
+    assert_eq!(chunks.len(), 1);
+
+    let sig_data = chunks[0].data.as_ref().unwrap();
+    assert!(sig_data.len() >= 70 && sig_data.len() <= 73);
+    assert_eq!(
+        *sig_data.last().unwrap(),
+        (SIGHASH_ALL | SIGHASH_FORKID) as u8
+    );
+}
+
+/// Test P2PK with different key formats.
+#[test]
+fn test_p2pk_compressed_vs_uncompressed_detection() {
+    let private_key = PrivateKey::random();
+    let compressed = private_key.public_key().to_compressed();
+
+    let template = P2PK::new();
+    let locking = template.lock(&compressed).unwrap();
+
+    // Should be detected as P2PK
+    assert!(locking.as_script().is_p2pk());
+}
+
+/// Test P2PK estimate length differs from P2PKH.
+#[test]
+fn test_p2pk_vs_p2pkh_estimate_length() {
+    let private_key = PrivateKey::random();
+
+    let p2pk_unlock = P2PK::unlock(&private_key, bsv_sdk::script::SignOutputs::All, false);
+    let p2pkh_unlock = P2PKH::unlock(&private_key, bsv_sdk::script::SignOutputs::All, false);
+
+    // P2PK: sig only (74), P2PKH: sig + pubkey (108)
+    assert_eq!(p2pk_unlock.estimate_length(), 74);
+    assert_eq!(p2pkh_unlock.estimate_length(), 108);
+    assert!(p2pk_unlock.estimate_length() < p2pkh_unlock.estimate_length());
+}
+
+/// Test P2PK rejects invalid public key lengths.
+#[test]
+fn test_p2pk_invalid_pubkey() {
+    let template = P2PK::new();
+
+    // 20 bytes (hash, not pubkey)
+    assert!(template.lock(&[0x02; 20]).is_err());
+
+    // 32 bytes (not a valid pubkey length)
+    assert!(template.lock(&[0x02; 32]).is_err());
+
+    // Valid length but bad prefix
+    let mut bad = [0u8; 33];
+    bad[0] = 0x05;
+    assert!(template.lock(&bad).is_err());
+}
+
+// ===========================
+// Multisig Template Tests
+// ===========================
+
+/// Test 2-of-3 multisig end-to-end.
+#[test]
+fn test_multisig_2_of_3_end_to_end() {
+    let key1 = PrivateKey::random();
+    let key2 = PrivateKey::random();
+    let key3 = PrivateKey::random();
+
+    // Create 2-of-3 locking script
+    let template = Multisig::new(2);
+    let pubkeys = vec![key1.public_key(), key2.public_key(), key3.public_key()];
+    let locking = template.lock_from_keys(&pubkeys).unwrap();
+
+    // Verify script detection
+    assert_eq!(locking.as_script().is_multisig(), Some((2, 3)));
+
+    // Verify ASM
+    let asm = locking.to_asm();
+    assert!(asm.contains("OP_2"));
+    assert!(asm.contains("OP_3"));
+    assert!(asm.contains("OP_CHECKMULTISIG"));
+
+    // Sign with keys 1 and 2
+    let mock_sighash = [1u8; 32];
+    let unlocking = Multisig::sign_with_sighash(
+        &[key1.clone(), key2.clone()],
+        &mock_sighash,
+        bsv_sdk::script::SignOutputs::All,
+        false,
+    )
+    .unwrap();
+
+    // Verify: OP_0 + 2 signatures = 3 chunks
+    let chunks = unlocking.chunks();
+    assert_eq!(chunks.len(), 3);
+
+    // First chunk: OP_0 (dummy)
+    assert_eq!(chunks[0].op, 0x00);
+    assert!(chunks[0].data.is_none());
+
+    // Chunks 1 and 2: signatures
+    for i in 1..=2 {
+        let sig = chunks[i].data.as_ref().unwrap();
+        assert!(sig.len() >= 70 && sig.len() <= 73);
+    }
+}
+
+/// Test 1-of-1 multisig (degenerate case).
+#[test]
+fn test_multisig_1_of_1() {
+    let key = PrivateKey::random();
+    let template = Multisig::new(1);
+    let locking = template.lock_from_keys(&[key.public_key()]).unwrap();
+
+    assert_eq!(locking.as_script().is_multisig(), Some((1, 1)));
+
+    // Should produce: OP_1 <pubkey> OP_1 OP_CHECKMULTISIG
+    let chunks = locking.chunks();
+    assert_eq!(chunks.len(), 4);
+}
+
+/// Test 3-of-3 multisig (all signers required).
+#[test]
+fn test_multisig_3_of_3() {
+    let keys: Vec<PrivateKey> = (0..3).map(|_| PrivateKey::random()).collect();
+    let pubkeys: Vec<_> = keys.iter().map(|k| k.public_key()).collect();
+
+    let template = Multisig::new(3);
+    let locking = template.lock_from_keys(&pubkeys).unwrap();
+
+    assert_eq!(locking.as_script().is_multisig(), Some((3, 3)));
+
+    let mock_sighash = [1u8; 32];
+    let unlocking = Multisig::sign_with_sighash(
+        &keys,
+        &mock_sighash,
+        bsv_sdk::script::SignOutputs::All,
+        false,
+    )
+    .unwrap();
+
+    // OP_0 + 3 sigs = 4 chunks
+    assert_eq!(unlocking.chunks().len(), 4);
+}
+
+/// Test multisig ScriptTemplate::lock with concatenated keys.
+#[test]
+fn test_multisig_script_template_trait() {
+    let key1 = PrivateKey::random();
+    let key2 = PrivateKey::random();
+    let key3 = PrivateKey::random();
+
+    let pk1 = key1.public_key().to_compressed();
+    let pk2 = key2.public_key().to_compressed();
+    let pk3 = key3.public_key().to_compressed();
+
+    // Concatenate 3 compressed pubkeys (33 * 3 = 99 bytes)
+    let mut params = Vec::with_capacity(99);
+    params.extend_from_slice(&pk1);
+    params.extend_from_slice(&pk2);
+    params.extend_from_slice(&pk3);
+
+    let template = Multisig::new(2);
+    let locking = template.lock(&params).unwrap();
+
+    // Should detect as 2-of-3 multisig
+    assert_eq!(locking.as_script().is_multisig(), Some((2, 3)));
+
+    // Verify it matches lock_from_keys
+    let locking2 = template
+        .lock_from_keys(&[key1.public_key(), key2.public_key(), key3.public_key()])
+        .unwrap();
+    assert_eq!(locking.to_hex(), locking2.to_hex());
+}
+
+/// Test multisig validation errors.
+#[test]
+fn test_multisig_validation_errors() {
+    // Threshold > N
+    let key = PrivateKey::random();
+    let template = Multisig::new(3);
+    assert!(template.lock_from_keys(&[key.public_key()]).is_err());
+
+    // Zero threshold
+    let template = Multisig::new(0);
+    assert!(template.lock_from_keys(&[key.public_key()]).is_err());
+
+    // Too many keys (17)
+    let keys: Vec<_> = (0..17).map(|_| PrivateKey::random().public_key()).collect();
+    let template = Multisig::new(1);
+    assert!(template.lock_from_keys(&keys).is_err());
+
+    // Empty keys
+    let template = Multisig::new(1);
+    assert!(template.lock_from_keys(&[]).is_err());
+}
+
+/// Test multisig estimate length scales with M.
+#[test]
+fn test_multisig_estimate_length_scaling() {
+    let key = PrivateKey::random();
+
+    // 1-of-N: 1 + 1*74 = 75
+    let unlock1 = Multisig::unlock(&[key.clone()], bsv_sdk::script::SignOutputs::All, false);
+    assert_eq!(unlock1.estimate_length(), 75);
+
+    // 2-of-N: 1 + 2*74 = 149
+    let unlock2 = Multisig::unlock(
+        &[key.clone(), key.clone()],
+        bsv_sdk::script::SignOutputs::All,
+        false,
+    );
+    assert_eq!(unlock2.estimate_length(), 149);
+
+    // 3-of-N: 1 + 3*74 = 223
+    let unlock3 = Multisig::unlock(
+        &[key.clone(), key.clone(), key.clone()],
+        bsv_sdk::script::SignOutputs::All,
+        false,
+    );
+    assert_eq!(unlock3.estimate_length(), 223);
+}
+
+/// Test multisig with maximum keys (16-of-16).
+#[test]
+fn test_multisig_max_keys() {
+    let keys: Vec<PrivateKey> = (0..16).map(|_| PrivateKey::random()).collect();
+    let pubkeys: Vec<_> = keys.iter().map(|k| k.public_key()).collect();
+
+    let template = Multisig::new(16);
+    let locking = template.lock_from_keys(&pubkeys).unwrap();
+
+    assert_eq!(locking.as_script().is_multisig(), Some((16, 16)));
+}
+
+/// Test multisig hex roundtrip.
+#[test]
+fn test_multisig_hex_roundtrip() {
+    let key1 = PrivateKey::random();
+    let key2 = PrivateKey::random();
+
+    let template = Multisig::new(1);
+    let locking = template
+        .lock_from_keys(&[key1.public_key(), key2.public_key()])
+        .unwrap();
+
+    let hex = locking.to_hex();
+    let parsed = bsv_sdk::script::LockingScript::from_hex(&hex).unwrap();
+    assert_eq!(parsed.to_hex(), hex);
+    assert_eq!(parsed.as_script().is_multisig(), Some((1, 2)));
 }

@@ -3,7 +3,7 @@
 
 ## Overview
 
-This module provides ready-to-use templates for creating and spending common Bitcoin script types. Templates abstract away the complexity of script construction and signing, providing simple interfaces for standard transaction patterns like P2PKH (Pay-to-Public-Key-Hash), R-Puzzles, and PushDrop data envelopes.
+This module provides ready-to-use templates for creating and spending common Bitcoin script types. Templates abstract away the complexity of script construction and signing, providing simple interfaces for standard transaction patterns like P2PKH (Pay-to-Public-Key-Hash), P2PK (Pay-to-Public-Key), Multisig (M-of-N), R-Puzzles, and PushDrop data envelopes.
 
 The implementation maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs through shared script structures and signing conventions.
 
@@ -13,6 +13,8 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 |------|---------|
 | `mod.rs` | Module root; submodule declarations and public re-exports |
 | `p2pkh.rs` | P2PKH template for the most common Bitcoin transaction type |
+| `p2pk.rs` | P2PK template for direct public key locking (simpler than P2PKH) |
+| `multisig.rs` | Multisig (M-of-N) template using OP_CHECKMULTISIG |
 | `pushdrop.rs` | PushDrop template for data envelopes with embedded fields and P2PK lock |
 | `rpuzzle.rs` | R-Puzzle template for knowledge-based locking using ECDSA K-values |
 
@@ -21,6 +23,8 @@ The implementation maintains cross-SDK compatibility with the TypeScript and Go 
 The module re-exports the following from `mod.rs`:
 
 ```rust
+pub use multisig::Multisig;
+pub use p2pk::P2PK;
 pub use p2pkh::P2PKH;
 pub use pushdrop::{LockPosition, PushDrop};
 pub use rpuzzle::{RPuzzle, RPuzzleType};
@@ -45,21 +49,13 @@ OP_DUP OP_HASH160 <20-byte pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG
 pub struct P2PKH;
 
 impl P2PKH {
-    /// Creates a new P2PKH template instance
     pub fn new() -> Self
-
-    /// Creates a locking script from a Base58Check address string
-    /// Supports mainnet (0x00) and testnet (0x6f) prefixes
     pub fn lock_from_address(address: &str) -> Result<LockingScript>
-
-    /// Creates an unlock template for spending a P2PKH output
     pub fn unlock(
         private_key: &PrivateKey,
         sign_outputs: SignOutputs,
         anyone_can_pay: bool,
     ) -> ScriptTemplateUnlock
-
-    /// Signs with a precomputed sighash (useful when transaction is already parsed)
     pub fn sign_with_sighash(
         private_key: &PrivateKey,
         sighash: &[u8; 32],
@@ -70,6 +66,92 @@ impl P2PKH {
 
 impl ScriptTemplate for P2PKH {
     /// Creates a locking script from a 20-byte public key hash
+    fn lock(&self, params: &[u8]) -> Result<LockingScript>
+}
+```
+
+### P2PK
+
+Pay-to-Public-Key locks funds directly to a public key rather than its hash. Simpler than P2PKH but reveals the public key in the locking script before spending. The unlock only requires a signature (no public key needed since it's already in the lock).
+
+**Locking Script Pattern:**
+```text
+<pubkey> OP_CHECKSIG
+```
+
+**Unlocking Script Pattern:**
+```text
+<signature>
+```
+
+```rust
+#[derive(Debug, Clone, Copy, Default)]
+pub struct P2PK;
+
+impl P2PK {
+    pub fn new() -> Self
+    pub fn unlock(
+        private_key: &PrivateKey,
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> ScriptTemplateUnlock
+    pub fn sign_with_sighash(
+        private_key: &PrivateKey,
+        sighash: &[u8; 32],
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> Result<UnlockingScript>
+}
+
+impl ScriptTemplate for P2PK {
+    /// Creates a locking script from a compressed (33-byte) or uncompressed (65-byte) public key.
+    /// Validates the key prefix (0x02/0x03 for compressed, 0x04/0x06/0x07 for uncompressed).
+    fn lock(&self, params: &[u8]) -> Result<LockingScript>
+}
+```
+
+### Multisig
+
+M-of-N multi-signature scripts require M valid signatures from a set of N public keys using OP_CHECKMULTISIG. Supports 1-16 keys with a threshold of 1-16 (where threshold <= N).
+
+**Locking Script Pattern:**
+```text
+OP_M <pubkey1> <pubkey2> ... <pubkeyN> OP_N OP_CHECKMULTISIG
+```
+
+**Unlocking Script Pattern:**
+```text
+OP_0 <sig1> <sig2> ... <sigM>
+```
+
+The leading OP_0 is required due to a historical off-by-one bug in Bitcoin's OP_CHECKMULTISIG implementation. Signatures must appear in the same order as their corresponding public keys in the locking script.
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Multisig {
+    pub threshold: u8,
+}
+
+impl Multisig {
+    pub fn new(threshold: u8) -> Self
+    /// Recommended API: creates locking script from PublicKey objects
+    pub fn lock_from_keys(&self, pubkeys: &[PublicKey]) -> Result<LockingScript>
+    pub fn unlock(
+        signers: &[PrivateKey],
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> ScriptTemplateUnlock
+    pub fn sign_with_sighash(
+        signers: &[PrivateKey],
+        sighash: &[u8; 32],
+        sign_outputs: SignOutputs,
+        anyone_can_pay: bool,
+    ) -> Result<UnlockingScript>
+}
+
+impl ScriptTemplate for Multisig {
+    /// Creates locking script from concatenated 33-byte compressed public keys.
+    /// Params must be a multiple of 33 bytes.
     fn lock(&self, params: &[u8]) -> Result<LockingScript>
 }
 ```
@@ -112,7 +194,6 @@ pub enum RPuzzleType {
 }
 
 impl RPuzzleType {
-    /// Computes the hash of data using this hash type
     pub fn hash(self, data: &[u8]) -> Vec<u8>
 }
 
@@ -122,21 +203,14 @@ pub struct RPuzzle {
 }
 
 impl RPuzzle {
-    /// Creates a new R-Puzzle template with the specified type
     pub fn new(puzzle_type: RPuzzleType) -> Self
-
-    /// Computes the R value (x-coordinate of k*G) from a K value
     pub fn compute_r_from_k(k: &BigNumber) -> Result<[u8; 32]>
-
-    /// Creates an unlock template for spending an R-Puzzle output
     pub fn unlock(
         k: &BigNumber,
         private_key: &PrivateKey,
         sign_outputs: SignOutputs,
         anyone_can_pay: bool,
     ) -> ScriptTemplateUnlock
-
-    /// Signs with a precomputed sighash using a specific K value
     pub fn sign_with_sighash(
         k: &BigNumber,
         private_key: &PrivateKey,
@@ -176,7 +250,6 @@ Note: Unlike P2PKH, the public key is already in the locking script, so only the
 The script pushes data fields onto the stack, then drops them using `OP_2DROP` (for pairs) and `OP_DROP` (for remaining single field), leaving only the P2PK signature check.
 
 ```rust
-/// Lock position for PushDrop template
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LockPosition {
     #[default]
@@ -192,34 +265,21 @@ pub struct PushDrop {
 }
 
 impl PushDrop {
-    /// Creates a new PushDrop with lock-before pattern (default)
     pub fn new(locking_public_key: PublicKey, fields: Vec<Vec<u8>>) -> Self
-
-    /// Sets the lock position and returns self for chaining
     pub fn with_position(mut self, position: LockPosition) -> Self
-
-    /// Creates the locking script
     pub fn lock(&self) -> LockingScript
-
-    /// Decodes a PushDrop locking script back into its components
     pub fn decode(script: &LockingScript) -> Result<Self>
-
-    /// Creates an unlock template for spending a PushDrop output
     pub fn unlock(
         private_key: &PrivateKey,
         sign_outputs: SignOutputs,
         anyone_can_pay: bool,
     ) -> ScriptTemplateUnlock
-
-    /// Signs with a precomputed sighash (useful when transaction is already parsed)
     pub fn sign_with_sighash(
         private_key: &PrivateKey,
         sighash: &[u8; 32],
         sign_outputs: SignOutputs,
         anyone_can_pay: bool,
     ) -> Result<UnlockingScript>
-
-    /// Estimates unlocking script length (returns 73 bytes)
     pub fn estimate_unlocking_length(&self) -> usize
 }
 ```
@@ -273,21 +333,72 @@ let unlocking = unlock.sign(&context)?;
 // Produces: <signature> <publicKey>
 ```
 
-### P2PKH: Sign with Precomputed Sighash
+### P2PK: Lock to Public Key
 
 ```rust
-use bsv_sdk::script::templates::P2PKH;
-use bsv_sdk::script::template::SignOutputs;
+use bsv_sdk::script::templates::P2PK;
+use bsv_sdk::script::template::ScriptTemplate;
+use bsv_sdk::primitives::ec::PrivateKey;
 
-// When you already have the sighash computed
-let sighash: [u8; 32] = compute_sighash_externally();
+let private_key = PrivateKey::random();
+let pubkey = private_key.public_key().to_compressed();
 
-let unlocking = P2PKH::sign_with_sighash(
-    &private_key,
-    &sighash,
-    SignOutputs::All,
-    false,  // anyone_can_pay
-)?;
+let template = P2PK::new();
+let locking = template.lock(&pubkey)?;
+// Produces: <pubkey> OP_CHECKSIG
+```
+
+### P2PK: Spend with Signature
+
+```rust
+use bsv_sdk::script::templates::P2PK;
+use bsv_sdk::script::template::{SignOutputs, SigningContext};
+use bsv_sdk::primitives::ec::PrivateKey;
+
+let private_key = PrivateKey::from_hex("...")?;
+
+// Create unlock template (signature only, 74 bytes estimated)
+let unlock = P2PK::unlock(&private_key, SignOutputs::All, false);
+let unlocking = unlock.sign(&context)?;
+// Produces: <signature>
+```
+
+### Multisig: Lock to M-of-N Keys
+
+```rust
+use bsv_sdk::script::templates::Multisig;
+use bsv_sdk::script::template::ScriptTemplate;
+use bsv_sdk::primitives::ec::PrivateKey;
+
+let key1 = PrivateKey::random();
+let key2 = PrivateKey::random();
+let key3 = PrivateKey::random();
+
+// Create 2-of-3 multisig locking script
+let template = Multisig::new(2);
+let pubkeys = vec![key1.public_key(), key2.public_key(), key3.public_key()];
+let locking = template.lock_from_keys(&pubkeys)?;
+// Produces: OP_2 <pk1> <pk2> <pk3> OP_3 OP_CHECKMULTISIG
+
+// Alternative: use ScriptTemplate trait with concatenated 33-byte keys
+let mut params = Vec::new();
+params.extend_from_slice(&key1.public_key().to_compressed());
+params.extend_from_slice(&key2.public_key().to_compressed());
+let locking = Multisig::new(1).lock(&params)?;
+```
+
+### Multisig: Spend with M Signatures
+
+```rust
+use bsv_sdk::script::templates::Multisig;
+use bsv_sdk::script::template::{SignOutputs, SigningContext};
+use bsv_sdk::primitives::ec::PrivateKey;
+
+// Sign with keys 1 and 3 (must be in same order as locking script)
+let signers = vec![key1.clone(), key3.clone()];
+let unlock = Multisig::unlock(&signers, SignOutputs::All, false);
+let unlocking = unlock.sign(&context)?;
+// Produces: OP_0 <sig1> <sig3>
 ```
 
 ### R-Puzzle: Lock to K Value
@@ -375,44 +486,6 @@ println!("Fields: {:?}", decoded.fields);
 println!("Lock position: {:?}", decoded.lock_position);
 ```
 
-### PushDrop: Spend with Signature
-
-```rust
-use bsv_sdk::script::templates::PushDrop;
-use bsv_sdk::script::template::{SignOutputs, SigningContext};
-use bsv_sdk::primitives::ec::PrivateKey;
-
-let private_key = PrivateKey::from_hex("...")?;
-
-// Create unlock template
-let unlock = PushDrop::unlock(&private_key, SignOutputs::All, false);
-
-// Estimated length for fee calculation (73 bytes: signature only)
-let estimated_size = unlock.estimate_length();
-
-// Sign with a transaction context
-let context = SigningContext::new(&raw_tx, input_index, satoshis, locking_script.as_script());
-let unlocking = unlock.sign(&context)?;
-// Produces: <signature>
-```
-
-### PushDrop: Sign with Precomputed Sighash
-
-```rust
-use bsv_sdk::script::templates::PushDrop;
-use bsv_sdk::script::template::SignOutputs;
-
-// When you already have the sighash computed
-let sighash: [u8; 32] = compute_sighash_externally();
-
-let unlocking = PushDrop::sign_with_sighash(
-    &private_key,
-    &sighash,
-    SignOutputs::All,
-    false,  // anyone_can_pay
-)?;
-```
-
 ### Sighash Types
 
 The `SignOutputs` enum and `anyone_can_pay` flag control which parts of the transaction are signed:
@@ -432,20 +505,19 @@ All scope bytes include `SIGHASH_FORKID` (0x40) as required by BSV.
 
 ### Signature Format
 
-Both templates produce DER-encoded ECDSA signatures with:
+All templates produce DER-encoded ECDSA signatures with:
 - Appended sighash scope byte (including FORKID)
 - Low-S normalization per BIP 62
 
 ### Estimated Lengths
 
-The `estimate_length()` method returns 108 bytes for P2PKH and RPuzzle:
-- Signature push: 1 + 72 bytes (max DER + sighash byte)
-- Public key push: 1 + 33 bytes (compressed)
-
-PushDrop's `estimate_unlocking_length()` returns 73 bytes (signature only, since public key is in the locking script):
-- Signature push: 1 + 72 bytes (max DER + sighash byte)
-
-This matches the TypeScript SDK's `estimateLength()` return value for PushDrop.
+| Template | `estimate_length()` | Components |
+|----------|---------------------|------------|
+| P2PKH | 108 bytes | 1 push + 72 sig + 1 push + 33 pubkey + 1 sighash |
+| P2PK | 74 bytes | 1 push + 72 sig + 1 sighash |
+| RPuzzle | 108 bytes | Same as P2PKH (sig + pubkey) |
+| PushDrop | 73 bytes | 1 push + 72 sig (signature only, pubkey in lock) |
+| Multisig | 1 + M*74 bytes | OP_0 + M * (1 push + 72 sig + 1 sighash) |
 
 These are worst-case estimates; actual signatures may be 1-2 bytes shorter.
 
@@ -487,6 +559,10 @@ Decoded minimal-encoded values are converted back to their byte representations:
 - `OP_0` → `[0]`
 - `OP_1` through `OP_16` → `[1]` through `[16]`
 - `OP_1NEGATE` → `[0x81]`
+
+### Multisig Signature Ordering
+
+OP_CHECKMULTISIG walks through keys and signatures in order, matching each signature to the next available key. Signatures in the unlock must appear in the same relative order as their corresponding public keys in the lock. For example, in a 2-of-3 with keys [A, B, C], signing with keys A and C is valid, but signatures must appear as `<sigA> <sigC>`, not `<sigC> <sigA>`.
 
 ## Related Documentation
 

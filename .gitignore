@@ -16,3 +16,9 @@ Thumbs.db
 # Debug
 *.pdb
 .claude-docs-logs/
+
+# Fuzzing
+fuzz/target/
+fuzz/Cargo.lock
+fuzz/corpus/
+fuzz/artifacts/

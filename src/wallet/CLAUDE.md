@@ -14,7 +14,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `interface.rs` | WalletInterface trait (28 methods) | ~297 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~679 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~526 |
-| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1348 |
+| `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1414 |
 | `validation.rs` | 40+ input validation helpers | ~1170 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
@@ -126,7 +126,7 @@ ProtoWallet can:
 - Create and verify ECDSA signatures
 - Encrypt and decrypt data (AES-256-GCM via derived symmetric keys)
 - Create and verify HMACs (SHA-256 with constant-time comparison)
-- Reveal key linkages for verification
+- Reveal key linkages for verification (with Schnorr ZK proofs for counterparty linkage)
 - Implement all `WalletInterface` methods (unsupported methods return errors)
 
 ProtoWallet does NOT:
@@ -136,12 +136,26 @@ ProtoWallet does NOT:
 - Manage certificates (returns error)
 - Store any persistent data
 
+#### Default Counterparty Behavior
+
+- `create_signature`: Defaults counterparty to `Anyone` (publicly derivable), matching TS SDK behavior
+- All other operations: Default counterparty to `Self_`
+
 #### WalletInterface Implementation
 
 ProtoWallet implements `WalletInterface` with full support for cryptographic operations:
 - Key operations: All 9 methods fully implemented
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
 - Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns mainnet, `get_version` returns "bsv-sdk-0.1.0", `get_height` returns 0, `get_header_for_height` returns error
+
+#### Schnorr Proof for Counterparty Key Linkage
+
+`reveal_counterparty_key_linkage` generates a real 98-byte Schnorr ZK proof demonstrating knowledge of the private key and correct ECDH computation. The proof is encoded as:
+- `R` (33 bytes, compressed point)
+- `S'` (33 bytes, compressed point)
+- `z` (32 bytes, scalar)
+
+Both the linkage and proof are encrypted for the verifier using the "counterparty linkage revelation" protocol with the revelation timestamp as key_id.
 
 ### Validation Module
 
@@ -245,7 +259,7 @@ let signed = wallet.create_signature(CreateSignatureArgs {
     hash_to_directly_sign: None,
     protocol_id: protocol,
     key_id: "sig-1".to_string(),
-    counterparty: None,
+    counterparty: None, // defaults to Anyone
 }).unwrap();
 ```
 
@@ -365,6 +379,8 @@ This module maintains API compatibility with:
 
 Key derivation uses the same algorithm (BRC-42) and produces identical keys across all SDK implementations.
 
+**Notable difference:** Go SDK's `create_signature` defaults counterparty to `Anyone`; Rust and TS SDKs also default to `Anyone`.
+
 ### Type Mapping
 
 | TypeScript | Rust |
@@ -383,6 +399,7 @@ Key derivation uses the same algorithm (BRC-42) and produces identical keys acro
 The wallet module uses:
 - `PrivateKey`, `PublicKey`, `SymmetricKey`, `Signature` from primitives module
 - `sha256`, `sha256_hmac` from hash module
+- `Schnorr` from `primitives::bsv::schnorr` for counterparty linkage ZK proofs
 - `derive_child`, `derive_shared_secret` methods for BRC-42 derivation
 - `subtle` crate for constant-time comparison (HMAC verification)
 - `async_trait` crate for async trait methods (WalletInterface)

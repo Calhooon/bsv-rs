@@ -16,7 +16,7 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields) | ~787 |
-| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1379 |
+| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1406 |
 | `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~760 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
 

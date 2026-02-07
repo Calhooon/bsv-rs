@@ -9,9 +9,9 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~172 |
-| `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~1476 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~173 |
+| `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
+| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~2459 |
 | `processor.rs` | Generic server-side processor over WalletInterface | ~943 |
 | `transceiver.rs` | Client-side message serialization and full wallet interface | ~1619 |
 
@@ -82,6 +82,8 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | 12 | decrypt | 26 | getHeaderForHeight |
 | 13 | createHmac | 27 | getNetwork |
 | 14 | verifyHmac | 28 | getVersion |
+
+`WalletCall` provides: `as_u8()`, `method_name()` (returns camelCase name), `TryFrom<u8>`, and `Display`.
 
 ## Serialization Rules
 
@@ -154,7 +156,7 @@ pub mod status_codes {
 - `string`, `optional_string`, `optional_bytes`, `string_array`, `optional_string_array`
 - `optional_bool`, `outpoint`, `outpoint_string`, `counterparty`
 - `protocol_id`, `optional_protocol_id`, `action_status`
-- `txid_hex`, `query_mode`, `optional_query_mode`
+- `txid_hex`, `pubkey_hex` (reader only), `query_mode`, `optional_query_mode`
 - `output_include`, `optional_output_include`
 - `string_map`, `optional_string_map`
 - `send_with_result_status`, `send_with_result`, `send_with_result_array`
@@ -168,6 +170,8 @@ pub mod status_codes {
 - `wallet_output`
 
 `WireWriter` implements `Default`.
+
+**Tests:** Comprehensive roundtrip tests for every type including edge cases (empty collections, unicode strings, large data, all security levels, all action statuses, negative satoshis).
 
 ## Processor (Server-Side)
 
@@ -188,11 +192,13 @@ pub mod status_codes {
 - getNetwork (uses processor's configured network)
 - getVersion (uses processor's configured version)
 
-**Stub handlers (return error, require full wallet):**
+**Stub handlers (return error, require full wallet implementation):**
 - createAction, signAction, abortAction, listActions, internalizeAction
 - listOutputs, relinquishOutput
 - acquireCertificate, listCertificates, proveCertificate, relinquishCertificate
 - discoverByIdentityKey, discoverByAttributes
+
+All 28 call codes are dispatched in the match statement. Stub handlers return descriptive errors indicating a full wallet implementation is required.
 
 **Error codes:** 0=success, 1=generic, 6=invalid parameter, 7=insufficient funds.
 
@@ -245,6 +251,11 @@ impl WalletWire for LoopbackWire {
     }
 }
 ```
+
+**Test coverage:**
+- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, send-with-results, sign-action-spends, wallet certificates, identity certifiers/certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
+- processor.rs: Tests for getPublicKey, getNetwork, getVersion, isAuthenticated, invalid call codes, and createAction error.
+- transceiver.rs: End-to-end loopback tests for get_public_key, encrypt/decrypt roundtrip, create/verify HMAC, create/verify signature, is_authenticated, get_network, get_version.
 
 Run tests:
 

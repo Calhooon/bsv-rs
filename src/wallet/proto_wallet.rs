@@ -35,6 +35,7 @@
 use std::sync::Arc;
 
 use crate::error::{Error, Result};
+use crate::primitives::bsv::schnorr::Schnorr;
 use crate::primitives::hash::sha256_hmac;
 use crate::primitives::{sha256, PrivateKey, PublicKey, Signature};
 
@@ -539,11 +540,24 @@ impl ProtoWallet {
             })?
             .ciphertext;
 
-        // Proof type 0: no cryptographic proof, just encrypted linkage
-        // A full implementation would include Schnorr proof here
+        // Generate Schnorr ZK proof demonstrating knowledge of private key
+        // and correct computation of the ECDH shared secret (linkage)
+        let proof = Schnorr::generate_proof(
+            self.key_deriver.root_key(),
+            &identity_key,
+            &args.counterparty,
+            &linkage,
+        )?;
+
+        // Encode proof as R (33 bytes) || S' (33 bytes) || z (32 bytes) = 98 bytes
+        let mut proof_bin = Vec::with_capacity(98);
+        proof_bin.extend_from_slice(&proof.r.to_compressed());
+        proof_bin.extend_from_slice(&proof.s_prime.to_compressed());
+        proof_bin.extend_from_slice(&proof.z.to_bytes_be(32));
+
         let encrypted_linkage_proof = self
             .encrypt(EncryptArgs {
-                plaintext: vec![0], // Proof type 0
+                plaintext: proof_bin,
                 protocol_id: Protocol::new(
                     SecurityLevel::Counterparty,
                     "counterparty linkage revelation",
@@ -1289,9 +1303,11 @@ mod tests {
 
     #[test]
     fn test_reveal_counterparty_key_linkage() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+        let prover_key = PrivateKey::random();
+        let wallet = ProtoWallet::new(Some(prover_key.clone()));
         let counterparty = PrivateKey::random().public_key();
-        let verifier = PrivateKey::random().public_key();
+        let verifier_key = PrivateKey::random();
+        let verifier = verifier_key.public_key();
 
         let result = wallet
             .reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs {
@@ -1305,6 +1321,56 @@ mod tests {
         assert_eq!(result.counterparty, counterparty.to_hex());
         assert!(!result.revelation_time.is_empty());
         assert!(!result.encrypted_linkage.is_empty());
+        assert!(!result.encrypted_linkage_proof.is_empty());
+
+        // Verifier decrypts and validates the Schnorr proof
+        let verifier_wallet = ProtoWallet::new(Some(verifier_key));
+        let protocol = Protocol::new(
+            SecurityLevel::Counterparty,
+            "counterparty linkage revelation",
+        );
+
+        // Decrypt the linkage
+        let decrypted_linkage = verifier_wallet
+            .decrypt(DecryptArgs {
+                ciphertext: result.encrypted_linkage,
+                protocol_id: protocol.clone(),
+                key_id: result.revelation_time.clone(),
+                counterparty: Some(Counterparty::Other(wallet.identity_key())),
+            })
+            .unwrap();
+        let linkage_point = PublicKey::from_bytes(&decrypted_linkage.plaintext).unwrap();
+
+        // Decrypt the proof
+        let decrypted_proof = verifier_wallet
+            .decrypt(DecryptArgs {
+                ciphertext: result.encrypted_linkage_proof,
+                protocol_id: protocol,
+                key_id: result.revelation_time,
+                counterparty: Some(Counterparty::Other(wallet.identity_key())),
+            })
+            .unwrap();
+
+        // Parse the 98-byte proof: R (33) || S' (33) || z (32)
+        let proof_bytes = &decrypted_proof.plaintext;
+        assert_eq!(proof_bytes.len(), 98);
+
+        use crate::primitives::bsv::schnorr::{Schnorr, SchnorrProof};
+        use crate::primitives::BigNumber;
+
+        let r = PublicKey::from_bytes(&proof_bytes[0..33]).unwrap();
+        let s_prime = PublicKey::from_bytes(&proof_bytes[33..66]).unwrap();
+        let z = BigNumber::from_bytes_be(&proof_bytes[66..98]);
+
+        let proof = SchnorrProof { r, s_prime, z };
+
+        // Verify the Schnorr proof
+        assert!(Schnorr::verify_proof(
+            &wallet.identity_key(),
+            &counterparty,
+            &linkage_point,
+            &proof,
+        ));
     }
 
     #[test]

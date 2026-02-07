@@ -27,9 +27,9 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
 | `storage_tests.rs` | UHRP storage module tests (70 tests: URLs, downloader, uploader) |
-| `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
+| `template_tests.rs` | Script template tests (P2PKH, P2PK, Multisig, RPuzzle, 22 tests) |
 | `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 86 tests) |
-| `wallet_tests.rs` | Wallet module tests (60+ tests: KeyDeriver, ProtoWallet, wire protocol) |
+| `wallet_tests.rs` | Wallet module tests (56 tests: KeyDeriver, ProtoWallet, wire protocol) |
 | `transaction/` | Transaction test vectors module |
 
 ## Test Vectors
@@ -304,12 +304,28 @@ Transaction sighash computation tests (3 tests, 499 vectors):
 
 ### Template Tests (`template_tests.rs`)
 
-Script template integration tests (10 tests):
+Script template integration tests (22 tests):
 
 **P2PKH Template**
 - `test_p2pkh_end_to_end_spend` - Full P2PKH locking script creation (DUP HASH160 EQUALVERIFY CHECKSIG) and unlocking
 - `test_p2pkh_from_address` - P2PKH locking from Bitcoin address matches locking from pubkey hash
 - `test_p2pkh_spend_validation` - P2PKH spend with Spend interpreter (validates structure)
+
+**P2PK Template**
+- `test_p2pk_end_to_end` - Full P2PK lock/unlock: `<pubkey> OP_CHECKSIG` with signature-only unlocking (1 chunk)
+- `test_p2pk_compressed_vs_uncompressed_detection` - Compressed pubkey detected as P2PK via `is_p2pk()`
+- `test_p2pk_vs_p2pkh_estimate_length` - P2PK estimates 74 bytes (sig only) vs P2PKH 108 bytes (sig + pubkey)
+- `test_p2pk_invalid_pubkey` - Rejects 20-byte hash, 32-byte data, and bad prefix (0x05)
+
+**Multisig Template**
+- `test_multisig_2_of_3_end_to_end` - 2-of-3 multisig: `OP_2 <pk1> <pk2> <pk3> OP_3 OP_CHECKMULTISIG`, unlock with OP_0 + 2 sigs
+- `test_multisig_1_of_1` - Degenerate 1-of-1 multisig (4 chunks: OP_1 <pk> OP_1 OP_CHECKMULTISIG)
+- `test_multisig_3_of_3` - All-signers-required 3-of-3 multisig, unlock with OP_0 + 3 sigs
+- `test_multisig_script_template_trait` - ScriptTemplate::lock with concatenated 33-byte pubkeys matches lock_from_keys
+- `test_multisig_validation_errors` - Rejects threshold > N, zero threshold, 17+ keys, and empty keys
+- `test_multisig_estimate_length_scaling` - Estimate scales: 1-of-N=75, 2-of-N=149, 3-of-N=223 (1 + M*74)
+- `test_multisig_max_keys` - Maximum 16-of-16 multisig works correctly
+- `test_multisig_hex_roundtrip` - Hex serialization roundtrip preserves multisig detection
 
 **RPuzzle Template**
 - `test_rpuzzle_lock_script_structure` - Verifies RPuzzle script: OP_OVER, OP_3, OP_SPLIT, OP_NIP, OP_SWAP, OP_DROP, OP_EQUALVERIFY, OP_CHECKSIG
@@ -318,7 +334,7 @@ Script template integration tests (10 tests):
 - `test_compute_r_from_k_known_values` - Tests k=1 produces generator point x-coordinate (79BE667E...)
 
 **Template Utilities**
-- `test_template_unlock_estimate_length` - Both P2PKH and RPuzzle estimate 108 bytes
+- `test_template_unlock_estimate_length` - P2PKH and RPuzzle estimate 108 bytes
 - `test_sighash_types` - Tests ALL|FORKID (0x41), NONE|FORKID (0x42), SINGLE|FORKID (0x43), ALL|FORKID|ANYONECANPAY (0xC1)
 - `test_rpuzzle_type_hash_functions` - Verifies Raw (same length), Sha1 (20), Sha256 (32), Hash256 (32), Ripemd160 (20), Hash160 (20)
 
@@ -735,7 +751,7 @@ UHRP storage module tests (70 tests, requires `storage` feature):
 
 ### Wallet Tests (`wallet_tests.rs`)
 
-Wallet module tests (60+ tests, requires `wallet` feature):
+Wallet module tests (56 tests, requires `wallet` feature):
 
 **KeyDeriver Tests**
 - `test_key_deriver_with_known_key` - PrivateKey(42) pattern from TypeScript SDK
@@ -744,8 +760,11 @@ Wallet module tests (60+ tests, requires `wallet` feature):
 - `test_derive_public_key_with_counterparty` - BRC-42 derivation with counterparty
 - `test_derive_private_key_matches_public` - Private key's public matches derived public
 - `test_derive_symmetric_key_consistency` - Deterministic symmetric keys
+- `test_derive_symmetric_key_with_anyone` - Symmetric key derivation with Anyone counterparty
 - `test_two_party_key_derivation` - Alice and Bob derive matching keys
 - `test_reveal_counterparty_secret_fails_for_self` - Self counterparty rejected
+- `test_reveal_counterparty_secret_succeeds_for_other` - Reveal succeeds for Other counterparty
+- `test_reveal_specific_secret_deterministic` - Specific secret is deterministic for same params
 - `test_different_security_levels_different_keys` - Silent/App/Counterparty produce unique keys
 - `test_protocol_validation` - Protocol name < 5 chars rejected
 - `test_key_id_validation` - Empty or > 800 chars rejected
@@ -753,9 +772,11 @@ Wallet module tests (60+ tests, requires `wallet` feature):
 **CachedKeyDeriver Tests**
 - `test_cached_deriver_same_identity` - Identity key matches inner deriver
 - `test_cache_hit_returns_same_value` - Cached values returned
+- `test_cache_miss_with_different_parameters` - Different params produce different cached results
 - `test_lru_eviction` - LRU eviction with max_size=3
 - `test_lru_access_updates_recentness` - Access refreshes LRU order
 - `test_secrets_not_cached` - reveal_* methods not cached for security
+- `test_cached_implements_api_trait` - CachedKeyDeriver implements KeyDeriverApi trait
 - `test_private_and_symmetric_key_caching` - Both key types cached
 
 **ProtoWallet Tests**
@@ -771,7 +792,9 @@ Wallet module tests (60+ tests, requires `wallet` feature):
 - `test_hmac_cross_party_verification` - Alice creates, Bob verifies
 - `test_create_verify_signature_roundtrip` - Signature create and verify
 - `test_signature_with_direct_hash` - Sign pre-hashed data
+- `test_signature_verification_fails_with_wrong_data` - Tampered data fails signature verification
 - `test_cross_party_signature_verification` - Alice signs, Bob verifies
+- `test_default_counterparty_for_operations` - Default counterparty behavior for encrypt/sign/HMAC
 
 **Cross-SDK Compatibility**
 - `test_brc3_signature_compliance` - BRC-3 signature vector from TypeScript SDK
@@ -784,10 +807,13 @@ Wallet module tests (60+ tests, requires `wallet` feature):
 - `test_signed_varint_roundtrip` - Signed VarInt including negatives
 - `test_string_roundtrip` - UTF-8 string encoding
 - `test_optional_string_roundtrip` - Optional string (Some/None)
+- `test_optional_bool_roundtrip` - Optional bool (Some(true)/Some(false)/None)
 - `test_counterparty_roundtrip` - Self_, Anyone, Other encoding
 - `test_protocol_id_roundtrip` - Protocol with security level
+- `test_optional_protocol_id_roundtrip` - Optional Protocol (Some/None)
 - `test_outpoint_roundtrip` - Txid + vout encoding
 - `test_string_array_roundtrip` - String array encoding
+- `test_optional_bytes_roundtrip` - Optional byte vector (Some/None)
 - `test_query_mode_roundtrip` - Any/All query mode
 - `test_output_include_roundtrip` - LockingScripts/EntireTransactions
 - `test_string_map_roundtrip` - HashMap<String, String> encoding
@@ -1085,7 +1111,7 @@ cargo test --test transaction_tests --features transaction -- beef
 **Script** (`bsv_sdk::script`):
 - `Script`, `LockingScript`, `UnlockingScript` - Script types
 - `Spend`, `SpendParams` - Script spend validator
-- `templates::{P2PKH, RPuzzle, RPuzzleType, PushDrop}` - Script templates
+- `templates::{P2PKH, P2PK, Multisig, RPuzzle, RPuzzleType, PushDrop}` - Script templates
 - `ScriptTemplate`, `SignOutputs` - Template trait and sighash selection
 
 **Transaction** (`bsv_sdk::transaction`):
@@ -1221,6 +1247,13 @@ cargo test --test transaction_tests --features transaction -- beef
 3. Test both parsing (from_hex) and execution (validate)
 4. Script hex roundtrip should be case-insensitive match
 
+**Template Tests:**
+1. Test all template types: P2PKH, P2PK, Multisig, RPuzzle
+2. P2PK: signature-only unlocking (1 chunk, 74-byte estimate), use `is_p2pk()` for detection
+3. Multisig: use `lock_from_keys(&[pubkeys])` or ScriptTemplate::lock with concatenated 33-byte keys
+4. Multisig validation: threshold must be 1..=N, N must be 1..=16, use `is_multisig()` → `Some((m, n))`
+5. Use `sign_with_sighash` for direct signing, `unlock` for deferred signing templates
+
 **DRBG Tests:**
 1. `HmacDrbg::new()` for SHA-256, `new_with_hash(..., true)` for SHA-512
 2. Generate multiple times if required by vector specification (e.g., `add.len()` times)
@@ -1246,7 +1279,7 @@ The BSV-specific `spend_valid.json` vectors should all pass. Vectors with `flags
 
 Tests are organized by feature area:
 - **primitives tests**: `cross_sdk_tests.rs`, `drbg_tests.rs`, `ec_tests.rs`, `integration_tests.rs`
-- **script tests**: `script_vectors_tests.rs`, `template_tests.rs`
+- **script tests**: `script_vectors_tests.rs`, `template_tests.rs` (P2PKH, P2PK, Multisig, RPuzzle)
 - **transaction tests**: `sighash_tests.rs`, `transaction_tests.rs`
 - **wallet tests**: `wallet_tests.rs` (requires `wallet` feature)
 - **identity tests**: `identity_tests.rs` (requires `identity` feature)
@@ -1267,11 +1300,11 @@ The `transaction_tests.rs` file uses nested modules for organization:
 - `merkle_path_advanced_tests` - Advanced MerklePath verification with ChainTracker
 
 The `wallet_tests.rs` file uses nested modules for organization:
-- `key_deriver_tests` - KeyDeriver unit tests
-- `cached_key_deriver_tests` - CachedKeyDeriver caching tests
-- `proto_wallet_tests` - ProtoWallet cryptographic operations
-- `cross_sdk_tests` - BRC-2/BRC-3 compliance vectors from TypeScript SDK
-- `wire_protocol_tests` - Wire protocol encoding/decoding
+- `key_deriver_tests` - KeyDeriver unit tests (14 tests)
+- `cached_key_deriver_tests` - CachedKeyDeriver caching tests (8 tests)
+- `proto_wallet_tests` - ProtoWallet cryptographic operations (16 tests)
+- `cross_sdk_tests` - BRC-2/BRC-3 compliance vectors from TypeScript SDK (4 tests)
+- `wire_protocol_tests` - Wire protocol encoding/decoding (14 tests)
 
 The `identity_tests.rs` file uses nested modules for organization:
 - `contacts_manager_tests` - ContactsManager async operations
