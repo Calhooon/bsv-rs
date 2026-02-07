@@ -11,7 +11,7 @@ This module provides complete Bitcoin transaction functionality:
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs with recursive ancestry collection
-- Async Broadcaster trait with ARC and WhatsOnChain implementations
+- Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
 
 Compatible with the TypeScript and Go SDKs through shared binary formats.
@@ -20,17 +20,17 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root; re-exports all public types |
+| `mod.rs` | Module root; re-exports all public types and sighash constants |
 | `input.rs` | `TransactionInput` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF ancestry collection |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
-| `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, and merging |
+| `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, merging, and logging |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig` |
-| `broadcaster.rs` | `Broadcaster` trait, response/failure types |
-| `broadcasters/` | `ArcBroadcaster`, `ArcConfig`, `WhatsOnChainBroadcaster`, `WocBroadcastConfig` |
+| `broadcaster.rs` | `Broadcaster` trait, response/failure types, helper functions |
+| `broadcasters/` | `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster` |
 | `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker`, `AlwaysValidChainTracker` |
 | `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, `BlockHeadersServiceConfig` |
 
@@ -130,6 +130,10 @@ impl Transaction {
     pub fn input_count(&self) -> usize
     pub fn output_count(&self) -> usize
 
+    // Inspection
+    pub fn is_coinbase(&self) -> bool       // True if single input with null TXID
+    pub fn has_data_outputs(&self) -> bool   // True if any output has OP_RETURN
+
     // Signing & Fees
     pub async fn sign(&mut self) -> Result<()>
     pub async fn fee(&mut self, fee_sats: Option<u64>, change_distribution: ChangeDistribution) -> Result<()>
@@ -199,12 +203,49 @@ pub trait Broadcaster: Send + Sync {
 }
 
 pub struct BroadcastResponse { pub status: BroadcastStatus, pub txid: String, pub message: String, pub competing_txs: Option<Vec<String>> }
+impl BroadcastResponse {
+    pub fn success(txid: String, message: String) -> Self
+    pub fn success_with_competing(txid, message, competing_txs) -> Self
+}
+
 pub struct BroadcastFailure { pub status: BroadcastStatus, pub code: String, pub txid: Option<String>, pub description: String, pub more: Option<Value> }
+impl BroadcastFailure {
+    pub fn new(code: String, description: String) -> Self
+    pub fn with_txid(code, txid, description) -> Self
+    pub fn with_details(code, description, more: Value) -> Self
+}
+
 pub enum BroadcastStatus { Success, Error }
 pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 
-// Implementations (require http feature): ArcBroadcaster, WhatsOnChainBroadcaster
+pub fn is_broadcast_success(result: &BroadcastResult) -> bool
+pub fn is_broadcast_failure(result: &BroadcastResult) -> bool
+
+// Implementations (require http feature):
+// - ArcBroadcaster: BEEF V1 format via ARC API (JSON)
+// - TeranodeBroadcaster: Extended Format (EF) binary via Teranode API
+// - WhatsOnChainBroadcaster: Raw tx hex via WhatsOnChain API
 ```
+
+### TeranodeBroadcaster
+
+```rust
+pub struct TeranodeBroadcaster { /* ... */ }
+impl TeranodeBroadcaster {
+    pub fn new(url: &str, api_key: Option<String>) -> Self  // No default URL
+    pub fn with_config(config: TeranodeConfig) -> Self
+    pub fn url(&self) -> &str
+    pub fn api_key(&self) -> Option<&str>
+}
+
+pub struct TeranodeConfig {
+    pub url: String,
+    pub api_key: Option<String>,
+    pub timeout_ms: u64,   // Default: 30_000
+}
+```
+
+Teranode differs from ARC by accepting EF binary (`application/octet-stream`) rather than JSON with BEEF hex. No default URL is provided (must be configured).
 
 ## Chain Tracking
 
@@ -281,6 +322,7 @@ pub struct Beef {
     pub txs: Vec<BeefTx>,             // Transactions (sorted by dependency)
     pub version: u32,                 // BEEF_V1 or BEEF_V2
     pub atomic_txid: Option<String>,  // Target txid for Atomic BEEF
+    // Internal: txid_index (HashMap for fast lookup), needs_sort flag
 }
 
 impl Beef {
@@ -299,14 +341,23 @@ impl Beef {
 
     // Lookup
     pub fn find_txid(&self, txid: &str) -> Option<&BeefTx>
+    pub fn find_txid_mut(&mut self, txid: &str) -> Option<&mut BeefTx>
     pub fn find_bump(&self, txid: &str) -> Option<&MerklePath>
+    pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction>
+    pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction>
+    pub fn is_atomic(&self) -> bool
 
     // Merging
     pub fn merge_bump(&mut self, bump: MerklePath) -> usize  // Combines same height/root
     pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx
+    pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx
     pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx
     pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx>
     pub fn merge_beef(&mut self, other: &Beef)
+
+    // Utility
+    pub fn clone_shallow(&self) -> Self
+    pub fn to_log_string(&mut self) -> String  // Debug summary
 }
 
 pub struct BeefValidationResult { pub valid: bool, pub roots: HashMap<u32, String> }
@@ -321,6 +372,11 @@ impl BeefTx {
     pub fn is_txid_only(&self) -> bool   // Has txid but no tx data
     pub fn txid(&self) -> String
     pub fn tx(&self) -> Option<&Transaction>
+    pub fn tx_mut(&mut self) -> Option<&mut Transaction>  // Parses from raw if needed
+    pub fn raw_tx(&self) -> Option<&[u8]>
+    pub fn raw_tx_or_compute(&mut self) -> Option<Vec<u8>>  // Computes from parsed tx if needed
+    pub fn bump_index(&self) -> Option<usize>
+    pub fn set_bump_index(&mut self, index: Option<usize>)
 }
 
 pub enum TxDataFormat { RawTx = 0, RawTxAndBumpIndex = 1, TxidOnly = 2 }
@@ -328,6 +384,12 @@ pub const BEEF_V1: u32 = 0xEFBE0001;  // BRC-62
 pub const BEEF_V2: u32 = 0xEFBE0002;  // BRC-96 with txid-only
 pub const ATOMIC_BEEF: u32 = 0x01010101;  // BRC-95
 ```
+
+## Re-exported Sighash Constants
+
+The module re-exports sighash constants from `primitives::bsv::sighash`:
+- `SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`
+- `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`
 
 ## Usage Examples
 
@@ -340,8 +402,16 @@ tx.add_p2pkh_output("1MyChange...", None)?;  // Change output
 tx.fee(None, ChangeDistribution::Equal).await?;
 tx.sign().await?;
 
+// Inspecting
+assert!(!tx.is_coinbase());
+assert!(tx.has_data_outputs());  // If any OP_RETURN outputs exist
+
 // Broadcasting
 let broadcaster = ArcBroadcaster::default();
+let result = broadcaster.broadcast(&tx).await;
+
+// Broadcasting via Teranode (EF binary format)
+let broadcaster = TeranodeBroadcaster::new("https://teranode.example.com", None);
 let result = broadcaster.broadcast(&tx).await;
 
 // Serializing to BEEF (recursively collects ancestors)
@@ -368,9 +438,10 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()` using Benford's law for Random distribution
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
-- **HTTP feature**: `ArcBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
+- **HTTP feature**: `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
 - **BEEF ancestry**: `to_beef()` and `to_beef_v1()` recursively walk `source_transaction` chain via `collect_ancestors()`, stops at txs with `merkle_path`
 - **BEEF V1 vs V2**: Use `to_beef_v1()` for ARC compatibility (BRC-62), `to_beef()` for V2 with TXID-only support (BRC-96)
+- **BEEF indexing**: Beef maintains an internal `txid_index` HashMap for O(1) transaction lookup by txid
 - **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by `"height:root"` key; combines proofs at same height/root
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker` implement `Default`
@@ -401,5 +472,5 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 - `../script/CLAUDE.md` - LockingScript, UnlockingScript, templates
 - `../primitives/CLAUDE.md` - Reader, Writer, sha256d, from_hex, to_hex
 - `fee_models/CLAUDE.md` - SatoshisPerKilobyte, LivePolicy
-- `broadcasters/CLAUDE.md` - ArcBroadcaster, WhatsOnChainBroadcaster
+- `broadcasters/CLAUDE.md` - ArcBroadcaster, TeranodeBroadcaster, WhatsOnChainBroadcaster
 - `chain_trackers/CLAUDE.md` - WhatsOnChainTracker, BlockHeadersServiceTracker

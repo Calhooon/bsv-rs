@@ -9,8 +9,8 @@ This module provides transport layer implementations for sending and receiving a
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with exports and usage examples | ~43 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1110 |
+| `mod.rs` | Module root with exports and usage examples | ~42 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1219 |
 
 ## Key Exports
 
@@ -52,7 +52,7 @@ pub struct SimplifiedFetchTransport {
     base_url: String,
     #[cfg(feature = "http")]
     client: reqwest::Client,
-    callback: Arc<RwLock<Option<Box<TransportCallback>>>>,
+    callback: Arc<StdRwLock<Option<Box<TransportCallback>>>>,
 }
 
 impl SimplifiedFetchTransport {
@@ -69,6 +69,7 @@ Features:
 - Sends General messages via BRC-104: deserializes payload as `HttpRequest`, makes actual HTTP request with auth headers, wraps response in `HttpResponse` payload
 - Automatically strips trailing slashes from base URL
 - Uses `reqwest` client (requires `http` feature)
+- Uses `std::sync::RwLock` for callback storage (synchronous access, no tokio::spawn needed)
 - Invokes registered callback with response messages
 - Implements `Debug` trait with redacted internal fields
 
@@ -98,6 +99,7 @@ Features:
 - Queues response messages to be returned in order (FIFO)
 - Simulates incoming messages via `receive_message()`
 - Thread-safe with `Arc<RwLock<...>>` for concurrent access (uses `tokio::sync::RwLock`)
+- Uses `tokio::spawn` for `set_callback`/`clear_callback` (async write to tokio RwLock from sync methods)
 - Implements `Default` and `Debug` traits
 
 ### HttpRequest
@@ -319,14 +321,19 @@ async fn test_auth_flow() {
 
 ### Varint Encoding (Internal)
 
-The module uses varint encoding for efficient payload serialization:
+The module uses Bitcoin-style varint encoding for payload serialization:
 
 | Function | Purpose |
 |----------|---------|
-| `read_varint(bytes)` | Reads a varint, returns `(value, bytes_consumed)` |
-| `write_varint(value)` | Writes a value as varint bytes |
+| `read_varint(bytes)` | Reads a varint, returns `(i64_value, bytes_consumed)` |
+| `write_varint(value)` | Writes an i64 value as varint bytes |
 
-Varint sizes: 0-127 = 1 byte, 128-16383 = 2 bytes, 16384-2097151 = 3 bytes
+Varint sizes (Bitcoin-style):
+- `0-252`: 1 byte (value directly)
+- `253-65535`: 3 bytes (0xFD prefix + 2 bytes LE)
+- `65536-4294967295`: 5 bytes (0xFE prefix + 4 bytes LE)
+- Larger values: 9 bytes (0xFF prefix + 8 bytes LE)
+- `-1` (empty/missing convention): 9 bytes (0xFF + 8 bytes of 0xFF)
 
 ## Message Routing
 
@@ -347,9 +354,12 @@ Varint sizes: 0-127 = 1 byte, 128-16383 = 2 bytes, 16384-2097151 = 3 bytes
 3. Add auth headers (version, identity_key, nonce, your_nonce, signature, request_id)
 4. Include original headers (`x-bsv-*`, `authorization`, `content-type`) excluding `x-bsv-auth-*`
 5. Send request with body from payload
-6. Parse response headers for required auth fields (version, identity_key, signature)
-7. Build `HttpResponse` payload with status, filtered headers, body
-8. Create response `AuthMessage` with payload and invoke callback
+6. Parse response: extract request ID from headers (falls back to original if absent)
+7. Filter response headers: include `x-bsv-*` (excluding `x-bsv-auth-*`) and `authorization`, sorted alphabetically
+8. Build `HttpResponse` payload with status, filtered headers, body
+9. Create response `AuthMessage`: identity key from response header if present, otherwise uses request's identity key (auth headers on response are optional)
+10. Extract optional nonce, your_nonce, signature from response headers; check for certificate request in response message type header
+11. Invoke callback with response message
 
 ## Feature Flags
 
@@ -367,7 +377,8 @@ Error::AuthError("HTTP transport requires the 'http' feature".into())
 ## Dependencies
 
 - `async_trait` - Async trait support for `Transport`
-- `tokio::sync::RwLock` - Thread-safe callback storage
+- `std::sync::RwLock` - Synchronous callback storage for `SimplifiedFetchTransport`
+- `tokio::sync::RwLock` - Async state storage for `MockTransport`
 - `reqwest` - HTTP client (optional, requires `http` feature)
 - `serde_json` - JSON serialization for certificate requests and auth messages
 
@@ -377,17 +388,18 @@ Error::AuthError("HTTP transport requires the 'http' feature".into())
 |-------|-------|
 | `AuthError("HTTP transport requires the 'http' feature")` | Sending without `http` feature |
 | `AuthError("HTTP request failed: {}")` | Network error from reqwest |
-| `AuthError("Auth endpoint returned {status}: {body}")` | Non-2xx HTTP response |
-| `AuthError("Failed to parse auth response: {}")` | Invalid JSON response |
+| `AuthError("Auth endpoint returned {status}: {body}")` | Non-2xx handshake HTTP response |
+| `AuthError("Failed to read auth response: {}")` | Failed to read handshake response body |
+| `AuthError("Failed to parse auth response: {} - body: {}")` | Invalid JSON in handshake response |
 | `AuthError("General message must have payload")` | General message missing payload |
+| `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body |
 | `AuthError("Payload too short for ...")` | Malformed payload during deserialization |
 | `AuthError("Invalid ... UTF-8: {}")` | Non-UTF8 string in payload |
 | `AuthError("Empty varint")` | Empty bytes when reading varint |
-| `AuthError("Varint too large")` | Varint exceeds 64-bit limit |
-| `AuthError("Incomplete varint")` | Truncated varint encoding |
-| `AuthError("Response missing required auth header: {}")` | Response lacks required BRC-104 header |
-| `AuthError("Invalid request ID length")` | Request ID not 32 bytes |
-| `AuthError("Missing identity key header")` | Response missing x-bsv-auth-identity-key |
+| `AuthError("Incomplete varint (fd/fe/ff)")` | Truncated varint encoding |
+| `AuthError("Response payload too short for request ID")` | HttpResponse payload < 32 bytes |
+| `AuthError("Invalid request ID length")` | Response request ID not 32 bytes |
+| `AuthError("Failed to acquire callback lock")` | Poisoned std::sync::RwLock on callback |
 
 ## Testing
 
@@ -403,7 +415,9 @@ cargo test --features auth,http transports
 
 ## Thread Safety
 
-Both `SimplifiedFetchTransport` and `MockTransport` use `tokio::spawn` to set and clear callbacks asynchronously. This allows the synchronous `set_callback()` and `clear_callback()` methods to work with async-only storage. When testing, a small delay may be needed after setting callbacks:
+`SimplifiedFetchTransport` uses `std::sync::RwLock` (not tokio) for callback storage, so `set_callback()` and `clear_callback()` operate synchronously without spawning tasks. The `invoke_callback()` method acquires a read lock briefly to get the future, then drops the lock before awaiting.
+
+`MockTransport` uses `tokio::sync::RwLock` for all internal state. Since `set_callback()` and `clear_callback()` are synchronous trait methods, it uses `tokio::spawn` to write to the async RwLock. When testing, a small delay may be needed after setting callbacks:
 
 ```rust
 transport.set_callback(callback);

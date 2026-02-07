@@ -628,6 +628,15 @@ impl Script {
         chunks.len() >= 2 && chunks[0].op == OP_FALSE && chunks[1].op == OP_RETURN
     }
 
+    /// Check if this is a safe data carrier script (OP_FALSE OP_RETURN pattern).
+    ///
+    /// A safe data carrier is provably unspendable and prunable. Unlike bare
+    /// `OP_RETURN`, it won't be rejected by nodes even with large data payloads.
+    pub fn is_safe_data_carrier(&self) -> bool {
+        let chunks = self.chunks();
+        chunks.len() >= 2 && chunks[0].op == OP_FALSE && chunks[1].op == OP_RETURN
+    }
+
     /// Check if this is a multisig script, returns (M, N) if so
     /// Pattern: `OP_M <pubkey>... OP_N OP_CHECKMULTISIG`
     pub fn is_multisig(&self) -> Option<(u8, u8)> {
@@ -1001,6 +1010,30 @@ mod script_type_tests {
         // Empty script
         let empty = Script::new();
         assert!(!empty.is_data());
+    }
+
+    #[test]
+    fn test_is_safe_data_carrier() {
+        // OP_FALSE OP_RETURN is a safe data carrier
+        let safe = Script::from_asm("OP_FALSE OP_RETURN").unwrap();
+        assert!(safe.is_safe_data_carrier());
+
+        // OP_FALSE OP_RETURN with data is still safe
+        let safe_data = Script::from_hex("006a0568656c6c6f").unwrap();
+        assert!(safe_data.is_safe_data_carrier());
+
+        // Bare OP_RETURN is NOT a safe data carrier
+        let bare = Script::from_asm("OP_RETURN").unwrap();
+        assert!(!bare.is_safe_data_carrier());
+
+        // Empty script is not a safe data carrier
+        let empty = Script::new();
+        assert!(!empty.is_safe_data_carrier());
+
+        // P2PKH is not a safe data carrier
+        let p2pkh =
+            Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(!p2pkh.is_safe_data_carrier());
     }
 
     #[test]

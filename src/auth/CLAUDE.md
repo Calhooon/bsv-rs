@@ -9,10 +9,10 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | 81 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 456 |
+| `mod.rs` | Module root with re-exports | 80 |
+| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 455 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation | 813 |
+| `peer.rs` | Core Peer implementation with `start()` transport setup | 924 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations | - |
 | `utils/` | Utility functions | - |
@@ -173,6 +173,7 @@ pub type CertificateRequestCallback = Box<dyn Fn(PublicKey, RequestedCertificate
 ```rust
 impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub fn new(options: PeerOptions<W, T>) -> Self
+    pub fn start(&self)                      // Sets up transport callback for receiving messages
 
     // Sending messages
     pub async fn to_peer(&self, message: &[u8], identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<()>
@@ -394,7 +395,7 @@ use bsv_sdk::primitives::PrivateKey;
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let transport = SimplifiedFetchTransport::new("https://example.com");
 
-// Create peer
+// Create peer and start transport callback
 let peer = Peer::new(PeerOptions {
     wallet,
     transport,
@@ -403,6 +404,7 @@ let peer = Peer::new(PeerOptions {
     auto_persist_last_session: false,
     originator: Some("myapp.com".into()),
 });
+peer.start(); // Must call start() to receive responses
 
 // Send authenticated message
 peer.to_peer(b"Hello, world!", None, None).await?;
@@ -466,6 +468,14 @@ let removed = mgr.prune_stale_sessions(3600 * 1000);
 
 ## Protocol Details
 
+### Peer Lifecycle
+
+1. **Create**: `Peer::new(options)` constructs the peer with wallet and transport
+2. **Start**: `peer.start()` sets up the transport callback to route incoming messages (InitialResponse, CertificateRequest/Response, General) to the appropriate handlers and pending handshake resolvers
+3. **Communicate**: Use `to_peer()`, `request_certificates()`, etc.
+
+The `start()` method is required for the peer to receive and process responses. It clones `Arc` references to internal state and passes them into the transport callback closure.
+
 ### Authentication Flow
 
 1. **InitialRequest**: Initiator sends session nonce and optional certificate request
@@ -508,7 +518,7 @@ For HTTP transport:
 
 For General messages, the payload encodes HTTP request/response data:
 
-**Request payload**: `[request_id: 32][method: varint+str][url: varint+str][headers: varint+pairs][body: varint+bytes]`
+**Request payload**: `[request_id: 32][method: varint+str][path: varint+str][search: varint+str][headers: varint+pairs][body: varint+bytes]`
 
 **Response payload**: `[request_id: 32][status: varint][headers: varint+pairs][body: varint+bytes]`
 

@@ -18,7 +18,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests (10 tests) |
 | `identity_tests.rs` | Identity module tests (50+ tests: certificates, contacts, queries) |
 | `integration_tests.rs` | Full workflow tests across all modules (22 tests) |
-| `kvstore_integration_tests.rs` | KVStore module tests (70+ tests: LocalKVStore, interpreter, queries) |
+| `kvstore_integration_tests.rs` | KVStore module tests (74 tests: LocalKVStore, interpreter, queries, options) |
 | `memory_profiling.rs` | Heap allocation profiling with dhat (requires `dhat-profiling` feature) |
 | `messages_tests.rs` | BRC-77/BRC-78 message signing/encryption tests (35+ tests) |
 | `overlay_cross_sdk_tests.rs` | Overlay cross-SDK admin token and type tests (13 tests) |
@@ -28,7 +28,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
 | `storage_tests.rs` | UHRP storage module tests (70 tests: URLs, downloader, uploader) |
 | `template_tests.rs` | Script template tests (P2PKH, RPuzzle, 10 tests) |
-| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 84 tests) |
+| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 86 tests) |
 | `wallet_tests.rs` | Wallet module tests (60+ tests: KeyDeriver, ProtoWallet, wire protocol) |
 | `transaction/` | Transaction test vectors module |
 
@@ -324,7 +324,7 @@ Script template integration tests (10 tests):
 
 ### Transaction Tests (`transaction_tests.rs`)
 
-Transaction module tests (90+ tests, requires `transaction` feature flag):
+Transaction module tests (86 tests, requires `transaction` feature flag):
 
 **Transaction Parsing**
 - `test_transaction_from_hex` - Parse valid transaction from hex (version=1, locktime=0)
@@ -534,55 +534,117 @@ Identity module integration tests (50+ tests, requires `identity` feature):
 
 ### KVStore Tests (`kvstore_integration_tests.rs`)
 
-KVStore module integration tests (70+ tests, requires `kvstore` feature):
+KVStore module integration tests (74 tests, requires `kvstore` feature):
 
-**KVStoreConfig Tests**
+**KVStoreConfig Tests** (4 tests)
 - `test_kvstore_config_default_values` - Default: protocol_id="kvstore", service_name="ls_kvstore", encrypt=true
 - `test_kvstore_config_builder_all_fields` - Builder pattern with all options
+- `test_kvstore_config_builder_partial` - Partial builder retains defaults
 - `test_kvstore_config_clone` - Clone implementation
 
-**KVStoreEntry Tests**
+**KVStoreEntry Tests** (5 tests)
 - `test_kvstore_entry_creation` - Entry with key, value, controller, protocol_id
 - `test_kvstore_entry_with_tags` - Entry with tags array
 - `test_kvstore_entry_with_token` - Entry with KVStoreToken
 - `test_kvstore_entry_with_history` - Entry with value history
 - `test_kvstore_entry_json_roundtrip` - JSON serialization roundtrip
 
-**KVStoreToken Tests**
+**KVStoreToken Tests** (4 tests)
 - `test_kvstore_token_creation` - Token with txid, output_index, satoshis
 - `test_kvstore_token_with_beef` - Token with BEEF data
 - `test_kvstore_token_outpoint_string` - "txid.vout" format
+- `test_kvstore_token_json_roundtrip` - Token JSON serialization roundtrip (camelCase)
 
-**KVStoreQuery Tests**
+**KVStoreQuery Tests** (4 tests)
+- `test_kvstore_query_default` - Default query has all fields None
 - `test_kvstore_query_builder_all_fields` - key, controller, protocol_id, tags, limit, skip, sort_order
 - `test_kvstore_query_to_json` - JSON output for query parameters
+- `test_kvstore_query_json_omits_none` - None fields omitted from JSON (empty = `{}`)
 
-**KVStoreInterpreter Tests**
+**KVStore Options Tests** (6 tests)
+- `test_kvstore_get_options_default` - Default: history=false, include_token=false
+- `test_kvstore_get_options_builder` - Builder with history, include_token, service_name
+- `test_kvstore_set_options_default` - Default: all fields None
+- `test_kvstore_set_options_builder` - Builder with protocol_id, description, token_amount, tags
+- `test_kvstore_remove_options_default` - Default: all fields None
+- `test_kvstore_remove_options_builder` - Builder with protocol_id, description
+
+**KVStoreContext Tests** (3 tests)
+- `test_kvstore_context_creation` - Context with key and protocol_id
+- `test_kvstore_context_cache_key` - Cache key format: "protocol_id:key"
+- `test_kvstore_context_clone` - Clone implementation
+
+**KVStoreInterpreter Tests** (8 tests)
 - `test_interpreter_extract_basic_token` - Extract entry from PushDrop script
 - `test_interpreter_extract_token_with_tags` - Extract entry with tags
-- `test_interpreter_with_matching_context` - Context filtering
-- `test_interpreter_is_kvstore_token` - Token format validation
-- `test_interpreter_extract_fields` - Extract all KVStoreFields
+- `test_interpreter_with_matching_context` - Context filtering (matching)
+- `test_interpreter_with_non_matching_context_key` - Context filtering (key mismatch returns None)
+- `test_interpreter_with_non_matching_context_protocol` - Context filtering (protocol mismatch returns None)
+- `test_interpreter_extract_value` - Extract value string from script
+- `test_interpreter_is_kvstore_token` - Token format validation (valid vs too few fields)
+- `test_interpreter_extract_fields` - Extract all KVStoreFields (protocol_id, key, value, controller, tags)
 
-**LocalKVStore Tests** (async)
+**KVStoreFields Tests** (3 tests)
+- `test_kvstore_fields_value_bytes` - Raw bytes from value field
+- `test_kvstore_fields_empty_tags` - Empty tags field (has_tags returns false)
+- `test_kvstore_fields_single_zero_byte_tags` - Single zero byte treated as no tags
+
+**Signature Verification Tests** (4 tests)
+- `test_verify_signature_missing` - Missing signature returns false
+- `test_verify_signature_empty` - Empty signature returns false
+- `test_verify_signature_invalid_bytes` - Invalid DER signature returns false
+- `test_verify_signature_invalid_controller` - Invalid pubkey (all zeros) returns false
+
+**LocalKVStore Constructor Tests** (3 sync tests)
 - `test_local_kvstore_new_success` - Creation with MockWallet
+- `test_local_kvstore_new_empty_context_fails` - Empty protocol_id returns KvStoreEmptyContext
+- `test_local_kvstore_new_custom_config` - Custom config with protocol_id, token_amount, originator
+
+**LocalKVStore Get Tests** (4 async tests)
+- `test_local_kvstore_get_empty_key_fails` - Empty key returns KvStoreInvalidKey
 - `test_local_kvstore_get_returns_default_when_not_found` - Default value fallback
-- `test_local_kvstore_set_success` - Set key-value, returns outpoint
-- `test_local_kvstore_remove_not_found_returns_empty` - Remove non-existent key
-- `test_local_kvstore_has_not_found` - Existence check
-- `test_local_kvstore_keys_empty` - List all keys
-- `test_local_kvstore_count_empty` - Entry count
+- `test_local_kvstore_get_wallet_error` - Wallet error propagates as WalletError
+- `test_local_kvstore_get_entry_empty_key_fails` - get_entry with empty key fails
+- `test_local_kvstore_get_entry_not_found` - get_entry returns None for missing key
+
+**LocalKVStore Set Tests** (5 async tests)
+- `test_local_kvstore_set_empty_key_fails` - Empty key returns KvStoreInvalidKey
+- `test_local_kvstore_set_empty_value_fails` - Empty value returns KvStoreInvalidValue
+- `test_local_kvstore_set_success` - Set key-value, returns outpoint ("txid.0" format)
+- `test_local_kvstore_set_wallet_error` - Wallet create_action error propagates
+- `test_local_kvstore_set_with_options` - Set with description, token_amount, and tags options
+
+**LocalKVStore Remove Tests** (3 async tests)
+- `test_local_kvstore_remove_empty_key_fails` - Empty key returns KvStoreInvalidKey
+- `test_local_kvstore_remove_not_found_returns_empty` - Remove non-existent key returns empty string
+- `test_local_kvstore_remove_wallet_error` - Wallet list_outputs error propagates
+
+**LocalKVStore Has Tests** (2 async tests)
+- `test_local_kvstore_has_empty_key_fails` - Empty key returns KvStoreInvalidKey
+- `test_local_kvstore_has_not_found` - Non-existent key returns false
+
+**LocalKVStore Keys/List/Count/Clear Tests** (5 async tests)
+- `test_local_kvstore_keys_empty` - List all keys (empty result)
+- `test_local_kvstore_list_empty` - List entries with no query (empty result)
+- `test_local_kvstore_list_with_query` - List with KVStoreQuery filter
+- `test_local_kvstore_count_empty` - Entry count (0)
 - `test_local_kvstore_clear_empty` - Clear all entries
 
-**Signature Verification Tests**
-- `test_verify_signature_missing` - Missing signature returns false
-- `test_verify_signature_invalid_bytes` - Invalid DER signature returns false
-- `test_verify_signature_invalid_controller` - Invalid pubkey returns false
-
-**Cross-SDK Compatibility**
+**Cross-SDK Compatibility** (4 tests)
 - `test_kvstore_config_matches_go_sdk_defaults` - Config defaults match Go SDK
-- `test_kvstore_entry_json_field_names_match_typescript` - camelCase field names
-- `test_pushdrop_field_order_matches_spec` - Field indices match specification
+- `test_kvstore_entry_json_field_names_match_typescript` - camelCase field names (protocolId)
+- `test_kvstore_query_json_field_names_match_typescript` - camelCase (tagQueryMode, sortOrder)
+- `test_pushdrop_field_order_matches_spec` - Field indices match specification (6 fields)
+
+**Error Type Tests** (1 test)
+- `test_kvstore_error_types` - KvStoreEmptyContext, KvStoreInvalidKey, KvStoreInvalidValue, KvStoreKeyNotFound, KvStoreError, KvStoreCorruptedState
+
+**Edge Cases and Boundary Tests** (5 tests)
+- `test_kvstore_entry_with_unicode_values` - Emoji keys and Chinese character values with JSON roundtrip
+- `test_kvstore_query_with_large_limit` - Query with u32::MAX for limit and skip
+- `test_kvstore_token_with_large_values` - Token with 64-char txid and u32::MAX/u64::MAX values
+- `test_kvstore_config_empty_topics` - Config with empty topics vector
+- `test_kvstore_entry_empty_tags` - Entry with empty tags vector
 
 ### Messages Tests (`messages_tests.rs`)
 
@@ -976,35 +1038,17 @@ cargo test --test wallet_tests --features wallet
 # Run all tests with full feature (includes all modules)
 cargo test --features full
 
-# Run all tests with transaction feature
-cargo test --features transaction
-
-# Run all tests with compat feature (includes BIP-39)
-cargo test --features compat
-
-# Run all tests with auth feature
-cargo test --features auth
-
-# Run all tests with overlay feature
-cargo test --features overlay
-
-# Run all tests with registry feature
-cargo test --features registry
-
-# Run all tests with identity feature
-cargo test --features identity
-
-# Run all tests with kvstore feature
-cargo test --features kvstore
-
-# Run all tests with messages feature
-cargo test --features messages
-
-# Run all tests with storage feature
-cargo test --features storage
-
-# Run all tests with wallet feature
-cargo test --features wallet
+# Run tests by feature group
+cargo test --features transaction      # Transaction, script, primitives
+cargo test --features wallet           # Wallet, transaction, script, primitives
+cargo test --features messages         # Messages, wallet chain
+cargo test --features compat           # BIP-39/32, BSM, ECIES, Base58
+cargo test --features auth             # Auth, messages, wallet chain
+cargo test --features overlay          # Overlay, wallet chain
+cargo test --features storage          # Storage, overlay chain
+cargo test --features registry         # Registry, overlay chain
+cargo test --features kvstore          # KVStore, overlay chain
+cargo test --features identity         # Identity, auth, overlay chain
 
 # Run memory profiling tests (requires dhat-profiling feature)
 cargo test --test memory_profiling --features dhat-profiling -- --test-threads=1 --nocapture

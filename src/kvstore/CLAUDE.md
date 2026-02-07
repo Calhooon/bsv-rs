@@ -15,10 +15,10 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields) | ~746 |
-| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1376 |
-| `global.rs` | GlobalKVStore implementation | ~680 |
-| `interpreter.rs` | PushDrop token interpreter and KVStoreFields | ~438 |
+| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields) | ~787 |
+| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1379 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~760 |
+| `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
 
 ## Key Exports
 
@@ -108,11 +108,13 @@ Public key-value store using the overlay network.
 
 ### Features
 - **Public discovery**: Entries discoverable via lookup services
-- **PushDrop tokens**: Entries stored as on-chain tokens
-- **Signature verification**: Entries signed by controller
+- **PushDrop tokens**: Entries stored as on-chain tokens with field layout
+- **Signature verification**: Entries signed by controller, verified on retrieval
 - **Tag filtering**: Query by tags with "all" or "any" mode
 - **Network presets**: Supports Mainnet and Testnet configurations
-- **Cached identity key**: Controller pubkey cached for performance
+- **Cached identity key**: Controller pubkey cached via `Arc<Mutex<Option<String>>>`
+- **History building**: Uses `SyncHistorian` to traverse transaction ancestry for entry history
+- **Overlay broadcast**: Broadcasts tokens via `TopicBroadcaster`
 
 ### Methods
 
@@ -240,7 +242,8 @@ impl KVStoreQuery {
 
 ## Interpreter
 
-The `KVStoreInterpreter` extracts entries from PushDrop scripts:
+The `KVStoreInterpreter` extracts entries from PushDrop scripts. Signature verification
+uses a cached `ProtoWallet::anyone()` via `OnceLock` for efficient repeated verification.
 
 ```rust
 impl KVStoreInterpreter {
@@ -258,6 +261,7 @@ impl KVStoreInterpreter {
     ) -> Option<KVStoreEntry>;
 
     /// Verify signature of a KVStore token
+    /// Uses ProtoWallet::anyone() with SecurityLevel::App protocol
     /// Returns true if signature is valid, false if invalid/missing
     pub fn verify_signature(fields: &KVStoreFields, protocol_id: &str) -> bool;
 
@@ -418,6 +422,26 @@ match store.get("key", "default").await {
     Err(e) => println!("Other error: {}", e),
 }
 ```
+
+## Internal Design
+
+### Per-Key Locking
+
+Both `LocalKVStore` and `GlobalKVStore` implement per-key atomic locking using `tokio::sync::oneshot` channels
+to prevent concurrent modifications to the same key. Operations acquire a lock before mutating and release
+it after completion.
+
+### Signature Verification
+
+`GlobalKVStore` verifies token signatures on retrieval. The verification:
+1. Concatenates fields 0-4 (protocol_id + key + value + controller + optional tags)
+2. Uses `SecurityLevel::App` protocol with key_id `"kvstore-token"`
+3. Verifies via `ProtoWallet::anyone()` with `Counterparty::Other(controller_pubkey)`
+
+### History Building
+
+`GlobalKVStore` uses the overlay module's `SyncHistorian` to traverse transaction input ancestry
+and extract all previous values for a key/protocol combination, returned in chronological order (oldest first).
 
 ## Feature Flag
 

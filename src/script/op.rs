@@ -9,6 +9,84 @@ use std::sync::LazyLock;
 // Push value
 pub const OP_FALSE: u8 = 0x00;
 pub const OP_0: u8 = 0x00;
+
+// Direct push data (OP_DATA_1 through OP_DATA_75: push exactly N bytes)
+pub const OP_DATA_1: u8 = 0x01;
+pub const OP_DATA_2: u8 = 0x02;
+pub const OP_DATA_3: u8 = 0x03;
+pub const OP_DATA_4: u8 = 0x04;
+pub const OP_DATA_5: u8 = 0x05;
+pub const OP_DATA_6: u8 = 0x06;
+pub const OP_DATA_7: u8 = 0x07;
+pub const OP_DATA_8: u8 = 0x08;
+pub const OP_DATA_9: u8 = 0x09;
+pub const OP_DATA_10: u8 = 0x0a;
+pub const OP_DATA_11: u8 = 0x0b;
+pub const OP_DATA_12: u8 = 0x0c;
+pub const OP_DATA_13: u8 = 0x0d;
+pub const OP_DATA_14: u8 = 0x0e;
+pub const OP_DATA_15: u8 = 0x0f;
+pub const OP_DATA_16: u8 = 0x10;
+pub const OP_DATA_17: u8 = 0x11;
+pub const OP_DATA_18: u8 = 0x12;
+pub const OP_DATA_19: u8 = 0x13;
+pub const OP_DATA_20: u8 = 0x14;
+pub const OP_DATA_21: u8 = 0x15;
+pub const OP_DATA_22: u8 = 0x16;
+pub const OP_DATA_23: u8 = 0x17;
+pub const OP_DATA_24: u8 = 0x18;
+pub const OP_DATA_25: u8 = 0x19;
+pub const OP_DATA_26: u8 = 0x1a;
+pub const OP_DATA_27: u8 = 0x1b;
+pub const OP_DATA_28: u8 = 0x1c;
+pub const OP_DATA_29: u8 = 0x1d;
+pub const OP_DATA_30: u8 = 0x1e;
+pub const OP_DATA_31: u8 = 0x1f;
+pub const OP_DATA_32: u8 = 0x20;
+pub const OP_DATA_33: u8 = 0x21;
+pub const OP_DATA_34: u8 = 0x22;
+pub const OP_DATA_35: u8 = 0x23;
+pub const OP_DATA_36: u8 = 0x24;
+pub const OP_DATA_37: u8 = 0x25;
+pub const OP_DATA_38: u8 = 0x26;
+pub const OP_DATA_39: u8 = 0x27;
+pub const OP_DATA_40: u8 = 0x28;
+pub const OP_DATA_41: u8 = 0x29;
+pub const OP_DATA_42: u8 = 0x2a;
+pub const OP_DATA_43: u8 = 0x2b;
+pub const OP_DATA_44: u8 = 0x2c;
+pub const OP_DATA_45: u8 = 0x2d;
+pub const OP_DATA_46: u8 = 0x2e;
+pub const OP_DATA_47: u8 = 0x2f;
+pub const OP_DATA_48: u8 = 0x30;
+pub const OP_DATA_49: u8 = 0x31;
+pub const OP_DATA_50: u8 = 0x32;
+pub const OP_DATA_51: u8 = 0x33;
+pub const OP_DATA_52: u8 = 0x34;
+pub const OP_DATA_53: u8 = 0x35;
+pub const OP_DATA_54: u8 = 0x36;
+pub const OP_DATA_55: u8 = 0x37;
+pub const OP_DATA_56: u8 = 0x38;
+pub const OP_DATA_57: u8 = 0x39;
+pub const OP_DATA_58: u8 = 0x3a;
+pub const OP_DATA_59: u8 = 0x3b;
+pub const OP_DATA_60: u8 = 0x3c;
+pub const OP_DATA_61: u8 = 0x3d;
+pub const OP_DATA_62: u8 = 0x3e;
+pub const OP_DATA_63: u8 = 0x3f;
+pub const OP_DATA_64: u8 = 0x40;
+pub const OP_DATA_65: u8 = 0x41;
+pub const OP_DATA_66: u8 = 0x42;
+pub const OP_DATA_67: u8 = 0x43;
+pub const OP_DATA_68: u8 = 0x44;
+pub const OP_DATA_69: u8 = 0x45;
+pub const OP_DATA_70: u8 = 0x46;
+pub const OP_DATA_71: u8 = 0x47;
+pub const OP_DATA_72: u8 = 0x48;
+pub const OP_DATA_73: u8 = 0x49;
+pub const OP_DATA_74: u8 = 0x4a;
+pub const OP_DATA_75: u8 = 0x4b;
+
 pub const OP_PUSHDATA1: u8 = 0x4c;
 pub const OP_PUSHDATA2: u8 = 0x4d;
 pub const OP_PUSHDATA4: u8 = 0x4e;
@@ -217,6 +295,84 @@ static OP_NAME_TO_VALUE: LazyLock<HashMap<&'static str, u8>> = LazyLock::new(|| 
     // Push value
     m.insert("OP_FALSE", OP_FALSE);
     m.insert("OP_0", OP_0);
+
+    // Direct push data
+    m.insert("OP_DATA_1", OP_DATA_1);
+    m.insert("OP_DATA_2", OP_DATA_2);
+    m.insert("OP_DATA_3", OP_DATA_3);
+    m.insert("OP_DATA_4", OP_DATA_4);
+    m.insert("OP_DATA_5", OP_DATA_5);
+    m.insert("OP_DATA_6", OP_DATA_6);
+    m.insert("OP_DATA_7", OP_DATA_7);
+    m.insert("OP_DATA_8", OP_DATA_8);
+    m.insert("OP_DATA_9", OP_DATA_9);
+    m.insert("OP_DATA_10", OP_DATA_10);
+    m.insert("OP_DATA_11", OP_DATA_11);
+    m.insert("OP_DATA_12", OP_DATA_12);
+    m.insert("OP_DATA_13", OP_DATA_13);
+    m.insert("OP_DATA_14", OP_DATA_14);
+    m.insert("OP_DATA_15", OP_DATA_15);
+    m.insert("OP_DATA_16", OP_DATA_16);
+    m.insert("OP_DATA_17", OP_DATA_17);
+    m.insert("OP_DATA_18", OP_DATA_18);
+    m.insert("OP_DATA_19", OP_DATA_19);
+    m.insert("OP_DATA_20", OP_DATA_20);
+    m.insert("OP_DATA_21", OP_DATA_21);
+    m.insert("OP_DATA_22", OP_DATA_22);
+    m.insert("OP_DATA_23", OP_DATA_23);
+    m.insert("OP_DATA_24", OP_DATA_24);
+    m.insert("OP_DATA_25", OP_DATA_25);
+    m.insert("OP_DATA_26", OP_DATA_26);
+    m.insert("OP_DATA_27", OP_DATA_27);
+    m.insert("OP_DATA_28", OP_DATA_28);
+    m.insert("OP_DATA_29", OP_DATA_29);
+    m.insert("OP_DATA_30", OP_DATA_30);
+    m.insert("OP_DATA_31", OP_DATA_31);
+    m.insert("OP_DATA_32", OP_DATA_32);
+    m.insert("OP_DATA_33", OP_DATA_33);
+    m.insert("OP_DATA_34", OP_DATA_34);
+    m.insert("OP_DATA_35", OP_DATA_35);
+    m.insert("OP_DATA_36", OP_DATA_36);
+    m.insert("OP_DATA_37", OP_DATA_37);
+    m.insert("OP_DATA_38", OP_DATA_38);
+    m.insert("OP_DATA_39", OP_DATA_39);
+    m.insert("OP_DATA_40", OP_DATA_40);
+    m.insert("OP_DATA_41", OP_DATA_41);
+    m.insert("OP_DATA_42", OP_DATA_42);
+    m.insert("OP_DATA_43", OP_DATA_43);
+    m.insert("OP_DATA_44", OP_DATA_44);
+    m.insert("OP_DATA_45", OP_DATA_45);
+    m.insert("OP_DATA_46", OP_DATA_46);
+    m.insert("OP_DATA_47", OP_DATA_47);
+    m.insert("OP_DATA_48", OP_DATA_48);
+    m.insert("OP_DATA_49", OP_DATA_49);
+    m.insert("OP_DATA_50", OP_DATA_50);
+    m.insert("OP_DATA_51", OP_DATA_51);
+    m.insert("OP_DATA_52", OP_DATA_52);
+    m.insert("OP_DATA_53", OP_DATA_53);
+    m.insert("OP_DATA_54", OP_DATA_54);
+    m.insert("OP_DATA_55", OP_DATA_55);
+    m.insert("OP_DATA_56", OP_DATA_56);
+    m.insert("OP_DATA_57", OP_DATA_57);
+    m.insert("OP_DATA_58", OP_DATA_58);
+    m.insert("OP_DATA_59", OP_DATA_59);
+    m.insert("OP_DATA_60", OP_DATA_60);
+    m.insert("OP_DATA_61", OP_DATA_61);
+    m.insert("OP_DATA_62", OP_DATA_62);
+    m.insert("OP_DATA_63", OP_DATA_63);
+    m.insert("OP_DATA_64", OP_DATA_64);
+    m.insert("OP_DATA_65", OP_DATA_65);
+    m.insert("OP_DATA_66", OP_DATA_66);
+    m.insert("OP_DATA_67", OP_DATA_67);
+    m.insert("OP_DATA_68", OP_DATA_68);
+    m.insert("OP_DATA_69", OP_DATA_69);
+    m.insert("OP_DATA_70", OP_DATA_70);
+    m.insert("OP_DATA_71", OP_DATA_71);
+    m.insert("OP_DATA_72", OP_DATA_72);
+    m.insert("OP_DATA_73", OP_DATA_73);
+    m.insert("OP_DATA_74", OP_DATA_74);
+    m.insert("OP_DATA_75", OP_DATA_75);
+
     m.insert("OP_PUSHDATA1", OP_PUSHDATA1);
     m.insert("OP_PUSHDATA2", OP_PUSHDATA2);
     m.insert("OP_PUSHDATA4", OP_PUSHDATA4);
@@ -685,5 +841,20 @@ mod tests {
         assert_eq!(OP_MUL, 0x95);
         assert_eq!(OP_DIV, 0x96);
         assert_eq!(OP_MOD, 0x97);
+    }
+
+    #[test]
+    fn test_op_data_constants() {
+        // Boundary values
+        assert_eq!(OP_DATA_1, 0x01);
+        assert_eq!(OP_DATA_75, 0x4b);
+
+        // Verify they don't collide with PUSHDATA opcodes
+        assert!(OP_DATA_75 < OP_PUSHDATA1);
+
+        // Name lookups work
+        assert_eq!(name_to_opcode("OP_DATA_1"), Some(0x01));
+        assert_eq!(name_to_opcode("OP_DATA_75"), Some(0x4b));
+        assert_eq!(name_to_opcode("OP_DATA_33"), Some(0x21));
     }
 }

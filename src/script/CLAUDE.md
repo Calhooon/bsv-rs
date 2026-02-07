@@ -10,7 +10,7 @@ This module provides complete Bitcoin Script functionality for the BSV SDK:
 - Script number encoding for stack operations
 - Full script interpreter with spend validation
 - Script templates for common transaction types (P2PKH, R-Puzzle, PushDrop)
-- Script type detection (P2PKH, P2PK, P2SH, multisig, data)
+- Script type detection (P2PKH, P2PK, P2SH, multisig, data, safe data carrier)
 - Transaction interface traits for Script/Transaction module integration
 
 Compatible with the TypeScript and Go SDKs through shared opcode values, serialization formats, and execution semantics.
@@ -140,6 +140,7 @@ impl Script {
     pub fn is_p2pk(&self) -> bool              // <33|65 bytes> OP_CHECKSIG
     pub fn is_p2sh(&self) -> bool              // OP_HASH160 <20> OP_EQUAL
     pub fn is_data(&self) -> bool              // OP_RETURN or OP_FALSE OP_RETURN
+    pub fn is_safe_data_carrier(&self) -> bool // OP_FALSE OP_RETURN only (prunable, unspendable)
     pub fn is_multisig(&self) -> Option<(u8, u8)>  // Returns (M, N) if multisig
     pub fn opcode_to_small_int(op: u8) -> Option<u8>  // OP_1..OP_16 -> 1..16
     pub fn extract_pubkey_hash(&self) -> Option<[u8; 20]>  // From P2PKH scripts
@@ -477,4 +478,4 @@ const REQUIRE_CLEAN_STACK: bool = true;
 - `../CLAUDE.md` - Root SDK documentation
 - `../primitives/CLAUDE.md` - Primitives module (encoding, hashing)
 - `../primitives/bsv/CLAUDE.md` - BSV primitives (sighash, transaction signatures)
-- `templates/CLAUDE.md` - Templates module documentation (if present)
+- `templates/CLAUDE.md` - Templates module documentation

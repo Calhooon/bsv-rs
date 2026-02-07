@@ -1259,6 +1259,33 @@ impl Transaction {
     pub fn output_count(&self) -> usize {
         self.outputs.len()
     }
+
+    /// Returns true if this is a coinbase transaction.
+    ///
+    /// A coinbase transaction has exactly one input with a null TXID
+    /// (all zeros) and output index of 0xFFFFFFFF.
+    pub fn is_coinbase(&self) -> bool {
+        if self.inputs.len() != 1 {
+            return false;
+        }
+        let input = &self.inputs[0];
+        if input.source_output_index != 0xFFFFFFFF {
+            return false;
+        }
+        // Check if source TXID is all zeros
+        if let Some(ref txid) = input.source_txid {
+            txid.chars().all(|c| c == '0')
+        } else {
+            false
+        }
+    }
+
+    /// Returns true if this transaction has any data-only outputs (OP_RETURN).
+    ///
+    /// Checks each output's locking script using `Script::is_data()`.
+    pub fn has_data_outputs(&self) -> bool {
+        self.outputs.iter().any(|o| o.locking_script.as_script().is_data())
+    }
 }
 
 impl Default for Transaction {
@@ -1488,5 +1515,83 @@ mod tests {
         tx.update_metadata("key", serde_json::json!("value"));
 
         assert_eq!(tx.metadata.get("key"), Some(&serde_json::json!("value")));
+    }
+
+    #[test]
+    fn test_is_coinbase() {
+        // Create a coinbase transaction
+        let mut coinbase_tx = Transaction::new();
+        coinbase_tx.inputs.push(TransactionInput {
+            source_transaction: None,
+            source_txid: Some("0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+            source_output_index: 0xFFFFFFFF,
+            unlocking_script: Some(UnlockingScript::from_hex("03a75e0b").unwrap()),
+            unlocking_script_template: None,
+            sequence: 0xFFFFFFFF,
+        });
+        coinbase_tx.outputs.push(TransactionOutput::new(
+            5000000000,
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
+        ));
+        assert!(coinbase_tx.is_coinbase());
+
+        // Regular transaction is not coinbase
+        let regular_tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
+        assert!(!regular_tx.is_coinbase());
+
+        // Transaction with 2 inputs is not coinbase
+        let mut two_input_tx = Transaction::new();
+        two_input_tx.inputs.push(TransactionInput {
+            source_transaction: None,
+            source_txid: Some("0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+            source_output_index: 0xFFFFFFFF,
+            unlocking_script: None,
+            unlocking_script_template: None,
+            sequence: 0xFFFFFFFF,
+        });
+        two_input_tx.inputs.push(TransactionInput {
+            source_transaction: None,
+            source_txid: Some("abc123".repeat(11)),
+            source_output_index: 0,
+            unlocking_script: None,
+            unlocking_script_template: None,
+            sequence: 0xFFFFFFFF,
+        });
+        assert!(!two_input_tx.is_coinbase());
+    }
+
+    #[test]
+    fn test_has_data_outputs() {
+        // Transaction with no data outputs
+        let mut tx = Transaction::new();
+        tx.outputs.push(TransactionOutput::new(
+            100_000,
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
+        ));
+        assert!(!tx.has_data_outputs());
+
+        // Transaction with an OP_RETURN output
+        let mut tx_data = Transaction::new();
+        tx_data.outputs.push(TransactionOutput::new(
+            0,
+            LockingScript::from_hex("6a0568656c6c6f").unwrap(), // OP_RETURN "hello"
+        ));
+        assert!(tx_data.has_data_outputs());
+
+        // Transaction with both data and non-data outputs
+        let mut tx_mixed = Transaction::new();
+        tx_mixed.outputs.push(TransactionOutput::new(
+            100_000,
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
+        ));
+        tx_mixed.outputs.push(TransactionOutput::new(
+            0,
+            LockingScript::from_asm("OP_FALSE OP_RETURN").unwrap(),
+        ));
+        assert!(tx_mixed.has_data_outputs());
+
+        // Empty outputs
+        let tx_empty = Transaction::new();
+        assert!(!tx_empty.has_data_outputs());
     }
 }

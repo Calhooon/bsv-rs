@@ -57,6 +57,7 @@ pub mod host_reputation_tracker;
 pub mod lookup_resolver;
 pub mod overlay_admin_token_template;
 pub mod topic_broadcaster;
+pub mod retry;
 pub mod types;
 
 // Re-exports from facilitators
@@ -87,6 +88,9 @@ pub use overlay_admin_token_template::{
 pub use topic_broadcaster::{
     RequireAck, SHIPBroadcaster, SHIPCast, TopicBroadcaster, TopicBroadcasterConfig,
 };
+
+// Re-exports from retry
+pub use retry::{with_double_spend_retry, DEFAULT_MAX_RETRIES};
 
 // Re-exports from types
 pub use types::{

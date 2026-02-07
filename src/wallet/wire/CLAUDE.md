@@ -9,11 +9,11 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~173 |
-| `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display impls | ~198 |
-| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~1475 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~944 |
-| `transceiver.rs` | Client-side message serialization and full wallet interface | ~1617 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~172 |
+| `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display impls | ~197 |
+| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~1476 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~943 |
+| `transceiver.rs` | Client-side message serialization and full wallet interface | ~1619 |
 
 ## Architecture
 
@@ -119,8 +119,6 @@ This allows -1 (representing `null`/`None`) to be encoded as a single byte (0x01
 
 ### Counterparty Encoding
 
-The counterparty field uses special sentinel values:
-
 ```rust
 pub mod counterparty_codes {
     pub const UNDEFINED: u8 = 0;   // None
@@ -146,283 +144,105 @@ pub mod status_codes {
 }
 ```
 
-## Usage
+## WireReader / WireWriter
 
-### Server-Side (Processor)
+`WireReader<'a>` and `WireWriter` wrap the primitives `Reader`/`Writer` with signed varint support and wallet-specific type methods.
 
-The processor is generic over `W: WalletInterface`, allowing any wallet implementation:
+**Basic types:** `read/write_u8`, `i8`, `u16_le`, `u32_le`, `u64_le`, `var_int`, `signed_var_int`, `optional_var_int`, `bytes`, plus `read_remaining`/`remaining`/`is_empty`/`position` on reader and `len`/`is_empty`/`as_bytes`/`into_bytes`/`with_capacity` on writer.
 
-```rust
-use bsv_sdk::wallet::wire::WalletWireProcessor;
-use bsv_sdk::wallet::{ProtoWallet, Network};
-use bsv_sdk::wallet::interface::WalletInterface;
+**Wire protocol types (both reader and writer):**
+- `string`, `optional_string`, `optional_bytes`, `string_array`, `optional_string_array`
+- `optional_bool`, `outpoint`, `outpoint_string`, `counterparty`
+- `protocol_id`, `optional_protocol_id`, `action_status`
+- `txid_hex`, `query_mode`, `optional_query_mode`
+- `output_include`, `optional_output_include`
+- `string_map`, `optional_string_map`
+- `send_with_result_status`, `send_with_result`, `send_with_result_array`
+- `sign_action_spend`, `sign_action_spends`
+- `wallet_certificate`, `optional_wallet_certificate`
+- `identity_certifier`, `optional_identity_certifier`, `identity_certificate`
+- `wallet_payment`, `optional_wallet_payment`
+- `basket_insertion`, `optional_basket_insertion`
+- `internalize_output`
+- `wallet_action_input`, `wallet_action_output`, `wallet_action`
+- `wallet_output`
 
-// Create processor with ProtoWallet (crypto-only operations)
-let wallet = ProtoWallet::new(Some(private_key));
-let processor = WalletWireProcessor::new(wallet);
+`WireWriter` implements `Default`.
 
-// Or create with custom network/version
-let processor = WalletWireProcessor::with_config(
-    wallet,
-    Network::Testnet,
-    "1.0.0"
-);
+## Processor (Server-Side)
 
-// Access processor properties
-let network = processor.network();     // Network::Testnet
-let version = processor.version();     // "1.0.0"
-let wallet_ref = processor.wallet();   // &ProtoWallet
+`WalletWireProcessor<W: WalletInterface>` handles incoming binary messages, dispatches to wallet methods, and returns serialized responses.
 
-// Process incoming request
-let response = processor.process_message(&request_bytes).await?;
+**Configuration:**
+- `new(wallet)` - default (mainnet, version "0.1.0")
+- `with_config(wallet, network, version)` - custom network/version
+- `wallet()`, `network()`, `version()` - accessors
 
-// Can also use with any WalletInterface implementor
-struct MyFullWallet { /* ... */ }
-impl WalletInterface for MyFullWallet { /* all 28 methods */ }
+**Fully implemented handlers (delegated to wallet):**
+- getPublicKey, encrypt, decrypt, createHmac, verifyHmac
+- createSignature, verifySignature
+- revealCounterpartyKeyLinkage, revealSpecificKeyLinkage
+- isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight
 
-let full_wallet = MyFullWallet::new();
-let processor = WalletWireProcessor::new(full_wallet);
-```
+**Processor-local handlers:**
+- getNetwork (uses processor's configured network)
+- getVersion (uses processor's configured version)
 
-### Client-Side (Transceiver)
-
-```rust
-use bsv_sdk::wallet::wire::{WalletWire, WalletWireTransceiver};
-use bsv_sdk::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel, Counterparty};
-
-// Implement transport
-struct HttpWire { url: String }
-
-#[async_trait::async_trait]
-impl WalletWire for HttpWire {
-    async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
-        // HTTP POST to wallet endpoint
-    }
-}
-
-// Create transceiver
-let wire = HttpWire { url: "https://wallet.example.com".into() };
-let transceiver = WalletWireTransceiver::new(wire);
-
-// Access the wire transport
-let wire_ref = transceiver.wire();
-
-// Make wallet calls - get a derived public key
-let result = transceiver.get_public_key(
-    GetPublicKeyArgs {
-        identity_key: false,  // Derive from protocol/key_id
-        protocol_id: Some(Protocol::new(SecurityLevel::App, "my app")),
-        key_id: Some("key-1".to_string()),
-        counterparty: Some(Counterparty::Self_),
-        for_self: Some(true),
-    },
-    "app.example.com"
-).await?;
-
-// Or get the identity public key
-let identity_key = transceiver.get_public_key(
-    GetPublicKeyArgs {
-        identity_key: true,
-        protocol_id: None,
-        key_id: None,
-        counterparty: None,
-        for_self: None,
-    },
-    "app.example.com"
-).await?;
-```
-
-### Direct Encoding
-
-```rust
-use bsv_sdk::wallet::wire::{WireReader, WireWriter};
-use bsv_sdk::wallet::types::{Counterparty, Protocol, SecurityLevel};
-
-// Writing
-let mut writer = WireWriter::new();
-writer.write_protocol_id(&Protocol::new(SecurityLevel::App, "test"));
-writer.write_string("key-id");
-writer.write_counterparty(Some(&Counterparty::Self_));
-writer.write_optional_bool(Some(true));
-
-let bytes = writer.into_bytes();
-
-// Reading
-let mut reader = WireReader::new(&bytes);
-let protocol = reader.read_protocol_id()?;
-let key_id = reader.read_string()?;
-let counterparty = reader.read_counterparty()?;
-let for_self = reader.read_optional_bool()?;
-```
-
-## Complex Type Encoding
-
-The encoding module supports many wallet-specific types:
-
-### WireReader Methods
-
-**Basic Types:**
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `read_u8()` / `read_i8()` | `u8` / `i8` | Single byte |
-| `read_u16_le()` / `read_u32_le()` / `read_u64_le()` | integers | Little-endian |
-| `read_var_int()` | `u64` | Unsigned varint |
-| `read_signed_var_int()` | `i64` | ZigZag-encoded signed varint |
-| `read_optional_var_int()` | `Option<u64>` | Varint or None if negative |
-| `read_bytes(len)` | `&[u8]` | Fixed-length bytes |
-| `read_remaining()` | `&[u8]` | All remaining bytes |
-| `remaining()` | `usize` | Bytes remaining |
-| `is_empty()` | `bool` | True if no bytes remain |
-| `position()` | `usize` | Current read position |
-
-**Wire Protocol Types:**
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `read_string()` | `String` | Length-prefixed UTF-8 |
-| `read_optional_string()` | `Option<String>` | -1 = None |
-| `read_optional_bytes()` | `Option<Vec<u8>>` | -1 = None |
-| `read_string_array()` | `Vec<String>` | Count + strings |
-| `read_optional_bool()` | `Option<bool>` | -1=None, 0=false, 1=true |
-| `read_outpoint()` | `Outpoint` | 32-byte txid + varint vout |
-| `read_outpoint_string()` | `String` | Outpoint as "txid.vout" |
-| `read_counterparty()` | `Option<Counterparty>` | Sentinel or 33-byte pubkey |
-| `read_protocol_id()` | `Protocol` | Security level + name |
-| `read_optional_protocol_id()` | `Option<Protocol>` | 255 = None |
-| `read_action_status()` | `Option<ActionStatus>` | Status code (1-8 or -1) |
-| `read_txid_hex()` | `String` | 32-byte txid as hex |
-| `read_query_mode()` | `QueryMode` | Any (0) or All (1) |
-| `read_optional_query_mode()` | `Option<QueryMode>` | -1 = None |
-| `read_output_include()` | `OutputInclude` | Locking scripts or full tx |
-| `read_optional_output_include()` | `Option<OutputInclude>` | -1 = None |
-| `read_string_map()` | `HashMap<String, String>` | Key-value pairs |
-| `read_optional_string_map()` | `Option<HashMap<...>>` | -1 = None |
-| `read_send_with_result_status()` | `SendWithResultStatus` | 0/1/2 status |
-| `read_send_with_result()` | `SendWithResult` | Txid + status |
-| `read_send_with_result_array()` | `Option<Vec<SendWithResult>>` | Array or None |
-| `read_sign_action_spend()` | `SignActionSpend` | Unlocking script + sequence |
-| `read_sign_action_spends()` | `HashMap<u32, SignActionSpend>` | Index -> spend map |
-| `read_wallet_certificate()` | `WalletCertificate` | Certificate with fields |
-| `read_optional_wallet_certificate()` | `Option<WalletCertificate>` | -1 = None |
-| `read_identity_certifier()` | `IdentityCertifier` | Certifier info |
-| `read_optional_identity_certifier()` | `Option<IdentityCertifier>` | -1 = None |
-| `read_identity_certificate()` | `IdentityCertificate` | Full identity cert |
-| `read_wallet_payment()` | `WalletPayment` | Payment derivation info |
-| `read_optional_wallet_payment()` | `Option<WalletPayment>` | -1 = None |
-| `read_basket_insertion()` | `BasketInsertion` | Basket + tags |
-| `read_optional_basket_insertion()` | `Option<BasketInsertion>` | -1 = None |
-| `read_internalize_output()` | `InternalizeOutput` | Output with remittance |
-| `read_wallet_action_input()` | `WalletActionInput` | Action input |
-| `read_wallet_action_output()` | `WalletActionOutput` | Action output |
-| `read_wallet_action()` | `WalletAction` | Full action with inputs/outputs |
-| `read_wallet_output()` | `WalletOutput` | Output with metadata |
-
-### WireWriter Methods
-
-**Basic Types:**
-- `write_u8()`, `write_i8()` - Single byte
-- `write_u16_le()`, `write_u32_le()`, `write_u64_le()` - Little-endian integers
-- `write_var_int()` - Unsigned varint
-- `write_signed_var_int()` - ZigZag-encoded signed varint
-- `write_optional_var_int()` - Varint or -1 for None
-- `write_bytes()` - Raw bytes
-- `len()`, `is_empty()`, `as_bytes()`, `into_bytes()` - Buffer access
-
-**Wire Protocol Types:**
-- `write_string()`, `write_optional_string()` - Strings
-- `write_optional_bytes()` - Optional byte arrays
-- `write_string_array()`, `write_optional_string_array()` - String arrays
-- `write_optional_bool()` - Optional boolean
-- `write_outpoint()`, `write_outpoint_string()` - Outpoints
-- `write_counterparty()` - Counterparty encoding
-- `write_protocol_id()`, `write_optional_protocol_id()` - Protocol IDs
-- `write_action_status()` - Action status codes
-- `write_txid_hex()` - Txid from hex string
-- `write_query_mode()`, `write_optional_query_mode()` - Query modes
-- `write_output_include()`, `write_optional_output_include()` - Output include modes
-- `write_string_map()`, `write_optional_string_map()` - String maps
-- `write_send_with_result_status()`, `write_send_with_result()`, `write_send_with_result_array()` - Send results
-- `write_sign_action_spend()`, `write_sign_action_spends()` - Sign action spends
-- `write_wallet_certificate()`, `write_optional_wallet_certificate()` - Certificates
-- `write_identity_certifier()`, `write_optional_identity_certifier()` - Certifier info
-- `write_identity_certificate()` - Identity certificates
-- `write_wallet_payment()`, `write_optional_wallet_payment()` - Payments
-- `write_basket_insertion()`, `write_optional_basket_insertion()` - Basket insertions
-- `write_internalize_output()` - Internalize outputs
-- `write_wallet_action_input()`, `write_wallet_action_output()` - Action I/O
-- `write_wallet_action()` - Full actions
-- `write_wallet_output()` - Wallet outputs
-
-## Implemented Methods
-
-### Processor (Server-Side)
-
-The `WalletWireProcessor<W>` is generic over `W: WalletInterface`. With `ProtoWallet`, the following operations are fully implemented:
-
-**Crypto Operations (delegated to wallet):**
-- [x] getPublicKey
-- [x] encrypt / decrypt
-- [x] createHmac / verifyHmac
-- [x] createSignature / verifySignature
-- [x] revealCounterpartyKeyLinkage / revealSpecificKeyLinkage
-
-**Status/Chain Operations:**
-- [x] isAuthenticated (delegates to wallet)
-- [x] waitForAuthentication (delegates to wallet)
-- [x] getHeight (delegates to wallet)
-- [x] getHeaderForHeight (delegates to wallet)
-- [x] getNetwork (uses processor's configured network)
-- [x] getVersion (uses processor's configured version)
-
-**Requires full wallet implementation** (returns error with ProtoWallet):
-- createAction, signAction, abortAction
-- listActions, internalizeAction
+**Stub handlers (return error, require full wallet):**
+- createAction, signAction, abortAction, listActions, internalizeAction
 - listOutputs, relinquishOutput
 - acquireCertificate, listCertificates, proveCertificate, relinquishCertificate
 - discoverByIdentityKey, discoverByAttributes
 
-### Transceiver (Client-Side)
+**Error codes:** 0=success, 1=generic, 6=invalid parameter, 7=insufficient funds.
 
-The `WalletWireTransceiver` implements serialization for ALL 28 methods:
+## Transceiver (Client-Side)
 
-**Key Operations:** getPublicKey, encrypt, decrypt, createHmac, verifyHmac, createSignature, verifySignature
+`WalletWireTransceiver<T: WalletWire>` serializes all 28 wallet methods into binary messages and deserializes responses.
 
-**Action Operations:** createAction, signAction, abortAction, listActions, internalizeAction
+- `new(wire)` - creates transceiver with wire transport
+- `wire()` - access underlying transport
 
-**Output Operations:** listOutputs, relinquishOutput
+**Implemented methods:**
+- **Key ops:** get_public_key, encrypt, decrypt, create_hmac, verify_hmac, create_signature, verify_signature
+- **Action ops:** create_action, sign_action, abort_action, list_actions, internalize_action
+- **Output ops:** list_outputs, relinquish_output
+- **Certificate ops:** acquire_certificate, list_certificates, prove_certificate, relinquish_certificate
+- **Discovery ops:** discover_by_identity_key, discover_by_attributes
+- **Chain ops:** get_height, get_network, get_version, get_header, wait_for_authentication, is_authenticated
 
-**Certificate Operations:** acquireCertificate, listCertificates, proveCertificate, relinquishCertificate
+**Helper methods:** `parse_certificate_from_binary`, `parse_discovery_result` (internal).
 
-**Discovery Operations:** discoverByIdentityKey, discoverByAttributes
+## Public Exports
 
-**Chain Operations:** getHeight, getNetwork, getVersion, getHeader (getHeaderForHeight)
+```rust
+pub use calls::WalletCall;
+pub use encoding::{WireReader, WireWriter};
+pub use processor::WalletWireProcessor;
+pub use transceiver::WalletWireTransceiver;
 
-**Auth Operations:** isAuthenticated, waitForAuthentication
+#[async_trait]
+pub trait WalletWire: Send + Sync {
+    async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error>;
+}
 
-**Key Linkage:** revealCounterpartyKeyLinkage, revealSpecificKeyLinkage (not exposed in transceiver public API)
-
-## Error Codes
-
-| Code | Meaning |
-|------|---------|
-| 0 | Success |
-| 1 | Generic error |
-| 6 | Invalid parameter |
-| 7 | Insufficient funds |
+pub mod counterparty_codes { /* UNDEFINED=0, SELF=11, ANYONE=12 */ }
+pub mod status_codes { /* COMPLETED=1 .. FAILED=8, UNKNOWN=-1 */ }
+```
 
 ## Testing
 
-The module includes comprehensive round-trip tests using a loopback wire:
+Tests use a loopback wire pattern connecting transceiver directly to processor:
 
 ```rust
-#[tokio::test]
-async fn test_roundtrip_encrypt_decrypt() {
-    let transceiver = create_loopback();
-    let plaintext = b"Hello, BSV!".to_vec();
+struct LoopbackWire {
+    processor: Arc<WalletWireProcessor<ProtoWallet>>,
+}
 
-    let encrypted = transceiver.encrypt(/* ... */).await.unwrap();
-    let decrypted = transceiver.decrypt(/* ... */).await.unwrap();
-
-    assert_eq!(decrypted.plaintext, plaintext);
+impl WalletWire for LoopbackWire {
+    async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+        self.processor.process_message(message).await
+    }
 }
 ```
 
@@ -435,88 +255,17 @@ cargo test wallet::wire --features wallet
 ## Cross-SDK Compatibility
 
 The wire format is binary-compatible with:
-
 - [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `WalletWireProcessor`, `WalletWireTransceiver`
 - [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `wallet/serializer`
 
-Messages serialized by one SDK can be deserialized by another, enabling cross-platform wallet communication.
-
-## WalletCall Enum
-
-The `WalletCall` enum provides type-safe call codes with helper methods:
-
-```rust
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum WalletCall {
-    CreateAction = 1,
-    SignAction = 2,
-    // ... through GetVersion = 28
-}
-
-impl WalletCall {
-    pub fn as_u8(self) -> u8;
-    pub fn method_name(self) -> &'static str;  // e.g., "createAction"
-}
-
-impl TryFrom<u8> for WalletCall { /* ... */ }
-impl Display for WalletCall { /* ... */ }
-```
-
-## Public Exports
-
-```rust
-// From mod.rs
-pub use calls::WalletCall;
-pub use encoding::{WireReader, WireWriter};
-pub use processor::WalletWireProcessor;
-pub use transceiver::WalletWireTransceiver;
-
-#[async_trait]
-pub trait WalletWire: Send + Sync {
-    async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error>;
-}
-
-pub mod counterparty_codes {
-    pub const UNDEFINED: u8 = 0;
-    pub const SELF: u8 = 11;
-    pub const ANYONE: u8 = 12;
-}
-
-pub mod status_codes {
-    pub const COMPLETED: i8 = 1;
-    pub const UNPROCESSED: i8 = 2;
-    pub const SENDING: i8 = 3;
-    pub const UNPROVEN: i8 = 4;
-    pub const UNSIGNED: i8 = 5;
-    pub const NOSEND: i8 = 6;
-    pub const NONFINAL: i8 = 7;
-    pub const FAILED: i8 = 8;
-    pub const UNKNOWN: i8 = -1;
-}
-```
-
-## WalletWireProcessor Configuration
-
-The processor can be configured with network and version:
-
-```rust
-// Default configuration (mainnet, "0.1.0")
-let processor = WalletWireProcessor::new(wallet);
-
-// Custom configuration
-let processor = WalletWireProcessor::with_config(
-    wallet,
-    Network::Testnet,
-    "2.0.0-beta"
-);
-```
+Messages serialized by one SDK can be deserialized by another.
 
 ## Dependencies
 
 - `async-trait` - For async trait methods in `WalletWire`
 - Internal: `primitives::encoding::{Reader, Writer}` for base serialization
-- Internal: `wallet::types` for all wallet type definitions (Outpoint, Counterparty, Protocol, etc.)
+- Internal: `wallet::types` for all wallet type definitions
+- Internal: `wallet::interface::WalletInterface` for processor generics
 
 ## Related Documentation
 

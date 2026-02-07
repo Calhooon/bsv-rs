@@ -14,7 +14,7 @@ This module provides decentralized file storage using content-addressed UHRP URL
 | `mod.rs` | 98 | Module root; re-exports public API |
 | `types.rs` | 202 | Core types (UploadableFile, DownloadResult, etc.) |
 | `utils.rs` | 503 | UHRP URL generation, parsing, validation, and cross-SDK test vectors |
-| `downloader.rs` | 337 | Download files from UHRP URLs via overlay lookup |
+| `downloader.rs` | 344 | Download files from UHRP URLs via overlay lookup |
 | `uploader.rs` | 445 | Upload files to storage services with retention management |
 
 ## Key Exports

@@ -9,11 +9,11 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with feature-gated exports | ~254 |
-| `types.rs` | Core wallet type definitions (70+ types) | ~1625 |
-| `interface.rs` | WalletInterface trait (26 methods) | ~297 |
-| `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~641 |
-| `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~491 |
+| `mod.rs` | Module root with feature-gated exports | ~253 |
+| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers) | ~1905 |
+| `interface.rs` | WalletInterface trait (28 methods) | ~297 |
+| `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~679 |
+| `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver | ~526 |
 | `proto_wallet.rs` | ProtoWallet + WalletInterface impl | ~1348 |
 | `validation.rs` | 40+ input validation helpers | ~1170 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
@@ -42,7 +42,7 @@ Wire protocol implementation:
 
 ### WalletInterface Trait
 
-The `WalletInterface` trait defines all 26 wallet operations (async with `originator` parameter):
+The `WalletInterface` trait defines all 28 wallet operations (async with `originator` parameter):
 
 | Category | Methods |
 |----------|---------|
@@ -164,6 +164,16 @@ Validation structs for action inputs/outputs:
 - `ValidSignActionSpend`, `ValidListOutputsArgs`, `ValidListActionsArgs`
 - Raw counterparts (`*Raw`) for unvalidated input
 
+### Hex Serialization Helpers (in `types.rs`)
+
+The `types.rs` module includes serde helper modules for cross-SDK JSON compatibility:
+- `hex_bytes` - Serializes `Vec<u8>` as hex strings (use with `#[serde(with = "hex_bytes")]`)
+- `hex_bytes_option` - Serializes `Option<Vec<u8>>` as optional hex strings
+- `hex_txid` - Serializes `[u8; 32]` TxId as hex strings
+- `hex_txid_vec_option` - Serializes `Option<Vec<[u8; 32]>>` as optional arrays of hex strings
+
+These ensure byte fields serialize as hex strings (e.g., `"76a914"`) rather than JSON arrays (e.g., `[118, 169, 20]`), matching the TypeScript and Go SDK wire formats.
+
 ### Core Types
 
 **SecurityLevel** - User interaction level for key derivation:
@@ -199,6 +209,7 @@ Validation structs for action inputs/outputs:
 - `identity_key_hex() -> String` - Returns identity key as hex string
 - `derive_public_key(protocol, key_id, counterparty, for_self)` - Derive public key
 - `derive_private_key(protocol, key_id, counterparty)` - Derive private key
+- `derive_private_key_raw(invoice_number, counterparty)` - Derive private key with raw invoice number (bypasses BRC-43 protocol name validation)
 - `derive_symmetric_key(protocol, key_id, counterparty)` - Derive symmetric key for encryption
 - `reveal_specific_secret()`, `reveal_counterparty_secret()` - For linkage revelation
 
@@ -212,7 +223,7 @@ Validation structs for action inputs/outputs:
 
 **KeyDeriverApi** - Trait implemented by both `KeyDeriver` and `CachedKeyDeriver`:
 - `identity_key()`, `identity_key_hex()`
-- `derive_public_key()`, `derive_private_key()`, `derive_symmetric_key()`
+- `derive_public_key()`, `derive_private_key()`, `derive_private_key_raw()`, `derive_symmetric_key()`
 - `reveal_specific_secret()`, `reveal_counterparty_secret()`
 
 **CacheConfig** - Configuration for CachedKeyDeriver:

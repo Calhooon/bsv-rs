@@ -18,7 +18,9 @@
 //! ```
 
 mod arc;
+mod teranode;
 mod whatsonchain;
 
 pub use arc::{ArcBroadcaster, ArcConfig};
+pub use teranode::{TeranodeBroadcaster, TeranodeConfig};
 pub use whatsonchain::{WhatsOnChainBroadcaster, WocBroadcastConfig, WocBroadcastNetwork};

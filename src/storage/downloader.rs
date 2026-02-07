@@ -18,8 +18,6 @@ use super::utils::is_valid_url;
 
 #[cfg(feature = "http")]
 use super::utils::get_hash_from_url;
-#[cfg(feature = "http")]
-use crate::primitives::hash::sha256;
 
 /// Configuration for StorageDownloader.
 #[derive(Clone)]
@@ -230,7 +228,9 @@ impl StorageDownloader {
         host: &str,
         expected_hash: &[u8; 32],
     ) -> Result<DownloadResult> {
-        let response = client
+        use sha2::{Digest, Sha256};
+
+        let mut response = client
             .get(host)
             .send()
             .await
@@ -251,14 +251,21 @@ impl StorageDownloader {
             .unwrap_or("application/octet-stream")
             .to_string();
 
-        let data = response
-            .bytes()
+        // Stream chunks with incremental SHA-256 hashing
+        let mut hasher = Sha256::new();
+        let mut data = Vec::new();
+
+        while let Some(chunk) = response
+            .chunk()
             .await
-            .map_err(|e| Error::OverlayError(format!("Failed to read response body: {}", e)))?
-            .to_vec();
+            .map_err(|e| Error::OverlayError(format!("Failed to read response chunk: {}", e)))?
+        {
+            hasher.update(&chunk);
+            data.extend_from_slice(&chunk);
+        }
 
         // Verify hash
-        let content_hash = sha256(&data);
+        let content_hash: [u8; 32] = hasher.finalize().into();
         if &content_hash != expected_hash {
             return Err(Error::OverlayError(format!(
                 "Content hash mismatch from {}",

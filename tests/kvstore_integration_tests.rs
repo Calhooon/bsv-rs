@@ -177,6 +177,9 @@ impl WalletInterface for MockWallet {
             no_send_change: None,
             send_with_results: None,
             signable_transaction: None,
+            input_type: None,
+            inputs: None,
+            reference_number: None,
         })
     }
 

@@ -106,7 +106,8 @@ pub use broadcaster::{
     BroadcastResult, BroadcastStatus, Broadcaster,
 };
 pub use broadcasters::{
-    ArcBroadcaster, ArcConfig, WhatsOnChainBroadcaster, WocBroadcastConfig, WocBroadcastNetwork,
+    ArcBroadcaster, ArcConfig, TeranodeBroadcaster, TeranodeConfig, WhatsOnChainBroadcaster,
+    WocBroadcastConfig, WocBroadcastNetwork,
 };
 pub use chain_tracker::{
     AlwaysValidChainTracker, ChainTracker, ChainTrackerError, MockChainTracker,
@@ -124,3 +125,8 @@ pub use input::TransactionInput;
 pub use merkle_path::{MerklePath, MerklePathLeaf};
 pub use output::TransactionOutput;
 pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};
+
+// Sighash constants re-exported for convenience
+pub use crate::primitives::bsv::sighash::{
+    SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
+};
