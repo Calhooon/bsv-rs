@@ -173,49 +173,82 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                 // Process the message based on type
                 match message.message_type {
                     MessageType::InitialResponse => {
-                        // Process InitialResponse - complete the handshake
-                        // yourNonce is the client's session nonce (echoed back by server)
-                        let client_nonce = message.your_nonce.as_ref().ok_or_else(|| {
-                            Error::AuthError("InitialResponse missing your_nonce".into())
-                        })?;
+                        // Process InitialResponse - complete the handshake.
+                        // Errors must be sent through the oneshot channel so the
+                        // caller gets the real error instead of a timeout.
+                        let result: Result<(String, String)> = (|| {
+                            // yourNonce is the client's session nonce (echoed back by server)
+                            let client_nonce =
+                                message.your_nonce.as_ref().ok_or_else(|| {
+                                    Error::AuthError(
+                                        "InitialResponse missing your_nonce".into(),
+                                    )
+                                })?;
 
-                        // nonce is the server's session nonce (responder's own nonce)
-                        let server_nonce = message.nonce.as_ref().ok_or_else(|| {
-                            Error::AuthError("InitialResponse missing nonce".into())
-                        })?;
+                            // The server's session nonce. Our own process_initial_request()
+                            // sets both `nonce` and `initial_nonce`, but the TS SDK only sends
+                            // `initialNonce` (no `nonce` field). The Go SDK sends both.
+                            // Fall back to initial_nonce when nonce is absent for cross-SDK compat.
+                            let server_nonce = message
+                                .nonce
+                                .as_ref()
+                                .or(message.initial_nonce.as_ref())
+                                .ok_or_else(|| {
+                                    Error::AuthError(
+                                        "InitialResponse missing nonce and initial_nonce".into(),
+                                    )
+                                })?;
 
-                        // Find and update the existing session (created in initiate_handshake).
-                        // Use get_session + clone + update_session to properly refresh the
-                        // identity key secondary index in the session manager.
-                        let session = {
-                            let mut mgr = session_manager.write().await;
-                            if let Some(existing) = mgr.get_session(client_nonce).cloned() {
-                                // Update the existing session
-                                let mut updated = existing;
-                                updated.peer_identity_key = Some(message.identity_key.clone());
-                                updated.peer_nonce = Some(server_nonce.clone());
-                                updated.is_authenticated = true;
-                                updated.touch();
-                                let session_clone = updated.clone();
-                                mgr.update_session(updated);
-                                session_clone
-                            } else {
-                                // No existing session - create a new one
-                                let mut session = PeerSession::with_nonce(client_nonce.clone());
-                                session.peer_identity_key = Some(message.identity_key.clone());
-                                session.peer_nonce = Some(server_nonce.clone());
-                                session.is_authenticated = true;
-                                session.touch();
-                                mgr.add_session(session.clone())?;
-                                session
+                            Ok((client_nonce.clone(), server_nonce.clone()))
+                        })();
+
+                        match result {
+                            Ok((client_nonce, server_nonce)) => {
+                                // Find and update the existing session (created in initiate_handshake).
+                                // Use get_session + clone + update_session to properly refresh the
+                                // identity key secondary index in the session manager.
+                                let session_result = {
+                                    let mut mgr = session_manager.write().await;
+                                    if let Some(existing) =
+                                        mgr.get_session(&client_nonce).cloned()
+                                    {
+                                        let mut updated = existing;
+                                        updated.peer_identity_key =
+                                            Some(message.identity_key.clone());
+                                        updated.peer_nonce = Some(server_nonce.clone());
+                                        updated.is_authenticated = true;
+                                        updated.touch();
+                                        let session_clone = updated.clone();
+                                        mgr.update_session(updated);
+                                        Ok(session_clone)
+                                    } else {
+                                        let mut session =
+                                            PeerSession::with_nonce(client_nonce.clone());
+                                        session.peer_identity_key =
+                                            Some(message.identity_key.clone());
+                                        session.peer_nonce = Some(server_nonce.clone());
+                                        session.is_authenticated = true;
+                                        session.touch();
+                                        mgr.add_session(session.clone()).map(|_| session)
+                                    }
+                                };
+
+                                // Resolve pending handshake using client's nonce
+                                let mut pending = pending_handshakes.write().await;
+                                if let Some(tx) = pending.remove(&client_nonce) {
+                                    let _ = tx.send(session_result);
+                                }
                             }
-                        };
-
-                        // Resolve pending handshake using client's nonce
-                        {
-                            let mut pending = pending_handshakes.write().await;
-                            if let Some(tx) = pending.remove(client_nonce) {
-                                let _ = tx.send(Ok(session));
+                            Err(e) => {
+                                // Try to find the pending handshake to deliver the error.
+                                // Use your_nonce if available, since that's our session nonce.
+                                if let Some(ref client_nonce) = message.your_nonce {
+                                    let mut pending = pending_handshakes.write().await;
+                                    if let Some(tx) = pending.remove(client_nonce) {
+                                        let _ = tx.send(Err(e.clone()));
+                                    }
+                                }
+                                return Err(e);
                             }
                         }
                     }
@@ -703,32 +736,57 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let our_nonce = message
             .your_nonce
             .as_ref()
-            .ok_or_else(|| Error::AuthError("InitialResponse missing your_nonce".into()))?;
+            .ok_or_else(|| Error::AuthError("InitialResponse missing your_nonce".into()))?
+            .clone();
 
+        // Process the response, catching any errors so they can be sent through
+        // the oneshot channel. Without this, errors from verify_message_signature
+        // would propagate via `?` and get swallowed by the routing task, causing
+        // the caller to time out instead of receiving the actual error.
+        let result = self
+            .process_initial_response_inner(&message, &our_nonce)
+            .await;
+
+        if let Err(ref e) = result {
+            let mut pending = self.pending_handshakes.write().await;
+            if let Some(tx) = pending.remove(&our_nonce) {
+                let _ = tx.send(Err(e.clone()));
+            }
+        }
+
+        result
+    }
+
+    async fn process_initial_response_inner(
+        &self,
+        message: &AuthMessage,
+        our_nonce: &str,
+    ) -> Result<()> {
         // Verify the signature
         // For InitialResponse, we need a temporary session for verification
         let temp_session = PeerSession {
-            session_nonce: Some(our_nonce.clone()),
+            session_nonce: Some(our_nonce.to_string()),
             peer_identity_key: Some(message.identity_key.clone()),
             peer_nonce: message.initial_nonce.clone(),
             ..Default::default()
         };
 
         if !self
-            .verify_message_signature(&message, &temp_session)
+            .verify_message_signature(message, &temp_session)
             .await?
         {
-            // Clean up pending handshake
-            let mut pending = self.pending_handshakes.write().await;
-            if let Some(tx) = pending.remove(our_nonce) {
-                let _ = tx.send(Err(Error::AuthError("Invalid signature".into())));
-            }
             return Err(Error::AuthError("InitialResponse signature invalid".into()));
         }
 
-        // Verify the nonce (optional, matches Go/TS behavior)
+        // Verify the nonce (optional, matches Go/TS behavior).
+        // Use nonce if present, fall back to initial_nonce for TS SDK compat.
+        let nonce_to_verify = message
+            .nonce
+            .as_deref()
+            .or(message.initial_nonce.as_deref())
+            .unwrap_or("");
         if !verify_nonce(
-            message.nonce.as_deref().unwrap_or(""),
+            nonce_to_verify,
             &self.wallet,
             Some(&message.identity_key),
             &self.originator,

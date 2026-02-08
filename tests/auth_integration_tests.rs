@@ -124,15 +124,26 @@ fn test_auth_message_validation() {
     msg.initial_nonce = Some("test-nonce".to_string());
     assert!(msg.validate().is_ok());
 
-    // InitialResponse needs multiple fields
+    // InitialResponse needs at least one of nonce/initial_nonce, plus your_nonce and signature
     let mut msg = AuthMessage::new(MessageType::InitialResponse, key.clone());
     assert!(msg.validate().is_err());
 
+    // Go-style: both nonce and initial_nonce present
     msg.nonce = Some("session-nonce".to_string());
     msg.initial_nonce = Some("initial-nonce".to_string());
     msg.your_nonce = Some("peer-nonce".to_string());
     msg.signature = Some(vec![0x30, 0x44]); // Fake signature
     assert!(msg.validate().is_ok());
+
+    // TS-style: only initial_nonce (no nonce field) - should also validate
+    let mut ts_msg = AuthMessage::new(MessageType::InitialResponse, key.clone());
+    ts_msg.initial_nonce = Some("initial-nonce".to_string());
+    ts_msg.your_nonce = Some("peer-nonce".to_string());
+    ts_msg.signature = Some(vec![0x30, 0x44]);
+    assert!(
+        ts_msg.validate().is_ok(),
+        "TS-style InitialResponse (no nonce, only initialNonce) should validate"
+    );
 
     // General message needs signature
     let mut msg = AuthMessage::new(MessageType::General, key.clone());
@@ -2026,4 +2037,277 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
         result.is_err(),
         "Decrypting with garbage keyring should fail"
     );
+}
+
+// =================
+// Cross-SDK Compatibility Tests: TS-shaped InitialResponse
+// =================
+// The TypeScript SDK's Peer.processInitialRequest() sends an InitialResponse
+// with initialNonce and yourNonce but WITHOUT a nonce field. The Go SDK sends
+// both nonce and initialNonce. These tests verify our Rust client handles both.
+
+#[test]
+fn test_ts_style_initial_response_no_nonce_field_validates() {
+    // TS SDK InitialResponse shape: { initialNonce, yourNonce, signature } — no nonce
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialResponse, key);
+    // Only set initialNonce (not nonce) - this is what the TS SDK sends
+    msg.initial_nonce = Some("responder-session-nonce".to_string());
+    msg.your_nonce = Some("initiator-session-nonce".to_string());
+    msg.signature = Some(vec![0x30, 0x44]);
+
+    let result = msg.validate();
+    assert!(
+        result.is_ok(),
+        "TS-style InitialResponse (initialNonce only, no nonce) should validate, got: {:?}",
+        result.err()
+    );
+}
+
+#[test]
+fn test_go_style_initial_response_both_nonces_validates() {
+    // Go SDK InitialResponse shape: { nonce, initialNonce, yourNonce, signature }
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialResponse, key);
+    msg.nonce = Some("responder-nonce".to_string());
+    msg.initial_nonce = Some("responder-session-nonce".to_string());
+    msg.your_nonce = Some("initiator-session-nonce".to_string());
+    msg.signature = Some(vec![0x30, 0x44]);
+
+    assert!(
+        msg.validate().is_ok(),
+        "Go-style InitialResponse (both nonce and initialNonce) should validate"
+    );
+}
+
+#[test]
+fn test_initial_response_neither_nonce_nor_initial_nonce_fails() {
+    // Edge case: neither nonce nor initialNonce — must fail
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialResponse, key);
+    msg.your_nonce = Some("initiator-nonce".to_string());
+    msg.signature = Some(vec![0x30, 0x44]);
+
+    let result = msg.validate();
+    assert!(
+        result.is_err(),
+        "InitialResponse with neither nonce nor initialNonce should fail validation"
+    );
+    assert!(
+        result.unwrap_err().to_string().contains("nonce"),
+        "Error should mention nonce"
+    );
+}
+
+#[test]
+fn test_ts_style_initial_response_signing_data_uses_initial_nonce() {
+    // When nonce is absent, signing_data should use initial_nonce for the responder's nonce
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialResponse, key);
+
+    let initiator_bytes = [1u8, 2, 3, 4];
+    let responder_bytes = [5u8, 6, 7, 8];
+
+    msg.your_nonce = Some(bsv_sdk::primitives::to_base64(&initiator_bytes));
+    msg.initial_nonce = Some(bsv_sdk::primitives::to_base64(&responder_bytes));
+    // No nonce field - TS style
+
+    let signing_data = msg.signing_data();
+    // signing_data should be: decoded(your_nonce) || decoded(initial_nonce)
+    assert_eq!(
+        signing_data,
+        vec![1, 2, 3, 4, 5, 6, 7, 8],
+        "Signing data should be initiator || responder decoded bytes"
+    );
+}
+
+#[test]
+fn test_ts_style_initial_response_key_id_uses_initial_nonce() {
+    // get_key_id for InitialResponse uses your_nonce and initial_nonce regardless of nonce field
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialResponse, key);
+    msg.your_nonce = Some("initiator-nonce".to_string());
+    msg.initial_nonce = Some("responder-nonce".to_string());
+    // No nonce field
+
+    let key_id = msg.get_key_id(None);
+    assert_eq!(
+        key_id, "initiator-nonce responder-nonce",
+        "Key ID should use your_nonce and initial_nonce even without nonce field"
+    );
+}
+
+#[test]
+fn test_initial_response_json_deserialization_ts_format() {
+    // Simulate deserializing a TS SDK InitialResponse JSON (no nonce field)
+    let key = PrivateKey::random().public_key();
+    let json = serde_json::json!({
+        "version": "0.1",
+        "messageType": "initialResponse",
+        "identityKey": key.to_hex(),
+        "initialNonce": "dGVzdC1yZXNwb25kZXItbm9uY2U=",
+        "yourNonce": "dGVzdC1pbml0aWF0b3Itbm9uY2U=",
+        "signature": [0x30, 0x44, 0x02, 0x20]
+    });
+
+    let msg: AuthMessage = serde_json::from_value(json).unwrap();
+    assert_eq!(msg.message_type, MessageType::InitialResponse);
+    assert!(msg.nonce.is_none(), "TS-style response should have no nonce");
+    assert!(msg.initial_nonce.is_some(), "Should have initialNonce");
+    assert!(msg.your_nonce.is_some(), "Should have yourNonce");
+    assert!(msg.validate().is_ok(), "Should pass validation");
+}
+
+#[test]
+fn test_initial_response_json_deserialization_go_format() {
+    // Simulate deserializing a Go SDK InitialResponse JSON (has nonce field)
+    let key = PrivateKey::random().public_key();
+    let json = serde_json::json!({
+        "version": "0.1",
+        "messageType": "initialResponse",
+        "identityKey": key.to_hex(),
+        "nonce": "dGVzdC1yZXNwb25kZXItbm9uY2U=",
+        "initialNonce": "dGVzdC1yZXNwb25kZXItbm9uY2U=",
+        "yourNonce": "dGVzdC1pbml0aWF0b3Itbm9uY2U=",
+        "signature": [0x30, 0x44, 0x02, 0x20]
+    });
+
+    let msg: AuthMessage = serde_json::from_value(json).unwrap();
+    assert_eq!(msg.message_type, MessageType::InitialResponse);
+    assert!(msg.nonce.is_some(), "Go-style response should have nonce");
+    assert!(msg.initial_nonce.is_some(), "Should have initialNonce");
+    assert!(msg.validate().is_ok(), "Should pass validation");
+}
+
+#[tokio::test]
+async fn test_ts_style_initial_response_through_mock_transport() {
+    // Simulate a TS server: receives InitialRequest, responds with InitialResponse
+    // that has initialNonce and yourNonce but NO nonce field.
+    use bsv_sdk::auth::{Peer, PeerOptions};
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let client_key = PrivateKey::random();
+    let server_key = PrivateKey::random();
+
+    let transport = MockTransport::new();
+
+    let client_wallet = ProtoWallet::new(Some(client_key.clone()));
+    let client = Peer::new(PeerOptions {
+        wallet: client_wallet,
+        transport,
+        certificates_to_request: None,
+        session_manager: None,
+        auto_persist_last_session: false,
+        originator: Some("cross-sdk-test".into()),
+    });
+    client.start();
+
+    // The mock transport's set_callback uses tokio::spawn, give it time
+    tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+
+    // We can't easily inject a TS-shaped response through the mock transport's
+    // queue_response because the Peer.start() callback processes it. But we can
+    // test directly via handle_incoming_message with a TS-shaped response.
+
+    // First, manually create a session as if we had sent an InitialRequest
+    let our_nonce = "dGVzdC1jbGllbnQtbm9uY2U=".to_string(); // base64 of test data
+    {
+        let mut mgr = client.session_manager().write().await;
+        let session = PeerSession::with_nonce(our_nonce.clone());
+        mgr.add_session(session).unwrap();
+    }
+
+    // Craft a TS-style InitialResponse (no nonce field)
+    let server_nonce = bsv_sdk::primitives::to_base64(&[0xBB; 32]);
+    let mut ts_response = AuthMessage::new(MessageType::InitialResponse, server_key.public_key());
+    ts_response.initial_nonce = Some(server_nonce.clone());
+    ts_response.your_nonce = Some(our_nonce.clone());
+    // nonce is NOT set - this is the TS SDK behavior
+    ts_response.signature = Some(vec![0x30, 0x44]); // Fake sig - verification will fail
+
+    // handle_incoming_message should NOT fail with "missing nonce"
+    let result = client.handle_incoming_message(ts_response).await;
+
+    // The signature verification will fail (fake sig), but the important thing
+    // is that we don't get "InitialResponse missing nonce" error
+    match result {
+        Ok(_) => {} // Unlikely with fake sig, but not an error
+        Err(e) => {
+            let err_msg = e.to_string();
+            assert!(
+                !err_msg.contains("missing nonce"),
+                "Should NOT fail with 'missing nonce' for TS-style response. Got: {}",
+                err_msg
+            );
+            // Expected: signature verification failure (since we used a fake sig)
+            assert!(
+                err_msg.contains("signature") || err_msg.contains("Signature"),
+                "Expected signature error for fake sig, got: {}",
+                err_msg
+            );
+        }
+    }
+}
+
+#[test]
+fn test_initial_response_missing_both_nonces_fails_validation() {
+    // When both nonce and initial_nonce are absent, validation must fail.
+    // This is the condition that previously caused "InitialResponse missing nonce"
+    // errors when connecting to TS SDK servers (which only send initialNonce).
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialResponse, key);
+    msg.your_nonce = Some("some-client-nonce".to_string());
+    // Neither nonce nor initial_nonce set
+    msg.signature = Some(vec![0x30, 0x44]);
+
+    let result = msg.validate();
+    assert!(result.is_err(), "Should fail when both nonce and initial_nonce are missing");
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("nonce or initial_nonce"),
+        "Error should mention both fields, got: {}",
+        err_msg
+    );
+}
+
+// =================
+// Regression: field presence requirements by message type
+// =================
+
+#[test]
+fn test_initial_request_only_needs_initial_nonce() {
+    // TS/Go SDKs: InitialRequest has initialNonce only (no nonce, no signature)
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::InitialRequest, key);
+    msg.initial_nonce = Some("test-nonce".to_string());
+    assert!(msg.validate().is_ok());
+}
+
+#[test]
+fn test_general_message_needs_signature_only() {
+    // General messages need signature; nonce/your_nonce optional per spec
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::General, key);
+    msg.signature = Some(vec![0x30, 0x44]);
+    assert!(msg.validate().is_ok());
+}
+
+#[test]
+fn test_certificate_request_needs_requested_certificates() {
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::CertificateRequest, key);
+    assert!(msg.validate().is_err());
+
+    msg.requested_certificates = Some(RequestedCertificateSet::new());
+    assert!(msg.validate().is_ok());
+}
+
+#[test]
+fn test_certificate_response_needs_certificates() {
+    let key = PrivateKey::random().public_key();
+    let mut msg = AuthMessage::new(MessageType::CertificateResponse, key);
+    assert!(msg.validate().is_err());
+
+    msg.certificates = Some(vec![]);
+    assert!(msg.validate().is_ok());
 }

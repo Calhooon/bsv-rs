@@ -1023,3 +1023,209 @@ async fn test_both_peers_have_sessions_after_handshake() {
     );
     assert!(bob_session.unwrap().is_authenticated);
 }
+
+// =============================================================================
+// Test 20: TS-style server (no nonce field in InitialResponse) works
+// =============================================================================
+
+/// Simulates a TS-style server that sends InitialResponse without a `nonce` field.
+/// The responder manually crafts a TS-shaped response to verify cross-SDK compat.
+#[tokio::test]
+async fn test_ts_style_server_no_nonce_field() {
+    use bsv_sdk::auth::create_nonce;
+
+    let alice_key = PrivateKey::random();
+    let bob_key = PrivateKey::random();
+
+    // Create Alice as initiator with a channel transport
+    let (alice_tx, mut alice_rx) = mpsc::unbounded_channel::<AuthMessage>();
+    let (bob_tx, mut bob_rx) = mpsc::unbounded_channel::<AuthMessage>();
+
+    let alice_transport = ChannelTransport::new(bob_tx);
+    let alice_wallet = ProtoWallet::new(Some(alice_key.clone()));
+    let alice = Arc::new(Peer::new(PeerOptions {
+        wallet: alice_wallet,
+        transport: alice_transport,
+        certificates_to_request: None,
+        session_manager: None,
+        auto_persist_last_session: false,
+        originator: Some("ts-compat-test".into()),
+    }));
+
+    // Alice uses start() to set up the callback (not handle_incoming_message)
+    alice.start();
+
+    // Spawn a task to route messages FROM alice_tx TO alice's callback
+    // (normally the transport does this, but we're simulating manually)
+    let alice_clone = alice.clone();
+    tokio::spawn(async move {
+        while let Some(msg) = alice_rx.recv().await {
+            if let Err(e) = alice_clone.handle_incoming_message(msg).await {
+                eprintln!("Alice routing error: {}", e);
+            }
+        }
+    });
+
+    // Simulate a TS-style server that receives InitialRequest and builds a response
+    // WITHOUT a `nonce` field (only `initialNonce` and `yourNonce`)
+    let bob_wallet = ProtoWallet::new(Some(bob_key.clone()));
+    let bob_identity = bob_key.public_key();
+
+    // Spawn Alice's handshake in background
+    let alice_clone = alice.clone();
+    let bob_hex = bob_identity.to_hex();
+    let handshake = tokio::spawn(async move {
+        alice_clone
+            .get_authenticated_session(Some(&bob_hex), Some(5000))
+            .await
+    });
+
+    // Wait for Alice to send her InitialRequest
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    let initial_request = bob_rx
+        .try_recv()
+        .expect("Alice should have sent an InitialRequest");
+    assert_eq!(initial_request.message_type, MessageType::InitialRequest);
+    let initiator_nonce = initial_request
+        .initial_nonce
+        .as_ref()
+        .expect("InitialRequest should have initial_nonce")
+        .clone();
+
+    // Now act as a TS-style server: build InitialResponse WITHOUT nonce field
+    let responder_nonce = create_nonce(&bob_wallet, None, "ts-compat-test")
+        .await
+        .unwrap();
+
+    // Build signing data: initiator_nonce || responder_nonce (decoded from base64)
+    let initiator_bytes = bsv_sdk::primitives::from_base64(&initiator_nonce).unwrap();
+    let responder_bytes = bsv_sdk::primitives::from_base64(&responder_nonce).unwrap();
+    let mut signing_data = Vec::new();
+    signing_data.extend_from_slice(&initiator_bytes);
+    signing_data.extend_from_slice(&responder_bytes);
+
+    // Sign using bob's wallet (sync ProtoWallet method)
+    use bsv_sdk::wallet::{Counterparty, CreateSignatureArgs, Protocol, SecurityLevel};
+    let key_id = format!("{} {}", initiator_nonce, responder_nonce);
+    let sig_result = bob_wallet
+        .create_signature(CreateSignatureArgs {
+            data: Some(signing_data),
+            hash_to_directly_sign: None,
+            protocol_id: Protocol::new(
+                SecurityLevel::Counterparty,
+                "auth message signature",
+            ),
+            key_id,
+            counterparty: Some(Counterparty::Other(alice_key.public_key())),
+        })
+        .unwrap();
+
+    // Build TS-style InitialResponse: NO nonce field, only initialNonce
+    let mut response = AuthMessage::new(MessageType::InitialResponse, bob_identity);
+    response.initial_nonce = Some(responder_nonce.clone());
+    response.your_nonce = Some(initiator_nonce.clone());
+    // Deliberately NOT setting response.nonce — this is the TS SDK behavior
+    response.signature = Some(sig_result.signature);
+
+    // Deliver the response to Alice
+    alice_tx.send(response).unwrap();
+
+    // Alice's handshake should complete successfully
+    let session = handshake.await.unwrap();
+    assert!(
+        session.is_ok(),
+        "Handshake with TS-style server should succeed, got: {:?}",
+        session.err()
+    );
+    let session = session.unwrap();
+    assert!(
+        session.is_authenticated,
+        "Session should be authenticated"
+    );
+    assert_eq!(
+        session.peer_identity_key.unwrap().to_hex(),
+        bob_key.public_key().to_hex(),
+        "Peer identity should be Bob's key"
+    );
+    assert_eq!(
+        session.peer_nonce.as_deref(),
+        Some(responder_nonce.as_str()),
+        "Peer nonce should be the responder's initialNonce"
+    );
+}
+
+// =============================================================================
+// Test 21: Error from start() callback reaches caller (not swallowed as timeout)
+// =============================================================================
+
+/// When the start() callback encounters a processing error for an InitialResponse,
+/// the error should be delivered through the oneshot channel so the caller
+/// gets the actual error instead of a generic timeout.
+#[tokio::test]
+async fn test_error_propagation_through_oneshot() {
+    let alice_key = PrivateKey::random();
+    let server_key = PrivateKey::random();
+
+    let (alice_tx, mut alice_rx) = mpsc::unbounded_channel::<AuthMessage>();
+    let (bob_tx, mut bob_rx) = mpsc::unbounded_channel::<AuthMessage>();
+
+    let alice_transport = ChannelTransport::new(bob_tx);
+    let alice_wallet = ProtoWallet::new(Some(alice_key.clone()));
+    let alice = Arc::new(Peer::new(PeerOptions {
+        wallet: alice_wallet,
+        transport: alice_transport,
+        certificates_to_request: None,
+        session_manager: None,
+        auto_persist_last_session: false,
+        originator: Some("error-propagation-test".into()),
+    }));
+
+    // Use start() to set up the callback (this is the code path we're testing)
+    alice.start();
+
+    // Route messages to alice via handle_incoming_message
+    let alice_clone = alice.clone();
+    tokio::spawn(async move {
+        while let Some(msg) = alice_rx.recv().await {
+            let _ = alice_clone.handle_incoming_message(msg).await;
+        }
+    });
+
+    // Start the handshake with a short timeout
+    let alice_clone = alice.clone();
+    let handshake = tokio::spawn(async move {
+        alice_clone
+            .get_authenticated_session(None, Some(2000))
+            .await
+    });
+
+    // Wait for Alice to send InitialRequest
+    tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    let _initial_request = bob_rx.try_recv().expect("Should have InitialRequest");
+
+    // Send a malformed InitialResponse: has your_nonce (so we can find the
+    // pending handshake) but NEITHER nonce NOR initial_nonce
+    let mut bad_response = AuthMessage::new(MessageType::InitialResponse, server_key.public_key());
+    // Read Alice's session nonce from the session manager
+    let our_nonce = {
+        let mgr = alice.session_manager().read().await;
+        let sessions: Vec<_> = mgr.iter().collect();
+        sessions[0].session_nonce.clone().unwrap()
+    };
+    bad_response.your_nonce = Some(our_nonce);
+    // Neither nonce nor initial_nonce — should cause error
+    bad_response.signature = Some(vec![0x30, 0x44]);
+
+    alice_tx.send(bad_response).unwrap();
+
+    // The handshake should fail with the actual error, not a timeout
+    let result = handshake.await.unwrap();
+    assert!(result.is_err(), "Handshake should fail");
+    let err_msg = result.unwrap_err().to_string();
+    // Should get the actual error about missing nonce, not "Handshake timeout"
+    assert!(
+        !err_msg.contains("timeout"),
+        "Should get actual error, not timeout. Got: {}",
+        err_msg
+    );
+}

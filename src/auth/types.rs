@@ -231,15 +231,13 @@ impl AuthMessage {
                 }
             }
             MessageType::InitialResponse => {
-                // InitialResponse must have nonce, initial_nonce, your_nonce, and signature
-                if self.nonce.is_none() {
+                // InitialResponse must have at least one of nonce/initial_nonce (the
+                // responder's session nonce), plus your_nonce and signature.
+                // The Go SDK sends both nonce and initial_nonce; the TS SDK only sends
+                // initialNonce (no nonce field). Accept either for cross-SDK compat.
+                if self.nonce.is_none() && self.initial_nonce.is_none() {
                     return Err(crate::Error::AuthError(
-                        "InitialResponse must have a nonce".into(),
-                    ));
-                }
-                if self.initial_nonce.is_none() {
-                    return Err(crate::Error::AuthError(
-                        "InitialResponse must have initial_nonce".into(),
+                        "InitialResponse must have nonce or initial_nonce".into(),
                     ));
                 }
                 if self.your_nonce.is_none() {
