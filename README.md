@@ -1,6 +1,6 @@
 # BSV SDK for Rust
 
-The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready, with 2,500+ tests and byte-for-byte compatibility with the [TypeScript](https://github.com/bitcoin-sv/ts-sdk) and [Go](https://github.com/bitcoin-sv/go-sdk) SDKs.
+The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready, with ~100,000 lines of Rust, 2,500 tests, 2,000+ cross-SDK test vectors, and byte-for-byte compatibility with the [TypeScript](https://github.com/bitcoin-sv/ts-sdk) and [Go](https://github.com/bitcoin-sv/go-sdk) SDKs.
 
 [![Crates.io](https://img.shields.io/crates/v/bsv-sdk.svg)](https://crates.io/crates/bsv-sdk)
 [![Documentation](https://docs.rs/bsv-sdk/badge.svg)](https://docs.rs/bsv-sdk)
@@ -56,6 +56,7 @@ bsv-sdk = { version = "0.2", features = ["wallet"] }           # Keys, transacti
 bsv-sdk = { version = "0.2", features = ["auth", "http"] }     # Authentication with HTTP transport
 bsv-sdk = { version = "0.2", features = ["overlay", "http"] }  # Overlay network operations
 bsv-sdk = { version = "0.2", features = ["compat"] }           # BIP-32/39, BSM, ECIES
+bsv-sdk = { version = "0.2", features = ["websocket"] }        # Auth with WebSocket transport
 ```
 
 ## Quick Start
@@ -473,6 +474,7 @@ if validation.valid {
 | `MasterCertificate` | Certificate with master keyring for issuance |
 | `VerifiableCertificate` | Certificate with verifier-specific keyring |
 | `Transport`, `SimplifiedFetchTransport` | BRC-104 HTTP transport layer |
+| `WebSocketTransport` | WebSocket transport (requires `websocket` feature) |
 | `RequestedCertificateSet` | Certificate request specification |
 | `validate_certificate_encoding` | Certificate field validation |
 | `validate_requested_certificate_set` | Certificate request set validation |
@@ -551,7 +553,9 @@ if validation.valid {
 | `identity` | No | Certificate-based identity resolution |
 | `full` | No | All modules above |
 | `http` | No | HTTP client for network operations |
+| `websocket` | No | WebSocket auth transport (tokio-tungstenite) |
 | `wasm` | No | WebAssembly support |
+| `dhat-profiling` | No | Heap profiling for benchmarks |
 
 ### Feature Dependency Hierarchy
 
@@ -561,12 +565,15 @@ full
  ├── messages → wallet
  ├── compat → primitives
  ├── totp → primitives
- ├── auth → wallet, messages
- ├── overlay → wallet
+ ├── auth → wallet, messages, tokio
+ ├── overlay → wallet, tokio
  ├── storage → overlay
  ├── registry → overlay
  ├── kvstore → overlay
  └── identity → auth, overlay
+
+websocket (opt-in, not in full)
+ └── auth + tokio-tungstenite + futures-util
 ```
 
 ## Cross-SDK Compatibility
@@ -579,24 +586,27 @@ All implementations share test vectors to ensure cross-platform compatibility:
 
 | Category | Test Count | Description |
 |----------|------------|-------------|
-| Sighash Computation | 499 | Transaction signature hash vectors |
-| Script Execution | 2,620+ | Valid scripts, invalid scripts, spend vectors |
-| BRC-42 Key Derivation | 100+ | Invoice number generation, key pair derivation |
+| Sighash Computation | 500 | Transaction signature hash vectors |
+| Script Execution | 1,488 | Valid scripts (598), invalid scripts (432), spend vectors (458) |
+| BRC-42 Key Derivation | 10 | Private and public key derivation vectors |
+| HMAC-DRBG | 15 | NIST SP 800-90A vectors |
+| Symmetric Encryption | 5 | AES-256-GCM vectors |
+| Auth Certificates | 4 | Certificate serialization vectors |
+| Overlay Types | 22 | Admin tokens (4) + type serialization (18) |
 | Wire Protocol | 90 | All 28 WalletInterface method roundtrips |
-| Transaction/BEEF | 86 | Parsing, serialization, ancestry, cross-SDK BEEF |
+| Transaction/BEEF | 87 | Parsing, serialization, ancestry, cross-SDK BEEF |
 | GlobalKVStore | 85 | CRUD, batch, PushDrop interpreter, signatures |
 | LocalKVStore | 83 | Config, entries, queries, batch operations |
-| Storage/UHRP | 105 | URL encoding, upload/download, HTTP mocks |
+| Storage/UHRP | 70 | URL encoding, upload/download, cross-SDK |
 | Identity | 69 | Certificate handling, contact management |
 | Compat (BIP-32/39/BSM/ECIES) | 60 | Official TREZOR vectors, HD wallets, BSM, ECIES |
-| Overlay | 185 | SHIP/SLAP, admin tokens, HTTP mocks, reputation |
+| Overlay | 75 | SHIP/SLAP, admin tokens, reputation, historian |
 | Wallet | 56 | KeyDeriver, CachedKeyDeriver, ProtoWallet |
 | Registry | 50 | Definitions, PushDrop roundtrips, cross-SDK |
 | Auth + Peer E2E | 58 | Sessions, certificates, mutual auth handshake |
 | Messages (BRC-77/78) | 33 | Sign/verify, encrypt/decrypt, cross-SDK vectors |
-| LivePolicy Fee Model | 20 | Dynamic fee rates via HTTP with wiremock |
 
-**Total: 2,508 tests passing (1,293 unit + 1,047 integration + 168 doc tests) across 29 test files + 2,632 cross-SDK vectors + 4 fuzz targets + 72 benchmarks**
+**Total: 2,500 tests (1,307 unit + 909 integration + 284 doc tests) across 29 test files + 2,044 cross-SDK vectors + 4 fuzz targets + 4 benchmark suites**
 
 ## Development
 
@@ -612,6 +622,9 @@ cargo test --features full
 
 # Run all tests including HTTP mock tests
 cargo test --features "full,http"
+
+# Run all tests including WebSocket transport
+cargo test --features "full,websocket"
 
 # Run tests for specific module
 cargo test --features wallet --test wallet_tests
@@ -664,6 +677,7 @@ cargo build --target wasm32-unknown-unknown --features wasm
 | BRC-104 | HTTP transport | `auth` |
 | SHIP | Submit Hierarchical Information Protocol | `overlay` |
 | SLAP | Service Lookup Availability Protocol | `overlay` |
+| STEAK | Serialized Transaction Envelopes with Acknowledgments | `overlay` |
 | UHRP | Universal Hash Resolution Protocol | `storage` |
 
 ## License
@@ -734,12 +748,18 @@ Independent modules (depend only on primitives):
 │     compat      │   │      totp       │
 │ (BIP-32/39/BSM) │   │   (RFC 6238)    │
 └─────────────────┘   └─────────────────┘
+
+Optional transports (opt-in feature flags):
+┌─────────────────┐   ┌─────────────────┐
+│   websocket     │   │      http       │
+│ (WS transport)  │   │ (ARC, WoC, etc) │
+└─────────────────┘   └─────────────────┘
 ```
 
 ## Contributing
 
 Contributions are welcome. Please ensure that:
-1. All tests pass (`cargo test --features "full,http"`)
+1. All tests pass (`cargo test --features "full,http,websocket"`)
 2. Code is formatted (`cargo fmt`)
 3. No clippy warnings (`cargo clippy --all-targets --all-features`)
 4. New functionality includes appropriate tests

@@ -1,5 +1,5 @@
 # BSV SDK for Rust
-> Official Rust implementation of the BSV blockchain SDK (~66,700 lines, 13 modules)
+> Official Rust implementation of the BSV blockchain SDK (~73,800 lines src, ~100,000 total, 13 modules)
 
 ## Overview
 
@@ -27,11 +27,11 @@ Production-ready Rust SDK for BSV blockchain applications. API-compatible with t
 
 | Path | Purpose |
 |------|---------|
-| `Cargo.toml` | Package manifest with 15 feature flags |
+| `Cargo.toml` | Package manifest with 19 feature flags |
 | `src/lib.rs` | Crate root with module declarations and convenience re-exports |
-| `src/error.rs` | Unified `Error` enum (54 variants) and `Result<T>` type alias |
-| `tests/` | 21 integration test files (~711 test functions) |
-| `tests/vectors/` | Cross-SDK test vectors (~2,632 vectors: sighash, script, BRC-42, etc.) |
+| `src/error.rs` | Unified `Error` enum (64 variants) and `Result<T>` type alias |
+| `tests/` | 29 integration test files (~909 test functions) |
+| `tests/vectors/` | Cross-SDK test vectors (2,044 vectors: sighash, script, BRC-42, etc.) |
 | `benches/` | 4 Criterion benchmark suites (hash, primitives, memory, script) |
 | `fuzz/` | 4 libfuzzer fuzz targets (script, transaction, wire protocol, encoding) |
 | `.github/workflows/ci.yml` | CI: test matrix, clippy, rustfmt, doc build, benchmark regression |
@@ -42,9 +42,10 @@ Production-ready Rust SDK for BSV blockchain applications. API-compatible with t
 default = ["primitives", "script"]
 full = ["primitives", "script", "transaction", "wallet", "messages", "compat",
         "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity"]
-http = ["dep:reqwest"]       # HTTP clients for ARC, WhatsOnChain, WalletClient
-wasm = ["getrandom/js"]      # WebAssembly support
-dhat-profiling = ["dep:dhat"] # Heap profiling
+http = ["dep:reqwest"]                          # HTTP clients for ARC, WhatsOnChain, WalletClient
+websocket = ["auth", "dep:tokio-tungstenite"]   # WebSocket auth transport (opt-in, not in full)
+wasm = ["getrandom/js"]                         # WebAssembly support
+dhat-profiling = ["dep:dhat"]                   # Heap profiling
 ```
 
 Feature dependency graph:
@@ -55,6 +56,8 @@ primitives ─── script ─── transaction ─── wallet ─┬── 
     ├── totp                                       │            ├── kvstore
     │                                              │            └──┐
     └───────────────────────── auth (wallet+messages+tokio) ───── identity (auth+overlay)
+
+websocket (opt-in, not in full) ── auth + tokio-tungstenite + futures-util
 ```
 
 ## Building & Testing
@@ -63,7 +66,7 @@ primitives ─── script ─── transaction ─── wallet ─┬── 
 cargo build                          # Default features (primitives + script)
 cargo build --features full          # All modules
 cargo test                           # Default feature tests
-cargo test --features full           # Full test suite (~1,941 tests, 0 failures)
+cargo test --features full           # Full test suite (2,500 tests, 0 failures)
 cargo test --features full -- wallet # Filter by module name
 cargo bench --bench primitives_bench # Run specific benchmark
 cargo bench                          # All benchmarks
@@ -93,14 +96,16 @@ Byte-for-byte compatible with Go and TS SDKs. Key details:
 
 | Category | Count |
 |----------|-------|
-| Unit tests (in-module) | ~1,158 |
-| Integration tests | ~711 across 21 files |
-| Doc tests | ~159 |
+| Unit tests (in-module) | 1,307 |
+| Integration tests | 909 across 29 files |
+| Doc tests | 284 |
 | Sighash vectors | 500 |
-| Script valid/invalid vectors | 1,030 |
+| Script valid vectors | 598 |
+| Script invalid vectors | 432 |
 | Spend vectors | 458 |
-| BRC-42/auth/overlay vectors | 39 |
-| **Total** | **~1,941 tests + 2,632 vectors** |
+| BRC-42 vectors | 10 |
+| Auth/overlay/DRBG/symmetric vectors | 46 |
+| **Total** | **2,500 tests + 2,044 cross-SDK vectors** |
 
 ## Fuzzing
 
