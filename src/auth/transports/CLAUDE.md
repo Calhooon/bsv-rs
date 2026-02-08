@@ -3,14 +3,15 @@
 
 ## Overview
 
-This module provides transport layer implementations for sending and receiving authentication messages in the BRC-31 (Authrite) protocol. It defines the `Transport` trait for pluggable transports and includes HTTP-based and mock implementations. The HTTP transport implements BRC-104 for authenticated HTTP communication.
+This module provides transport layer implementations for sending and receiving authentication messages in the BRC-31 (Authrite) protocol. It defines the `Transport` trait for pluggable transports and includes three implementations: HTTP-based (`SimplifiedFetchTransport`), WebSocket-based (`WebSocketTransport`), and mock (`MockTransport`). The HTTP transport implements BRC-104 for authenticated HTTP communication.
 
 ## Files
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with exports and usage examples | ~42 |
+| `mod.rs` | Module root with exports and usage examples | ~49 |
 | `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1215 |
+| `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~508 |
 
 ## Key Exports
 
@@ -72,6 +73,46 @@ Features:
 - Uses `std::sync::RwLock` for callback storage (synchronous access, no tokio::spawn needed)
 - Invokes registered callback with response messages
 - Implements `Debug` trait with redacted internal fields
+
+### WebSocketTransport
+
+WebSocket-based transport for full-duplex communication (requires `websocket` feature):
+
+```rust
+pub struct WebSocketTransport {
+    base_url: String,
+    sink: Arc<Mutex<Option<WsSink>>>,
+    on_data_callbacks: Arc<RwLock<Vec<Box<TransportCallback>>>>,
+    read_deadline_secs: u64,
+}
+
+impl WebSocketTransport {
+    pub fn new(options: WebSocketTransportOptions) -> Result<Self>
+    pub fn base_url(&self) -> &str
+    pub fn read_deadline_secs(&self) -> u64
+}
+```
+
+Configuration:
+
+```rust
+pub struct WebSocketTransportOptions {
+    pub base_url: String,           // Must start with ws:// or wss://
+    pub read_deadline_secs: Option<u64>,  // Defaults to 30 if None or 0
+}
+```
+
+Features:
+- Lazy connection: WebSocket connection established on first `send()` call
+- Background receive loop: spawns a tokio task that reads incoming messages and dispatches to all registered callbacks
+- JSON-serialized `AuthMessage` payloads over WebSocket text frames (also accepts binary frames)
+- Connection dropped on send/receive errors (matches Go SDK behavior)
+- Requires at least one callback registered before sending (returns `TransportError` otherwise)
+- URL validation: rejects non-`ws://`/`wss://` schemes and empty hosts
+- Supports multiple callbacks (unlike HTTP transport which stores a single callback)
+- Ping/Pong handled automatically by tungstenite
+- Malformed incoming JSON messages silently skipped (matches Go SDK behavior)
+- Implements `Debug` trait with base_url and read_deadline_secs
 
 ### MockTransport
 
@@ -184,6 +225,19 @@ let transport = SimplifiedFetchTransport::new("https://example.com");
 assert_eq!(transport.base_url(), "https://example.com");
 ```
 
+### Creating a WebSocket Transport
+
+```rust
+use bsv_sdk::auth::transports::{WebSocketTransport, WebSocketTransportOptions};
+
+let transport = WebSocketTransport::new(WebSocketTransportOptions {
+    base_url: "wss://example.com/ws".to_string(),
+    read_deadline_secs: Some(60),
+}).unwrap();
+assert_eq!(transport.base_url(), "wss://example.com/ws");
+assert_eq!(transport.read_deadline_secs(), 60);
+```
+
 ### Creating HTTP Request Payloads
 
 ```rust
@@ -205,71 +259,11 @@ let decoded = HttpRequest::from_payload(&payload).unwrap();
 assert_eq!(decoded.url_postfix(), "/api/v1/users");
 ```
 
-### Creating HTTP Response Payloads
-
-```rust
-use bsv_sdk::auth::transports::HttpResponse;
-
-let response = HttpResponse {
-    request_id: [42u8; 32],
-    status: 200,
-    headers: vec![
-        ("content-type".to_string(), "application/json".to_string()),
-    ],
-    body: b"{\"id\":123}".to_vec(),
-};
-
-let payload = response.to_payload();
-let decoded = HttpResponse::from_payload(&payload).unwrap();
-```
-
-### Implementing a Custom Transport
-
-```rust
-use bsv_sdk::auth::transports::{Transport, TransportCallback};
-use bsv_sdk::auth::types::AuthMessage;
-use bsv_sdk::Result;
-use async_trait::async_trait;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-
-struct MyTransport {
-    callback: Arc<RwLock<Option<Box<TransportCallback>>>>,
-}
-
-#[async_trait]
-impl Transport for MyTransport {
-    async fn send(&self, message: &AuthMessage) -> Result<()> {
-        // Send the message via your transport
-        Ok(())
-    }
-
-    fn set_callback(&self, callback: Box<TransportCallback>) {
-        let store = self.callback.clone();
-        tokio::spawn(async move {
-            let mut cb = store.write().await;
-            *cb = Some(callback);
-        });
-    }
-
-    fn clear_callback(&self) {
-        let store = self.callback.clone();
-        tokio::spawn(async move {
-            let mut cb = store.write().await;
-            *cb = None;
-        });
-    }
-}
-```
-
 ### Using MockTransport in Tests
 
 ```rust
 use bsv_sdk::auth::transports::{MockTransport, Transport};
 use bsv_sdk::auth::types::{AuthMessage, MessageType};
-use bsv_sdk::primitives::PrivateKey;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 #[tokio::test]
 async fn test_auth_flow() {
@@ -286,24 +280,13 @@ async fn test_auth_flow() {
         })
     }));
 
-    // Wait for callback to be set
+    // Wait for callback to be set (tokio::spawn in set_callback)
     tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-    // Queue a response
-    let response = AuthMessage::new(
-        MessageType::InitialResponse,
-        PrivateKey::random().public_key(),
-    );
+    // Queue a response and send a message
+    let response = AuthMessage::new(MessageType::InitialResponse, key);
     transport.queue_response(response).await;
-
-    // Send a message
-    let request = AuthMessage::new(
-        MessageType::InitialRequest,
-        PrivateKey::random().public_key(),
-    );
     transport.send(&request).await.unwrap();
-
-    // Verify sent messages
     assert_eq!(transport.get_sent_messages().await.len(), 1);
 }
 ```
@@ -318,6 +301,12 @@ async fn test_auth_flow() {
 | `message_to_headers()` | Converts AuthMessage to HTTP header pairs |
 | `headers_to_message_fields()` | Parses HTTP headers into nonce, your_nonce, signature |
 | `invoke_callback()` | Invokes the registered callback with a message |
+
+### WebSocketTransport Internal Methods
+
+| Method | Purpose |
+|--------|---------|
+| `connect()` | Establishes WebSocket connection, spawns background receive loop |
 
 ### Varint Encoding (Internal)
 
@@ -347,7 +336,9 @@ Varint sizes (Bitcoin-style):
 | `CertificateResponse` | POST to `/.well-known/auth` as JSON |
 | `General` | BRC-104: Parse payload as `HttpRequest`, make HTTP request with auth headers, wrap response in `HttpResponse` payload |
 
-### General Message Flow (BRC-104)
+`WebSocketTransport` sends all message types as JSON text frames over WebSocket.
+
+### General Message Flow (BRC-104, HTTP only)
 
 1. Deserialize `AuthMessage.payload` as `HttpRequest`
 2. Build HTTP request to `{base_url}{url_postfix}` with method from payload
@@ -366,6 +357,9 @@ Varint sizes (Bitcoin-style):
 ```toml
 # HTTP transport requires the http feature
 bsv-sdk = { version = "0.2", features = ["auth", "http"] }
+
+# WebSocket transport requires the websocket feature (adds tokio-tungstenite, futures-util)
+bsv-sdk = { version = "0.2", features = ["auth", "websocket"] }
 ```
 
 Without the `http` feature, `SimplifiedFetchTransport::send()` returns an error:
@@ -374,12 +368,19 @@ Without the `http` feature, `SimplifiedFetchTransport::send()` returns an error:
 Error::AuthError("HTTP transport requires the 'http' feature".into())
 ```
 
+The `websocket` feature is opt-in and not included in `full`. It gates:
+- The `websocket_transport` submodule in `mod.rs`
+- The `WebSocketTransport` and `WebSocketTransportOptions` re-exports
+
 ## Dependencies
 
 - `async_trait` - Async trait support for `Transport`
 - `std::sync::RwLock` - Synchronous callback storage for `SimplifiedFetchTransport`
-- `tokio::sync::RwLock` - Async state storage for `MockTransport`
+- `tokio::sync::RwLock` - Async state storage for `MockTransport` and `WebSocketTransport`
+- `tokio::sync::Mutex` - Async mutex for WebSocket write half
 - `reqwest` - HTTP client (optional, requires `http` feature)
+- `tokio-tungstenite` - WebSocket client (optional, requires `websocket` feature)
+- `futures-util` - Stream/Sink extensions for WebSocket (optional, requires `websocket` feature)
 - `serde_json` - JSON serialization for certificate requests and auth messages
 
 ## Error Handling
@@ -400,6 +401,14 @@ Error::AuthError("HTTP transport requires the 'http' feature".into())
 | `AuthError("Response payload too short for request ID")` | HttpResponse payload < 32 bytes |
 | `AuthError("Invalid request ID length")` | Response request ID not 32 bytes |
 | `AuthError("Failed to acquire callback lock")` | Poisoned std::sync::RwLock on callback |
+| `TransportError("base_url is required...")` | WebSocket created with empty URL |
+| `TransportError("WebSocket URL must start with ws://...")` | Invalid WebSocket URL scheme |
+| `TransportError("WebSocket URL must include a host")` | WebSocket URL has no host component |
+| `TransportError("no handler registered")` | WebSocket send before setting callback |
+| `TransportError("failed to connect to WebSocket: {}")` | WebSocket connection failure |
+| `TransportError("failed to marshal auth message: {}")` | JSON serialization error |
+| `TransportError("failed to send WebSocket message: {}")` | WebSocket write error |
+| `TransportError("WebSocket connection not available")` | Connection dropped after error |
 
 ## Testing
 
@@ -411,29 +420,33 @@ cargo test --features auth transports
 
 # With HTTP transport
 cargo test --features auth,http transports
+
+# With WebSocket transport
+cargo test --features auth,websocket transports
 ```
 
 ## Thread Safety
 
 `SimplifiedFetchTransport` uses `std::sync::RwLock` (not tokio) for callback storage, so `set_callback()` and `clear_callback()` operate synchronously without spawning tasks. The `invoke_callback()` method acquires a read lock briefly to get the future, then drops the lock before awaiting.
 
-`MockTransport` uses `tokio::sync::RwLock` for all internal state. Since `set_callback()` and `clear_callback()` are synchronous trait methods, it uses `tokio::spawn` to write to the async RwLock. When testing, a small delay may be needed after setting callbacks:
+`MockTransport` uses `tokio::sync::RwLock` for all internal state. Since `set_callback()` and `clear_callback()` are synchronous trait methods, it uses `tokio::spawn` to write to the async RwLock. When testing, a small delay may be needed after setting callbacks.
 
-```rust
-transport.set_callback(callback);
-tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-// Now callback is guaranteed to be set
-```
+`WebSocketTransport` uses `tokio::sync::Mutex` for the write-half sink and `tokio::sync::RwLock` for callbacks. Like `MockTransport`, `set_callback()` and `clear_callback()` use `tokio::spawn`. It supports multiple concurrent callbacks (stored as `Vec<Box<TransportCallback>>`).
 
 ## Exports
 
 From `mod.rs`:
 
 ```rust
+// Always exported
 pub use http::{
     headers, HttpRequest, HttpResponse, MockTransport, SimplifiedFetchTransport, Transport,
     TransportCallback,
 };
+
+// Exported with websocket feature
+#[cfg(feature = "websocket")]
+pub use websocket_transport::{WebSocketTransport, WebSocketTransportOptions};
 ```
 
 ## Related Documentation

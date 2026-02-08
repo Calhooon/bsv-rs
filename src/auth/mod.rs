@@ -73,6 +73,8 @@ pub use certificates::{Certificate, MasterCertificate, VerifiableCertificate};
 pub use peer::{Peer, PeerOptions};
 pub use session_manager::SessionManager;
 pub use transports::{MockTransport, SimplifiedFetchTransport, Transport};
+#[cfg(feature = "websocket")]
+pub use transports::{WebSocketTransport, WebSocketTransportOptions};
 pub use types::{
     current_time_ms, AuthMessage, MessageType, PeerSession, RequestedCertificateSet,
     AUTH_PROTOCOL_ID, AUTH_VERSION,

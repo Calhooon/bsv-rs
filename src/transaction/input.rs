@@ -5,6 +5,40 @@
 
 use crate::script::{LockingScript, ScriptTemplateUnlock, UnlockingScript};
 
+/// Represents an unspent transaction output (UTXO).
+///
+/// A lightweight struct for referencing a specific output from a previous
+/// transaction by its TXID, output index, satoshi value, and locking script.
+/// Used with [`Transaction::add_inputs_from_utxos`] for convenient input creation.
+///
+/// # Example
+///
+/// ```rust,ignore
+/// use bsv_sdk::transaction::Utxo;
+/// use bsv_sdk::script::LockingScript;
+///
+/// let utxo = Utxo {
+///     txid: "abc123...".to_string(),
+///     vout: 0,
+///     satoshis: 100_000,
+///     locking_script: LockingScript::from_hex("76a914...88ac")?,
+/// };
+/// ```
+#[derive(Debug, Clone)]
+pub struct Utxo {
+    /// The transaction ID (TXID) of the transaction containing this output.
+    pub txid: String,
+
+    /// The index of this output in the source transaction.
+    pub vout: u32,
+
+    /// The amount of satoshis in this output.
+    pub satoshis: u64,
+
+    /// The locking script (scriptPubKey) that defines spending conditions.
+    pub locking_script: LockingScript,
+}
+
 /// Represents an input to a Bitcoin transaction.
 ///
 /// Each input references a previous transaction output (UTXO) that is being spent.

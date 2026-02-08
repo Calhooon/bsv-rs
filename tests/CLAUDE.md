@@ -30,7 +30,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
 | `overlay_cross_sdk_tests.rs` | 13 | `overlay` | Admin token and overlay type cross-SDK vectors |
 | `overlay_http_tests.rs` | 49 | `overlay`+`http` | SHIP broadcast and SLAP lookup facilitators with wiremock |
-| `overlay_integration_tests.rs` | 60 | `overlay` | Protocols, topics, reputation, historian, admin tokens |
+| `overlay_integration_tests.rs` | 62 | `overlay` | Protocols, topics, reputation, historian, admin tokens, lookup resolver |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
 | `script_vectors_tests.rs` | 13 | default | Script interpreter with ~1,660 vectors |
 | `sighash_tests.rs` | 3 | default | Transaction sighash computation with 499 vectors |
@@ -110,7 +110,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 
 ### Overlay (`overlay` feature)
 - **`overlay_cross_sdk_tests.rs`** — Admin token creation/decoding/protocol detection, network presets, LookupQuestion/Answer types, AdmittanceInstructions, TaggedBEEF
-- **`overlay_integration_tests.rs`** — Protocols, LookupQuestion/Answer, TaggedBEEF, AdmittanceInstructions, TopicBroadcaster validation, RequireAck, LookupResolverConfig, HostReputationTracker (ranking, reset, JSON export/import, global singleton), SyncHistorian (chain traversal, filtering, cycle prevention), admin tokens, HostResponse/ServiceMetadata
+- **`overlay_integration_tests.rs`** — Protocols, LookupQuestion/Answer, TaggedBEEF, AdmittanceInstructions, TopicBroadcaster validation, RequireAck, LookupResolverConfig, HostReputationTracker (ranking, reset, JSON export/import, global singleton), SyncHistorian (chain traversal, filtering, cycle prevention), admin tokens, HostResponse/ServiceMetadata, LookupResolver.find_competent_hosts() public API
 
 ### Overlay HTTP (`overlay`+`http` features, wiremock)
 - **`overlay_http_tests.rs`** — SHIP broadcast facilitator (25 tests: STEAK response, Content-Type/X-Topics headers, off-chain values, error responses 400/404/500, HTTP security, URL trimming) and SLAP lookup facilitator (24 tests: OutputList/Freeform/Formula answers, binary response format, request format verification, error handling, edge cases)

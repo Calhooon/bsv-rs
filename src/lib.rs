@@ -122,6 +122,8 @@ pub use auth::{
     RequestedCertificateSet, SessionManager, SimplifiedFetchTransport, Transport,
     VerifiableCertificate,
 };
+#[cfg(feature = "websocket")]
+pub use auth::{WebSocketTransport, WebSocketTransportOptions};
 
 // Convenience re-exports from overlay
 #[cfg(feature = "overlay")]

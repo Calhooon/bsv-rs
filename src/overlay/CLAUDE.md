@@ -114,11 +114,13 @@ pub struct LookupResolverConfig {
 impl LookupResolver {
     pub fn new(config: LookupResolverConfig) -> Self
     pub async fn query(&self, question: &LookupQuestion, timeout_ms: Option<u64>) -> Result<LookupAnswer>
+    pub async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>>
     pub async fn prune_tx_memo_cache(&self) -> usize
     pub async fn tx_memo_cache_size(&self) -> usize
 }
 ```
 
+- **`find_competent_hosts(service)`**: Public low-level SLAP discovery method. Queries all SLAP trackers in parallel to find hosts advertising a service. Does **not** use the hosts cache or request coalescing (those are in the internal `get_competent_hosts` called by `query`)
 - **TX Memoization**: Caches parsed transaction IDs from BEEF, deduplicating outputs using `txId.outputIndex` as the unique key (matches TS SDK behavior)
 - **Request Coalescing**: Concurrent requests for the same service share a single SLAP tracker query via `tokio::sync::watch` channels
 - **Validation**: Host override service names must start with `ls_` or the constructor will panic

@@ -8,7 +8,7 @@
 use bsv_sdk::overlay::{
     create_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token, is_ship_token,
     is_slap_token, AdmittanceInstructions, HostReputationTracker, LookupAnswer, LookupQuestion,
-    LookupResolverConfig, NetworkPreset, OutputListItem, Protocol, ReputationConfig,
+    LookupResolver, LookupResolverConfig, NetworkPreset, OutputListItem, Protocol, ReputationConfig,
     ReputationStorage, RequireAck, Steak, SyncHistorian, TaggedBEEF, TopicBroadcaster,
     TopicBroadcasterConfig,
 };
@@ -1105,6 +1105,57 @@ fn test_global_reputation_tracker() {
     let entry = tracker2.snapshot(&unique_host);
     assert!(entry.is_some());
     assert_eq!(entry.unwrap().total_successes, 1);
+}
+
+// =================
+// LookupResolver::find_competent_hosts Tests
+// =================
+
+#[tokio::test]
+async fn test_find_competent_hosts_public_api() {
+    // Verify that find_competent_hosts is publicly accessible on LookupResolver.
+    // This test confirms the method signature matches the Go SDK's FindCompetentHosts:
+    //   Go:   func (l *LookupResolver) FindCompetentHosts(ctx, service string) ([]string, error)
+    //   Rust: pub async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>>
+    let resolver = LookupResolver::default();
+    let result = resolver.find_competent_hosts("ls_test_service").await;
+
+    // Without network access, the SLAP tracker queries will fail.
+    // The key assertion is that the method is public and returns Result<Vec<String>>.
+    match result {
+        Ok(hosts) => {
+            // Hosts should be a Vec<String> of domain URLs
+            for host in &hosts {
+                assert!(!host.is_empty());
+            }
+        }
+        Err(_) => {
+            // Expected: SLAP trackers are not reachable in test environment
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_find_competent_hosts_with_custom_config() {
+    // Verify find_competent_hosts works with custom LookupResolverConfig
+    let config = LookupResolverConfig {
+        network_preset: NetworkPreset::Testnet,
+        slap_trackers: Some(vec!["https://nonexistent-tracker.invalid".to_string()]),
+        ..Default::default()
+    };
+    let resolver = LookupResolver::new(config);
+    let result = resolver.find_competent_hosts("ls_custom_service").await;
+
+    // With a non-existent tracker, the query will fail or return empty
+    match result {
+        Ok(hosts) => {
+            // Tracker unreachable means no hosts discovered
+            assert!(hosts.is_empty());
+        }
+        Err(_) => {
+            // Also acceptable - tracker query failed
+        }
+    }
 }
 
 // Random number for unique test data

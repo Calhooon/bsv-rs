@@ -59,6 +59,10 @@ reqwest = { version = "0.12", features = ["json"], optional = true }
 # Async runtime (optional, for auth module)
 tokio = { version = "1", features = ["sync", "time", "rt"], optional = true }
 
+# WebSocket client (optional, for websocket transport)
+tokio-tungstenite = { version = "0.24", features = ["native-tls"], optional = true }
+futures-util = { version = "0.3", optional = true }
+
 # Async futures (for overlay module parallel operations)
 futures = "0.3"
 
@@ -93,6 +97,7 @@ identity = ["auth", "overlay"]
 wasm = ["getrandom/js"]
 full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity"]
 http = ["dep:reqwest"]
+websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
 dhat-profiling = ["dep:dhat"]
 
 [[bench]]

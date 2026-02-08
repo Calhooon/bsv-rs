@@ -6,6 +6,7 @@
 //! ## Available Transports
 //!
 //! - [`SimplifiedFetchTransport`] - HTTP-based transport (requires `http` feature)
+//! - [`WebSocketTransport`] - WebSocket-based transport (requires `websocket` feature)
 //! - [`MockTransport`] - Mock transport for testing
 //!
 //! ## Custom Transports
@@ -36,7 +37,13 @@
 
 pub mod http;
 
+#[cfg(feature = "websocket")]
+pub mod websocket_transport;
+
 pub use http::{
     headers, HttpRequest, HttpResponse, MockTransport, SimplifiedFetchTransport, Transport,
     TransportCallback,
 };
+
+#[cfg(feature = "websocket")]
+pub use websocket_transport::{WebSocketTransport, WebSocketTransportOptions};

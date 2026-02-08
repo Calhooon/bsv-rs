@@ -46,6 +46,7 @@ The crate root re-exports commonly used types for ergonomic imports:
 | `compat` | `Mnemonic`, `Language`, `WordCount` |
 | `totp` | `Totp`, `TotpAlgorithm`, `TotpOptions`, `TotpValidateOptions` |
 | `auth` | `AuthMessage`, `Certificate`, `MasterCertificate`, `VerifiableCertificate`, `MessageType`, `Peer`, `PeerOptions`, `PeerSession`, `RequestedCertificateSet`, `SessionManager`, `SimplifiedFetchTransport`, `Transport` |
+| `websocket` | `WebSocketTransport`, `WebSocketTransportOptions` (requires `websocket` feature flag) |
 | `overlay` | `LookupAnswer`, `LookupQuestion`, `LookupResolver`, `NetworkPreset`, `Steak`, `TaggedBEEF`, `TopicBroadcaster` |
 | `storage` | `get_hash_from_url`, `get_url_for_file`, `is_valid_url`, `DownloadResult`, `StorageDownloader`, `StorageUploader`, `UploadFileResult`, `UploadableFile` |
 | `registry` | `BasketDefinitionData`, `BasketQuery`, `BroadcastFailure`, `BroadcastSuccess`, `CertificateDefinitionData`, `CertificateFieldDescriptor`, `CertificateQuery`, `DefinitionData`, `DefinitionType`, `ProtocolDefinitionData`, `ProtocolQuery`, `RegisterDefinitionResult`, `RegistryClient`, `RegistryClientConfig`, `RegistryRecord`, `RevokeDefinitionResult`, `TokenData` |
@@ -150,6 +151,9 @@ full
  ├── registry → overlay
  ├── kvstore → overlay
  └── identity → auth + overlay
+
+websocket (opt-in, not in full)
+ └── auth transport via tokio-tungstenite
 ```
 
 **Default features**: `primitives`, `script`
@@ -157,6 +161,7 @@ full
 **Optional features**:
 - `http` - HTTP clients for ARC broadcaster, WhatsOnChain, WalletClient substrate
 - `wasm` - WebAssembly support via `getrandom/js`
+- `websocket` - WebSocket auth transport via `tokio-tungstenite` (opt-in, not included in `full`)
 - `full` - All modules enabled
 - `dhat-profiling` - Memory profiling support for benchmarks
 

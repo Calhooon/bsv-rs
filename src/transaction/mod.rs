@@ -122,7 +122,7 @@ pub use fee_models::{
     LivePolicy, LivePolicyConfig, SatoshisPerKilobyte, DEFAULT_CACHE_TTL_SECS,
     DEFAULT_FALLBACK_RATE, DEFAULT_POLICY_URL,
 };
-pub use input::TransactionInput;
+pub use input::{TransactionInput, Utxo};
 pub use merkle_path::{MerklePath, MerklePathLeaf};
 pub use output::TransactionOutput;
 pub use transaction::{ChangeDistribution, ScriptOffset, ScriptOffsets, Transaction};

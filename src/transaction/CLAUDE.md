@@ -22,7 +22,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root; re-exports all public types and sighash constants |
-| `input.rs` | `TransactionInput` for transaction inputs |
+| `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF ancestry collection |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
@@ -64,6 +64,19 @@ impl TransactionInput {
 ```
 
 Note: `unlocking_script_template` is not cloned when cloning `TransactionInput` (templates contain closures).
+
+### Utxo
+
+```rust
+pub struct Utxo {
+    pub txid: String,                    // TXID of the source transaction
+    pub vout: u32,                       // Output index in source transaction
+    pub satoshis: u64,                   // Amount in the output
+    pub locking_script: LockingScript,   // Spending conditions
+}
+```
+
+Used with `Transaction::add_inputs_from_utxos()` for convenient batch input creation without needing full source transactions.
 
 ### TransactionOutput
 
@@ -131,6 +144,12 @@ impl Transaction {
     pub fn add_input(&mut self, input: TransactionInput) -> Result<()>
     pub fn add_output(&mut self, output: TransactionOutput) -> Result<()>
     pub fn add_p2pkh_output(&mut self, address: &str, satoshis: Option<u64>) -> Result<()>
+    pub fn add_op_return_output(&mut self, data: &[u8]) -> Result<()>          // OP_FALSE OP_RETURN <data>
+    pub fn add_op_return_parts_output(&mut self, parts: &[&[u8]]) -> Result<()> // Multi-part OP_RETURN
+    pub fn add_hash_puzzle_output(&mut self, secret: &str, public_key_hash: &str, satoshis: u64) -> Result<()>
+    pub fn add_input_from_tx(&mut self, source_tx: Transaction, vout: u32, template: ScriptTemplateUnlock) -> Result<()>
+    pub fn add_input_from(&mut self, prev_txid: &str, vout: u32, prev_locking_script: &LockingScript, satoshis: u64, template: ScriptTemplateUnlock) -> Result<()>
+    pub fn add_inputs_from_utxos(&mut self, utxos: &[Utxo]) -> Result<()>      // No template set
     pub fn update_metadata(&mut self, key: &str, value: Value)
     pub fn input_count(&self) -> usize
     pub fn output_count(&self) -> usize
@@ -138,6 +157,8 @@ impl Transaction {
     // Inspection
     pub fn is_coinbase(&self) -> bool       // True if single input with null TXID
     pub fn has_data_outputs(&self) -> bool   // True if any output has OP_RETURN
+    pub fn total_input_satoshis(&self) -> Result<u64>  // Sum of all input satoshis
+    pub fn total_output_satoshis(&self) -> u64         // Sum of all output satoshis
 
     // Signing & Fees
     pub async fn sign(&mut self) -> Result<()>
@@ -185,45 +206,12 @@ pub trait FeeModel: Send + Sync {
     fn compute_fee(&self, tx: &Transaction) -> Result<u64>;
 }
 
-// Fixed fee - always returns the same amount
-pub struct FixedFee(u64);
-impl FixedFee {
-    pub fn new(satoshis: u64) -> Self
-}
-
-// Satoshis per kilobyte - computes based on transaction size
-pub struct SatoshisPerKilobyte { pub value: u64 }
-impl SatoshisPerKilobyte {
-    pub fn new(value: u64) -> Self      // value = satoshis per KB
-    pub fn default() -> Self            // 100 sat/KB (standard BSV rate)
-}
-
-// Live policy - fetches fee rate from ARC policy endpoint
-pub struct LivePolicy { /* ... */ }
-impl LivePolicy {
-    pub fn new() -> Self                // Uses DEFAULT_POLICY_URL
-    pub fn with_url(policy_url: &str) -> Self
-    pub fn with_config(config: LivePolicyConfig) -> Self
-    pub fn policy_url(&self) -> &str
-    pub fn cache_ttl(&self) -> Duration
-    pub async fn refresh(&self) -> Result<u64>  // Fetch live rate
-    pub fn cached_rate(&self) -> Option<u64>
-    pub fn effective_rate(&self) -> u64  // Cached or fallback (100 sat/KB)
-    pub fn set_rate(&self, rate: u64)    // Manual override
-}
-
-pub struct LivePolicyConfig {
-    pub policy_url: String,
-    pub api_key: Option<String>,
-    pub cache_ttl: Duration,        // Default: 5 minutes
-    pub fallback_rate: u64,         // Default: 100 sat/KB
-    pub timeout_ms: u64,
-}
-
-pub const DEFAULT_POLICY_URL: &str = "https://arc.gorillapool.io/v1/policy";
-pub const DEFAULT_CACHE_TTL_SECS: u64 = 300;
-pub const DEFAULT_FALLBACK_RATE: u64 = 100;
+pub struct FixedFee(u64);                              // Always returns same fee
+pub struct SatoshisPerKilobyte { pub value: u64 }      // Fee based on tx size (default: 100 sat/KB)
+pub struct LivePolicy { /* ... */ }                    // Fetches rate from ARC policy endpoint
 ```
+
+`LivePolicy` has `new()`, `with_url()`, `with_config(LivePolicyConfig)`, `refresh()` (async fetch), `cached_rate()`, `effective_rate()`, `set_rate()`. Config: `LivePolicyConfig { policy_url, api_key, cache_ttl, fallback_rate, timeout_ms }`. Default policy URL: `https://arc.gorillapool.io/v1/policy`.
 
 ## Broadcasting
 
@@ -231,69 +219,25 @@ pub const DEFAULT_FALLBACK_RATE: u64 = 100;
 #[async_trait(?Send)]
 pub trait Broadcaster: Send + Sync {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult;
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>;
+    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>; // Default: sequential
 }
 
-pub struct BroadcastResponse { pub status: BroadcastStatus, pub txid: String, pub message: String, pub competing_txs: Option<Vec<String>> }
-impl BroadcastResponse {
-    pub fn success(txid: String, message: String) -> Self
-    pub fn success_with_competing(txid, message, competing_txs) -> Self
-}
-
-pub struct BroadcastFailure { pub status: BroadcastStatus, pub code: String, pub txid: Option<String>, pub description: String, pub more: Option<Value> }
-impl BroadcastFailure {
-    pub fn new(code: String, description: String) -> Self
-    pub fn with_txid(code, txid, description) -> Self
-    pub fn with_details(code, description, more: Value) -> Self
-}
-
-pub enum BroadcastStatus { Success, Error }
 pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
-
-pub fn is_broadcast_success(result: &BroadcastResult) -> bool
-pub fn is_broadcast_failure(result: &BroadcastResult) -> bool
+pub enum BroadcastStatus { Success, Error }
+// BroadcastResponse: status, txid, message, competing_txs. Constructors: success(), success_with_competing()
+// BroadcastFailure: status, code, txid, description, more. Constructors: new(), with_txid(), with_details()
+// Helpers: is_broadcast_success(), is_broadcast_failure()
 ```
 
 ### Broadcaster Implementations (require `http` feature)
 
-**ArcBroadcaster** - BEEF V1 format via ARC API (JSON):
-```rust
-pub struct ArcBroadcaster { /* ... */ }
-impl ArcBroadcaster {
-    pub fn new(url: &str, api_key: Option<String>) -> Self
-    pub fn with_config(config: ArcConfig) -> Self
-    pub fn default() -> Self  // Uses gorillapool.io ARC
-}
-```
+| Broadcaster | Format | Default | Config |
+|-------------|--------|---------|--------|
+| `ArcBroadcaster` | BEEF V1 (JSON) | `default()` = gorillapool.io | `ArcConfig` |
+| `TeranodeBroadcaster` | Extended Format (EF binary) | No default URL | `TeranodeConfig` |
+| `WhatsOnChainBroadcaster` | Raw tx hex | `mainnet()`, `testnet()`, `stn()` | `WocBroadcastConfig` |
 
-**TeranodeBroadcaster** - Extended Format (EF) binary via Teranode API:
-```rust
-pub struct TeranodeBroadcaster { /* ... */ }
-impl TeranodeBroadcaster {
-    pub fn new(url: &str, api_key: Option<String>) -> Self  // No default URL
-    pub fn with_config(config: TeranodeConfig) -> Self
-    pub fn url(&self) -> &str
-    pub fn api_key(&self) -> Option<&str>
-}
-pub struct TeranodeConfig { pub url: String, pub api_key: Option<String>, pub timeout_ms: u64 }
-```
-
-**WhatsOnChainBroadcaster** - Raw tx hex via WhatsOnChain API:
-```rust
-pub struct WhatsOnChainBroadcaster { /* ... */ }
-impl WhatsOnChainBroadcaster {
-    pub fn mainnet() -> Self
-    pub fn testnet() -> Self
-    pub fn stn() -> Self                // Scaling Test Network
-    pub fn new(network: WocBroadcastNetwork, api_key: Option<String>) -> Self
-    pub fn with_config(config: WocBroadcastConfig) -> Self
-    pub fn with_base_url(base_url: &str, network: WocBroadcastNetwork, api_key: Option<String>) -> Self
-    pub fn network(&self) -> WocBroadcastNetwork
-    pub fn api_key(&self) -> Option<&str>
-}
-pub enum WocBroadcastNetwork { Mainnet, Testnet, Stn }
-pub struct WocBroadcastConfig { pub network, pub api_key, pub timeout_ms, pub base_url }
-```
+All have `new(url, api_key)` and `with_config(config)` constructors.
 
 ## Chain Tracking
 
@@ -311,25 +255,10 @@ pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), Bloc
 
 ### Chain Tracker Implementations (require `http` feature)
 
-**WhatsOnChainTracker**:
-```rust
-pub struct WhatsOnChainTracker { /* ... */ }
-impl WhatsOnChainTracker {
-    pub fn mainnet() -> Self
-    pub fn testnet() -> Self
-    pub fn new(network: WocNetwork) -> Self
-    pub fn with_base_url(base_url: &str, network: WocNetwork) -> Self
-    pub fn network(&self) -> WocNetwork
-}
-pub enum WocNetwork { Mainnet, Testnet }
-```
-
-**BlockHeadersServiceTracker**:
-```rust
-pub struct BlockHeadersServiceTracker { /* ... */ }
-pub struct BlockHeadersServiceConfig { pub url: String, pub auth_token: Option<String>, pub timeout_ms: u64 }
-pub const DEFAULT_HEADERS_URL: &str;
-```
+| Tracker | Networks | Config |
+|---------|----------|--------|
+| `WhatsOnChainTracker` | `mainnet()`, `testnet()` | `WocNetwork` enum |
+| `BlockHeadersServiceTracker` | Any (via URL) | `BlockHeadersServiceConfig` |
 
 ## MerklePath (BUMP - BRC-74)
 
@@ -340,48 +269,25 @@ pub struct MerklePath {
 }
 
 pub struct MerklePathLeaf {
-    pub offset: u64,            // Position in tree level
-    pub hash: Option<String>,   // None if duplicate
-    pub txid: bool,             // True if this is a transaction ID
-    pub duplicate: bool,        // True if hash duplicated from sibling
+    pub offset: u64, pub hash: Option<String>, pub txid: bool, pub duplicate: bool,
 }
-
-impl MerklePathLeaf {
-    pub fn new(offset: u64, hash: String) -> Self
-    pub fn new_txid(offset: u64, hash: String) -> Self
-    pub fn new_duplicate(offset: u64) -> Self
-}
+// Leaf constructors: new(offset, hash), new_txid(offset, hash), new_duplicate(offset)
 
 impl MerklePath {
-    // Constructors
     pub fn new(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>  // Full validation
-    pub fn new_unchecked(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>  // Skips offset validation
-    pub fn from_hex(hex: &str) -> Result<Self>
-    pub fn from_binary(bin: &[u8]) -> Result<Self>
-    pub fn from_reader(reader: &mut Reader) -> Result<Self>
+    pub fn new_unchecked(block_height, path) -> Result<Self>    // Skips offset validation
+    pub fn from_hex/from_binary/from_reader(...)                // Parsing
     pub fn from_coinbase_txid(txid: &str, height: u32) -> Self  // Single-tx block
-
-    // Serialization
-    pub fn to_hex(&self) -> String
-    pub fn to_binary(&self) -> Vec<u8>
-    pub fn to_writer(&self, writer: &mut Writer)
-
-    // Verification
+    pub fn to_hex/to_binary/to_writer(...)                      // Serialization
     pub fn compute_root(&self, txid: Option<&str>) -> Result<String>
     pub fn contains(&self, txid: &str) -> bool
-    pub fn txids(&self) -> Vec<String>  // All txids marked with txid=true
-
-    // Merging
+    pub fn txids(&self) -> Vec<String>
     pub fn combine(&mut self, other: &MerklePath) -> Result<()>  // Same height/root required
     pub fn trim(&mut self)  // Remove unnecessary internal nodes
 }
 ```
 
-Validation in `new()`:
-- Level 0 must not be empty
-- No duplicate offsets at same level
-- All higher-level offsets must be derivable from level 0 txids
-- All txids must compute to the same root
+Validation in `new()`: level 0 non-empty, no duplicate offsets, legal higher-level offsets, all txids compute same root.
 
 ## BEEF Format (BRC-62/95/96)
 
@@ -395,64 +301,21 @@ pub struct Beef {
 }
 
 impl Beef {
-    pub fn new() -> Self                 // V2 by default
-    pub fn with_version(version: u32) -> Self
-    pub fn from_hex(hex: &str) -> Result<Self>
-    pub fn from_binary(bin: &[u8]) -> Result<Self>
-    pub fn to_hex(&mut self) -> String
-    pub fn to_binary(&mut self) -> Vec<u8>         // Auto-sorts txs
-    pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>>
-
-    // Validation
-    pub fn is_valid(&mut self, allow_txid_only: bool) -> bool
-    pub fn verify_valid(&mut self, allow_txid_only: bool) -> BeefValidationResult
-    pub fn sort_txs(&mut self) -> SortResult
-
-    // Lookup
-    pub fn find_txid(&self, txid: &str) -> Option<&BeefTx>
-    pub fn find_txid_mut(&mut self, txid: &str) -> Option<&mut BeefTx>
-    pub fn find_bump(&self, txid: &str) -> Option<&MerklePath>
-    pub fn find_transaction_for_signing(&self, txid: &str) -> Option<Transaction>
-    pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction>
-    pub fn is_atomic(&self) -> bool
-
-    // Merging
-    pub fn merge_bump(&mut self, bump: MerklePath) -> usize  // Combines same height/root
-    pub fn merge_transaction(&mut self, tx: Transaction) -> &BeefTx
-    pub fn merge_raw_tx(&mut self, raw_tx: Vec<u8>, bump_index: Option<usize>) -> &BeefTx
-    pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx
-    pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx>
-    pub fn merge_beef(&mut self, other: &Beef)
-
-    // Utility
-    pub fn clone_shallow(&self) -> Self
-    pub fn to_log_string(&mut self) -> String  // Debug summary
+    // Construction: new() [V2], with_version(), from_hex(), from_binary()
+    // Serialization: to_hex(), to_binary() [auto-sorts], to_binary_atomic(txid)
+    // Validation: is_valid(allow_txid_only), verify_valid() -> BeefValidationResult, sort_txs() -> SortResult
+    // Lookup: find_txid(), find_txid_mut(), find_bump(), find_transaction_for_signing(), find_atomic_transaction(), is_atomic()
+    // Merging: merge_bump() [combines same height/root], merge_transaction(), merge_raw_tx(), merge_txid_only(), make_txid_only(), merge_beef()
+    // Utility: clone_shallow(), to_log_string()
 }
 
 pub struct BeefValidationResult { pub valid: bool, pub roots: HashMap<u32, String> }
 pub struct SortResult { pub missing_inputs, not_valid, valid, with_missing_inputs, txid_only: Vec<String> }
-
-pub struct BeefTx { pub input_txids: Vec<String>, pub is_valid: Option<bool> }
-impl BeefTx {
-    pub fn from_tx(tx: Transaction, bump_index: Option<usize>) -> Self
-    pub fn from_raw_tx(raw_tx: Vec<u8>, bump_index: Option<usize>) -> Self
-    pub fn from_txid(txid: String) -> Self
-    pub fn has_proof(&self) -> bool      // bump_index.is_some()
-    pub fn is_txid_only(&self) -> bool   // Has txid but no tx data
-    pub fn txid(&self) -> String
-    pub fn tx(&self) -> Option<&Transaction>
-    pub fn tx_mut(&mut self) -> Option<&mut Transaction>  // Parses from raw if needed
-    pub fn raw_tx(&self) -> Option<&[u8]>
-    pub fn raw_tx_or_compute(&mut self) -> Option<Vec<u8>>  // Computes from parsed tx if needed
-    pub fn bump_index(&self) -> Option<usize>
-    pub fn set_bump_index(&mut self, index: Option<usize>)
-}
-
-pub enum TxDataFormat { RawTx = 0, RawTxAndBumpIndex = 1, TxidOnly = 2 }
-pub const BEEF_V1: u32 = 0xEFBE0001;  // BRC-62
-pub const BEEF_V2: u32 = 0xEFBE0002;  // BRC-96 with txid-only
-pub const ATOMIC_BEEF: u32 = 0x01010101;  // BRC-95
 ```
+
+**BeefTx**: Wraps a single tx in BEEF. Constructors: `from_tx(tx, bump_index)`, `from_raw_tx(raw_tx, bump_index)`, `from_txid(txid)`. Accessors: `txid()`, `tx()`, `tx_mut()`, `raw_tx()`, `raw_tx_or_compute()`. State: `has_proof()`, `is_txid_only()`, `bump_index()`, `set_bump_index()`. Public fields: `input_txids`, `is_valid`.
+
+**Constants**: `BEEF_V1 = 0xEFBE0001` (BRC-62), `BEEF_V2 = 0xEFBE0002` (BRC-96 with txid-only), `ATOMIC_BEEF = 0x01010101` (BRC-95). `TxDataFormat`: `RawTx=0`, `RawTxAndBumpIndex=1`, `TxidOnly=2`.
 
 ## Re-exported Sighash Constants
 
@@ -471,6 +334,11 @@ tx.add_p2pkh_output("1MyChange...", None)?;  // Change output
 tx.fee(None, ChangeDistribution::Equal).await?;
 tx.sign().await?;
 
+// Convenience input methods (match Go SDK)
+tx.add_input_from_tx(source_tx, 0, p2pkh_unlock)?;        // Full source tx + template
+tx.add_input_from(txid, 0, &locking_script, 50_000, p2pkh_unlock)?; // By TXID + script
+tx.add_inputs_from_utxos(&utxos)?;  // Batch add from UTXOs (templates set separately)
+
 // Inspecting
 assert!(!tx.is_coinbase());
 assert!(tx.has_data_outputs());  // If any OP_RETURN outputs exist
@@ -480,17 +348,10 @@ let json = tx.to_json()?;
 let tx2 = Transaction::from_json(&json)?;
 assert_eq!(tx.to_hex(), tx2.to_hex());
 
-// Broadcasting
-let broadcaster = ArcBroadcaster::default();
-let result = broadcaster.broadcast(&tx).await;
-
-// Broadcasting via WhatsOnChain (supports mainnet/testnet/STN)
-let broadcaster = WhatsOnChainBroadcaster::mainnet();
-let result = broadcaster.broadcast(&tx).await;
-
-// Broadcasting via Teranode (EF binary format)
-let broadcaster = TeranodeBroadcaster::new("https://teranode.example.com", None);
-let result = broadcaster.broadcast(&tx).await;
+// Broadcasting (requires `http` feature)
+let result = ArcBroadcaster::default().broadcast(&tx).await;             // BEEF V1
+let result = WhatsOnChainBroadcaster::mainnet().broadcast(&tx).await;    // Raw hex
+let result = TeranodeBroadcaster::new(url, None).broadcast(&tx).await;   // EF binary
 
 // Serializing to BEEF (recursively collects ancestors)
 let beef_v1 = tx.to_beef_v1(false)?;  // For ARC
@@ -513,6 +374,7 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 
 - **Caching**: Transaction hash/serialization cached in RefCell; invalidates on modification via `add_input()`, `add_output()`, `sign()`, `fee()`
 - **Inputs**: Must have `source_txid` or `source_transaction`; fee calc/signing need full source tx with satoshis/locking_script
+- **Convenience inputs**: `add_input_from_tx` sets template; `add_input_from` builds a minimal source tx; `add_inputs_from_utxos` does NOT set templates (caller must set them separately)
 - **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()` using Benford's law for Random distribution
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async

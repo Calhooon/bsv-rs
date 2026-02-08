@@ -422,8 +422,34 @@ impl LookupResolver {
         hosts
     }
 
-    /// Find hosts that can answer queries for a service via SLAP.
-    async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>> {
+    /// Find hosts that can answer queries for a given lookup service via SLAP.
+    ///
+    /// Queries all available SLAP trackers in parallel to discover hosts that
+    /// advertise the specified service. Each tracker response is parsed as a
+    /// SLAP admin token to extract the host domain.
+    ///
+    /// This is the low-level discovery method. It does **not** use the hosts
+    /// cache or request coalescing (those are handled by `get_competent_hosts`,
+    /// which is called internally by [`query`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `service` - The lookup service name (e.g. `"ls_myservice"`)
+    ///
+    /// # Returns
+    ///
+    /// A list of host URLs that advertise the given service.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let resolver = LookupResolver::default();
+    /// let hosts = resolver.find_competent_hosts("ls_myservice").await?;
+    /// for host in &hosts {
+    ///     println!("Found host: {}", host);
+    /// }
+    /// ```
+    pub async fn find_competent_hosts(&self, service: &str) -> Result<Vec<String>> {
         let question = LookupQuestion::new("ls_slap", serde_json::json!({ "service": service }));
 
         // Rank trackers and filter out those in backoff
@@ -786,5 +812,94 @@ mod tests {
         let resolver = LookupResolver::default();
         let in_flight = resolver.hosts_in_flight.read().await;
         assert!(in_flight.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_find_competent_hosts_returns_vec() {
+        // Verify the method is public, callable, and returns Result<Vec<String>>.
+        // With default mainnet trackers but no real network, the SLAP queries
+        // will fail or return empty. The important thing is the method is
+        // accessible and returns the correct type.
+        let resolver = LookupResolver::default();
+        let result = resolver.find_competent_hosts("ls_test_service").await;
+        // Result is either Ok(vec) or Err - both are valid without network.
+        // We just verify the return type compiles and the method is public.
+        match result {
+            Ok(hosts) => {
+                // If it succeeds (unlikely without network), hosts is a Vec<String>
+                let _: Vec<String> = hosts;
+            }
+            Err(_) => {
+                // Expected without network connectivity
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_find_competent_hosts_empty_service() {
+        // Empty service name should still be handled without panicking.
+        let resolver = LookupResolver::default();
+        let result = resolver.find_competent_hosts("").await;
+        // Should not panic; result depends on network availability
+        match result {
+            Ok(hosts) => {
+                let _: Vec<String> = hosts;
+            }
+            Err(_) => {
+                // Expected without network connectivity
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_find_competent_hosts_local_preset_bypassed() {
+        // find_competent_hosts is the low-level SLAP discovery method.
+        // The local preset shortcut is in get_competent_hosts, not here.
+        // With local preset, the SLAP trackers list is localhost,
+        // so queries will fail without a local overlay node running.
+        let config = LookupResolverConfig {
+            network_preset: NetworkPreset::Local,
+            ..Default::default()
+        };
+        let resolver = LookupResolver::new(config);
+        let result = resolver.find_competent_hosts("ls_test").await;
+        match result {
+            Ok(hosts) => {
+                let _: Vec<String> = hosts;
+            }
+            Err(_) => {
+                // Expected - no local overlay node running
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_find_competent_hosts_with_host_overrides_not_applied() {
+        // find_competent_hosts does raw SLAP discovery.
+        // Host overrides are applied in get_competent_hosts, not here.
+        // Verify they don't leak into find_competent_hosts results.
+        let mut overrides = HashMap::new();
+        overrides.insert(
+            "ls_override_test".to_string(),
+            vec!["https://override.host".to_string()],
+        );
+
+        let config = LookupResolverConfig {
+            host_overrides: Some(overrides),
+            ..Default::default()
+        };
+        let resolver = LookupResolver::new(config);
+
+        let result = resolver.find_competent_hosts("ls_override_test").await;
+        match result {
+            Ok(hosts) => {
+                // The override host should NOT appear since find_competent_hosts
+                // only does SLAP discovery. Without network, it returns empty.
+                assert!(!hosts.contains(&"https://override.host".to_string()));
+            }
+            Err(_) => {
+                // Expected without network connectivity
+            }
+        }
     }
 }

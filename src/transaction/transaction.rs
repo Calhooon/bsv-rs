@@ -796,6 +796,268 @@ impl Transaction {
         }
     }
 
+    /// Adds an OP_FALSE OP_RETURN output with a single data payload.
+    ///
+    /// Creates a safe data carrier output (unspendable, prunable) with the given data.
+    /// The output has 0 satoshis.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The data to embed in the OP_RETURN output
+    pub fn add_op_return_output(&mut self, data: &[u8]) -> Result<()> {
+        self.add_op_return_parts_output(&[data])
+    }
+
+    /// Adds an OP_FALSE OP_RETURN output with multiple data parts.
+    ///
+    /// Creates a safe data carrier output (unspendable, prunable) with multiple
+    /// push-data segments. The output has 0 satoshis.
+    ///
+    /// # Arguments
+    ///
+    /// * `parts` - The data parts to embed in the OP_RETURN output
+    pub fn add_op_return_parts_output(&mut self, parts: &[&[u8]]) -> Result<()> {
+        use crate::script::Script;
+
+        let mut script = Script::new();
+        script
+            .write_opcode(0x00) // OP_FALSE
+            .write_opcode(0x6a); // OP_RETURN
+        for part in parts {
+            script.write_bin(part);
+        }
+
+        let locking_script = LockingScript::from_script(script);
+        self.add_output(TransactionOutput::new(0, locking_script))
+    }
+
+    /// Adds a hash puzzle output to the transaction.
+    ///
+    /// Creates a locking script that requires both knowledge of a secret preimage
+    /// and a valid P2PKH signature to spend:
+    /// `OP_HASH160 <HASH160(secret)> OP_EQUALVERIFY OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG`
+    ///
+    /// # Arguments
+    ///
+    /// * `secret` - The secret string whose HASH160 becomes the puzzle
+    /// * `public_key_hash` - Hex-encoded 20-byte public key hash
+    /// * `satoshis` - The amount to lock in the output
+    pub fn add_hash_puzzle_output(
+        &mut self,
+        secret: &str,
+        public_key_hash: &str,
+        satoshis: u64,
+    ) -> Result<()> {
+        use crate::primitives::{from_hex as decode_hex, hash160};
+        use crate::script::Script;
+
+        let pubkey_hash_bytes = decode_hex(public_key_hash)?;
+        if pubkey_hash_bytes.len() != 20 {
+            return Err(crate::Error::TransactionError(
+                "Invalid pubkey hash length, expected 20 bytes".to_string(),
+            ));
+        }
+
+        let secret_hash = hash160(secret.as_bytes());
+
+        let mut script = Script::new();
+        script
+            .write_opcode(0xa9) // OP_HASH160
+            .write_bin(&secret_hash)
+            .write_opcode(0x88) // OP_EQUALVERIFY
+            .write_opcode(0x76) // OP_DUP
+            .write_opcode(0xa9) // OP_HASH160
+            .write_bin(&pubkey_hash_bytes)
+            .write_opcode(0x88) // OP_EQUALVERIFY
+            .write_opcode(0xac); // OP_CHECKSIG
+
+        let locking_script = LockingScript::from_script(script);
+        self.add_output(TransactionOutput::new(satoshis, locking_script))
+    }
+
+    /// Adds an input from a source transaction and output index, with an unlocking script template.
+    ///
+    /// This is a convenience wrapper that creates a `TransactionInput` with a full
+    /// source transaction reference and assigns the given unlocking script template,
+    /// matching the Go SDK's `AddInputFromTx` method.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_tx` - The source transaction containing the output being spent
+    /// * `vout` - The index of the output being spent in the source transaction
+    /// * `template` - The unlocking script template for signing this input
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be added (e.g., missing source data).
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::transaction::Transaction;
+    /// use bsv_sdk::script::templates::P2PKH;
+    ///
+    /// let source_tx = Transaction::from_hex("...")?;
+    /// let mut tx = Transaction::new();
+    /// tx.add_input_from_tx(source_tx, 0, P2PKH::new().unlock(&private_key, None, None, None)?)?;
+    /// ```
+    pub fn add_input_from_tx(
+        &mut self,
+        source_tx: Transaction,
+        vout: u32,
+        template: crate::script::ScriptTemplateUnlock,
+    ) -> Result<()> {
+        let mut input = TransactionInput::with_source_transaction(source_tx, vout);
+        input.set_unlocking_script_template(template);
+        self.add_input(input)
+    }
+
+    /// Adds an input from a previous TXID, output index, locking script, and satoshis,
+    /// with an unlocking script template.
+    ///
+    /// This is a convenience wrapper that creates a `TransactionInput` with a minimal
+    /// source transaction containing the specified locking script and satoshis at the
+    /// correct output index. This allows signing to work without having the full source
+    /// transaction available, matching the Go SDK's `AddInputFrom` method.
+    ///
+    /// # Arguments
+    ///
+    /// * `prev_txid` - The hex-encoded TXID of the previous transaction
+    /// * `vout` - The index of the output being spent
+    /// * `prev_locking_script` - The locking script of the output being spent
+    /// * `satoshis` - The satoshi value of the output being spent
+    /// * `template` - The unlocking script template for signing this input
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the TXID is empty or not valid hex encoding of 32 bytes.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::transaction::Transaction;
+    /// use bsv_sdk::script::{LockingScript, templates::P2PKH};
+    ///
+    /// let mut tx = Transaction::new();
+    /// let locking_script = LockingScript::from_hex("76a914...88ac")?;
+    /// tx.add_input_from(
+    ///     "abc123...",
+    ///     0,
+    ///     &locking_script,
+    ///     100_000,
+    ///     P2PKH::new().unlock(&private_key, None, None, None)?,
+    /// )?;
+    /// ```
+    pub fn add_input_from(
+        &mut self,
+        prev_txid: &str,
+        vout: u32,
+        prev_locking_script: &LockingScript,
+        satoshis: u64,
+        template: crate::script::ScriptTemplateUnlock,
+    ) -> Result<()> {
+        // Validate the TXID
+        if prev_txid.is_empty() {
+            return Err(crate::Error::TransactionError(
+                "Previous TXID must not be empty".to_string(),
+            ));
+        }
+
+        let txid_bytes = from_hex(prev_txid)?;
+        if txid_bytes.len() != 32 {
+            return Err(crate::Error::TransactionError(format!(
+                "Invalid TXID length: expected 32 bytes (64 hex chars), got {} bytes",
+                txid_bytes.len()
+            )));
+        }
+
+        // Build a minimal source transaction with the correct output at the given index
+        let mut source_tx = Transaction::new();
+        for _ in 0..vout {
+            source_tx
+                .outputs
+                .push(TransactionOutput::new(0, LockingScript::new()));
+        }
+        source_tx
+            .outputs
+            .push(TransactionOutput::new(satoshis, prev_locking_script.clone()));
+
+        let mut input = TransactionInput::new(prev_txid.to_string(), vout);
+        input.source_transaction = Some(Box::new(source_tx));
+        input.set_unlocking_script_template(template);
+        self.add_input(input)
+    }
+
+    /// Adds inputs from a slice of UTXOs.
+    ///
+    /// For each UTXO, creates a `TransactionInput` with a minimal source transaction
+    /// containing the UTXO's locking script and satoshis at the correct output index.
+    /// The unlocking script template is **not** set; the caller must set templates on
+    /// the inputs separately or provide them during signing.
+    ///
+    /// This matches the Go SDK's `AddInputsFromUTXOs` method.
+    ///
+    /// # Arguments
+    ///
+    /// * `utxos` - The UTXOs to add as inputs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any UTXO has an empty or invalid TXID.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// use bsv_sdk::transaction::{Transaction, Utxo};
+    /// use bsv_sdk::script::LockingScript;
+    ///
+    /// let utxos = vec![
+    ///     Utxo {
+    ///         txid: "abc123...".to_string(),
+    ///         vout: 0,
+    ///         satoshis: 100_000,
+    ///         locking_script: LockingScript::from_hex("76a914...88ac")?,
+    ///     },
+    /// ];
+    /// let mut tx = Transaction::new();
+    /// tx.add_inputs_from_utxos(&utxos)?;
+    /// ```
+    pub fn add_inputs_from_utxos(&mut self, utxos: &[super::input::Utxo]) -> Result<()> {
+        for utxo in utxos {
+            // Validate the TXID
+            if utxo.txid.is_empty() {
+                return Err(crate::Error::TransactionError(
+                    "UTXO TXID must not be empty".to_string(),
+                ));
+            }
+
+            let txid_bytes = from_hex(&utxo.txid)?;
+            if txid_bytes.len() != 32 {
+                return Err(crate::Error::TransactionError(format!(
+                    "Invalid UTXO TXID length: expected 32 bytes (64 hex chars), got {} bytes",
+                    txid_bytes.len()
+                )));
+            }
+
+            // Build a minimal source transaction with the correct output at the given index
+            let mut source_tx = Transaction::new();
+            for _ in 0..utxo.vout {
+                source_tx
+                    .outputs
+                    .push(TransactionOutput::new(0, LockingScript::new()));
+            }
+            source_tx.outputs.push(TransactionOutput::new(
+                utxo.satoshis,
+                utxo.locking_script.clone(),
+            ));
+
+            let mut input = TransactionInput::new(utxo.txid.clone(), utxo.vout);
+            input.source_transaction = Some(Box::new(source_tx));
+            self.add_input(input)?;
+        }
+        Ok(())
+    }
+
     /// Updates the transaction metadata.
     ///
     /// # Arguments
@@ -1286,6 +1548,35 @@ impl Transaction {
     pub fn has_data_outputs(&self) -> bool {
         self.outputs.iter().any(|o| o.locking_script.as_script().is_data())
     }
+
+    /// Returns the total satoshis of all inputs that have source transaction data.
+    ///
+    /// Returns an error if any input is missing its source transaction, since
+    /// the satoshi value cannot be determined without it.
+    pub fn total_input_satoshis(&self) -> Result<u64> {
+        let mut total: u64 = 0;
+        for (i, input) in self.inputs.iter().enumerate() {
+            match input.source_satoshis() {
+                Some(sats) => {
+                    total = total.checked_add(sats).ok_or_else(|| {
+                        crate::Error::TransactionError("Input satoshis overflow".to_string())
+                    })?;
+                }
+                None => {
+                    return Err(crate::Error::TransactionError(format!(
+                        "Input {} is missing source transaction data",
+                        i
+                    )));
+                }
+            }
+        }
+        Ok(total)
+    }
+
+    /// Returns the total satoshis of all outputs.
+    pub fn total_output_satoshis(&self) -> u64 {
+        self.outputs.iter().filter_map(|o| o.satoshis).sum()
+    }
 }
 
 impl Default for Transaction {
@@ -1593,5 +1884,425 @@ mod tests {
         // Empty outputs
         let tx_empty = Transaction::new();
         assert!(!tx_empty.has_data_outputs());
+    }
+
+    #[test]
+    fn test_add_op_return_output() {
+        let mut tx = Transaction::new();
+        tx.add_op_return_output(b"hello world").unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].satoshis, Some(0));
+        assert!(tx.outputs[0].locking_script.as_script().is_data());
+        assert!(tx.outputs[0].locking_script.as_script().is_safe_data_carrier());
+
+        // Verify the script structure: OP_FALSE OP_RETURN <data>
+        let asm = tx.outputs[0].locking_script.to_asm();
+        assert!(asm.starts_with("0 OP_RETURN"));
+    }
+
+    #[test]
+    fn test_add_op_return_output_empty_data() {
+        let mut tx = Transaction::new();
+        tx.add_op_return_output(b"").unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert!(tx.outputs[0].locking_script.as_script().is_data());
+    }
+
+    #[test]
+    fn test_add_op_return_parts_output() {
+        let mut tx = Transaction::new();
+        tx.add_op_return_parts_output(&[b"part1", b"part2", b"part3"])
+            .unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].satoshis, Some(0));
+        assert!(tx.outputs[0].locking_script.as_script().is_data());
+        assert!(tx.outputs[0].locking_script.as_script().is_safe_data_carrier());
+
+        // Verify all parts are present in the script
+        let asm = tx.outputs[0].locking_script.to_asm();
+        assert!(asm.starts_with("0 OP_RETURN"));
+    }
+
+    #[test]
+    fn test_add_op_return_parts_single_part() {
+        let mut tx = Transaction::new();
+        tx.add_op_return_parts_output(&[b"single"]).unwrap();
+
+        // Single part should produce same result as add_op_return_output
+        let mut tx2 = Transaction::new();
+        tx2.add_op_return_output(b"single").unwrap();
+
+        assert_eq!(
+            tx.outputs[0].locking_script.to_hex(),
+            tx2.outputs[0].locking_script.to_hex()
+        );
+    }
+
+    #[test]
+    fn test_add_op_return_triggers_has_data_outputs() {
+        let mut tx = Transaction::new();
+        assert!(!tx.has_data_outputs());
+
+        tx.add_op_return_output(b"test").unwrap();
+        assert!(tx.has_data_outputs());
+    }
+
+    #[test]
+    fn test_add_hash_puzzle_output() {
+        let mut tx = Transaction::new();
+        // 20-byte pubkey hash (hex)
+        let pubkey_hash = "89abcdefabbaabbaabbaabbaabbaabbaabbaabba";
+        tx.add_hash_puzzle_output("my secret", pubkey_hash, 50_000)
+            .unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].satoshis, Some(50_000));
+
+        // Verify the script structure:
+        // OP_HASH160 <hash> OP_EQUALVERIFY OP_DUP OP_HASH160 <pubkeyhash> OP_EQUALVERIFY OP_CHECKSIG
+        let asm = tx.outputs[0].locking_script.to_asm();
+        assert!(asm.starts_with("OP_HASH160"));
+        assert!(asm.contains("OP_EQUALVERIFY OP_DUP OP_HASH160"));
+        assert!(asm.ends_with("OP_EQUALVERIFY OP_CHECKSIG"));
+    }
+
+    #[test]
+    fn test_add_hash_puzzle_output_invalid_pubkey_hash() {
+        let mut tx = Transaction::new();
+        // Wrong length (not 20 bytes)
+        let result = tx.add_hash_puzzle_output("secret", "abcd", 1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_hash_puzzle_output_invalid_hex() {
+        let mut tx = Transaction::new();
+        let result = tx.add_hash_puzzle_output("secret", "not_hex!", 1000);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_total_output_satoshis() {
+        let mut tx = Transaction::new();
+        assert_eq!(tx.total_output_satoshis(), 0);
+
+        tx.outputs.push(TransactionOutput::new(
+            100_000,
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap(),
+        ));
+        assert_eq!(tx.total_output_satoshis(), 100_000);
+
+        tx.outputs.push(TransactionOutput::new(
+            50_000,
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap(),
+        ));
+        assert_eq!(tx.total_output_satoshis(), 150_000);
+    }
+
+    #[test]
+    fn test_total_output_satoshis_with_op_return() {
+        let mut tx = Transaction::new();
+        tx.add_op_return_output(b"data").unwrap();
+        tx.outputs.push(TransactionOutput::new(
+            100_000,
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap(),
+        ));
+        // OP_RETURN has 0 satoshis
+        assert_eq!(tx.total_output_satoshis(), 100_000);
+    }
+
+    #[test]
+    fn test_total_input_satoshis() {
+        // Parse a known transaction that has source data
+        let source_tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
+        let mut tx = Transaction::new();
+        tx.add_input(TransactionInput::with_source_transaction(
+            source_tx.clone(),
+            0,
+        ))
+        .unwrap();
+
+        let total = tx.total_input_satoshis().unwrap();
+        assert_eq!(total, source_tx.outputs[0].satoshis.unwrap());
+    }
+
+    #[test]
+    fn test_total_input_satoshis_missing_source() {
+        let mut tx = Transaction::new();
+        tx.add_input(TransactionInput::new(
+            "0000000000000000000000000000000000000000000000000000000000000001"
+                .to_string(),
+            0,
+        ))
+        .unwrap();
+
+        // Should error because source transaction is not available
+        assert!(tx.total_input_satoshis().is_err());
+    }
+
+    #[test]
+    fn test_total_input_satoshis_empty() {
+        let tx = Transaction::new();
+        assert_eq!(tx.total_input_satoshis().unwrap(), 0);
+    }
+
+    #[test]
+    fn test_add_op_return_large_data() {
+        let mut tx = Transaction::new();
+        let large_data = vec![0xAB; 10_000];
+        tx.add_op_return_output(&large_data).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert!(tx.outputs[0].locking_script.as_script().is_data());
+    }
+
+    #[test]
+    fn test_add_op_return_parts_empty() {
+        let mut tx = Transaction::new();
+        let empty_parts: &[&[u8]] = &[];
+        tx.add_op_return_parts_output(empty_parts).unwrap();
+
+        assert_eq!(tx.outputs.len(), 1);
+        assert!(tx.outputs[0].locking_script.as_script().is_data());
+        // Should just be OP_FALSE OP_RETURN with no data
+        let asm = tx.outputs[0].locking_script.to_asm();
+        assert_eq!(asm, "0 OP_RETURN");
+    }
+
+    #[test]
+    fn test_hash_puzzle_secret_deterministic() {
+        // Same secret should produce the same hash puzzle
+        let mut tx1 = Transaction::new();
+        let mut tx2 = Transaction::new();
+        let pubkey_hash = "89abcdefabbaabbaabbaabbaabbaabbaabbaabba";
+        tx1.add_hash_puzzle_output("same_secret", pubkey_hash, 1000)
+            .unwrap();
+        tx2.add_hash_puzzle_output("same_secret", pubkey_hash, 1000)
+            .unwrap();
+
+        assert_eq!(
+            tx1.outputs[0].locking_script.to_hex(),
+            tx2.outputs[0].locking_script.to_hex()
+        );
+    }
+
+    #[test]
+    fn test_hash_puzzle_different_secrets() {
+        let mut tx1 = Transaction::new();
+        let mut tx2 = Transaction::new();
+        let pubkey_hash = "89abcdefabbaabbaabbaabbaabbaabbaabbaabba";
+        tx1.add_hash_puzzle_output("secret1", pubkey_hash, 1000)
+            .unwrap();
+        tx2.add_hash_puzzle_output("secret2", pubkey_hash, 1000)
+            .unwrap();
+
+        assert_ne!(
+            tx1.outputs[0].locking_script.to_hex(),
+            tx2.outputs[0].locking_script.to_hex()
+        );
+    }
+
+    // =========================================================
+    // Tests for add_input_from_tx, add_input_from, add_inputs_from_utxos
+    // =========================================================
+
+    /// Helper: create a dummy ScriptTemplateUnlock for testing.
+    fn dummy_template() -> crate::script::ScriptTemplateUnlock {
+        crate::script::ScriptTemplateUnlock::new(
+            |_ctx| Ok(UnlockingScript::from_hex("00").unwrap()),
+            || 1,
+        )
+    }
+
+    #[test]
+    fn test_add_input_from_tx() {
+        let source_tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
+        let expected_txid = source_tx.id();
+        let expected_satoshis = source_tx.outputs[0].satoshis.unwrap();
+
+        let mut tx = Transaction::new();
+        tx.add_input_from_tx(source_tx, 0, dummy_template()).unwrap();
+
+        assert_eq!(tx.inputs.len(), 1);
+        assert!(tx.inputs[0].has_source_transaction());
+        assert_eq!(tx.inputs[0].get_source_txid().unwrap(), expected_txid);
+        assert_eq!(tx.inputs[0].source_output_index, 0);
+        assert_eq!(tx.inputs[0].source_satoshis().unwrap(), expected_satoshis);
+    }
+
+    #[test]
+    fn test_add_input_from() {
+        let prev_txid =
+            "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458";
+        let locking_script =
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap();
+        let satoshis = 50_000u64;
+
+        let mut tx = Transaction::new();
+        tx.add_input_from(prev_txid, 0, &locking_script, satoshis, dummy_template())
+            .unwrap();
+
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.inputs[0].get_source_txid().unwrap(), prev_txid);
+        assert_eq!(tx.inputs[0].source_output_index, 0);
+        assert_eq!(tx.inputs[0].source_satoshis().unwrap(), satoshis);
+        assert_eq!(
+            tx.inputs[0].source_locking_script().unwrap().to_hex(),
+            locking_script.to_hex()
+        );
+    }
+
+    #[test]
+    fn test_add_input_from_with_nonzero_vout() {
+        let prev_txid =
+            "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458";
+        let locking_script =
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap();
+        let satoshis = 75_000u64;
+
+        let mut tx = Transaction::new();
+        tx.add_input_from(prev_txid, 3, &locking_script, satoshis, dummy_template())
+            .unwrap();
+
+        assert_eq!(tx.inputs.len(), 1);
+        assert_eq!(tx.inputs[0].source_output_index, 3);
+        // The minimal source transaction should have padding outputs + the real one at index 3
+        let source = tx.inputs[0].source_transaction.as_ref().unwrap();
+        assert_eq!(source.outputs.len(), 4);
+        assert_eq!(source.outputs[3].satoshis.unwrap(), satoshis);
+        assert_eq!(source.outputs[3].locking_script.to_hex(), locking_script.to_hex());
+    }
+
+    #[test]
+    fn test_add_input_from_invalid_txid_empty() {
+        let locking_script =
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap();
+
+        let mut tx = Transaction::new();
+        let result = tx.add_input_from("", 0, &locking_script, 1000, dummy_template());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_input_from_invalid_txid_bad_hex() {
+        let locking_script =
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap();
+
+        let mut tx = Transaction::new();
+        let result = tx.add_input_from("not_valid_hex!", 0, &locking_script, 1000, dummy_template());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_input_from_invalid_txid_wrong_length() {
+        let locking_script =
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap();
+
+        let mut tx = Transaction::new();
+        // Only 16 bytes (32 hex chars) instead of 32 bytes (64 hex chars)
+        let result = tx.add_input_from(
+            "a477af6b2667c29670467e4e0728b685",
+            0,
+            &locking_script,
+            1000,
+            dummy_template(),
+        );
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_add_inputs_from_utxos() {
+        use crate::transaction::input::Utxo;
+
+        let locking_script =
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
+                .unwrap();
+
+        let utxos = vec![
+            Utxo {
+                txid: "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458"
+                    .to_string(),
+                vout: 0,
+                satoshis: 100_000,
+                locking_script: locking_script.clone(),
+            },
+            Utxo {
+                txid: "b577af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58459"
+                    .to_string(),
+                vout: 1,
+                satoshis: 200_000,
+                locking_script: locking_script.clone(),
+            },
+            Utxo {
+                txid: "c677af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58460"
+                    .to_string(),
+                vout: 2,
+                satoshis: 300_000,
+                locking_script: locking_script.clone(),
+            },
+        ];
+
+        let mut tx = Transaction::new();
+        tx.add_inputs_from_utxos(&utxos).unwrap();
+
+        assert_eq!(tx.inputs.len(), 3);
+
+        // Verify each input matches its UTXO
+        for (i, utxo) in utxos.iter().enumerate() {
+            assert_eq!(tx.inputs[i].get_source_txid().unwrap(), utxo.txid);
+            assert_eq!(tx.inputs[i].source_output_index, utxo.vout);
+            assert_eq!(tx.inputs[i].source_satoshis().unwrap(), utxo.satoshis);
+            assert_eq!(
+                tx.inputs[i].source_locking_script().unwrap().to_hex(),
+                utxo.locking_script.to_hex()
+            );
+        }
+
+        // Template should NOT be set (add_inputs_from_utxos does not set it)
+        for input in &tx.inputs {
+            assert!(input.unlocking_script_template.is_none());
+        }
+    }
+
+    #[test]
+    fn test_add_inputs_from_utxos_empty() {
+        let utxos: Vec<crate::transaction::input::Utxo> = vec![];
+        let mut tx = Transaction::new();
+        tx.add_inputs_from_utxos(&utxos).unwrap();
+
+        assert_eq!(tx.inputs.len(), 0);
+    }
+
+    #[test]
+    fn test_add_input_from_tx_preserves_template() {
+        use crate::script::{Script, SigningContext};
+
+        let source_tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
+
+        let mut tx = Transaction::new();
+        tx.add_input_from_tx(source_tx, 0, dummy_template()).unwrap();
+
+        // The template should be set on the input
+        assert!(tx.inputs[0].unlocking_script_template.is_some());
+
+        // Verify the template can produce an unlocking script
+        let template = tx.inputs[0].unlocking_script_template.as_ref().unwrap();
+        let dummy_tx = Transaction::new();
+        let raw_tx = dummy_tx.to_binary();
+        let locking_script = Script::new();
+        let ctx = SigningContext::new(&raw_tx, 0, 0, &locking_script);
+        let result = template.sign(&ctx);
+        assert!(result.is_ok());
     }
 }
