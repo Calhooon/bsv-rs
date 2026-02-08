@@ -920,7 +920,10 @@ mod tests {
         assert_eq!(event1.host, "host1");
         // For a brand new host, old_rank is the default latency score (1500ms)
         // and new_rank should be based on the recorded latency (100ms) minus success bonus
-        assert!(event1.old_rank > event1.new_rank, "success should improve rank");
+        assert!(
+            event1.old_rank > event1.new_rank,
+            "success should improve rank"
+        );
         assert!(event1.reason.contains("success"));
         assert!(event1.reason.contains("100ms"));
 
@@ -932,7 +935,10 @@ mod tests {
             .expect("channel closed");
 
         assert_eq!(event2.host, "host1");
-        assert!(event2.new_rank > event2.old_rank, "failure should worsen rank");
+        assert!(
+            event2.new_rank > event2.old_rank,
+            "failure should worsen rank"
+        );
         assert!(event2.reason.contains("failure"));
         assert!(event2.reason.contains("connection refused"));
     }

@@ -15,11 +15,11 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 |------|---------|
 | `mod.rs` | Module root; re-exports |
 | `types.rs` | Core types (Protocol, TaggedBEEF, Steak, LookupQuestion/Answer, etc.) and constants |
-| `host_reputation_tracker.rs` | Host performance tracking with exponential backoff |
+| `host_reputation_tracker.rs` | Host performance tracking with exponential backoff and rank change events |
 | `facilitators.rs` | HTTP lookup/broadcast facilitators with binary/JSON response parsing |
 | `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop |
 | `historian.rs` | Transaction ancestry traversal for building chronological history |
-| `lookup_resolver.rs` | SLAP query resolution with host discovery and caching |
+| `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing |
 | `topic_broadcaster.rs` | SHIP topic broadcasting with acknowledgment requirements |
 | `retry.rs` | Double-spend retry helper for overlay broadcast operations |
 
@@ -73,30 +73,40 @@ pub use facilitators::{
 
 ## Core Types
 
-- **`Protocol`** - `Ship` or `Slap` enum with `as_str()` and `parse()` methods
-- **`NetworkPreset`** - `Mainnet`, `Testnet`, or `Local` with `slap_trackers()` and `allow_http()` methods
+- **`Protocol`** - `Ship` or `Slap` enum with `as_str()`, `parse()`, and `Display` impl; serde renames to `"SHIP"`/`"SLAP"`
+- **`NetworkPreset`** - `Mainnet` (default), `Testnet`, or `Local` with `slap_trackers()` and `allow_http()` methods
 - **`LookupQuestion`** - Service identifier + JSON query payload; `new(service, query)`
-- **`LookupAnswer`** - Tagged enum: `OutputList`, `Freeform`, or `Formula` variants
-- **`OutputListItem`** - BEEF bytes + output index + optional context
-- **`LookupFormula`** - Outpoint string + history function name
-- **`TaggedBEEF`** - BEEF bytes + topic list + optional off-chain values
+- **`LookupAnswer`** - Tagged enum: `OutputList`, `Freeform`, or `Formula` variants; serde tag `"type"` with kebab-case; `answer_type()` and `empty_output_list()` helpers
+- **`OutputListItem`** - BEEF bytes + output index + optional context bytes
+- **`LookupFormula`** - Outpoint string + history function name (`historyFn`)
+- **`TaggedBEEF`** - BEEF bytes + topic list + optional off-chain values; `new()` and `with_off_chain_values()` constructors
 - **`AdmittanceInstructions`** - Outputs admitted, coins retained, coins removed; `has_activity()`
 - **`Steak`** - `HashMap<String, AdmittanceInstructions>` (Submitted Transaction Execution AcKnowledgment)
-- **`HostResponse`** - Host URL + success/failure + optional Steak or error
-- **`ServiceMetadata`** - Name, description, icon URL, version, info URL
+- **`HostResponse`** - Host URL + success/failure + optional Steak or error; `success()` and `failure()` constructors
+- **`ServiceMetadata`** - Name, description, icon URL, version, info URL (all optional except name)
+
+### Network Presets
+
+| Preset | SLAP Trackers | Allow HTTP |
+|--------|---------------|------------|
+| `Mainnet` | `overlay-us-1.bsvb.tech`, `overlay-eu-1.bsvb.tech`, `overlay-ap-1.bsvb.tech`, `users.bapp.dev` | No |
+| `Testnet` | `testnet-users.bapp.dev` | No |
+| `Local` | `localhost:8080` | Yes |
 
 ## Facilitators
 
-Traits and HTTPS implementations for overlay communication.
+Traits and HTTPS implementations for overlay communication. Require the `http` feature for actual HTTP calls.
 
 - **`OverlayLookupFacilitator`** trait: `async fn lookup(url, question, timeout_ms) -> Result<LookupAnswer>`
 - **`OverlayBroadcastFacilitator`** trait: `async fn send(url, tagged_beef) -> Result<Steak>`
-- **`HttpsOverlayLookupFacilitator`** - POST to `/lookup` endpoint; handles JSON and binary (octet-stream) responses
-- **`HttpsOverlayBroadcastFacilitator`** - POST to `/submit` endpoint with binary BEEF body and `X-Topics` header
+- **`HttpsOverlayLookupFacilitator`** - POST to `/lookup` with JSON body and `X-Aggregation: yes` header; handles both JSON and binary (`octet-stream`) responses. JSON BEEF fields accept arrays of numbers, hex strings, or base64 strings. Default timeout: 5000ms
+- **`HttpsOverlayBroadcastFacilitator`** - POST to `/submit` with binary BEEF body, `X-Topics` header (JSON array), and `Content-Type: application/octet-stream`. Supports off-chain values via varint-prefixed BEEF length + `x-includes-off-chain-values: true` header
+
+Both facilitators reject `http://` URLs unless `allow_http` is set (only `NetworkPreset::Local` enables this). Without the `http` feature, both return `Error::OverlayError`.
 
 ## LookupResolver
 
-Resolves lookup queries by discovering competent hosts via SLAP trackers. Includes TX memoization cache for deduplication.
+Resolves lookup queries by discovering competent hosts via SLAP trackers. Includes TX memoization cache for deduplication. Implements `Default`.
 
 ```rust
 pub struct LookupResolverConfig {
@@ -120,14 +130,27 @@ impl LookupResolver {
 }
 ```
 
+### Query Flow
+
+1. `get_competent_hosts()` (internal) finds hosts with caching and request coalescing
+2. Hosts are ranked by reputation and filtered for backoff status
+3. All available hosts are queried in parallel
+4. `OutputList` responses are deduplicated via TX memoization (`txId.outputIndex` as key)
+5. `Freeform` responses return the first successful one; `Formula` responses are not aggregated
+6. Success/failure is recorded in the reputation tracker for each host
+
+### Key Behaviors
+
 - **`find_competent_hosts(service)`**: Public low-level SLAP discovery method. Queries all SLAP trackers in parallel to find hosts advertising a service. Does **not** use the hosts cache or request coalescing (those are in the internal `get_competent_hosts` called by `query`)
-- **TX Memoization**: Caches parsed transaction IDs from BEEF, deduplicating outputs using `txId.outputIndex` as the unique key (matches TS SDK behavior)
+- **TX Memoization**: Caches parsed transaction IDs from BEEF, deduplicating outputs using `txId.outputIndex` as the unique key (matches TS SDK behavior). Cache key is comma-separated byte values
 - **Request Coalescing**: Concurrent requests for the same service share a single SLAP tracker query via `tokio::sync::watch` channels
 - **Validation**: Host override service names must start with `ls_` or the constructor will panic
+- **Local Preset**: Returns `http://localhost:8080` directly without SLAP discovery
+- **`ls_slap` Service**: Returns the configured SLAP trackers directly without discovery
 
 ## TopicBroadcaster
 
-Broadcasts transactions to SHIP overlay topics. Implements the `Broadcaster` trait.
+Broadcasts transactions to SHIP overlay topics. Implements the `Broadcaster` trait (`broadcast`, `broadcast_many`).
 
 ```rust
 pub struct TopicBroadcasterConfig {
@@ -147,15 +170,24 @@ impl TopicBroadcaster {
     pub async fn find_interested_hosts(&self) -> Result<HashMap<String, HashSet<String>>>
 }
 
-// Also implements Broadcaster trait (broadcast, broadcast_many)
 // Type aliases: SHIPBroadcaster, SHIPCast
 ```
+
+### Broadcast Flow
+
+1. Transaction is serialized to BEEF format (with `allow_partial=true`)
+2. Off-chain values are extracted from `tx.metadata["OffChainValues"]` if present
+3. Interested hosts are discovered via SHIP lookup (`ls_ship` service with topics query)
+4. BEEF is sent to all interested hosts in parallel, each receiving only their relevant topics
+5. Responses are collected; STEAK with activity counts as acknowledgment
+6. Acknowledgment requirements are validated
+7. `broadcast_many` calls `broadcast_tx` sequentially for each transaction
 
 **Validation**: At least one topic is required, and all topics must start with `tm_`.
 
 ## HostReputationTracker
 
-Tracks host performance for intelligent selection. Thread-safe with `RwLock`. Emits `RankChangeEvent` notifications via `tokio::sync::broadcast`.
+Tracks host performance for intelligent selection. Thread-safe with `std::sync::RwLock`. Emits `RankChangeEvent` notifications via `tokio::sync::broadcast`.
 
 ```rust
 impl HostReputationTracker {
@@ -182,9 +214,10 @@ pub fn get_overlay_host_reputation_tracker() -> &'static HostReputationTracker
 ```
 
 - **ReputationConfig** defaults: latency_smoothing=0.25, grace_failures=2, backoff_base_ms=1000, backoff_max_ms=60000, default_latency_ms=1500, failure_penalty_ms=400, success_bonus_ms=30
-- **ReputationStorage** trait: `get/set/remove` for custom persistence backends; auto-saves after each update
-- **Immediate backoff** for DNS errors (ERR_NAME_NOT_RESOLVED, ENOTFOUND, etc.)
-- **Scoring**: latency + failure_penalty + backoff_penalty - success_bonus (lower = better)
+- **ReputationStorage** trait: `get/set/remove` for custom persistence backends; auto-saves after each update; loads from storage on creation
+- **Immediate backoff** for DNS errors (ERR_NAME_NOT_RESOLVED, ENOTFOUND, getaddrinfo, Failed to fetch)
+- **Scoring**: `latency + failure_penalty + backoff_penalty - success_bonus` (lower = better)
+- **`rank_hosts`**: Deduplicates input hosts, filters empty strings, ties broken by original order (0.001 per position), sorts not-in-backoff first then by score then by total successes
 
 ### Rank Change Events
 
@@ -206,12 +239,21 @@ pub struct RankChangeEvent {
 
 ## Historian
 
-Traverses transaction ancestry to build chronological history.
+Traverses transaction ancestry to build chronological history. Follows `input.source_transaction` references recursively.
 
-- **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching, and `interpreter_version` for cache invalidation
+- **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching, and `interpreter_version` for cache invalidation. Cache key format: `"{version}|{txid}|{ctx_key}"`
 - **`SyncHistorian<T, C>`** - Synchronous version with builder methods `with_debug()` and `with_version()`
 
-Both return values in **chronological order** (oldest first) and prevent cycles via visited set.
+```rust
+pub struct HistorianConfig<T, C> {
+    pub debug: bool,
+    pub history_cache: Option<HashMap<String, Vec<T>>>,
+    pub interpreter_version: Option<String>,       // Default: "v1"
+    pub ctx_key_fn: Option<Box<dyn Fn(Option<&C>) -> String>>,
+}
+```
+
+Both return values in **chronological order** (oldest first) and prevent cycles via visited set. The interpreter receives `(tx, output_index, context)` and returns `Option<T>` — returning `None` skips that output.
 
 ## Admin Token Template
 
@@ -223,6 +265,16 @@ pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdmin
 pub fn is_overlay_admin_token(script) -> bool
 pub fn is_ship_token(script) -> bool
 pub fn is_slap_token(script) -> bool
+
+pub struct OverlayAdminTokenData {
+    pub protocol: Protocol,
+    pub identity_key: PublicKey,
+    pub domain: String,
+    pub topic_or_service: String,
+}
+impl OverlayAdminTokenData {
+    pub fn identity_key_hex(&self) -> String   // 66-char hex of compressed pubkey
+}
 ```
 
 ## Double-Spend Retry
@@ -250,7 +302,7 @@ Detects double-spend errors by matching: `double spend`, `double-spend`, `txn-me
 
 ### Acknowledgment Requirements
 - `require_ack_from_all_hosts`: All hosts must acknowledge specified topics
-- `require_ack_from_any_host`: At least one host must acknowledge
+- `require_ack_from_any_host`: At least one host must acknowledge (default: `All` topics)
 - `require_ack_from_specific_hosts`: Per-host requirements
 
 ### Naming Conventions
@@ -258,7 +310,7 @@ Detects double-spend errors by matching: `double spend`, `double-spend`, `txn-me
 - Services must start with `ls_` (Lookup Service prefix)
 
 ### HTTP Feature
-The `http` feature enables HTTP communication via `reqwest`. Without it, facilitators return errors.
+The `http` feature enables HTTP communication via `reqwest`. Without it, facilitators return errors. Binary lookup responses use a compact format: varint outpoint count, then per-outpoint (32-byte txid + varint output index + varint context length + context bytes), followed by shared BEEF data.
 
 ## Error Handling
 
@@ -283,9 +335,10 @@ Overlay operations use `Error::OverlayError(String)`. The `TopicBroadcaster` ret
 | `DEFAULT_TX_MEMO_TTL_MS` | 600000 | `types.rs` | TX memoization cache TTL (10 minutes) |
 | `DEFAULT_TX_MEMO_MAX_ENTRIES` | 4096 | `types.rs` | Max TX memoization cache entries |
 | `DEFAULT_MAX_RETRIES` | 3 | `retry.rs` | Double-spend retry attempts |
+| `DEFAULT_BROADCAST_CHANNEL_CAPACITY` | 64 | `host_reputation_tracker.rs` | Rank change broadcast channel size |
 
 ## Related Documentation
 
-- `../transaction/CLAUDE.md` - Transaction module (BEEF, broadcasting)
+- `../transaction/CLAUDE.md` - Transaction module (BEEF, broadcasting, `Broadcaster` trait)
 - `../script/templates/CLAUDE.md` - PushDrop template (admin tokens)
 - `../CLAUDE.md` - Root SDK documentation

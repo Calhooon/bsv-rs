@@ -9,7 +9,7 @@ use crate::script::{LockingScript, ScriptTemplateUnlock, UnlockingScript};
 ///
 /// A lightweight struct for referencing a specific output from a previous
 /// transaction by its TXID, output index, satoshi value, and locking script.
-/// Used with [`Transaction::add_inputs_from_utxos`] for convenient input creation.
+/// Used with `Transaction::add_inputs_from_utxos` for convenient input creation.
 ///
 /// # Example
 ///

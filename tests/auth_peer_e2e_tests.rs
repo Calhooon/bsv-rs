@@ -405,7 +405,7 @@ async fn test_invalid_auth_version_rejected() {
     let alice_pub = alice_key.public_key();
     let mut bad_msg = AuthMessage::new(MessageType::InitialRequest, alice_pub);
     bad_msg.version = "99.0".to_string();
-    bad_msg.nonce = Some("test".to_string());
+    bad_msg.initial_nonce = Some("test".to_string());
 
     let result = bob.handle_incoming_message(bad_msg).await;
     assert!(result.is_err(), "Invalid auth version should be rejected");
@@ -467,10 +467,7 @@ async fn test_handle_initial_request_creates_session() {
 
     // Bob should have sent an InitialResponse via his transport
     let response = bob_rx.try_recv();
-    assert!(
-        response.is_ok(),
-        "Bob should have sent an InitialResponse"
-    );
+    assert!(response.is_ok(), "Bob should have sent an InitialResponse");
     assert_eq!(response.unwrap().message_type, MessageType::InitialResponse);
 }
 
@@ -513,15 +510,13 @@ async fn test_listener_registration_and_deregistration() {
         .listen_for_certificates_received(|_sender, _certs| Box::pin(async { Ok(()) }))
         .await;
     assert!(cert_id > 0);
-    peer.stop_listening_for_certificates_received(cert_id)
-        .await;
+    peer.stop_listening_for_certificates_received(cert_id).await;
 
     let req_id = peer
         .listen_for_certificates_requested(|_sender, _req| Box::pin(async { Ok(()) }))
         .await;
     assert!(req_id > 0);
-    peer.stop_listening_for_certificates_requested(req_id)
-        .await;
+    peer.stop_listening_for_certificates_requested(req_id).await;
 }
 
 // =============================================================================
@@ -676,8 +671,7 @@ async fn test_certificate_response_flow() {
     let alice_hex = alice.get_identity_key().await.unwrap().to_hex();
 
     // Set up Alice's certificate received callback
-    let certs_received: Arc<RwLock<Vec<VerifiableCertificate>>> =
-        Arc::new(RwLock::new(Vec::new()));
+    let certs_received: Arc<RwLock<Vec<VerifiableCertificate>>> = Arc::new(RwLock::new(Vec::new()));
     let certs_clone = certs_received.clone();
     alice
         .listen_for_certificates_received(move |_sender, certs| {

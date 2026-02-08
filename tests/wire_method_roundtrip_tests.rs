@@ -26,11 +26,11 @@ use bsv_sdk::wallet::{
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, DiscoverByAttributesArgs,
     DiscoverByIdentityKeyArgs, EncryptArgs, GetHeaderArgs, GetPublicKeyArgs, IdentityCertificate,
     IdentityCertifier, InternalizeActionArgs, InternalizeOutput, ListActionsArgs,
-    ListCertificatesArgs, ListOutputsArgs, Network, Outpoint, OutputInclude, Protocol,
-    ProveCertificateArgs, ProtoWallet, QueryMode, RelinquishCertificateArgs, RelinquishOutputArgs,
+    ListCertificatesArgs, ListOutputsArgs, Network, Outpoint, OutputInclude, ProtoWallet, Protocol,
+    ProveCertificateArgs, QueryMode, RelinquishCertificateArgs, RelinquishOutputArgs,
     SecurityLevel, SendWithResult, SendWithResultStatus, SignActionArgs, SignActionSpend,
-    TrustSelf, VerifyHmacArgs, VerifySignatureArgs, WalletAction,
-    WalletActionInput, WalletActionOutput, WalletCertificate, WalletOutput, WalletPayment,
+    TrustSelf, VerifyHmacArgs, VerifySignatureArgs, WalletAction, WalletActionInput,
+    WalletActionOutput, WalletCertificate, WalletOutput, WalletPayment,
 };
 use bsv_sdk::Error;
 use std::collections::HashMap;
@@ -424,11 +424,16 @@ mod hmac_tests {
         // ProtoWallet returns an error when HMAC verification fails (not valid=false).
         // The wire protocol transmits this error back to the transceiver.
         match verify_result {
-            Ok(res) => assert!(!res.valid, "expected valid=false or error for tampered HMAC"),
+            Ok(res) => assert!(
+                !res.valid,
+                "expected valid=false or error for tampered HMAC"
+            ),
             Err(e) => {
                 let err_msg = format!("{}", e);
                 assert!(
-                    err_msg.contains("HMAC") || err_msg.contains("hmac") || err_msg.contains("wallet error"),
+                    err_msg.contains("HMAC")
+                        || err_msg.contains("hmac")
+                        || err_msg.contains("wallet error"),
                     "expected HMAC-related error, got: {}",
                     err_msg
                 );
@@ -602,7 +607,10 @@ mod key_linkage_tests {
         let response = processor.process_message(writer.as_bytes()).await.unwrap();
         let mut reader = WireReader::new(&response);
         let error_byte = reader.read_u8().unwrap();
-        assert_eq!(error_byte, 0, "expected success for counterparty key linkage");
+        assert_eq!(
+            error_byte, 0,
+            "expected success for counterparty key linkage"
+        );
 
         // Parse response: encrypted_linkage_len + bytes, encrypted_proof_len + bytes,
         // prover(33), verifier(33), counterparty(33), revelation_time(string)
@@ -759,10 +767,7 @@ mod status_tests {
     async fn test_roundtrip_get_header_for_height_error() {
         let transceiver = create_loopback();
         let result = transceiver
-            .get_header(
-                GetHeaderArgs { height: 100 },
-                "test",
-            )
+            .get_header(GetHeaderArgs { height: 100 }, "test")
             .await;
 
         // ProtoWallet doesn't support get_header_for_height, so we expect an error
@@ -1401,7 +1406,9 @@ mod complex_type_roundtrips {
         let cert = sample_wallet_certificate();
 
         let mut writer = WireWriter::new();
-        writer.write_optional_wallet_certificate(Some(&cert)).unwrap();
+        writer
+            .write_optional_wallet_certificate(Some(&cert))
+            .unwrap();
 
         let mut reader = WireReader::new(writer.as_bytes());
         let read_cert = reader.read_optional_wallet_certificate().unwrap();
@@ -1414,9 +1421,7 @@ mod complex_type_roundtrips {
     #[test]
     fn test_optional_wallet_certificate_none_roundtrip() {
         let mut writer = WireWriter::new();
-        writer
-            .write_optional_wallet_certificate(None)
-            .unwrap();
+        writer.write_optional_wallet_certificate(None).unwrap();
 
         let mut reader = WireReader::new(writer.as_bytes());
         let read_cert = reader.read_optional_wallet_certificate().unwrap();
@@ -2092,10 +2097,10 @@ mod complex_type_roundtrips {
     fn test_unicode_string_roundtrip() {
         let strings = vec![
             "Hello, World!".to_string(),
-            "Привет мир".to_string(), // Russian
-            "日本語テスト".to_string(),    // Japanese
+            "Привет мир".to_string(),   // Russian
+            "日本語テスト".to_string(), // Japanese
             "🎉🚀💰".to_string(),       // Emoji
-            "".to_string(),            // Empty
+            "".to_string(),             // Empty
         ];
 
         for s in &strings {
@@ -2401,7 +2406,10 @@ mod call_code_tests {
             "internalizeAction"
         );
         assert_eq!(WalletCall::ListOutputs.method_name(), "listOutputs");
-        assert_eq!(WalletCall::RelinquishOutput.method_name(), "relinquishOutput");
+        assert_eq!(
+            WalletCall::RelinquishOutput.method_name(),
+            "relinquishOutput"
+        );
         assert_eq!(WalletCall::GetPublicKey.method_name(), "getPublicKey");
         assert_eq!(
             WalletCall::RevealCounterpartyKeyLinkage.method_name(),
@@ -2477,10 +2485,7 @@ mod request_frame_tests {
         writer.write_bytes(b"test");
         // No params for getVersion
 
-        let response = processor
-            .process_message(writer.as_bytes())
-            .await
-            .unwrap();
+        let response = processor.process_message(writer.as_bytes()).await.unwrap();
 
         let mut reader = WireReader::new(&response);
         let error = reader.read_u8().unwrap();
@@ -2499,10 +2504,7 @@ mod request_frame_tests {
         writer.write_u8(WalletCall::IsAuthenticated.as_u8());
         writer.write_u8(0); // empty originator
 
-        let response = processor
-            .process_message(writer.as_bytes())
-            .await
-            .unwrap();
+        let response = processor.process_message(writer.as_bytes()).await.unwrap();
 
         let mut reader = WireReader::new(&response);
         let error = reader.read_u8().unwrap();
@@ -2523,10 +2525,7 @@ mod request_frame_tests {
         writer.write_u8(originator.len() as u8);
         writer.write_bytes(originator.as_bytes());
 
-        let response = processor
-            .process_message(writer.as_bytes())
-            .await
-            .unwrap();
+        let response = processor.process_message(writer.as_bytes()).await.unwrap();
 
         let mut reader = WireReader::new(&response);
         let error = reader.read_u8().unwrap();
@@ -2547,10 +2546,7 @@ mod request_frame_tests {
         writer.write_u8(0);
         // This will cause a parse error or wallet error - either way error response
 
-        let response = processor
-            .process_message(writer.as_bytes())
-            .await
-            .unwrap();
+        let response = processor.process_message(writer.as_bytes()).await.unwrap();
 
         let mut reader = WireReader::new(&response);
         let error_byte = reader.read_u8().unwrap();

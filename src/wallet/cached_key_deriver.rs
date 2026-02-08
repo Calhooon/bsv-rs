@@ -306,7 +306,9 @@ impl KeyDeriverApi for CachedKeyDeriver {
         }
 
         // Derive and cache
-        let derived = self.inner.derive_private_key_raw(invoice_number, counterparty)?;
+        let derived = self
+            .inner
+            .derive_private_key_raw(invoice_number, counterparty)?;
         {
             let mut cache = self.private_key_cache.lock().unwrap();
             cache.put(cache_key, derived.clone());

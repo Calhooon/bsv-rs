@@ -1566,7 +1566,10 @@ mod tests {
 
     #[test]
     fn test_output_include_roundtrip() {
-        for mode in [OutputInclude::LockingScripts, OutputInclude::EntireTransactions] {
+        for mode in [
+            OutputInclude::LockingScripts,
+            OutputInclude::EntireTransactions,
+        ] {
             let mut writer = WireWriter::new();
             writer.write_output_include(mode);
             let mut reader = WireReader::new(writer.as_bytes());
@@ -1801,7 +1804,9 @@ mod tests {
         // Some certificate
         let cert = make_test_certificate();
         let mut writer = WireWriter::new();
-        writer.write_optional_wallet_certificate(Some(&cert)).unwrap();
+        writer
+            .write_optional_wallet_certificate(Some(&cert))
+            .unwrap();
         let mut reader = WireReader::new(writer.as_bytes());
         let read = reader.read_optional_wallet_certificate().unwrap();
         assert!(read.is_some());
@@ -1907,7 +1912,10 @@ mod tests {
         );
         assert!(read.certifier_info.is_some());
         assert_eq!(read.certifier_info.unwrap().name, "Trusted CA");
-        assert_eq!(read.publicly_revealed_keyring, cert.publicly_revealed_keyring);
+        assert_eq!(
+            read.publicly_revealed_keyring,
+            cert.publicly_revealed_keyring
+        );
         assert_eq!(read.decrypted_fields, cert.decrypted_fields);
 
         // Minimal: no optional fields
@@ -2373,12 +2381,7 @@ mod tests {
 
     #[test]
     fn test_unicode_strings_roundtrip() {
-        let unicode_strings = [
-            "日本語テスト",
-            "Ü̈ñîcödé",
-            "🚀💰🔐",
-            "mixed ASCII and 中文",
-        ];
+        let unicode_strings = ["日本語テスト", "Ü̈ñîcödé", "🚀💰🔐", "mixed ASCII and 中文"];
 
         for s in unicode_strings {
             let mut writer = WireWriter::new();

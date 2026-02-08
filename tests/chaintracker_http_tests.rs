@@ -13,8 +13,7 @@ use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 /// A realistic 64-char hex merkle root for testing.
-const TEST_MERKLE_ROOT: &str =
-    "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b";
+const TEST_MERKLE_ROOT: &str = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b";
 
 const TEST_HEIGHT: u32 = 700_000;
 
@@ -79,11 +78,9 @@ async fn test_woc_tracker_case_insensitive_root() {
 
     Mock::given(method("GET"))
         .and(path(format!("/block/{}/header", TEST_HEIGHT)))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "merkleroot": uppercase_root
-            })),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "merkleroot": uppercase_root
+        })))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -161,9 +158,7 @@ async fn test_woc_tracker_malformed_json() {
 
     Mock::given(method("GET"))
         .and(path(format!("/block/{}/header", TEST_HEIGHT)))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string("this is not json at all"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string("this is not json at all"))
         .expect(1)
         .mount(&mock_server)
         .await;

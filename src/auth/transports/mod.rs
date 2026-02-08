@@ -6,7 +6,7 @@
 //! ## Available Transports
 //!
 //! - [`SimplifiedFetchTransport`] - HTTP-based transport (requires `http` feature)
-//! - [`WebSocketTransport`] - WebSocket-based transport (requires `websocket` feature)
+//! - `WebSocketTransport` - WebSocket-based transport (requires `websocket` feature)
 //! - [`MockTransport`] - Mock transport for testing
 //!
 //! ## Custom Transports

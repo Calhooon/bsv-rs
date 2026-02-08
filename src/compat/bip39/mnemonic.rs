@@ -826,8 +826,7 @@ mod tests {
 
         for lang in &languages {
             let entropy = [0u8; 16]; // 128 bits = 12 words
-            let mnemonic =
-                Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
+            let mnemonic = Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
             assert_eq!(
                 mnemonic.words().len(),
                 12,
@@ -855,8 +854,7 @@ mod tests {
 
         for lang in &languages {
             let entropy = [0xABu8; 16]; // 128 bits
-            let mnemonic =
-                Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
+            let mnemonic = Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
 
             // Generate seed
             let seed1 = mnemonic.to_seed("");
@@ -875,11 +873,7 @@ mod tests {
 
             // Same mnemonic + same passphrase should produce same seed
             let seed3 = mnemonic.to_seed("");
-            assert_eq!(
-                seed1, seed3,
-                "Seeds should be deterministic for {:?}",
-                lang
-            );
+            assert_eq!(seed1, seed3, "Seeds should be deterministic for {:?}", lang);
         }
     }
 
@@ -888,8 +882,7 @@ mod tests {
         // BIP-39 specifies that Japanese mnemonics use ideographic space (U+3000)
         // as the word separator.
         let entropy = [0u8; 16]; // 128 bits = 12 words
-        let mnemonic =
-            Mnemonic::from_entropy_with_language(&entropy, Language::Japanese).unwrap();
+        let mnemonic = Mnemonic::from_entropy_with_language(&entropy, Language::Japanese).unwrap();
 
         let phrase = mnemonic.phrase();
 
@@ -954,13 +947,11 @@ mod tests {
 
         for lang in &languages {
             let entropy = [0x42u8; 16];
-            let mnemonic =
-                Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
+            let mnemonic = Mnemonic::from_entropy_with_language(&entropy, *lang).unwrap();
             let phrase = mnemonic.phrase();
 
             // Parse the phrase back
-            let restored =
-                Mnemonic::from_phrase_with_language(&phrase, *lang).unwrap();
+            let restored = Mnemonic::from_phrase_with_language(&phrase, *lang).unwrap();
             assert_eq!(
                 mnemonic.entropy(),
                 restored.entropy(),

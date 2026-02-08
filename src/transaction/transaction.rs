@@ -978,9 +978,10 @@ impl Transaction {
                 .outputs
                 .push(TransactionOutput::new(0, LockingScript::new()));
         }
-        source_tx
-            .outputs
-            .push(TransactionOutput::new(satoshis, prev_locking_script.clone()));
+        source_tx.outputs.push(TransactionOutput::new(
+            satoshis,
+            prev_locking_script.clone(),
+        ));
 
         let mut input = TransactionInput::new(prev_txid.to_string(), vout);
         input.source_transaction = Some(Box::new(source_tx));
@@ -1546,7 +1547,9 @@ impl Transaction {
     ///
     /// Checks each output's locking script using `Script::is_data()`.
     pub fn has_data_outputs(&self) -> bool {
-        self.outputs.iter().any(|o| o.locking_script.as_script().is_data())
+        self.outputs
+            .iter()
+            .any(|o| o.locking_script.as_script().is_data())
     }
 
     /// Returns the total satoshis of all inputs that have source transaction data.
@@ -1576,6 +1579,167 @@ impl Transaction {
     /// Returns the total satoshis of all outputs.
     pub fn total_output_satoshis(&self) -> u64 {
         self.outputs.iter().filter_map(|o| o.satoshis).sum()
+    }
+
+    /// Verifies this transaction using SPV (Simplified Payment Verification).
+    ///
+    /// Performs a queue-based recursive verification of the transaction and its
+    /// ancestry chain. For each transaction:
+    ///
+    /// 1. If the transaction has a merkle path, verifies it against the chain tracker
+    /// 2. Optionally validates that the fee meets the fee model requirements
+    /// 3. Validates all input scripts using the Spend interpreter
+    /// 4. Enqueues unverified source transactions for recursive verification
+    ///
+    /// Matches the Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`.
+    ///
+    /// # Arguments
+    ///
+    /// * `chain_tracker` - The chain tracker for verifying merkle roots
+    /// * `fee_model` - Optional fee model for fee validation
+    pub async fn verify(
+        &self,
+        chain_tracker: &dyn super::ChainTracker,
+        fee_model: Option<&dyn super::FeeModel>,
+    ) -> Result<bool> {
+        use crate::primitives::bsv::sighash::{TxInput, TxOutput};
+        use crate::script::{LockingScript, Spend, SpendParams, UnlockingScript};
+        use std::collections::HashSet;
+
+        let mut verified_txids: HashSet<String> = HashSet::new();
+        let mut tx_queue: Vec<&Transaction> = vec![self];
+
+        while let Some(tx) = tx_queue.pop() {
+            let txid = tx.id();
+
+            if verified_txids.contains(&txid) {
+                continue;
+            }
+
+            // If the transaction has a merkle path, verify it
+            if let Some(ref merkle_path) = tx.merkle_path {
+                let root = merkle_path.compute_root(Some(&txid))?;
+                let is_valid = chain_tracker
+                    .is_valid_root_for_height(&root, merkle_path.block_height)
+                    .await
+                    .map_err(|e| {
+                        crate::Error::TransactionError(format!("Chain tracker error: {}", e))
+                    })?;
+
+                if is_valid {
+                    verified_txids.insert(txid);
+                    continue;
+                } else {
+                    return Err(crate::Error::TransactionError(format!(
+                        "Invalid merkle path for transaction {}",
+                        txid
+                    )));
+                }
+            }
+
+            // Verify fee if fee model is provided
+            if let Some(fm) = fee_model {
+                let tx_fee = tx.get_fee()?;
+                let required_fee = fm.compute_fee(tx)?;
+                if tx_fee < required_fee {
+                    return Err(crate::Error::TransactionError("Fee is too low".to_string()));
+                }
+            }
+
+            // Verify each input's script
+            for (vin, input) in tx.inputs.iter().enumerate() {
+                let source_tx = input.source_transaction.as_ref().ok_or_else(|| {
+                    crate::Error::TransactionError(format!(
+                        "Input {} has no source transaction",
+                        vin
+                    ))
+                })?;
+
+                let source_output = source_tx
+                    .outputs
+                    .get(input.source_output_index as usize)
+                    .ok_or_else(|| {
+                        crate::Error::TransactionError(format!(
+                            "Input {} source output index out of bounds",
+                            vin
+                        ))
+                    })?;
+
+                let source_satoshis = source_output.satoshis.unwrap_or(0);
+                let locking_script = source_output.locking_script.clone();
+                let unlocking_script = input.unlocking_script.as_ref().ok_or_else(|| {
+                    crate::Error::TransactionError(format!(
+                        "Input {} is missing unlocking script",
+                        vin
+                    ))
+                })?;
+
+                // Build other_inputs for sighash context
+                let other_inputs: Vec<TxInput> = tx
+                    .inputs
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != vin)
+                    .map(|(_, inp)| TxInput {
+                        txid: inp.get_source_txid_bytes().unwrap_or([0u8; 32]),
+                        output_index: inp.source_output_index,
+                        script: inp
+                            .unlocking_script
+                            .as_ref()
+                            .map(|s| s.to_binary())
+                            .unwrap_or_default(),
+                        sequence: inp.sequence,
+                    })
+                    .collect();
+
+                let outputs: Vec<TxOutput> = tx
+                    .outputs
+                    .iter()
+                    .map(|o| TxOutput {
+                        satoshis: o.satoshis.unwrap_or(0),
+                        script: o.locking_script.to_binary(),
+                    })
+                    .collect();
+
+                let source_txid_bytes = input.get_source_txid_bytes()?;
+
+                let mut spend = Spend::new(SpendParams {
+                    source_txid: source_txid_bytes,
+                    source_output_index: input.source_output_index,
+                    source_satoshis,
+                    locking_script: LockingScript::from_script(crate::script::Script::from_binary(
+                        &locking_script.to_binary(),
+                    )?),
+                    transaction_version: tx.version as i32,
+                    other_inputs,
+                    outputs,
+                    input_index: vin,
+                    unlocking_script: UnlockingScript::from_script(
+                        crate::script::Script::from_binary(&unlocking_script.to_binary())?,
+                    ),
+                    input_sequence: input.sequence,
+                    lock_time: tx.lock_time,
+                    memory_limit: None,
+                });
+
+                spend.validate().map_err(|e| {
+                    crate::Error::TransactionError(format!(
+                        "Script validation failed for input {}: {}",
+                        vin, e.message
+                    ))
+                })?;
+
+                // Enqueue unverified source transactions
+                let source_txid = source_tx.id();
+                if !verified_txids.contains(&source_txid) {
+                    tx_queue.push(source_tx);
+                }
+            }
+
+            verified_txids.insert(txid);
+        }
+
+        Ok(true)
     }
 }
 
@@ -1814,7 +1978,9 @@ mod tests {
         let mut coinbase_tx = Transaction::new();
         coinbase_tx.inputs.push(TransactionInput {
             source_transaction: None,
-            source_txid: Some("0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+            source_txid: Some(
+                "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            ),
             source_output_index: 0xFFFFFFFF,
             unlocking_script: Some(UnlockingScript::from_hex("03a75e0b").unwrap()),
             unlocking_script_template: None,
@@ -1834,7 +2000,9 @@ mod tests {
         let mut two_input_tx = Transaction::new();
         two_input_tx.inputs.push(TransactionInput {
             source_transaction: None,
-            source_txid: Some("0000000000000000000000000000000000000000000000000000000000000000".to_string()),
+            source_txid: Some(
+                "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            ),
             source_output_index: 0xFFFFFFFF,
             unlocking_script: None,
             unlocking_script_template: None,
@@ -1894,7 +2062,10 @@ mod tests {
         assert_eq!(tx.outputs.len(), 1);
         assert_eq!(tx.outputs[0].satoshis, Some(0));
         assert!(tx.outputs[0].locking_script.as_script().is_data());
-        assert!(tx.outputs[0].locking_script.as_script().is_safe_data_carrier());
+        assert!(tx.outputs[0]
+            .locking_script
+            .as_script()
+            .is_safe_data_carrier());
 
         // Verify the script structure: OP_FALSE OP_RETURN <data>
         let asm = tx.outputs[0].locking_script.to_asm();
@@ -1919,7 +2090,10 @@ mod tests {
         assert_eq!(tx.outputs.len(), 1);
         assert_eq!(tx.outputs[0].satoshis, Some(0));
         assert!(tx.outputs[0].locking_script.as_script().is_data());
-        assert!(tx.outputs[0].locking_script.as_script().is_safe_data_carrier());
+        assert!(tx.outputs[0]
+            .locking_script
+            .as_script()
+            .is_safe_data_carrier());
 
         // Verify all parts are present in the script
         let asm = tx.outputs[0].locking_script.to_asm();
@@ -1991,15 +2165,13 @@ mod tests {
 
         tx.outputs.push(TransactionOutput::new(
             100_000,
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap(),
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
         assert_eq!(tx.total_output_satoshis(), 100_000);
 
         tx.outputs.push(TransactionOutput::new(
             50_000,
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap(),
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
         assert_eq!(tx.total_output_satoshis(), 150_000);
     }
@@ -2010,8 +2182,7 @@ mod tests {
         tx.add_op_return_output(b"data").unwrap();
         tx.outputs.push(TransactionOutput::new(
             100_000,
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap(),
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap(),
         ));
         // OP_RETURN has 0 satoshis
         assert_eq!(tx.total_output_satoshis(), 100_000);
@@ -2036,8 +2207,7 @@ mod tests {
     fn test_total_input_satoshis_missing_source() {
         let mut tx = Transaction::new();
         tx.add_input(TransactionInput::new(
-            "0000000000000000000000000000000000000000000000000000000000000001"
-                .to_string(),
+            "0000000000000000000000000000000000000000000000000000000000000001".to_string(),
             0,
         ))
         .unwrap();
@@ -2127,7 +2297,8 @@ mod tests {
         let expected_satoshis = source_tx.outputs[0].satoshis.unwrap();
 
         let mut tx = Transaction::new();
-        tx.add_input_from_tx(source_tx, 0, dummy_template()).unwrap();
+        tx.add_input_from_tx(source_tx, 0, dummy_template())
+            .unwrap();
 
         assert_eq!(tx.inputs.len(), 1);
         assert!(tx.inputs[0].has_source_transaction());
@@ -2138,11 +2309,9 @@ mod tests {
 
     #[test]
     fn test_add_input_from() {
-        let prev_txid =
-            "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458";
+        let prev_txid = "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458";
         let locking_script =
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap();
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
         let satoshis = 50_000u64;
 
         let mut tx = Transaction::new();
@@ -2161,11 +2330,9 @@ mod tests {
 
     #[test]
     fn test_add_input_from_with_nonzero_vout() {
-        let prev_txid =
-            "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458";
+        let prev_txid = "a477af6b2667c29670467e4e0728b685ee07b240235771862318e29ddbe58458";
         let locking_script =
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap();
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
         let satoshis = 75_000u64;
 
         let mut tx = Transaction::new();
@@ -2178,14 +2345,16 @@ mod tests {
         let source = tx.inputs[0].source_transaction.as_ref().unwrap();
         assert_eq!(source.outputs.len(), 4);
         assert_eq!(source.outputs[3].satoshis.unwrap(), satoshis);
-        assert_eq!(source.outputs[3].locking_script.to_hex(), locking_script.to_hex());
+        assert_eq!(
+            source.outputs[3].locking_script.to_hex(),
+            locking_script.to_hex()
+        );
     }
 
     #[test]
     fn test_add_input_from_invalid_txid_empty() {
         let locking_script =
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap();
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
 
         let mut tx = Transaction::new();
         let result = tx.add_input_from("", 0, &locking_script, 1000, dummy_template());
@@ -2195,19 +2364,18 @@ mod tests {
     #[test]
     fn test_add_input_from_invalid_txid_bad_hex() {
         let locking_script =
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap();
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
 
         let mut tx = Transaction::new();
-        let result = tx.add_input_from("not_valid_hex!", 0, &locking_script, 1000, dummy_template());
+        let result =
+            tx.add_input_from("not_valid_hex!", 0, &locking_script, 1000, dummy_template());
         assert!(result.is_err());
     }
 
     #[test]
     fn test_add_input_from_invalid_txid_wrong_length() {
         let locking_script =
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap();
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
 
         let mut tx = Transaction::new();
         // Only 16 bytes (32 hex chars) instead of 32 bytes (64 hex chars)
@@ -2226,8 +2394,7 @@ mod tests {
         use crate::transaction::input::Utxo;
 
         let locking_script =
-            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac")
-                .unwrap();
+            LockingScript::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
 
         let utxos = vec![
             Utxo {
@@ -2291,7 +2458,8 @@ mod tests {
         let source_tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
 
         let mut tx = Transaction::new();
-        tx.add_input_from_tx(source_tx, 0, dummy_template()).unwrap();
+        tx.add_input_from_tx(source_tx, 0, dummy_template())
+            .unwrap();
 
         // The template should be set on the input
         assert!(tx.inputs[0].unlocking_script_template.is_some());

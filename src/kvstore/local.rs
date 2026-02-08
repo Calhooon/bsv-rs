@@ -267,7 +267,11 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             && !lookup_result.outpoints.is_empty()
         {
             // Safe: guarded by !lookup_result.outpoints.is_empty() above
-            return Ok(lookup_result.outpoints.last().expect("outpoints non-empty").clone());
+            return Ok(lookup_result
+                .outpoints
+                .last()
+                .expect("outpoints non-empty")
+                .clone());
         }
 
         // Prepare value (encrypt if needed)
@@ -975,7 +979,11 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             // Create a oneshot channel and wait
             let (tx, rx) = tokio::sync::oneshot::channel();
             // Safe: guarded by contains_key(key) check above
-            state.key_locks.get_mut(key).expect("key exists in key_locks").push(tx);
+            state
+                .key_locks
+                .get_mut(key)
+                .expect("key exists in key_locks")
+                .push(tx);
             drop(state);
             let _ = rx.await;
         } else {
@@ -1685,8 +1693,7 @@ mod tests {
 
     #[test]
     fn test_ttl_set_options_builder() {
-        let opts = KVStoreSetOptions::new()
-            .with_ttl(std::time::Duration::from_secs(300));
+        let opts = KVStoreSetOptions::new().with_ttl(std::time::Duration::from_secs(300));
         assert_eq!(opts.ttl, Some(std::time::Duration::from_secs(300)));
     }
 
@@ -1701,8 +1708,7 @@ mod tests {
         let wallet = MockWallet::new();
         let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
 
-        let opts = KVStoreSetOptions::new()
-            .with_ttl(std::time::Duration::from_secs(3600));
+        let opts = KVStoreSetOptions::new().with_ttl(std::time::Duration::from_secs(3600));
         let result = store.set("ttl_key", "ttl_value", Some(opts)).await;
         assert!(result.is_ok(), "Set with TTL should succeed: {:?}", result);
     }

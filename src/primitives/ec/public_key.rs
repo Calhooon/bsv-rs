@@ -338,6 +338,17 @@ impl PublicKey {
         Ok(Self { inner: pubkey })
     }
 
+    /// Validates that this public key represents a valid point on the secp256k1 curve.
+    ///
+    /// Since public keys are validated at parse time (`from_bytes` / `from_hex`),
+    /// this method always returns `true` for any successfully constructed `PublicKey`.
+    /// It is provided for API compatibility with the Go SDK's `Validate()` and
+    /// TS SDK's `Point.validate()`.
+    pub fn is_valid(&self) -> bool {
+        let point = AffinePoint::from(self.inner);
+        !bool::from(point.is_identity())
+    }
+
     /// Creates a public key from an internal k256 public key.
     pub(crate) fn from_k256(inner: K256PublicKey) -> Self {
         Self { inner }
@@ -606,5 +617,25 @@ mod tests {
         let b_plus_a = b.add(&a).unwrap();
 
         assert_eq!(a_plus_b.to_compressed(), b_plus_a.to_compressed());
+    }
+
+    #[test]
+    fn test_public_key_is_valid() {
+        use crate::primitives::PrivateKey;
+
+        // Any successfully parsed public key is valid
+        let pubkey = PrivateKey::random().public_key();
+        assert!(pubkey.is_valid());
+
+        // Generator point is valid
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let g = PublicKey::from_hex(g_hex).unwrap();
+        assert!(g.is_valid());
+
+        // Invalid point should fail at parse time (all zeros is not on curve)
+        assert!(PublicKey::from_hex(
+            "020000000000000000000000000000000000000000000000000000000000000000"
+        )
+        .is_err());
     }
 }

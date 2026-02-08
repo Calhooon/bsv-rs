@@ -3,7 +3,7 @@
 //! Run with: cargo bench --bench script_bench
 
 use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::script::templates::{Multisig, P2PK, P2PKH, PushDrop};
+use bsv_sdk::script::templates::{Multisig, PushDrop, P2PK, P2PKH};
 use bsv_sdk::script::{Script, ScriptTemplate};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
@@ -154,21 +154,19 @@ fn bench_script_serialization(c: &mut Criterion) {
     let pubkey_hash = key.public_key().hash160();
     let script = P2PKH::new().lock(&pubkey_hash).unwrap();
 
-    group.bench_function("to_hex (P2PKH)", |b| {
-        b.iter(|| black_box(&script).to_hex())
-    });
+    group.bench_function("to_hex (P2PKH)", |b| b.iter(|| black_box(&script).to_hex()));
 
     group.bench_function("to_binary (P2PKH)", |b| {
         b.iter(|| black_box(&script).to_binary())
     });
 
-    group.bench_function("to_asm (P2PKH)", |b| {
-        b.iter(|| black_box(&script).to_asm())
-    });
+    group.bench_function("to_asm (P2PKH)", |b| b.iter(|| black_box(&script).to_asm()));
 
     // Larger script: PushDrop with multiple fields
     let pubkey_obj = key.public_key();
-    let fields: Vec<Vec<u8>> = (0..10).map(|i| format!("field_{}", i).into_bytes()).collect();
+    let fields: Vec<Vec<u8>> = (0..10)
+        .map(|i| format!("field_{}", i).into_bytes())
+        .collect();
     let pushdrop = PushDrop::new(pubkey_obj, fields);
     let large_script = pushdrop.lock();
 

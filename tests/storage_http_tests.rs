@@ -73,7 +73,10 @@ async fn test_uploader_publish_file_success() {
     assert!(result.is_ok(), "Expected success, got: {:?}", result);
 
     let upload_result = result.unwrap();
-    assert!(upload_result.published, "File should be marked as published");
+    assert!(
+        upload_result.published,
+        "File should be marked as published"
+    );
     assert!(
         is_valid_url(&upload_result.uhrp_url),
         "Result should contain a valid UHRP URL, got: {}",
@@ -191,7 +194,11 @@ async fn test_uploader_publish_file_upload_info_400() {
     let file = UploadableFile::new(b"test".to_vec(), "text/plain");
 
     let result = uploader.publish_file(&file, None).await;
-    assert!(result.is_err(), "Expected failure for 400, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for 400, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -219,7 +226,11 @@ async fn test_uploader_publish_file_upload_info_401() {
     let file = UploadableFile::new(b"test".to_vec(), "text/plain");
 
     let result = uploader.publish_file(&file, None).await;
-    assert!(result.is_err(), "Expected failure for 401, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for 401, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -247,7 +258,11 @@ async fn test_uploader_publish_file_upload_info_413() {
     let file = UploadableFile::new(vec![0u8; 1024], "application/octet-stream");
 
     let result = uploader.publish_file(&file, None).await;
-    assert!(result.is_err(), "Expected failure for 413, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for 413, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -275,7 +290,11 @@ async fn test_uploader_publish_file_upload_info_500() {
     let file = UploadableFile::new(b"test".to_vec(), "text/plain");
 
     let result = uploader.publish_file(&file, None).await;
-    assert!(result.is_err(), "Expected failure for 500, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for 500, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -403,7 +422,11 @@ async fn test_uploader_publish_file_small_file() {
     let uploader = StorageUploader::new(config);
 
     let result = uploader.publish_file(&file, None).await;
-    assert!(result.is_ok(), "Expected success for small file, got: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Expected success for small file, got: {:?}",
+        result
+    );
 
     let upload_result = result.unwrap();
     let expected_url = get_url_for_file(&file_data).unwrap();
@@ -548,7 +571,11 @@ async fn test_uploader_find_file_http_error() {
     let uploader = StorageUploader::new(config);
 
     let result = uploader.find_file("uhrp://some-hash").await;
-    assert!(result.is_err(), "Expected failure for HTTP 500, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for HTTP 500, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -680,7 +707,11 @@ async fn test_uploader_list_uploads_http_500() {
     let uploader = StorageUploader::new(config);
 
     let result = uploader.list_uploads().await;
-    assert!(result.is_err(), "Expected failure for HTTP 500, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for HTTP 500, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -781,7 +812,11 @@ async fn test_uploader_renew_file_http_404() {
     let uploader = StorageUploader::new(config);
 
     let result = uploader.renew_file("uhrp://ghost", 10).await;
-    assert!(result.is_err(), "Expected failure for 404, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for 404, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -808,7 +843,11 @@ async fn test_uploader_renew_file_http_500() {
     let uploader = StorageUploader::new(config);
 
     let result = uploader.renew_file("uhrp://some-hash", 60).await;
-    assert!(result.is_err(), "Expected failure for 500, got: {:?}", result);
+    assert!(
+        result.is_err(),
+        "Expected failure for 500, got: {:?}",
+        result
+    );
 
     let err = result.unwrap_err();
     let err_msg = err.to_string();
@@ -1059,7 +1098,9 @@ async fn test_uploader_renew_request_body() {
 
     Mock::given(method("POST"))
         .and(path("/renew"))
-        .and(body_string_contains("\"uhrpUrl\":\"uhrp://test-file-hash\""))
+        .and(body_string_contains(
+            "\"uhrpUrl\":\"uhrp://test-file-hash\"",
+        ))
         .and(body_string_contains("\"additionalMinutes\":2880"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "status": "success",

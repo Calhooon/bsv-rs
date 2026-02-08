@@ -692,6 +692,31 @@ impl Script {
         hash.copy_from_slice(data);
         Some(hash)
     }
+
+    /// Extracts the public key from a P2PK script.
+    ///
+    /// Returns the raw public key bytes from the first chunk of a P2PK script
+    /// (`<pubkey> OP_CHECKSIG`), or `None` if this is not a P2PK script.
+    ///
+    /// Matches the Go SDK's `Script.PubKey()` method.
+    pub fn get_public_key(&self) -> Option<Vec<u8>> {
+        if !self.is_p2pk() {
+            return None;
+        }
+        let chunks = self.chunks();
+        chunks[0].data.clone()
+    }
+
+    /// Extracts the public key from a P2PK script as a hex string.
+    ///
+    /// Returns the hex-encoded public key from the first chunk of a P2PK script,
+    /// or `None` if this is not a P2PK script.
+    ///
+    /// Matches the Go SDK's `Script.PubKeyHex()` method.
+    pub fn get_public_key_hex(&self) -> Option<String> {
+        self.get_public_key()
+            .map(|bytes| crate::primitives::to_hex(&bytes))
+    }
 }
 
 impl Default for Script {
@@ -1031,8 +1056,7 @@ mod script_type_tests {
         assert!(!empty.is_safe_data_carrier());
 
         // P2PKH is not a safe data carrier
-        let p2pkh =
-            Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        let p2pkh = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
         assert!(!p2pkh.is_safe_data_carrier());
     }
 
@@ -1117,5 +1141,52 @@ mod script_type_tests {
         // Not push-only
         let with_ops = Script::from_asm("OP_DUP OP_HASH160").unwrap();
         assert!(!with_ops.is_push_only());
+    }
+
+    #[test]
+    fn test_get_public_key() {
+        // Valid P2PK with compressed pubkey (33 bytes)
+        let pubkey_bytes = [0x02u8; 33];
+        let mut p2pk = Script::new();
+        p2pk.write_bin(&pubkey_bytes);
+        p2pk.write_opcode(OP_CHECKSIG);
+
+        let result = p2pk.get_public_key();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap(), pubkey_bytes.to_vec());
+
+        // Valid P2PK with uncompressed pubkey (65 bytes)
+        let pubkey_bytes_uncompressed = [0x04u8; 65];
+        let mut p2pk_uncompressed = Script::new();
+        p2pk_uncompressed.write_bin(&pubkey_bytes_uncompressed);
+        p2pk_uncompressed.write_opcode(OP_CHECKSIG);
+
+        let result = p2pk_uncompressed.get_public_key();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().len(), 65);
+
+        // Not P2PK - P2PKH script
+        let p2pkh = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(p2pkh.get_public_key().is_none());
+
+        // Not P2PK - empty script
+        let empty = Script::new();
+        assert!(empty.get_public_key().is_none());
+    }
+
+    #[test]
+    fn test_get_public_key_hex() {
+        let pubkey_bytes = [0x02u8; 33];
+        let mut p2pk = Script::new();
+        p2pk.write_bin(&pubkey_bytes);
+        p2pk.write_opcode(OP_CHECKSIG);
+
+        let hex = p2pk.get_public_key_hex();
+        assert!(hex.is_some());
+        assert_eq!(hex.unwrap(), crate::primitives::to_hex(&pubkey_bytes));
+
+        // Not P2PK
+        let p2pkh = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
+        assert!(p2pkh.get_public_key_hex().is_none());
     }
 }

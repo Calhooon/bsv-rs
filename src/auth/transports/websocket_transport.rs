@@ -126,12 +126,9 @@ impl WebSocketTransport {
     /// Returns the write-half sink for sending messages. The read-half stream is
     /// consumed by a spawned tokio task that dispatches incoming messages to callbacks.
     async fn connect(&self) -> Result<()> {
-        let (ws_stream, _response) =
-            tokio_tungstenite::connect_async(&self.base_url)
-                .await
-                .map_err(|e| {
-                    Error::TransportError(format!("failed to connect to WebSocket: {}", e))
-                })?;
+        let (ws_stream, _response) = tokio_tungstenite::connect_async(&self.base_url)
+            .await
+            .map_err(|e| Error::TransportError(format!("failed to connect to WebSocket: {}", e)))?;
 
         let (sink, stream) = ws_stream.split();
 
@@ -417,9 +414,7 @@ mod tests {
         .unwrap();
 
         // Register a callback via set_callback
-        transport.set_callback(Box::new(|_msg| {
-            Box::pin(async move { Ok(()) })
-        }));
+        transport.set_callback(Box::new(|_msg| Box::pin(async move { Ok(()) })));
 
         // Wait for the spawned task to complete
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
@@ -438,9 +433,7 @@ mod tests {
         .unwrap();
 
         // Register a callback
-        transport.set_callback(Box::new(|_msg| {
-            Box::pin(async move { Ok(()) })
-        }));
+        transport.set_callback(Box::new(|_msg| Box::pin(async move { Ok(()) })));
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
         // Clear callbacks

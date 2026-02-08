@@ -117,11 +117,11 @@ fn test_session_manager_prune_stale() {
 fn test_auth_message_validation() {
     let key = PrivateKey::random().public_key();
 
-    // InitialRequest needs nonce
+    // InitialRequest needs initial_nonce
     let mut msg = AuthMessage::new(MessageType::InitialRequest, key.clone());
     assert!(msg.validate().is_err());
 
-    msg.nonce = Some("test-nonce".to_string());
+    msg.initial_nonce = Some("test-nonce".to_string());
     assert!(msg.validate().is_ok());
 
     // InitialResponse needs multiple fields
@@ -146,10 +146,10 @@ fn test_auth_message_validation() {
 fn test_auth_message_signing_data() {
     let key = PrivateKey::random().public_key();
 
-    // InitialResponse signing data is initialNonce || sessionNonce
+    // InitialResponse signing data is yourNonce || initialNonce (initiator || responder)
     let mut msg = AuthMessage::new(MessageType::InitialResponse, key.clone());
-    msg.initial_nonce = Some(bsv_sdk::primitives::to_base64(&[1, 2, 3, 4]));
-    msg.nonce = Some(bsv_sdk::primitives::to_base64(&[5, 6, 7, 8]));
+    msg.your_nonce = Some(bsv_sdk::primitives::to_base64(&[1, 2, 3, 4])); // initiator's nonce
+    msg.initial_nonce = Some(bsv_sdk::primitives::to_base64(&[5, 6, 7, 8])); // responder's nonce
 
     let signing_data = msg.signing_data();
     assert_eq!(signing_data, vec![1, 2, 3, 4, 5, 6, 7, 8]);
@@ -173,13 +173,13 @@ fn test_auth_message_key_id() {
     let key_id = msg.get_key_id(Some("peer-nonce"));
     assert_eq!(key_id, "my-nonce peer-nonce");
 
-    // InitialResponse key ID is "{initialNonce} {sessionNonce}"
+    // InitialResponse key ID is "{yourNonce} {initialNonce}" = "{initiator} {responder}"
     let mut msg = AuthMessage::new(MessageType::InitialResponse, key.clone());
-    msg.initial_nonce = Some("initial".to_string());
-    msg.nonce = Some("session".to_string());
+    msg.your_nonce = Some("initiator-nonce".to_string());
+    msg.initial_nonce = Some("responder-nonce".to_string());
 
     let key_id = msg.get_key_id(None);
-    assert_eq!(key_id, "initial session");
+    assert_eq!(key_id, "initiator-nonce responder-nonce");
 }
 
 // =================
@@ -511,7 +511,7 @@ fn test_invalid_auth_version() {
     let key = PrivateKey::random().public_key();
     let mut msg = AuthMessage::new(MessageType::InitialRequest, key);
     msg.version = "99.0".to_string(); // Wrong version
-    msg.nonce = Some("test".to_string());
+    msg.initial_nonce = Some("test".to_string());
 
     let result = msg.validate();
     assert!(result.is_err());
@@ -575,7 +575,7 @@ fn test_http_request_unicode_values() {
         path: "/api/users/test".to_string(), // URL
         search: String::new(),
         headers: vec![("x-custom".to_string(), "unicode-value".to_string())], // Header value
-        body: "hello".as_bytes().to_vec(),          // Body
+        body: "hello".as_bytes().to_vec(),                                    // Body
     };
 
     let payload = request.to_payload();

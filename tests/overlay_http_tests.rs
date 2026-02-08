@@ -11,8 +11,8 @@
 #![cfg(all(feature = "overlay", feature = "http"))]
 
 use bsv_sdk::overlay::{
-    HttpsOverlayBroadcastFacilitator, HttpsOverlayLookupFacilitator, LookupAnswer,
-    LookupQuestion, OverlayBroadcastFacilitator, OverlayLookupFacilitator, TaggedBEEF,
+    HttpsOverlayBroadcastFacilitator, HttpsOverlayLookupFacilitator, LookupAnswer, LookupQuestion,
+    OverlayBroadcastFacilitator, OverlayLookupFacilitator, TaggedBEEF,
 };
 use wiremock::matchers::{body_string_contains, header, header_regex, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -151,10 +151,7 @@ async fn test_broadcast_x_topics_header_multiple() {
         .await;
 
     let facilitator = HttpsOverlayBroadcastFacilitator::new(true);
-    let tagged_beef = TaggedBEEF::new(
-        vec![0x01],
-        vec!["tm_foo".to_string(), "tm_bar".to_string()],
-    );
+    let tagged_beef = TaggedBEEF::new(vec![0x01], vec!["tm_foo".to_string(), "tm_bar".to_string()]);
 
     let result = facilitator.send(&mock_server.uri(), &tagged_beef).await;
     assert!(result.is_ok(), "Expected success, got: {:?}", result);
@@ -303,9 +300,7 @@ async fn test_broadcast_error_500_server_error() {
 
     Mock::given(method("POST"))
         .and(path("/submit"))
-        .respond_with(
-            ResponseTemplate::new(500).set_body_string("Internal Server Error"),
-        )
+        .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -355,9 +350,7 @@ async fn test_broadcast_malformed_json_response() {
 
     Mock::given(method("POST"))
         .and(path("/submit"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string("this is not valid json"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string("this is not valid json"))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -387,7 +380,9 @@ async fn test_broadcast_rejects_http_when_not_allowed() {
     let facilitator = HttpsOverlayBroadcastFacilitator::new(false);
     let tagged_beef = TaggedBEEF::new(vec![0x01], vec!["tm_test".to_string()]);
 
-    let result = facilitator.send("http://insecure.host/", &tagged_beef).await;
+    let result = facilitator
+        .send("http://insecure.host/", &tagged_beef)
+        .await;
 
     assert!(result.is_err(), "Expected error, got: {:?}", result);
     let err = result.unwrap_err();
@@ -487,8 +482,13 @@ async fn test_broadcast_facilitator_default() {
     let tagged_beef = TaggedBEEF::new(vec![0x01], vec!["tm_test".to_string()]);
 
     // HTTP URLs should be rejected with default settings
-    let result = facilitator.send("http://insecure.host/", &tagged_beef).await;
-    assert!(result.is_err(), "Default facilitator should reject HTTP URLs");
+    let result = facilitator
+        .send("http://insecure.host/", &tagged_beef)
+        .await;
+    assert!(
+        result.is_err(),
+        "Default facilitator should reject HTTP URLs"
+    );
 }
 
 // =============================================================================
@@ -702,8 +702,10 @@ async fn test_lookup_request_body_contains_service_and_query() {
         .await;
 
     let facilitator = HttpsOverlayLookupFacilitator::new(true);
-    let question =
-        LookupQuestion::new("ls_myservice", serde_json::json!({"test_key": "test_value"}));
+    let question = LookupQuestion::new(
+        "ls_myservice",
+        serde_json::json!({"test_key": "test_value"}),
+    );
 
     let result = facilitator
         .lookup(&mock_server.uri(), &question, None)
@@ -776,9 +778,7 @@ async fn test_lookup_error_500_server_error() {
 
     Mock::given(method("POST"))
         .and(path("/lookup"))
-        .respond_with(
-            ResponseTemplate::new(500).set_body_string("Internal Server Error"),
-        )
+        .respond_with(ResponseTemplate::new(500).set_body_string("Internal Server Error"))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -1124,7 +1124,10 @@ async fn test_lookup_binary_response() {
         // The BEEF data should be the remaining bytes after outpoints
         assert_eq!(outputs[0].beef, vec![0xBE, 0xEF]);
     } else {
-        panic!("Expected OutputList from binary response, got: {:?}", answer);
+        panic!(
+            "Expected OutputList from binary response, got: {:?}",
+            answer
+        );
     }
 }
 
@@ -1179,7 +1182,10 @@ async fn test_lookup_binary_response_with_context() {
         assert_eq!(outputs[0].context, Some(vec![0x01, 0x02, 0x03]));
         assert_eq!(outputs[0].beef, vec![0xCA, 0xFE]);
     } else {
-        panic!("Expected OutputList from binary response, got: {:?}", answer);
+        panic!(
+            "Expected OutputList from binary response, got: {:?}",
+            answer
+        );
     }
 }
 
@@ -1234,7 +1240,10 @@ async fn test_lookup_binary_response_multiple_outpoints() {
         assert_eq!(outputs[0].beef, vec![0xDE, 0xAD]);
         assert_eq!(outputs[1].beef, vec![0xDE, 0xAD]);
     } else {
-        panic!("Expected OutputList from binary response, got: {:?}", answer);
+        panic!(
+            "Expected OutputList from binary response, got: {:?}",
+            answer
+        );
     }
 }
 
@@ -1256,8 +1265,7 @@ async fn test_lookup_slap_service_discovery() {
         .await;
 
     let facilitator = HttpsOverlayLookupFacilitator::new(true);
-    let question =
-        LookupQuestion::new("ls_slap", serde_json::json!({"service": "ls_myservice"}));
+    let question = LookupQuestion::new("ls_slap", serde_json::json!({"service": "ls_myservice"}));
 
     let result = facilitator
         .lookup(&mock_server.uri(), &question, None)
@@ -1283,8 +1291,7 @@ async fn test_lookup_ship_host_discovery() {
         .await;
 
     let facilitator = HttpsOverlayLookupFacilitator::new(true);
-    let question =
-        LookupQuestion::new("ls_ship", serde_json::json!({"topics": ["tm_mytopic"]}));
+    let question = LookupQuestion::new("ls_ship", serde_json::json!({"topics": ["tm_mytopic"]}));
 
     let result = facilitator
         .lookup(&mock_server.uri(), &question, None)
@@ -1384,7 +1391,10 @@ async fn test_lookup_output_list_missing_outputs_field() {
     assert!(result.is_ok(), "Expected success, got: {:?}", result);
     let answer = result.unwrap();
     if let LookupAnswer::OutputList { outputs } = answer {
-        assert!(outputs.is_empty(), "Expected empty outputs when field missing");
+        assert!(
+            outputs.is_empty(),
+            "Expected empty outputs when field missing"
+        );
     } else {
         panic!("Expected OutputList, got: {:?}", answer);
     }

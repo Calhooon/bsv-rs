@@ -352,9 +352,7 @@ pub fn certificates_match_request(
 /// );
 /// validate_certificate_encoding(&cert)?;
 /// ```
-pub fn validate_certificate_encoding(
-    cert: &crate::auth::certificates::Certificate,
-) -> Result<()> {
+pub fn validate_certificate_encoding(cert: &crate::auth::certificates::Certificate) -> Result<()> {
     // cert_type is always [u8; 32], so it's always valid by construction.
     // serial_number is always [u8; 32], so it's always valid by construction.
 
@@ -481,10 +479,7 @@ pub fn validate_requested_certificate_set(requested: &RequestedCertificateSet) -
 
         // Try to parse as a public key.
         let bytes = crate::primitives::from_hex(trimmed).map_err(|_| {
-            Error::CertificateValidationError(format!(
-                "Certifier '{}' is not valid hex",
-                trimmed
-            ))
+            Error::CertificateValidationError(format!("Certifier '{}' is not valid hex", trimmed))
         })?;
 
         PublicKey::from_bytes(&bytes).map_err(|_| {
@@ -738,8 +733,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.revocation_outpoint =
-            Some(crate::wallet::types::Outpoint::new([3u8; 32], 5));
+        cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new([3u8; 32], 5));
         cert.sign(&certifier).unwrap();
 
         assert!(validate_certificate_encoding(&cert).is_ok());
@@ -752,8 +746,7 @@ mod tests {
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
         // Set the null sentinel outpoint explicitly
-        cert.revocation_outpoint =
-            Some(crate::wallet::types::Outpoint::new([0u8; 32], 0));
+        cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new([0u8; 32], 0));
 
         let result = validate_certificate_encoding(&cert);
         assert!(result.is_err());
@@ -874,10 +867,7 @@ mod tests {
 
         let result = validate_requested_certificate_set(&req);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("not valid base64"));
+        assert!(result.unwrap_err().to_string().contains("not valid base64"));
     }
 
     #[test]

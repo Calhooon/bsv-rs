@@ -24,7 +24,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `mod.rs` | Module root; re-exports all public types and sighash constants |
 | `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
-| `transaction.rs` | `Transaction` with parsing, serialization, signing, BEEF ancestry collection |
+| `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
 | `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, merging, and logging |
@@ -165,6 +165,9 @@ impl Transaction {
     pub async fn fee(&mut self, fee_sats: Option<u64>, change_distribution: ChangeDistribution) -> Result<()>
     pub fn get_fee(&self) -> Result<u64>
     pub fn estimate_size(&self) -> usize
+
+    // SPV Verification
+    pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>) -> Result<bool>
 }
 
 pub enum ChangeDistribution { Equal, Random }  // Random uses Benford's law
@@ -237,7 +240,7 @@ pub enum BroadcastStatus { Success, Error }
 | `TeranodeBroadcaster` | Extended Format (EF binary) | No default URL | `TeranodeConfig` |
 | `WhatsOnChainBroadcaster` | Raw tx hex | `mainnet()`, `testnet()`, `stn()` | `WocBroadcastConfig` |
 
-All have `new(url, api_key)` and `with_config(config)` constructors.
+ARC/Teranode have `new(url, api_key)` and `with_config(config)` constructors. WoC has `new(network, api_key)`, `mainnet()`, `testnet()`, `stn()`, `with_config(config)`, `with_base_url(url, network, api_key)`.
 
 ## Chain Tracking
 
@@ -358,8 +361,12 @@ let beef_v1 = tx.to_beef_v1(false)?;  // For ARC
 let beef_v2 = tx.to_beef(false)?;     // V2 format
 let atomic = tx.to_atomic_beef(false)?;
 
-// SPV Verification
+// SPV Verification (Transaction-level, recursive)
 let tracker = WhatsOnChainTracker::mainnet();
+let is_valid = tx.verify(&tracker, None).await?;              // Recursive SPV verify
+let is_valid = tx.verify(&tracker, Some(&fee_model)).await?;  // With fee validation
+
+// SPV Verification (BEEF-level, manual root checking)
 let validation = beef.verify_valid(false);
 for (height, root) in validation.roots {
     tracker.is_valid_root_for_height(&root, height).await?;
@@ -386,6 +393,7 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
 - **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker` implement `Default`
+- **SPV verify**: `verify()` performs queue-based recursive verification: checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input, enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
 - **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
 
 ## BEEF Ancestry Collection Algorithm
@@ -402,7 +410,7 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 
 | Error Type | Conditions |
 |------------|------------|
-| `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing, JSON serialization |
+| `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing, JSON serialization, SPV verification failures (invalid merkle path, fee too low, script validation) |
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
 | `MerklePathError` | Empty path, duplicate offset, invalid offset at height, mismatched roots |

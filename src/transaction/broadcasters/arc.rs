@@ -217,7 +217,6 @@ impl Broadcaster for ArcBroadcaster {
             more: None,
         })
     }
-
 }
 
 #[cfg(test)]

@@ -185,7 +185,6 @@ impl Broadcaster for TeranodeBroadcaster {
             more: None,
         })
     }
-
 }
 
 #[cfg(test)]

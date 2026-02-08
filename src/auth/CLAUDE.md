@@ -10,9 +10,9 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 455 |
+| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 459 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation with `start()` transport setup | 937 |
+| `peer.rs` | Core Peer implementation with `start()` transport setup | 941 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
 | `utils/` | Utility functions | - |
@@ -53,6 +53,7 @@ Re-exports from `mod.rs`:
 - `Peer`, `PeerOptions` (peer)
 - `SessionManager` (session_manager)
 - `MockTransport`, `SimplifiedFetchTransport`, `Transport` (transports)
+- `headers`, `TransportCallback`, `HttpRequest`, `HttpResponse` (transports)
 - `WebSocketTransport`, `WebSocketTransportOptions` (transports, gated behind `websocket` feature)
 - `current_time_ms`, `AuthMessage`, `MessageType`, `PeerSession`, `RequestedCertificateSet`, `AUTH_PROTOCOL_ID`, `AUTH_VERSION` (types)
 - `create_nonce`, `validate_certificate_encoding`, `validate_certificates`, `validate_requested_certificate_set`, `verify_nonce` (utils)
@@ -99,6 +100,17 @@ impl AuthMessage {
     pub fn validate(&self) -> Result<()>
 }
 ```
+
+**signing_data()** behavior by message type:
+- `InitialRequest` - Empty (not signed, starts handshake)
+- `InitialResponse` - `your_nonce || initial_nonce` (base64-decoded, initiator nonce then responder nonce; matches Go/TS)
+- `General` - The payload bytes
+- `CertificateRequest` - JSON-serialized `requested_certificates`
+- `CertificateResponse` - JSON-serialized `certificates`
+
+**get_key_id()** behavior by message type:
+- `InitialResponse` - `"{your_nonce} {initial_nonce}"` (uses the message's own fields, ignoring `peer_session_nonce` param)
+- All others - `"{nonce} {peer_session_nonce}"` (message nonce + the passed-in peer nonce)
 
 **PeerSession** - Session state between peers:
 ```rust
@@ -165,10 +177,12 @@ impl SessionManager {
 }
 ```
 
-Session lookup:
+Session lookup (`get_session`):
 1. First tries as session nonce (exact match)
 2. Then tries as identity key (returns best session)
 3. "Best" = authenticated preferred, then most recent
+
+Note: `get_session_mut` only searches by session nonce (not identity key).
 
 ### Peer
 
@@ -340,14 +354,28 @@ peer.start();
 
 ### Authentication Flow
 
-1. **InitialRequest**: Initiator sends session nonce + optional certificate request
-2. **InitialResponse**: Responder sends own nonce, signs `initialNonce || sessionNonce`
+1. **InitialRequest**: Initiator sends `initial_nonce` (session nonce) + optional certificate request
+2. **InitialResponse**: Responder sends `nonce` and `initial_nonce` (both set to responder's session nonce), `your_nonce` (initiator's nonce echoed back), and signature over `your_nonce || initial_nonce`
 3. **CertificateExchange** (optional): Peers exchange verifiable certificates
-4. **General**: Authenticated messages with payload
+4. **General**: Authenticated messages with payload, signed with per-message random nonce
+
+### InitialResponse Field Mapping (Cross-SDK)
+
+The InitialResponse field mapping matches Go and TS SDKs:
+- `initial_nonce` = responder's session nonce (Go: `InitialNonce = session.SessionNonce`)
+- `nonce` = responder's session nonce (same value, Go: `Nonce = ourNonce`)
+- `your_nonce` = initiator's nonce echoed back (for session lookup by initiator)
+
+On the initiator side, the responder's session nonce (`initial_nonce`) is stored as `peer_nonce`.
+
+### Nonce Generation
+
+Message nonces for General/CertificateRequest/CertificateResponse use simple 32-byte random values (base64-encoded), matching TypeScript's `Utils.toBase64(Random(32))`. Session nonces use HMAC-based `create_nonce()` with counterparty=Self.
 
 ### Cryptographic Details
 
-- **Signature**: Protocol `"auth message signature"`, security level 2, key ID `"{nonce} {peer_session_nonce}"`
+- **Signature**: Protocol `"auth message signature"`, security level 2 (Counterparty), key ID `"{nonce} {peer_session_nonce}"`
+- **InitialResponse key ID**: `"{your_nonce} {initial_nonce}"` (uses message's own fields)
 - **Nonce**: 32 bytes (16 random + 16 HMAC via `"server hmac"` protocol), base64 encoded
 - **Certificate fields**: Protocol `"certificate field encryption"`, security level 2. Master key ID: `"{field_name}"`, verifiable key ID: `"{serial_number_base64} {field_name}"`
 
@@ -390,6 +418,12 @@ This module maintains API compatibility with:
 - [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `Peer`, `SessionManager`, `Certificate`
 
 Authentication messages and certificates are wire-compatible across all SDK implementations.
+
+Key compatibility details:
+- InitialResponse `signing_data` signs `your_nonce || initial_nonce` (matches Go/TS byte order)
+- InitialResponse `get_key_id` uses `"{your_nonce} {initial_nonce}"` format (matches Go `keyID()`)
+- `create_nonce` uses counterparty=Self (matches Go/TS)
+- Nonce verification on InitialResponse is optional (non-fatal failure, matches Go/TS behavior)
 
 ## Dependencies
 

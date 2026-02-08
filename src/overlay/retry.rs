@@ -80,9 +80,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_succeeds_first_try() {
-        let result = with_double_spend_retry(None, || async {
-            Ok::<_, Error>(42)
-        }).await;
+        let result = with_double_spend_retry(None, || async { Ok::<_, Error>(42) }).await;
         assert_eq!(result.unwrap(), 42);
     }
 
@@ -101,7 +99,8 @@ mod tests {
                     Ok(42)
                 }
             }
-        }).await;
+        })
+        .await;
 
         assert_eq!(result.unwrap(), 42);
         assert_eq!(counter.load(Ordering::SeqCst), 3); // 0, 1, 2
@@ -118,7 +117,8 @@ mod tests {
                 counter.fetch_add(1, Ordering::SeqCst);
                 Err::<i32, _>(Error::OverlayError("some other error".to_string()))
             }
-        }).await;
+        })
+        .await;
 
         assert!(result.is_err());
         assert_eq!(counter.load(Ordering::SeqCst), 1); // Only one attempt
@@ -135,7 +135,8 @@ mod tests {
                 counter.fetch_add(1, Ordering::SeqCst);
                 Err::<i32, _>(Error::OverlayError("txn-mempool-conflict".to_string()))
             }
-        }).await;
+        })
+        .await;
 
         assert!(result.is_err());
         assert_eq!(counter.load(Ordering::SeqCst), 3); // Initial + 2 retries
@@ -152,7 +153,8 @@ mod tests {
                 counter.fetch_add(1, Ordering::SeqCst);
                 Err::<i32, _>(Error::OverlayError("already spent".to_string()))
             }
-        }).await;
+        })
+        .await;
 
         assert!(result.is_err());
         assert_eq!(counter.load(Ordering::SeqCst), 4); // Initial + 3 retries (DEFAULT_MAX_RETRIES)
@@ -160,12 +162,26 @@ mod tests {
 
     #[test]
     fn test_is_double_spend_error() {
-        assert!(is_double_spend_error(&Error::OverlayError("double spend detected".to_string())));
-        assert!(is_double_spend_error(&Error::OverlayError("double-spend conflict".to_string())));
-        assert!(is_double_spend_error(&Error::OverlayError("txn-mempool-conflict".to_string())));
-        assert!(is_double_spend_error(&Error::OverlayError("input already spent".to_string())));
-        assert!(is_double_spend_error(&Error::OverlayError("missing inputs".to_string())));
-        assert!(!is_double_spend_error(&Error::OverlayError("network error".to_string())));
-        assert!(!is_double_spend_error(&Error::OverlayError("timeout".to_string())));
+        assert!(is_double_spend_error(&Error::OverlayError(
+            "double spend detected".to_string()
+        )));
+        assert!(is_double_spend_error(&Error::OverlayError(
+            "double-spend conflict".to_string()
+        )));
+        assert!(is_double_spend_error(&Error::OverlayError(
+            "txn-mempool-conflict".to_string()
+        )));
+        assert!(is_double_spend_error(&Error::OverlayError(
+            "input already spent".to_string()
+        )));
+        assert!(is_double_spend_error(&Error::OverlayError(
+            "missing inputs".to_string()
+        )));
+        assert!(!is_double_spend_error(&Error::OverlayError(
+            "network error".to_string()
+        )));
+        assert!(!is_double_spend_error(&Error::OverlayError(
+            "timeout".to_string()
+        )));
     }
 }

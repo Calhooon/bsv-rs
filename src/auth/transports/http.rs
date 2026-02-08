@@ -155,7 +155,11 @@ impl HttpRequest {
         // Read headers (varint count, then pairs of varint+string)
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
-        let count = if header_count > 0 { header_count as usize } else { 0 };
+        let count = if header_count > 0 {
+            header_count as usize
+        } else {
+            0
+        };
         let mut headers = Vec::with_capacity(count);
         for _ in 0..count {
             // Read key
@@ -334,7 +338,11 @@ impl HttpResponse {
         // Read headers (varint count, then pairs)
         let (header_count, bytes_read) = read_varint(&payload[cursor..])?;
         cursor += bytes_read;
-        let count = if header_count > 0 { header_count as usize } else { 0 };
+        let count = if header_count > 0 {
+            header_count as usize
+        } else {
+            0
+        };
         let mut headers = Vec::with_capacity(count);
         for _ in 0..count {
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
@@ -573,9 +581,10 @@ impl SimplifiedFetchTransport {
     async fn invoke_callback(&self, message: AuthMessage) -> Result<()> {
         // Get a future to execute from the callback (while holding lock briefly)
         let future_opt = {
-            let guard = self.callback.read().map_err(|_| {
-                Error::AuthError("Failed to acquire callback lock".into())
-            })?;
+            let guard = self
+                .callback
+                .read()
+                .map_err(|_| Error::AuthError("Failed to acquire callback lock".into()))?;
             (*guard).as_ref().map(|cb| cb(message))
         };
 
@@ -628,9 +637,13 @@ impl Transport for SimplifiedFetchTransport {
                         Error::AuthError(format!("Failed to read auth response: {}", e))
                     })?;
 
-                    let response_message: AuthMessage = serde_json::from_str(&response_text).map_err(|e| {
-                        Error::AuthError(format!("Failed to parse auth response: {} - body: {}", e, response_text))
-                    })?;
+                    let response_message: AuthMessage = serde_json::from_str(&response_text)
+                        .map_err(|e| {
+                            Error::AuthError(format!(
+                                "Failed to parse auth response: {} - body: {}",
+                                e, response_text
+                            ))
+                        })?;
 
                     // Invoke callback with response
                     self.invoke_callback(response_message).await?;
@@ -762,8 +775,9 @@ impl Transport for SimplifiedFetchTransport {
 
                     // Build response AuthMessage
                     // Note: Identity key header is optional - server may not return it
-                    let response_identity = if let Some(resp_identity_key) =
-                        response_headers.get(headers::IDENTITY_KEY).and_then(|v| v.to_str().ok())
+                    let response_identity = if let Some(resp_identity_key) = response_headers
+                        .get(headers::IDENTITY_KEY)
+                        .and_then(|v| v.to_str().ok())
                     {
                         crate::primitives::PublicKey::from_hex(resp_identity_key)?
                     } else {

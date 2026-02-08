@@ -430,7 +430,7 @@ impl LookupResolver {
     ///
     /// This is the low-level discovery method. It does **not** use the hosts
     /// cache or request coalescing (those are handled by `get_competent_hosts`,
-    /// which is called internally by [`query`]).
+    /// which is called internally by `query`).
     ///
     /// # Arguments
     ///

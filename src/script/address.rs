@@ -218,11 +218,7 @@ impl Address {
 
 impl fmt::Display for Address {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            to_base58_check(&self.pub_key_hash, &[self.prefix])
-        )
+        write!(f, "{}", to_base58_check(&self.pub_key_hash, &[self.prefix]))
     }
 }
 
@@ -356,9 +352,15 @@ mod tests {
 
     #[test]
     fn test_is_valid_address() {
-        assert!(Address::is_valid_address("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH"));
-        assert!(Address::is_valid_address("114ZWApV4EEU8frr7zygqQcB1V2BodGZuS"));
-        assert!(Address::is_valid_address("mfaWoDuTsFfiunLTqZx4fKpVsUctiDV9jk"));
+        assert!(Address::is_valid_address(
+            "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH"
+        ));
+        assert!(Address::is_valid_address(
+            "114ZWApV4EEU8frr7zygqQcB1V2BodGZuS"
+        ));
+        assert!(Address::is_valid_address(
+            "mfaWoDuTsFfiunLTqZx4fKpVsUctiDV9jk"
+        ));
         assert!(!Address::is_valid_address("invalid"));
         assert!(!Address::is_valid_address(""));
     }
@@ -398,8 +400,8 @@ mod tests {
 
     #[test]
     fn test_locking_script_to_address() {
-        use crate::script::templates::P2PKH;
         use crate::script::template::ScriptTemplate;
+        use crate::script::templates::P2PKH;
 
         let private_key = PrivateKey::from_hex(
             "0000000000000000000000000000000000000000000000000000000000000001",
@@ -427,10 +429,8 @@ mod tests {
         assert!(op_return.to_address().is_none());
 
         // P2SH script
-        let p2sh = LockingScript::from_hex(
-            "a914000000000000000000000000000000000000000087",
-        )
-        .unwrap();
+        let p2sh =
+            LockingScript::from_hex("a914000000000000000000000000000000000000000087").unwrap();
         assert!(p2sh.to_address().is_none());
 
         // Empty script

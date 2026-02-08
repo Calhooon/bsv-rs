@@ -220,7 +220,8 @@ impl KeyDeriver {
         counterparty: &Counterparty,
     ) -> Result<PrivateKey> {
         let counterparty_key = self.normalize_counterparty(counterparty)?;
-        self.root_key.derive_child(&counterparty_key, invoice_number)
+        self.root_key
+            .derive_child(&counterparty_key, invoice_number)
     }
 
     /// Derives a symmetric key for encryption/decryption.

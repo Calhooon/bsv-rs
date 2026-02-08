@@ -177,7 +177,11 @@ impl WhatsOnChainBroadcaster {
     /// * `base_url` - The base URL to use instead of the standard WhatsOnChain API URL
     /// * `network` - The network to broadcast to (used for URL path segment)
     /// * `api_key` - Optional API key
-    pub fn with_base_url(base_url: &str, network: WocBroadcastNetwork, api_key: Option<String>) -> Self {
+    pub fn with_base_url(
+        base_url: &str,
+        network: WocBroadcastNetwork,
+        api_key: Option<String>,
+    ) -> Self {
         Self {
             config: WocBroadcastConfig {
                 network,
@@ -206,7 +210,11 @@ impl Broadcaster for WhatsOnChainBroadcaster {
     #[cfg(feature = "http")]
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult {
         let url = match &self.config.base_url {
-            Some(base) => format!("{}/v1/bsv/{}/tx/raw", base, self.config.network.path_segment()),
+            Some(base) => format!(
+                "{}/v1/bsv/{}/tx/raw",
+                base,
+                self.config.network.path_segment()
+            ),
             None => self.config.network.broadcast_url(),
         };
         let raw_tx = tx.to_hex();
@@ -277,7 +285,6 @@ impl Broadcaster for WhatsOnChainBroadcaster {
             more: None,
         })
     }
-
 }
 
 #[cfg(test)]

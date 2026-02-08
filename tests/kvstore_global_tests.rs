@@ -20,9 +20,8 @@
 #![cfg(feature = "kvstore")]
 
 use bsv_sdk::kvstore::{
-    GlobalKVStore, KVStoreConfig, KVStoreContext, KVStoreEntry, KVStoreFields,
-    KVStoreGetOptions, KVStoreInterpreter, KVStoreQuery, KVStoreRemoveOptions,
-    KVStoreSetOptions, KVStoreToken,
+    GlobalKVStore, KVStoreConfig, KVStoreContext, KVStoreEntry, KVStoreFields, KVStoreGetOptions,
+    KVStoreInterpreter, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
 use bsv_sdk::overlay::NetworkPreset;
 use bsv_sdk::primitives::{to_hex, PrivateKey, PublicKey};
@@ -447,7 +446,11 @@ async fn test_global_get_empty_key_returns_error() {
     let result = store.get("", None).await;
     assert!(result.is_err());
     match result.unwrap_err() {
-        Error::KvStoreError(msg) => assert!(msg.contains("empty"), "Error should mention empty key: {}", msg),
+        Error::KvStoreError(msg) => assert!(
+            msg.contains("empty"),
+            "Error should mention empty key: {}",
+            msg
+        ),
         other => panic!("Expected KvStoreError, got: {:?}", other),
     }
 }
@@ -465,7 +468,11 @@ async fn test_global_set_empty_key_returns_error() {
     let result = store.set("", "some_value", None).await;
     assert!(result.is_err());
     match result.unwrap_err() {
-        Error::KvStoreError(msg) => assert!(msg.contains("empty"), "Error should mention empty key: {}", msg),
+        Error::KvStoreError(msg) => assert!(
+            msg.contains("empty"),
+            "Error should mention empty key: {}",
+            msg
+        ),
         other => panic!("Expected KvStoreError, got: {:?}", other),
     }
 }
@@ -483,7 +490,11 @@ async fn test_global_remove_empty_key_returns_error() {
     let result = store.remove("", None).await;
     assert!(result.is_err());
     match result.unwrap_err() {
-        Error::KvStoreError(msg) => assert!(msg.contains("empty"), "Error should mention empty key: {}", msg),
+        Error::KvStoreError(msg) => assert!(
+            msg.contains("empty"),
+            "Error should mention empty key: {}",
+            msg
+        ),
         other => panic!("Expected KvStoreError, got: {:?}", other),
     }
 }
@@ -505,7 +516,10 @@ async fn test_global_set_wallet_create_action_error() {
     // The set() should fail. With no overlay, the overlay query fails before
     // create_action is reached. The create_action_error flag is a defense-in-depth
     // test that verifies the operation does not succeed in any case.
-    assert!(result.is_err(), "set() should fail when overlay is unavailable");
+    assert!(
+        result.is_err(),
+        "set() should fail when overlay is unavailable"
+    );
 }
 
 // =============================================================================
@@ -555,15 +569,18 @@ async fn test_global_remove_wallet_get_public_key_error() {
 
 #[tokio::test]
 async fn test_global_get_nonexistent_key_overlay_error() {
-    // With no matching data on the overlay, get() returns Ok(None).
-    // The overlay query succeeds but finds no entries for the key.
+    // Without live SLAP hosts, get() returns an OverlayError because
+    // the resolver cannot find competent hosts for the lookup service.
     let wallet = MockWallet::new();
     let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
 
     let result = store.get("nonexistent_key", None).await;
-    // The overlay query completes but returns no matching entries.
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_none());
+    // Without a live overlay, the resolver returns an error.
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        Error::OverlayError(_) | Error::NoHostsFound(_) => {} // Expected
+        other => panic!("Expected OverlayError or NoHostsFound, got: {:?}", other),
+    }
 }
 
 // =============================================================================
@@ -572,15 +589,18 @@ async fn test_global_get_nonexistent_key_overlay_error() {
 
 #[tokio::test]
 async fn test_global_query_overlay_error_propagation() {
-    // query() delegates to query_overlay. With no matching data on the overlay,
-    // it returns Ok with an empty vector.
+    // query() delegates to query_overlay. Without live SLAP hosts,
+    // the resolver cannot find competent hosts and returns an error.
     let wallet = MockWallet::new();
     let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
 
     let query = KVStoreQuery::new().with_key("test_key");
     let result = store.query(query).await;
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_empty());
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        Error::OverlayError(_) | Error::NoHostsFound(_) => {} // Expected
+        other => panic!("Expected OverlayError or NoHostsFound, got: {:?}", other),
+    }
 }
 
 // =============================================================================
@@ -590,13 +610,16 @@ async fn test_global_query_overlay_error_propagation() {
 #[tokio::test]
 async fn test_global_get_by_controller_overlay_error() {
     // get_by_controller delegates to query(), which queries the overlay.
-    // With no matching data, it returns Ok with an empty vector.
+    // Without live SLAP hosts, the resolver returns an error.
     let wallet = MockWallet::new();
     let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
 
     let result = store.get_by_controller("02abc123def456").await;
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_empty());
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        Error::OverlayError(_) | Error::NoHostsFound(_) => {} // Expected
+        other => panic!("Expected OverlayError or NoHostsFound, got: {:?}", other),
+    }
 }
 
 // =============================================================================
@@ -606,15 +629,16 @@ async fn test_global_get_by_controller_overlay_error() {
 #[tokio::test]
 async fn test_global_get_by_tags_overlay_error() {
     // get_by_tags delegates to query(), which queries the overlay.
-    // With no matching data, it returns Ok with an empty vector.
+    // Without live SLAP hosts, the resolver returns an error.
     let wallet = MockWallet::new();
     let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
 
-    let result = store
-        .get_by_tags(&["important".to_string()], None)
-        .await;
-    assert!(result.is_ok());
-    assert!(result.unwrap().is_empty());
+    let result = store.get_by_tags(&["important".to_string()], None).await;
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        Error::OverlayError(_) | Error::NoHostsFound(_) => {} // Expected
+        other => panic!("Expected OverlayError or NoHostsFound, got: {:?}", other),
+    }
 }
 
 // =============================================================================
@@ -756,8 +780,13 @@ fn test_interpreter_global_token_with_tags() {
     let pubkey = privkey.public_key();
 
     let tags = vec!["important".to_string(), "user-data".to_string()];
-    let script =
-        create_test_token("kvstore", "tagged_key", "tagged_value", &pubkey, Some(tags.clone()));
+    let script = create_test_token(
+        "kvstore",
+        "tagged_key",
+        "tagged_value",
+        &pubkey,
+        Some(tags.clone()),
+    );
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -879,8 +908,13 @@ fn test_interpreter_extract_fields_complete() {
     let pubkey = privkey.public_key();
 
     let tags = vec!["tag1".to_string(), "tag2".to_string()];
-    let script =
-        create_test_token("my_protocol", "my_key", "my_value", &pubkey, Some(tags.clone()));
+    let script = create_test_token(
+        "my_protocol",
+        "my_key",
+        "my_value",
+        &pubkey,
+        Some(tags.clone()),
+    );
 
     let fields = KVStoreInterpreter::extract_fields(&script);
     assert!(fields.is_some());
@@ -1079,7 +1113,10 @@ fn test_kvstore_entry_json_camel_case() {
     let entry = KVStoreEntry::new("key", "value", "ctrl", "proto");
     let json = serde_json::to_string(&entry).unwrap();
 
-    assert!(json.contains("protocolId"), "Should use protocolId (camelCase)");
+    assert!(
+        json.contains("protocolId"),
+        "Should use protocolId (camelCase)"
+    );
     assert!(
         !json.contains("protocol_id"),
         "Should not use protocol_id (snake_case)"
@@ -1105,7 +1142,10 @@ fn test_kvstore_token_json_camel_case() {
     let token = KVStoreToken::new("abc123", 0, 1);
     let json = serde_json::to_string(&token).unwrap();
 
-    assert!(json.contains("outputIndex"), "Should use outputIndex (camelCase)");
+    assert!(
+        json.contains("outputIndex"),
+        "Should use outputIndex (camelCase)"
+    );
     assert!(
         !json.contains("output_index"),
         "Should not use output_index (snake_case)"
@@ -1444,7 +1484,13 @@ fn test_interpreter_new_format_with_tags() {
     let pubkey = privkey.public_key();
 
     let tags = vec!["tag_a".to_string(), "tag_b".to_string()];
-    let script = create_test_token("kvstore", "new_key", "new_value", &pubkey, Some(tags.clone()));
+    let script = create_test_token(
+        "kvstore",
+        "new_key",
+        "new_value",
+        &pubkey,
+        Some(tags.clone()),
+    );
 
     let entry = KVStoreInterpreter::interpret_script(&script, None);
     assert!(entry.is_some());
@@ -1670,27 +1716,28 @@ fn test_kvstore_set_options_default_no_ttl() {
 
 #[tokio::test]
 async fn test_global_set_progresses_past_wallet_calls() {
-    // set() calls get_public_key, create_signature, and create_action via the
-    // wallet. With a working MockWallet, all wallet calls succeed. The
-    // MockWallet's create_action returns a txid but no tx bytes, so the overlay
-    // broadcast step is skipped and set() returns Ok with an outpoint string.
-    // This proves all wallet methods were called successfully.
+    // set() calls get_public_key first (wallet call), then calls set_internal
+    // which queries the overlay to check for existing tokens. Without live SLAP
+    // hosts, the overlay query fails. The error type should be OverlayError
+    // (not WalletError), proving the wallet's get_public_key call succeeded.
     let wallet = MockWallet::new();
     let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
 
     let result = store.set("test_key", "test_value", None).await;
     assert!(
-        result.is_ok(),
-        "Expected Ok (wallet calls succeeded), got: {:?}",
-        result.unwrap_err()
+        result.is_err(),
+        "Expected error from overlay (no live SLAP hosts)"
     );
-    // The result should be an outpoint string in "txid.0" format.
-    let outpoint = result.unwrap();
-    assert!(
-        outpoint.ends_with(".0"),
-        "Expected outpoint format 'txid.0', got: {}",
-        outpoint
-    );
+    match result.unwrap_err() {
+        Error::WalletError(msg) => panic!(
+            "Expected OverlayError (wallet calls should succeed), got WalletError: {}",
+            msg
+        ),
+        Error::OverlayError(_) | Error::NoHostsFound(_) => {
+            // Expected: wallet calls succeeded, overlay query failed
+        }
+        other => panic!("Expected OverlayError or NoHostsFound, got: {:?}", other),
+    }
 }
 
 // =============================================================================
@@ -1770,11 +1817,7 @@ fn test_interpreter_multiple_tags() {
     let privkey = PrivateKey::random();
     let pubkey = privkey.public_key();
 
-    let tags = vec![
-        "alpha".to_string(),
-        "beta".to_string(),
-        "gamma".to_string(),
-    ];
+    let tags = vec!["alpha".to_string(), "beta".to_string(), "gamma".to_string()];
     let script = create_test_token("kvstore", "key", "value", &pubkey, Some(tags.clone()));
 
     let fields = KVStoreInterpreter::extract_fields(&script).unwrap();

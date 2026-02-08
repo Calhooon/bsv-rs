@@ -75,6 +75,9 @@ pub struct PublicKey {
     // Verification
     pub fn verify(&self, msg_hash: &[u8; 32], signature: &Signature) -> bool
 
+    // Validation
+    pub fn is_valid(&self) -> bool                                    // Always true for parsed keys (Go/TS compat)
+
     // Point arithmetic
     pub fn mul_scalar(&self, scalar: &[u8; 32]) -> Result<PublicKey>  // Point * scalar
     pub fn add(&self, other: &PublicKey) -> Result<PublicKey>         // Point addition

@@ -21,8 +21,8 @@ use std::collections::HashMap;
 // Hex Serialization Helpers
 // =============================================================================
 
-/// Serde helper module for serializing Vec<u8> as hex strings.
-/// Use with `#[serde(with = "hex_bytes")]` on Vec<u8> fields.
+/// Serde helper module for serializing `Vec<u8>` as hex strings.
+/// Use with `#[serde(with = "hex_bytes")]` on `Vec<u8>` fields.
 pub mod hex_bytes {
     use serde::{Deserialize, Deserializer, Serializer};
 
@@ -42,9 +42,9 @@ pub mod hex_bytes {
     }
 }
 
-/// Serde helper module for serializing Option<Vec<u8>> as optional hex strings.
+/// Serde helper module for serializing `Option<Vec<u8>>` as optional hex strings.
 /// Use with `#[serde(with = "hex_bytes_option", skip_serializing_if = "Option::is_none")]`
-/// on Option<Vec<u8>> fields.
+/// on `Option<Vec<u8>>` fields.
 pub mod hex_bytes_option {
     use serde::{Deserialize, Deserializer, Serializer};
 
@@ -64,9 +64,7 @@ pub mod hex_bytes_option {
     {
         let opt: Option<String> = Option::deserialize(deserializer)?;
         match opt {
-            Some(s) => hex::decode(&s)
-                .map(Some)
-                .map_err(serde::de::Error::custom),
+            Some(s) => hex::decode(&s).map(Some).map_err(serde::de::Error::custom),
             None => Ok(None),
         }
     }
@@ -374,7 +372,8 @@ impl<'de> serde::Deserialize<'de> for Outpoint {
             type Value = Outpoint;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a string like 'txid.vout' or an object with txid and vout fields")
+                formatter
+                    .write_str("a string like 'txid.vout' or an object with txid and vout fields")
             }
 
             fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
@@ -395,8 +394,8 @@ impl<'de> serde::Deserialize<'de> for Outpoint {
                     match key.as_str() {
                         "txid" => {
                             let hex: String = map.next_value()?;
-                            let bytes = crate::primitives::from_hex(&hex)
-                                .map_err(de::Error::custom)?;
+                            let bytes =
+                                crate::primitives::from_hex(&hex).map_err(de::Error::custom)?;
                             if bytes.len() != 32 {
                                 return Err(de::Error::custom("txid must be 32 bytes"));
                             }
@@ -650,7 +649,11 @@ pub struct ReviewActionResult {
     /// The status of the review.
     pub status: ReviewActionResultStatus,
     /// Competing transaction IDs (hex encoded in JSON).
-    #[serde(with = "hex_txid_vec_option", skip_serializing_if = "Option::is_none", default)]
+    #[serde(
+        with = "hex_txid_vec_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub competing_txs: Option<Vec<TxId>>,
     /// Merged BEEF of competing transactions (hex encoded).
     #[serde(
@@ -1829,8 +1832,16 @@ mod tests {
 
         let json = serde_json::to_string(&output).unwrap();
         // Should contain hex string "76a914", not array [118, 169, 20]
-        assert!(json.contains("\"76a914\""), "Expected hex string in JSON: {}", json);
-        assert!(!json.contains("[118"), "Should not contain int array: {}", json);
+        assert!(
+            json.contains("\"76a914\""),
+            "Expected hex string in JSON: {}",
+            json
+        );
+        assert!(
+            !json.contains("[118"),
+            "Should not contain int array: {}",
+            json
+        );
 
         // Test deserialization from hex string
         let json_input = r#"{"lockingScript":"76a914","satoshis":1000,"outputDescription":"Test output description"}"#;
@@ -1854,8 +1865,16 @@ mod tests {
 
         let json = serde_json::to_string(&input_with_script).unwrap();
         // Should contain hex string "483045", not array [72, 48, 69]
-        assert!(json.contains("\"483045\""), "Expected hex string in JSON: {}", json);
-        assert!(!json.contains("[72"), "Should not contain int array: {}", json);
+        assert!(
+            json.contains("\"483045\""),
+            "Expected hex string in JSON: {}",
+            json
+        );
+        assert!(
+            !json.contains("[72"),
+            "Should not contain int array: {}",
+            json
+        );
 
         // Test that None serializes correctly (field should be absent)
         let input_without_script = CreateActionInput {
@@ -1867,7 +1886,11 @@ mod tests {
         };
 
         let json = serde_json::to_string(&input_without_script).unwrap();
-        assert!(!json.contains("unlockingScript"), "Field should be absent when None: {}", json);
+        assert!(
+            !json.contains("unlockingScript"),
+            "Field should be absent when None: {}",
+            json
+        );
 
         // Test deserialization from hex string
         let json_input = format!(
@@ -1894,8 +1917,16 @@ mod tests {
 
         let json = serde_json::to_string(&args).unwrap();
         // Should contain hex string "beef0001"
-        assert!(json.contains("\"beef0001\""), "Expected hex string for inputBeef: {}", json);
-        assert!(!json.contains("[190"), "Should not contain int array: {}", json);
+        assert!(
+            json.contains("\"beef0001\""),
+            "Expected hex string for inputBeef: {}",
+            json
+        );
+        assert!(
+            !json.contains("[190"),
+            "Should not contain int array: {}",
+            json
+        );
 
         // Test deserialization
         let json_input = r#"{"description":"Test action description","inputBeef":"beef0001"}"#;

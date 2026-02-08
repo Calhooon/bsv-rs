@@ -230,10 +230,7 @@ impl ScriptTemplate for Multisig {
 
         let n = params.len() / 33;
         if n > 16 {
-            return Err(Error::CryptoError(format!(
-                "Too many keys: {} (max 16)",
-                n
-            )));
+            return Err(Error::CryptoError(format!("Too many keys: {} (max 16)", n)));
         }
         if (self.threshold as usize) > n {
             return Err(Error::CryptoError(format!(
@@ -243,7 +240,9 @@ impl ScriptTemplate for Multisig {
         }
 
         let mut chunks = Vec::with_capacity(n + 3);
-        chunks.push(ScriptChunk::new_opcode(small_int_to_opcode(self.threshold)?));
+        chunks.push(ScriptChunk::new_opcode(small_int_to_opcode(
+            self.threshold,
+        )?));
 
         for i in 0..n {
             let pk_bytes = &params[i * 33..(i + 1) * 33];
@@ -331,13 +330,8 @@ mod tests {
         let key2 = PrivateKey::random();
         let sighash = [1u8; 32];
 
-        let unlocking = Multisig::sign_with_sighash(
-            &[key1, key2],
-            &sighash,
-            SignOutputs::All,
-            false,
-        )
-        .unwrap();
+        let unlocking =
+            Multisig::sign_with_sighash(&[key1, key2], &sighash, SignOutputs::All, false).unwrap();
 
         let chunks = unlocking.chunks();
         // OP_0 + 2 signatures = 3 chunks

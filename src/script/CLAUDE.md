@@ -154,6 +154,8 @@ impl Script {
     pub fn is_multisig(&self) -> Option<(u8, u8)>  // Returns (M, N) if multisig
     pub fn opcode_to_small_int(op: u8) -> Option<u8>  // OP_1..OP_16 -> 1..16
     pub fn extract_pubkey_hash(&self) -> Option<[u8; 20]>  // From P2PKH scripts
+    pub fn get_public_key(&self) -> Option<Vec<u8>>        // From P2PK scripts (matches Go PubKey())
+    pub fn get_public_key_hex(&self) -> Option<String>     // Hex-encoded (matches Go PubKeyHex())
 }
 ```
 

@@ -151,7 +151,9 @@ impl Transaction {
             None => Vec::new(),
         };
 
-        Ok(Transaction::with_params(version, inputs, outputs, lock_time))
+        Ok(Transaction::with_params(
+            version, inputs, outputs, lock_time,
+        ))
     }
 
     /// Builds the internal TxJson representation for serialization.
@@ -160,9 +162,7 @@ impl Transaction {
             .inputs
             .iter()
             .map(|input| {
-                let txid = input
-                    .get_source_txid()
-                    .unwrap_or_else(|_| "0".repeat(64));
+                let txid = input.get_source_txid().unwrap_or_else(|_| "0".repeat(64));
                 let unlocking_script = input
                     .unlocking_script
                     .as_ref()

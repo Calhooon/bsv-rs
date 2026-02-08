@@ -1220,10 +1220,8 @@ mod transaction_tests {
                 // Verify the order: proven roots should come before their children
                 let txids: Vec<String> = beef.txs.iter().map(|t| t.txid()).collect();
                 let last_idx = txids.len() - 1;
-                let consolidation_idx = txids
-                    .iter()
-                    .position(|t| t == &consolidation_txid)
-                    .unwrap();
+                let consolidation_idx =
+                    txids.iter().position(|t| t == &consolidation_txid).unwrap();
                 assert_eq!(
                     consolidation_idx, last_idx,
                     "{}: Consolidation TX at index {} but should be at {} (last)",
@@ -1310,10 +1308,7 @@ mod transaction_tests {
                 "Middle must come before terminal"
             );
 
-            let consolidation_idx = txids
-                .iter()
-                .position(|t| t == &consolidation_txid)
-                .unwrap();
+            let consolidation_idx = txids.iter().position(|t| t == &consolidation_txid).unwrap();
             assert_eq!(
                 consolidation_idx,
                 txids.len() - 1,

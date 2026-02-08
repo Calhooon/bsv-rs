@@ -13,12 +13,12 @@ use crate::auth::{
     },
     utils::{create_nonce, get_verifiable_certificates, validate_certificates, verify_nonce},
 };
+use crate::primitives::to_base64;
 use crate::primitives::PublicKey;
 use crate::wallet::{
     Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, SecurityLevel,
     VerifySignatureArgs, WalletInterface,
 };
-use crate::primitives::to_base64;
 use crate::{Error, Result};
 use rand::RngCore;
 use std::collections::HashMap;
@@ -175,16 +175,14 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     MessageType::InitialResponse => {
                         // Process InitialResponse - complete the handshake
                         // yourNonce is the client's session nonce (echoed back by server)
-                        let client_nonce = message
-                            .your_nonce
-                            .as_ref()
-                            .ok_or_else(|| Error::AuthError("InitialResponse missing your_nonce".into()))?;
+                        let client_nonce = message.your_nonce.as_ref().ok_or_else(|| {
+                            Error::AuthError("InitialResponse missing your_nonce".into())
+                        })?;
 
                         // nonce is the server's session nonce (responder's own nonce)
-                        let server_nonce = message
-                            .nonce
-                            .as_ref()
-                            .ok_or_else(|| Error::AuthError("InitialResponse missing nonce".into()))?;
+                        let server_nonce = message.nonce.as_ref().ok_or_else(|| {
+                            Error::AuthError("InitialResponse missing nonce".into())
+                        })?;
 
                         // Find and update the existing session (created in initiate_handshake).
                         // Use get_session + clone + update_session to properly refresh the
@@ -640,9 +638,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     async fn process_initial_request(&self, message: AuthMessage) -> Result<()> {
         let my_identity = self.get_identity_key().await?;
 
-        // Create our session
-        let session_nonce =
-            create_nonce(&self.wallet, Some(&message.identity_key), &self.originator).await?;
+        // Create our session nonce (counterparty=None=Self, matching Go/TS)
+        let session_nonce = create_nonce(&self.wallet, None, &self.originator).await?;
         let mut session = PeerSession::with_nonce(session_nonce.clone());
         session.peer_identity_key = Some(message.identity_key.clone());
         session.peer_nonce = message.initial_nonce.clone();
@@ -662,13 +659,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             mgr.add_session(session.clone())?;
         }
 
-        // Build InitialResponse
-        // initial_nonce = initiator's nonce (for signing_data computation)
-        // nonce = our session nonce (responder's nonce)
-        // your_nonce = initiator's nonce echoed back (for session lookup)
+        // Build InitialResponse (matching Go/TS field mapping)
+        // initial_nonce = responder's session nonce (matches Go: InitialNonce = session.SessionNonce)
+        // nonce = responder's session nonce (same value, matches Go: Nonce = ourNonce)
+        // your_nonce = initiator's nonce echoed back (for session lookup by initiator)
         let mut response = AuthMessage::new(MessageType::InitialResponse, my_identity);
-        response.nonce = Some(session_nonce);
-        response.initial_nonce = message.initial_nonce.clone();
+        response.nonce = Some(session_nonce.clone());
+        response.initial_nonce = Some(session_nonce);
         response.your_nonce = message.initial_nonce.clone();
 
         // Sign the response
@@ -700,18 +697,20 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     }
 
     async fn process_initial_response(&self, message: AuthMessage) -> Result<()> {
-        // Find the pending handshake
-        let initial_nonce = message
-            .initial_nonce
+        // Find the pending handshake using your_nonce (our nonce echoed back)
+        // Matches Go: session = sessionManager.GetSession(message.YourNonce)
+        // Matches TS: peerSession = sessionManager.getSession(message.yourNonce)
+        let our_nonce = message
+            .your_nonce
             .as_ref()
-            .ok_or_else(|| Error::AuthError("InitialResponse missing initial_nonce".into()))?;
+            .ok_or_else(|| Error::AuthError("InitialResponse missing your_nonce".into()))?;
 
         // Verify the signature
         // For InitialResponse, we need a temporary session for verification
         let temp_session = PeerSession {
-            session_nonce: Some(initial_nonce.clone()),
+            session_nonce: Some(our_nonce.clone()),
             peer_identity_key: Some(message.identity_key.clone()),
-            peer_nonce: message.nonce.clone(),
+            peer_nonce: message.initial_nonce.clone(),
             ..Default::default()
         };
 
@@ -721,13 +720,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         {
             // Clean up pending handshake
             let mut pending = self.pending_handshakes.write().await;
-            if let Some(tx) = pending.remove(initial_nonce) {
+            if let Some(tx) = pending.remove(our_nonce) {
                 let _ = tx.send(Err(Error::AuthError("Invalid signature".into())));
             }
             return Err(Error::AuthError("InitialResponse signature invalid".into()));
         }
 
-        // Verify the nonce
+        // Verify the nonce (optional, matches Go/TS behavior)
         if !verify_nonce(
             message.nonce.as_deref().unwrap_or(""),
             &self.wallet,
@@ -745,10 +744,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // so the secondary index (identity key -> nonce) is properly refreshed.
         {
             let mut mgr = self.session_manager.write().await;
-            if let Some(existing) = mgr.get_session(initial_nonce).cloned() {
+            if let Some(existing) = mgr.get_session(our_nonce).cloned() {
                 let mut updated = existing;
                 updated.peer_identity_key = Some(message.identity_key.clone());
-                updated.peer_nonce = message.nonce.clone();
+                // Store responder's session nonce as peer_nonce
+                // Matches Go: session.PeerNonce = message.InitialNonce
+                // Matches TS: peerSession.peerNonce = message.initialNonce
+                updated.peer_nonce = message.initial_nonce.clone();
                 updated.is_authenticated = true;
                 updated.touch();
 
@@ -764,7 +766,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
                 // Notify pending handshake
                 let mut pending = self.pending_handshakes.write().await;
-                if let Some(tx) = pending.remove(initial_nonce) {
+                if let Some(tx) = pending.remove(our_nonce) {
                     let _ = tx.send(Ok(session_clone));
                 }
             }

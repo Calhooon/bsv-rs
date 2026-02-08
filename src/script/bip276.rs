@@ -132,9 +132,8 @@ pub fn decode_bip276(encoded: &str) -> Result<(u8, u8, Vec<u8>)> {
 
     // Parse network byte (first 2 hex chars after prefix)
     let network_hex = &after_prefix[..2];
-    let network_bytes = from_hex(network_hex).map_err(|_| {
-        Error::Bip276Error(format!("invalid network hex: '{}'", network_hex))
-    })?;
+    let network_bytes = from_hex(network_hex)
+        .map_err(|_| Error::Bip276Error(format!("invalid network hex: '{}'", network_hex)))?;
     let network = network_bytes[0];
 
     // Parse script_type byte (next 2 hex chars)
@@ -147,16 +146,17 @@ pub fn decode_bip276(encoded: &str) -> Result<(u8, u8, Vec<u8>)> {
     // The remaining data is script_hex + 8-char checksum
     let data_and_checksum = &after_prefix[4..];
     if data_and_checksum.len() < 8 {
-        return Err(Error::Bip276Error("input too short for checksum".to_string()));
+        return Err(Error::Bip276Error(
+            "input too short for checksum".to_string(),
+        ));
     }
 
     let script_hex = &data_and_checksum[..data_and_checksum.len() - 8];
     let provided_checksum = &data_and_checksum[data_and_checksum.len() - 8..];
 
     // Decode script data
-    let script_data = from_hex(script_hex).map_err(|_| {
-        Error::Bip276Error(format!("invalid script hex: '{}'", script_hex))
-    })?;
+    let script_data = from_hex(script_hex)
+        .map_err(|_| Error::Bip276Error(format!("invalid script hex: '{}'", script_hex)))?;
 
     // Compute expected checksum: SHA256d of the payload (everything before the checksum)
     let payload = &encoded[..encoded.len() - 8];
@@ -177,19 +177,13 @@ mod tests {
     #[test]
     fn test_encode_mainnet() {
         let encoded = encode_bip276(NETWORK_MAINNET, 1, b"fake script");
-        assert_eq!(
-            encoded,
-            "bitcoin-script:010166616b65207363726970746f0cd86a"
-        );
+        assert_eq!(encoded, "bitcoin-script:010166616b65207363726970746f0cd86a");
     }
 
     #[test]
     fn test_encode_testnet() {
         let encoded = encode_bip276(NETWORK_TESTNET, 1, b"fake script");
-        assert_eq!(
-            encoded,
-            "bitcoin-script:020166616b65207363726970742577a444"
-        );
+        assert_eq!(encoded, "bitcoin-script:020166616b65207363726970742577a444");
     }
 
     #[test]

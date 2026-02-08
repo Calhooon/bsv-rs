@@ -6,7 +6,7 @@
 use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
 use bsv_sdk::primitives::ec::PrivateKey;
 use bsv_sdk::primitives::BigNumber;
-use bsv_sdk::script::templates::{Multisig, P2PK, RPuzzle, RPuzzleType, P2PKH};
+use bsv_sdk::script::templates::{Multisig, RPuzzle, RPuzzleType, P2PK, P2PKH};
 use bsv_sdk::script::ScriptTemplate;
 
 /// Test that P2PKH locking script can be spent with the correct key.

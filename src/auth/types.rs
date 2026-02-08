@@ -140,20 +140,21 @@ impl AuthMessage {
     /// Returns the bytes to sign for this message.
     ///
     /// The signing data varies by message type:
-    /// - InitialResponse: initialNonce || sessionNonce (decoded from base64)
+    /// - InitialResponse: yourNonce || initialNonce (initiator's nonce || responder's session nonce, decoded from base64)
     /// - General/CertificateRequest/CertificateResponse: payload or serialized requested_certificates
     pub fn signing_data(&self) -> Vec<u8> {
         match self.message_type {
             MessageType::InitialResponse => {
-                // For InitialResponse, sign: initialNonce || sessionNonce
+                // For InitialResponse, sign: yourNonce (initiator's nonce) || initialNonce (responder's session nonce)
+                // This matches Go/TS SDKs: initiator_nonce_bytes || responder_nonce_bytes
                 let mut data = Vec::new();
-                if let Some(ref initial_nonce) = self.initial_nonce {
-                    if let Ok(decoded) = crate::primitives::from_base64(initial_nonce) {
+                if let Some(ref your_nonce) = self.your_nonce {
+                    if let Ok(decoded) = crate::primitives::from_base64(your_nonce) {
                         data.extend_from_slice(&decoded);
                     }
                 }
-                if let Some(ref nonce) = self.nonce {
-                    if let Ok(decoded) = crate::primitives::from_base64(nonce) {
+                if let Some(ref initial_nonce) = self.initial_nonce {
+                    if let Ok(decoded) = crate::primitives::from_base64(initial_nonce) {
                         data.extend_from_slice(&decoded);
                     }
                 }
@@ -195,9 +196,12 @@ impl AuthMessage {
 
         match self.message_type {
             MessageType::InitialResponse => {
-                // For InitialResponse: "{initialNonce} {sessionNonce}"
+                // For InitialResponse: "{yourNonce} {initialNonce}" = "{initiator_nonce} {responder_nonce}"
+                // Matches Go: keyID(message.InitialNonce, session.SessionNonce) on responder
+                //             keyID(session.SessionNonce, message.InitialNonce) on initiator
+                let your = self.your_nonce.as_deref().unwrap_or("");
                 let initial = self.initial_nonce.as_deref().unwrap_or("");
-                format!("{} {}", initial, nonce)
+                format!("{} {}", your, initial)
             }
             _ => {
                 // For other messages: "{nonce} {peer_session_nonce}"
@@ -219,10 +223,10 @@ impl AuthMessage {
         // Validate based on message type
         match self.message_type {
             MessageType::InitialRequest => {
-                // InitialRequest must have a nonce (session nonce)
-                if self.nonce.is_none() {
+                // InitialRequest must have an initial_nonce (session nonce)
+                if self.initial_nonce.is_none() {
                     return Err(crate::Error::AuthError(
-                        "InitialRequest must have a nonce".into(),
+                        "InitialRequest must have an initial_nonce".into(),
                     ));
                 }
             }

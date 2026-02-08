@@ -103,8 +103,7 @@ async fn test_arc_broadcast_success_with_api_key() {
         .mount(&mock_server)
         .await;
 
-    let broadcaster =
-        ArcBroadcaster::new(&mock_server.uri(), Some("test-api-key".to_string()));
+    let broadcaster = ArcBroadcaster::new(&mock_server.uri(), Some("test-api-key".to_string()));
     let tx = test_transaction();
     let result = broadcaster.broadcast(&tx).await;
 
@@ -198,10 +197,7 @@ async fn test_arc_broadcast_malformed_json() {
 
     Mock::given(method("POST"))
         .and(path("/v1/tx"))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_string("this is not json at all"),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string("this is not json at all"))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -317,9 +313,7 @@ async fn test_woc_broadcast_success() {
     Mock::given(method("POST"))
         .and(path("/v1/bsv/main/tx/raw"))
         .and(header("Content-Type", "application/json"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string(format!("\"{}\"", expected_txid)),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!("\"{}\"", expected_txid)))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -345,9 +339,7 @@ async fn test_woc_broadcast_success_testnet() {
 
     Mock::given(method("POST"))
         .and(path("/v1/bsv/test/tx/raw"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -369,18 +361,13 @@ async fn test_woc_broadcast_success_stn() {
 
     Mock::given(method("POST"))
         .and(path("/v1/bsv/stn/tx/raw"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())))
         .expect(1)
         .mount(&mock_server)
         .await;
 
-    let broadcaster = WhatsOnChainBroadcaster::with_base_url(
-        &mock_server.uri(),
-        WocBroadcastNetwork::Stn,
-        None,
-    );
+    let broadcaster =
+        WhatsOnChainBroadcaster::with_base_url(&mock_server.uri(), WocBroadcastNetwork::Stn, None);
     let result = broadcaster.broadcast(&tx).await;
 
     assert!(result.is_ok(), "Expected success, got: {:?}", result);
@@ -472,9 +459,7 @@ async fn test_woc_broadcast_with_api_key_header() {
     Mock::given(method("POST"))
         .and(path("/v1/bsv/main/tx/raw"))
         .and(header("Authorization", "my-woc-key"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -498,9 +483,7 @@ async fn test_woc_broadcast_sends_raw_hex_body() {
     Mock::given(method("POST"))
         .and(path("/v1/bsv/main/tx/raw"))
         .and(body_string_contains(&expected_hex))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())))
         .expect(1)
         .mount(&mock_server)
         .await;
@@ -522,9 +505,7 @@ async fn test_woc_broadcast_many() {
 
     Mock::given(method("POST"))
         .and(path("/v1/bsv/main/tx/raw"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_string(format!("\"{}\"", tx.id())))
         .expect(2)
         .mount(&mock_server)
         .await;
@@ -595,9 +576,7 @@ async fn test_teranode_broadcast_error_response() {
 
     Mock::given(method("POST"))
         .and(path("/v1/tx"))
-        .respond_with(
-            ResponseTemplate::new(400).set_body_string("Invalid transaction format"),
-        )
+        .respond_with(ResponseTemplate::new(400).set_body_string("Invalid transaction format"))
         .expect(1)
         .mount(&mock_server)
         .await;

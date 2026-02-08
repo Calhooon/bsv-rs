@@ -56,8 +56,8 @@ pub mod historian;
 pub mod host_reputation_tracker;
 pub mod lookup_resolver;
 pub mod overlay_admin_token_template;
-pub mod topic_broadcaster;
 pub mod retry;
+pub mod topic_broadcaster;
 pub mod types;
 
 // Re-exports from facilitators
@@ -71,8 +71,8 @@ pub use historian::{Historian, HistorianConfig, InterpreterFn, SyncHistorian};
 
 // Re-exports from host_reputation_tracker
 pub use host_reputation_tracker::{
-    get_overlay_host_reputation_tracker, HostReputationEntry, HostReputationTracker, RankedHost,
-    RankChangeEvent, ReputationConfig, ReputationStorage,
+    get_overlay_host_reputation_tracker, HostReputationEntry, HostReputationTracker,
+    RankChangeEvent, RankedHost, ReputationConfig, ReputationStorage,
 };
 
 // Re-exports from lookup_resolver

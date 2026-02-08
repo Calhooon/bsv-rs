@@ -731,9 +731,12 @@ mod tests {
         let backup = shares.to_backup_format();
 
         // Use share 0, share 1, and share 1 again (duplicate)
-        let recovery =
-            KeyShares::from_backup_format(&[backup[0].clone(), backup[1].clone(), backup[1].clone()])
-                .unwrap();
+        let recovery = KeyShares::from_backup_format(&[
+            backup[0].clone(),
+            backup[1].clone(),
+            backup[1].clone(),
+        ])
+        .unwrap();
 
         // Recovery should fail: either the interpolation gives wrong result
         // (integrity check fails) or the mod_inverse fails on duplicate x coords
@@ -756,7 +759,10 @@ mod tests {
         let result = subset.recover_private_key();
         assert!(result.is_err());
         assert!(
-            result.unwrap_err().to_string().contains("Insufficient shares"),
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Insufficient shares"),
             "Expected 'Insufficient shares' error message"
         );
     }
@@ -817,8 +823,7 @@ mod tests {
                 .iter()
                 .map(|&i| shares.points[i].clone())
                 .collect();
-            let subset =
-                KeyShares::new(subset_points, 3, shares.integrity.clone());
+            let subset = KeyShares::new(subset_points, 3, shares.integrity.clone());
             let recovered = subset.recover_private_key().unwrap();
             assert_eq!(
                 key.to_bytes(),
@@ -854,8 +859,11 @@ mod tests {
         assert_eq!(key.to_bytes(), recovered.to_bytes());
 
         // Recover from last 3 shares
-        let subset =
-            KeyShares::new(shares.points[252..255].to_vec(), 3, shares.integrity.clone());
+        let subset = KeyShares::new(
+            shares.points[252..255].to_vec(),
+            3,
+            shares.integrity.clone(),
+        );
         let recovered = subset.recover_private_key().unwrap();
         assert_eq!(key.to_bytes(), recovered.to_bytes());
 
@@ -889,14 +897,7 @@ mod tests {
     fn test_different_thresholds_and_shares() {
         // Mirrors Go: TestPolynomialDifferentThresholdsAndShares
         // Test various threshold/total combinations
-        let test_cases = vec![
-            (2, 3),
-            (2, 5),
-            (3, 5),
-            (4, 7),
-            (5, 10),
-            (10, 10),
-        ];
+        let test_cases = vec![(2, 3), (2, 5), (3, 5), (4, 7), (5, 10), (10, 10)];
 
         for (threshold, total) in test_cases {
             let key = PrivateKey::random();
@@ -965,8 +966,7 @@ mod tests {
         for _ in 0..10 {
             let key = PrivateKey::random();
             let shares = split_private_key(&key, 3, 5).unwrap();
-            let subset =
-                KeyShares::new(shares.points[..3].to_vec(), 3, shares.integrity.clone());
+            let subset = KeyShares::new(shares.points[..3].to_vec(), 3, shares.integrity.clone());
             let recovered = subset.recover_private_key().unwrap();
             assert_eq!(key.to_bytes(), recovered.to_bytes());
         }
@@ -982,8 +982,7 @@ mod tests {
             assert_eq!(backup.len(), 5);
 
             // Recover from first 3 backup strings
-            let recovered_shares =
-                KeyShares::from_backup_format(&backup[..3]).unwrap();
+            let recovered_shares = KeyShares::from_backup_format(&backup[..3]).unwrap();
             let recovered_key = recovered_shares.recover_private_key().unwrap();
             assert_eq!(key.to_bytes(), recovered_key.to_bytes());
         }

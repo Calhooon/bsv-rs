@@ -5,7 +5,7 @@
 
 This directory contains integration tests that verify the BSV Rust SDK works correctly across modules and produces results identical to the TypeScript and Go SDK implementations. Tests use shared JSON test vectors to ensure byte-for-byte compatibility across all three SDK implementations.
 
-**Total: ~1,054 test functions across 29 test files + ~2,632 test vectors**
+**Total: 1,053 test functions across 29 test files + ~2,026 JSON test vectors + Rust constant vectors**
 
 ## Files
 
@@ -32,7 +32,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `overlay_http_tests.rs` | 49 | `overlay`+`http` | SHIP broadcast and SLAP lookup facilitators with wiremock |
 | `overlay_integration_tests.rs` | 62 | `overlay` | Protocols, topics, reputation, historian, admin tokens, lookup resolver |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
-| `script_vectors_tests.rs` | 13 | default | Script interpreter with ~1,660 vectors |
+| `script_vectors_tests.rs` | 13 | default | Script interpreter with 1,488 vectors (458+598+432) |
 | `sighash_tests.rs` | 3 | default | Transaction sighash computation with 499 vectors |
 | `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
 | `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
@@ -49,16 +49,16 @@ Test vectors in `tests/vectors/` are shared with the TypeScript and Go SDKs:
 | Vector File | Contents |
 |-------------|----------|
 | `auth_certificate.json` | Auth certificate serialization vectors (4 vectors) |
-| `brc42_private.json` | BRC-42 private key derivation vectors |
-| `brc42_public.json` | BRC-42 public key derivation vectors |
-| `symmetric_key.json` | Symmetric encryption test vectors |
+| `brc42_private.json` | BRC-42 private key derivation vectors (5 vectors) |
+| `brc42_public.json` | BRC-42 public key derivation vectors (5 vectors) |
+| `symmetric_key.json` | Symmetric encryption test vectors (5 vectors) |
 | `overlay_admin_token.json` | Overlay SHIP/SLAP admin token vectors (4 vectors) |
-| `overlay_types.json` | Overlay type serialization vectors |
-| `drbg.json` | HMAC-DRBG vectors (15 vectors for RFC 6979) |
-| `sighash.json` | Transaction sighash vectors (499 vectors) |
-| `spend_valid.json` | Valid spend execution vectors (~570+ vectors) |
-| `script_valid.json` | Valid script parsing vectors (~590+ vectors) |
-| `script_invalid.json` | Invalid scripts that should fail (~500+ vectors) |
+| `overlay_types.json` | Overlay type serialization vectors (18 entries across 6 categories) |
+| `drbg.json` | HMAC-DRBG vectors (15 vectors from NIST SP 800-90A) |
+| `sighash.json` | Transaction sighash vectors (500 entries, 499 used) |
+| `spend_valid.json` | Valid spend execution vectors (458 vectors) |
+| `script_valid.json` | Valid script parsing vectors (598 vectors) |
+| `script_invalid.json` | Invalid scripts that should fail (432 vectors) |
 
 Transaction test vectors in `tests/transaction/vectors/`:
 
@@ -80,8 +80,8 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`integration_tests.rs`** — Full workflows: key derivation, symmetric encryption, Schnorr proofs, Shamir secret sharing (3-of-5, subset recovery), P-256, hash chains, sighash+signing, complete payment workflow
 
 ### Script (default features)
-- **`script_vectors_tests.rs`** — ~570 spend valid vectors, ~590 script parsing vectors, ~500 invalid script vectors, individual opcode tests (OP_CAT, OP_SPLIT, OP_MUL, OP_DIV)
-- **`sighash_tests.rs`** — 499 sighash vectors with `compute_sighash`, detailed first-vector debugging, transaction parsing verification
+- **`script_vectors_tests.rs`** — 458 spend valid vectors, 598 script parsing vectors, 432 invalid script vectors, individual opcode tests (OP_CAT, OP_SPLIT, OP_MUL, OP_DIV)
+- **`sighash_tests.rs`** — 499 sighash vectors (from 500 JSON entries) with `compute_sighash`, detailed first-vector debugging, transaction parsing verification
 - **`template_tests.rs`** — P2PKH (lock/unlock/address/validation), P2PK (compressed detection, length estimate), Multisig (2-of-3, 1-of-1, 3-of-3, 16-of-16, validation errors), RPuzzle (hash types, K value, R computation)
 
 ### Transaction (`transaction` feature)
