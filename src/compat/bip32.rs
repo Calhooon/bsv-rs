@@ -959,6 +959,192 @@ mod tests {
         );
     }
 
+    // =========================================================================
+    // P0-CRYPTO-5: Complete BIP-32 test vectors (depths 4-5 for Vector 1,
+    // depths 2-5 for Vector 2)
+    // Ported from TS SDK: compat/__tests/HD.test.ts
+    // =========================================================================
+
+    // Vector 1, depth 4: m/0'/1/2'/2
+    #[test]
+    fn test_vector_1_chain_m_0h_1_2h_2() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child = master.derive_path("m/0'/1/2'/2").unwrap();
+
+        assert_eq!(
+            child.to_string(),
+            "xprvA2JDeKCSNNZky6uBCviVfJSKyQ1mDYahRjijr5idH2WwLsEd4Hsb2Tyh8RfQMuPh7f7RtyzTtdrbdqqsunu5Mm3wDvUAKRHSC34sJ7in334"
+        );
+
+        let xpub = child.neuter().unwrap();
+        assert_eq!(
+            xpub.to_string(),
+            "xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV"
+        );
+    }
+
+    // Vector 1, depth 5: m/0'/1/2'/2/1000000000
+    #[test]
+    fn test_vector_1_chain_m_0h_1_2h_2_1000000000() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child = master.derive_path("m/0'/1/2'/2/1000000000").unwrap();
+
+        assert_eq!(
+            child.to_string(),
+            "xprvA41z7zogVVwxVSgdKUHDy1SKmdb533PjDz7J6N6mV6uS3ze1ai8FHa8kmHScGpWmj4WggLyQjgPie1rFSruoUihUZREPSL39UNdE3BBDu76"
+        );
+
+        let xpub = child.neuter().unwrap();
+        assert_eq!(
+            xpub.to_string(),
+            "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy"
+        );
+    }
+
+    // Vector 1, depth 4: verify public-only derivation at m/0'/1/2'/2
+    #[test]
+    fn test_vector_1_public_derivation_depth_4() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive m/0'/1/2' privately, then neuter, then derive /2 publicly
+        let child_priv = master.derive_path("m/0'/1/2'").unwrap();
+        let child_pub = child_priv.neuter().unwrap();
+        let child2 = child_pub.derive_child(2).unwrap();
+
+        assert_eq!(
+            child2.to_string(),
+            "xpub6FHa3pjLCk84BayeJxFW2SP4XRrFd1JYnxeLeU8EqN3vDfZmbqBqaGJAyiLjTAwm6ZLRQUMv1ZACTj37sR62cfN7fe5JnJ7dh8zL4fiyLHV"
+        );
+    }
+
+    // Vector 1, depth 5: verify public-only derivation at m/0'/1/2'/2/1000000000
+    #[test]
+    fn test_vector_1_public_derivation_depth_5() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Derive m/0'/1/2'/2 privately, then neuter, then derive /1000000000 publicly
+        let child_priv = master.derive_path("m/0'/1/2'/2").unwrap();
+        let child_pub = child_priv.neuter().unwrap();
+        let child2 = child_pub.derive_child(1000000000).unwrap();
+
+        assert_eq!(
+            child2.to_string(),
+            "xpub6H1LXWLaKsWFhvm6RVpEL9P4KfRZSW7abD2ttkWP3SSQvnyA8FSVqNTEcYFgJS2UaFcxupHiYkro49S8yGasTvXEYBVPamhGW6cFJodrTHy"
+        );
+    }
+
+    // Vector 2, depth 2: m/0/2147483647'
+    #[test]
+    fn test_vector_2_chain_m_0_2147483647h() {
+        let seed = from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child = master.derive_path("m/0/2147483647'").unwrap();
+
+        assert_eq!(
+            child.to_string(),
+            "xprv9wSp6B7kry3Vj9m1zSnLvN3xH8RdsPP1Mh7fAaR7aRLcQMKTR2vidYEeEg2mUCTAwCd6vnxVrcjfy2kRgVsFawNzmjuHc2YmYRmagcEPdU9"
+        );
+
+        let xpub = child.neuter().unwrap();
+        assert_eq!(
+            xpub.to_string(),
+            "xpub6ASAVgeehLbnwdqV6UKMHVzgqAG8Gr6riv3Fxxpj8ksbH9ebxaEyBLZ85ySDhKiLDBrQSARLq1uNRts8RuJiHjaDMBU4Zn9h8LZNnBC5y4a"
+        );
+    }
+
+    // Vector 2, depth 3: m/0/2147483647'/1
+    #[test]
+    fn test_vector_2_chain_m_0_2147483647h_1() {
+        let seed = from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child = master.derive_path("m/0/2147483647'/1").unwrap();
+
+        assert_eq!(
+            child.to_string(),
+            "xprv9zFnWC6h2cLgpmSA46vutJzBcfJ8yaJGg8cX1e5StJh45BBciYTRXSd25UEPVuesF9yog62tGAQtHjXajPPdbRCHuWS6T8XA2ECKADdw4Ef"
+        );
+
+        let xpub = child.neuter().unwrap();
+        assert_eq!(
+            xpub.to_string(),
+            "xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon"
+        );
+    }
+
+    // Vector 2, depth 3: public-only derivation from m/0/2147483647'
+    #[test]
+    fn test_vector_2_public_derivation_depth_3() {
+        let seed = from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child_priv = master.derive_path("m/0/2147483647'").unwrap();
+        let child_pub = child_priv.neuter().unwrap();
+        let child2 = child_pub.derive_child(1).unwrap();
+
+        assert_eq!(
+            child2.to_string(),
+            "xpub6DF8uhdarytz3FWdA8TvFSvvAh8dP3283MY7p2V4SeE2wyWmG5mg5EwVvmdMVCQcoNJxGoWaU9DCWh89LojfZ537wTfunKau47EL2dhHKon"
+        );
+    }
+
+    // Vector 2, depth 4: m/0/2147483647'/1/2147483646'
+    #[test]
+    fn test_vector_2_chain_m_0_2147483647h_1_2147483646h() {
+        let seed = from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child = master.derive_path("m/0/2147483647'/1/2147483646'").unwrap();
+
+        assert_eq!(
+            child.to_string(),
+            "xprvA1RpRA33e1JQ7ifknakTFpgNXPmW2YvmhqLQYMmrj4xJXXWYpDPS3xz7iAxn8L39njGVyuoseXzU6rcxFLJ8HFsTjSyQbLYnMpCqE2VbFWc"
+        );
+
+        let xpub = child.neuter().unwrap();
+        assert_eq!(
+            xpub.to_string(),
+            "xpub6ERApfZwUNrhLCkDtcHTcxd75RbzS1ed54G1LkBUHQVHQKqhMkhgbmJbZRkrgZw4koxb5JaHWkY4ALHY2grBGRjaDMzQLcgJvLJuZZvRcEL"
+        );
+    }
+
+    // Vector 2, depth 5: m/0/2147483647'/1/2147483646'/2
+    #[test]
+    fn test_vector_2_chain_m_0_2147483647h_1_2147483646h_2() {
+        let seed = from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child = master
+            .derive_path("m/0/2147483647'/1/2147483646'/2")
+            .unwrap();
+
+        assert_eq!(
+            child.to_string(),
+            "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j"
+        );
+
+        let xpub = child.neuter().unwrap();
+        assert_eq!(
+            xpub.to_string(),
+            "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt"
+        );
+    }
+
+    // Vector 2, depth 5: public-only derivation from m/0/2147483647'/1/2147483646'
+    #[test]
+    fn test_vector_2_public_derivation_depth_5() {
+        let seed = from_hex("fffcf9f6f3f0edeae7e4e1dedbd8d5d2cfccc9c6c3c0bdbab7b4b1aeaba8a5a29f9c999693908d8a8784817e7b7875726f6c696663605d5a5754514e4b484542").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let child_priv = master.derive_path("m/0/2147483647'/1/2147483646'").unwrap();
+        let child_pub = child_priv.neuter().unwrap();
+        let child2 = child_pub.derive_child(2).unwrap();
+
+        assert_eq!(
+            child2.to_string(),
+            "xpub6FnCn6nSzZAw5Tw7cgR9bi15UV96gLZhjDstkXXxvCLsUXBGXPdSnLFbdpq8p9HmGsApME5hQTZ3emM2rnY5agb9rXpVGyy3bdW6EEgAtqt"
+        );
+    }
+
     #[test]
     fn test_parse_xprv() {
         let xprv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi";
@@ -985,17 +1171,55 @@ mod tests {
         assert!(result.is_err());
     }
 
+    // P0-CRYPTO-8: Fix test_derive_path_variants -- all 5 variants must
+    // produce the same key, and that key matches the known BIP-32 vector.
     #[test]
     fn test_derive_path_variants() {
         let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
         let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
 
-        // Test various path formats
-        let _ = master.derive_path("m/0'/1").unwrap();
-        let _ = master.derive_path("m/0h/1").unwrap();
-        let _ = master.derive_path("m/0H/1").unwrap();
-        let _ = master.derive_path("0'/1").unwrap();
-        let _ = master.derive_path("/0'/1").unwrap();
+        // All these path formats should produce the identical derived key
+        let key_1 = master.derive_path("m/0'/1").unwrap();
+        let key_2 = master.derive_path("m/0h/1").unwrap();
+        let key_3 = master.derive_path("m/0H/1").unwrap();
+        let key_4 = master.derive_path("0'/1").unwrap();
+        let key_5 = master.derive_path("/0'/1").unwrap();
+
+        // All should produce the same xprv
+        let expected_xprv = "xprv9wTYmMFdV23N2TdNG573QoEsfRrWKQgWeibmLntzniatZvR9BmLnvSxqu53Kw1UmYPxLgboyZQaXwTCg8MSY3H2EU4pWcQDnRnrVA1xe8fs";
+        assert_eq!(key_1.to_string(), expected_xprv, "m/0'/1 format mismatch");
+        assert_eq!(key_2.to_string(), expected_xprv, "m/0h/1 format mismatch");
+        assert_eq!(key_3.to_string(), expected_xprv, "m/0H/1 format mismatch");
+        assert_eq!(key_4.to_string(), expected_xprv, "0'/1 format mismatch");
+        assert_eq!(key_5.to_string(), expected_xprv, "/0'/1 format mismatch");
+
+        // All should produce the same xpub
+        let expected_xpub = "xpub6ASuArnXKPbfEwhqN6e3mwBcDTgzisQN1wXN9BJcM47sSikHjJf3UFHKkNAWbWMiGj7Wf5uMash7SyYq527Hqck2AxYysAA7xmALppuCkwQ";
+        assert_eq!(
+            key_1.neuter().unwrap().to_string(),
+            expected_xpub,
+            "m/0'/1 xpub mismatch"
+        );
+        assert_eq!(
+            key_2.neuter().unwrap().to_string(),
+            expected_xpub,
+            "m/0h/1 xpub mismatch"
+        );
+        assert_eq!(
+            key_3.neuter().unwrap().to_string(),
+            expected_xpub,
+            "m/0H/1 xpub mismatch"
+        );
+        assert_eq!(
+            key_4.neuter().unwrap().to_string(),
+            expected_xpub,
+            "0'/1 xpub mismatch"
+        );
+        assert_eq!(
+            key_5.neuter().unwrap().to_string(),
+            expected_xpub,
+            "/0'/1 xpub mismatch"
+        );
     }
 
     #[test]

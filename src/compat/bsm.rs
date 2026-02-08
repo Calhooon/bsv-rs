@@ -329,6 +329,7 @@ fn compute_message_hash(message: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use base64::Engine;
 
     #[test]
     fn test_sign_and_verify() {
@@ -511,6 +512,48 @@ mod tests {
         // Recover public key
         let (recovered, _) = recover_public_key_from_signature(&signature, message).unwrap();
         assert_eq!(recovered.to_compressed(), key.public_key().to_compressed());
+    }
+
+    // =======================================
+    // P0-CRYPTO-6: Cross-SDK BSM signature vector
+    // Ported from TS SDK: compat/__tests/BSM.test.ts
+    // =======================================
+
+    #[test]
+    fn test_cross_sdk_bsm_known_vector() {
+        // TS SDK test: PrivateKey.fromWif('L211enC224G1kV8pyyq7bjVd9SxZebnRYEzzM3i7ZHCc1c5E7dQu')
+        // signs "hello world" and produces a specific base64 signature
+        let key =
+            PrivateKey::from_wif("L211enC224G1kV8pyyq7bjVd9SxZebnRYEzzM3i7ZHCc1c5E7dQu").unwrap();
+        let message = b"hello world";
+
+        let signature = sign_message(&key, message).unwrap();
+        assert_eq!(signature.len(), 65, "BSM signature must be 65 bytes");
+
+        // Verify the base64 encoding matches the TS SDK output exactly
+        let sig_base64 = base64::engine::general_purpose::STANDARD.encode(&signature);
+        assert_eq!(
+            sig_base64,
+            "H4T8Asr0WkC6wYfBESR6pCAfECtdsPM4fwiSQ2qndFi8dVtv/mrOFaySx9xQE7j24ugoJ4iGnsRwAC8QwaoHOXk=",
+            "Cross-SDK BSM signature base64 mismatch with TS SDK"
+        );
+
+        // Verify the signature is valid via address verification
+        let address = key.public_key().to_address();
+        assert!(
+            verify_message(&address, &signature, message).unwrap(),
+            "Cross-SDK BSM signature should verify"
+        );
+
+        // Also verify recovery: the recovered public key should match
+        let (recovered, compressed) =
+            recover_public_key_from_signature(&signature, message).unwrap();
+        assert_eq!(
+            recovered.to_compressed(),
+            key.public_key().to_compressed(),
+            "Recovered public key should match original"
+        );
+        assert!(compressed, "Signature should indicate compressed key");
     }
 
     #[test]

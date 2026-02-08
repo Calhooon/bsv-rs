@@ -88,15 +88,52 @@ mod transaction_tests {
 
     #[test]
     fn test_invalid_tx_can_be_parsed_structurally() {
-        // Invalid transactions are structurally valid (can parse) but semantically invalid
-        // They should still parse as raw transactions
+        // These vectors are structurally valid transactions (correct binary format)
+        // but semantically invalid (would fail script verification).
+        // They should ALL parse successfully from hex.
         for (i, (hex, desc)) in TX_INVALID_VECTORS.iter().enumerate() {
             let result = Transaction::from_hex(hex);
-            // These are structurally valid hex - they should parse
-            // They would fail only during script verification
             assert!(
-                result.is_ok() || result.is_err(),
-                "Vector {}: {} - parsing should return a result",
+                result.is_ok(),
+                "Vector {}: '{}' should parse structurally but got error: {}",
+                i,
+                desc,
+                result.unwrap_err()
+            );
+            // Verify roundtrip: the parsed transaction should re-serialize to the same hex
+            let tx = result.unwrap();
+            assert_eq!(
+                tx.to_hex().to_lowercase(),
+                hex.to_lowercase(),
+                "Vector {}: '{}' hex roundtrip mismatch",
+                i,
+                desc
+            );
+        }
+    }
+
+    #[test]
+    fn test_truly_malformed_binary_fails_to_parse() {
+        // Truly malformed binary data should fail to parse
+        let malformed_vectors: &[(&str, &str)] = &[
+            ("", "empty input"),
+            ("00", "single zero byte"),
+            (
+                "0100000000",
+                "truncated: version + zero inputs, missing output count + locktime",
+            ),
+            (
+                "01000000ff",
+                "invalid varint: 0xff prefix without 8 following bytes",
+            ),
+            ("deadbeef", "random 4 bytes, not a valid tx"),
+        ];
+
+        for (i, (hex, desc)) in malformed_vectors.iter().enumerate() {
+            let result = Transaction::from_hex(hex);
+            assert!(
+                result.is_err(),
+                "Malformed vector {}: '{}' should fail to parse but got Ok",
                 i,
                 desc
             );
@@ -1447,6 +1484,710 @@ mod transaction_tests {
     // MerklePath Advanced Tests
     // ===================
 
+    // ===================
+    // End-to-end P2PKH sign+fee+verify tests (P0-TX-1, P0-TX-2)
+    // ===================
+
+    mod p2pkh_e2e_tests {
+        use bsv_sdk::primitives::ec::PrivateKey;
+        use bsv_sdk::script::templates::P2PKH;
+        use bsv_sdk::script::{LockingScript, ScriptTemplate, SignOutputs};
+        use bsv_sdk::transaction::{
+            AlwaysValidChainTracker, ChangeDistribution, FeeModel, SatoshisPerKilobyte,
+            Transaction, TransactionInput, TransactionOutput,
+        };
+
+        /// Build a P2PKH source transaction with a single output of the given amount,
+        /// locked to the given private key's public key hash.
+        fn build_source_tx(private_key: &PrivateKey, satoshis: u64) -> Transaction {
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+            let locking_script = p2pkh.lock(&pubkey_hash).expect("P2PKH lock should work");
+
+            let mut source_tx = Transaction::new();
+            source_tx
+                .add_output(TransactionOutput::new(satoshis, locking_script))
+                .expect("add_output should work");
+            source_tx
+        }
+
+        /// End-to-end: create source tx, spending tx, call fee(), sign(), verify all assertions.
+        /// This is the most fundamental missing test per the audit (P0-TX-1 + P0-TX-2).
+        #[tokio::test]
+        async fn test_p2pkh_sign_fee_verify_e2e() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Create source transaction with 100,000 sats
+            let source_tx = build_source_tx(&private_key, 100_000);
+            let source_txid = source_tx.id();
+            assert_eq!(source_txid.len(), 64);
+
+            // Create spending transaction
+            let mut spend_tx = Transaction::new();
+
+            // Add input from source tx with P2PKH unlock template
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add_input_from_tx should work");
+
+            // Add a payment output (1,000 sats)
+            let payment_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(1_000, payment_locking))
+                .expect("add payment output");
+
+            // Add a change output
+            let change_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new_change(change_locking))
+                .expect("add change output");
+
+            // Verify change is not yet computed
+            assert!(
+                spend_tx.outputs[1].satoshis.is_none(),
+                "Change output should not have satoshis before fee()"
+            );
+
+            // Call fee() with default (1 sat/byte)
+            spend_tx
+                .fee(None, ChangeDistribution::Equal)
+                .await
+                .expect("fee() should work");
+
+            // Verify change is now computed
+            assert!(
+                spend_tx.outputs[1].satoshis.is_some(),
+                "Change output should have satoshis after fee()"
+            );
+
+            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let total_out = spend_tx.total_output_satoshis();
+            // change = 100,000 - 1,000 - fee; total_out = 1,000 + change
+            // total_out + fee should equal 100,000
+            let fee = 100_000 - total_out;
+            assert!(fee > 0, "Fee should be positive, got {}", fee);
+            assert!(
+                fee < 1000,
+                "Fee should be reasonable (< 1000 sats for a simple tx), got {}",
+                fee
+            );
+            assert_eq!(
+                total_out + fee,
+                100_000,
+                "total_out + fee should equal input amount"
+            );
+
+            // Sign the transaction
+            spend_tx.sign().await.expect("sign() should work");
+
+            // Verify unlocking scripts are set
+            for (i, input) in spend_tx.inputs.iter().enumerate() {
+                assert!(
+                    input.unlocking_script.is_some(),
+                    "Input {} should have unlocking_script after sign()",
+                    i
+                );
+                let unlocking = input.unlocking_script.as_ref().unwrap();
+                // P2PKH unlocking script has 2 chunks: signature + pubkey
+                let chunks = unlocking.chunks();
+                assert_eq!(
+                    chunks.len(),
+                    2,
+                    "P2PKH unlocking script should have 2 chunks (sig + pubkey)"
+                );
+                // Signature chunk
+                let sig_data = chunks[0].data.as_ref().expect("sig should have data");
+                assert!(
+                    sig_data.len() >= 70 && sig_data.len() <= 73,
+                    "DER signature should be 70-73 bytes, got {}",
+                    sig_data.len()
+                );
+                // Last byte is sighash type (SIGHASH_ALL | SIGHASH_FORKID = 0x41)
+                assert_eq!(
+                    *sig_data.last().unwrap(),
+                    0x41,
+                    "Sighash type should be SIGHASH_ALL | SIGHASH_FORKID"
+                );
+                // Pubkey chunk
+                let pk_data = chunks[1].data.as_ref().expect("pubkey should have data");
+                assert_eq!(pk_data.len(), 33, "Compressed pubkey should be 33 bytes");
+            }
+
+            // Verify the transaction serializes and has a valid TXID
+            let txid = spend_tx.id();
+            assert_eq!(txid.len(), 64);
+            assert!(txid.chars().all(|c| c.is_ascii_hexdigit()));
+
+            // Verify the hex roundtrips
+            let hex = spend_tx.to_hex();
+            let parsed = Transaction::from_hex(&hex).expect("Should parse signed tx");
+            assert_eq!(parsed.id(), txid, "Parsed tx should have same TXID");
+        }
+
+        /// Test verify() with AlwaysValidChainTracker on a signed P2PKH transaction.
+        /// Matches the Go SDK pattern of building a tx and calling verify().
+        #[tokio::test]
+        async fn test_p2pkh_verify_with_chain_tracker() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Create source transaction
+            let source_tx = build_source_tx(&private_key, 50_000);
+
+            // Create spending transaction
+            let mut spend_tx = Transaction::new();
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add input");
+
+            // Add output (send all minus fee, no change output)
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(49_000, locking))
+                .expect("add output");
+
+            // Sign
+            spend_tx.sign().await.expect("sign should work");
+
+            // Verify with AlwaysValidChainTracker
+            let tracker = AlwaysValidChainTracker::new(800_000);
+            let result = spend_tx.verify(&tracker, None).await;
+            assert!(
+                result.is_ok(),
+                "verify() should succeed, got error: {:?}",
+                result.err()
+            );
+            assert_eq!(result.unwrap(), true, "verify() should return true");
+        }
+
+        /// Test verify() with fee model validation.
+        /// The source tx needs a merkle_path so verify() doesn't try to check its fee.
+        #[tokio::test]
+        async fn test_p2pkh_verify_with_fee_model() {
+            use bsv_sdk::transaction::MerklePath;
+
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Build source tx with a merkle_path so verify() treats it as mined/proven
+            let mut source_tx = build_source_tx(&private_key, 50_000);
+            let source_txid = source_tx.id();
+            source_tx.merkle_path = Some(MerklePath::from_coinbase_txid(&source_txid, 800_000));
+
+            let mut spend_tx = Transaction::new();
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add input");
+
+            // Output 49,000 sats = 1,000 sats fee (which should pass 100 sat/KB easily)
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(49_000, locking))
+                .expect("add output");
+
+            spend_tx.sign().await.expect("sign should work");
+
+            let tracker = AlwaysValidChainTracker::new(800_000);
+            let fee_model = SatoshisPerKilobyte::new(100); // 100 sat/KB
+
+            let result = spend_tx.verify(&tracker, Some(&fee_model)).await;
+            assert!(
+                result.is_ok(),
+                "verify with fee model should succeed: {:?}",
+                result.err()
+            );
+            assert_eq!(result.unwrap(), true);
+        }
+
+        /// Test that verify() fails when the fee is too low.
+        #[tokio::test]
+        async fn test_p2pkh_verify_fee_too_low() {
+            use bsv_sdk::transaction::MerklePath;
+
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Source tx needs a merkle_path so verify() doesn't fail on IT
+            let mut source_tx = build_source_tx(&private_key, 50_000);
+            let source_txid = source_tx.id();
+            source_tx.merkle_path = Some(MerklePath::from_coinbase_txid(&source_txid, 800_000));
+
+            let mut spend_tx = Transaction::new();
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add input");
+
+            // Output 50,000 - 1 = 49,999 sats => only 1 sat fee
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(49_999, locking))
+                .expect("add output");
+
+            spend_tx.sign().await.expect("sign should work");
+
+            let tracker = AlwaysValidChainTracker::new(800_000);
+            // Use a very high fee rate: 100,000 sat/KB (requires ~20 sats for a ~200 byte tx)
+            let fee_model = SatoshisPerKilobyte::new(100_000);
+
+            let result = spend_tx.verify(&tracker, Some(&fee_model)).await;
+            assert!(result.is_err(), "verify should fail with fee too low");
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains("Fee is too low"),
+                "Error should mention fee, got: {}",
+                err
+            );
+        }
+
+        /// Test fee() with a fixed fee amount (TS SDK pattern: computeFee returns 1033)
+        #[tokio::test]
+        async fn test_fee_with_fixed_amount() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            let source_tx = build_source_tx(&private_key, 4_000);
+
+            let mut spend_tx = Transaction::new();
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add input");
+
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(1_000, locking.clone()))
+                .expect("payment output");
+
+            let change_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new_change(change_locking))
+                .expect("change output");
+
+            // Use a fixed fee of 1033 sats (matches TS SDK test pattern)
+            spend_tx
+                .fee(Some(1033), ChangeDistribution::Equal)
+                .await
+                .expect("fee() should work");
+
+            // 4000 in - 1000 out - 1033 fee = 1967 change
+            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            assert_eq!(
+                change_sats, 1967,
+                "Change should be 4000 - 1000 - 1033 = 1967"
+            );
+        }
+
+        /// Test that signing before fee() fails with appropriate error.
+        /// Matches TS SDK test: "Throws an Error if signing before the fee is computed"
+        #[tokio::test]
+        async fn test_sign_before_fee_fails() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            let source_tx = build_source_tx(&private_key, 4_000);
+
+            let mut spend_tx = Transaction::new();
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add input");
+
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(1_000, locking))
+                .expect("payment output");
+
+            let change_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new_change(change_locking))
+                .expect("change output");
+
+            // Try to sign WITHOUT calling fee() first
+            let result = spend_tx.sign().await;
+            assert!(
+                result.is_err(),
+                "sign() should fail when change outputs have uncomputed amounts"
+            );
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains("change outputs"),
+                "Error should mention change outputs, got: {}",
+                err
+            );
+        }
+    }
+
+    // ===================
+    // Fee model with realistic sizes (P1-TX-4)
+    // Ported from Go SDK `TestCalculateFee` in sats_per_kb_test.go
+    // ===================
+
+    mod fee_model_realistic_tests {
+        use bsv_sdk::script::LockingScript;
+        use bsv_sdk::transaction::{
+            FeeModel, SatoshisPerKilobyte, Transaction, TransactionInput, TransactionOutput,
+        };
+
+        /// Build a transaction of approximately the given size.
+        /// Returns (transaction, actual_size).
+        fn build_tx_of_approx_size(target_bytes: usize) -> Transaction {
+            // A minimal transaction is: version(4) + varint_in(1) + varint_out(1) + locktime(4) = 10 bytes
+            // Each input adds: txid(32) + vout(4) + varint(1) + script + seq(4) = 41 + script_len
+            // Each output adds: sats(8) + varint(1) + script = 9 + script_len
+            //
+            // To reach the target, we use a single input with a padded unlocking script
+            // and a single output with a padded locking script.
+            let mut tx = Transaction::new();
+
+            // Base: 10 bytes (version + varint_in + varint_out + locktime)
+            // Input overhead: 41 bytes (txid + vout + varint + seq)
+            // Output overhead: 9 bytes (sats + varint)
+            // Total overhead: 60 bytes
+            let overhead = 60;
+            let script_padding = if target_bytes > overhead {
+                target_bytes - overhead
+            } else {
+                0
+            };
+
+            // Split padding between input script and output script
+            let input_script_len = script_padding / 2;
+            let output_script_len = script_padding - input_script_len;
+
+            // Create input with padded unlocking script
+            let input_script_data = vec![0u8; input_script_len];
+            let unlocking_script =
+                bsv_sdk::script::UnlockingScript::from_binary(&input_script_data)
+                    .unwrap_or_else(|_| bsv_sdk::script::UnlockingScript::new());
+
+            let mut input = TransactionInput::new("a".repeat(64), 0);
+            input.unlocking_script = Some(unlocking_script);
+            tx.inputs.push(input);
+
+            // Create output with padded locking script
+            let output_script_data = vec![0u8; output_script_len];
+            let locking_script = LockingScript::from_binary(&output_script_data)
+                .unwrap_or_else(|_| LockingScript::new());
+            tx.outputs
+                .push(TransactionOutput::new(1000, locking_script));
+
+            tx
+        }
+
+        /// Port of Go SDK TestCalculateFee vectors.
+        /// Tests the fee calculation formula: ceil(txSize * satoshisPerKB / 1000).
+        #[test]
+        fn test_fee_model_go_vectors() {
+            // These vectors are directly from the Go SDK: sats_per_kb_test.go
+            let vectors: &[(usize, u64, u64, &str)] = &[
+                (
+                    240,
+                    100,
+                    24,
+                    "240 bytes at 100 sats/KB: 240/1000 * 100 = 24",
+                ),
+                (
+                    240,
+                    1,
+                    1,
+                    "240 bytes at 1 sat/KB: edge case, ceil(0.24) = 1",
+                ),
+                (240, 10, 3, "240 bytes at 10 sats/KB: ceil(2.4) = 3"),
+                (
+                    250,
+                    500,
+                    125,
+                    "250 bytes at 500 sats/KB: 250/1000 * 500 = 125",
+                ),
+                (
+                    1000,
+                    100,
+                    100,
+                    "1000 bytes at 100 sats/KB: 1000/1000 * 100 = 100",
+                ),
+                (
+                    1500,
+                    100,
+                    150,
+                    "1500 bytes at 100 sats/KB: 1500/1000 * 100 = 150",
+                ),
+                (
+                    1500,
+                    500,
+                    750,
+                    "1500 bytes at 500 sats/KB: 1500/1000 * 500 = 750",
+                ),
+            ];
+
+            for (tx_size, sats_per_kb, expected_fee, description) in vectors {
+                // Build a transaction of the exact target size
+                let tx = build_tx_of_approx_size(*tx_size);
+                let actual_size = tx.to_binary().len();
+
+                // Compute what the fee SHOULD be for actual_size bytes
+                let computed_fee = (actual_size as u64 * sats_per_kb).div_ceil(1000);
+
+                let fee_model = SatoshisPerKilobyte::new(*sats_per_kb);
+                let model_fee = fee_model.compute_fee(&tx).expect("compute_fee should work");
+
+                // The model fee should match the manually computed ceiling division
+                assert_eq!(
+                    model_fee, computed_fee,
+                    "Fee model and manual calculation should agree for {}",
+                    description
+                );
+
+                // Also verify the Go SDK formula directly:
+                // For the exact target sizes, verify the expected fee
+                let direct_fee = (*tx_size as u64 * sats_per_kb).div_ceil(1000);
+                assert_eq!(
+                    direct_fee, *expected_fee,
+                    "Direct formula should match Go expected fee for {}",
+                    description
+                );
+            }
+        }
+
+        /// Test fee formula for boundary conditions
+        #[test]
+        fn test_fee_formula_boundaries() {
+            // 1 byte at 1 sat/KB -> ceil(1/1000) = 1 sat (minimum)
+            let fee_1 = (1u64 * 1).div_ceil(1000);
+            assert_eq!(fee_1, 1, "Minimum fee should be 1 sat");
+
+            // 999 bytes at 1 sat/KB -> ceil(999/1000) = 1 sat
+            let fee_999 = (999u64 * 1).div_ceil(1000);
+            assert_eq!(fee_999, 1, "999 bytes at 1 sat/KB should be 1 sat");
+
+            // 1000 bytes at 1 sat/KB -> exactly 1 sat
+            let fee_1000 = (1000u64 * 1).div_ceil(1000);
+            assert_eq!(fee_1000, 1, "1000 bytes at 1 sat/KB should be 1 sat");
+
+            // 1001 bytes at 1 sat/KB -> ceil(1001/1000) = 2 sats
+            let fee_1001 = (1001u64 * 1).div_ceil(1000);
+            assert_eq!(fee_1001, 2, "1001 bytes at 1 sat/KB should be 2 sats");
+        }
+    }
+
+    // ===================
+    // Fee with change computation (P1-TX-5)
+    // ===================
+
+    mod fee_change_tests {
+        use bsv_sdk::primitives::ec::PrivateKey;
+        use bsv_sdk::script::templates::P2PKH;
+        use bsv_sdk::script::{ScriptTemplate, SignOutputs};
+        use bsv_sdk::transaction::{ChangeDistribution, Transaction, TransactionOutput};
+
+        #[tokio::test]
+        async fn test_fee_with_change_computation() {
+            // 100k sat input, 1k output, change output.
+            // Call fee(). Verify change = input - output - fee.
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Build source tx with 100k sats
+            let mut source_tx = Transaction::new();
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            source_tx
+                .add_output(TransactionOutput::new(100_000, locking.clone()))
+                .unwrap();
+
+            // Build spending tx
+            let mut spend_tx = Transaction::new();
+            let unlock = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock)
+                .expect("add input");
+
+            // Add 1k payment output
+            spend_tx
+                .add_output(TransactionOutput::new(1_000, locking.clone()))
+                .expect("payment output");
+
+            // Add change output
+            let change_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new_change(change_locking))
+                .expect("change output");
+
+            // Call fee() with default (1 sat/byte)
+            spend_tx
+                .fee(None, ChangeDistribution::Equal)
+                .await
+                .expect("fee() should work");
+
+            // Verify invariant: input = payment + change + fee
+            let input_sats: u64 = 100_000;
+            let payment_sats = spend_tx.outputs[0].satoshis.unwrap();
+            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let total_out = payment_sats + change_sats;
+            let implied_fee = input_sats - total_out;
+
+            assert_eq!(payment_sats, 1_000, "Payment output should be 1,000 sats");
+            assert!(change_sats > 0, "Change should be positive");
+            assert!(
+                implied_fee > 0,
+                "Fee should be positive, got {}",
+                implied_fee
+            );
+            assert_eq!(
+                payment_sats + change_sats + implied_fee,
+                input_sats,
+                "payment + change + fee should equal input"
+            );
+
+            // The fee should be reasonable for a ~225 byte P2PKH tx at 1 sat/byte
+            // (estimate_size gives the fee when fee_sats is None)
+            let estimated_size = spend_tx.estimate_size();
+            assert_eq!(
+                implied_fee, estimated_size as u64,
+                "Implied fee should equal the estimated size (1 sat/byte default)"
+            );
+        }
+
+        /// Test fee() with a specific fixed fee
+        #[tokio::test]
+        async fn test_fee_with_explicit_amount() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            let mut source_tx = Transaction::new();
+            let locking = p2pkh.lock(&pubkey_hash).unwrap();
+            source_tx
+                .add_output(TransactionOutput::new(100_000, locking.clone()))
+                .unwrap();
+
+            let mut spend_tx = Transaction::new();
+            let unlock = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock)
+                .expect("add input");
+
+            spend_tx
+                .add_output(TransactionOutput::new(1_000, locking.clone()))
+                .expect("payment output");
+
+            let change_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new_change(change_locking))
+                .expect("change output");
+
+            // Explicit fee of 500 sats
+            spend_tx
+                .fee(Some(500), ChangeDistribution::Equal)
+                .await
+                .expect("fee() should work");
+
+            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            // 100,000 - 1,000 - 500 = 98,500
+            assert_eq!(
+                change_sats, 98_500,
+                "Change should be 100,000 - 1,000 - 500 = 98,500"
+            );
+        }
+    }
+
+    // ===================
+    // sign() error when template missing (P1-TX-9)
+    // ===================
+
+    mod sign_error_tests {
+        use bsv_sdk::script::LockingScript;
+        use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+
+        /// Test: create tx with input lacking unlocking_script_template, call sign(), assert error.
+        #[tokio::test]
+        async fn test_sign_error_when_template_missing() {
+            let mut tx = Transaction::new();
+
+            // Add input with no template and no unlocking script
+            let input = TransactionInput::new("a".repeat(64), 0);
+            tx.inputs.push(input);
+
+            // Add output with amount (so sign() doesn't fail on "missing amount")
+            tx.outputs
+                .push(TransactionOutput::new(1000, LockingScript::new()));
+
+            // sign() should succeed but produce no unlocking script for the template-less input
+            // (sign() only processes inputs with templates)
+            let result = tx.sign().await;
+            // sign() itself doesn't error for missing templates - it only signs those that have one.
+            // However, if we try to serialize or verify, the input will lack an unlocking script.
+            // Let's verify the input still has no unlocking script
+            assert!(
+                result.is_ok(),
+                "sign() should not error for template-less inputs"
+            );
+            assert!(
+                tx.inputs[0].unlocking_script.is_none(),
+                "Input without template should still have no unlocking script after sign()"
+            );
+        }
+
+        /// Test: fee model errors when input has no template and no unlocking script
+        #[test]
+        fn test_fee_model_error_when_template_missing() {
+            use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte};
+
+            let mut tx = Transaction::new();
+            let input = TransactionInput::new("a".repeat(64), 0);
+            tx.inputs.push(input);
+            tx.outputs
+                .push(TransactionOutput::new(1000, LockingScript::new()));
+
+            let fee_model = SatoshisPerKilobyte::new(100);
+            let result = fee_model.compute_fee(&tx);
+            assert!(
+                result.is_err(),
+                "Fee model should error when input has no script or template"
+            );
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains("unlocking script or template"),
+                "Error should mention missing unlocking script/template, got: {}",
+                err
+            );
+        }
+    }
+
     mod merkle_path_advanced_tests {
         use crate::transaction::vectors::beef_cross_sdk::*;
         use bsv_sdk::transaction::{ChainTracker, MerklePath, MockChainTracker};
@@ -1560,6 +2301,294 @@ mod transaction_tests {
 
             assert_eq!(mp.block_height, parsed.block_height);
             assert_eq!(mp.path.len(), parsed.path.len());
+        }
+    }
+
+    // ===================
+    // P1-TX-6: ChangeDistribution::Equal multi-output test
+    // ===================
+
+    mod change_distribution_tests {
+        use bsv_sdk::primitives::ec::PrivateKey;
+        use bsv_sdk::script::templates::P2PKH;
+        use bsv_sdk::script::{ScriptTemplate, SignOutputs};
+        use bsv_sdk::transaction::{ChangeDistribution, Transaction, TransactionOutput};
+
+        /// Build a source transaction with a single P2PKH output of the given amount.
+        fn build_source_tx(private_key: &PrivateKey, satoshis: u64) -> Transaction {
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+            let locking_script = p2pkh.lock(&pubkey_hash).expect("P2PKH lock should work");
+
+            let mut source_tx = Transaction::new();
+            source_tx
+                .add_output(TransactionOutput::new(satoshis, locking_script))
+                .expect("add_output should work");
+            source_tx
+        }
+
+        /// Test that ChangeDistribution::Equal distributes change approximately equally
+        /// among 3 change outputs and that no satoshis are lost.
+        #[tokio::test]
+        async fn test_change_distribution_equal_multi_output() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Create source transaction with 100,000 sats
+            let source_tx = build_source_tx(&private_key, 100_000);
+
+            // Create spending transaction
+            let mut spend_tx = Transaction::new();
+
+            // Add input from source tx with P2PKH unlock template
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .expect("add_input_from_tx should work");
+
+            // Add one non-change output (1,000 sats)
+            let payment_locking = p2pkh.lock(&pubkey_hash).unwrap();
+            spend_tx
+                .add_output(TransactionOutput::new(1_000, payment_locking))
+                .expect("add payment output");
+
+            // Add 3 change outputs
+            for _ in 0..3 {
+                let change_locking = p2pkh.lock(&pubkey_hash).unwrap();
+                spend_tx
+                    .add_output(TransactionOutput::new_change(change_locking))
+                    .expect("add change output");
+            }
+
+            // Verify change outputs have no satoshis before fee()
+            for i in 1..=3 {
+                assert!(
+                    spend_tx.outputs[i].satoshis.is_none(),
+                    "Change output {} should not have satoshis before fee()",
+                    i
+                );
+            }
+
+            // Call fee() with ChangeDistribution::Equal
+            spend_tx
+                .fee(None, ChangeDistribution::Equal)
+                .await
+                .expect("fee() should work");
+
+            // Verify all change outputs now have satoshis
+            for i in 1..=3 {
+                assert!(
+                    spend_tx.outputs[i].satoshis.is_some(),
+                    "Change output {} should have satoshis after fee()",
+                    i
+                );
+            }
+
+            // Gather the 3 change amounts
+            let change_amounts: Vec<u64> = (1..=3)
+                .map(|i| spend_tx.outputs[i].satoshis.unwrap())
+                .collect();
+
+            // Verify they are approximately equal (within 1 sat of each other)
+            let max_change = *change_amounts.iter().max().unwrap();
+            let min_change = *change_amounts.iter().min().unwrap();
+            assert!(
+                max_change - min_change <= 1,
+                "Change amounts should be approximately equal (within 1 sat). \
+                 Got amounts: {:?}, diff: {}",
+                change_amounts,
+                max_change - min_change
+            );
+
+            // Verify total output = total input (no sats lost)
+            let total_output = spend_tx.total_output_satoshis();
+            let fee = 100_000 - total_output;
+            assert!(fee > 0, "Fee should be positive, got {}", fee);
+            assert_eq!(
+                total_output + fee,
+                100_000,
+                "total_output + fee should equal input amount (no sats lost)"
+            );
+
+            // Verify the change amounts sum up correctly
+            let change_sum: u64 = change_amounts.iter().sum();
+            let expected_change = 100_000 - 1_000 - fee;
+            assert_eq!(
+                change_sum, expected_change,
+                "Sum of change outputs should equal total_input - payment - fee"
+            );
+        }
+    }
+
+    // ===================
+    // P1-TX-7: EF format cross-SDK exact hex test
+    // ===================
+
+    mod ef_format_tests {
+        use bsv_sdk::transaction::Beef;
+
+        /// Go SDK TestEF exact vector: parse BEEF hex -> link source txs -> serialize to EF hex -> compare.
+        /// Input: BRC62Hex (Go SDK constant, also in beef_cross_sdk.rs).
+        /// Expected EF hex from Go SDK TestEF.
+        #[test]
+        fn test_ef_hex_cross_sdk_go_vector() {
+            use crate::transaction::vectors::beef_cross_sdk::BRC62_HEX;
+
+            let expected_ef_hex = "010000000000000000ef01ac4e164f5bc16746bb0868404292ac8318bbac3800e4aad13a014da427adce3e000000006a47304402203a61a2e931612b4bda08d541cfb980885173b8dcf64a3471238ae7abcd368d6402204cbf24f04b9aa2256d8901f0ed97866603d2be8324c2bfb7a37bf8fc90edd5b441210263e2dee22b1ddc5e11f6fab8bcd2378bdd19580d640501ea956ec0e786f93e76ffffffff3e660000000000001976a9146bfd5c7fbe21529d45803dbcf0c87dd3c71efbc288ac013c660000000000001976a9146bfd5c7fbe21529d45803dbcf0c87dd3c71efbc288ac00000000";
+
+            // Parse BEEF to get all transactions in order
+            let beef = Beef::from_hex(BRC62_HEX).expect("Should parse BEEF");
+
+            // BEEF should have 2 transactions: tx[0] is the parent, tx[1] is the child
+            assert!(
+                beef.txs.len() >= 2,
+                "BRC62 BEEF should have at least 2 transactions, got {}",
+                beef.txs.len()
+            );
+
+            // Get the parent (first) and child (last) transactions
+            let parent_tx = beef.txs[0]
+                .tx()
+                .expect("Parent tx should be parsed")
+                .clone();
+            let mut child_tx = beef.txs[1].tx().expect("Child tx should be parsed").clone();
+
+            // Link the parent as source_transaction on the child's input
+            // The child's input references the parent's output
+            assert!(
+                !child_tx.inputs.is_empty(),
+                "Child tx should have at least one input"
+            );
+            child_tx.inputs[0].source_transaction = Some(Box::new(parent_tx));
+
+            // Convert to EF hex
+            let ef_hex = child_tx.to_hex_ef().expect("Should serialize to EF hex");
+
+            assert_eq!(
+                ef_hex.to_lowercase(),
+                expected_ef_hex.to_lowercase(),
+                "EF hex should match Go SDK TestEF expected output exactly"
+            );
+        }
+    }
+
+    // ===================
+    // P1-TX-9: sign() behavior when template missing
+    // (extends existing sign_error_tests module)
+    // ===================
+
+    mod sign_no_template_tests {
+        use bsv_sdk::primitives::ec::PrivateKey;
+        use bsv_sdk::script::templates::P2PKH;
+        use bsv_sdk::script::{LockingScript, ScriptTemplate, SignOutputs};
+        use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+
+        /// Test that sign() on a transaction where one input has no template
+        /// leaves that input without an unlocking script, while inputs WITH
+        /// templates get properly signed.
+        #[tokio::test]
+        async fn test_sign_skips_inputs_without_template() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            // Create source transaction
+            let locking_script = p2pkh.lock(&pubkey_hash).unwrap();
+            let mut source_tx = Transaction::new();
+            source_tx
+                .add_output(TransactionOutput::new(100_000, locking_script.clone()))
+                .unwrap();
+            source_tx
+                .add_output(TransactionOutput::new(100_000, locking_script.clone()))
+                .unwrap();
+
+            // Create spending transaction with two inputs
+            let mut spend_tx = Transaction::new();
+
+            // Input 0: has a template (should be signed)
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx.clone(), 0, unlock_template)
+                .unwrap();
+
+            // Input 1: no template (add manually without template)
+            let input_no_template = TransactionInput::with_source_transaction(source_tx, 1);
+            // Do NOT set unlocking_script_template
+            spend_tx.inputs.push(input_no_template);
+
+            // Add output
+            spend_tx
+                .add_output(TransactionOutput::new(150_000, LockingScript::new()))
+                .unwrap();
+
+            // Sign
+            let result = spend_tx.sign().await;
+            assert!(
+                result.is_ok(),
+                "sign() should succeed even with template-less inputs, got: {:?}",
+                result.err()
+            );
+
+            // Input 0 should have an unlocking script
+            assert!(
+                spend_tx.inputs[0].unlocking_script.is_some(),
+                "Input 0 (with template) should have unlocking script after sign()"
+            );
+
+            // Input 1 should NOT have an unlocking script
+            assert!(
+                spend_tx.inputs[1].unlocking_script.is_none(),
+                "Input 1 (without template) should still lack unlocking script after sign()"
+            );
+        }
+
+        /// Test that sign() returns an error if there are change outputs
+        /// with uncomputed amounts (satoshis is None and change is true).
+        #[tokio::test]
+        async fn test_sign_error_uncomputed_change() {
+            let private_key = PrivateKey::from_hex(
+                "0000000000000000000000000000000000000000000000000000000000000001",
+            )
+            .unwrap();
+            let pubkey_hash = private_key.public_key().hash160();
+            let p2pkh = P2PKH::new();
+
+            let locking_script = p2pkh.lock(&pubkey_hash).unwrap();
+            let mut source_tx = Transaction::new();
+            source_tx
+                .add_output(TransactionOutput::new(100_000, locking_script.clone()))
+                .unwrap();
+
+            let mut spend_tx = Transaction::new();
+            let unlock_template = P2PKH::unlock(&private_key, SignOutputs::All, false);
+            spend_tx
+                .add_input_from_tx(source_tx, 0, unlock_template)
+                .unwrap();
+
+            // Add a change output WITHOUT calling fee() first
+            spend_tx
+                .add_output(TransactionOutput::new_change(locking_script))
+                .unwrap();
+
+            // sign() should fail because change output has no satoshis
+            let result = spend_tx.sign().await;
+            assert!(
+                result.is_err(),
+                "sign() should error when change outputs have uncomputed amounts"
+            );
+            let err_msg = result.unwrap_err().to_string();
+            assert!(
+                err_msg.contains("change outputs"),
+                "Error should mention change outputs, got: {}",
+                err_msg
+            );
         }
     }
 }

@@ -771,7 +771,11 @@ mod status_tests {
             .await;
 
         // ProtoWallet doesn't support get_header_for_height, so we expect an error
-        assert!(result.is_err());
+        assert!(
+            matches!(result, Err(Error::WalletError(_))),
+            "expected WalletError, got {:?}",
+            result
+        );
     }
 }
 
@@ -828,7 +832,7 @@ mod action_tests {
             .await;
 
         // ProtoWallet returns error for createAction, but the request serialized OK
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests createAction with minimal args (only description, no inputs/outputs/options).
@@ -851,7 +855,7 @@ mod action_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests signAction request serialization.
@@ -890,7 +894,7 @@ mod action_tests {
             )
             .await;
 
-        assert!(result.is_err()); // ProtoWallet doesn't support signAction
+        assert!(matches!(result, Err(Error::WalletError(_)))); // ProtoWallet doesn't support signAction
     }
 
     /// Tests abortAction request serialization.
@@ -906,7 +910,7 @@ mod action_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests listActions request serialization with all options.
@@ -932,7 +936,7 @@ mod action_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests listActions with minimal args.
@@ -958,7 +962,7 @@ mod action_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests internalizeAction request serialization with wallet payment protocol.
@@ -989,7 +993,7 @@ mod action_tests {
 
         // Internalize returns Ok(accepted: true) on success of transmit
         // But the underlying ProtoWallet doesn't support it
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests internalizeAction with basket insertion protocol.
@@ -1018,7 +1022,7 @@ mod action_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 }
 
@@ -1051,7 +1055,7 @@ mod output_tests {
             )
             .await;
 
-        assert!(result.is_err()); // ProtoWallet doesn't support listOutputs
+        assert!(matches!(result, Err(Error::WalletError(_)))); // ProtoWallet doesn't support listOutputs
     }
 
     /// Tests listOutputs with minimal args.
@@ -1076,7 +1080,7 @@ mod output_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests listOutputs with EntireTransactions include mode.
@@ -1101,7 +1105,7 @@ mod output_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests relinquishOutput request serialization.
@@ -1118,7 +1122,7 @@ mod output_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 }
 
@@ -1165,7 +1169,7 @@ mod certificate_tests {
             )
             .await;
 
-        assert!(result.is_err()); // ProtoWallet doesn't support acquireCertificate
+        assert!(matches!(result, Err(Error::WalletError(_)))); // ProtoWallet doesn't support acquireCertificate
     }
 
     /// Tests acquireCertificate with issuance protocol.
@@ -1193,7 +1197,7 @@ mod certificate_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests listCertificates request serialization.
@@ -1214,7 +1218,7 @@ mod certificate_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests listCertificates with minimal args.
@@ -1235,7 +1239,7 @@ mod certificate_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests proveCertificate request serialization.
@@ -1256,7 +1260,7 @@ mod certificate_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests relinquishCertificate request serialization.
@@ -1275,7 +1279,7 @@ mod certificate_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 }
 
@@ -1302,7 +1306,7 @@ mod discovery_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests discoverByIdentityKey with minimal args.
@@ -1321,7 +1325,7 @@ mod discovery_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests discoverByAttributes request serialization.
@@ -1344,7 +1348,7 @@ mod discovery_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 
     /// Tests discoverByAttributes with minimal args.
@@ -1366,7 +1370,7 @@ mod discovery_tests {
             )
             .await;
 
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::WalletError(_))));
     }
 }
 
@@ -2389,9 +2393,18 @@ mod call_code_tests {
     /// Tests invalid call codes.
     #[test]
     fn test_invalid_call_codes() {
-        assert!(WalletCall::try_from(0).is_err());
-        assert!(WalletCall::try_from(29).is_err());
-        assert!(WalletCall::try_from(255).is_err());
+        assert!(matches!(
+            WalletCall::try_from(0),
+            Err(Error::WalletError(_))
+        ));
+        assert!(matches!(
+            WalletCall::try_from(29),
+            Err(Error::WalletError(_))
+        ));
+        assert!(matches!(
+            WalletCall::try_from(255),
+            Err(Error::WalletError(_))
+        ));
     }
 
     /// Tests method names match expected camelCase format.

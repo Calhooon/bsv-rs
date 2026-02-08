@@ -1554,9 +1554,15 @@ mod tests {
         assert_eq!(config.token_amount, 10);
     }
 
-    #[test]
-    fn test_publicly_reveal_attributes_validation() {
-        // Test that validation works without needing a real wallet
+    #[tokio::test]
+    async fn test_publicly_reveal_attributes_validation() {
+        use crate::primitives::PrivateKey;
+        use crate::wallet::ProtoWallet;
+
+        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+        let client = IdentityClient::new(wallet, IdentityClientConfig::default());
+
+        // Certificate with empty fields should be rejected
         let empty_cert = WalletCertificate {
             certificate_type: "test".to_string(),
             subject: "".to_string(),
@@ -1567,8 +1573,28 @@ mod tests {
             fields: HashMap::new(),
         };
 
-        // Validation should fail for empty fields
-        assert!(empty_cert.fields.is_empty());
+        let result = client
+            .publicly_reveal_attributes(empty_cert, vec!["field1".to_string()])
+            .await;
+        assert!(matches!(result, Err(Error::IdentityError(_))));
+
+        // Certificate with fields but empty fields_to_reveal should be rejected
+        let mut fields = HashMap::new();
+        fields.insert("name".to_string(), "Alice".to_string());
+        let cert_with_fields = WalletCertificate {
+            certificate_type: "test".to_string(),
+            subject: "subject".to_string(),
+            serial_number: "123".to_string(),
+            certifier: "certifier".to_string(),
+            revocation_outpoint: "".to_string(),
+            signature: "".to_string(),
+            fields,
+        };
+
+        let result = client
+            .publicly_reveal_attributes(cert_with_fields, vec![])
+            .await;
+        assert!(matches!(result, Err(Error::IdentityError(_))));
     }
 
     #[test]
@@ -1591,59 +1617,9 @@ mod tests {
     }
 
     // =========================================================================
-    // publiclyRevealAttributes validation tests
-    // Matches TypeScript: "should throw an error if certificate has no fields"
-    // Matches Go: "should throw an error if certificate has no fields"
-    // =========================================================================
-
-    #[test]
-    fn test_publicly_reveal_attributes_throws_if_no_fields() {
-        // Certificate with no fields should be invalid for revelation
-        let certificate = WalletCertificate {
-            certificate_type: "test".to_string(),
-            subject: "02abc123".to_string(),
-            serial_number: "12345".to_string(),
-            certifier: "02def456".to_string(),
-            revocation_outpoint: "txid.0".to_string(),
-            signature: "sig".to_string(),
-            fields: HashMap::new(), // Empty fields!
-        };
-
-        // Validation: certificate should have fields to reveal
-        assert!(
-            certificate.fields.is_empty(),
-            "Certificate has no fields to reveal!"
-        );
-    }
-
-    #[test]
-    fn test_publicly_reveal_attributes_throws_if_fields_to_reveal_empty() {
-        // Even with certificate fields, empty fieldsToReveal should fail
-        let mut fields = HashMap::new();
-        fields.insert("name".to_string(), "Alice".to_string());
-
-        let certificate = WalletCertificate {
-            certificate_type: "test".to_string(),
-            subject: "02abc123".to_string(),
-            serial_number: "12345".to_string(),
-            certifier: "02def456".to_string(),
-            revocation_outpoint: "txid.0".to_string(),
-            signature: "sig".to_string(),
-            fields,
-        };
-
-        let fields_to_reveal: Vec<String> = vec![]; // Empty!
-
-        // Validation: at least one field must be revealed
-        assert!(
-            fields_to_reveal.is_empty(),
-            "You must reveal at least one field!"
-        );
-        assert!(!certificate.fields.is_empty());
-    }
-
-    // =========================================================================
     // parseIdentity tests - matching TypeScript and Go SDKs
+    // Note: publiclyRevealAttributes validation (empty fields, empty fields_to_reveal)
+    // is covered by the async test_publicly_reveal_attributes_validation test above.
     // =========================================================================
 
     #[test]

@@ -476,4 +476,56 @@ mod tests {
         assert!(Signature::from_compact_slice(&[0u8; 63]).is_err());
         assert!(Signature::from_compact_slice(&[0u8; 65]).is_err());
     }
+
+    #[test]
+    fn test_all_zero_signature_fails_verification() {
+        // All-zero R and S should parse but fail verification
+        let sig = Signature::from_compact_slice(&[0u8; 64]).unwrap();
+        assert_eq!(sig.r(), &[0u8; 32]);
+        assert_eq!(sig.s(), &[0u8; 32]);
+
+        // Verification must fail with any public key and message
+        use crate::primitives::hash::sha256;
+        use crate::primitives::PrivateKey;
+        let pubkey = PrivateKey::random().public_key();
+        let msg_hash = sha256(b"test");
+        assert!(!pubkey.verify(&msg_hash, &sig));
+    }
+
+    #[test]
+    fn test_signature_r_at_curve_order() {
+        // R = secp256k1 curve order N (should fail verification)
+        // N = FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        let r = hex::decode("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+            .unwrap();
+        let mut r_arr = [0u8; 32];
+        r_arr.copy_from_slice(&r);
+        let mut s_arr = [0u8; 32];
+        s_arr[31] = 1;
+        let sig = Signature::new(r_arr, s_arr);
+
+        use crate::primitives::hash::sha256;
+        use crate::primitives::PrivateKey;
+        let pubkey = PrivateKey::random().public_key();
+        let msg_hash = sha256(b"test");
+        assert!(!pubkey.verify(&msg_hash, &sig));
+    }
+
+    #[test]
+    fn test_signature_s_at_curve_order() {
+        // S = secp256k1 curve order N (should fail verification)
+        let s = hex::decode("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
+            .unwrap();
+        let mut r_arr = [0u8; 32];
+        r_arr[31] = 1;
+        let mut s_arr = [0u8; 32];
+        s_arr.copy_from_slice(&s);
+        let sig = Signature::new(r_arr, s_arr);
+
+        use crate::primitives::hash::sha256;
+        use crate::primitives::PrivateKey;
+        let pubkey = PrivateKey::random().public_key();
+        let msg_hash = sha256(b"test");
+        assert!(!pubkey.verify(&msg_hash, &sig));
+    }
 }

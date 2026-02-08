@@ -658,3 +658,1372 @@ fn test_verifiable_certificate_json_roundtrip() {
     assert!(decoded.verify().unwrap());
     assert!(decoded.keyring.contains_key("field1"));
 }
+
+// =================
+// P0-CERT-3: Tampered certificate detection
+// =================
+
+#[test]
+fn test_tampered_certificate_field_fails_verification() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+    cert.fields
+        .insert("name".to_string(), b"encrypted_name".to_vec());
+    cert.fields
+        .insert("email".to_string(), b"encrypted_email".to_vec());
+
+    // Sign the certificate
+    cert.sign(&certifier_key).unwrap();
+    assert!(
+        cert.verify().unwrap(),
+        "Certificate should verify before tampering"
+    );
+
+    // Tamper with a field value after signing
+    cert.fields
+        .insert("email".to_string(), b"attacker@evil.com".to_vec());
+
+    // Verify should now return false (signature does not match modified content)
+    let result = cert.verify().unwrap();
+    assert!(
+        !result,
+        "Certificate verification should fail after field tampering"
+    );
+}
+
+#[test]
+fn test_tampered_certificate_subject_fails_verification() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+    cert.fields
+        .insert("name".to_string(), b"encrypted_name".to_vec());
+
+    cert.sign(&certifier_key).unwrap();
+    assert!(
+        cert.verify().unwrap(),
+        "Certificate should verify before tampering"
+    );
+
+    // Tamper with the subject public key
+    let different_subject = PrivateKey::random().public_key();
+    cert.subject = different_subject;
+
+    // Verify should now return false
+    let result = cert.verify().unwrap();
+    assert!(
+        !result,
+        "Certificate verification should fail after subject tampering"
+    );
+}
+
+#[test]
+fn test_tampered_certificate_serial_number_fails_verification() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    cert.sign(&certifier_key).unwrap();
+    assert!(
+        cert.verify().unwrap(),
+        "Certificate should verify before tampering"
+    );
+
+    // Tamper with the serial number
+    cert.serial_number = [99u8; 32];
+
+    let result = cert.verify().unwrap();
+    assert!(
+        !result,
+        "Certificate verification should fail after serial number tampering"
+    );
+}
+
+#[test]
+fn test_tampered_certificate_type_fails_verification() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    cert.sign(&certifier_key).unwrap();
+    assert!(cert.verify().unwrap());
+
+    // Tamper with the cert type
+    cert.cert_type = [99u8; 32];
+
+    let result = cert.verify().unwrap();
+    assert!(
+        !result,
+        "Certificate verification should fail after cert_type tampering"
+    );
+}
+
+// =================
+// P0-CERT-4: Missing signature verification
+// =================
+
+#[test]
+fn test_unsigned_certificate_verify_returns_error() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    // Certificate has no signature - verify() should return an error
+    let result = cert.verify();
+    assert!(
+        result.is_err(),
+        "Verifying an unsigned certificate should return an error"
+    );
+    let err_msg = result.unwrap_err().to_string();
+    assert!(
+        err_msg.contains("not signed"),
+        "Error should mention missing signature, got: {}",
+        err_msg
+    );
+}
+
+#[test]
+fn test_certificate_with_invalid_der_signature_fails() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    // Set an invalid DER signature
+    cert.signature = Some(vec![0x30, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+    let result = cert.verify();
+    assert!(
+        result.is_err(),
+        "Certificate with invalid DER signature should fail verification"
+    );
+}
+
+// =================
+// P0-CERT-7: Nonce create/verify round-trip
+// =================
+
+#[tokio::test]
+async fn test_nonce_create_verify_roundtrip() {
+    use bsv_sdk::auth::{create_nonce, verify_nonce};
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+
+    // Create a nonce with self counterparty (no counterparty = self)
+    let nonce = create_nonce(&wallet, None, "test-app").await.unwrap();
+
+    // Nonce should not be empty
+    assert!(!nonce.is_empty(), "Created nonce should not be empty");
+
+    // Verify the nonce with the same wallet and same counterparty
+    let is_valid = verify_nonce(&nonce, &wallet, None, "test-app")
+        .await
+        .unwrap();
+    assert!(
+        is_valid,
+        "Nonce should verify with the same wallet and counterparty"
+    );
+}
+
+#[tokio::test]
+async fn test_nonce_uniqueness() {
+    use bsv_sdk::auth::create_nonce;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+
+    let nonce1 = create_nonce(&wallet, None, "test-app").await.unwrap();
+    let nonce2 = create_nonce(&wallet, None, "test-app").await.unwrap();
+
+    assert_ne!(
+        nonce1, nonce2,
+        "Two nonces created by the same wallet should be different"
+    );
+}
+
+#[tokio::test]
+async fn test_nonce_verify_fails_with_wrong_counterparty() {
+    use bsv_sdk::auth::{create_nonce, verify_nonce};
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+    let other_key = PrivateKey::random().public_key();
+
+    // Create nonce with self counterparty (None)
+    let nonce = create_nonce(&wallet, None, "test-app").await.unwrap();
+
+    // Verify with a different counterparty should fail
+    let is_valid = verify_nonce(&nonce, &wallet, Some(&other_key), "test-app")
+        .await
+        .unwrap();
+    assert!(
+        !is_valid,
+        "Nonce should not verify with a different counterparty"
+    );
+}
+
+#[tokio::test]
+async fn test_nonce_verify_fails_with_different_wallet() {
+    use bsv_sdk::auth::{create_nonce, verify_nonce};
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let wallet1 = ProtoWallet::new(Some(PrivateKey::random()));
+    let wallet2 = ProtoWallet::new(Some(PrivateKey::random()));
+
+    // Create nonce with wallet1
+    let nonce = create_nonce(&wallet1, None, "test-app").await.unwrap();
+
+    // Verify with wallet2 should fail
+    let is_valid = verify_nonce(&nonce, &wallet2, None, "test-app")
+        .await
+        .unwrap();
+    assert!(!is_valid, "Nonce should not verify with a different wallet");
+}
+
+#[tokio::test]
+async fn test_nonce_with_specific_counterparty_roundtrip() {
+    use bsv_sdk::auth::{create_nonce, verify_nonce};
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+    let counterparty_key = PrivateKey::random().public_key();
+
+    // Create nonce with specific counterparty
+    let nonce = create_nonce(&wallet, Some(&counterparty_key), "test-app")
+        .await
+        .unwrap();
+
+    // Verify with same counterparty should succeed
+    let is_valid = verify_nonce(&nonce, &wallet, Some(&counterparty_key), "test-app")
+        .await
+        .unwrap();
+    assert!(is_valid, "Nonce should verify with the same counterparty");
+
+    // Verify with different counterparty should fail
+    let other_key = PrivateKey::random().public_key();
+    let is_valid2 = verify_nonce(&nonce, &wallet, Some(&other_key), "test-app")
+        .await
+        .unwrap();
+    assert!(
+        !is_valid2,
+        "Nonce should not verify with a different counterparty"
+    );
+}
+
+#[tokio::test]
+async fn test_nonce_verify_invalid_format() {
+    use bsv_sdk::auth::verify_nonce;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+
+    // Verify a too-short nonce should return an error
+    let short_nonce = bsv_sdk::primitives::to_base64(&[0u8; 16]);
+    let result = verify_nonce(&short_nonce, &wallet, None, "test-app").await;
+    assert!(
+        result.is_err(),
+        "Verifying a too-short nonce should return an error"
+    );
+}
+
+// =================
+// P0-CERT-1: MasterCertificate async tests
+// =================
+
+#[tokio::test]
+async fn test_master_certificate_issue_for_subject() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+    plain_fields.insert("department".to_string(), "Engineering".to_string());
+
+    let cert_type = [1u8; 32];
+    let serial_number = [2u8; 32];
+
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields.clone(),
+        cert_type,
+        Some(serial_number),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Verify the certificate is signed
+    assert!(
+        master_cert.certificate.signature.is_some(),
+        "Issued certificate should have a signature"
+    );
+
+    // Verify the signature is valid
+    assert!(
+        master_cert.verify().unwrap(),
+        "Issued certificate signature should be valid"
+    );
+
+    // Verify certificate metadata
+    assert_eq!(master_cert.certificate.cert_type, cert_type);
+    assert_eq!(master_cert.certificate.serial_number, serial_number);
+    assert_eq!(master_cert.certificate.subject, subject_key.public_key());
+    assert_eq!(
+        master_cert.certificate.certifier,
+        certifier_key.public_key()
+    );
+
+    // Verify fields are encrypted (not plaintext)
+    assert_eq!(
+        master_cert.certificate.fields.len(),
+        3,
+        "Certificate should have 3 encrypted fields"
+    );
+    for (field_name, encrypted_value) in &master_cert.certificate.fields {
+        assert!(
+            plain_fields.contains_key(field_name),
+            "Field '{}' should be a known field",
+            field_name
+        );
+        // Encrypted values should not equal the plaintext
+        let plain_value = plain_fields[field_name].as_bytes();
+        assert_ne!(
+            encrypted_value,
+            &plain_value.to_vec(),
+            "Field '{}' should be encrypted, not plaintext",
+            field_name
+        );
+        // Encrypted values should be non-empty
+        assert!(
+            !encrypted_value.is_empty(),
+            "Encrypted field '{}' should not be empty",
+            field_name
+        );
+    }
+
+    // Verify master keyring has entries for all fields
+    assert_eq!(
+        master_cert.master_keyring.len(),
+        3,
+        "Master keyring should have 3 entries"
+    );
+    for field_name in plain_fields.keys() {
+        assert!(
+            master_cert.master_keyring.contains_key(field_name),
+            "Master keyring should contain key for field '{}'",
+            field_name
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_master_certificate_decrypt_fields() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+    plain_fields.insert("department".to_string(), "Engineering".to_string());
+
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields.clone(),
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Subject decrypts all fields using their wallet
+    let decrypted = master_cert
+        .decrypt_fields(&subject_wallet, &certifier_key.public_key(), "test-app")
+        .await
+        .unwrap();
+
+    // All fields should be decrypted to their original plaintext
+    assert_eq!(
+        decrypted.len(),
+        plain_fields.len(),
+        "Should decrypt all fields"
+    );
+    for (field_name, expected_value) in &plain_fields {
+        let actual = decrypted.get(field_name).unwrap_or_else(|| {
+            panic!("Decrypted fields should contain '{}'", field_name);
+        });
+        assert_eq!(
+            actual, expected_value,
+            "Decrypted value for '{}' should match plaintext",
+            field_name
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_master_certificate_decrypt_single_field() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields,
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Decrypt a single field
+    let name_value = master_cert
+        .decrypt_field(
+            &subject_wallet,
+            &certifier_key.public_key(),
+            "name",
+            "test-app",
+        )
+        .await
+        .unwrap();
+    assert_eq!(name_value, "Alice", "Decrypted name should be 'Alice'");
+
+    let email_value = master_cert
+        .decrypt_field(
+            &subject_wallet,
+            &certifier_key.public_key(),
+            "email",
+            "test-app",
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        email_value, "alice@example.com",
+        "Decrypted email should be 'alice@example.com'"
+    );
+}
+
+#[tokio::test]
+async fn test_master_certificate_create_keyring_for_verifier() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let verifier_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+    plain_fields.insert("department".to_string(), "Engineering".to_string());
+
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields,
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Create keyring for verifier revealing only "name" field
+    let fields_to_reveal = vec!["name".to_string()];
+    let keyring = MasterCertificate::create_keyring_for_verifier(
+        &subject_wallet,
+        &certifier_key.public_key(),
+        &verifier_key.public_key(),
+        &fields_to_reveal,
+        &master_cert.certificate.fields,
+        &master_cert.certificate.serial_number,
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Keyring should contain only the revealed field
+    assert_eq!(
+        keyring.len(),
+        1,
+        "Keyring should have 1 entry for the revealed field"
+    );
+    assert!(
+        keyring.contains_key("name"),
+        "Keyring should contain entry for 'name'"
+    );
+    assert!(
+        !keyring.contains_key("email"),
+        "Keyring should not contain entry for unrevealed 'email'"
+    );
+    assert!(
+        !keyring.contains_key("department"),
+        "Keyring should not contain entry for unrevealed 'department'"
+    );
+}
+
+// =================
+// P0-CERT-2: VerifiableCertificate async tests
+// =================
+
+#[tokio::test]
+async fn test_verifiable_certificate_full_chain() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let verifier_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+    let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+    plain_fields.insert("organization".to_string(), "Example Corp".to_string());
+
+    // Step 1: Certifier issues master certificate
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields.clone(),
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Step 2: Subject creates keyring for verifier (reveal all fields)
+    let all_field_names: Vec<String> = plain_fields.keys().cloned().collect();
+    let keyring = MasterCertificate::create_keyring_for_verifier(
+        &subject_wallet,
+        &certifier_key.public_key(),
+        &verifier_key.public_key(),
+        &all_field_names,
+        &master_cert.certificate.fields,
+        &master_cert.certificate.serial_number,
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Step 3: Construct VerifiableCertificate
+    let mut verifiable = VerifiableCertificate::new(master_cert.certificate.clone(), keyring);
+
+    // Verify the underlying certificate signature
+    assert!(
+        verifiable.verify().unwrap(),
+        "VerifiableCertificate should verify"
+    );
+
+    // Step 4: Verifier decrypts fields
+    let decrypted = verifiable
+        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .await
+        .unwrap();
+
+    // All plaintext fields should match
+    assert_eq!(
+        decrypted.len(),
+        plain_fields.len(),
+        "Should decrypt all fields"
+    );
+    for (field_name, expected_value) in &plain_fields {
+        let actual = decrypted.get(field_name).unwrap_or_else(|| {
+            panic!("Decrypted fields should contain '{}'", field_name);
+        });
+        assert_eq!(
+            actual, expected_value,
+            "Decrypted '{}' should match plaintext",
+            field_name
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_verifiable_certificate_selective_disclosure() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let verifier_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+    let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+    plain_fields.insert("department".to_string(), "Engineering".to_string());
+
+    // Issue master certificate
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields.clone(),
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Create keyring revealing only "name"
+    let fields_to_reveal = vec!["name".to_string()];
+    let keyring = MasterCertificate::create_keyring_for_verifier(
+        &subject_wallet,
+        &certifier_key.public_key(),
+        &verifier_key.public_key(),
+        &fields_to_reveal,
+        &master_cert.certificate.fields,
+        &master_cert.certificate.serial_number,
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    let mut verifiable = VerifiableCertificate::new(master_cert.certificate.clone(), keyring);
+
+    // Verifier can only decrypt revealed fields
+    let decrypted = verifiable
+        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .await
+        .unwrap();
+
+    assert_eq!(decrypted.len(), 1, "Only 1 field should be decryptable");
+    assert_eq!(
+        decrypted.get("name").unwrap(),
+        "Alice",
+        "Decrypted 'name' should be 'Alice'"
+    );
+    assert!(
+        decrypted.get("email").is_none(),
+        "'email' should not be decryptable"
+    );
+    assert!(
+        decrypted.get("department").is_none(),
+        "'department' should not be decryptable"
+    );
+}
+
+// =================
+// P0-CERT-5: Wrong-key decryption
+// =================
+
+#[tokio::test]
+async fn test_verifiable_certificate_wrong_key_decryption_fails() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let verifier_a_key = PrivateKey::random();
+    let verifier_b_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+    let wrong_wallet = ProtoWallet::new(Some(verifier_b_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+
+    // Issue certificate
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields,
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Create keyring for verifier A
+    let fields_to_reveal = vec!["name".to_string(), "email".to_string()];
+    let keyring = MasterCertificate::create_keyring_for_verifier(
+        &subject_wallet,
+        &certifier_key.public_key(),
+        &verifier_a_key.public_key(),
+        &fields_to_reveal,
+        &master_cert.certificate.fields,
+        &master_cert.certificate.serial_number,
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    let mut verifiable = VerifiableCertificate::new(master_cert.certificate.clone(), keyring);
+
+    // Try to decrypt with verifier B's wallet (wrong key) -- should fail
+    let result = verifiable
+        .decrypt_fields(&wrong_wallet, &subject_key.public_key(), "test-app")
+        .await;
+
+    assert!(
+        result.is_err(),
+        "Decrypting with wrong verifier's wallet should fail"
+    );
+}
+
+// =================
+// P0-CERT-6: Full issuance-to-verification chain
+// =================
+
+#[tokio::test]
+async fn test_full_issuance_to_verification_chain() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let verifier_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let subject_wallet = ProtoWallet::new(Some(subject_key.clone()));
+    let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+    plain_fields.insert("email".to_string(), "alice@example.com".to_string());
+    plain_fields.insert("clearance_level".to_string(), "Top Secret".to_string());
+    plain_fields.insert("department".to_string(), "Engineering".to_string());
+
+    let cert_type = [42u8; 32];
+    let serial_number = [99u8; 32];
+
+    // === Phase 1: Certifier issues certificate ===
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields.clone(),
+        cert_type,
+        Some(serial_number),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Verify it's properly signed
+    assert!(
+        master_cert.verify().unwrap(),
+        "Issued cert should be signed"
+    );
+    assert_eq!(master_cert.certificate.cert_type, cert_type);
+    assert_eq!(master_cert.certificate.serial_number, serial_number);
+    assert_eq!(
+        master_cert.certificate.certifier,
+        certifier_key.public_key()
+    );
+    assert_eq!(master_cert.certificate.subject, subject_key.public_key());
+
+    // === Phase 2: Subject verifies they can decrypt all fields ===
+    let all_decrypted = master_cert
+        .decrypt_fields(&subject_wallet, &certifier_key.public_key(), "test-app")
+        .await
+        .unwrap();
+
+    assert_eq!(all_decrypted.len(), 4);
+    assert_eq!(all_decrypted["name"], "Alice");
+    assert_eq!(all_decrypted["email"], "alice@example.com");
+    assert_eq!(all_decrypted["clearance_level"], "Top Secret");
+    assert_eq!(all_decrypted["department"], "Engineering");
+
+    // === Phase 3: Subject selectively reveals only name and email to verifier ===
+    let fields_to_reveal = vec!["name".to_string(), "email".to_string()];
+    let keyring = MasterCertificate::create_keyring_for_verifier(
+        &subject_wallet,
+        &certifier_key.public_key(),
+        &verifier_key.public_key(),
+        &fields_to_reveal,
+        &master_cert.certificate.fields,
+        &master_cert.certificate.serial_number,
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(keyring.len(), 2, "Keyring should have 2 entries");
+    assert!(keyring.contains_key("name"), "Keyring should have 'name'");
+    assert!(keyring.contains_key("email"), "Keyring should have 'email'");
+
+    // === Phase 4: Construct VerifiableCertificate and send to verifier ===
+    let mut verifiable = VerifiableCertificate::new(master_cert.certificate.clone(), keyring);
+
+    // Verifier validates signature
+    assert!(
+        verifiable.verify().unwrap(),
+        "Verifier should be able to verify cert signature"
+    );
+
+    // Verifier checks metadata
+    assert_eq!(*verifiable.cert_type(), cert_type);
+    assert_eq!(*verifiable.serial_number(), serial_number);
+    assert_eq!(*verifiable.subject(), subject_key.public_key());
+    assert_eq!(*verifiable.certifier(), certifier_key.public_key());
+
+    // === Phase 5: Verifier decrypts only revealed fields ===
+    let verifier_decrypted = verifiable
+        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .await
+        .unwrap();
+
+    assert_eq!(
+        verifier_decrypted.len(),
+        2,
+        "Verifier should only see 2 fields"
+    );
+    assert_eq!(verifier_decrypted["name"], "Alice");
+    assert_eq!(verifier_decrypted["email"], "alice@example.com");
+    assert!(
+        verifier_decrypted.get("clearance_level").is_none(),
+        "Verifier should not see clearance_level"
+    );
+    assert!(
+        verifier_decrypted.get("department").is_none(),
+        "Verifier should not see department"
+    );
+
+    // === Phase 6: Verify caching works ===
+    let cached = verifiable.get_decrypted_fields();
+    assert!(cached.is_some(), "Decrypted fields should be cached");
+    assert_eq!(cached.unwrap().len(), 2);
+
+    verifiable.clear_decrypted_cache();
+    assert!(
+        verifiable.get_decrypted_fields().is_none(),
+        "Cache should be cleared"
+    );
+}
+
+// =================
+// P1-CERT-8: WalletCertificate conversion roundtrip
+// =================
+
+#[test]
+fn test_wallet_certificate_conversion_roundtrip() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [0xAA; 32],
+        [0xBB; 32],
+        subject_key.clone(),
+        certifier_key.public_key(),
+    );
+    cert.fields
+        .insert("name".to_string(), b"encrypted_name".to_vec());
+    cert.fields
+        .insert("email".to_string(), b"encrypted_email".to_vec());
+    cert.revocation_outpoint = Some(bsv_sdk::wallet::types::Outpoint::new([0xCC; 32], 7));
+    cert.sign(&certifier_key).unwrap();
+
+    // Convert to WalletCertificate
+    let wallet_cert = cert.to_wallet_certificate();
+
+    // Verify all fields are preserved in WalletCertificate
+    assert_eq!(
+        wallet_cert.certificate_type,
+        cert.type_base64(),
+        "Certificate type should be preserved"
+    );
+    assert_eq!(
+        wallet_cert.serial_number,
+        cert.serial_number_base64(),
+        "Serial number should be preserved"
+    );
+    assert_eq!(
+        wallet_cert.subject, cert.subject,
+        "Subject should be preserved"
+    );
+    assert_eq!(
+        wallet_cert.certifier, cert.certifier,
+        "Certifier should be preserved"
+    );
+    assert!(
+        wallet_cert.signature.is_some(),
+        "Signature should be preserved"
+    );
+    assert_eq!(
+        wallet_cert.signature.as_ref().unwrap(),
+        cert.signature.as_ref().unwrap(),
+        "Signature bytes should match"
+    );
+
+    // Verify revocation outpoint is preserved
+    assert!(wallet_cert.revocation_outpoint.is_some());
+    let outpoint = wallet_cert.revocation_outpoint.as_ref().unwrap();
+    assert_eq!(outpoint.txid, [0xCC; 32]);
+    assert_eq!(outpoint.vout, 7);
+
+    // Verify fields are base64-encoded in WalletCertificate
+    assert_eq!(wallet_cert.fields.len(), 2);
+    let name_b64 = wallet_cert.fields.get("name").unwrap();
+    let email_b64 = wallet_cert.fields.get("email").unwrap();
+
+    // Decode base64 fields back and verify they match original bytes
+    let name_bytes = bsv_sdk::primitives::from_base64(name_b64).unwrap();
+    assert_eq!(name_bytes, b"encrypted_name");
+    let email_bytes = bsv_sdk::primitives::from_base64(email_b64).unwrap();
+    assert_eq!(email_bytes, b"encrypted_email");
+}
+
+#[test]
+fn test_wallet_certificate_conversion_without_signature() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+    cert.fields
+        .insert("status".to_string(), b"approved".to_vec());
+
+    // Do NOT sign - test unsigned conversion
+    let wallet_cert = cert.to_wallet_certificate();
+
+    assert!(
+        wallet_cert.signature.is_none(),
+        "Unsigned cert should have no signature in wallet format"
+    );
+    assert_eq!(wallet_cert.fields.len(), 1);
+}
+
+#[test]
+fn test_wallet_certificate_conversion_no_revocation() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    let wallet_cert = cert.to_wallet_certificate();
+
+    assert!(
+        wallet_cert.revocation_outpoint.is_none(),
+        "Certificate without revocation outpoint should preserve None"
+    );
+}
+
+#[test]
+fn test_wallet_certificate_conversion_empty_fields() {
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    let wallet_cert = cert.to_wallet_certificate();
+
+    assert!(
+        wallet_cert.fields.is_empty(),
+        "Empty fields should be preserved"
+    );
+}
+
+// =================
+// Additional MasterCertificate edge case tests
+// =================
+
+#[tokio::test]
+async fn test_master_certificate_issue_with_random_serial() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Bob".to_string());
+
+    // Pass None for serial_number to get random one
+    let cert1 = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields.clone(),
+        [1u8; 32],
+        None, // Random serial
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    let cert2 = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields,
+        [1u8; 32],
+        None, // Random serial
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Two certificates with random serial numbers should differ
+    assert_ne!(
+        cert1.certificate.serial_number, cert2.certificate.serial_number,
+        "Two certs with random serials should have different serial numbers"
+    );
+
+    // Both should verify
+    assert!(cert1.verify().unwrap());
+    assert!(cert2.verify().unwrap());
+}
+
+#[tokio::test]
+async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let wrong_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let wrong_wallet = ProtoWallet::new(Some(wrong_key));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields,
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Try to decrypt with wrong wallet (not the subject)
+    let result = master_cert
+        .decrypt_fields(&wrong_wallet, &certifier_key.public_key(), "test-app")
+        .await;
+
+    assert!(result.is_err(), "Decrypting with wrong wallet should fail");
+}
+
+// =================
+// P1-CERT-9: Self-signed certificate (certifier == subject)
+// =================
+
+#[tokio::test]
+async fn test_self_signed_master_certificate() {
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    // One wallet acts as BOTH certifier and subject
+    let self_key = PrivateKey::random();
+    let self_wallet = ProtoWallet::new(Some(self_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Self-Certifier".to_string());
+    plain_fields.insert("email".to_string(), "self@example.com".to_string());
+    plain_fields.insert("role".to_string(), "admin".to_string());
+
+    let cert_type = [0x55; 32];
+    let serial_number = [0x77; 32];
+
+    // Issue certificate to self: certifier_key == subject_key
+    let master_cert = MasterCertificate::issue_for_subject(
+        &self_wallet,
+        &self_key,
+        self_key.public_key(), // Subject IS the certifier
+        plain_fields.clone(),
+        cert_type,
+        Some(serial_number),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Verify certificate metadata: certifier_key == subject_key
+    assert_eq!(
+        master_cert.certificate.certifier.to_hex(),
+        master_cert.certificate.subject.to_hex(),
+        "Certifier and subject should be the same key"
+    );
+    assert_eq!(master_cert.certificate.cert_type, cert_type);
+    assert_eq!(master_cert.certificate.serial_number, serial_number);
+
+    // Verify the signature is present and valid
+    assert!(
+        master_cert.certificate.signature.is_some(),
+        "Self-signed certificate should have a signature"
+    );
+    assert!(
+        master_cert.verify().unwrap(),
+        "Self-signed certificate signature should be valid"
+    );
+
+    // Verify fields are encrypted (not plaintext)
+    assert_eq!(master_cert.certificate.fields.len(), 3);
+    for (field_name, encrypted_value) in &master_cert.certificate.fields {
+        let plain_value = plain_fields[field_name].as_bytes();
+        assert_ne!(
+            encrypted_value,
+            &plain_value.to_vec(),
+            "Field '{}' should be encrypted, not plaintext",
+            field_name
+        );
+    }
+
+    // Subject can decrypt its own fields (same wallet used for both roles)
+    let decrypted = master_cert
+        .decrypt_fields(&self_wallet, &self_key.public_key(), "test-app")
+        .await
+        .unwrap();
+
+    assert_eq!(decrypted.len(), 3, "Should decrypt all 3 fields");
+    assert_eq!(decrypted["name"], "Self-Certifier");
+    assert_eq!(decrypted["email"], "self@example.com");
+    assert_eq!(decrypted["role"], "admin");
+
+    // Also test single-field decrypt
+    let name_val = master_cert
+        .decrypt_field(&self_wallet, &self_key.public_key(), "name", "test-app")
+        .await
+        .unwrap();
+    assert_eq!(name_val, "Self-Certifier");
+}
+
+// =================
+// P1-CERT-10: Certificate rejection / validation failure tests
+// =================
+
+#[test]
+fn test_tampered_revocation_outpoint_fails_verification() {
+    // Sign a cert with a revocation outpoint, then tamper with it after signing.
+    // verify() should fail because the revocation outpoint is part of the signed data.
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+    cert.revocation_outpoint = Some(bsv_sdk::wallet::types::Outpoint::new([0xAA; 32], 0));
+    cert.fields
+        .insert("name".to_string(), b"encrypted_name".to_vec());
+
+    cert.sign(&certifier_key).unwrap();
+    assert!(
+        cert.verify().unwrap(),
+        "Certificate should verify before tampering"
+    );
+
+    // Tamper with the revocation outpoint
+    cert.revocation_outpoint = Some(bsv_sdk::wallet::types::Outpoint::new([0xBB; 32], 5));
+
+    let result = cert.verify().unwrap();
+    assert!(
+        !result,
+        "Certificate verification should fail after revocation outpoint tampering"
+    );
+}
+
+#[test]
+fn test_verifiable_certificate_with_garbage_keyring() {
+    // Create a valid signed certificate, then construct a VerifiableCertificate
+    // with garbage keyring entries. The signature should still verify (keyring is
+    // not part of the signed data), but attempting to decrypt should fail.
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+    cert.fields
+        .insert("name".to_string(), b"encrypted_name".to_vec());
+    cert.sign(&certifier_key).unwrap();
+
+    // Create VerifiableCertificate with garbage keyring
+    let mut garbage_keyring = HashMap::new();
+    garbage_keyring.insert("name".to_string(), vec![0xFF, 0xFE, 0xFD, 0xFC]);
+
+    let verifiable = VerifiableCertificate::new(cert, garbage_keyring);
+
+    // Signature verification should still pass (keyring is not signed)
+    assert!(
+        verifiable.verify().unwrap(),
+        "Certificate signature should still verify with garbage keyring"
+    );
+
+    // But the keyring has garbage, so the revealable_fields still lists "name"
+    let fields = verifiable.revealable_fields();
+    assert_eq!(fields.len(), 1, "Should report 1 revealable field");
+}
+
+#[test]
+fn test_certificate_with_empty_fields_map() {
+    // Create, sign, and verify a certificate with no fields at all
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random().public_key();
+
+    let mut cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        subject_key,
+        certifier_key.public_key(),
+    );
+
+    // fields is already empty by default
+    assert!(cert.fields.is_empty(), "Fields should start empty");
+
+    cert.sign(&certifier_key).unwrap();
+    assert!(
+        cert.verify().unwrap(),
+        "Certificate with empty fields should verify"
+    );
+
+    // Binary roundtrip should work with empty fields
+    let binary = cert.to_binary(true);
+    let decoded = Certificate::from_binary(&binary).unwrap();
+    assert!(
+        decoded.fields.is_empty(),
+        "Decoded cert should also have empty fields"
+    );
+    assert!(
+        decoded.verify().unwrap(),
+        "Decoded cert with empty fields should verify"
+    );
+}
+
+#[tokio::test]
+async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
+    // Full async test: construct a properly-issued certificate, then replace the
+    // keyring with garbage data and attempt to decrypt -- should error.
+    use bsv_sdk::auth::MasterCertificate;
+    use bsv_sdk::wallet::ProtoWallet;
+
+    let certifier_key = PrivateKey::random();
+    let subject_key = PrivateKey::random();
+    let verifier_key = PrivateKey::random();
+    let certifier_wallet = ProtoWallet::new(Some(certifier_key.clone()));
+    let verifier_wallet = ProtoWallet::new(Some(verifier_key.clone()));
+
+    let mut plain_fields = HashMap::new();
+    plain_fields.insert("name".to_string(), "Alice".to_string());
+
+    let master_cert = MasterCertificate::issue_for_subject(
+        &certifier_wallet,
+        &certifier_key,
+        subject_key.public_key(),
+        plain_fields,
+        [1u8; 32],
+        Some([2u8; 32]),
+        "test-app",
+    )
+    .await
+    .unwrap();
+
+    // Create VerifiableCertificate with garbage keyring bytes
+    let mut garbage_keyring = HashMap::new();
+    garbage_keyring.insert("name".to_string(), vec![0x00, 0x01, 0x02, 0x03, 0x04]);
+
+    let mut verifiable =
+        VerifiableCertificate::new(master_cert.certificate.clone(), garbage_keyring);
+
+    // Signature still verifies
+    assert!(verifiable.verify().unwrap());
+
+    // Attempting to decrypt with garbage keyring should fail
+    let result = verifiable
+        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .await;
+
+    assert!(
+        result.is_err(),
+        "Decrypting with garbage keyring should fail"
+    );
+}

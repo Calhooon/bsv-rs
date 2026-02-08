@@ -337,12 +337,30 @@ fn test_script_valid_vectors_execution() {
         total, passed, skipped, failed
     );
 
-    // These vectors include BTC-specific tests, so we don't require 100% pass rate
-    // The important thing is that BSV-specific spend.valid.vectors all pass
+    // These vectors include BTC-specific tests, so we don't require 100% pass rate.
+    // However, we enforce a minimum pass rate to catch regressions.
     println!(
         "\nNote: Some vectors fail due to BTC-specific behavior (P2SH, non-push scriptSig, etc.)"
     );
     println!("The BSV-specific spend.valid.vectors should all pass.");
+
+    // Minimum pass rate assertion to catch regressions.
+    // The script_valid.json vectors include many BTC-specific scripts (P2SH, non-push
+    // scriptSig, etc.) that correctly fail under BSV rules. The current baseline is ~39.5%.
+    // We set the floor at 35% to catch regressions where BSV-valid scripts start failing.
+    let pass_rate = (passed as f64) / (total as f64) * 100.0;
+    let min_pass_rate = 35.0;
+    assert!(
+        pass_rate >= min_pass_rate,
+        "Script valid vectors execution pass rate {:.1}% is below minimum {:.1}%. \
+         Passed: {}/{} (skipped: {}, failed: {}). This indicates a regression.",
+        pass_rate,
+        min_pass_rate,
+        passed,
+        total,
+        skipped,
+        failed
+    );
 }
 
 // ============================================================================
@@ -434,12 +452,16 @@ fn test_script_invalid_vectors() {
             println!("  {}. {}", i + 1, failure);
         }
 
-        // Some invalid vectors might pass due to different flag handling
-        // Only fail if more than 10% pass unexpectedly
-        if failed > total / 10 {
+        // Some invalid vectors might pass due to different flag handling between
+        // BSV and BTC (e.g., STRICTENC, CLEANSTACK rules).
+        // Tightened from 10% to 5% tolerance to better catch regressions.
+        let false_positive_rate = (failed as f64) / (total as f64) * 100.0;
+        let max_false_positive_rate = 5.0;
+        if false_positive_rate > max_false_positive_rate {
             panic!(
-                "Script invalid vectors: {}/{} correctly failed ({} incorrectly passed)",
-                passed, total, failed
+                "Script invalid vectors: {:.1}% false positives ({} of {} incorrectly passed). \
+                 Maximum allowed is {:.1}%. {}/{} correctly failed.",
+                false_positive_rate, failed, total, max_false_positive_rate, passed, total
             );
         }
     }
@@ -554,9 +576,10 @@ fn test_op_cat() {
 #[test]
 fn test_op_split() {
     // Push "abcd", split at position 2
-    // Should result in ["ab", "cd"]
+    // After OP_SPLIT: stack = ["ab", "cd"] (cd on top)
+    // Then verify: top == "cd" (EQUALVERIFY), remaining == "ab" (EQUAL)
     let unlocking = UnlockingScript::from_hex("0461626364").unwrap(); // push "abcd"
-    let locking = LockingScript::from_hex("527f7c026364877c02616287").unwrap(); // OP_2 OP_SPLIT OP_SWAP <"cd"> OP_EQUAL OP_SWAP <"ab"> OP_EQUAL
+    let locking = LockingScript::from_hex("527f0263648802616287").unwrap(); // OP_2 OP_SPLIT <"cd"> OP_EQUALVERIFY <"ab"> OP_EQUAL
 
     let mut spend = Spend::new(SpendParams {
         source_txid: [0u8; 32],
@@ -573,9 +596,7 @@ fn test_op_split() {
         memory_limit: None,
     });
 
-    // This test validates the structure is correct even if it doesn't pass
-    // due to stack requirements
-    let _ = spend.validate();
+    assert!(spend.validate().unwrap());
 }
 
 /// Test multiplication (BSV re-enabled OP_MUL)

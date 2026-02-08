@@ -498,4 +498,102 @@ mod tests {
     fn test_url_parse_check_invalid_scheme() {
         assert!(url_parse_check("http://example.com").is_err());
     }
+
+    #[test]
+    fn test_url_with_trailing_slash() {
+        // WebSocket transport should accept URLs with trailing slashes
+        let transport = WebSocketTransport::new(WebSocketTransportOptions {
+            base_url: "ws://localhost:8080/".to_string(),
+            read_deadline_secs: None,
+        })
+        .unwrap();
+        // The URL is stored as-is (no trailing slash stripping for WebSocket)
+        assert_eq!(transport.base_url(), "ws://localhost:8080/");
+    }
+
+    #[test]
+    fn test_url_with_path_and_trailing_slash() {
+        let transport = WebSocketTransport::new(WebSocketTransportOptions {
+            base_url: "wss://example.com/ws/auth/".to_string(),
+            read_deadline_secs: Some(45),
+        })
+        .unwrap();
+        assert_eq!(transport.base_url(), "wss://example.com/ws/auth/");
+        assert_eq!(transport.read_deadline_secs(), 45);
+    }
+
+    #[tokio::test]
+    async fn test_send_with_callback_but_no_connection_triggers_connect_error() {
+        // Register a callback so the "no handler" check passes, then send.
+        // This should attempt to connect to a non-existent server and fail.
+        let transport = WebSocketTransport::new(WebSocketTransportOptions {
+            base_url: "ws://127.0.0.1:1".to_string(), // Port 1 is almost certainly not listening
+            read_deadline_secs: Some(5),
+        })
+        .unwrap();
+
+        // Register a callback
+        transport.set_callback(Box::new(|_msg| Box::pin(async move { Ok(()) })));
+
+        // Wait for the spawned task to register the callback
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let msg = AuthMessage::new(
+            crate::auth::types::MessageType::InitialRequest,
+            crate::primitives::PrivateKey::random().public_key(),
+        );
+
+        // Sending should trigger a connection attempt which fails
+        let result = transport.send(&msg).await;
+        assert!(result.is_err(), "Sending to unreachable server should fail");
+        match result.unwrap_err() {
+            Error::TransportError(msg) => {
+                assert!(
+                    msg.contains("failed to connect"),
+                    "Error should mention connection failure, got: {}",
+                    msg
+                );
+            }
+            other => panic!("Expected TransportError, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_read_deadline_one_second() {
+        let transport = WebSocketTransport::new(WebSocketTransportOptions {
+            base_url: "ws://localhost:8080".to_string(),
+            read_deadline_secs: Some(1),
+        })
+        .unwrap();
+        assert_eq!(transport.read_deadline_secs(), 1);
+    }
+
+    #[test]
+    fn test_constructor_with_port_and_path() {
+        let transport = WebSocketTransport::new(WebSocketTransportOptions {
+            base_url: "ws://192.168.1.100:3000/v1/ws".to_string(),
+            read_deadline_secs: Some(60),
+        })
+        .unwrap();
+        assert_eq!(transport.base_url(), "ws://192.168.1.100:3000/v1/ws");
+        assert_eq!(transport.read_deadline_secs(), 60);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_callbacks_registered() {
+        let transport = WebSocketTransport::new(WebSocketTransportOptions {
+            base_url: "ws://localhost:9999".to_string(),
+            read_deadline_secs: None,
+        })
+        .unwrap();
+
+        // Register two callbacks
+        transport.set_callback(Box::new(|_msg| Box::pin(async move { Ok(()) })));
+        transport.set_callback(Box::new(|_msg| Box::pin(async move { Ok(()) })));
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+
+        let cbs = transport.on_data_callbacks.read().await;
+        assert_eq!(cbs.len(), 2, "Should support multiple concurrent callbacks");
+    }
 }

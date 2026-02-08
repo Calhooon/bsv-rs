@@ -510,7 +510,7 @@ mod tests {
         // Try to recover with only 2 shares (less than threshold)
         let subset = KeyShares::new(shares.points[0..2].to_vec(), 3, shares.integrity.clone());
         let result = subset.recover_private_key();
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
     }
 
     #[test]
@@ -518,11 +518,20 @@ mod tests {
         let key = PrivateKey::random();
 
         // Threshold less than 2
-        assert!(split_private_key(&key, 1, 5).is_err());
-        assert!(split_private_key(&key, 0, 5).is_err());
+        assert!(matches!(
+            split_private_key(&key, 1, 5),
+            Err(Error::CryptoError(_))
+        ));
+        assert!(matches!(
+            split_private_key(&key, 0, 5),
+            Err(Error::CryptoError(_))
+        ));
 
         // Total less than threshold
-        assert!(split_private_key(&key, 5, 3).is_err());
+        assert!(matches!(
+            split_private_key(&key, 5, 3),
+            Err(Error::CryptoError(_))
+        ));
     }
 
     #[test]
@@ -538,7 +547,7 @@ mod tests {
         );
 
         let result = corrupted.recover_private_key();
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -565,7 +574,7 @@ mod tests {
         let share2 = "3.def.4.XXXX".to_string(); // Different threshold
 
         let result = KeyShares::from_backup_format(&[share1, share2]);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -579,7 +588,7 @@ mod tests {
         let share2 = "3.def.3.BBBB".to_string(); // Different integrity
 
         let result = KeyShares::from_backup_format(&[share1, share2]);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -676,19 +685,25 @@ mod tests {
     #[test]
     fn test_decode_share_invalid_format() {
         // Too few parts
-        assert!(decode_share("a.b.c").is_err());
+        assert!(matches!(decode_share("a.b.c"), Err(Error::CryptoError(_))));
 
         // Too many parts
-        assert!(decode_share("a.b.c.d.e").is_err());
+        assert!(matches!(
+            decode_share("a.b.c.d.e"),
+            Err(Error::CryptoError(_))
+        ));
 
         // Invalid threshold
-        assert!(decode_share("2.abc.notanumber.XXXX").is_err());
+        assert!(matches!(
+            decode_share("2.abc.notanumber.XXXX"),
+            Err(Error::CryptoError(_))
+        ));
     }
 
     #[test]
     fn test_empty_shares() {
         let result = KeyShares::from_backup_format(&[]);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
     }
 
     // ========================
@@ -700,7 +715,7 @@ mod tests {
         // Mirrors Go: TestThresholdLargerThanTotalShares
         let key = PrivateKey::random();
         let result = split_private_key(&key, 50, 5);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(
             result.unwrap_err().to_string().contains("must be at least"),
             "Expected error about total shares being less than threshold"
@@ -714,11 +729,11 @@ mod tests {
 
         // total=1 with threshold=2 should fail (total < threshold)
         let result = split_private_key(&key, 2, 1);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
 
         // total=1 with threshold=1 should also fail (threshold < 2)
         let result = split_private_key(&key, 1, 1);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
     }
 
     #[test]
@@ -742,8 +757,9 @@ mod tests {
         // (integrity check fails) or the mod_inverse fails on duplicate x coords
         let result = recovery.recover_private_key();
         assert!(
-            result.is_err(),
-            "Expected error when using duplicate shares for recovery"
+            matches!(result, Err(Error::CryptoError(_))),
+            "Expected CryptoError when using duplicate shares for recovery, got {:?}",
+            result
         );
     }
 
@@ -757,7 +773,7 @@ mod tests {
         // Manually set only 2 points but keep threshold at 3
         let subset = KeyShares::new(shares.points[..2].to_vec(), 3, shares.integrity.clone());
         let result = subset.recover_private_key();
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(
             result
                 .unwrap_err()
@@ -839,7 +855,7 @@ mod tests {
         // Threshold of 1 should be rejected (1-of-N is just copying the secret)
         let key = PrivateKey::random();
         let result = split_private_key(&key, 1, 5);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(
             result.unwrap_err().to_string().contains("at least 2"),
             "Expected error about threshold being at least 2"
@@ -886,7 +902,7 @@ mod tests {
         // Threshold > 255 should be rejected
         let key = PrivateKey::random();
         let result = split_private_key(&key, 256, 300);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
         assert!(
             result.unwrap_err().to_string().contains("255"),
             "Expected error about threshold exceeding 255"
@@ -954,8 +970,9 @@ mod tests {
         let result = mixed.recover_private_key();
         // Should fail with integrity check error (or invalid private key)
         assert!(
-            result.is_err(),
-            "Expected error when mixing shares from different keys"
+            matches!(result, Err(Error::CryptoError(_))),
+            "Expected CryptoError when mixing shares from different keys, got {:?}",
+            result
         );
     }
 
@@ -993,7 +1010,7 @@ mod tests {
         // Threshold of 0 should be rejected
         let key = PrivateKey::random();
         let result = split_private_key(&key, 0, 5);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
     }
 
     #[test]
@@ -1001,6 +1018,6 @@ mod tests {
         // Total of 0 should be rejected (threshold >= 2 > 0)
         let key = PrivateKey::random();
         let result = split_private_key(&key, 2, 0);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CryptoError(_))));
     }
 }

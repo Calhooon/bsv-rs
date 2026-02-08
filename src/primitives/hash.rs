@@ -703,36 +703,50 @@ mod tests {
     fn test_sha256_utf8_one_byte() {
         // ASCII characters (1 byte per char)
         let hash = sha256("hello".as_bytes());
-        // Just verify it produces consistent output
-        assert_eq!(hash.len(), 32);
+        assert_eq!(
+            hex::encode(hash),
+            "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        );
     }
 
     #[test]
     fn test_sha256_utf8_two_bytes() {
         // Cyrillic characters (2 bytes per char in UTF-8)
         let hash = sha256("привет".as_bytes());
-        assert_eq!(hash.len(), 32);
+        assert_eq!(
+            hex::encode(hash),
+            "e58f1e8c55fa105bdd3f40e5037eb0b039b5998d52c05e6cd98878dd2da5cab2"
+        );
     }
 
     #[test]
     fn test_sha256_utf8_three_bytes() {
         // Chinese characters (3 bytes per char in UTF-8)
         let hash = sha256("您好".as_bytes());
-        assert_eq!(hash.len(), 32);
+        assert_eq!(
+            hex::encode(hash),
+            "609bc0751d56eb467961e2bc6f798f7d44627696248e52315e1d6d091bdf502a"
+        );
     }
 
     #[test]
     fn test_sha256_utf8_four_bytes() {
         // Emoji (4 bytes per char in UTF-8)
         let hash = sha256("👋".as_bytes());
-        assert_eq!(hash.len(), 32);
+        assert_eq!(
+            hex::encode(hash),
+            "1d0452e3d194cc7950909b578c611d5ad4cd15105c6aeefc38ce213240ffc457"
+        );
     }
 
     #[test]
     fn test_sha256_utf8_mixed() {
         // Mixed character lengths
         let hash = sha256("hello привет 您好 👋!!!".as_bytes());
-        assert_eq!(hash.len(), 32);
+        assert_eq!(
+            hex::encode(hash),
+            "b7858cde6e07b54bb3963e543245909a7b222619b03d647bd011b145f7b29bee"
+        );
     }
 
     // HMAC-SHA1 test vectors (RFC 2202)
@@ -778,6 +792,9 @@ mod tests {
         let key = b"12345678901234567890";
         let data = [0u8, 0, 0, 0, 0, 0, 0, 1]; // counter = 1 as big-endian 8 bytes
         let result = sha1_hmac(key, &data);
-        assert_eq!(result.len(), 20);
+        assert_eq!(
+            hex::encode(result),
+            "75a48a19d4cbe100644e8ac1397eea747a2d33ab"
+        );
     }
 }

@@ -29,16 +29,36 @@ use bsv_sdk::wallet::{
     VerifySignatureResult, WalletCertificate, WalletInterface, WalletRevealCounterpartyArgs,
     WalletRevealSpecificArgs,
 };
+use bsv_sdk::wallet::{Outpoint, WalletOutput};
 use bsv_sdk::{Error, Result};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::Mutex;
 
 // =============================================================================
 // Mock Wallet Implementation
 // =============================================================================
 
+/// A stored output in the mock wallet.
+#[derive(Clone, Debug)]
+struct MockOutput {
+    /// The locking script bytes.
+    locking_script: Vec<u8>,
+    /// The satoshi value.
+    satoshis: u64,
+    /// The basket this output belongs to.
+    basket: String,
+    /// Tags for this output.
+    tags: Vec<String>,
+    /// The mock transaction ID (unique per create_action call).
+    txid: [u8; 32],
+    /// The output index.
+    vout: u32,
+}
+
 /// A comprehensive mock wallet for testing KVStore operations.
 /// Provides configurable behavior for success and error cases.
-#[derive(Debug)]
+/// Enhanced to store outputs created by create_action and return
+/// them from list_outputs, enabling set/get roundtrip testing.
 struct MockWallet {
     /// If true, list_outputs returns an error.
     list_outputs_error: AtomicBool,
@@ -49,12 +69,33 @@ struct MockWallet {
     /// The underlying private key (kept for potential future use).
     #[allow(dead_code)]
     private_key: PrivateKey,
-    /// Counter for create_action calls.
-    #[allow(dead_code)]
+    /// Counter for create_action calls (also used to generate unique txids).
     create_action_count: AtomicU32,
     /// Counter for list_outputs calls.
     #[allow(dead_code)]
     list_outputs_count: AtomicU32,
+    /// Stored outputs from create_action calls.
+    outputs: Mutex<Vec<MockOutput>>,
+}
+
+impl std::fmt::Debug for MockWallet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MockWallet")
+            .field("public_key_hex", &self.public_key_hex)
+            .field(
+                "list_outputs_error",
+                &self.list_outputs_error.load(Ordering::SeqCst),
+            )
+            .field(
+                "create_action_error",
+                &self.create_action_error.load(Ordering::SeqCst),
+            )
+            .field(
+                "create_action_count",
+                &self.create_action_count.load(Ordering::SeqCst),
+            )
+            .finish()
+    }
 }
 
 impl MockWallet {
@@ -70,6 +111,7 @@ impl MockWallet {
             private_key: privkey,
             create_action_count: AtomicU32::new(0),
             list_outputs_count: AtomicU32::new(0),
+            outputs: Mutex::new(Vec::new()),
         }
     }
 
@@ -81,6 +123,18 @@ impl MockWallet {
     fn with_create_action_error(self) -> Self {
         self.create_action_error.store(true, Ordering::SeqCst);
         self
+    }
+
+    /// Generate a unique mock txid from the call counter.
+    fn generate_txid(counter: u32) -> [u8; 32] {
+        let mut txid = [0u8; 32];
+        let bytes = counter.to_le_bytes();
+        txid[0..4].copy_from_slice(&bytes);
+        // Fill remaining bytes with a pattern for uniqueness
+        for i in 4..32 {
+            txid[i] = (counter as u8).wrapping_add(i as u8);
+        }
+        txid
     }
 }
 
@@ -164,15 +218,58 @@ impl WalletInterface for MockWallet {
     // Action Operations
     async fn create_action(
         &self,
-        _args: CreateActionArgs,
+        args: CreateActionArgs,
         _originator: &str,
     ) -> Result<CreateActionResult> {
-        self.create_action_count.fetch_add(1, Ordering::SeqCst);
+        let counter = self.create_action_count.fetch_add(1, Ordering::SeqCst);
         if self.create_action_error.load(Ordering::SeqCst) {
             return Err(Error::WalletError("wallet error".to_string()));
         }
+
+        let txid = Self::generate_txid(counter);
+
+        // Store outputs if present
+        if let Some(ref action_outputs) = args.outputs {
+            let mut stored = self.outputs.lock().unwrap();
+
+            // If there are inputs, remove the corresponding stored outputs
+            // (simulates spending old outputs when updating a key)
+            if let Some(ref inputs) = args.inputs {
+                for input in inputs {
+                    let input_txid_hex = to_hex(&input.outpoint.txid);
+                    let input_vout = input.outpoint.vout;
+                    stored.retain(|o| {
+                        let o_txid_hex = to_hex(&o.txid);
+                        !(o_txid_hex == input_txid_hex && o.vout == input_vout)
+                    });
+                }
+            }
+
+            for (idx, output) in action_outputs.iter().enumerate() {
+                stored.push(MockOutput {
+                    locking_script: output.locking_script.clone(),
+                    satoshis: output.satoshis,
+                    basket: output.basket.clone().unwrap_or_default(),
+                    tags: output.tags.clone().unwrap_or_default(),
+                    txid,
+                    vout: idx as u32,
+                });
+            }
+        } else if let Some(ref inputs) = args.inputs {
+            // Remove only (no new outputs) - this is the remove() path
+            let mut stored = self.outputs.lock().unwrap();
+            for input in inputs {
+                let input_txid_hex = to_hex(&input.outpoint.txid);
+                let input_vout = input.outpoint.vout;
+                stored.retain(|o| {
+                    let o_txid_hex = to_hex(&o.txid);
+                    !(o_txid_hex == input_txid_hex && o.vout == input_vout)
+                });
+            }
+        }
+
         Ok(CreateActionResult {
-            txid: Some([0u8; 32]),
+            txid: Some(txid),
             tx: None,
             no_send_change: None,
             send_with_results: None,
@@ -225,16 +322,54 @@ impl WalletInterface for MockWallet {
     // Output Operations
     async fn list_outputs(
         &self,
-        _args: ListOutputsArgs,
+        args: ListOutputsArgs,
         _originator: &str,
     ) -> Result<ListOutputsResult> {
         self.list_outputs_count.fetch_add(1, Ordering::SeqCst);
         if self.list_outputs_error.load(Ordering::SeqCst) {
             return Err(Error::WalletError("wallet error".to_string()));
         }
+
+        let stored = self.outputs.lock().unwrap();
+
+        // Filter outputs by basket and tags
+        let matching: Vec<&MockOutput> = stored
+            .iter()
+            .filter(|o| o.basket == args.basket)
+            .filter(|o| {
+                if let Some(ref required_tags) = args.tags {
+                    // All required tags must be present on the output
+                    required_tags.iter().all(|t| o.tags.contains(t))
+                } else {
+                    true // No tag filter
+                }
+            })
+            .collect();
+
+        // Apply limit
+        let limited: Vec<&MockOutput> = if let Some(limit) = args.limit {
+            matching.into_iter().take(limit as usize).collect()
+        } else {
+            matching
+        };
+
+        let wallet_outputs: Vec<WalletOutput> = limited
+            .iter()
+            .map(|o| WalletOutput {
+                satoshis: o.satoshis,
+                locking_script: Some(o.locking_script.clone()),
+                spendable: true,
+                custom_instructions: None,
+                tags: Some(o.tags.clone()),
+                outpoint: Outpoint::new(o.txid, o.vout),
+                labels: None,
+            })
+            .collect();
+
+        let total = wallet_outputs.len() as u32;
         Ok(ListOutputsResult {
-            outputs: vec![],
-            total_outputs: 0,
+            outputs: wallet_outputs,
+            total_outputs: total,
             beef: None,
         })
     }
@@ -1395,17 +1530,17 @@ async fn test_local_batch_set_and_get() {
     let result = store.batch_set(&entries).await;
     assert!(result.is_ok(), "batch_set should succeed: {:?}", result);
 
-    // Batch get them back
+    // Batch get them back - with enhanced MockWallet, values should be found
     let keys = vec!["key1", "key2", "key3"];
     let result = store.batch_get(&keys).await;
     assert!(result.is_ok(), "batch_get should succeed: {:?}", result);
 
     let values = result.unwrap();
     assert_eq!(values.len(), 3);
-    // MockWallet returns empty list_outputs, so lookup_value returns not_found
-    for v in &values {
-        assert!(v.is_none());
-    }
+    // Enhanced MockWallet stores outputs, so batch_get should find the values
+    assert_eq!(values[0], Some("value1".to_string()));
+    assert_eq!(values[1], Some("value2".to_string()));
+    assert_eq!(values[2], Some("value3".to_string()));
 }
 
 #[tokio::test]
@@ -1427,18 +1562,18 @@ async fn test_local_batch_get_missing_keys() {
     let wallet = MockWallet::new();
     let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
 
-    // Set only key1 (mock wallet won't persist, but the operation succeeds)
+    // Set only key1 - enhanced mock wallet now persists outputs
     store.set("key1", "value1", None).await.unwrap();
 
-    // Batch get key1, key2, key3 - all will be None since MockWallet has no persistence
+    // Batch get key1 (exists), key2 (missing), key3 (missing)
     let keys = vec!["key1", "key2", "key3"];
     let result = store.batch_get(&keys).await;
     assert!(result.is_ok());
 
     let values = result.unwrap();
     assert_eq!(values.len(), 3);
-    // All None because mock wallet returns empty outputs
-    assert!(values[0].is_none());
+    // key1 was set, so it should be found; key2 and key3 were not set
+    assert_eq!(values[0], Some("value1".to_string()));
     assert!(values[1].is_none());
     assert!(values[2].is_none());
 }
@@ -1502,7 +1637,7 @@ async fn test_local_batch_get_single_key() {
     let wallet = MockWallet::new();
     let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
 
-    // Single key batch should work the same as multi-key
+    // Single key batch with no prior set should return None
     let keys = vec!["single_key"];
     let result = store.batch_get(&keys).await;
     assert!(result.is_ok());
@@ -1510,6 +1645,11 @@ async fn test_local_batch_get_single_key() {
     let values = result.unwrap();
     assert_eq!(values.len(), 1);
     assert!(values[0].is_none());
+
+    // Now set it and get again
+    store.set("single_key", "single_value", None).await.unwrap();
+    let result = store.batch_get(&keys).await.unwrap();
+    assert_eq!(result[0], Some("single_value".to_string()));
 }
 
 #[tokio::test]
@@ -1521,4 +1661,166 @@ async fn test_local_batch_set_single_entry() {
     let entries = vec![("only_key", "only_value")];
     let result = store.batch_set(&entries).await;
     assert!(result.is_ok());
+}
+
+// =============================================================================
+// Enhanced MockWallet Roundtrip Tests
+// =============================================================================
+
+#[tokio::test]
+async fn test_local_kvstore_set_get_roundtrip() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set a value
+    let outpoint = store.set("greeting", "hello world", None).await;
+    assert!(outpoint.is_ok(), "set should succeed: {:?}", outpoint);
+
+    // Get it back
+    let value = store.get("greeting", "not_found").await;
+    assert!(value.is_ok(), "get should succeed: {:?}", value);
+    assert_eq!(value.unwrap(), "hello world");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_set_overwrite() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set initial value
+    store.set("color", "red", None).await.unwrap();
+    let v1 = store.get("color", "").await.unwrap();
+    assert_eq!(v1, "red");
+
+    // Overwrite with new value
+    store.set("color", "blue", None).await.unwrap();
+    let v2 = store.get("color", "").await.unwrap();
+    assert_eq!(v2, "blue");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_keys_and_count() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set 3 keys
+    store.set("alpha", "1", None).await.unwrap();
+    store.set("beta", "2", None).await.unwrap();
+    store.set("gamma", "3", None).await.unwrap();
+
+    // Verify count returns 3
+    let count = store.count().await.unwrap();
+    assert_eq!(count, 3, "Should have 3 entries");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_remove() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set a key
+    store.set("ephemeral", "temporary", None).await.unwrap();
+
+    // Verify it exists
+    let exists = store.has("ephemeral").await.unwrap();
+    assert!(exists, "Key should exist after set");
+
+    // Remove it
+    let removed = store.remove("ephemeral", None).await;
+    assert!(removed.is_ok(), "remove should succeed: {:?}", removed);
+
+    // Verify it no longer exists
+    let exists_after = store.has("ephemeral").await.unwrap();
+    assert!(!exists_after, "Key should not exist after remove");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_batch_operations() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Batch set 3 entries
+    let entries = vec![("x", "10"), ("y", "20"), ("z", "30")];
+    store.batch_set(&entries).await.unwrap();
+
+    // Batch get returns all values
+    let results = store.batch_get(&["x", "y", "z"]).await.unwrap();
+    assert_eq!(results.len(), 3);
+    assert_eq!(results[0], Some("10".to_string()));
+    assert_eq!(results[1], Some("20".to_string()));
+    assert_eq!(results[2], Some("30".to_string()));
+}
+
+#[tokio::test]
+async fn test_local_kvstore_concurrent_writes() {
+    // Verify that multiple sequential writes to the same key don't panic
+    // and the final value is the last one written.
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Write 5 values to the same key sequentially
+    for i in 0..5 {
+        let value = format!("value_{}", i);
+        let result = store.set("contested", &value, None).await;
+        assert!(result.is_ok(), "Write {} should succeed: {:?}", i, result);
+    }
+
+    // The final value should be the last one written
+    let final_value = store.get("contested", "").await.unwrap();
+    assert_eq!(final_value, "value_4", "Should have the last written value");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_get_default_when_not_set() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Get a key that was never set should return default
+    let value = store.get("never_set", "default_val").await.unwrap();
+    assert_eq!(value, "default_val");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_set_get_special_characters() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Test with special characters in the value
+    let special_value = "hello\nworld\ttab\"quotes'apostrophe";
+    store.set("special", special_value, None).await.unwrap();
+
+    let retrieved = store.get("special", "").await.unwrap();
+    assert_eq!(retrieved, special_value);
+}
+
+#[tokio::test]
+async fn test_local_kvstore_multiple_independent_keys() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set different keys
+    store.set("name", "Alice", None).await.unwrap();
+    store.set("age", "30", None).await.unwrap();
+    store.set("city", "Zurich", None).await.unwrap();
+
+    // Each key should return its own value
+    assert_eq!(store.get("name", "").await.unwrap(), "Alice");
+    assert_eq!(store.get("age", "").await.unwrap(), "30");
+    assert_eq!(store.get("city", "").await.unwrap(), "Zurich");
+}
+
+#[tokio::test]
+async fn test_local_kvstore_remove_then_set_again() {
+    let wallet = MockWallet::new();
+    let store = LocalKVStore::new(wallet, KVStoreConfig::default()).unwrap();
+
+    // Set, remove, then set again
+    store.set("reusable", "first", None).await.unwrap();
+    assert_eq!(store.get("reusable", "").await.unwrap(), "first");
+
+    store.remove("reusable", None).await.unwrap();
+    assert!(!store.has("reusable").await.unwrap());
+
+    store.set("reusable", "second", None).await.unwrap();
+    assert_eq!(store.get("reusable", "").await.unwrap(), "second");
 }

@@ -651,7 +651,7 @@ mod tests {
         cert.set_field("name", b"encrypted_value".to_vec());
         cert.sign(&certifier).unwrap();
 
-        assert!(validate_certificate_encoding(&cert).is_ok());
+        validate_certificate_encoding(&cert).unwrap();
     }
 
     #[test]
@@ -662,7 +662,7 @@ mod tests {
         let cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
 
         // No signature is valid (unsigned certificate)
-        assert!(validate_certificate_encoding(&cert).is_ok());
+        validate_certificate_encoding(&cert).unwrap();
     }
 
     #[test]
@@ -674,7 +674,7 @@ mod tests {
         cert.fields.insert("".to_string(), vec![1, 2, 3]);
 
         let result = validate_certificate_encoding(&cert);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -691,7 +691,7 @@ mod tests {
         cert.fields.insert(long_name, vec![1, 2, 3]);
 
         let result = validate_certificate_encoding(&cert);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result.unwrap_err().to_string().contains("exceeds 50 bytes"));
     }
 
@@ -704,7 +704,7 @@ mod tests {
         cert.signature = Some(vec![0xFF, 0xFF, 0xFF]); // Invalid DER
 
         let result = validate_certificate_encoding(&cert);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -720,7 +720,7 @@ mod tests {
         cert.signature = Some(vec![]); // Empty signature bytes
 
         let result = validate_certificate_encoding(&cert);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -736,7 +736,7 @@ mod tests {
         cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new([3u8; 32], 5));
         cert.sign(&certifier).unwrap();
 
-        assert!(validate_certificate_encoding(&cert).is_ok());
+        validate_certificate_encoding(&cert).unwrap();
     }
 
     #[test]
@@ -749,7 +749,7 @@ mod tests {
         cert.revocation_outpoint = Some(crate::wallet::types::Outpoint::new([0u8; 32], 0));
 
         let result = validate_certificate_encoding(&cert);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result.unwrap_err().to_string().contains("null sentinel"));
     }
 
@@ -763,7 +763,7 @@ mod tests {
         cert.fields.insert(exactly_50, vec![1, 2, 3]);
 
         // Exactly 50 bytes should be valid
-        assert!(validate_certificate_encoding(&cert).is_ok());
+        validate_certificate_encoding(&cert).unwrap();
     }
 
     #[test]
@@ -777,7 +777,7 @@ mod tests {
         cert.set_field("phone", b"+1234567890".to_vec());
         cert.sign(&certifier).unwrap();
 
-        assert!(validate_certificate_encoding(&cert).is_ok());
+        validate_certificate_encoding(&cert).unwrap();
     }
 
     // =======================================
@@ -794,7 +794,7 @@ mod tests {
         req.add_certifier(certifier.public_key().to_hex());
         req.add_type(type_b64, vec!["name".to_string(), "email".to_string()]);
 
-        assert!(validate_requested_certificate_set(&req).is_ok());
+        validate_requested_certificate_set(&req).unwrap();
     }
 
     #[test]
@@ -806,7 +806,7 @@ mod tests {
         // No types specified
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -823,7 +823,7 @@ mod tests {
         req.add_type(type_b64, vec!["name".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
     }
 
     #[test]
@@ -836,7 +836,7 @@ mod tests {
         req.add_type(type_b64, vec!["name".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -853,7 +853,7 @@ mod tests {
         req.add_type(type_b64, vec!["name".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result.unwrap_err().to_string().contains("empty"));
     }
 
@@ -866,7 +866,7 @@ mod tests {
         req.add_type("not valid base64!!!".to_string(), vec!["name".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result.unwrap_err().to_string().contains("not valid base64"));
     }
 
@@ -881,7 +881,7 @@ mod tests {
         req.add_type(short_type, vec!["name".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -898,7 +898,7 @@ mod tests {
         req.add_type(type_b64, vec!["".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
 
@@ -912,7 +912,7 @@ mod tests {
         req.add_type(type_b64, vec!["a".repeat(51)]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result.unwrap_err().to_string().contains("exceeds 50 bytes"));
     }
 
@@ -925,7 +925,7 @@ mod tests {
         req.add_type("".to_string(), vec!["name".to_string()]);
 
         let result = validate_requested_certificate_set(&req);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::CertificateValidationError(_))));
         assert!(result
             .unwrap_err()
             .to_string()
@@ -940,7 +940,7 @@ mod tests {
         let mut req = RequestedCertificateSet::new();
         req.add_type(type_b64, vec!["name".to_string()]);
 
-        assert!(validate_requested_certificate_set(&req).is_ok());
+        validate_requested_certificate_set(&req).unwrap();
     }
 
     #[test]
@@ -953,7 +953,7 @@ mod tests {
         req.add_certifier(certifier.public_key().to_hex());
         req.add_type(type_b64, vec![]);
 
-        assert!(validate_requested_certificate_set(&req).is_ok());
+        validate_requested_certificate_set(&req).unwrap();
     }
 
     #[test]
@@ -967,6 +967,6 @@ mod tests {
         req.add_type(type_b64_1, vec!["name".to_string()]);
         req.add_type(type_b64_2, vec!["email".to_string(), "phone".to_string()]);
 
-        assert!(validate_requested_certificate_set(&req).is_ok());
+        validate_requested_certificate_set(&req).unwrap();
     }
 }

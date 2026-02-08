@@ -13,9 +13,7 @@
 //! verifiable by the counterparty.
 
 use crate::primitives::{from_base64, to_base64};
-use crate::wallet::{
-    Counterparty, CreateHmacArgs, Protocol, SecurityLevel, VerifyHmacArgs, WalletInterface,
-};
+use crate::wallet::{Counterparty, CreateHmacArgs, Protocol, SecurityLevel, WalletInterface};
 use crate::{Error, Result};
 use rand::RngCore;
 
@@ -116,16 +114,14 @@ pub async fn verify_nonce<W: WalletInterface>(
     let protocol = Protocol::new(SecurityLevel::App, NONCE_PROTOCOL);
     let key_id = to_base64(random_bytes);
 
-    // Convert hmac_bytes to fixed-size array
-    let mut hmac_array = [0u8; 32];
-    hmac_array[..NONCE_RANDOM_SIZE].copy_from_slice(hmac_bytes);
-
-    // Verify HMAC
-    let verify_result = wallet
-        .verify_hmac(
-            VerifyHmacArgs {
+    // Recompute the HMAC and compare the first 16 bytes.
+    // We use create_hmac instead of verify_hmac because create_nonce
+    // only stores the first 16 bytes of the 32-byte HMAC, so we need
+    // to recompute and compare the truncated portion.
+    let hmac_result = wallet
+        .create_hmac(
+            CreateHmacArgs {
                 data: random_bytes.to_vec(),
-                hmac: hmac_array,
                 protocol_id: protocol,
                 key_id,
                 counterparty: counterparty.map(|pk| Counterparty::Other(pk.clone())),
@@ -134,7 +130,8 @@ pub async fn verify_nonce<W: WalletInterface>(
         )
         .await?;
 
-    Ok(verify_result.valid)
+    // Compare the first 16 bytes of the computed HMAC with the stored portion
+    Ok(hmac_result.hmac[..NONCE_RANDOM_SIZE] == *hmac_bytes)
 }
 
 /// Validates that a nonce has the correct format.

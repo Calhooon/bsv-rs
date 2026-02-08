@@ -865,4 +865,70 @@ mod tests {
         assert_eq!(cloned.period, 60);
         assert_eq!(cloned.timestamp, Some(12345));
     }
+
+    // Unusual digit count tests
+    #[test]
+    fn test_digits_1() {
+        let options = TotpOptions {
+            digits: 1,
+            timestamp: Some(59),
+            ..Default::default()
+        };
+        let code = Totp::generate(SHA1_SECRET, Some(options.clone()));
+        assert_eq!(code.len(), 1);
+
+        // Should still validate
+        let validate_options = TotpValidateOptions { options, skew: 0 };
+        assert!(Totp::validate(SHA1_SECRET, &code, Some(validate_options)));
+    }
+
+    #[test]
+    fn test_digits_9() {
+        // 9 digits is the max that fits in u32 (10^9 = 1_000_000_000 < u32::MAX)
+        let options = TotpOptions {
+            digits: 9,
+            timestamp: Some(59),
+            ..Default::default()
+        };
+        let code = Totp::generate(SHA1_SECRET, Some(options.clone()));
+        assert_eq!(code.len(), 9);
+
+        // Should still validate
+        let validate_options = TotpValidateOptions { options, skew: 0 };
+        assert!(Totp::validate(SHA1_SECRET, &code, Some(validate_options)));
+    }
+
+    // RFC 4226 Appendix D HOTP test vectors
+    // Secret: "12345678901234567890" (ASCII), 6-digit codes
+    // These verify the underlying HOTP algorithm by using period=1 and timestamp=counter
+    #[test]
+    fn test_rfc4226_hotp_vectors() {
+        let expected = [
+            "755224", // counter 0
+            "287082", // counter 1
+            "359152", // counter 2
+            "969429", // counter 3
+            "338314", // counter 4
+            "254676", // counter 5
+            "287922", // counter 6
+            "162583", // counter 7
+            "399871", // counter 8
+            "520489", // counter 9
+        ];
+
+        for (counter, expected_code) in expected.iter().enumerate() {
+            let options = TotpOptions {
+                digits: 6,
+                algorithm: Algorithm::Sha1,
+                period: 1,                       // 1-second period so timestamp == counter
+                timestamp: Some(counter as u64), // counter value
+            };
+            let code = Totp::generate(SHA1_SECRET, Some(options));
+            assert_eq!(
+                &code, expected_code,
+                "RFC 4226 HOTP vector failed for counter {}",
+                counter
+            );
+        }
+    }
 }

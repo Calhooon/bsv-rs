@@ -749,7 +749,7 @@ mod tests {
 
         // Wrong recipient should fail HMAC verification
         let result = electrum_decrypt(&encrypted, &wrong_recipient, None);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesHmacMismatch)));
     }
 
     #[test]
@@ -763,7 +763,7 @@ mod tests {
 
         // Wrong recipient should fail HMAC verification
         let result = bitcore_decrypt(&encrypted, &wrong_recipient);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesHmacMismatch)));
     }
 
     #[test]
@@ -781,7 +781,7 @@ mod tests {
 
         // Should fail HMAC verification
         let result = electrum_decrypt(&encrypted, &recipient, None);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesHmacMismatch)));
     }
 
     #[test]
@@ -799,7 +799,7 @@ mod tests {
 
         // Should fail HMAC verification
         let result = bitcore_decrypt(&encrypted, &recipient);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesHmacMismatch)));
     }
 
     #[test]
@@ -809,7 +809,7 @@ mod tests {
 
         let recipient = PrivateKey::random();
         let result = electrum_decrypt(&data, &recipient, None);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesDecryptionFailed(_))));
     }
 
     #[test]
@@ -818,7 +818,7 @@ mod tests {
 
         // Too short
         let result = electrum_decrypt(&[0u8; 20], &recipient, None);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesDecryptionFailed(_))));
     }
 
     #[test]
@@ -827,7 +827,7 @@ mod tests {
 
         // Too short
         let result = bitcore_decrypt(&[0u8; 50], &recipient);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesDecryptionFailed(_))));
     }
 
     #[test]
@@ -927,7 +927,7 @@ mod tests {
         let invalid_base64 = "not valid base64!!!";
 
         let result = decrypt_single_base64(invalid_base64, &key);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesDecryptionFailed(_))));
     }
 
     #[test]
@@ -965,7 +965,7 @@ mod tests {
         let invalid_base64 = "!!!invalid!!!";
 
         let result = decrypt_shared_base64(invalid_base64, &bob, &alice.public_key());
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesDecryptionFailed(_))));
     }
 
     #[test]
@@ -1013,7 +1013,162 @@ mod tests {
         // Encrypt with key1, try to decrypt with key2
         let encrypted = encrypt_single_base64(message, &key1).unwrap();
         let result = decrypt_single_base64(&encrypted, &key2);
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesHmacMismatch)));
+    }
+
+    // =========================================================================
+    // P0-CRYPTO-7: Cross-SDK ECIES ciphertext vectors
+    // Ported from TS SDK: compat/__tests/ECIES.test.ts
+    // =========================================================================
+
+    #[test]
+    fn test_cross_sdk_electrum_decrypt_known_ciphertext_alice() {
+        // TS SDK test vector: electrumDecrypt with alicePrivateKey
+        // alicePrivateKey = PrivateKey.fromString('77e06abc52bf065cb5164c5deca839d0276911991a2730be4d8d0a0307de7ceb', 16)
+        // Ciphertext was encrypted to alice by bob.
+        let alice_key = PrivateKey::from_hex(
+            "77e06abc52bf065cb5164c5deca839d0276911991a2730be4d8d0a0307de7ceb",
+        )
+        .unwrap();
+
+        let ciphertext_base64 = "QklFMQOGFyMXLo9Qv047K3BYJhmnJgt58EC8skYP/R2QU/U0yXXHOt6L3tKmrXho6yj6phfoiMkBOhUldRPnEI4fSZXbiaH4FsxKIOOvzolIFVAS0FplUmib2HnlAM1yP/iiPsU=";
+        let ciphertext = BASE64.decode(ciphertext_base64).unwrap();
+
+        let plaintext = electrum_decrypt(&ciphertext, &alice_key, None).unwrap();
+        assert_eq!(
+            plaintext, b"this is my test message",
+            "Cross-SDK Electrum ECIES decrypt (alice) plaintext mismatch"
+        );
+    }
+
+    #[test]
+    fn test_cross_sdk_electrum_decrypt_known_ciphertext_bob() {
+        // TS SDK test vector: electrumDecrypt with bobPrivateKey
+        // bobPrivateKey = PrivateKey.fromString('2b57c7c5e408ce927eef5e2efb49cfdadde77961d342daa72284bb3d6590862d', 16)
+        let bob_key = PrivateKey::from_hex(
+            "2b57c7c5e408ce927eef5e2efb49cfdadde77961d342daa72284bb3d6590862d",
+        )
+        .unwrap();
+
+        let ciphertext_base64 = "QklFMQM55QTWSSsILaluEejwOXlrBs1IVcEB4kkqbxDz4Fap53XHOt6L3tKmrXho6yj6phfoiMkBOhUldRPnEI4fSZXbvZJHgyAzxA6SoujduvJXv+A9ri3po9veilrmc8p6dwo=";
+        let ciphertext = BASE64.decode(ciphertext_base64).unwrap();
+
+        let plaintext = electrum_decrypt(&ciphertext, &bob_key, None).unwrap();
+        assert_eq!(
+            plaintext, b"this is my test message",
+            "Cross-SDK Electrum ECIES decrypt (bob) plaintext mismatch"
+        );
+    }
+
+    #[test]
+    fn test_cross_sdk_electrum_encrypt_deterministic_alice_to_bob() {
+        // TS SDK: electrumEncrypt(message, bobPublicKey, alicePrivateKey) produces exact ciphertext
+        let alice_key = PrivateKey::from_hex(
+            "77e06abc52bf065cb5164c5deca839d0276911991a2730be4d8d0a0307de7ceb",
+        )
+        .unwrap();
+        let bob_key = PrivateKey::from_hex(
+            "2b57c7c5e408ce927eef5e2efb49cfdadde77961d342daa72284bb3d6590862d",
+        )
+        .unwrap();
+        let message = b"this is my test message";
+
+        let encrypted =
+            electrum_encrypt(message, &bob_key.public_key(), &alice_key, false).unwrap();
+        let encrypted_base64 = BASE64.encode(&encrypted);
+
+        assert_eq!(
+            encrypted_base64,
+            "QklFMQM55QTWSSsILaluEejwOXlrBs1IVcEB4kkqbxDz4Fap53XHOt6L3tKmrXho6yj6phfoiMkBOhUldRPnEI4fSZXbvZJHgyAzxA6SoujduvJXv+A9ri3po9veilrmc8p6dwo=",
+            "Cross-SDK Electrum ECIES encrypt (alice->bob) ciphertext mismatch"
+        );
+    }
+
+    #[test]
+    fn test_cross_sdk_electrum_encrypt_deterministic_bob_to_alice() {
+        // TS SDK: electrumEncrypt(message, alicePublicKey, bobPrivateKey) produces exact ciphertext
+        let alice_key = PrivateKey::from_hex(
+            "77e06abc52bf065cb5164c5deca839d0276911991a2730be4d8d0a0307de7ceb",
+        )
+        .unwrap();
+        let bob_key = PrivateKey::from_hex(
+            "2b57c7c5e408ce927eef5e2efb49cfdadde77961d342daa72284bb3d6590862d",
+        )
+        .unwrap();
+        let message = b"this is my test message";
+
+        let encrypted =
+            electrum_encrypt(message, &alice_key.public_key(), &bob_key, false).unwrap();
+        let encrypted_base64 = BASE64.encode(&encrypted);
+
+        assert_eq!(
+            encrypted_base64,
+            "QklFMQOGFyMXLo9Qv047K3BYJhmnJgt58EC8skYP/R2QU/U0yXXHOt6L3tKmrXho6yj6phfoiMkBOhUldRPnEI4fSZXbiaH4FsxKIOOvzolIFVAS0FplUmib2HnlAM1yP/iiPsU=",
+            "Cross-SDK Electrum ECIES encrypt (bob->alice) ciphertext mismatch"
+        );
+    }
+
+    #[test]
+    fn test_cross_sdk_electrum_ecdh_no_key_symmetry() {
+        // TS SDK: ECDH noKey mode produces identical ciphertext regardless of direction
+        // electrumEncrypt(message, bobPub, alicePriv, noKey=true) ==
+        // electrumEncrypt(message, alicePub, bobPriv, noKey=true)
+        let alice_key = PrivateKey::from_hex(
+            "77e06abc52bf065cb5164c5deca839d0276911991a2730be4d8d0a0307de7ceb",
+        )
+        .unwrap();
+        let bob_key = PrivateKey::from_hex(
+            "2b57c7c5e408ce927eef5e2efb49cfdadde77961d342daa72284bb3d6590862d",
+        )
+        .unwrap();
+        let message = b"this is my ECDH test message";
+
+        let encrypted_bob =
+            electrum_encrypt(message, &bob_key.public_key(), &alice_key, true).unwrap();
+        let encrypted_alice =
+            electrum_encrypt(message, &alice_key.public_key(), &bob_key, true).unwrap();
+
+        // Both directions should produce identical ciphertext
+        assert_eq!(
+            encrypted_bob, encrypted_alice,
+            "ECDH noKey mode should produce identical ciphertext in both directions"
+        );
+
+        // Both should decrypt to the original message
+        let decrypted_1 =
+            electrum_decrypt(&encrypted_alice, &bob_key, Some(&alice_key.public_key())).unwrap();
+        assert_eq!(decrypted_1, message);
+
+        let decrypted_2 =
+            electrum_decrypt(&encrypted_bob, &alice_key, Some(&bob_key.public_key())).unwrap();
+        assert_eq!(decrypted_2, message);
+    }
+
+    #[test]
+    fn test_cross_sdk_electrum_roundtrip_with_known_keys() {
+        // Verify encrypt/decrypt roundtrip with known TS SDK keys
+        let alice_key = PrivateKey::from_hex(
+            "77e06abc52bf065cb5164c5deca839d0276911991a2730be4d8d0a0307de7ceb",
+        )
+        .unwrap();
+        let bob_key = PrivateKey::from_hex(
+            "2b57c7c5e408ce927eef5e2efb49cfdadde77961d342daa72284bb3d6590862d",
+        )
+        .unwrap();
+        let message = b"this is my test message";
+
+        // Encrypt alice -> bob
+        let encrypted =
+            electrum_encrypt(message, &bob_key.public_key(), &alice_key, false).unwrap();
+
+        // Decrypt as bob, providing alice's pubkey as sender
+        let decrypted =
+            electrum_decrypt(&encrypted, &bob_key, Some(&alice_key.public_key())).unwrap();
+        assert_eq!(decrypted, message);
+
+        // Also decrypt without providing sender pubkey (ephemeral key in ciphertext)
+        let decrypted2 = electrum_decrypt(&encrypted, &bob_key, None).unwrap();
+        assert_eq!(decrypted2, message);
     }
 
     #[test]
@@ -1028,6 +1183,6 @@ mod tests {
 
         // Charlie tries to decrypt (should fail)
         let result = decrypt_shared_base64(&encrypted, &charlie, &alice.public_key());
-        assert!(result.is_err());
+        assert!(matches!(result, Err(Error::EciesHmacMismatch)));
     }
 }

@@ -514,6 +514,41 @@ mod tests {
     }
 
     #[test]
+    fn test_from_wif_empty_string() {
+        // Empty string should fail
+        assert!(PrivateKey::from_wif("").is_err());
+    }
+
+    #[test]
+    fn test_from_wif_not_a_wif() {
+        // Random non-WIF string should fail
+        assert!(PrivateKey::from_wif("not_a_wif").is_err());
+    }
+
+    #[test]
+    fn test_from_wif_bad_checksum() {
+        // Go SDK vector: one char changed from valid WIF -> checksum mismatch
+        // Valid: "L4o1GXuUSHauk19f9Cfpm1qfSXZuGLBUAC2VZM6vdmfMxRxAYkWq"
+        assert!(
+            PrivateKey::from_wif("L401GXuUSHauk19f9Cfpm1qfSXZuGLBUAC2VZM6vdmfMxRxAYkWq").is_err()
+        );
+    }
+
+    #[test]
+    fn test_from_wif_truncated() {
+        // Go SDK vector: valid WIF with last char removed -> wrong length
+        assert!(
+            PrivateKey::from_wif("L4o1GXuUSHauk19f9Cfpm1qfSXZuGLBUAC2VZM6vdmfMxRxAYkW").is_err()
+        );
+    }
+
+    #[test]
+    fn test_from_wif_too_long() {
+        // Go SDK vector: WIF repeated twice -> too long
+        assert!(PrivateKey::from_wif("L4o1GXuUSHauk19f9Cfpm1qfSXZuGLBUAC2VZM6vdmfMxRxAYkWqL4o1GXuUSHauk19f9Cfpm1qfSXZuGLBUAC2VZM6vdmfMxRxAYkWq").is_err());
+    }
+
+    #[test]
     fn test_wif_testnet() {
         // Test testnet WIF (version 0xef)
         let key = PrivateKey::random();

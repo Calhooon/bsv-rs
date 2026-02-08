@@ -101,7 +101,13 @@ mod key_deriver_tests {
 
         // TypeScript SDK: derivePublicKey with for_self=false derives for the counterparty
         // Result should match counterpartyPublicKey.deriveChild(rootPrivateKey, invoice)
-        assert!(!derived_pub.to_hex().is_empty());
+        assert_eq!(derived_pub.to_hex().len(), 66); // compressed pubkey hex is 66 chars
+
+        // Derivation must be deterministic
+        let derived_pub2 = deriver
+            .derive_public_key(&protocol, key_id, &counterparty, false)
+            .unwrap();
+        assert_eq!(derived_pub.to_hex(), derived_pub2.to_hex());
     }
 
     #[test]
@@ -194,10 +200,15 @@ mod key_deriver_tests {
         let deriver = KeyDeriver::new(Some(PrivateKey::random()));
         let other = PrivateKey::random().public_key();
 
-        let result = deriver.reveal_counterparty_secret(&Counterparty::Other(other));
+        let result = deriver.reveal_counterparty_secret(&Counterparty::Other(other.clone()));
         assert!(result.is_ok());
         let secret = result.unwrap();
-        assert!(!secret.to_hex().is_empty());
+
+        // Call again with same args -- result must be deterministic
+        let secret2 = deriver
+            .reveal_counterparty_secret(&Counterparty::Other(other))
+            .unwrap();
+        assert_eq!(secret.to_hex(), secret2.to_hex());
     }
 
     #[test]
@@ -411,9 +422,14 @@ mod cached_key_deriver_tests {
                 .unwrap()
         }
 
-        let cached = CachedKeyDeriver::new(Some(PrivateKey::random()), None);
+        let root_key = PrivateKey::random();
+        let cached = CachedKeyDeriver::new(Some(root_key.clone()), None);
         let key = derive_key(&cached);
-        assert!(!key.to_hex().is_empty());
+
+        // Derive same key via non-cached KeyDeriver and verify equality
+        let non_cached = KeyDeriver::new(Some(root_key));
+        let key_non_cached = derive_key(&non_cached);
+        assert_eq!(key.to_hex(), key_non_cached.to_hex());
     }
 
     #[test]
