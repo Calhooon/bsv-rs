@@ -11,9 +11,9 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~173 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with signed varint and complex type support | ~2459 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~943 |
-| `transceiver.rs` | Client-side message serialization and full wallet interface | ~1619 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2554 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~949 |
+| `transceiver.rs` | Client-side message serialization and full wallet interface (all 28 methods) | ~1628 |
 
 ## Architecture
 
@@ -87,9 +87,15 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 ## Serialization Rules
 
+### Go-Compatible Nil Sentinel
+
+Optional strings, bytes, string arrays, and string maps use `VarInt(u64::MAX)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil/absent sentinel, matching the Go SDK's `VarInt(math.MaxUint64)` encoding. This is used in `read/write_optional_string`, `read/write_optional_bytes`, `read/write_string_array`, `read/write_string_map`, and `read/write_optional_string_map`.
+
+Empty optional strings and empty optional bytes are treated the same as `None` — both write the nil sentinel. This matches Go SDK behavior.
+
 ### Signed VarInt (ZigZag Encoding)
 
-The protocol uses ZigZag encoding for signed varints to efficiently encode negative values:
+Used for optional numeric values and signed counts (e.g., optional input/output arrays). ZigZag encoding maps signed integers to unsigned:
 - Non-negative `n` is encoded as `2n`
 - Negative `n` is encoded as `2|n| - 1`
 
@@ -104,11 +110,12 @@ This allows -1 (representing `null`/`None`) to be encoded as a single byte (0x01
 | `varint` | Variable (1-9 bytes) |
 | `signed_varint` | ZigZag encoded |
 | UTF-8 string | `varint(len) + bytes` |
-| Optional string | `signed_varint(len or -1) + bytes` |
-| Optional bytes | `signed_varint(len or -1) + bytes` |
+| Optional string | `varint(len or MaxUint64) + bytes` (Go-compat nil sentinel) |
+| Optional bytes | `varint(len or MaxUint64) + bytes` (Go-compat nil sentinel) |
 | Optional bool | `i8(-1=None, 0=false, 1=true)` |
-| String array | `signed_varint(count or -1) + strings...` |
-| String map | `signed_varint(count or -1) + (key, value)...` |
+| String array | `varint(count or MaxUint64) + strings...` (Go-compat nil sentinel) |
+| String map | `varint(count or MaxUint64) + sorted (key, value)...` (Go-compat nil sentinel) |
+| Optional string map | `varint(count or MaxUint64) + sorted (key, value)...` (Go-compat nil sentinel) |
 | Outpoint | `32 bytes (txid) + varint(vout)` |
 | Public key | 33 bytes (compressed) |
 | Counterparty | `0=None, 11=Self, 12=Anyone, else=33-byte pubkey` |
@@ -148,12 +155,12 @@ pub mod status_codes {
 
 ## WireReader / WireWriter
 
-`WireReader<'a>` and `WireWriter` wrap the primitives `Reader`/`Writer` with signed varint support and wallet-specific type methods.
+`WireReader<'a>` and `WireWriter` wrap the primitives `Reader`/`Writer` with Go-compatible nil sentinel support and wallet-specific type methods.
 
 **Basic types:** `read/write_u8`, `i8`, `u16_le`, `u32_le`, `u64_le`, `var_int`, `signed_var_int`, `optional_var_int`, `bytes`, plus `read_remaining`/`remaining`/`is_empty`/`position` on reader and `len`/`is_empty`/`as_bytes`/`into_bytes`/`with_capacity` on writer.
 
 **Wire protocol types (both reader and writer):**
-- `string`, `optional_string`, `optional_bytes`, `string_array`, `optional_string_array`
+- `string`, `optional_string`, `optional_bytes`, `string_array`
 - `optional_bool`, `outpoint`, `outpoint_string`, `counterparty`
 - `protocol_id`, `optional_protocol_id`, `action_status`
 - `txid_hex`, `pubkey_hex` (reader only), `query_mode`, `optional_query_mode`
@@ -169,7 +176,23 @@ pub mod status_codes {
 - `wallet_action_input`, `wallet_action_output`, `wallet_action`
 - `wallet_output`
 
+**Writer-only:** `optional_string_array` (writes `None` as nil sentinel, `Some` as count + elements).
+
 `WireWriter` implements `Default`.
+
+**WalletCertificate wire format (Go-compatible):** `type(32 raw bytes, base64) -> serial(32 raw bytes, base64) -> subject(33 pubkey) -> certifier(33 pubkey) -> revocation outpoint -> fields(sorted map) -> signature(remaining bytes, no length prefix)`.
+
+**IdentityCertificate wire format (Go-compatible):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> optional certifier_info -> optional publicly_revealed_keyring -> optional decrypted_fields`.
+
+**WalletAction wire format (Go-compatible):** `txid(32) -> satoshis(unsigned VarInt) -> status(i8) -> isOutgoing(optional bool) -> description(string) -> labels(string array) -> version(VarInt) -> lockTime(VarInt) -> inputs(VarInt count or MaxUint64) -> outputs(VarInt count or MaxUint64)`.
+
+**WalletActionOutput field order:** `OutputIndex -> Satoshis -> LockingScript -> Spendable -> OutputDescription -> Basket -> Tags -> CustomInstructions`.
+
+**WalletOutput field order:** `Outpoint -> Satoshis -> LockingScript -> CustomInstructions -> Tags -> Labels` (no `spendable` field on wire, defaults to `true`).
+
+**WalletActionInput:** `sequence_number` is VarInt (not u32_le), matching Go.
+
+**String maps:** Keys sorted lexicographically before writing, matching Go SDK.
 
 **Tests:** Comprehensive roundtrip tests for every type including edge cases (empty collections, unicode strings, large data, all security levels, all action statuses, negative satoshis).
 
@@ -189,8 +212,8 @@ pub mod status_codes {
 - isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight
 
 **Processor-local handlers:**
-- getNetwork (uses processor's configured network)
-- getVersion (uses processor's configured version)
+- getNetwork (uses processor's configured network, single byte: 0x00=mainnet, 0x01=testnet)
+- getVersion (uses processor's configured version, raw UTF-8 bytes, no length prefix)
 
 **Stub handlers (return error, require full wallet implementation):**
 - createAction, signAction, abortAction, listActions, internalizeAction
@@ -209,15 +232,18 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 - `new(wire)` - creates transceiver with wire transport
 - `wire()` - access underlying transport
 
-**Implemented methods:**
+**All 28 methods fully implemented:**
 - **Key ops:** get_public_key, encrypt, decrypt, create_hmac, verify_hmac, create_signature, verify_signature
-- **Action ops:** create_action, sign_action, abort_action, list_actions, internalize_action
+- **Key linkage:** reveal_counterparty_key_linkage, reveal_specific_key_linkage
+- **Action ops:** create_action (with full options: sign_and_process, trust_self, known_txids, no_send, no_send_change, send_with, randomize_outputs), sign_action, abort_action, list_actions, internalize_action
 - **Output ops:** list_outputs, relinquish_output
-- **Certificate ops:** acquire_certificate, list_certificates, prove_certificate, relinquish_certificate
+- **Certificate ops:** acquire_certificate (both Direct and Issuance protocols), list_certificates, prove_certificate, relinquish_certificate
 - **Discovery ops:** discover_by_identity_key, discover_by_attributes
 - **Chain ops:** get_height, get_network, get_version, get_header, wait_for_authentication, is_authenticated
 
 **Helper methods:** `parse_certificate_from_binary`, `parse_discovery_result` (internal).
+
+**Certificate binary format in transceiver response parsing:** `type(32 bytes) -> subject(33 bytes) -> serial(32 bytes) -> certifier(33 bytes) -> outpoint -> varint(sig_len) + sig -> fields map`. Note: this order differs from the `WireWriter::write_wallet_certificate` Go-compatible format (which puts serial before subject).
 
 ## Public Exports
 
@@ -253,7 +279,7 @@ impl WalletWire for LoopbackWire {
 ```
 
 **Test coverage:**
-- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, send-with-results, sign-action-spends, wallet certificates, identity certifiers/certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
+- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, optional string arrays, send-with-results, sign-action-spends, wallet certificates, identity certifiers/certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
 - processor.rs: Tests for getPublicKey, getNetwork, getVersion, isAuthenticated, invalid call codes, and createAction error.
 - transceiver.rs: End-to-end loopback tests for get_public_key, encrypt/decrypt roundtrip, create/verify HMAC, create/verify signature, is_authenticated, get_network, get_version.
 
@@ -269,12 +295,24 @@ The wire format is binary-compatible with:
 - [TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk) - `WalletWireProcessor`, `WalletWireTransceiver`
 - [Go SDK](https://github.com/bitcoin-sv/go-sdk) - `wallet/serializer`
 
-Messages serialized by one SDK can be deserialized by another.
+Messages serialized by one SDK can be deserialized by another. Key compatibility details:
+- **Nil sentinel**: `VarInt(u64::MAX)` (9 bytes) matches Go's `VarInt(math.MaxUint64)`
+- **getNetwork**: Single byte (0x00=mainnet, 0x01=testnet), not a length-prefixed string
+- **getVersion**: Raw UTF-8 bytes with no length prefix
+- **WalletAction satoshis**: Unsigned VarInt (cast to i64 on read)
+- **WalletAction version/lockTime**: VarInt (not u32 little-endian)
+- **WalletActionInput sequence_number**: VarInt (not u32 little-endian)
+- **WalletOutput**: No `spendable` field on wire (defaults to `true`)
+- **String maps**: Keys sorted lexicographically before writing
+- **Empty optional strings/bytes**: Treated same as None (both write nil sentinel)
+
+54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 42 cross-SDK roundtrip tests.
 
 ## Dependencies
 
 - `async-trait` - For async trait methods in `WalletWire`
 - Internal: `primitives::encoding::{Reader, Writer}` for base serialization
+- Internal: `primitives::{from_hex, to_hex, PublicKey, from_base64, to_base64}` for type conversions
 - Internal: `wallet::types` for all wallet type definitions
 - Internal: `wallet::interface::WalletInterface` for processor generics
 

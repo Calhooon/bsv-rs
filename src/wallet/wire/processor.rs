@@ -232,8 +232,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
                 let message = e.to_string();
                 writer.write_string(&message);
 
-                // Write empty stack trace
-                writer.write_signed_var_int(0);
+                // Write empty stack trace (Go uses VarInt(len) + bytes)
+                writer.write_var_int(0);
             }
         }
 
@@ -618,16 +618,20 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     }
 
     async fn handle_get_network(&self, _originator: &str) -> Result<Vec<u8>, Error> {
-        // Use processor's configured network instead of delegating to wallet
+        // Go uses single byte: 0x00=mainnet, 0x01=testnet (not length-prefixed string)
         let mut writer = WireWriter::new();
-        writer.write_string(self.network.as_str());
+        let code = match self.network {
+            Network::Mainnet => 0u8,
+            Network::Testnet => 1u8,
+        };
+        writer.write_u8(code);
         Ok(writer.into_bytes())
     }
 
     async fn handle_get_version(&self, _originator: &str) -> Result<Vec<u8>, Error> {
-        // Use processor's configured version instead of delegating to wallet
+        // Go writes raw UTF-8 bytes with NO length prefix
         let mut writer = WireWriter::new();
-        writer.write_string(&self.version);
+        writer.write_bytes(self.version.as_bytes());
         Ok(writer.into_bytes())
     }
 
@@ -856,8 +860,9 @@ mod tests {
         let error_byte = reader.read_u8().unwrap();
         assert_eq!(error_byte, 0);
 
-        let network = reader.read_string().unwrap();
-        assert_eq!(network, "testnet");
+        // Go wire format: single byte (0x00=mainnet, 0x01=testnet)
+        let network_byte = reader.read_u8().unwrap();
+        assert_eq!(network_byte, 0x01); // testnet
     }
 
     #[tokio::test]
@@ -876,7 +881,8 @@ mod tests {
         let error_byte = reader.read_u8().unwrap();
         assert_eq!(error_byte, 0);
 
-        let version = reader.read_string().unwrap();
+        // Go wire format: raw UTF-8 bytes (no length prefix)
+        let version = std::str::from_utf8(reader.read_remaining()).unwrap();
         assert_eq!(version, "2.0.0-beta");
     }
 
@@ -924,12 +930,12 @@ mod tests {
         writer.write_u8(0);
         // Write minimal args (will fail at wallet level)
         writer.write_string("test description"); // description
-        writer.write_signed_var_int(-1); // no inputBEEF
-        writer.write_signed_var_int(-1); // no inputs
-        writer.write_signed_var_int(-1); // no outputs
-        writer.write_signed_var_int(-1); // no lockTime
-        writer.write_signed_var_int(-1); // no version
-        writer.write_signed_var_int(-1); // no labels
+        writer.write_var_int(u64::MAX); // no inputBEEF
+        writer.write_var_int(u64::MAX); // no inputs
+        writer.write_var_int(u64::MAX); // no outputs
+        writer.write_var_int(u64::MAX); // no lockTime
+        writer.write_var_int(u64::MAX); // no version
+        writer.write_var_int(u64::MAX); // no labels
         writer.write_i8(-1); // no options
         let request = writer.into_bytes();
 

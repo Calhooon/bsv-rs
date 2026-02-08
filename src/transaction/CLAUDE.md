@@ -30,7 +30,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, merging, and logging |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
-| `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig` |
+| `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
 | `broadcaster.rs` | `Broadcaster` trait, response/failure types, helper functions |
 | `broadcasters/` | `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster` |
 | `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker`, `AlwaysValidChainTracker` |
@@ -212,6 +212,11 @@ pub trait FeeModel: Send + Sync {
 pub struct FixedFee(u64);                              // Always returns same fee
 pub struct SatoshisPerKilobyte { pub value: u64 }      // Fee based on tx size (default: 100 sat/KB)
 pub struct LivePolicy { /* ... */ }                    // Fetches rate from ARC policy endpoint
+
+// Exported constants
+pub const DEFAULT_POLICY_URL: &str;     // "https://arc.gorillapool.io/v1/policy"
+pub const DEFAULT_FALLBACK_RATE: u64;   // Fallback sat/KB rate
+pub const DEFAULT_CACHE_TTL_SECS: u64;  // Cache TTL for live policy
 ```
 
 `LivePolicy` has `new()`, `with_url()`, `with_config(LivePolicyConfig)`, `refresh()` (async fetch), `cached_rate()`, `effective_rate()`, `set_rate()`. Config: `LivePolicyConfig { policy_url, api_key, cache_ttl, fallback_rate, timeout_ms }`. Default policy URL: `https://arc.gorillapool.io/v1/policy`.
@@ -238,9 +243,9 @@ pub enum BroadcastStatus { Success, Error }
 |-------------|--------|---------|--------|
 | `ArcBroadcaster` | BEEF V1 (JSON) | `default()` = gorillapool.io | `ArcConfig` |
 | `TeranodeBroadcaster` | Extended Format (EF binary) | No default URL | `TeranodeConfig` |
-| `WhatsOnChainBroadcaster` | Raw tx hex | `mainnet()`, `testnet()`, `stn()` | `WocBroadcastConfig` |
+| `WhatsOnChainBroadcaster` | Raw tx hex | `mainnet()`, `testnet()`, `stn()` | `WocBroadcastConfig`, `WocBroadcastNetwork` |
 
-ARC/Teranode have `new(url, api_key)` and `with_config(config)` constructors. WoC has `new(network, api_key)`, `mainnet()`, `testnet()`, `stn()`, `with_config(config)`, `with_base_url(url, network, api_key)`.
+ARC/Teranode have `new(url, api_key)` and `with_config(config)` constructors. WoC has `new(network, api_key)`, `mainnet()`, `testnet()`, `stn()`, `with_config(config)`, `with_base_url(url, network, api_key)`. `WocBroadcastNetwork` enum selects `Mainnet`, `Testnet`, or `STN`.
 
 ## Chain Tracking
 
@@ -253,7 +258,11 @@ pub trait ChainTracker: Send + Sync {
 
 pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), BlockNotFound(u32), Other(String) }
 
-// Test mocks: MockChainTracker, AlwaysValidChainTracker
+// Test mocks
+pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String> }
+pub struct AlwaysValidChainTracker { pub height: u32 }
+// MockChainTracker: new(height), add_root(height, root), always_valid(height) -> AlwaysValidChainTracker
+// AlwaysValidChainTracker: new(height) - always returns true for any root
 ```
 
 ### Chain Tracker Implementations (require `http` feature)
@@ -261,7 +270,7 @@ pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), Bloc
 | Tracker | Networks | Config |
 |---------|----------|--------|
 | `WhatsOnChainTracker` | `mainnet()`, `testnet()` | `WocNetwork` enum |
-| `BlockHeadersServiceTracker` | Any (via URL) | `BlockHeadersServiceConfig` |
+| `BlockHeadersServiceTracker` | Any (via URL) | `BlockHeadersServiceConfig`, `DEFAULT_HEADERS_URL` |
 
 ## MerklePath (BUMP - BRC-74)
 

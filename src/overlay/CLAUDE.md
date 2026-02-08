@@ -95,10 +95,10 @@ pub use facilitators::{
 
 ## Facilitators
 
-Traits and HTTPS implementations for overlay communication. Require the `http` feature for actual HTTP calls.
+Traits and HTTPS implementations for overlay communication. Require the `http` feature for actual HTTP calls. Both traits use `#[async_trait(?Send)]` (not `Send`-bound), allowing non-Send futures.
 
-- **`OverlayLookupFacilitator`** trait: `async fn lookup(url, question, timeout_ms) -> Result<LookupAnswer>`
-- **`OverlayBroadcastFacilitator`** trait: `async fn send(url, tagged_beef) -> Result<Steak>`
+- **`OverlayLookupFacilitator`** trait: `async fn lookup(&self, url, question, timeout_ms) -> Result<LookupAnswer>`
+- **`OverlayBroadcastFacilitator`** trait: `async fn send(&self, url, tagged_beef) -> Result<Steak>`
 - **`HttpsOverlayLookupFacilitator`** - POST to `/lookup` with JSON body and `X-Aggregation: yes` header; handles both JSON and binary (`octet-stream`) responses. JSON BEEF fields accept arrays of numbers, hex strings, or base64 strings. Default timeout: 5000ms
 - **`HttpsOverlayBroadcastFacilitator`** - POST to `/submit` with binary BEEF body, `X-Topics` header (JSON array), and `Content-Type: application/octet-stream`. Supports off-chain values via varint-prefixed BEEF length + `x-includes-off-chain-values: true` header
 
@@ -150,7 +150,7 @@ impl LookupResolver {
 
 ## TopicBroadcaster
 
-Broadcasts transactions to SHIP overlay topics. Implements the `Broadcaster` trait (`broadcast`, `broadcast_many`).
+Broadcasts transactions to SHIP overlay topics. Implements the `Broadcaster` trait (`broadcast` delegates to `broadcast_tx`, `broadcast_many` calls `broadcast_tx` sequentially).
 
 ```rust
 pub struct TopicBroadcasterConfig {
@@ -214,7 +214,8 @@ pub fn get_overlay_host_reputation_tracker() -> &'static HostReputationTracker
 ```
 
 - **ReputationConfig** defaults: latency_smoothing=0.25, grace_failures=2, backoff_base_ms=1000, backoff_max_ms=60000, default_latency_ms=1500, failure_penalty_ms=400, success_bonus_ms=30
-- **ReputationStorage** trait: `get/set/remove` for custom persistence backends; auto-saves after each update; loads from storage on creation
+- **ReputationStorage** trait: `get/set/remove` (all `&self`) for custom persistence backends; auto-saves after each update; loads from storage on creation
+- **HostReputationEntry** serializes with `serde(rename_all = "camelCase")` — JSON fields are `totalSuccesses`, `avgLatencyMs`, etc.
 - **Immediate backoff** for DNS errors (ERR_NAME_NOT_RESOLVED, ENOTFOUND, getaddrinfo, Failed to fetch)
 - **Scoring**: `latency + failure_penalty + backoff_penalty - success_bonus` (lower = better)
 - **`rank_hosts`**: Deduplicates input hosts, filters empty strings, ties broken by original order (0.001 per position), sorts not-in-backoff first then by score then by total successes
@@ -241,7 +242,7 @@ pub struct RankChangeEvent {
 
 Traverses transaction ancestry to build chronological history. Follows `input.source_transaction` references recursively.
 
-- **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching, and `interpreter_version` for cache invalidation. Cache key format: `"{version}|{txid}|{ctx_key}"`
+- **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching via `tokio::sync::RwLock`, and `interpreter_version` for cache invalidation. Cache key format: `"{version}|{txid}|{ctx_key}"`
 - **`SyncHistorian<T, C>`** - Synchronous version with builder methods `with_debug()` and `with_version()`
 
 ```rust
@@ -249,7 +250,7 @@ pub struct HistorianConfig<T, C> {
     pub debug: bool,
     pub history_cache: Option<HashMap<String, Vec<T>>>,
     pub interpreter_version: Option<String>,       // Default: "v1"
-    pub ctx_key_fn: Option<Box<dyn Fn(Option<&C>) -> String>>,
+    pub ctx_key_fn: Option<Box<dyn Fn(Option<&C>) -> String + Send + Sync>>,
 }
 ```
 

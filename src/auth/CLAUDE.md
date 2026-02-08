@@ -10,9 +10,9 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 459 |
+| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 457 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation with `start()` transport setup | 941 |
+| `peer.rs` | Core Peer implementation with `start()` transport setup | 996 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
 | `utils/` | Utility functions | - |
@@ -100,6 +100,13 @@ impl AuthMessage {
     pub fn validate(&self) -> Result<()>
 }
 ```
+
+**validate()** field requirements by message type:
+- `InitialRequest` - requires `initial_nonce`
+- `InitialResponse` - requires (`nonce` OR `initial_nonce`) + `your_nonce` + `signature`. Accepts either `nonce` or `initial_nonce` for cross-SDK compat (Go sends both, TS only sends `initialNonce`)
+- `CertificateRequest` - requires `requested_certificates`
+- `CertificateResponse` - requires `certificates`
+- `General` - requires `signature`
 
 **signing_data()** behavior by message type:
 - `InitialRequest` - Empty (not signed, starts handshake)
@@ -221,6 +228,17 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub async fn handle_incoming_message(&self, message: AuthMessage) -> Result<()>
 }
 ```
+
+**Internal methods** (private):
+- `sign_message()` - Signs an AuthMessage using BRC-42 key derivation with the session's peer identity key
+- `verify_message_signature()` - Verifies an incoming AuthMessage signature
+- `initiate_handshake()` - Creates session, sends InitialRequest, waits for InitialResponse via oneshot channel with timeout
+- `process_initial_request()` - Server-side: creates session, sends InitialResponse, optionally sends certificates
+- `process_initial_response()` - Client-side: delegates to `process_initial_response_inner()`, sends errors through oneshot channel
+- `process_initial_response_inner()` - Verifies InitialResponse signature, updates session, resolves pending handshake
+- `process_certificate_request()` - Verifies signature, notifies certificate request callbacks
+- `process_certificate_response()` - Verifies signature, validates certificates, updates session, notifies callbacks
+- `process_general_message()` - Verifies auth and signature, updates peer nonce, notifies callbacks
 
 **PeerOptions** - Configuration for creating a Peer:
 ```rust
@@ -368,9 +386,22 @@ The InitialResponse field mapping matches Go and TS SDKs:
 
 On the initiator side, the responder's session nonce (`initial_nonce`) is stored as `peer_nonce`.
 
+**TS SDK compatibility**: The TS SDK's InitialResponse has NO `nonce` field (only `initialNonce`, `yourNonce`). The Go SDK sends both `Nonce` and `InitialNonce`. The Rust SDK accepts either: both `start()` callback and `process_initial_response()` fall back to `initial_nonce` when `nonce` is absent.
+
+### Error Propagation
+
+Errors during InitialResponse processing (e.g., signature verification failure) are sent through the oneshot channel to the waiting `initiate_handshake()` caller. This is implemented in two places:
+
+1. **`start()` callback**: Extracts nonces in a closure; on error, sends through oneshot before returning
+2. **`process_initial_response()`**: Delegates to `process_initial_response_inner()`; on error, sends through oneshot
+
+Without this, errors would be swallowed by the routing task and the caller would time out instead of receiving the actual error.
+
 ### Nonce Generation
 
-Message nonces for General/CertificateRequest/CertificateResponse use simple 32-byte random values (base64-encoded), matching TypeScript's `Utils.toBase64(Random(32))`. Session nonces use HMAC-based `create_nonce()` with counterparty=Self.
+Message nonces for General/CertificateRequest/CertificateResponse use simple 32-byte random values (base64-encoded), matching TypeScript's `Utils.toBase64(Random(32))`. Session nonces use HMAC-based `create_nonce()` with counterparty=Self (None).
+
+Nonce verification on InitialResponse uses `nonce` if present, falls back to `initial_nonce` for TS SDK compat. Verification failure is non-fatal (matches Go/TS behavior).
 
 ### Cryptographic Details
 
@@ -457,6 +488,8 @@ Run with WebSocket transport tests:
 ```bash
 cargo test --features auth,websocket
 ```
+
+**Test pattern note**: `ChannelTransport` (MockTransport) in tests never invokes the `start()` callback. Messages go through `handle_incoming_message` → `process_initial_response`, NOT through the `start()` callback. The `start()` callback path is only exercised by real transports (HTTP, WebSocket) that invoke the registered callback when they receive data.
 
 ## Related Documentation
 

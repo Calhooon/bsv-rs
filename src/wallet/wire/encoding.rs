@@ -5,7 +5,7 @@
 //! for the WalletWire protocol.
 
 use crate::primitives::encoding::{Reader, Writer};
-use crate::primitives::{from_hex, to_hex, PublicKey};
+use crate::primitives::{from_base64, from_hex, to_base64, to_hex, PublicKey};
 use crate::wallet::types::{
     ActionStatus, BasketInsertion, Counterparty, IdentityCertificate, IdentityCertifier,
     InternalizeOutput, Outpoint, OutputInclude, Protocol, QueryMode, SecurityLevel, SendWithResult,
@@ -14,6 +14,10 @@ use crate::wallet::types::{
 };
 use crate::Error;
 use std::collections::HashMap;
+
+/// Sentinel value for nil/absent optional values in the Go-compatible wire format.
+/// Go uses `VarInt(math.MaxUint64)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil sentinel.
+const NIL_SENTINEL: u64 = u64::MAX;
 
 /// Wire protocol reader with signed varint support.
 ///
@@ -133,10 +137,10 @@ impl<'a> WireReader<'a> {
             .map_err(|e| Error::WalletError(format!("invalid UTF-8: {}", e)))
     }
 
-    /// Reads an optional string (length -1 = null).
+    /// Reads an optional string (Go-compatible: VarInt(MaxUint64) = null).
     pub fn read_optional_string(&mut self) -> Result<Option<String>, Error> {
-        let len = self.read_signed_var_int()?;
-        if len < 0 {
+        let len = self.read_var_int()?;
+        if len == NIL_SENTINEL {
             Ok(None)
         } else {
             let bytes = self.read_bytes(len as usize)?;
@@ -146,10 +150,10 @@ impl<'a> WireReader<'a> {
         }
     }
 
-    /// Reads an optional byte array (length -1 = null).
+    /// Reads an optional byte array (Go-compatible: VarInt(MaxUint64) = null).
     pub fn read_optional_bytes(&mut self) -> Result<Option<Vec<u8>>, Error> {
-        let len = self.read_signed_var_int()?;
-        if len < 0 {
+        let len = self.read_var_int()?;
+        if len == NIL_SENTINEL {
             Ok(None)
         } else {
             let bytes = self.read_bytes(len as usize)?;
@@ -157,16 +161,16 @@ impl<'a> WireReader<'a> {
         }
     }
 
-    /// Reads a string array (count -1 = null/empty).
+    /// Reads a string array (Go-compatible: VarInt(MaxUint64) = null/empty).
     pub fn read_string_array(&mut self) -> Result<Vec<String>, Error> {
-        let count = self.read_signed_var_int()?;
-        if count < 0 {
+        let count = self.read_var_int()?;
+        if count == NIL_SENTINEL {
             return Ok(Vec::new());
         }
 
         let mut strings = Vec::with_capacity(count as usize);
         for _ in 0..count {
-            strings.push(self.read_string()?);
+            strings.push(self.read_optional_string()?.unwrap_or_default());
         }
         Ok(strings)
     }
@@ -342,10 +346,10 @@ impl<'a> WireReader<'a> {
         }
     }
 
-    /// Reads a string to string map.
+    /// Reads a string to string map (Go-compatible: VarInt(MaxUint64) = empty).
     pub fn read_string_map(&mut self) -> Result<HashMap<String, String>, Error> {
-        let count = self.read_signed_var_int()?;
-        if count < 0 {
+        let count = self.read_var_int()?;
+        if count == NIL_SENTINEL {
             return Ok(HashMap::new());
         }
 
@@ -360,8 +364,8 @@ impl<'a> WireReader<'a> {
 
     /// Reads an optional string map.
     pub fn read_optional_string_map(&mut self) -> Result<Option<HashMap<String, String>>, Error> {
-        let count = self.read_signed_var_int()?;
-        if count < 0 {
+        let count = self.read_var_int()?;
+        if count == NIL_SENTINEL {
             return Ok(None);
         }
 
@@ -399,8 +403,8 @@ impl<'a> WireReader<'a> {
 
     /// Reads an array of SendWithResults.
     pub fn read_send_with_result_array(&mut self) -> Result<Option<Vec<SendWithResult>>, Error> {
-        let count = self.read_signed_var_int()?;
-        if count < 0 {
+        let count = self.read_var_int()?;
+        if count == NIL_SENTINEL {
             return Ok(None);
         }
 
@@ -424,8 +428,8 @@ impl<'a> WireReader<'a> {
 
     /// Reads a map of u32 to SignActionSpend.
     pub fn read_sign_action_spends(&mut self) -> Result<HashMap<u32, SignActionSpend>, Error> {
-        let count = self.read_signed_var_int()?;
-        if count < 0 {
+        let count = self.read_var_int()?;
+        if count == NIL_SENTINEL {
             return Ok(HashMap::new());
         }
 
@@ -438,16 +442,34 @@ impl<'a> WireReader<'a> {
         Ok(spends)
     }
 
-    /// Reads a WalletCertificate.
+    /// Reads a WalletCertificate (Go-compatible field order).
+    ///
+    /// Go format: type(32 raw) → serial(32 raw) → subject(33 pubkey) → certifier(33 pubkey)
+    ///           → outpoint → fields(sorted map) → signature(remaining bytes, no length prefix)
     pub fn read_wallet_certificate(&mut self) -> Result<WalletCertificate, Error> {
-        let certificate_type = self.read_string()?;
-        let subject = self.read_pubkey_hex()?; // 33-byte compressed pubkey as hex
-        let serial_number = self.read_string()?;
-        let certifier = self.read_pubkey_hex()?; // 33-byte compressed pubkey as hex
+        // Type: 32 raw bytes, stored as base64 string
+        let type_bytes = self.read_bytes(32)?;
+        let certificate_type = to_base64(type_bytes);
+
+        // Serial number: 32 raw bytes, stored as base64 string
+        let serial_bytes = self.read_bytes(32)?;
+        let serial_number = to_base64(serial_bytes);
+
+        // Subject: 33-byte compressed pubkey as hex
+        let subject = self.read_pubkey_hex()?;
+
+        // Certifier: 33-byte compressed pubkey as hex
+        let certifier = self.read_pubkey_hex()?;
+
+        // Revocation outpoint
         let revocation_outpoint = self.read_outpoint_string()?;
-        let signature_len = self.read_var_int()? as usize;
-        let signature = to_hex(self.read_bytes(signature_len)?);
+
+        // Fields: sorted string map (varint count + key/value pairs)
         let fields = self.read_string_map()?;
+
+        // Signature: remaining bytes (no length prefix, raw DER)
+        let sig_bytes = self.read_remaining();
+        let signature = to_hex(sig_bytes);
 
         Ok(WalletCertificate {
             certificate_type,
@@ -504,9 +526,14 @@ impl<'a> WireReader<'a> {
         }))
     }
 
-    /// Reads an IdentityCertificate.
+    /// Reads an IdentityCertificate (Go-compatible: length-prefixed certificate bytes).
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
-        let certificate = self.read_wallet_certificate()?;
+        // Go format: VarInt(cert_len) + cert_bytes, then certifier_info fields, keyring, decrypted_fields
+        let cert_len = self.read_var_int()? as usize;
+        let cert_bytes = self.read_bytes(cert_len)?;
+        let mut cert_reader = WireReader::new(cert_bytes);
+        let certificate = cert_reader.read_wallet_certificate()?;
+
         let certifier_info = self.read_optional_identity_certifier()?;
         let publicly_revealed_keyring = self.read_optional_string_map()?;
         let decrypted_fields = self.read_optional_string_map()?;
@@ -585,14 +612,15 @@ impl<'a> WireReader<'a> {
         })
     }
 
-    /// Reads a WalletActionInput.
+    /// Reads a WalletActionInput (Go-compatible format).
     pub fn read_wallet_action_input(&mut self) -> Result<WalletActionInput, Error> {
         let source_outpoint = self.read_outpoint()?;
         let source_satoshis = self.read_var_int()?;
         let source_locking_script = self.read_optional_bytes()?;
         let unlocking_script = self.read_optional_bytes()?;
         let input_description = self.read_string()?;
-        let sequence_number = self.read_u32_le()?;
+        // Go uses VarInt for sequence_number (not u32_le)
+        let sequence_number = self.read_var_int()? as u32;
 
         Ok(WalletActionInput {
             source_outpoint,
@@ -604,16 +632,19 @@ impl<'a> WireReader<'a> {
         })
     }
 
-    /// Reads a WalletActionOutput.
+    /// Reads a WalletActionOutput (Go-compatible field order).
+    ///
+    /// Go order: OutputIndex → Satoshis → LockingScript → Spendable
+    ///          → OutputDescription → Basket → Tags → CustomInstructions
     pub fn read_wallet_action_output(&mut self) -> Result<WalletActionOutput, Error> {
+        let output_index = self.read_var_int()? as u32;
         let satoshis = self.read_var_int()?;
         let locking_script = self.read_optional_bytes()?;
         let spendable = self.read_optional_bool()?.unwrap_or(false);
-        let custom_instructions = self.read_optional_string()?;
-        let tags = self.read_string_array()?;
-        let output_index = self.read_var_int()? as u32;
         let output_description = self.read_string()?;
         let basket = self.read_string()?;
+        let tags = self.read_string_array()?;
+        let custom_instructions = self.read_optional_string()?;
 
         Ok(WalletActionOutput {
             satoshis,
@@ -627,13 +658,17 @@ impl<'a> WireReader<'a> {
         })
     }
 
-    /// Reads a WalletAction.
+    /// Reads a WalletAction (Go-compatible format).
+    ///
+    /// Go format: txid(32 reversed) → satoshis(varint) → status(u8) → isOutgoing(optional bool)
+    ///           → description(string) → labels(string slice) → version(varint) → lockTime(varint)
+    ///           → inputs(varint count or MaxUint64) → outputs(varint count or MaxUint64)
     pub fn read_wallet_action(&mut self) -> Result<WalletAction, Error> {
         let txid_bytes = self.read_bytes(32)?;
         let mut txid = [0u8; 32];
         txid.copy_from_slice(txid_bytes);
-        // satoshis can be negative for outgoing transactions
-        let satoshis = self.read_signed_var_int()?;
+        // Go uses unsigned VarInt for satoshis, cast to i64
+        let satoshis = self.read_var_int()? as i64;
         let status = self
             .read_action_status()?
             .unwrap_or(ActionStatus::Unprocessed);
@@ -647,12 +682,13 @@ impl<'a> WireReader<'a> {
                 Some(arr)
             }
         };
-        let version = self.read_u32_le()?;
-        let lock_time = self.read_u32_le()?;
+        // Go uses VarInt for version/lockTime (not u32_le)
+        let version = self.read_var_int()? as u32;
+        let lock_time = self.read_var_int()? as u32;
 
-        // Read optional inputs array
-        let inputs_count = self.read_signed_var_int()?;
-        let inputs = if inputs_count < 0 {
+        // Read optional inputs array (Go uses VarInt(MaxUint64) for nil)
+        let inputs_count = self.read_var_int()?;
+        let inputs = if inputs_count == NIL_SENTINEL {
             None
         } else {
             let mut inputs = Vec::with_capacity(inputs_count as usize);
@@ -662,9 +698,9 @@ impl<'a> WireReader<'a> {
             Some(inputs)
         };
 
-        // Read optional outputs array
-        let outputs_count = self.read_signed_var_int()?;
-        let outputs = if outputs_count < 0 {
+        // Read optional outputs array (Go uses VarInt(MaxUint64) for nil)
+        let outputs_count = self.read_var_int()?;
+        let outputs = if outputs_count == NIL_SENTINEL {
             None
         } else {
             let mut outputs = Vec::with_capacity(outputs_count as usize);
@@ -688,11 +724,14 @@ impl<'a> WireReader<'a> {
         })
     }
 
-    /// Reads a WalletOutput.
+    /// Reads a WalletOutput (Go-compatible field order).
+    ///
+    /// Go order: Outpoint → Satoshis → LockingScript → CustomInstructions → Tags → Labels
+    /// Note: Go WalletOutput does NOT have a `spendable` field. Defaults to true.
     pub fn read_wallet_output(&mut self) -> Result<WalletOutput, Error> {
+        let outpoint = self.read_outpoint()?;
         let satoshis = self.read_var_int()?;
         let locking_script = self.read_optional_bytes()?;
-        let spendable = self.read_optional_bool()?.unwrap_or(false);
         let custom_instructions = self.read_optional_string()?;
         let tags = {
             let arr = self.read_string_array()?;
@@ -702,7 +741,6 @@ impl<'a> WireReader<'a> {
                 Some(arr)
             }
         };
-        let outpoint = self.read_outpoint()?;
         let labels = {
             let arr = self.read_string_array()?;
             if arr.is_empty() {
@@ -715,7 +753,7 @@ impl<'a> WireReader<'a> {
         Ok(WalletOutput {
             satoshis,
             locking_script,
-            spendable,
+            spendable: true, // Go defaults to true; field not on wire
             custom_instructions,
             tags,
             outpoint,
@@ -849,43 +887,45 @@ impl WireWriter {
         self.write_bytes(bytes)
     }
 
-    /// Writes an optional string (length -1 = null).
+    /// Writes an optional string (Go-compatible: VarInt(MaxUint64) = null).
+    ///
+    /// Go uses `WriteOptionalString`: empty string → NegativeOne, non-empty → VarInt(len) + bytes.
     pub fn write_optional_string(&mut self, s: Option<&str>) -> &mut Self {
         match s {
-            Some(s) => {
+            Some(s) if !s.is_empty() => {
                 let bytes = s.as_bytes();
-                self.write_signed_var_int(bytes.len() as i64);
+                self.write_var_int(bytes.len() as u64);
                 self.write_bytes(bytes)
             }
-            None => self.write_signed_var_int(-1),
+            _ => self.write_var_int(NIL_SENTINEL),
         }
     }
 
-    /// Writes optional bytes (length -1 = null).
+    /// Writes optional bytes (Go-compatible: VarInt(MaxUint64) = null).
     pub fn write_optional_bytes(&mut self, data: Option<&[u8]>) -> &mut Self {
         match data {
-            Some(data) => {
-                self.write_signed_var_int(data.len() as i64);
+            Some(data) if !data.is_empty() => {
+                self.write_var_int(data.len() as u64);
                 self.write_bytes(data)
             }
-            None => self.write_signed_var_int(-1),
+            _ => self.write_var_int(NIL_SENTINEL),
         }
     }
 
-    /// Writes a string array.
+    /// Writes a string array (Go-compatible: VarInt count, each element via write_optional_string).
     pub fn write_string_array(&mut self, strings: &[String]) -> &mut Self {
-        self.write_signed_var_int(strings.len() as i64);
+        self.write_var_int(strings.len() as u64);
         for s in strings {
-            self.write_string(s);
+            self.write_optional_string(Some(s));
         }
         self
     }
 
-    /// Writes an optional string array (None becomes count -1).
+    /// Writes an optional string array (None becomes VarInt(MaxUint64)).
     pub fn write_optional_string_array(&mut self, strings: Option<&[String]>) -> &mut Self {
         match strings {
             Some(strings) => self.write_string_array(strings),
-            None => self.write_signed_var_int(-1),
+            None => self.write_var_int(NIL_SENTINEL),
         }
     }
 
@@ -1014,23 +1054,26 @@ impl WireWriter {
         }
     }
 
-    /// Writes a string to string map.
+    /// Writes a string to string map (Go-compatible: sorted keys, VarInt count).
     pub fn write_string_map(&mut self, map: &HashMap<String, String>) -> &mut Self {
-        self.write_signed_var_int(map.len() as i64);
-        for (key, value) in map {
+        // Go sorts keys lexicographically
+        let mut keys: Vec<&String> = map.keys().collect();
+        keys.sort();
+        self.write_var_int(keys.len() as u64);
+        for key in keys {
             self.write_string(key);
-            self.write_string(value);
+            self.write_string(&map[key]);
         }
         self
     }
 
-    /// Writes an optional string map.
+    /// Writes an optional string map (Go-compatible: VarInt(MaxUint64) for None).
     pub fn write_optional_string_map(
         &mut self,
         map: Option<&HashMap<String, String>>,
     ) -> &mut Self {
         match map {
-            None => self.write_signed_var_int(-1),
+            None => self.write_var_int(NIL_SENTINEL),
             Some(map) => self.write_string_map(map),
         }
     }
@@ -1051,15 +1094,15 @@ impl WireWriter {
         self.write_send_with_result_status(result.status)
     }
 
-    /// Writes an optional array of SendWithResults.
+    /// Writes an optional array of SendWithResults (Go-compatible: VarInt(MaxUint64) for None).
     pub fn write_send_with_result_array(
         &mut self,
         results: Option<&[SendWithResult]>,
     ) -> &mut Self {
         match results {
-            None => self.write_signed_var_int(-1),
+            None => self.write_var_int(NIL_SENTINEL),
             Some(results) => {
-                self.write_signed_var_int(results.len() as i64);
+                self.write_var_int(results.len() as u64);
                 for r in results {
                     self.write_send_with_result(r);
                 }
@@ -1075,12 +1118,12 @@ impl WireWriter {
         self.write_optional_var_int(spend.sequence_number.map(|v| v as u64))
     }
 
-    /// Writes a map of u32 to SignActionSpend.
+    /// Writes a map of u32 to SignActionSpend (Go-compatible: VarInt count).
     pub fn write_sign_action_spends(
         &mut self,
         spends: &HashMap<u32, SignActionSpend>,
     ) -> &mut Self {
-        self.write_signed_var_int(spends.len() as i64);
+        self.write_var_int(spends.len() as u64);
         for (index, spend) in spends {
             self.write_var_int(*index as u64);
             self.write_sign_action_spend(spend);
@@ -1088,27 +1131,54 @@ impl WireWriter {
         self
     }
 
-    /// Writes a WalletCertificate.
+    /// Writes a WalletCertificate (Go-compatible field order).
+    ///
+    /// Go order: type(32 raw base64) → serial(32 raw base64) → subject(33 hex pubkey)
+    ///          → certifier(33 hex pubkey) → outpoint → fields(sorted map) → signature(raw, no length prefix)
     pub fn write_wallet_certificate(
         &mut self,
         cert: &WalletCertificate,
     ) -> Result<&mut Self, Error> {
-        self.write_string(&cert.certificate_type);
-        // Write subject as 33-byte pubkey (from hex)
+        // Type: decode from base64, write 32 raw bytes
+        let type_bytes = from_base64(&cert.certificate_type)
+            .map_err(|e| Error::WalletError(format!("invalid certificate_type base64: {}", e)))?;
+        if type_bytes.len() != 32 {
+            return Err(Error::WalletError(format!(
+                "certificate_type must be 32 bytes, got {}",
+                type_bytes.len()
+            )));
+        }
+        self.write_bytes(&type_bytes);
+
+        // Serial: decode from base64, write 32 raw bytes
+        let serial_bytes = from_base64(&cert.serial_number)
+            .map_err(|e| Error::WalletError(format!("invalid serial_number base64: {}", e)))?;
+        if serial_bytes.len() != 32 {
+            return Err(Error::WalletError(format!(
+                "serial_number must be 32 bytes, got {}",
+                serial_bytes.len()
+            )));
+        }
+        self.write_bytes(&serial_bytes);
+
+        // Subject: 33-byte pubkey from hex
         let subject_bytes = from_hex(&cert.subject)?;
         self.write_bytes(&subject_bytes);
-        self.write_string(&cert.serial_number);
-        // Write certifier as 33-byte pubkey (from hex)
+
+        // Certifier: 33-byte pubkey from hex
         let certifier_bytes = from_hex(&cert.certifier)?;
         self.write_bytes(&certifier_bytes);
-        // Write revocation outpoint
+
+        // Revocation outpoint
         self.write_outpoint_string(&cert.revocation_outpoint)?;
-        // Write signature
-        let sig_bytes = from_hex(&cert.signature)?;
-        self.write_var_int(sig_bytes.len() as u64);
-        self.write_bytes(&sig_bytes);
-        // Write fields
+
+        // Fields: sorted string map (Go writes fields BEFORE signature)
         self.write_string_map(&cert.fields);
+
+        // Signature: raw bytes, no length prefix (Go writes remaining bytes)
+        let sig_bytes = from_hex(&cert.signature)?;
+        self.write_bytes(&sig_bytes);
+
         Ok(self)
     }
 
@@ -1151,12 +1221,18 @@ impl WireWriter {
         }
     }
 
-    /// Writes an IdentityCertificate.
+    /// Writes an IdentityCertificate (Go-compatible: length-prefixed certificate bytes).
     pub fn write_identity_certificate(
         &mut self,
         cert: &IdentityCertificate,
     ) -> Result<&mut Self, Error> {
-        self.write_wallet_certificate(&cert.certificate)?;
+        // Go format: serialize certificate to bytes, then write as VarInt(len) + bytes
+        let mut cert_writer = WireWriter::new();
+        cert_writer.write_wallet_certificate(&cert.certificate)?;
+        let cert_bytes = cert_writer.into_bytes();
+        self.write_var_int(cert_bytes.len() as u64);
+        self.write_bytes(&cert_bytes);
+
         self.write_optional_identity_certifier(cert.certifier_info.as_ref());
         self.write_optional_string_map(cert.publicly_revealed_keyring.as_ref());
         self.write_optional_string_map(cert.decrypted_fields.as_ref());
@@ -1211,61 +1287,70 @@ impl WireWriter {
         self.write_optional_basket_insertion(output.insertion_remittance.as_ref())
     }
 
-    /// Writes a WalletActionInput.
+    /// Writes a WalletActionInput (Go-compatible: VarInt for sequence_number).
     pub fn write_wallet_action_input(&mut self, input: &WalletActionInput) -> &mut Self {
         self.write_outpoint(&input.source_outpoint);
         self.write_var_int(input.source_satoshis);
         self.write_optional_bytes(input.source_locking_script.as_deref());
         self.write_optional_bytes(input.unlocking_script.as_deref());
         self.write_string(&input.input_description);
-        self.write_u32_le(input.sequence_number)
+        // Go uses VarInt for sequence_number (not u32_le)
+        self.write_var_int(input.sequence_number as u64)
     }
 
-    /// Writes a WalletActionOutput.
+    /// Writes a WalletActionOutput (Go-compatible field order).
+    ///
+    /// Go order: OutputIndex → Satoshis → LockingScript → Spendable
+    ///          → OutputDescription → Basket → Tags → CustomInstructions
     pub fn write_wallet_action_output(&mut self, output: &WalletActionOutput) -> &mut Self {
+        self.write_var_int(output.output_index as u64);
         self.write_var_int(output.satoshis);
         self.write_optional_bytes(output.locking_script.as_deref());
         self.write_optional_bool(Some(output.spendable));
-        self.write_optional_string(output.custom_instructions.as_deref());
-        self.write_string_array(&output.tags);
-        self.write_var_int(output.output_index as u64);
         self.write_string(&output.output_description);
-        self.write_string(&output.basket)
+        self.write_string(&output.basket);
+        self.write_string_array(&output.tags);
+        self.write_optional_string(output.custom_instructions.as_deref())
     }
 
-    /// Writes a WalletAction.
+    /// Writes a WalletAction (Go-compatible format).
+    ///
+    /// Go format: txid(32) → satoshis(varint) → status(u8) → isOutgoing(optional bool)
+    ///           → description(string) → labels(string slice) → version(varint) → lockTime(varint)
+    ///           → inputs(varint count or MaxUint64) → outputs(varint count or MaxUint64)
     pub fn write_wallet_action(&mut self, action: &WalletAction) -> &mut Self {
         self.write_bytes(&action.txid);
-        // satoshis can be negative for outgoing transactions
-        self.write_signed_var_int(action.satoshis);
+        // Go uses unsigned VarInt for satoshis
+        self.write_var_int(action.satoshis as u64);
         self.write_action_status(Some(action.status));
         self.write_optional_bool(Some(action.is_outgoing));
         self.write_string(&action.description);
         let labels = action.labels.as_deref().unwrap_or(&[]);
         self.write_string_array(labels);
-        self.write_u32_le(action.version);
-        self.write_u32_le(action.lock_time);
+        // Go uses VarInt for version/lockTime (not u32_le)
+        self.write_var_int(action.version as u64);
+        self.write_var_int(action.lock_time as u64);
 
-        // Write optional inputs array
+        // Write optional inputs array (Go uses VarInt(MaxUint64) for nil)
         match &action.inputs {
             None => {
-                self.write_signed_var_int(-1);
+                self.write_var_int(NIL_SENTINEL);
             }
             Some(inputs) => {
-                self.write_signed_var_int(inputs.len() as i64);
+                self.write_var_int(inputs.len() as u64);
                 for input in inputs {
                     self.write_wallet_action_input(input);
                 }
             }
         }
 
-        // Write optional outputs array
+        // Write optional outputs array (Go uses VarInt(MaxUint64) for nil)
         match &action.outputs {
             None => {
-                self.write_signed_var_int(-1);
+                self.write_var_int(NIL_SENTINEL);
             }
             Some(outputs) => {
-                self.write_signed_var_int(outputs.len() as i64);
+                self.write_var_int(outputs.len() as u64);
                 for output in outputs {
                     self.write_wallet_action_output(output);
                 }
@@ -1275,15 +1360,17 @@ impl WireWriter {
         self
     }
 
-    /// Writes a WalletOutput.
+    /// Writes a WalletOutput (Go-compatible field order).
+    ///
+    /// Go order: Outpoint → Satoshis → LockingScript → CustomInstructions → Tags → Labels
+    /// Note: Go WalletOutput does NOT write a `spendable` field.
     pub fn write_wallet_output(&mut self, output: &WalletOutput) -> &mut Self {
+        self.write_outpoint(&output.outpoint);
         self.write_var_int(output.satoshis);
         self.write_optional_bytes(output.locking_script.as_deref());
-        self.write_optional_bool(Some(output.spendable));
         self.write_optional_string(output.custom_instructions.as_deref());
         let tags = output.tags.as_deref().unwrap_or(&[]);
         self.write_string_array(tags);
-        self.write_outpoint(&output.outpoint);
         let labels = output.labels.as_deref().unwrap_or(&[]);
         self.write_string_array(labels)
     }
@@ -1501,11 +1588,11 @@ mod tests {
         let mut reader = WireReader::new(writer.as_bytes());
         assert_eq!(reader.read_optional_bytes().unwrap(), None);
 
-        // Empty bytes
+        // Empty bytes - Go treats empty same as nil (both write NIL_SENTINEL)
         let mut writer = WireWriter::new();
         writer.write_optional_bytes(Some(&[]));
         let mut reader = WireReader::new(writer.as_bytes());
-        assert_eq!(reader.read_optional_bytes().unwrap(), Some(vec![]));
+        assert_eq!(reader.read_optional_bytes().unwrap(), None);
     }
 
     #[test]
@@ -1772,10 +1859,14 @@ mod tests {
         fields.insert("name".to_string(), "encrypted_value_1".to_string());
         fields.insert("email".to_string(), "encrypted_value_2".to_string());
 
+        // Type and serial must be valid base64-encoded 32-byte values (Go format)
+        let type_bytes = [0xaa; 32];
+        let serial_bytes = [0xbb; 32];
+
         WalletCertificate {
-            certificate_type: "z8nzALhCLnLbi4p6iCDW4oiFd6jd".to_string(),
+            certificate_type: crate::primitives::to_base64(&type_bytes),
             subject: pubkey.to_hex(),
-            serial_number: "cert-serial-12345".to_string(),
+            serial_number: crate::primitives::to_base64(&serial_bytes),
             certifier: certifier.to_hex(),
             revocation_outpoint: format!("{}.0", crate::primitives::to_hex(&[0xcc; 32])),
             signature: crate::primitives::to_hex(&[0xdd; 72]),
@@ -2266,7 +2357,7 @@ mod tests {
         assert_eq!(read.outpoint.vout, output.outpoint.vout);
         assert_eq!(read.labels, output.labels);
 
-        // Minimal output
+        // Minimal output (spendable not on wire, defaults to true on read)
         let minimal = WalletOutput {
             satoshis: 546,
             locking_script: None,
@@ -2283,7 +2374,8 @@ mod tests {
         let read = reader.read_wallet_output().unwrap();
         assert_eq!(read.satoshis, 546);
         assert_eq!(read.locking_script, None);
-        assert!(!read.spendable);
+        // Go wire format has no spendable field; defaults to true on read
+        assert!(read.spendable);
         assert_eq!(read.custom_instructions, None);
         assert_eq!(read.tags, None);
         assert_eq!(read.labels, None);

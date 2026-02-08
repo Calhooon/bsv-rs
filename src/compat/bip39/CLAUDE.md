@@ -12,7 +12,7 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module declaration, documentation, and public re-exports |
-| `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, and `NfkdNormalize` trait implementations |
+| `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, `NfkdNormalize` trait, and `Display` impl (~963 lines) |
 | `wordlists/mod.rs` | Wordlist module declaration, re-exports, and `verify_english_wordlist()` |
 | `wordlists/english.rs` | English BIP-39 wordlist (2048 words as `[&str; 2048]`) |
 | `wordlists/chinese_simplified.rs` | Chinese Simplified wordlist |
@@ -105,11 +105,12 @@ pub enum Language {
 - `word_index(&self, word: &str) -> Option<usize>` - Finds word index
 
 **Wordlist Utilities:**
-- `verify_english_wordlist() -> bool` - Verify wordlist integrity (first/last words, 2048 count)
+- `verify_english_wordlist() -> bool` - Verify wordlist integrity (first/last words, 2048 count; `#[inline]`)
 
 **Trait Implementations:**
 - `Display` for `Mnemonic` - Displays the phrase via `phrase()` method
 - `Clone` for `Mnemonic` - Enables cloning mnemonic instances
+- `NfkdNormalize` for `str` and `String` (private) - Pass-through NFKD normalization matching Go SDK
 
 ## Usage
 
@@ -368,6 +369,8 @@ cargo test --features compat bip39
 cargo test --features compat
 ```
 
+27 unit tests (23 in `mnemonic.rs`, 4 in `wordlists/mod.rs`) plus 29 integration tests in `compat_bip39_tests.rs`.
+
 Test coverage includes:
 - All word counts (12, 15, 18, 21, 24 words)
 - Known test vectors (all zeros, all ones)
@@ -376,7 +379,7 @@ Test coverage includes:
 - Binary serialization roundtrip for all word counts
 - Invalid inputs (wrong word count, bad checksum, invalid words, invalid entropy length)
 - Invalid binary inputs (invalid UTF-8, invalid phrase)
-- Wordlist integrity verification (all 9 languages verified to have 2048 words)
+- Wordlist integrity verification (all 9 languages verified to have 2048 words, first/last word checks)
 - Multi-language mnemonic generation for all 9 languages
 - Multi-language seed derivation (determinism, passphrase differentiation)
 - Japanese ideographic space separator validation

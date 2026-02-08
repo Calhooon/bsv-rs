@@ -10,10 +10,10 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with feature-gated exports and re-exports | ~253 |
-| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers) | ~1905 |
+| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers) | ~1936 |
 | `interface.rs` | WalletInterface async trait (28 methods) + marker traits | ~297 |
-| `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~679 |
-| `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~526 |
+| `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
+| `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
 | `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl | ~1414 |
 | `validation.rs` | 40+ input validation helpers + validated structs | ~1170 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
@@ -32,7 +32,7 @@ Transport layer implementations for wallet communication (requires `http` featur
 ### wire/
 Wire protocol implementation for binary wallet communication:
 - `mod.rs` - Module definitions and re-exports
-- `encoding.rs` - Binary encoding/decoding for all wallet types (~2,459 lines)
+- `encoding.rs` - Binary encoding/decoding for all wallet types (~2,493 lines)
 - `calls.rs` - Call frame definitions for all 28 wallet operations
 - `transceiver.rs` - Protocol transceiver (`WalletWireTransceiver`)
 - `processor.rs` - Request/response processing (`WalletWireProcessor`)

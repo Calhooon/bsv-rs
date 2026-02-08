@@ -15,8 +15,8 @@ These utilities are used internally by the `Peer` implementation but are also ex
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports | ~16 |
-| `nonce.rs` | Cryptographic nonce creation and verification | ~204 |
-| `validation.rs` | Certificate validation, encoding checks, and retrieval | ~982 |
+| `nonce.rs` | Cryptographic nonce creation and verification | ~201 |
+| `validation.rs` | Certificate validation, encoding checks, and retrieval | ~972 |
 
 ## Key Exports
 
@@ -463,7 +463,7 @@ cargo test --features auth validation
 - `test_validate_nonce_format` - Format validation (valid, too short, invalid base64)
 - `test_get_nonce_random` - Random extraction from nonce bytes
 
-**validation.rs tests (22 tests):**
+**validation.rs tests (28 tests):**
 
 *certificates_match_request:*
 - `test_certificates_match_empty_request` - Empty request always matches

@@ -10,15 +10,17 @@ This module contains Criterion-based benchmarks for measuring the performance of
 | File | Purpose |
 |------|---------|
 | `hash_bench.rs` | Standalone hash function benchmarks |
-| `primitives_bench.rs` | Comprehensive benchmarks for all primitives |
-| `script_bench.rs` | Script parsing, templates, signing, and serialization benchmarks |
-| `memory_bench.rs` | Performance benchmarks with RSS memory tracking |
+| `primitives_bench.rs` | Comprehensive benchmarks for all primitives (11 groups) |
+| `script_bench.rs` | Script parsing, templates, signing, and serialization benchmarks (5 groups) |
+| `memory_bench.rs` | Performance benchmarks with RSS memory tracking (4 groups) |
+
+All four are declared as `[[bench]]` in `Cargo.toml` with `harness = false` (Criterion provides its own main).
 
 ## Benchmark Groups
 
 ### hash_bench.rs
 
-Focused benchmarks for core hash functions:
+Focused benchmarks for core hash functions on a 36-byte payload:
 
 | Benchmark | Function |
 |-----------|----------|
@@ -121,6 +123,23 @@ Benchmarks for script parsing, template construction, signing, and serialization
 - `to_hex (PushDrop 10 fields)` - Serialize large PushDrop script to hex
 - `to_binary (PushDrop 10 fields)` - Serialize large PushDrop script to binary
 
+### memory_bench.rs
+
+Performance benchmarks with RSS (Resident Set Size) memory tracking, organized into 4 groups:
+
+| Benchmark Group | Operations |
+|-----------------|------------|
+| Memory/Encryption | AES-GCM encrypt/decrypt at 64B, 1KB, 16KB (with throughput) |
+| Memory/KeyDerivation | BRC-42 derive_child (with counter-based unique invoice IDs), ECDH shared secret |
+| Memory/Shamir | split 3-of-5, split 5-of-10, recover 3-of-5 |
+| Memory/Signing | ECDSA sign, ECDSA verify |
+
+These benchmarks provide:
+- Standard Criterion timing measurements for performance regression detection
+- RSS memory delta tracking printed after each benchmark group via `memory_stats::memory_stats()`
+- Cross-platform support (Linux, macOS, Windows)
+- Throughput measurements for encryption operations
+
 ## Running Benchmarks
 
 ```bash
@@ -201,33 +220,16 @@ fn bench_new_feature(c: &mut Criterion) {
 
 3. For throughput benchmarks, set `group.throughput(Throughput::Bytes(size))`.
 
-### memory_bench.rs
-
-Performance benchmarks with RSS (Resident Set Size) memory tracking:
-
-| Benchmark Group | Operations |
-|-----------------|------------|
-| Memory/Encryption | AES-GCM encrypt/decrypt at 64B, 1KB, 16KB |
-| Memory/KeyDerivation | BRC-42 derive_child, ECDH shared secret |
-| Memory/Shamir | split 3-of-5, split 5-of-10, recover 3-of-5 |
-| Memory/Signing | ECDSA sign, ECDSA verify |
-
-These benchmarks provide:
-- Standard Criterion timing measurements for performance regression detection
-- RSS memory delta tracking printed after each benchmark group
-- Cross-platform support (Linux, macOS, Windows)
-- Throughput measurements for encryption operations
-
 ## Memory Profiling (Development)
 
-For detailed heap allocation analysis, use the dhat profiler tests:
+For detailed heap allocation analysis, use the dhat profiler tests in `tests/memory_profiling.rs`:
 
 ```bash
 # Run dhat profiling tests (requires dhat-profiling feature)
 cargo test --features dhat-profiling memory_profiling -- --nocapture --test-threads=1
 ```
 
-Tests in `tests/memory_profiling.rs` provide:
+These tests provide:
 - Total allocations per operation
 - Peak heap usage
 - Bytes allocated per iteration
@@ -243,8 +245,8 @@ Covered operations:
 ## Dependencies
 
 The benchmarks use:
-- `criterion` - Benchmarking framework
-- `memory-stats` - Cross-platform RSS memory tracking
+- `criterion` - Benchmarking framework (with `harness = false`)
+- `memory-stats` - Cross-platform RSS memory tracking (memory_bench only)
 - `bsv_sdk::primitives` - All cryptographic primitives being measured
 - `bsv_sdk::script` - Script parsing, templates (P2PKH, P2PK, Multisig, PushDrop), and serialization
 

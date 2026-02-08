@@ -1,6 +1,6 @@
 # BSV SDK for Rust
 
-The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready, with ~100,000 lines of Rust, 2,500 tests, 2,000+ cross-SDK test vectors, and byte-for-byte compatibility with the [TypeScript](https://github.com/bitcoin-sv/ts-sdk) and [Go](https://github.com/bitcoin-sv/go-sdk) SDKs.
+The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready, with ~100,000 lines of Rust, 2,578 tests, 2,044+ cross-SDK test vectors, and byte-for-byte compatibility with the [TypeScript](https://github.com/bitcoin-sv/ts-sdk) and [Go](https://github.com/bitcoin-sv/go-sdk) SDKs — including binary wire protocol interoperability.
 
 [![Crates.io](https://img.shields.io/crates/v/bsv-sdk.svg)](https://crates.io/crates/bsv-sdk)
 [![Documentation](https://docs.rs/bsv-sdk/badge.svg)](https://docs.rs/bsv-sdk)
@@ -431,6 +431,8 @@ if validation.valid {
 | `CachedKeyDeriver` | LRU-cached key deriver for performance |
 | `ProtoWallet` | Cryptographic operations (sign, encrypt, HMAC) |
 | `WalletClient` | HTTP client for remote wallet communication |
+| `WalletWireTransceiver` | Binary wire protocol client (Go-compatible) |
+| `WalletWireProcessor` | Binary wire protocol server (Go-compatible) |
 | `Protocol` | BRC-43 protocol identifier |
 | `SecurityLevel` | Key derivation security levels (0, 1, 2) |
 | `Counterparty` | Key derivation counterparty specification |
@@ -582,6 +584,8 @@ This SDK maintains byte-for-byte compatibility with:
 - [BSV TypeScript SDK](https://github.com/bitcoin-sv/ts-sdk)
 - [BSV Go SDK](https://github.com/bitcoin-sv/go-sdk)
 
+The binary wire protocol (`WalletWireTransceiver`/`WalletWireProcessor`) is fully interoperable with the Go SDK's `wallet/serializer` — messages serialized by one SDK can be deserialized by the other. This covers all 28 wallet interface methods, certificate formats, and complex nested types.
+
 All implementations share test vectors to ensure cross-platform compatibility:
 
 | Category | Test Count | Description |
@@ -593,7 +597,7 @@ All implementations share test vectors to ensure cross-platform compatibility:
 | Symmetric Encryption | 5 | AES-256-GCM vectors |
 | Auth Certificates | 4 | Certificate serialization vectors |
 | Overlay Types | 22 | Admin tokens (4) + type serialization (18) |
-| Wire Protocol | 90 | All 28 WalletInterface method roundtrips |
+| Wire Protocol | 132 | All 28 method roundtrips (90) + Go cross-SDK vectors (42) |
 | Transaction/BEEF | 87 | Parsing, serialization, ancestry, cross-SDK BEEF |
 | GlobalKVStore | 85 | CRUD, batch, PushDrop interpreter, signatures |
 | LocalKVStore | 83 | Config, entries, queries, batch operations |
@@ -606,7 +610,7 @@ All implementations share test vectors to ensure cross-platform compatibility:
 | Auth + Peer E2E | 58 | Sessions, certificates, mutual auth handshake |
 | Messages (BRC-77/78) | 33 | Sign/verify, encrypt/decrypt, cross-SDK vectors |
 
-**Total: 2,500 tests (1,307 unit + 909 integration + 284 doc tests) across 29 test files + 2,044 cross-SDK vectors + 4 fuzz targets + 4 benchmark suites**
+**Total: 2,578 tests (1,339 unit + 1,071 integration + 168 doc tests) across 31 test files + 2,044 cross-SDK vectors + 54 wire protocol vectors + 4 fuzz targets + 4 benchmark suites**
 
 ## Development
 
@@ -629,6 +633,7 @@ cargo test --features "full,websocket"
 # Run tests for specific module
 cargo test --features wallet --test wallet_tests
 cargo test --features wallet --test wire_method_roundtrip_tests
+cargo test --features wallet --test wallet_wire_cross_sdk_tests
 cargo test --features auth --test auth_peer_e2e_tests
 cargo test --features "overlay,http" --test overlay_http_tests
 cargo test --features "storage,http" --test storage_http_tests

@@ -1088,7 +1088,8 @@ mod wire_protocol_tests {
             Some("present".to_string())
         );
         assert_eq!(reader.read_optional_string().unwrap(), None);
-        assert_eq!(reader.read_optional_string().unwrap(), Some("".to_string()));
+        // Go treats empty string same as nil (both write NIL_SENTINEL)
+        assert_eq!(reader.read_optional_string().unwrap(), None);
     }
 
     #[test]
@@ -1233,7 +1234,8 @@ mod wire_protocol_tests {
             Some(vec![1, 2, 3, 4, 5])
         );
         assert_eq!(reader.read_optional_bytes().unwrap(), None);
-        assert_eq!(reader.read_optional_bytes().unwrap(), Some(vec![]));
+        // Go treats empty bytes same as nil (both write NIL_SENTINEL)
+        assert_eq!(reader.read_optional_bytes().unwrap(), None);
     }
 
     #[test]

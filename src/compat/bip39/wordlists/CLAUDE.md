@@ -10,15 +10,15 @@ This module provides the official BIP-39 wordlists used for encoding entropy as 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | 121 | Module declarations, re-exports, `verify_english_wordlist()`, and tests |
-| `english.rs` | 224 | Official BIP-39 English wordlist (2048 words) |
-| `chinese_simplified.rs` | 355 | Official BIP-39 Chinese Simplified wordlist (2048 words) |
-| `chinese_traditional.rs` | 355 | Official BIP-39 Chinese Traditional wordlist (2048 words) |
-| `czech.rs` | 241 | Official BIP-39 Czech wordlist (2048 words) |
-| `french.rs` | 241 | Official BIP-39 French wordlist (2048 words) |
-| `italian.rs` | 241 | Official BIP-39 Italian wordlist (2048 words) |
-| `japanese.rs` | 355 | Official BIP-39 Japanese wordlist (2048 words) |
-| `korean.rs` | 355 | Official BIP-39 Korean wordlist (2048 words) |
-| `spanish.rs` | 241 | Official BIP-39 Spanish wordlist (2048 words) |
+| `english.rs` | 224 | Official BIP-39 English wordlist (2048 words, ~9 words/line) |
+| `chinese_simplified.rs` | 141 | Official BIP-39 Chinese Simplified wordlist (2048 words, 16 chars/line) |
+| `chinese_traditional.rs` | 141 | Official BIP-39 Chinese Traditional wordlist (2048 words, 16 chars/line) |
+| `czech.rs` | 244 | Official BIP-39 Czech wordlist (2048 words, ~9 words/line) |
+| `french.rs` | 2061 | Official BIP-39 French wordlist (2048 words, 1 word/line) |
+| `italian.rs` | 2061 | Official BIP-39 Italian wordlist (2048 words, 1 word/line) |
+| `japanese.rs` | 2061 | Official BIP-39 Japanese wordlist (2048 words, 1 word/line) |
+| `korean.rs` | 2061 | Official BIP-39 Korean wordlist (2048 words, 1 word/line) |
+| `spanish.rs` | 2061 | Official BIP-39 Spanish wordlist (2048 words, 1 word/line) |
 
 ## Key Exports
 
@@ -84,7 +84,10 @@ BIP-39 wordlists have specific properties for mnemonic generation:
 - **Common words**: Words are chosen to be easy to spell and recognize
 - **No similar words**: Avoids confusing word pairs (e.g., "build" vs "built")
 
-CJK wordlists (Chinese, Japanese, Korean) use Unicode characters and have different line formatting (6 words per line vs 9 for Latin-script languages).
+Wordlist files use different line formatting depending on the language:
+- **English, Czech**: ~9 comma-separated words per line (compact, 224/244 lines)
+- **Chinese Simplified, Chinese Traditional**: 16 characters per line (141 lines each)
+- **French, Italian, Japanese, Korean, Spanish**: 1 word per line (2061 lines each)
 
 ## Language Integration
 
@@ -169,7 +172,7 @@ pub static {LANGUAGE}: [&str; 2048] = [
 ];
 ```
 
-Latin-script languages format 9 words per line. CJK languages format 6 words per line.
+English and Czech format ~9 words per line. Chinese formats 16 characters per line. French, Italian, Japanese, Korean, and Spanish format 1 word per line.
 
 ## Tests
 

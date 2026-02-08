@@ -13,10 +13,10 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 |------|---------|
 | `mod.rs` | Module declaration and re-exports |
 | `base58.rs` | Base58 encoding wrapper (~133 lines) |
-| `bip32.rs` | BIP-32 HD key derivation (~1288 lines) |
+| `bip32.rs` | BIP-32 HD key derivation (~1512 lines) |
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
-| `bsm.rs` | Bitcoin Signed Message (~670 lines) |
-| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1033 lines) |
+| `bsm.rs` | Bitcoin Signed Message (~713 lines) |
+| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1188 lines) |
 
 ## Submodules
 
@@ -351,7 +351,7 @@ pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>>
 **Algorithm**:
 1. ECDH: `shared = from_privkey * to_pubkey`
 2. Key derivation: `SHA512(shared.x)` → key_e[0:32], key_m[32:64]
-3. Encrypt: `AES-256-CBC(message, key_e, iv)` with PKCS7 padding
+3. Encrypt: `AES-256-CBC(message, key_e, iv)` with PKCS7 padding (key_e used directly, not hashed)
 4. MAC: `HMAC-SHA256(key_m, iv || ciphertext)`
 
 ### Convenience Functions
@@ -421,6 +421,9 @@ Error::InvalidSignature(String)
 // ECIES errors
 Error::EciesDecryptionFailed(String)
 Error::EciesHmacMismatch
+
+// Shared (BIP-32, BIP-39)
+Error::CryptoError(String)  // Random entropy generation failures
 ```
 
 ## Feature Flag

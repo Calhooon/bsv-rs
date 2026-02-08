@@ -66,7 +66,7 @@ impl ArcBroadcaster {
 #[async_trait(?Send)]
 impl Broadcaster for ArcBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>
+    // broadcast_many() inherited from Broadcaster default (sequential)
 }
 ```
 
@@ -104,7 +104,7 @@ impl TeranodeBroadcaster {
 #[async_trait(?Send)]
 impl Broadcaster for TeranodeBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>
+    // broadcast_many() inherited from Broadcaster default (sequential)
 }
 ```
 
@@ -163,7 +163,7 @@ impl WhatsOnChainBroadcaster {
 #[async_trait(?Send)]
 impl Broadcaster for WhatsOnChainBroadcaster {
     async fn broadcast(&self, tx: &Transaction) -> BroadcastResult
-    async fn broadcast_many(&self, txs: Vec<Transaction>) -> Vec<BroadcastResult>
+    // broadcast_many() inherited from Broadcaster default (sequential)
 }
 ```
 

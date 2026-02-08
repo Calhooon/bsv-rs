@@ -93,8 +93,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         } else {
             // Error
             let message = reader.read_string()?;
-            // Skip stack trace
-            let _stack_len = reader.read_signed_var_int()?;
+            // Skip stack trace (Go uses VarInt(len) + bytes)
+            let stack_len = reader.read_var_int()?;
+            if stack_len > 0 && stack_len != u64::MAX {
+                let _stack = reader.read_bytes(stack_len as usize)?;
+            }
 
             Err(Error::WalletError(format!(
                 "wallet error (code {}): {}",
@@ -382,32 +385,37 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     }
 
     /// Gets the network the wallet is connected to.
+    ///
+    /// Go uses single byte: 0x00=mainnet, 0x01=testnet.
     pub async fn get_network(&self, originator: &str) -> Result<Network, Error> {
         let response = self
             .transmit(WalletCall::GetNetwork, originator, &[])
             .await?;
 
         let mut reader = WireReader::new(&response);
-        let network_str = reader.read_string()?;
+        let code = reader.read_u8()?;
 
-        match network_str.as_str() {
-            "mainnet" => Ok(Network::Mainnet),
-            "testnet" => Ok(Network::Testnet),
+        match code {
+            0 => Ok(Network::Mainnet),
+            1 => Ok(Network::Testnet),
             _ => Err(Error::WalletError(format!(
-                "unknown network: {}",
-                network_str
+                "unknown network code: {}",
+                code
             ))),
         }
     }
 
     /// Gets the wallet version.
+    ///
+    /// Go writes raw UTF-8 bytes with NO length prefix.
     pub async fn get_version(&self, originator: &str) -> Result<String, Error> {
         let response = self
             .transmit(WalletCall::GetVersion, originator, &[])
             .await?;
 
-        let mut reader = WireReader::new(&response);
-        reader.read_string()
+        // Go returns raw bytes, no length prefix
+        String::from_utf8(response)
+            .map_err(|e| Error::WalletError(format!("invalid version UTF-8: {}", e)))
     }
 
     // =========================================================================
@@ -430,18 +438,18 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         // Inputs
         if let Some(inputs) = &args.inputs {
-            writer.write_signed_var_int(inputs.len() as i64);
+            writer.write_var_int(inputs.len() as u64);
             for input in inputs {
                 // Outpoint
                 writer.write_outpoint(&input.outpoint);
 
                 // Unlocking script (or length)
                 if let Some(unlocking_script) = &input.unlocking_script {
-                    writer.write_signed_var_int(unlocking_script.len() as i64);
+                    writer.write_var_int(unlocking_script.len() as u64);
                     writer.write_bytes(unlocking_script);
                 } else {
-                    writer.write_signed_var_int(-1);
-                    writer.write_signed_var_int(input.unlocking_script_length.unwrap_or(0) as i64);
+                    writer.write_var_int(u64::MAX);
+                    writer.write_var_int(input.unlocking_script_length.unwrap_or(0) as u64);
                 }
 
                 // Input description
@@ -451,12 +459,12 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 writer.write_optional_var_int(input.sequence_number.map(|v| v as u64));
             }
         } else {
-            writer.write_signed_var_int(-1);
+            writer.write_var_int(u64::MAX);
         }
 
         // Outputs
         if let Some(outputs) = &args.outputs {
-            writer.write_signed_var_int(outputs.len() as i64);
+            writer.write_var_int(outputs.len() as u64);
             for output in outputs {
                 // Locking script
                 writer.write_var_int(output.locking_script.len() as u64);
@@ -478,7 +486,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 writer.write_optional_string_array(output.tags.as_deref());
             }
         } else {
-            writer.write_signed_var_int(-1);
+            writer.write_var_int(u64::MAX);
         }
 
         // Lock time
@@ -506,12 +514,12 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
             // Known txids
             if let Some(txids) = &options.known_txids {
-                writer.write_signed_var_int(txids.len() as i64);
+                writer.write_var_int(txids.len() as u64);
                 for txid in txids {
                     writer.write_bytes(txid);
                 }
             } else {
-                writer.write_signed_var_int(-1);
+                writer.write_var_int(u64::MAX);
             }
 
             writer.write_optional_bool(options.return_txid_only);
@@ -519,22 +527,22 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
             // No send change
             if let Some(outpoints) = &options.no_send_change {
-                writer.write_signed_var_int(outpoints.len() as i64);
+                writer.write_var_int(outpoints.len() as u64);
                 for outpoint in outpoints {
                     writer.write_outpoint(outpoint);
                 }
             } else {
-                writer.write_signed_var_int(-1);
+                writer.write_var_int(u64::MAX);
             }
 
             // Send with
             if let Some(txids) = &options.send_with {
-                writer.write_signed_var_int(txids.len() as i64);
+                writer.write_var_int(txids.len() as u64);
                 for txid in txids {
                     writer.write_bytes(txid);
                 }
             } else {
-                writer.write_signed_var_int(-1);
+                writer.write_var_int(u64::MAX);
             }
 
             writer.write_optional_bool(options.randomize_outputs);
@@ -568,9 +576,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             None
         };
 
-        // Parse no_send_change
-        let no_send_change_len = reader.read_signed_var_int()?;
-        let no_send_change = if no_send_change_len >= 0 {
+        // Parse no_send_change (Go uses VarInt(MaxUint64) for nil)
+        let no_send_change_len = reader.read_var_int()?;
+        let no_send_change = if no_send_change_len != u64::MAX {
             let mut outpoints = Vec::with_capacity(no_send_change_len as usize);
             for _ in 0..no_send_change_len {
                 outpoints.push(reader.read_outpoint()?);
@@ -635,12 +643,12 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             writer.write_optional_bool(options.no_send);
 
             if let Some(txids) = &options.send_with {
-                writer.write_signed_var_int(txids.len() as i64);
+                writer.write_var_int(txids.len() as u64);
                 for txid in txids {
                     writer.write_bytes(txid);
                 }
             } else {
-                writer.write_signed_var_int(-1);
+                writer.write_var_int(u64::MAX);
             }
         } else {
             writer.write_i8(0);
@@ -791,8 +799,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                     writer.write_string_array(tags);
                 } else {
                     writer.write_string("");
-                    writer.write_signed_var_int(-1);
-                    writer.write_signed_var_int(0);
+                    writer.write_var_int(u64::MAX);
+                    writer.write_var_int(0);
                 }
             }
         }
@@ -864,11 +872,12 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let total_outputs = reader.read_var_int()? as u32;
-        let beef_len = reader.read_signed_var_int()?;
-        let beef = if beef_len >= 0 {
-            Some(reader.read_bytes(beef_len as usize)?.to_vec())
-        } else {
+        // Go uses VarInt(MaxUint64) for nil BEEF, VarInt(len) for present
+        let beef_len = reader.read_var_int()?;
+        let beef = if beef_len == u64::MAX {
             None
+        } else {
+            Some(reader.read_bytes(beef_len as usize)?.to_vec())
         };
 
         let mut outputs = Vec::with_capacity(total_outputs as usize);
@@ -989,7 +998,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
             // Keyring for subject
             if let Some(keyring) = &args.keyring_for_subject {
-                writer.write_signed_var_int(keyring.len() as i64);
+                writer.write_var_int(keyring.len() as u64);
                 for (key, value) in keyring {
                     writer.write_string(key);
                     let value_bytes = from_base64(value).map_err(|e| {
@@ -999,7 +1008,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                     writer.write_bytes(&value_bytes);
                 }
             } else {
-                writer.write_signed_var_int(0);
+                writer.write_var_int(0);
             }
         } else {
             // Issuance - certifier URL
@@ -1033,14 +1042,14 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut writer = WireWriter::new();
 
         // Certifiers
-        writer.write_signed_var_int(args.certifiers.len() as i64);
+        writer.write_var_int(args.certifiers.len() as u64);
         for certifier in &args.certifiers {
             let bytes = from_hex(certifier)?;
             writer.write_bytes(&bytes);
         }
 
         // Types
-        writer.write_signed_var_int(args.types.len() as i64);
+        writer.write_var_int(args.types.len() as u64);
         for cert_type in &args.types {
             let bytes = from_base64(cert_type).map_err(|e| {
                 Error::WalletError(format!("invalid certificate type base64: {}", e))
@@ -1263,7 +1272,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut writer = WireWriter::new();
 
         // Attributes
-        writer.write_signed_var_int(args.attributes.len() as i64);
+        writer.write_var_int(args.attributes.len() as u64);
         for (key, value) in &args.attributes {
             writer.write_string(key);
             writer.write_string(value);

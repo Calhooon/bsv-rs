@@ -10,8 +10,8 @@ This module provides transport layer implementations for sending and receiving a
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~49 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1215 |
-| `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~508 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1229 |
+| `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
 
 ## Key Exports
 

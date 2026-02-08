@@ -12,7 +12,7 @@ This module provides Time-based One-Time Password (TOTP) functionality following
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | ~42 | Module root with documentation and re-exports |
-| `core.rs` | ~870 | Core TOTP implementation with extensive tests |
+| `core.rs` | ~934 | Core TOTP implementation with extensive tests |
 
 ## Key Exports
 

@@ -12,14 +12,14 @@ This module provides cryptographic primitives compatible with the BSV TypeScript
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module declarations and re-exports | 36 |
-| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 783 |
+| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 800 |
 | `symmetric.rs` | AES-256-GCM encryption (32-byte nonce for BSV SDK compatibility) | 972 |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer | 1696 |
 | `bignum.rs` | Arbitrary-precision integers for EC scalars | 1550 |
 | `drbg.rs` | HMAC-DRBG for RFC 6979 deterministic signatures | 201 |
 | `p256.rs` | P-256 (secp256r1): P256PrivateKey, P256PublicKey, P256Signature | 910 |
-| `ec/` | secp256k1: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | ~2001 |
-| `bsv/` | Sighash, transaction signatures, Schnorr proofs, Shamir sharing | ~2821 |
+| `ec/` | secp256k1: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | ~2157 |
+| `bsv/` | Sighash, transaction signatures, Schnorr proofs, Shamir sharing | ~2837 |
 
 ## Key Exports (from mod.rs)
 
@@ -49,22 +49,43 @@ pub fn to_utf8_bytes(s: &str) -> Vec<u8>
 pub fn from_utf8_bytes(data: &[u8]) -> Result<String>
 
 // Binary serialization
-pub struct Reader<'a> { ... }  // read_u8, read_u32_le, read_var_int, read_var_bytes, etc.
-pub struct Writer { ... }       // write_u8, write_u32_le, write_var_int, write_var_bytes, etc.
+pub struct Reader<'a> { ... }  // read_u8, read_u16_le, read_u32_le, read_u64_le,
+                                // read_i8, read_i16_le, read_i32_le, read_i64_le,
+                                // read_var_int, read_var_int_num, read_bytes,
+                                // read_var_bytes, read_remaining, remaining, is_empty, position
+pub struct Writer { ... }       // write_u8, write_u16_le, write_u32_le, write_u64_le,
+                                // write_i8, write_i16_le, write_i32_le, write_i64_le,
+                                // write_var_int, write_bytes, write_var_bytes,
+                                // len, is_empty, as_bytes, into_bytes, with_capacity
 
 // Symmetric encryption
-pub struct SymmetricKey { ... }  // random(), from_bytes(), encrypt(), decrypt()
+pub struct SymmetricKey { ... }  // random(), from_bytes(), as_bytes(), encrypt(), decrypt()
 
 // BigNumber (arbitrary precision)
-pub struct BigNumber { ... }  // from_hex(), to_bytes_be(), add(), modulo(), secp256k1_order(), etc.
+pub struct BigNumber { ... }  // from_hex(), from_dec_str(), from_bytes_be(), from_bytes_le(),
+                               // from_signed_bytes_be(), from_i64(), from_u64(), zero(), one(),
+                               // to_hex(), to_bytes_be(), to_bytes_le(), to_bytes_be_min(),
+                               // to_bytes_le_min(), to_dec_string(), to_i64(), to_u64(),
+                               // add(), sub(), mul(), div(), modulo(), mod_floor(), neg(), abs(),
+                               // pow(), mod_inverse(), mod_pow(), gcd(), compare(),
+                               // is_zero(), is_negative(), is_positive(), is_odd(), is_even(),
+                               // bit_length(), byte_length(), secp256k1_order(), secp256k1_prime(),
+                               // as_bigint(), from_bigint()
 
 // HMAC-DRBG
 pub struct HmacDrbg { ... }  // new(), new_with_hash(), generate(), reseed()
 
 // EC (secp256k1)
-pub struct PrivateKey { ... }  // random(), from_wif(), sign(), derive_child()
-pub struct PublicKey { ... }   // from_bytes(), verify(), to_address(), derive_child()
-pub struct Signature { ... }   // from_der(), to_der(), is_low_s()
+pub struct PrivateKey { ... }  // random(), from_bytes(), from_hex(), from_wif(), sign(),
+                                // public_key(), to_bytes(), to_hex(), to_wif(), to_wif_with_prefix(),
+                                // derive_child(), derive_shared_secret()
+pub struct PublicKey { ... }   // from_bytes(), from_hex(), from_private_key(), from_scalar_mul_generator(),
+                                // verify(), to_compressed(), to_uncompressed(), to_hex(),
+                                // to_hex_uncompressed(), x(), y(), y_is_even(), hash160(),
+                                // to_address(), to_address_with_prefix(), derive_child(),
+                                // derive_shared_secret(), mul_scalar(), add(), is_valid()
+pub struct Signature { ... }   // new(), from_der(), from_compact(), from_compact_slice(),
+                                // r(), s(), to_der(), to_compact(), is_low_s(), to_low_s(), verify()
 ```
 
 ## Cross-SDK Compatibility Notes
@@ -78,6 +99,7 @@ pub struct Signature { ... }   // from_der(), to_der(), is_low_s()
 - Bitcoin alphabet (excludes 0, O, I, l)
 - Checksum: first 4 bytes of SHA256(SHA256(version || payload))
 - Addresses: version 0x00, WIF keys: version 0x80
+- `from_base58_check_with_prefix_length()` supports custom version prefix lengths
 
 ### Bitcoin Varint Encoding
 | Value Range | Encoding |
@@ -86,6 +108,10 @@ pub struct Signature { ... }   // from_der(), to_der(), is_low_s()
 | 0xFD-0xFFFF | 0xFD + uint16 LE (3 bytes) |
 | 0x10000-0xFFFFFFFF | 0xFE + uint32 LE (5 bytes) |
 | > 0xFFFFFFFF | 0xFF + uint64 LE (9 bytes) |
+
+### PublicKey.is_valid()
+- Always returns `true` for successfully parsed keys (matches Go `Validate()` / TS `validate()`)
+- Invalid keys fail at parse time (`from_bytes()` / `from_hex()`)
 
 ## Usage Examples
 
@@ -131,6 +157,17 @@ let bob_derived = alice.public_key().derive_child(&bob, "invoice-123")?;
 assert_eq!(alice_child.public_key().to_compressed(), bob_derived.to_compressed());
 ```
 
+### ECDH Shared Secret
+```rust
+use bsv_sdk::primitives::PrivateKey;
+
+let alice = PrivateKey::random();
+let bob = PrivateKey::random();
+let shared_ab = alice.derive_shared_secret(&bob.public_key())?;
+let shared_ba = bob.derive_shared_secret(&alice.public_key())?;
+assert_eq!(shared_ab.to_compressed(), shared_ba.to_compressed());
+```
+
 ### BigNumber for Key Math
 ```rust
 use bsv_sdk::primitives::BigNumber;
@@ -166,6 +203,11 @@ let public_key = private_key.public_key();
 // Sign a message (will be hashed with SHA-256)
 let signature = private_key.sign(b"Hello, P-256!");
 assert!(public_key.verify(b"Hello, P-256!", &signature));
+
+// Sign a pre-hashed message
+let hash = bsv_sdk::primitives::hash::sha256(b"Hello, P-256!");
+let sig2 = private_key.sign_hash(&hash);
+assert!(public_key.verify_hash(&hash, &sig2));
 ```
 
 ### Shamir Secret Sharing
@@ -192,9 +234,9 @@ assert_eq!(key.to_bytes(), recovered.to_bytes());
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | 77 | Module exports |
-| `private_key.rs` | 529 | PrivateKey: random generation, WIF, signing, BRC-42 derivation |
-| `public_key.rs` | 610 | PublicKey: verification, addresses, BRC-42 derivation |
-| `signature.rs` | 479 | Signature: DER/compact encoding, low-S normalization |
+| `private_key.rs` | 564 | PrivateKey: random generation, WIF, signing, BRC-42 derivation, ECDH |
+| `public_key.rs` | 679 | PublicKey: verification, addresses, BRC-42 derivation, ECDH, point math |
+| `signature.rs` | 531 | Signature: DER/compact encoding, low-S normalization, standalone verify |
 | `ecdsa.rs` | 306 | Core ECDSA sign/verify/recover functions |
 
 Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_public_key`, `calculate_recovery_id`
@@ -207,10 +249,18 @@ Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_
 | `sighash.rs` | 623 | BIP-143 style sighash computation |
 | `tx_signature.rs` | 309 | Transaction signature encoding/decoding with sighash scope |
 | `schnorr.rs` | 413 | Schnorr zero-knowledge proofs for ECDH verification |
-| `shamir.rs` | 1007 | Shamir secret sharing for private key backup/recovery |
+| `shamir.rs` | 1023 | Shamir secret sharing for private key backup/recovery |
 | `polynomial.rs` | 394 | Polynomial operations over finite field (for Shamir) |
 
 Key exports: `compute_sighash`, `build_sighash_preimage`, `compute_sighash_for_signing`, `compute_sighash_from_raw`, `parse_transaction`, `RawTransaction`, `SighashParams`, `TxInput`, `TxOutput`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`)
+
+### p256 (P-256/secp256r1)
+
+Key types: `P256PrivateKey`, `P256PublicKey`, `P256Signature`
+
+Convenience functions: `generate_private_key_hex()`, `public_key_from_private()`, `sign()`, `verify()`
+
+P256Signature supports DER and compact encoding, low-S normalization via `to_low_s()`.
 
 ## Error Handling
 
@@ -221,6 +271,8 @@ Key error variants in `src/error.rs`:
 - `InvalidSignature(String)` / `InvalidPublicKey(String)` / `InvalidPrivateKey(String)`
 - `DecryptionFailed` - AES-GCM authentication failed
 - `ReaderUnderflow { needed, available }` - Not enough bytes to read
+- `InvalidUtf8(String)` - UTF-8 decoding failed
+- `CryptoError(String)` - General crypto errors (e.g., varint overflow)
 
 ## Dependencies
 
@@ -229,7 +281,7 @@ Key error variants in `src/error.rs`:
 - `aes-gcm` - Authenticated encryption
 - `k256` - secp256k1 operations
 - `p256` - P-256 operations
-- `num-bigint` - BigNumber backing
+- `num-bigint`, `num-integer`, `num-traits` - BigNumber backing
 - `hex`, `bs58`, `base64` - Encoding
 - `rand`, `getrandom` - Secure randomness
 - `subtle` - Constant-time comparison
@@ -240,7 +292,7 @@ Key error variants in `src/error.rs`:
 cargo test primitives
 ```
 
-Tests include NIST vectors, TypeScript/Go SDK compatibility, round-trip encoding, and edge cases. Test vectors in `tests/vectors/symmetric_key.json`.
+Tests include NIST vectors, RFC 2202 HMAC-SHA1 vectors, PBKDF2-SHA512 vectors, TypeScript/Go SDK compatibility, round-trip encoding, UTF-8 multi-byte handling, and edge cases. Test vectors in `tests/vectors/symmetric_key.json`.
 
 ## Related Documentation
 

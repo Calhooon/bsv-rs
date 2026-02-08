@@ -100,10 +100,12 @@ fn sample_outpoint_string() -> String {
 
 /// Helper to create a sample WalletCertificate.
 fn sample_wallet_certificate() -> WalletCertificate {
+    // certificate_type and serial_number must be valid base64 encoding of 32 bytes
+    use bsv_sdk::primitives::to_base64;
     WalletCertificate {
-        certificate_type: "test-cert-type".to_string(),
+        certificate_type: to_base64(&[0xaa; 32]),
         subject: sample_pubkey_hex(),
-        serial_number: "serial-12345".to_string(),
+        serial_number: to_base64(&[0xbb; 32]),
         certifier: sample_pubkey_hex(),
         revocation_outpoint: sample_outpoint_string(),
         signature: "deadbeef".to_string(),
@@ -1895,7 +1897,8 @@ mod complex_type_roundtrips {
 
         assert_eq!(read.satoshis, 0);
         assert_eq!(read.locking_script, None);
-        assert_eq!(read.spendable, false);
+        // Go wire format has no spendable field; defaults to true on read
+        assert_eq!(read.spendable, true);
         assert_eq!(read.custom_instructions, None);
         assert!(read.tags.is_none());
         assert!(read.labels.is_none());
@@ -2503,7 +2506,8 @@ mod request_frame_tests {
         let mut reader = WireReader::new(&response);
         let error = reader.read_u8().unwrap();
         assert_eq!(error, 0);
-        let version = reader.read_string().unwrap();
+        // Go wire format: raw UTF-8 bytes (no length prefix)
+        let version = std::str::from_utf8(reader.read_remaining()).unwrap();
         assert_eq!(version, "0.1.0");
     }
 
@@ -2543,8 +2547,9 @@ mod request_frame_tests {
         let mut reader = WireReader::new(&response);
         let error = reader.read_u8().unwrap();
         assert_eq!(error, 0);
-        let network = reader.read_string().unwrap();
-        assert_eq!(network, "mainnet");
+        // Go wire format: single byte (0x00=mainnet, 0x01=testnet)
+        let network_byte = reader.read_u8().unwrap();
+        assert_eq!(network_byte, 0x00); // mainnet
     }
 
     /// Tests error response format when an error occurs.

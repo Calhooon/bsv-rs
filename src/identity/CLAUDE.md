@@ -20,8 +20,8 @@ This module integrates with the `auth` module for certificate handling and the `
 |------|---------|
 | `mod.rs` | Module root with re-exports (111 lines) |
 | `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (886 lines) |
-| `client.rs` | IdentityClient for identity resolution, revelation, and management (2077 lines) |
-| `contacts.rs` | ContactsManager for encrypted contact storage with caching (1277 lines) |
+| `client.rs` | IdentityClient for identity resolution, revelation, and management (2053 lines) |
+| `contacts.rs` | ContactsManager for encrypted contact storage with caching (1276 lines) |
 
 ## Feature Flag
 

@@ -5,40 +5,42 @@
 
 This directory contains integration tests that verify the BSV Rust SDK works correctly across modules and produces results identical to the TypeScript and Go SDK implementations. Tests use shared JSON test vectors to ensure byte-for-byte compatibility across all three SDK implementations.
 
-**Total: 1,053 test functions across 29 test files + ~2,026 JSON test vectors + Rust constant vectors**
+**Total: 1,215 test functions across 31 test files + ~2,044 JSON test vectors + Rust constant vectors**
 
 ## Files
 
 | File | Tests | Feature Gate | Description |
 |------|------:|-------------|-------------|
 | `auth_cross_sdk_tests.rs` | 13 | `auth` | Certificate serialization cross-SDK vectors |
-| `auth_integration_tests.rs` | 26 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads |
-| `auth_peer_e2e_tests.rs` | 19 | `auth` | BRC-31 peer mutual authentication end-to-end via loopback |
+| `auth_integration_tests.rs` | 70 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads, nonce handling |
+| `auth_peer_e2e_tests.rs` | 21 | `auth` | BRC-31 peer mutual authentication end-to-end via loopback |
 | `broadcaster_http_tests.rs` | 26 | `transaction`+`http` | ARC, WoC, Teranode broadcasters with wiremock |
 | `chaintracker_http_tests.rs` | 10 | `transaction`+`http` | WhatsOnChain chain tracker with wiremock |
 | `compat_bip39_tests.rs` | 29 | `compat` | BIP-39 mnemonics with official TREZOR vectors |
 | `compat_integration_tests.rs` | 31 | `compat` | BIP-32/39, BSM, ECIES, Base58 workflows |
 | `cross_sdk_tests.rs` | 17 | default | BRC-42, symmetric encryption, WIF/address vectors |
 | `drbg_tests.rs` | 6 | default | HMAC-DRBG with NIST SP 800-90A vectors |
-| `ec_tests.rs` | 10 | default | Elliptic curve ops, BRC-42 derivation, ECDH |
+| `ec_tests.rs` | 37 | default | Elliptic curve ops, BRC-42 derivation, ECDH, pubkey validation |
 | `identity_tests.rs` | 69 | `identity` | Certificates, contacts, queries, broadcast results |
 | `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
-| `kvstore_integration_tests.rs` | 83 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
+| `kvstore_integration_tests.rs` | 93 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
 | `live_policy_http_tests.rs` | 20 | `transaction`+`http` | LivePolicy dynamic fee model with wiremock |
 | `memory_profiling.rs` | 5 | `dhat-profiling` | Heap allocation profiling for crypto operations |
 | `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
 | `overlay_cross_sdk_tests.rs` | 13 | `overlay` | Admin token and overlay type cross-SDK vectors |
 | `overlay_http_tests.rs` | 49 | `overlay`+`http` | SHIP broadcast and SLAP lookup facilitators with wiremock |
 | `overlay_integration_tests.rs` | 62 | `overlay` | Protocols, topics, reputation, historian, admin tokens, lookup resolver |
+| `overlay_mock_tests.rs` | 20 | `full` | Mock facilitator tests for LookupResolver/TopicBroadcaster |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
 | `script_vectors_tests.rs` | 13 | default | Script interpreter with 1,488 vectors (458+598+432) |
 | `sighash_tests.rs` | 3 | default | Transaction sighash computation with 499 vectors |
 | `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
 | `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
 | `template_tests.rs` | 22 | default | P2PKH, P2PK, Multisig, RPuzzle script templates |
-| `transaction_tests.rs` | 86 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry |
+| `transaction_tests.rs` | 103 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry, SPV verify |
 | `wallet_tests.rs` | 56 | `wallet` | KeyDeriver, CachedKeyDeriver, ProtoWallet, wire protocol |
+| `wallet_wire_cross_sdk_tests.rs` | 42 | `wallet` | Cross-SDK wire protocol vectors from Go SDK (54 vectors) |
 | `wire_method_roundtrip_tests.rs` | 90 | `wallet` | Wire protocol roundtrips for all 28 WalletInterface methods |
 | `transaction/` | — | — | Transaction test vector constants module |
 
@@ -60,6 +62,14 @@ Test vectors in `tests/vectors/` are shared with the TypeScript and Go SDKs:
 | `script_valid.json` | Valid script parsing vectors (598 vectors) |
 | `script_invalid.json` | Invalid scripts that should fail (432 vectors) |
 
+Wire protocol vectors in `tests/vectors/wallet_wire/` (from Go SDK `wallet/substrates/testdata/`):
+
+| Pattern | Contents |
+|---------|----------|
+| `*-args.json` | Wire-encoded request vectors for each WalletInterface method |
+| `*-result.json` | Wire-encoded response vectors for each WalletInterface method |
+| **54 files total** | Covers all 28 methods: createAction, signAction, abortAction, listActions, internalizeAction, createSignature, revealCounterpartyKeyLinkage, revealSpecificKeyLinkage, encrypt, decrypt, createHmac, verifyHmac, verifySignature, getPublicKey, acquireCertificate, listCertificates, proveCertificate, relinquishCertificate, discoverByIdentityKey, discoverByAttributes, isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight, getNetwork, getVersion, listOutputs, relinquishOutput |
+
 Transaction test vectors in `tests/transaction/vectors/`:
 
 | File | Contents |
@@ -76,7 +86,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 ### Primitives (default features)
 - **`cross_sdk_tests.rs`** — BRC-42 key derivation, symmetric encryption, WIF/address vectors, DRBG verification, edge cases (unicode, empty, large messages)
 - **`drbg_tests.rs`** — NIST vector tests, SHA-512 variant, reseed, output length, determinism
-- **`ec_tests.rs`** — BRC-42 derivation consistency, WIF/pubkey/address known vectors, sign/verify, ECDH
+- **`ec_tests.rs`** — BRC-42 derivation consistency, WIF/pubkey/address known vectors, sign/verify, ECDH, PublicKey::is_valid(), get_public_key from P2PK scripts, key serialization
 - **`integration_tests.rs`** — Full workflows: key derivation, symmetric encryption, Schnorr proofs, Shamir secret sharing (3-of-5, subset recovery), P-256, hash chains, sighash+signing, complete payment workflow
 
 ### Script (default features)
@@ -85,7 +95,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`template_tests.rs`** — P2PKH (lock/unlock/address/validation), P2PK (compressed detection, length estimate), Multisig (2-of-3, 1-of-1, 3-of-3, 16-of-16, validation errors), RPuzzle (hash types, K value, R computation)
 
 ### Transaction (`transaction` feature)
-- **`transaction_tests.rs`** — Parsing/roundtrip (86 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
+- **`transaction_tests.rs`** — Parsing/roundtrip (103 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), SPV verification (`Transaction::verify()`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
 
 ### Transaction HTTP (`transaction`+`http` features, wiremock)
 - **`broadcaster_http_tests.rs`** — ARC (9 tests: success, API key, errors, batch), WoC (9 tests: mainnet/testnet/STN, errors), Teranode (8 tests: EF format, timeout, batch)
@@ -95,6 +105,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 ### Wallet (`wallet` feature)
 - **`wallet_tests.rs`** — KeyDeriver (14 tests: derivation, validation, security levels), CachedKeyDeriver (8 tests: LRU eviction, secrets not cached), ProtoWallet (16 tests: encrypt/decrypt, HMAC, signatures, cross-party), cross-SDK BRC-2/BRC-3 compliance (4 tests), wire protocol encoding (14 tests: VarInt, strings, Counterparty, Protocol, Outpoint, maps, enums)
 - **`wire_method_roundtrip_tests.rs`** — All 28 WalletInterface methods via loopback transport (90 tests): get_public_key, encrypt/decrypt, HMAC, signatures, key linkage, status (auth/height/network/version), actions (create/sign/abort/list/internalize), outputs (list/relinquish), certificates (acquire/list/prove/relinquish/discover). Also tests complex type roundtrips, response roundtrips, call codes, request frames, and Counterparty variant encoding.
+- **`wallet_wire_cross_sdk_tests.rs`** — Cross-SDK wire protocol compatibility with Go SDK (42 tests). Loads 54 JSON vector files from Go SDK testdata. Tests request decoding (params extraction after call_code + originator) and response decoding (result extraction after error byte) for all 28 WalletInterface methods. Validates byte-level interoperability between Rust and Go wire encoders.
 
 ### Messages (`messages` feature)
 - **`messages_tests.rs`** — BRC-77 signed messages (8 tests: specific/anyone recipient, empty/large, tampering), BRC-78 encrypted messages (9 tests: roundtrip, wrong key, GCM auth), cross-SDK vectors (8 tests: error format compatibility), unicode/binary data, multi-party
@@ -105,12 +116,13 @@ Transaction test vectors in `tests/transaction/vectors/`:
 
 ### Auth (`auth` feature)
 - **`auth_cross_sdk_tests.rs`** — Certificate binary/JSON roundtrip, deterministic serialization, field sorting, DER signature format, outpoint parsing, cross-SDK binary layout
-- **`auth_integration_tests.rs`** — SessionManager lifecycle/pruning, AuthMessage validation/signing, mock transport, HTTP payloads (complex/unicode/100 headers), certificate signing/verification, RequestedCertificateSet, PeerSession states
+- **`auth_integration_tests.rs`** — SessionManager lifecycle/pruning, AuthMessage validation/signing, mock transport, HTTP payloads (complex/unicode/100 headers), certificate signing/verification, RequestedCertificateSet, PeerSession states, nonce handling (TS SDK `initial_nonce` fallback), error propagation through oneshot channels
 - **`auth_peer_e2e_tests.rs`** — Full BRC-31 mutual authentication between two Peer instances via channel loopback: handshake, bidirectional messaging, session persistence, explicit `get_authenticated_session()`, listener registration, certificate request/response flow, empty/large (100KB) payloads, nonce uniqueness, error cases (invalid version, no session)
 
 ### Overlay (`overlay` feature)
 - **`overlay_cross_sdk_tests.rs`** — Admin token creation/decoding/protocol detection, network presets, LookupQuestion/Answer types, AdmittanceInstructions, TaggedBEEF
 - **`overlay_integration_tests.rs`** — Protocols, LookupQuestion/Answer, TaggedBEEF, AdmittanceInstructions, TopicBroadcaster validation, RequireAck, LookupResolverConfig, HostReputationTracker (ranking, reset, JSON export/import, global singleton), SyncHistorian (chain traversal, filtering, cycle prevention), admin tokens, HostResponse/ServiceMetadata, LookupResolver.find_competent_hosts() public API
+- **`overlay_mock_tests.rs`** — MockLookupFacilitator and MockBroadcastFacilitator with pre-configured responses. Tests LookupResolver with mock SLAP facilitators (query routing, empty results, error handling, call counting), TopicBroadcaster with mock SHIP facilitators (broadcast routing, multi-host fan-out, partial failures, RequireAck handling). No network access required.
 
 ### Overlay HTTP (`overlay`+`http` features, wiremock)
 - **`overlay_http_tests.rs`** — SHIP broadcast facilitator (25 tests: STEAK response, Content-Type/X-Topics headers, off-chain values, error responses 400/404/500, HTTP security, URL trimming) and SLAP lookup facilitator (24 tests: OutputList/Freeform/Formula answers, binary response format, request format verification, error handling, edge cases)
@@ -125,7 +137,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`identity_tests.rs`** — KnownCertificateType (9 types, cross-SDK type IDs), DisplayableIdentity, Contact CRUD, IdentityQuery builder, ContactsManager async ops (add/update/remove/search/cache), CertifierInfo, BroadcastResult, static avatar URLs, default values, config builders, camelCase JSON compatibility
 
 ### KVStore (`kvstore` feature)
-- **`kvstore_integration_tests.rs`** — LocalKVStore: config/entry/token/query/options types, KVStoreInterpreter (PushDrop script extraction), signature verification, constructor/get/set/remove/has/keys/list/count/clear operations, batch ops (9 tests), cross-SDK compatibility (field names, PushDrop order), edge cases (unicode, large values)
+- **`kvstore_integration_tests.rs`** — LocalKVStore: config/entry/token/query/options types, KVStoreInterpreter (PushDrop script extraction), signature verification, constructor/get/set/remove/has/keys/list/count/clear operations, batch ops, cross-SDK compatibility (field names, PushDrop order), edge cases (unicode, large values)
 - **`kvstore_global_tests.rs`** — GlobalKVStore: construction with default/custom config, network presets, input validation (empty key/value), wallet error propagation, overlay error propagation, interpreter tests (19 tests: basic tokens, context filtering, unicode, large values, old/new format), signature verification, data model tests, cross-SDK compatibility, edge cases (special chars, JSON values, multiple tags)
 
 ### Registry (`registry` feature)
@@ -157,7 +169,9 @@ cargo test --features identity             # Identity, auth, overlay chain
 
 # Specific test file
 cargo test --test wire_method_roundtrip_tests --features wallet
+cargo test --test wallet_wire_cross_sdk_tests --features wallet
 cargo test --test overlay_http_tests --features "overlay,http"
+cargo test --test overlay_mock_tests --features full
 cargo test --test live_policy_http_tests --features "transaction,http"
 
 # Filter by test name
@@ -177,11 +191,11 @@ Tests are organized by feature area:
 | **script** | `script_vectors_tests`, `template_tests` |
 | **transaction** | `sighash_tests`, `transaction_tests` |
 | **transaction HTTP** | `broadcaster_http_tests`, `chaintracker_http_tests`, `live_policy_http_tests` |
-| **wallet** | `wallet_tests`, `wire_method_roundtrip_tests` |
+| **wallet** | `wallet_tests`, `wire_method_roundtrip_tests`, `wallet_wire_cross_sdk_tests` |
 | **messages** | `messages_tests` |
 | **compat** | `compat_bip39_tests`, `compat_integration_tests` |
 | **auth** | `auth_cross_sdk_tests`, `auth_integration_tests`, `auth_peer_e2e_tests` |
-| **overlay** | `overlay_cross_sdk_tests`, `overlay_integration_tests` |
+| **overlay** | `overlay_cross_sdk_tests`, `overlay_integration_tests`, `overlay_mock_tests` |
 | **overlay HTTP** | `overlay_http_tests` |
 | **storage** | `storage_tests` |
 | **storage HTTP** | `storage_http_tests` |
@@ -199,6 +213,7 @@ Notable multi-module test files use nested submodules:
 ## Adding New Tests
 
 - **Cross-SDK vectors**: Add JSON to `tests/vectors/`, use `#[serde(rename_all = "camelCase")]`, include vector index in panic messages
+- **Wire protocol vectors**: Add JSON to `tests/vectors/wallet_wire/`, following `{method}-{variant}-{args|result}.json` naming convention
 - **Feature gates**: Use `#![cfg(feature = "...")]` at file top, or `#![cfg(all(feature = "...", feature = "http"))]` for HTTP tests
 - **HTTP tests**: Use `wiremock` crate, create broadcaster/tracker with `::with_base_url(&mock_server.uri(), network)`
 - **Wire protocol**: Use loopback pattern with `WalletWireTransceiver` → `WalletWireProcessor` for method roundtrips

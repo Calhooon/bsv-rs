@@ -125,7 +125,7 @@ impl RPuzzleType {
     pub fn hash(self, data: &[u8]) -> Vec<u8>
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]  // Default = RPuzzleType::Raw
 pub struct RPuzzle { pub puzzle_type: RPuzzleType }
 
 impl RPuzzle {
