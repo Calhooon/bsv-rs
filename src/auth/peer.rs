@@ -180,22 +180,27 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                             .as_ref()
                             .ok_or_else(|| Error::AuthError("InitialResponse missing your_nonce".into()))?;
 
-                        // initialNonce is the server's session nonce
+                        // nonce is the server's session nonce (responder's own nonce)
                         let server_nonce = message
-                            .initial_nonce
+                            .nonce
                             .as_ref()
-                            .ok_or_else(|| Error::AuthError("InitialResponse missing initial_nonce".into()))?;
+                            .ok_or_else(|| Error::AuthError("InitialResponse missing nonce".into()))?;
 
-                        // Find and update the existing session (created in initiate_handshake)
+                        // Find and update the existing session (created in initiate_handshake).
+                        // Use get_session + clone + update_session to properly refresh the
+                        // identity key secondary index in the session manager.
                         let session = {
                             let mut mgr = session_manager.write().await;
-                            if let Some(session) = mgr.get_session_mut(client_nonce) {
+                            if let Some(existing) = mgr.get_session(client_nonce).cloned() {
                                 // Update the existing session
-                                session.peer_identity_key = Some(message.identity_key.clone());
-                                session.peer_nonce = Some(server_nonce.clone());
-                                session.is_authenticated = true;
-                                session.touch();
-                                session.clone()
+                                let mut updated = existing;
+                                updated.peer_identity_key = Some(message.identity_key.clone());
+                                updated.peer_nonce = Some(server_nonce.clone());
+                                updated.is_authenticated = true;
+                                updated.touch();
+                                let session_clone = updated.clone();
+                                mgr.update_session(updated);
+                                session_clone
                             } else {
                                 // No existing session - create a new one
                                 let mut session = PeerSession::with_nonce(client_nonce.clone());
@@ -640,7 +645,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             create_nonce(&self.wallet, Some(&message.identity_key), &self.originator).await?;
         let mut session = PeerSession::with_nonce(session_nonce.clone());
         session.peer_identity_key = Some(message.identity_key.clone());
-        session.peer_nonce = message.nonce.clone();
+        session.peer_nonce = message.initial_nonce.clone();
         session.is_authenticated = true;
         session.touch();
 
@@ -658,10 +663,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         }
 
         // Build InitialResponse
+        // initial_nonce = initiator's nonce (for signing_data computation)
+        // nonce = our session nonce (responder's nonce)
+        // your_nonce = initiator's nonce echoed back (for session lookup)
         let mut response = AuthMessage::new(MessageType::InitialResponse, my_identity);
         response.nonce = Some(session_nonce);
-        response.initial_nonce = message.nonce.clone();
-        response.your_nonce = message.nonce.clone();
+        response.initial_nonce = message.initial_nonce.clone();
+        response.your_nonce = message.initial_nonce.clone();
 
         // Sign the response
         self.sign_message(&mut response, &session).await?;
@@ -732,23 +740,27 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             // Nonce verification is optional, continue anyway
         }
 
-        // Update the session
+        // Update the session and its secondary index (identity key mapping).
+        // We read the session, build a modified copy, and use update_session
+        // so the secondary index (identity key -> nonce) is properly refreshed.
         {
             let mut mgr = self.session_manager.write().await;
-            if let Some(session) = mgr.get_session_mut(initial_nonce) {
-                session.peer_identity_key = Some(message.identity_key.clone());
-                session.peer_nonce = message.nonce.clone();
-                session.is_authenticated = true;
-                session.touch();
+            if let Some(existing) = mgr.get_session(initial_nonce).cloned() {
+                let mut updated = existing;
+                updated.peer_identity_key = Some(message.identity_key.clone());
+                updated.peer_nonce = message.nonce.clone();
+                updated.is_authenticated = true;
+                updated.touch();
 
                 // Check if we need certificates
                 if let Some(ref req) = self.certificates_to_request {
                     if !req.is_empty() {
-                        session.certificates_required = true;
+                        updated.certificates_required = true;
                     }
                 }
 
-                let session_clone = session.clone();
+                let session_clone = updated.clone();
+                mgr.update_session(updated);
 
                 // Notify pending handshake
                 let mut pending = self.pending_handshakes.write().await;

@@ -12,5 +12,5 @@ pub use nonce::{
 };
 pub use validation::{
     certificates_match_request, get_verifiable_certificates, validate_certificate,
-    validate_certificates,
+    validate_certificate_encoding, validate_certificates, validate_requested_certificate_set,
 };

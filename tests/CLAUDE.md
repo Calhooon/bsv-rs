@@ -5,1483 +5,214 @@
 
 This directory contains integration tests that verify the BSV Rust SDK works correctly across modules and produces results identical to the TypeScript and Go SDK implementations. Tests use shared JSON test vectors to ensure byte-for-byte compatibility across all three SDK implementations.
 
+**Total: ~1,054 test functions across 29 test files + ~2,632 test vectors**
+
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `auth_cross_sdk_tests.rs` | Auth cross-SDK certificate serialization tests (13 tests) |
-| `auth_integration_tests.rs` | Auth module integration tests (26 tests: certificates, sessions, transport) |
-| `broadcaster_http_tests.rs` | HTTP broadcaster tests with wiremock (26 tests: ARC, WoC, Teranode) |
-| `chaintracker_http_tests.rs` | HTTP chain tracker tests with wiremock (10 tests: WhatsOnChain) |
-| `compat_bip39_tests.rs` | BIP-39 mnemonic tests with official TREZOR vectors (30 tests) |
-| `compat_integration_tests.rs` | Compat module integration tests (BIP-32/39, BSM, ECIES, 31 tests) |
-| `cross_sdk_tests.rs` | Tests using shared vectors from TypeScript/Go SDKs (17 tests) |
-| `drbg_tests.rs` | HMAC-DRBG tests with NIST SP 800-90A vectors (6 tests) |
-| `ec_tests.rs` | Elliptic curve and BRC-42 key derivation tests (10 tests) |
-| `identity_tests.rs` | Identity module tests (69 tests: certificates, contacts, queries, broadcast) |
-| `integration_tests.rs` | Full workflow tests across all modules (22 tests) |
-| `kvstore_integration_tests.rs` | KVStore module tests (83 tests: LocalKVStore, interpreter, queries, batch ops) |
-| `memory_profiling.rs` | Heap allocation profiling with dhat (requires `dhat-profiling` feature) |
-| `messages_tests.rs` | BRC-77/BRC-78 message signing/encryption tests (33 tests) |
-| `overlay_cross_sdk_tests.rs` | Overlay cross-SDK admin token and type tests (13 tests) |
-| `overlay_integration_tests.rs` | Overlay module integration tests (60 tests) |
-| `registry_integration_tests.rs` | Registry module integration tests (50 tests: definitions, queries, serialization) |
-| `script_vectors_tests.rs` | Script interpreter tests with ~1,660 vectors (13 tests) |
-| `sighash_tests.rs` | Transaction sighash computation with 499 vectors (3 tests) |
-| `storage_tests.rs` | UHRP storage module tests (70 tests: URLs, downloader, uploader) |
-| `template_tests.rs` | Script template tests (P2PKH, P2PK, Multisig, RPuzzle, 22 tests) |
-| `transaction_tests.rs` | Transaction module tests (BEEF, MerklePath, fee models, 86 tests) |
-| `wallet_tests.rs` | Wallet module tests (56 tests: KeyDeriver, ProtoWallet, wire protocol) |
-| `transaction/` | Transaction test vectors module |
+| File | Tests | Feature Gate | Description |
+|------|------:|-------------|-------------|
+| `auth_cross_sdk_tests.rs` | 13 | `auth` | Certificate serialization cross-SDK vectors |
+| `auth_integration_tests.rs` | 26 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads |
+| `auth_peer_e2e_tests.rs` | 19 | `auth` | BRC-31 peer mutual authentication end-to-end via loopback |
+| `broadcaster_http_tests.rs` | 26 | `transaction`+`http` | ARC, WoC, Teranode broadcasters with wiremock |
+| `chaintracker_http_tests.rs` | 10 | `transaction`+`http` | WhatsOnChain chain tracker with wiremock |
+| `compat_bip39_tests.rs` | 29 | `compat` | BIP-39 mnemonics with official TREZOR vectors |
+| `compat_integration_tests.rs` | 31 | `compat` | BIP-32/39, BSM, ECIES, Base58 workflows |
+| `cross_sdk_tests.rs` | 17 | default | BRC-42, symmetric encryption, WIF/address vectors |
+| `drbg_tests.rs` | 6 | default | HMAC-DRBG with NIST SP 800-90A vectors |
+| `ec_tests.rs` | 10 | default | Elliptic curve ops, BRC-42 derivation, ECDH |
+| `identity_tests.rs` | 69 | `identity` | Certificates, contacts, queries, broadcast results |
+| `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
+| `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
+| `kvstore_integration_tests.rs` | 83 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
+| `live_policy_http_tests.rs` | 20 | `transaction`+`http` | LivePolicy dynamic fee model with wiremock |
+| `memory_profiling.rs` | 5 | `dhat-profiling` | Heap allocation profiling for crypto operations |
+| `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
+| `overlay_cross_sdk_tests.rs` | 13 | `overlay` | Admin token and overlay type cross-SDK vectors |
+| `overlay_http_tests.rs` | 49 | `overlay`+`http` | SHIP broadcast and SLAP lookup facilitators with wiremock |
+| `overlay_integration_tests.rs` | 60 | `overlay` | Protocols, topics, reputation, historian, admin tokens |
+| `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
+| `script_vectors_tests.rs` | 13 | default | Script interpreter with ~1,660 vectors |
+| `sighash_tests.rs` | 3 | default | Transaction sighash computation with 499 vectors |
+| `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
+| `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
+| `template_tests.rs` | 22 | default | P2PKH, P2PK, Multisig, RPuzzle script templates |
+| `transaction_tests.rs` | 86 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry |
+| `wallet_tests.rs` | 56 | `wallet` | KeyDeriver, CachedKeyDeriver, ProtoWallet, wire protocol |
+| `wire_method_roundtrip_tests.rs` | 90 | `wallet` | Wire protocol roundtrips for all 28 WalletInterface methods |
+| `transaction/` | — | — | Transaction test vector constants module |
 
 ## Test Vectors
 
-Test vectors are stored in `tests/vectors/` and shared with the TypeScript and Go SDKs:
+Test vectors in `tests/vectors/` are shared with the TypeScript and Go SDKs:
 
 | Vector File | Contents |
 |-------------|----------|
 | `auth_certificate.json` | Auth certificate serialization vectors (4 vectors) |
 | `brc42_private.json` | BRC-42 private key derivation vectors |
-| `overlay_admin_token.json` | Overlay SHIP/SLAP admin token vectors (4 vectors) |
-| `overlay_types.json` | Overlay type serialization vectors |
 | `brc42_public.json` | BRC-42 public key derivation vectors |
 | `symmetric_key.json` | Symmetric encryption test vectors |
+| `overlay_admin_token.json` | Overlay SHIP/SLAP admin token vectors (4 vectors) |
+| `overlay_types.json` | Overlay type serialization vectors |
 | `drbg.json` | HMAC-DRBG vectors (15 vectors for RFC 6979) |
 | `sighash.json` | Transaction sighash vectors (499 vectors) |
 | `spend_valid.json` | Valid spend execution vectors (~570+ vectors) |
 | `script_valid.json` | Valid script parsing vectors (~590+ vectors) |
 | `script_invalid.json` | Invalid scripts that should fail (~500+ vectors) |
 
-Transaction test vectors are in `tests/transaction/vectors/`:
+Transaction test vectors in `tests/transaction/vectors/`:
 
 | File | Contents |
 |------|----------|
-| `mod.rs` | Module declarations for vector submodules |
 | `tx_valid.rs` | Valid transaction hex strings for roundtrip testing |
 | `tx_invalid.rs` | Invalid transaction vectors (semantically invalid) |
 | `bump_valid.rs` | Valid BRC-74 BUMP (MerklePath) hex vectors |
 | `bump_invalid.rs` | Invalid BUMP vectors with expected error messages |
 | `bigtx.rs` | Large transaction test vectors |
 | `beef_cross_sdk.rs` | BEEF (BRC-62) and MerklePath vectors from TypeScript/Go SDKs |
-| `CLAUDE.md` | Transaction vectors documentation |
 
-## Test Categories
+## Test Categories by Module
 
-### BIP-39 Compatibility (`compat_bip39_tests.rs`)
+### Primitives (default features)
+- **`cross_sdk_tests.rs`** — BRC-42 key derivation, symmetric encryption, WIF/address vectors, DRBG verification, edge cases (unicode, empty, large messages)
+- **`drbg_tests.rs`** — NIST vector tests, SHA-512 variant, reseed, output length, determinism
+- **`ec_tests.rs`** — BRC-42 derivation consistency, WIF/pubkey/address known vectors, sign/verify, ECDH
+- **`integration_tests.rs`** — Full workflows: key derivation, symmetric encryption, Schnorr proofs, Shamir secret sharing (3-of-5, subset recovery), P-256, hash chains, sighash+signing, complete payment workflow
 
-BIP-39 mnemonic phrase tests using official TREZOR vectors (30 tests, requires `compat` feature):
+### Script (default features)
+- **`script_vectors_tests.rs`** — ~570 spend valid vectors, ~590 script parsing vectors, ~500 invalid script vectors, individual opcode tests (OP_CAT, OP_SPLIT, OP_MUL, OP_DIV)
+- **`sighash_tests.rs`** — 499 sighash vectors with `compute_sighash`, detailed first-vector debugging, transaction parsing verification
+- **`template_tests.rs`** — P2PKH (lock/unlock/address/validation), P2PK (compressed detection, length estimate), Multisig (2-of-3, 1-of-1, 3-of-3, 16-of-16, validation errors), RPuzzle (hash types, K value, R computation)
 
-**Entropy to Mnemonic**
-- `test_entropy_to_mnemonic` - 22 vectors converting entropy to mnemonic phrases
-- `test_entropy_roundtrip` - Verifies entropy extraction from mnemonic matches original
+### Transaction (`transaction` feature)
+- **`transaction_tests.rs`** — Parsing/roundtrip (86 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
 
-**Mnemonic to Seed**
-- `test_mnemonic_to_seed` - 22 vectors with passphrase "TREZOR" producing 512-bit seeds
-- `test_to_seed_empty_passphrase` - Empty passphrase matches `to_seed_normalized()`
+### Transaction HTTP (`transaction`+`http` features, wiremock)
+- **`broadcaster_http_tests.rs`** — ARC (9 tests: success, API key, errors, batch), WoC (9 tests: mainnet/testnet/STN, errors), Teranode (8 tests: EF format, timeout, batch)
+- **`chaintracker_http_tests.rs`** — WoC tracker: valid/invalid root, case-insensitive, 404/500, current_height, testnet paths
+- **`live_policy_http_tests.rs`** — LivePolicy dynamic fee model: refresh from ARC policy endpoint, error handling (500/404/malformed), fallback rates, cache expiry, sat/byte→sat/KB conversion, API key auth
 
-**Mnemonic Validation**
-- `test_mnemonic_validation` - All test vectors produce valid mnemonics
-- `test_invalid_mnemonic_bad_sentences` - 16 bad sentences from Go SDK rejected
-- `test_invalid_mnemonic_wrong_word_count` - 11 and 13 word mnemonics rejected
-- `test_invalid_mnemonic_bad_checksum` - Invalid checksum detection
-- `test_invalid_mnemonic_unknown_word` - Unknown word detection
+### Wallet (`wallet` feature)
+- **`wallet_tests.rs`** — KeyDeriver (14 tests: derivation, validation, security levels), CachedKeyDeriver (8 tests: LRU eviction, secrets not cached), ProtoWallet (16 tests: encrypt/decrypt, HMAC, signatures, cross-party), cross-SDK BRC-2/BRC-3 compliance (4 tests), wire protocol encoding (14 tests: VarInt, strings, Counterparty, Protocol, Outpoint, maps, enums)
+- **`wire_method_roundtrip_tests.rs`** — All 28 WalletInterface methods via loopback transport (90 tests): get_public_key, encrypt/decrypt, HMAC, signatures, key linkage, status (auth/height/network/version), actions (create/sign/abort/list/internalize), outputs (list/relinquish), certificates (acquire/list/prove/relinquish/discover). Also tests complex type roundtrips, response roundtrips, call codes, request frames, and Counterparty variant encoding.
 
-**Mnemonic Generation**
-- `test_generate_mnemonic_12_words` - Generate valid 12-word mnemonic
-- `test_generate_mnemonic_15_words` - Generate valid 15-word mnemonic
-- `test_generate_mnemonic_18_words` - Generate valid 18-word mnemonic
-- `test_generate_mnemonic_21_words` - Generate valid 21-word mnemonic
-- `test_generate_mnemonic_24_words` - Generate valid 24-word mnemonic
+### Messages (`messages` feature)
+- **`messages_tests.rs`** — BRC-77 signed messages (8 tests: specific/anyone recipient, empty/large, tampering), BRC-78 encrypted messages (9 tests: roundtrip, wrong key, GCM auth), cross-SDK vectors (8 tests: error format compatibility), unicode/binary data, multi-party
 
-**Entropy Validation**
-- `test_invalid_entropy_length` - Rejects 15, 17, and 33 byte entropy
-- `test_valid_entropy_lengths` - Accepts 16, 20, 24, 28, 32 byte entropy
+### Compat (`compat` feature)
+- **`compat_bip39_tests.rs`** — TREZOR vectors: entropy↔mnemonic (22 vectors), mnemonic→seed, validation (bad sentences, wrong word count, bad checksum), generation (12/15/18/21/24 words), randomized roundtrips (100 iterations per entropy size)
+- **`compat_integration_tests.rs`** — BIP-39+BIP-32 HD wallet flows, BSM sign/verify, ECIES (Electrum/Bitcore), Base58, cross-module integration, error handling, type/enum tests
 
-**Parsing**
-- `test_phrase_case_insensitive` - Mixed case phrases normalize to lowercase
-- `test_phrase_with_extra_spaces` - Extra whitespace is trimmed
+### Auth (`auth` feature)
+- **`auth_cross_sdk_tests.rs`** — Certificate binary/JSON roundtrip, deterministic serialization, field sorting, DER signature format, outpoint parsing, cross-SDK binary layout
+- **`auth_integration_tests.rs`** — SessionManager lifecycle/pruning, AuthMessage validation/signing, mock transport, HTTP payloads (complex/unicode/100 headers), certificate signing/verification, RequestedCertificateSet, PeerSession states
+- **`auth_peer_e2e_tests.rs`** — Full BRC-31 mutual authentication between two Peer instances via channel loopback: handshake, bidirectional messaging, session persistence, explicit `get_authenticated_session()`, listener registration, certificate request/response flow, empty/large (100KB) payloads, nonce uniqueness, error cases (invalid version, no session)
 
-**Utilities**
-- `test_word_count_enum` - WordCount methods (entropy_bytes, word_count, checksum_bits)
-- `test_language_default` - Default language is English
-- `test_mnemonic_display` - Display trait implementation
-- `test_zero_leading_entropy` - Zero-leading entropy roundtrips correctly
-- `test_entropy_with_checksum` - Entropy with checksum bytes (12-word=17 bytes, 24-word=33 bytes)
-- `test_wordlist_verification` - verify_english_wordlist() returns true
+### Overlay (`overlay` feature)
+- **`overlay_cross_sdk_tests.rs`** — Admin token creation/decoding/protocol detection, network presets, LookupQuestion/Answer types, AdmittanceInstructions, TaggedBEEF
+- **`overlay_integration_tests.rs`** — Protocols, LookupQuestion/Answer, TaggedBEEF, AdmittanceInstructions, TopicBroadcaster validation, RequireAck, LookupResolverConfig, HostReputationTracker (ranking, reset, JSON export/import, global singleton), SyncHistorian (chain traversal, filtering, cycle prevention), admin tokens, HostResponse/ServiceMetadata
 
-**Randomized Roundtrip Tests** (matching Go SDK fuzz testing approach)
-- `test_random_entropy_roundtrip_128` - 100 random 128-bit (16-byte) entropy roundtrips
-- `test_random_entropy_roundtrip_160` - 100 random 160-bit (20-byte) entropy roundtrips
-- `test_random_entropy_roundtrip_192` - 100 random 192-bit (24-byte) entropy roundtrips
-- `test_random_entropy_roundtrip_224` - 100 random 224-bit (28-byte) entropy roundtrips
-- `test_random_entropy_roundtrip_256` - 100 random 256-bit (32-byte) entropy roundtrips
+### Overlay HTTP (`overlay`+`http` features, wiremock)
+- **`overlay_http_tests.rs`** — SHIP broadcast facilitator (25 tests: STEAK response, Content-Type/X-Topics headers, off-chain values, error responses 400/404/500, HTTP security, URL trimming) and SLAP lookup facilitator (24 tests: OutputList/Freeform/Formula answers, binary response format, request format verification, error handling, edge cases)
 
-### Compat Integration Tests (`compat_integration_tests.rs`)
+### Storage (`storage` feature)
+- **`storage_tests.rs`** — UHRP URL generation/parsing/validation/normalization, roundtrip (file→URL→hash), StorageDownloader/Uploader config, UploadableFile, cross-SDK hash/file/URL vectors
 
-Full workflow integration tests for the compat module (31 tests, requires `compat` feature):
+### Storage HTTP (`storage`+`http` features, wiremock)
+- **`storage_http_tests.rs`** — Two-step upload flow (POST /upload → PUT presigned URL), custom retention, required headers, error handling (400/401/413/500), find_file, list_uploads, renew_file, request body verification, MIME type headers, downloader URL validation (invalid/empty/HTTP/bad checksum URLs), timeout config
 
-**BIP-39 + BIP-32 HD Wallet Integration**
-- `test_full_hd_wallet_generation_flow` - Generate mnemonic, create master key, derive child keys, generate addresses
-- `test_mnemonic_to_hd_key_helper` - Test generate_hd_key_from_mnemonic helper function
-- `test_extended_key_serialization_roundtrip` - xprv/xpub string serialization roundtrip
-- `test_hardened_derivation` - Hardened child key derivation (m/0')
-- `test_public_key_derivation_only` - Derive public children from public extended key
-- `test_testnet_hd_key_derivation` - Testnet network (tprv/tpub) derivation
+### Identity (`identity` feature)
+- **`identity_tests.rs`** — KnownCertificateType (9 types, cross-SDK type IDs), DisplayableIdentity, Contact CRUD, IdentityQuery builder, ContactsManager async ops (add/update/remove/search/cache), CertifierInfo, BroadcastResult, static avatar URLs, default values, config builders, camelCase JSON compatibility
 
-**Bitcoin Signed Message (BSM)**
-- `test_bsm_sign_verify_roundtrip` - Sign message, verify against address
-- `test_bsm_public_key_recovery` - Recover public key from signature
-- `test_bsm_compressed_and_uncompressed` - Both compressed and uncompressed signatures
-- `test_bsm_different_messages_different_signatures` - Different messages produce different signatures
-- `test_bsm_empty_and_long_messages` - Empty and 10KB message handling
+### KVStore (`kvstore` feature)
+- **`kvstore_integration_tests.rs`** — LocalKVStore: config/entry/token/query/options types, KVStoreInterpreter (PushDrop script extraction), signature verification, constructor/get/set/remove/has/keys/list/count/clear operations, batch ops (9 tests), cross-SDK compatibility (field names, PushDrop order), edge cases (unicode, large values)
+- **`kvstore_global_tests.rs`** — GlobalKVStore: construction with default/custom config, network presets, input validation (empty key/value), wallet error propagation, overlay error propagation, interpreter tests (19 tests: basic tokens, context filtering, unicode, large values, old/new format), signature verification, data model tests, cross-SDK compatibility, edge cases (special chars, JSON values, multiple tags)
 
-**ECIES Encryption**
-- `test_electrum_ecies_roundtrip` - Electrum-style ECIES encrypt/decrypt
-- `test_electrum_ecies_no_key_mode` - Electrum ECIES with no_key=true (omit ephemeral pubkey)
-- `test_bitcore_ecies_roundtrip` - Bitcore-style ECIES encrypt/decrypt
-- `test_bitcore_ecies_with_fixed_iv` - Deterministic encryption with fixed IV
-- `test_ecies_self_encryption` - Encrypt/decrypt with same key pair
-- `test_ecies_empty_and_large_messages` - Empty and 1MB message handling
-- `test_ecies_wrong_key_fails` - Decryption with wrong key fails
+### Registry (`registry` feature)
+- **`registry_integration_tests.rs`** — DefinitionType (string conversion, lookup services, topics, baskets, field counts), BasketDefinitionData (builder, PushDrop encode/decode), ProtocolDefinitionData (security levels), CertificateDefinitionData (field descriptors), DefinitionData enum, TokenData, RegistryRecord, query builders, result types, RegistryClientConfig, cross-SDK PushDrop field order, constants
 
-**Base58 Encoding**
-- `test_base58_roundtrip` - Encode/decode roundtrip
-- `test_base58_leading_zeros` - Leading zero preservation
-- `test_base58_known_values` - Known Bitcoin Base58 test vectors
-
-**Cross-Module Integration**
-- `test_mnemonic_to_signed_message` - Generate mnemonic, derive key, sign message
-- `test_mnemonic_to_ecies_encryption` - Generate mnemonic, derive key, encrypt/decrypt
-
-**Error Handling**
-- `test_invalid_mnemonic_phrase` - Invalid mnemonic phrase rejected
-- `test_invalid_extended_key_string` - Invalid xprv/xpub strings rejected
-- `test_invalid_derivation_path` - Invalid BIP-32 paths rejected
-- `test_invalid_bsm_signature` - Invalid BSM signature format rejected
-- `test_invalid_ecies_ciphertext` - Truncated/corrupted ciphertext rejected
-
-**Type and Enum Tests**
-- `test_word_count_enum` - WordCount enum methods
-- `test_language_enum` - Language enum values
-- `test_network_enum` - Network (Mainnet/Testnet) enum
-
-### Cross-SDK Compatibility (`cross_sdk_tests.rs`)
-
-Tests that verify the Rust implementation matches TypeScript and Go SDK output (17 tests):
-
-**BRC-42 Key Derivation**
-- `test_brc42_private_derivation_vectors` - Derives child private keys using sender public key
-- `test_brc42_public_derivation_vectors` - Derives child public keys using sender private key
-
-**Symmetric Encryption**
-- `test_symmetric_key_cross_sdk_vectors` - Decrypts ciphertexts from other SDKs
-- `test_31_byte_key_go_ciphertext_compatibility` - Tests keys with leading zero byte
-- `test_32_byte_key_go_ciphertext_compatibility` - Tests full 32-byte keys
-- `test_typescript_ciphertext_compatibility` - Decrypts TypeScript-generated ciphertexts
-- `test_rust_encryption_roundtrip_with_31_byte_key` - Verifies Rust encrypt/decrypt with 31-byte keys
-- `test_rust_encryption_roundtrip_with_32_byte_key` - Verifies Rust encrypt/decrypt with 32-byte keys
-
-**WIF and Address Compatibility**
-- `test_wif_compatibility_vectors` - Known Bitcoin WIF test vectors
-- `test_public_key_compatibility_vectors` - Private key to public key derivation
-- `test_address_compatibility_vectors` - Public key to address generation
-
-**DRBG Verification**
-- `test_drbg_vectors_loaded` - Verifies DRBG vectors can be loaded and parsed (15 vectors)
-
-**Edge Cases**
-- `test_symmetric_encryption_unicode` - Unicode text encryption
-- `test_empty_message_encryption` - Empty message handling
-- `test_large_message_encryption` - 1MB message handling
-- `test_brc42_empty_invoice` - Empty invoice number derivation
-- `test_brc42_long_invoice` - 1000-character invoice number
-
-### DRBG Tests (`drbg_tests.rs`)
-
-HMAC-DRBG (Deterministic Random Bit Generator) tests using NIST SP 800-90A vectors (6 tests):
-
-**NIST Vector Tests**
-- `test_drbg_nist_vectors` - Runs 15 NIST test vectors with SHA-256
-
-**DRBG Variants**
-- `test_drbg_sha512_variant` - Tests SHA-512 HMAC-DRBG produces different output than SHA-256
-- `test_drbg_empty_personalization` - Empty personalization string works correctly
-
-**DRBG Operations**
-- `test_drbg_reseed_changes_output` - Verifies reseed changes generator state
-- `test_drbg_output_length` - Tests various output lengths (1, 16, 32, 64, 128, 256 bytes)
-- `test_drbg_determinism` - Verifies same inputs produce same outputs
-
-### EC Module Tests (`ec_tests.rs`)
-
-Focused tests for elliptic curve operations using BRC-42 test vectors (10 tests):
-
-**BRC-42 Key Derivation**
-- `test_brc42_private_derivation` - Recipient derives child private key from sender's public key using JSON vectors
-- `test_brc42_public_derivation` - Sender derives child public key from recipient's public key using JSON vectors
-- `test_brc42_consistency` - Verifies private and public derivation produce matching key pairs
-
-**Key Serialization**
-- `test_wif_roundtrip_known_vectors` - WIF encoding/decoding with known test cases (k=1, k=known)
-- `test_public_key_known_vectors` - Known private to public key mappings (generator point, 2G, 3G)
-- `test_address_generation_known_vectors` - Known public key to address mappings (1BgGZ9...)
-
-**Signing and Verification**
-- `test_sign_and_verify_roundtrip` - Signs and verifies messages of various lengths (empty, 100 bytes, 256 bytes)
-- `test_deterministic_signatures` - Verifies RFC 6979 deterministic signing (same message = same signature)
-- `test_public_key_recovery` - Recovers public key from signature using recovery IDs 0-1
-
-**ECDH**
-- `test_ecdh_shared_secret` - Verifies both parties derive identical shared secret
-
-### Integration Tests (`integration_tests.rs`)
-
-Full workflow tests combining multiple modules (22 tests):
-
-**Key Derivation Workflows**
-- `test_full_key_derivation_workflow` - Complete BRC-42 key agreement between sender and recipient
-- `test_key_derivation_multiple_invoices` - Verifies different invoices produce unique keys (4 invoices)
-- `test_sign_and_verify_with_derived_keys` - Signs with BRC-42 derived keys, verifies low-S
-- `test_signature_recovery_with_derived_keys` - Recovers public key from derived key signature
-
-**Symmetric Encryption**
-- `test_symmetric_encryption_with_derived_key` - Encrypts using ECDH X coordinate as key
-- `test_symmetric_encryption_bidirectional` - Both parties can encrypt/decrypt using shared secret
-
-**WIF and Address**
-- `test_wif_address_roundtrip` - Mainnet key export and address generation (prefix '1')
-- `test_testnet_wif_address` - Testnet WIF (prefix 0xEF) and address (prefix 0x6F, starts with 'm' or 'n')
-
-**Schnorr Proofs**
-- `test_schnorr_proof_with_derived_keys` - Generates and verifies Schnorr proofs using shared secret
-- `test_schnorr_proof_fails_with_wrong_secret` - Verifies proof rejection with Carol's secret instead of Bob's
-
-**Shamir Secret Sharing**
-- `test_shamir_with_wif_export` - Splits key into 5 shares (threshold 3), recovers, verifies WIF match
-- `test_shamir_different_subsets` - Recovers from 4 different 3-of-5 share combinations
-
-**P-256 Curve**
-- `test_p256_sign_verify_roundtrip` - P-256 signing and verification
-- `test_p256_key_serialization` - P-256 key hex and compressed (33 bytes) / uncompressed (65 bytes) formats
-
-**Hash Functions**
-- `test_hash_chain_for_key_derivation` - SHA256 (32 bytes), SHA256d (32 bytes), Hash160 (20 bytes) chaining
-- `test_hmac_for_key_derivation` - SHA256-HMAC (32 bytes) and SHA512-HMAC (64 bytes)
-
-**Encoding**
-- `test_encoding_roundtrips` - Hex, Base64, Base58 roundtrips
-- `test_address_encoding_integration` - Address encoding with Base58Check (version byte 0x00)
-
-**Sighash**
-- `test_sighash_with_signature` - Computes sighash with SIGHASH_ALL | SIGHASH_FORKID and signs
-
-**Complete Workflows**
-- `test_complete_payment_workflow` - Full merchant/customer payment with BRC-42, ECDH encryption, signing
-- `test_key_backup_and_recovery_workflow` - Complete Shamir split (3-of-5), backup, recover, sign workflow
-- `test_multi_party_schnorr_verification` - Both Alice and Bob generate and cross-verify proofs
-
-### Script Vectors Tests (`script_vectors_tests.rs`)
-
-Comprehensive script interpreter tests using TypeScript SDK vectors (13 tests):
-
-**Spend Valid Vectors**
-- `test_spend_valid_vectors` - Runs ~570+ spend execution test vectors with SpendParams
-- `test_first_spend_vector_detailed` - Detailed debugging output for first vector (ASM, hex)
-
-**Script Parsing Tests**
-- `test_script_valid_vectors_parsing` - Tests ~590+ scripts can be parsed and hex roundtrips
-- `test_script_valid_vectors_execution` - Tests script execution (P2SH vectors skipped for BSV)
-
-**Script Invalid Vectors**
-- `test_script_invalid_vectors` - Verifies ~500+ invalid scripts fail during parsing or execution
-
-**Individual Script Tests**
-- `test_arithmetic_script` - Basic arithmetic (OP_1 OP_2 OP_ADD OP_3 OP_EQUAL)
-- `test_op_depth` - OP_DEPTH operation (empty stack = 0)
-- `test_conditional` - IF/ELSE/ENDIF control flow with OP_1 condition
-- `test_op_cat` - BSV re-enabled OP_CAT ("ab" + "cd" = "abcd")
-- `test_op_split` - BSV re-enabled OP_SPLIT ("abcd" at position 2)
-- `test_op_mul` - BSV re-enabled OP_MUL (3 * 7 = 21)
-- `test_op_div` - BSV re-enabled OP_DIV (21 / 7 = 3)
-- `test_hash_operations` - OP_SHA256 with computed expected hash from primitives
-
-### Sighash Tests (`sighash_tests.rs`)
-
-Transaction sighash computation tests (3 tests, 499 vectors):
-
-- `test_sighash_vectors` - Runs all 499 sighash test vectors using `compute_sighash` and `parse_transaction`
-- `test_sighash_first_vector_detailed` - Detailed debugging output: raw_tx, script, hash_type, parsed inputs/outputs
-- `test_parse_all_vectors_transactions` - Verifies all 499 transactions can be parsed from raw hex
-
-### Template Tests (`template_tests.rs`)
-
-Script template integration tests (22 tests):
-
-**P2PKH Template**
-- `test_p2pkh_end_to_end_spend` - Full P2PKH locking script creation (DUP HASH160 EQUALVERIFY CHECKSIG) and unlocking
-- `test_p2pkh_from_address` - P2PKH locking from Bitcoin address matches locking from pubkey hash
-- `test_p2pkh_spend_validation` - P2PKH spend with Spend interpreter (validates structure)
-
-**P2PK Template**
-- `test_p2pk_end_to_end` - Full P2PK lock/unlock: `<pubkey> OP_CHECKSIG` with signature-only unlocking (1 chunk)
-- `test_p2pk_compressed_vs_uncompressed_detection` - Compressed pubkey detected as P2PK via `is_p2pk()`
-- `test_p2pk_vs_p2pkh_estimate_length` - P2PK estimates 74 bytes (sig only) vs P2PKH 108 bytes (sig + pubkey)
-- `test_p2pk_invalid_pubkey` - Rejects 20-byte hash, 32-byte data, and bad prefix (0x05)
-
-**Multisig Template**
-- `test_multisig_2_of_3_end_to_end` - 2-of-3 multisig: `OP_2 <pk1> <pk2> <pk3> OP_3 OP_CHECKMULTISIG`, unlock with OP_0 + 2 sigs
-- `test_multisig_1_of_1` - Degenerate 1-of-1 multisig (4 chunks: OP_1 <pk> OP_1 OP_CHECKMULTISIG)
-- `test_multisig_3_of_3` - All-signers-required 3-of-3 multisig, unlock with OP_0 + 3 sigs
-- `test_multisig_script_template_trait` - ScriptTemplate::lock with concatenated 33-byte pubkeys matches lock_from_keys
-- `test_multisig_validation_errors` - Rejects threshold > N, zero threshold, 17+ keys, and empty keys
-- `test_multisig_estimate_length_scaling` - Estimate scales: 1-of-N=75, 2-of-N=149, 3-of-N=223 (1 + M*74)
-- `test_multisig_max_keys` - Maximum 16-of-16 multisig works correctly
-- `test_multisig_hex_roundtrip` - Hex serialization roundtrip preserves multisig detection
-
-**RPuzzle Template**
-- `test_rpuzzle_lock_script_structure` - Verifies RPuzzle script: OP_OVER, OP_3, OP_SPLIT, OP_NIP, OP_SWAP, OP_DROP, OP_EQUALVERIFY, OP_CHECKSIG
-- `test_rpuzzle_hashed_lock` - RPuzzle with HASH160 (contains OP_HASH160) and SHA256 (contains OP_SHA256) R values
-- `test_rpuzzle_unlock_k_value` - Verifies K value produces correct R in signature (DER R extraction)
-- `test_compute_r_from_k_known_values` - Tests k=1 produces generator point x-coordinate (79BE667E...)
-
-**Template Utilities**
-- `test_template_unlock_estimate_length` - P2PKH and RPuzzle estimate 108 bytes
-- `test_sighash_types` - Tests ALL|FORKID (0x41), NONE|FORKID (0x42), SINGLE|FORKID (0x43), ALL|FORKID|ANYONECANPAY (0xC1)
-- `test_rpuzzle_type_hash_functions` - Verifies Raw (same length), Sha1 (20), Sha256 (32), Hash256 (32), Ripemd160 (20), Hash160 (20)
-
-### Transaction Tests (`transaction_tests.rs`)
-
-Transaction module tests (86 tests, requires `transaction` feature flag):
-
-**Transaction Parsing**
-- `test_transaction_from_hex` - Parse valid transaction from hex (version=1, locktime=0)
-- `test_transaction_roundtrip_hex` - Hex serialization/deserialization roundtrip for all TX_VALID_VECTORS
-- `test_transaction_roundtrip_binary` - Binary serialization/deserialization roundtrip
-- `test_transaction_txid` - Transaction ID computation matches TX_VALID_2_TXID
-- `test_transaction_hash_differs_from_id` - Hash vs TXID byte order (reversed)
-- `test_new_transaction_defaults` - Default: version=1, lock_time=0, empty inputs/outputs
-- `test_invalid_tx_can_be_parsed_structurally` - Invalid tx vectors can still be parsed structurally
-
-**Fee Models**
-- `test_fixed_fee` - FixedFee model returns constant 500 sats
-- `test_satoshis_per_kilobyte_default` - Default 100 sat/KB rate
-- `test_satoshis_per_kilobyte_new` - Custom 1000 sat/KB rate
-- `test_satoshis_per_kilobyte_empty_tx` - Fee for empty transaction: 10 bytes × 1000 sat/KB = 10 sats
-- `test_satoshis_per_kilobyte_ceiling_division` - Fees rounded up (10 bytes × 100 sat/KB = 1 sat)
-
-**Chain Tracker (async, tokio)**
-- `test_mock_chain_tracker` - MockChainTracker with add_root and is_valid_root_for_height
-- `test_always_valid_chain_tracker` - AlwaysValidChainTracker accepts all roots at any height
-
-**Broadcaster (async, tokio)**
-- `test_broadcaster_success` - BroadcastResponse::success with status Success
-- `test_broadcaster_failure` - BroadcastFailure with code "REJECTED"
-- `test_broadcaster_many` - broadcast_many for batch broadcasting
-
-**MerklePath (BUMP)**
-- `test_merkle_path_from_hex` - Parse BRC-74 BUMP format (all BUMP_VALID_VECTORS)
-- `test_merkle_path_roundtrip` - BUMP hex roundtrip
-- `test_merkle_path_from_coinbase` - Create MerklePath for coinbase tx at height 100
-- `test_merkle_path_compute_root` - Compute merkle root from path (64 hex chars)
-- `test_invalid_bump_vectors` - Invalid BUMP vectors with expected error descriptions
-
-**BEEF Format**
-- `test_beef_new` - Create empty BEEF container (empty bumps/txs)
-- `test_beef_merge_txid_only` - Add txid-only references, find_txid works
-- `test_beef_merge_bump` - Add MerklePath to BEEF (index 0)
-- `test_beef_empty_is_valid` - Empty BEEF validation with is_valid(false)
-
-**Big Transaction Tests**
-- `test_big_tx_constant_exists` - Verify BIG_TX_TXID is 64 hex chars
-- `test_large_tx_parses` - Parse LARGE_TX_HEX coinbase (1 input, 1 output)
-- `test_multi_io_tx_parses` - Parse MULTI_IO_TX_HEX (2 inputs, 2 outputs)
-
-**Transaction Construction**
-- `test_estimate_size` - Size estimation within 10 bytes of actual
-- `test_add_input_requires_txid_or_source` - Default TransactionInput fails
-- `test_add_input_with_txid` - TransactionInput::new with 64-char txid
-- `test_add_output` - TransactionOutput::new with satoshis and LockingScript
-- `test_add_change_output` - TransactionOutput::new_change with change=true flag
-- `test_metadata` - update_metadata with serde_json::json!
-
-**Extended BEEF Tests** (in `beef_extended_tests` submodule, 17 tests)
-- Transaction merging: parent/child, two BEEFs, duplicate deduplication, raw tx
-- Sorting: `sort_txs` orders by dependency (grandparent → parent → child)
-- Serialization: atomic (with target txid), V1/V2 roundtrip, hex/binary roundtrip
-- Validation: empty BEEF, txid-only (strict vs lenient), verify_valid result structure
-- MerklePaths: multiple bumps at heights 100-1000000
-
-**BEEF Ancestry Collection Tests** (in `beef_ancestry_tests` submodule, 15 tests)
-- `test_to_beef_single_transaction_no_ancestors` - Single tx with no inputs produces valid BEEF
-- `test_to_beef_walks_two_level_ancestry` - grandparent → parent → child chain collection
-- `test_to_beef_walks_three_level_ancestry` - great-grandparent → grandparent → parent → child
-- `test_to_beef_stops_at_proven_transaction` - Stops walking at tx with merkle proof
-- `test_to_beef_collects_merkle_proofs` - Collects proofs from multiple proven ancestors
-- `test_to_beef_allow_partial_false_fails_on_missing` - Fails when source tx missing
-- `test_to_beef_allow_partial_true_skips_missing` - Succeeds with missing source when partial allowed
-- `test_to_beef_handles_diamond_dependency` - Deduplicates common ancestor in diamond pattern
-- `test_to_beef_dependency_order` - Ancestors ordered before descendants in output
-- `test_to_atomic_beef_includes_ancestry` - Atomic BEEF includes full ancestry
-- `test_to_beef_with_proven_child` - Proven tx alone in BEEF with its proof
-- `test_merkle_path_field_works` - Set and check merkle_path field on Transaction
-- `test_to_beef_multiple_inputs_different_chains` - Merges two separate ancestry chains
-- `test_to_beef_tip_is_last_transaction` - Tip transaction is always last in BEEF (BRC-62 requirement)
-- `test_to_beef_tip_last_with_deep_chains` - Consolidation TX is last with deep ancestry chains
-
-**Cross-SDK Compatibility Tests** (in `cross_sdk_tests` submodule, 13 tests)
-- BRC-74 MerklePath: parse, hex roundtrip, compute root for 3 TXIDs
-- Single-tx block: root equals coinbase txid
-- BRC-62 BEEF: V1/V2 empty serialization, parse from Go SDK, find transactions
-- BEEF set: parse multi-tx BEEF, find specific txid, binary roundtrip
-
-**MerklePath Advanced Tests** (in `merkle_path_advanced_tests` submodule, 7 async tests)
-- ChainTracker verification: correct root passes, wrong root/height fails
-- Utility methods: contains, txids, compute_root(None), binary roundtrip
-
-### Auth Cross-SDK Tests (`auth_cross_sdk_tests.rs`)
-
-Certificate serialization tests for cross-SDK compatibility (13 tests, requires `auth` feature):
-
-**Certificate Parsing**
-- `test_certificate_vector_parsing` - Parses all certificate vectors, verifies fields match
-
-**Binary Serialization**
-- `test_certificate_binary_roundtrip` - Binary serialization roundtrip with and without signature
-- `test_certificate_deterministic_serialization` - Verifies binary output is deterministic
-- `test_certificate_binary_format_structure` - Verifies binary format matches TypeScript SDK layout
-
-**Field Handling**
-- `test_certificate_fields_sorted_alphabetically` - Fields sorted alphabetically for determinism
-- `test_certificate_empty_fields` - Empty fields serialize/deserialize correctly
-
-**Signature Tests**
-- `test_certificate_with_signature_has_valid_format` - DER-encoded signatures start with 0x30
-
-**JSON Serialization**
-- `test_certificate_json_roundtrip` - JSON serialization roundtrip for all fields
-
-**Type and Serial Number**
-- `test_certificate_type_base64` - type_base64() and serial_number_base64() methods
-
-**Outpoint Tests**
-- `test_certificate_outpoint_parsing` - Outpoint parsing helper (txid.vout format)
-- `test_certificate_without_revocation_outpoint` - None outpoint handles correctly
-- `test_certificate_no_outpoint_sentinel_value` - No-outpoint encoded as all-zeros
-
-**Vector Validation**
-- `test_certificate_vector_count` - Verifies at least 4 certificate vectors loaded
-
-### Auth Integration Tests (`auth_integration_tests.rs`)
-
-Auth module integration tests (26 tests, requires `auth` feature):
-
-**Session Manager Tests**
-- `test_session_manager_lifecycle` - Session creation, lookup, removal, and clearing
-- `test_session_manager_identity_lookup` - Lookup by identity key, prefer authenticated sessions
-- `test_session_manager_prune_stale` - Prune sessions older than specified age
-
-**AuthMessage Tests**
-- `test_auth_message_validation` - Validation for different message types
-- `test_auth_message_signing_data` - Signing data construction for InitialResponse and General
-- `test_auth_message_key_id` - Key ID generation from nonces
-
-**Mock Transport Tests**
-- `test_mock_transport_multiple_responses` - Queue and receive multiple responses
-- `test_mock_transport_receive_message` - Receive messages via callback
-
-**HTTP Payload Tests**
-- `test_http_request_payload_complex` - Complex HTTP request roundtrip
-- `test_http_response_payload_with_headers` - HTTP response with headers roundtrip
-- `test_http_request_empty_values` - Empty values handling
-- `test_http_request_unicode_values` - Unicode content handling
-- `test_http_request_large_header_count` - 100 headers roundtrip
-
-**Certificate Tests**
-- `test_certificate_creation_and_signing` - Create, sign, and verify certificate
-- `test_certificate_binary_roundtrip` - Binary serialization roundtrip
-- `test_certificate_wrong_signer_fails` - Signing with wrong key fails
-- `test_verifiable_certificate_creation` - VerifiableCertificate with keyring
-- `test_certificate_json_roundtrip` - JSON serialization roundtrip
-- `test_verifiable_certificate_json_roundtrip` - VerifiableCertificate JSON roundtrip
-
-**RequestedCertificateSet Tests**
-- `test_requested_certificate_set_matching` - Certifier and type matching
-- `test_requested_certificate_set_json_roundtrip` - JSON serialization roundtrip
-
-**Peer Session Tests**
-- `test_peer_session_ready_states` - Ready state logic based on authentication and certificates
-- `test_peer_session_touch` - Touch updates last_update timestamp
-
-**Error Handling Tests**
-- `test_invalid_auth_version` - Invalid version is rejected
-- `test_duplicate_session_nonce_rejected` - Duplicate nonces are rejected
-- `test_session_without_nonce_rejected` - Sessions without nonce are rejected
-
-### Broadcaster HTTP Tests (`broadcaster_http_tests.rs`)
-
-HTTP integration tests for broadcaster implementations (26 tests, requires `transaction` + `http` features):
-
-Uses `wiremock` mock HTTP server to verify correct request sending and response handling.
-
-**ARC Broadcaster Tests** (9 tests)
-- `test_arc_broadcast_success` - Successful broadcast returns txid
-- `test_arc_broadcast_success_with_api_key` - API key sent in Authorization header
-- `test_arc_broadcast_error_response` - Error response returns BroadcastFailure
-- `test_arc_broadcast_server_error` - 500 status returns failure
-- `test_arc_broadcast_server_error_empty_detail` - Empty detail field handled
-- `test_arc_broadcast_malformed_json` - Malformed JSON handled gracefully
-- `test_arc_broadcast_sends_raw_tx_in_body` - Raw transaction hex in POST body
-- `test_arc_broadcast_with_config_timeout` - Custom ArcConfig timeout applied
-- `test_arc_broadcast_many` - Batch broadcasting multiple transactions
-
-**WhatsOnChain Broadcaster Tests** (9 tests)
-- `test_woc_broadcast_success` - Mainnet broadcast returns txid
-- `test_woc_broadcast_success_testnet` - Testnet network uses correct URL path
-- `test_woc_broadcast_success_stn` - STN network uses correct URL path
-- `test_woc_broadcast_bad_request` - 400 status returns failure
-- `test_woc_broadcast_unauthorized` - 401 status returns failure
-- `test_woc_broadcast_server_error` - 500 status returns failure
-- `test_woc_broadcast_with_api_key_header` - API key sent in header
-- `test_woc_broadcast_sends_raw_hex_body` - Raw hex sent as text/plain body
-- `test_woc_broadcast_many` - Batch broadcasting
-
-**Teranode Broadcaster Tests** (8 tests)
-- `test_teranode_broadcast_success` - Successful EF-format broadcast
-- `test_teranode_broadcast_with_api_key` - API key in Authorization header
-- `test_teranode_broadcast_error_response` - Error response handling
-- `test_teranode_broadcast_server_error` - 500 status handling
-- `test_teranode_broadcast_empty_success_body` - Empty 200 response handled
-- `test_teranode_broadcast_timeout` - Custom TeranodeConfig timeout
-- `test_teranode_broadcast_ef_serialization_error` - EF serialization failure (missing source tx)
-- `test_teranode_broadcast_many` - Batch broadcasting
-
-### ChainTracker HTTP Tests (`chaintracker_http_tests.rs`)
-
-HTTP integration tests for WhatsOnChain chain tracker (10 tests, requires `transaction` + `http` features):
-
-Uses `wiremock` mock HTTP server to verify correct request/response handling.
-
-**is_valid_root_for_height Tests** (6 tests)
-- `test_woc_tracker_valid_root_success` - Valid merkle root returns true
-- `test_woc_tracker_invalid_root` - Mismatched root returns false
-- `test_woc_tracker_case_insensitive_root` - Root comparison is case-insensitive
-- `test_woc_tracker_block_not_found` - 404 returns ChainTrackerError
-- `test_woc_tracker_server_error` - 500 returns ChainTrackerError
-- `test_woc_tracker_malformed_json` - Malformed JSON returns error
-
-**current_height Tests** (3 tests)
-- `test_woc_tracker_current_height_success` - Returns current block height
-- `test_woc_tracker_current_height_server_error` - 500 returns error
-- `test_woc_tracker_current_height_malformed_json` - Malformed response returns error
-
-**Network Tests** (1 test)
-- `test_woc_tracker_testnet_uses_correct_path` - Testnet uses `/test/` path prefix
-
-### Identity Tests (`identity_tests.rs`)
-
-Identity module integration tests (69 tests, requires `identity` feature):
-
-**KnownCertificateType Tests**
-- `test_known_certificate_type_all_types` - All 9 certificate types (IdentiCert, DiscordCert, PhoneCert, XCert, Registrant, EmailCert, Anyone, SelfCert, CoolCert)
-- `test_known_certificate_type_names` - Type name strings match expected values
-- `test_known_certificate_type_ids_cross_sdk_compatible` - Base64 type IDs match TypeScript/Go SDKs
-- `test_known_certificate_type_from_type_id` - Recover type from type ID
-- `test_known_certificate_type_from_unknown_id` - Unknown IDs return None
-
-**DisplayableIdentity Tests**
-- `test_displayable_identity_from_key_long` - Abbreviation for 66-char public keys
-- `test_displayable_identity_from_key_short` - No abbreviation for short keys
-- `test_displayable_identity_unknown` - Default unknown identity values
-- `test_displayable_identity_json_serialization` - camelCase JSON roundtrip
-
-**Contact Tests**
-- `test_contact_creation` - Contact with tags and metadata
-- `test_contact_from_identity` - Create from DisplayableIdentity
-- `test_contact_to_displayable_identity` - Convert back to DisplayableIdentity
-- `test_contact_json_serialization` - JSON roundtrip with camelCase
-
-**IdentityQuery Tests**
-- `test_identity_query_by_identity_key` - Query by public key
-- `test_identity_query_by_attribute` - Query by single attribute
-- `test_identity_query_by_attributes` - Query by multiple attributes
-- `test_identity_query_builder_pattern` - Fluent builder with limit, offset, certifier
-
-**ContactsManager Tests** (async)
-- `test_add_and_get_contact` - Add contact, retrieve by identity key
-- `test_update_contact` - Update existing contact
-- `test_remove_contact` - Remove contact by identity key
-- `test_list_contacts` - List all contacts
-- `test_search_contacts_by_name` - Case-insensitive name search
-- `test_get_contacts_by_tag` - Filter by tag
-- `test_cache_management` - Cache initialization, count, clearing
-
-**CertifierInfo Tests**
-- `test_certifier_info_default` - Default: name="Unknown Certifier", trust=0
-- `test_certifier_info_creation` - Custom certifier with name, icon_url, description, trust
-- `test_certifier_info_json_serialization` - JSON roundtrip with camelCase (iconUrl)
-
-**BroadcastResult Tests**
-- `test_broadcast_success` - BroadcastSuccess with txid and message
-- `test_broadcast_failure` - BroadcastFailure with code and description
-- `test_broadcast_result_success` - Success variant: is_success()=true, txid() returns Some
-- `test_broadcast_result_failure` - Failure variant: is_success()=false, txid() returns None
-- `test_broadcast_result_into_result_success` - into_result() Ok for success
-- `test_broadcast_result_into_result_failure` - into_result() Err for failure
-
-**Static Avatar URLs and Default Values**
-- `test_static_avatar_urls` - All static avatars are UHRP-style (start with "XU"), all unique
-- `test_default_identity_values` - NAME, AVATAR_URL, BADGE_ICON_URL, BADGE_LABEL, BADGE_CLICK_URL
-- `test_default_socialcert_certifier` - Valid 66-char hex compressed public key (33 bytes)
-
-**Configuration Tests**
-- `test_identity_client_config_default` - Default: Mainnet, protocol (1, "identity"), token_amount=1
-- `test_identity_client_config_with_originator` - Config with custom originator
-- `test_identity_client_config_with_network` - Config with custom network preset
-- `test_identity_client_config_with_token_amount` - Config with custom token amount
-- `test_identity_client_config_builder_chaining` - Fluent builder with all options
-- `test_contacts_manager_config_default` - Default: protocol (2, "contact"), basket="contacts"
-- `test_contacts_manager_config_with_originator` - Config with custom originator
-
-**ContactsManager Tests** (async, extended)
-- `test_add_and_get_contact` - Add contact, retrieve by identity key
-- `test_get_nonexistent_contact` - Returns None for missing contact
-- `test_update_contact` - Update existing contact
-- `test_update_nonexistent_contact_fails` - Update missing contact returns error
-- `test_remove_contact` - Remove contact by identity key
-- `test_remove_nonexistent_contact_fails` - Remove missing contact returns error
-- `test_list_contacts` - List all contacts
-- `test_search_contacts_by_name` - Case-insensitive name search
-- `test_search_contacts_case_insensitive` - Mixed case search
-- `test_search_contacts_by_tag` - Search by tag field
-- `test_search_contacts_by_notes` - Search by notes field
-- `test_get_contacts_by_tag` - Filter by specific tag
-- `test_cache_management` - Cache initialization, count, clearing
-- `test_add_contact_replaces_existing` - Adding same key replaces existing contact
-- `test_empty_search_returns_empty` - Empty search term returns empty list
-
-**IdentityClient Config Tests**
-- `test_identity_client_config_defaults` - Default configuration values
-- `test_identity_client_config_builder` - Builder pattern
-- `test_identity_client_config_protocol_defaults` - Protocol default values
-
-**Cross-SDK Compatibility**
-- `test_certificate_type_ids_are_base64` - Type IDs are valid Base64 strings
-- `test_json_field_names_are_camel_case` - JSON fields use camelCase
-
-### KVStore Tests (`kvstore_integration_tests.rs`)
-
-KVStore module integration tests (83 tests, requires `kvstore` feature):
-
-**KVStoreConfig Tests** (4 tests)
-- `test_kvstore_config_default_values` - Default: protocol_id="kvstore", service_name="ls_kvstore", encrypt=true
-- `test_kvstore_config_builder_all_fields` - Builder pattern with all options
-- `test_kvstore_config_builder_partial` - Partial builder retains defaults
-- `test_kvstore_config_clone` - Clone implementation
-
-**KVStoreEntry Tests** (5 tests)
-- `test_kvstore_entry_creation` - Entry with key, value, controller, protocol_id
-- `test_kvstore_entry_with_tags` - Entry with tags array
-- `test_kvstore_entry_with_token` - Entry with KVStoreToken
-- `test_kvstore_entry_with_history` - Entry with value history
-- `test_kvstore_entry_json_roundtrip` - JSON serialization roundtrip
-
-**KVStoreToken Tests** (4 tests)
-- `test_kvstore_token_creation` - Token with txid, output_index, satoshis
-- `test_kvstore_token_with_beef` - Token with BEEF data
-- `test_kvstore_token_outpoint_string` - "txid.vout" format
-- `test_kvstore_token_json_roundtrip` - Token JSON serialization roundtrip (camelCase)
-
-**KVStoreQuery Tests** (4 tests)
-- `test_kvstore_query_default` - Default query has all fields None
-- `test_kvstore_query_builder_all_fields` - key, controller, protocol_id, tags, limit, skip, sort_order
-- `test_kvstore_query_to_json` - JSON output for query parameters
-- `test_kvstore_query_json_omits_none` - None fields omitted from JSON (empty = `{}`)
-
-**KVStore Options Tests** (6 tests)
-- `test_kvstore_get_options_default` - Default: history=false, include_token=false
-- `test_kvstore_get_options_builder` - Builder with history, include_token, service_name
-- `test_kvstore_set_options_default` - Default: all fields None
-- `test_kvstore_set_options_builder` - Builder with protocol_id, description, token_amount, tags
-- `test_kvstore_remove_options_default` - Default: all fields None
-- `test_kvstore_remove_options_builder` - Builder with protocol_id, description
-
-**KVStoreContext Tests** (3 tests)
-- `test_kvstore_context_creation` - Context with key and protocol_id
-- `test_kvstore_context_cache_key` - Cache key format: "protocol_id:key"
-- `test_kvstore_context_clone` - Clone implementation
-
-**KVStoreInterpreter Tests** (8 tests)
-- `test_interpreter_extract_basic_token` - Extract entry from PushDrop script
-- `test_interpreter_extract_token_with_tags` - Extract entry with tags
-- `test_interpreter_with_matching_context` - Context filtering (matching)
-- `test_interpreter_with_non_matching_context_key` - Context filtering (key mismatch returns None)
-- `test_interpreter_with_non_matching_context_protocol` - Context filtering (protocol mismatch returns None)
-- `test_interpreter_extract_value` - Extract value string from script
-- `test_interpreter_is_kvstore_token` - Token format validation (valid vs too few fields)
-- `test_interpreter_extract_fields` - Extract all KVStoreFields (protocol_id, key, value, controller, tags)
-
-**KVStoreFields Tests** (3 tests)
-- `test_kvstore_fields_value_bytes` - Raw bytes from value field
-- `test_kvstore_fields_empty_tags` - Empty tags field (has_tags returns false)
-- `test_kvstore_fields_single_zero_byte_tags` - Single zero byte treated as no tags
-
-**Signature Verification Tests** (4 tests)
-- `test_verify_signature_missing` - Missing signature returns false
-- `test_verify_signature_empty` - Empty signature returns false
-- `test_verify_signature_invalid_bytes` - Invalid DER signature returns false
-- `test_verify_signature_invalid_controller` - Invalid pubkey (all zeros) returns false
-
-**LocalKVStore Constructor Tests** (3 sync tests)
-- `test_local_kvstore_new_success` - Creation with MockWallet
-- `test_local_kvstore_new_empty_context_fails` - Empty protocol_id returns KvStoreEmptyContext
-- `test_local_kvstore_new_custom_config` - Custom config with protocol_id, token_amount, originator
-
-**LocalKVStore Get Tests** (4 async tests)
-- `test_local_kvstore_get_empty_key_fails` - Empty key returns KvStoreInvalidKey
-- `test_local_kvstore_get_returns_default_when_not_found` - Default value fallback
-- `test_local_kvstore_get_wallet_error` - Wallet error propagates as WalletError
-- `test_local_kvstore_get_entry_empty_key_fails` - get_entry with empty key fails
-- `test_local_kvstore_get_entry_not_found` - get_entry returns None for missing key
-
-**LocalKVStore Set Tests** (5 async tests)
-- `test_local_kvstore_set_empty_key_fails` - Empty key returns KvStoreInvalidKey
-- `test_local_kvstore_set_empty_value_fails` - Empty value returns KvStoreInvalidValue
-- `test_local_kvstore_set_success` - Set key-value, returns outpoint ("txid.0" format)
-- `test_local_kvstore_set_wallet_error` - Wallet create_action error propagates
-- `test_local_kvstore_set_with_options` - Set with description, token_amount, and tags options
-
-**LocalKVStore Remove Tests** (3 async tests)
-- `test_local_kvstore_remove_empty_key_fails` - Empty key returns KvStoreInvalidKey
-- `test_local_kvstore_remove_not_found_returns_empty` - Remove non-existent key returns empty string
-- `test_local_kvstore_remove_wallet_error` - Wallet list_outputs error propagates
-
-**LocalKVStore Has Tests** (2 async tests)
-- `test_local_kvstore_has_empty_key_fails` - Empty key returns KvStoreInvalidKey
-- `test_local_kvstore_has_not_found` - Non-existent key returns false
-
-**LocalKVStore Keys/List/Count/Clear Tests** (5 async tests)
-- `test_local_kvstore_keys_empty` - List all keys (empty result)
-- `test_local_kvstore_list_empty` - List entries with no query (empty result)
-- `test_local_kvstore_list_with_query` - List with KVStoreQuery filter
-- `test_local_kvstore_count_empty` - Entry count (0)
-- `test_local_kvstore_clear_empty` - Clear all entries
-
-**Cross-SDK Compatibility** (4 tests)
-- `test_kvstore_config_matches_go_sdk_defaults` - Config defaults match Go SDK
-- `test_kvstore_entry_json_field_names_match_typescript` - camelCase field names (protocolId)
-- `test_kvstore_query_json_field_names_match_typescript` - camelCase (tagQueryMode, sortOrder)
-- `test_pushdrop_field_order_matches_spec` - Field indices match specification (6 fields)
-
-**Error Type Tests** (1 test)
-- `test_kvstore_error_types` - KvStoreEmptyContext, KvStoreInvalidKey, KvStoreInvalidValue, KvStoreKeyNotFound, KvStoreError, KvStoreCorruptedState
-
-**Edge Cases and Boundary Tests** (5 tests)
-- `test_kvstore_entry_with_unicode_values` - Emoji keys and Chinese character values with JSON roundtrip
-- `test_kvstore_query_with_large_limit` - Query with u32::MAX for limit and skip
-- `test_kvstore_token_with_large_values` - Token with 64-char txid and u32::MAX/u64::MAX values
-- `test_kvstore_config_empty_topics` - Config with empty topics vector
-- `test_kvstore_entry_empty_tags` - Entry with empty tags vector
-
-**LocalKVStore Batch Operation Tests** (9 async tests)
-- `test_local_batch_set_and_get` - Batch set 3 entries, batch get them back
-- `test_local_batch_remove` - Batch set then batch remove
-- `test_local_batch_get_missing_keys` - Batch get with non-persisted keys returns None
-- `test_local_batch_empty` - Empty batch_get/batch_set/batch_remove succeed as no-ops
-- `test_local_batch_get_invalid_key_fails` - Empty key in batch returns KvStoreInvalidKey
-- `test_local_batch_set_wallet_error` - Wallet create_action error propagates in batch_set
-- `test_local_batch_remove_wallet_error` - Wallet list_outputs error propagates in batch_remove
-- `test_local_batch_get_single_key` - Single-key batch works same as multi-key
-- `test_local_batch_set_single_entry` - Single-entry batch set works
-
-### Messages Tests (`messages_tests.rs`)
-
-BRC-77 signed message and BRC-78 encrypted message tests (33 tests, requires `messages` feature):
-
-**BRC-77 Signed Message Tests**
-- `test_sign_and_verify_roundtrip_specific_recipient` - Sign for specific recipient, verify
-- `test_sign_and_verify_roundtrip_anyone` - Sign for anyone (recipient marker 0x00)
-- `test_verify_with_different_key_fails` - Wrong recipient returns MessageRecipientMismatch
-- `test_sign_and_verify_empty_message` - Empty message handling
-- `test_sign_and_verify_large_message` - 100KB message handling
-- `test_tampered_message_returns_false_not_error` - Tampered message returns false, not error
-- `test_verify_without_recipient_when_required` - Missing recipient key error
-- `test_signature_wrong_version` - Invalid version returns MessageVersionMismatch
-
-**BRC-78 Encrypted Message Tests**
-- `test_encrypt_and_decrypt_roundtrip` - Encrypt for recipient, decrypt
-- `test_decrypt_with_wrong_key_fails` - Wrong key returns MessageRecipientMismatch
-- `test_encrypt_and_decrypt_empty_message` - Empty message handling
-- `test_encrypt_and_decrypt_large_message` - 1MB message handling
-- `test_tampered_ciphertext_fails_decryption` - GCM authentication failure
-- `test_encrypted_message_wrong_version` - Invalid version error
-- `test_message_too_short` - Short message error
-- `test_same_plaintext_different_ciphertext` - Random keyID/IV produces different output
-- `test_different_senders_same_recipient` - Different senders, same recipient decrypts
-
-**Cross-SDK Compatibility**
-- `test_cross_sdk_sign_verify_specific_recipient` - Sender=15, recipient=21 vector
-- `test_cross_sdk_sign_verify_anyone` - Sender=15, no recipient vector
-- `test_cross_sdk_encrypt_decrypt` - Encrypt/decrypt with scalar keys
-- `test_cross_sdk_wrong_version_signed_error_format` - Error format: "Expected 42423301, received..."
-- `test_cross_sdk_no_verifier_error_format` - Missing verifier key error format
-- `test_cross_sdk_wrong_verifier_error_format` - Wrong verifier key error format
-- `test_cross_sdk_wrong_version_encrypted_error_format` - Encrypted version mismatch error
-- `test_cross_sdk_wrong_recipient_encrypted_error_format` - Wrong recipient error
-- `test_cross_sdk_rare_key_length_encrypted` - TypeScript test vector with rare key length
-
-**Version Constants**
-- `test_version_constants` - SIGNED_VERSION=0x42423301, ENCRYPTED_VERSION=0x42421033
-
-**Unicode and Binary Data**
-- `test_sign_verify_unicode_message` - Unicode text signing roundtrip
-- `test_encrypt_decrypt_unicode_message` - Unicode text encryption roundtrip
-- `test_sign_verify_binary_data` - Binary (non-UTF8) data signing roundtrip
-- `test_encrypt_decrypt_binary_data` - Binary (non-UTF8) data encryption roundtrip
-
-**Multi-Party Tests**
-- `test_multiple_signatures_same_message` - Multiple signatures on same message, each verifiable
-- `test_cross_communication` - Alice→Bob and Bob→Alice bidirectional encryption
-
-### Storage Tests (`storage_tests.rs`)
-
-UHRP storage module tests (70 tests, requires `storage` feature):
-
-**UHRP URL Generation**
-- `test_get_url_for_file_known_data` - TypeScript SDK test vector
-- `test_get_url_for_file_empty` - Empty file produces valid URL
-- `test_get_url_for_file_hello_world` - Hello World roundtrip
-- `test_get_url_for_hash_known_hash` - Known hash to URL
-- `test_get_url_for_hash_invalid_length` - 16/64 byte hashes rejected
-
-**UHRP URL Parsing**
-- `test_get_hash_from_url_extracts_correct_hash` - Extract hash from Base58Check
-- `test_get_hash_from_url_with_uhrp_prefix` - Handle uhrp:// prefix
-- `test_get_hash_from_url_with_web_prefix` - Handle web+uhrp:// prefix
-- `test_get_hash_from_url_invalid_checksum` - Bad checksum rejected
-- `test_get_hash_from_url_invalid_base58` - Invalid characters (0, O, l, I) rejected
-
-**UHRP URL Validation**
-- `test_is_valid_url_accepts_valid_urls` - Base58Check, uhrp://, web+uhrp://
-- `test_is_valid_url_rejects_invalid_checksum` - Bad checksum rejected
-- `test_is_valid_url_rejects_non_uhrp_urls` - https://, http://, file://, data: rejected
-- `test_normalize_url_removes_uhrp_prefix` - Strip uhrp:// prefix
-- `test_normalize_url_case_insensitive` - UHRP:// and uhrp:// handled
-
-**Roundtrip Tests**
-- `test_roundtrip_file_to_url_to_hash` - File → URL → Hash matches SHA256(file)
-- `test_roundtrip_hash_to_url_to_hash` - Hash → URL → Hash identical
-- `test_roundtrip_various_files` - Empty, short, 1000 bytes tests
-- `test_roundtrip_with_different_prefixes` - All prefix formats
-
-**StorageDownloader Configuration**
-- `test_storage_downloader_config_default` - Default: Mainnet, timeout 30000ms
-- `test_storage_downloader_config_testnet` - Testnet preset
-- `test_storage_downloader_creation` - Create with default config
-- `test_storage_downloader_creation_with_config` - Create with custom config
-
-**StorageUploader Configuration**
-- `test_storage_uploader_config_new` - Default retention 7 days
-- `test_storage_uploader_config_with_retention` - Custom retention
-- `test_storage_uploader_base_url` - URL accessor
-
-**UploadableFile Tests**
-- `test_uploadable_file_creation` - Data and MIME type
-- `test_uploadable_file_empty` - Empty file
-- `test_uploadable_file_large` - 1MB file
-
-**Cross-SDK Compatibility**
-- `test_cross_sdk_hash_to_url` - Hash→URL matches TypeScript SDK
-- `test_cross_sdk_file_to_url` - File→URL matches TypeScript SDK
-- `test_cross_sdk_url_to_hash` - URL→Hash matches TypeScript SDK
-
-### Wallet Tests (`wallet_tests.rs`)
-
-Wallet module tests (56 tests, requires `wallet` feature):
-
-**KeyDeriver Tests**
-- `test_key_deriver_with_known_key` - PrivateKey(42) pattern from TypeScript SDK
-- `test_anyone_key_is_scalar_one` - Anyone key is PrivateKey(1)
-- `test_invoice_number_format` - Invoice format: "level-protocol-keyID"
-- `test_derive_public_key_with_counterparty` - BRC-42 derivation with counterparty
-- `test_derive_private_key_matches_public` - Private key's public matches derived public
-- `test_derive_symmetric_key_consistency` - Deterministic symmetric keys
-- `test_derive_symmetric_key_with_anyone` - Symmetric key derivation with Anyone counterparty
-- `test_two_party_key_derivation` - Alice and Bob derive matching keys
-- `test_reveal_counterparty_secret_fails_for_self` - Self counterparty rejected
-- `test_reveal_counterparty_secret_succeeds_for_other` - Reveal succeeds for Other counterparty
-- `test_reveal_specific_secret_deterministic` - Specific secret is deterministic for same params
-- `test_different_security_levels_different_keys` - Silent/App/Counterparty produce unique keys
-- `test_protocol_validation` - Protocol name < 5 chars rejected
-- `test_key_id_validation` - Empty or > 800 chars rejected
-
-**CachedKeyDeriver Tests**
-- `test_cached_deriver_same_identity` - Identity key matches inner deriver
-- `test_cache_hit_returns_same_value` - Cached values returned
-- `test_cache_miss_with_different_parameters` - Different params produce different cached results
-- `test_lru_eviction` - LRU eviction with max_size=3
-- `test_lru_access_updates_recentness` - Access refreshes LRU order
-- `test_secrets_not_cached` - reveal_* methods not cached for security
-- `test_cached_implements_api_trait` - CachedKeyDeriver implements KeyDeriverApi trait
-- `test_private_and_symmetric_key_caching` - Both key types cached
-
-**ProtoWallet Tests**
-- `test_proto_wallet_creation` - Create with random key
-- `test_proto_wallet_anyone` - Anyone wallets have identical identity
-- `test_get_public_key_identity` - identity_key=true returns identity
-- `test_get_public_key_derived` - Derived key differs from identity
-- `test_encrypt_decrypt_roundtrip` - Self-encryption roundtrip
-- `test_two_party_encryption` - Alice encrypts for Bob, Bob decrypts
-- `test_decrypt_fails_with_wrong_protocol` - Protocol mismatch fails
-- `test_create_verify_hmac_roundtrip` - HMAC create and verify
-- `test_hmac_verification_fails_with_wrong_data` - Tampered data fails
-- `test_hmac_cross_party_verification` - Alice creates, Bob verifies
-- `test_create_verify_signature_roundtrip` - Signature create and verify
-- `test_signature_with_direct_hash` - Sign pre-hashed data
-- `test_signature_verification_fails_with_wrong_data` - Tampered data fails signature verification
-- `test_cross_party_signature_verification` - Alice signs, Bob verifies
-- `test_default_counterparty_for_operations` - Default counterparty behavior for encrypt/sign/HMAC
-
-**Cross-SDK Compatibility**
-- `test_brc3_signature_compliance` - BRC-3 signature vector from TypeScript SDK
-- `test_brc2_hmac_compliance` - BRC-2 HMAC vector from TypeScript SDK
-- `test_brc2_encryption_compliance` - BRC-2 encryption vector from TypeScript SDK
-- `test_key_derivation_ts_pattern` - PrivateKey(42), PrivateKey(69) pattern
-
-**Wire Protocol Tests**
-- `test_varint_roundtrip` - VarInt encoding 0 to u64::MAX
-- `test_signed_varint_roundtrip` - Signed VarInt including negatives
-- `test_string_roundtrip` - UTF-8 string encoding
-- `test_optional_string_roundtrip` - Optional string (Some/None)
-- `test_optional_bool_roundtrip` - Optional bool (Some(true)/Some(false)/None)
-- `test_counterparty_roundtrip` - Self_, Anyone, Other encoding
-- `test_protocol_id_roundtrip` - Protocol with security level
-- `test_optional_protocol_id_roundtrip` - Optional Protocol (Some/None)
-- `test_outpoint_roundtrip` - Txid + vout encoding
-- `test_string_array_roundtrip` - String array encoding
-- `test_optional_bytes_roundtrip` - Optional byte vector (Some/None)
-- `test_query_mode_roundtrip` - Any/All query mode
-- `test_output_include_roundtrip` - LockingScripts/EntireTransactions
-- `test_string_map_roundtrip` - HashMap<String, String> encoding
-- `test_action_status_roundtrip` - Completed/Unprocessed/Sending/Failed
-
-### Memory Profiling (`memory_profiling.rs`)
-
-Heap allocation profiling tests (requires `dhat-profiling` feature):
-
-**Encryption Profiling**
-- `test_encryption_allocations` - AES-GCM encrypt/decrypt at 64/256/1024/4096/16384 bytes
-
-**Key Derivation Profiling**
-- `test_key_derivation_allocations` - BRC-42 and ECDH shared secret
-
-**Shamir Profiling**
-- `test_shamir_allocations` - 3-of-5 and 5-of-10 split/recover
-
-**Signing Profiling**
-- `test_signing_allocations` - ECDSA sign, verify, and sign+verify cycle
-
-**Hashing Profiling**
-- `test_hashing_allocations` - SHA-256 and Hash160 at 1KB/16KB
-
-### Overlay Cross-SDK Tests (`overlay_cross_sdk_tests.rs`)
-
-Cross-SDK compatibility tests for overlay types (13 tests, requires `overlay` feature):
-
-**Admin Token Tests**
-- `test_admin_token_creation_and_decoding` - Create/decode admin tokens, verify all fields match
-- `test_admin_token_protocol_detection` - Protocol detection (is_ship_token, is_slap_token, is_overlay_admin_token)
-- `test_admin_token_deterministic_encoding` - Token encoding is deterministic
-- `test_admin_token_vector_count` - Verifies at least 4 admin token vectors loaded
-
-**Protocol Tests**
-- `test_protocol_parsing` - Protocol string parsing case-insensitive
-
-**Network Preset Tests**
-- `test_network_presets` - Mainnet/Testnet/Local preset configuration (allow_http, slap_trackers)
-
-**LookupQuestion Tests**
-- `test_lookup_question_creation` - Question creation with service and query, JSON roundtrip
-
-**LookupAnswer Tests**
-- `test_lookup_answer_output_list_json` - OutputList variant with 2 outputs and context
-- `test_lookup_answer_freeform_json` - Freeform variant with status field
-- `test_lookup_answer_formula_json` - Formula variant with outpoint and history_fn
-
-**AdmittanceInstructions Tests**
-- `test_admittance_instructions_json` - has_activity() and JSON roundtrip
-
-**TaggedBEEF Tests**
-- `test_tagged_beef_creation` - Creation with and without off_chain_values, JSON roundtrip
-
-**Vector Validation**
-- `test_overlay_types_vector_count` - Verifies minimum vector counts for all types
-
-### Registry Integration Tests (`registry_integration_tests.rs`)
-
-Registry module integration tests (50 tests, requires `registry` feature):
-
-**DefinitionType Tests**
-- `test_definition_type_as_str` - String conversion (basket, protocol, certificate)
-- `test_definition_type_try_from_str` - Case-insensitive parsing
-- `test_definition_type_from_str` - FromStr trait implementation
-- `test_definition_type_lookup_service` - Lookup service names (ls_basketmap, ls_protomap, ls_certmap)
-- `test_definition_type_broadcast_topic` - Broadcast topic names (tm_basketmap, tm_protomap, tm_certmap)
-- `test_definition_type_wallet_basket` - Wallet basket names
-- `test_definition_type_expected_field_count` - Field count (6 for basket/protocol, 7 for certificate)
-
-**BasketDefinitionData Tests**
-- `test_basket_definition_creation` - Builder pattern with all fields
-- `test_basket_definition_identifier` - Identifier is basket_id
-- `test_basket_definition_pushdrop_fields` - Encode to 6 PushDrop fields
-- `test_basket_definition_from_pushdrop_fields` - Decode from PushDrop fields
-- `test_basket_definition_from_pushdrop_fields_wrong_count` - Wrong field count rejected
-- `test_basket_definition_json_serialization` - JSON with Go SDK compatible field names
-
-**ProtocolDefinitionData Tests**
-- `test_protocol_definition_creation` - Builder pattern with Protocol and fields
-- `test_protocol_definition_identifier` - JSON identifier format ([level, "name"])
-- `test_protocol_definition_pushdrop_fields` - Encode to 6 PushDrop fields
-- `test_protocol_definition_all_security_levels` - Silent, App, Counterparty levels
-
-**CertificateDefinitionData Tests**
-- `test_certificate_definition_creation` - Builder pattern with field descriptors
-- `test_certificate_field_descriptor_types` - text(), image_url(), custom types
-- `test_certificate_definition_pushdrop_fields` - Encode to 7 PushDrop fields
-
-**DefinitionData Enum Tests**
-- `test_definition_data_from_basket` - Basket variant conversion and accessors
-- `test_definition_data_from_protocol` - Protocol variant conversion and accessors
-- `test_definition_data_from_certificate` - Certificate variant conversion and accessors
-- `test_definition_data_set_registry_operator` - Set/get registry operator
-- `test_definition_data_identifier` - Identifier dispatch by type
-
-**TokenData Tests**
-- `test_token_data_creation` - Basic creation with txid, output_index, satoshis, locking_script
-- `test_token_data_with_beef` - Creation with optional BEEF data
-- `test_token_data_outpoint` - Outpoint format (txid.vout)
-
-**RegistryRecord Tests**
-- `test_registry_record_basket` - Basket record with token data
-- `test_registry_record_protocol` - Protocol record with token data
-- `test_registry_record_certificate` - Certificate record with token data
-
-**Query Types Tests**
-- `test_basket_query_builder` - Builder with basket_id, operator, name
-- `test_basket_query_multiple_operators` - Multiple registry operators
-- `test_basket_query_json_serialization` - JSON with basketID field
-- `test_protocol_query_builder` - Builder with protocol_id, name, operator
-- `test_certificate_query_builder` - Builder with cert_type, name, operators
-- `test_certificate_query_json_serialization` - JSON with type field
-
-**Result Types Tests**
-- `test_register_definition_result` - Success/failure states and is_success()/is_failure()
-- `test_revoke_definition_result` - Revocation result states
-- `test_update_definition_result` - Update result states
-
-**RegistryClientConfig Tests**
-- `test_registry_client_config_defaults` - Default: Mainnet, no resolver, no originator
-- `test_registry_client_config_builder` - Builder with network, originator, delayed_broadcast
-- `test_registry_client_config_local_network` - Local network preset
-
-**Cross-SDK Compatibility Tests**
-- `test_pushdrop_field_format_basket_matches_go_sdk` - Basket field order matches Go SDK
-- `test_pushdrop_field_format_protocol_matches_go_sdk` - Protocol field order matches Go SDK
-- `test_pushdrop_field_format_certificate_matches_go_sdk` - Certificate field order matches Go SDK
-- `test_pushdrop_roundtrip_basket` - Basket encode/decode roundtrip
-- `test_pushdrop_roundtrip_protocol` - Protocol encode/decode roundtrip
-- `test_pushdrop_roundtrip_certificate` - Certificate encode/decode roundtrip
-
-**Constants Tests**
-- `test_registry_constants` - Verify LS_*, TM_*, REGISTRANT_* constants
-
-### Overlay Integration Tests (`overlay_integration_tests.rs`)
-
-Overlay module integration tests (60 tests, requires `overlay` feature):
-
-**Network Preset Tests**
-- `test_network_preset_slap_trackers` - SLAP tracker URLs for each preset
-- `test_network_preset_allow_http` - HTTP allowed only for Local preset
-- `test_network_preset_default_is_mainnet` - Default preset is Mainnet
-
-**Protocol Tests**
-- `test_protocol_parsing_case_insensitive` - SHIP/SLAP parsing case-insensitive
-- `test_protocol_str_roundtrip` - Protocol string roundtrip
-- `test_protocol_display` - Display trait implementation
-- `test_protocol_json_roundtrip` - JSON serialization roundtrip
-
-**LookupQuestion/Answer Tests**
-- `test_lookup_question_creation` - Question creation with service and query
-- `test_lookup_answer_output_list` - OutputList variant
-- `test_lookup_answer_freeform` - Freeform variant
-- `test_lookup_answer_empty_output_list` - Empty output list creation
-
-**TaggedBEEF Tests**
-- `test_tagged_beef_creation` - Basic creation with beef and topics
-- `test_tagged_beef_with_off_chain_values` - Creation with off-chain values
-- `test_tagged_beef_json_roundtrip` - JSON serialization roundtrip
-
-**AdmittanceInstructions Tests**
-- `test_admittance_instructions_empty` - Empty instructions has no activity
-- `test_admittance_instructions_with_activity` - Various activity combinations
-- `test_admittance_instructions_json_roundtrip` - JSON serialization roundtrip
-
-**TopicBroadcaster Tests**
-- `test_topic_broadcaster_valid_topics` - Valid topics accepted
-- `test_topic_broadcaster_invalid_topic_prefix` - Topics must start with "tm_"
-- `test_topic_broadcaster_empty_topics` - At least one topic required
-- `test_topic_broadcaster_mixed_valid_invalid` - Mixed valid/invalid rejected
-- `test_topic_broadcaster_config_defaults` - Default configuration values
-- `test_ship_broadcaster_alias` - SHIPBroadcaster and SHIPCast aliases work
-
-**RequireAck Tests**
-- `test_require_ack_variants` - All RequireAck variants
-- `test_require_ack_default_is_none` - Default is None
-
-**LookupResolverConfig Tests**
-- `test_lookup_resolver_default_config` - Default configuration values
-- `test_lookup_resolver_config_custom_values` - Custom configuration values
-- `test_lookup_resolver_config_with_host_overrides` - Host overrides
-- `test_lookup_resolver_config_with_additional_hosts` - Additional hosts
-
-**HostReputationTracker Tests**
-- `test_host_reputation_tracker_basic` - Record success, verify metrics
-- `test_host_reputation_tracker_failure` - Record failures, verify metrics
-- `test_host_reputation_tracker_success_resets_consecutive_failures` - Success resets failures
-- `test_host_reputation_tracker_ranking` - Host ranking by latency and failures
-- `test_host_reputation_tracker_config` - Custom config affects EMA calculation
-- `test_host_reputation_tracker_reset` - Reset clears all entries
-- `test_host_reputation_tracker_with_storage` - Storage persistence
-- `test_host_reputation_tracker_json_export_import` - JSON export/import
-- `test_host_reputation_tracker_json_import_invalid` - Invalid JSON rejected
-- `test_global_reputation_tracker` - Global singleton tracker
-
-**SyncHistorian Tests**
-- `test_sync_historian_single_transaction` - Single transaction processing
-- `test_sync_historian_chain_traversal` - Chain traversal in chronological order
-- `test_sync_historian_filtering` - Interpreter filtering
-- `test_sync_historian_with_context` - Context passing to interpreter
-- `test_sync_historian_cycle_prevention` - Cycle detection prevents infinite loops
-- `test_sync_historian_with_debug` - Debug and version configuration
-
-**Admin Token Tests**
-- `test_create_and_decode_ship_token` - SHIP token creation and decoding
-- `test_create_and_decode_slap_token` - SLAP token creation and decoding
-- `test_is_ship_token` - SHIP token detection
-- `test_is_slap_token` - SLAP token detection
-- `test_is_overlay_admin_token` - Admin token detection
-- `test_admin_token_identity_key_hex` - Identity key hex extraction
-- `test_decode_invalid_admin_token` - Invalid tokens rejected
-
-**HostResponse/ServiceMetadata Tests**
-- `test_host_response_success` - Success response creation
-- `test_host_response_failure` - Failure response creation
-- `test_service_metadata_default` - Default metadata values
-- `test_service_metadata_creation` - Custom metadata values
-
-**Constants Tests**
-- `test_overlay_constants` - Verify constants have reasonable values
+### Profiling (`dhat-profiling` feature)
+- **`memory_profiling.rs`** — Heap allocation profiling: AES-GCM (64-16384 bytes), BRC-42/ECDH derivation, Shamir 3-of-5 and 5-of-10, ECDSA sign/verify, SHA-256/Hash160 hashing
 
 ## Running Tests
 
 ```bash
-# Run all integration tests
-cargo test --test auth_cross_sdk_tests --features auth
-cargo test --test auth_integration_tests --features auth
-cargo test --test broadcaster_http_tests --features "full,http"
-cargo test --test chaintracker_http_tests --features "full,http"
-cargo test --test compat_bip39_tests --features compat
-cargo test --test compat_integration_tests --features compat
-cargo test --test cross_sdk_tests
-cargo test --test drbg_tests
-cargo test --test ec_tests
-cargo test --test identity_tests --features identity
-cargo test --test integration_tests
-cargo test --test kvstore_integration_tests --features kvstore
-cargo test --test messages_tests --features messages
-cargo test --test overlay_cross_sdk_tests --features overlay
-cargo test --test overlay_integration_tests --features overlay
-cargo test --test registry_integration_tests --features registry
-cargo test --test script_vectors_tests
-cargo test --test sighash_tests
-cargo test --test storage_tests --features storage
-cargo test --test template_tests
-cargo test --test transaction_tests --features transaction
-cargo test --test wallet_tests --features wallet
-
-# Run all tests with full feature (includes all modules)
+# All tests with all modules
 cargo test --features full
 
-# Run HTTP tests (requires http feature in addition to full)
+# All tests including HTTP (requires http feature)
 cargo test --features "full,http"
 
-# Run tests by feature group
-cargo test --features transaction      # Transaction, script, primitives
-cargo test --features wallet           # Wallet, transaction, script, primitives
-cargo test --features messages         # Messages, wallet chain
-cargo test --features compat           # BIP-39/32, BSM, ECIES, Base58
-cargo test --features auth             # Auth, messages, wallet chain
-cargo test --features overlay          # Overlay, wallet chain
-cargo test --features storage          # Storage, overlay chain
-cargo test --features registry         # Registry, overlay chain
-cargo test --features kvstore          # KVStore, overlay chain
-cargo test --features identity         # Identity, auth, overlay chain
+# By feature group
+cargo test --features transaction          # Transaction, script, primitives
+cargo test --features wallet               # Wallet, transaction, script, primitives
+cargo test --features messages             # Messages, wallet chain
+cargo test --features compat               # BIP-39/32, BSM, ECIES, Base58
+cargo test --features auth                 # Auth, messages, wallet chain
+cargo test --features overlay              # Overlay, wallet chain
+cargo test --features storage              # Storage, overlay chain
+cargo test --features registry             # Registry, overlay chain
+cargo test --features kvstore              # KVStore, overlay chain
+cargo test --features identity             # Identity, auth, overlay chain
 
-# Run memory profiling tests (requires dhat-profiling feature)
+# Specific test file
+cargo test --test wire_method_roundtrip_tests --features wallet
+cargo test --test overlay_http_tests --features "overlay,http"
+cargo test --test live_policy_http_tests --features "transaction,http"
+
+# Filter by test name
+cargo test --features full -- test_complete_payment_workflow
+
+# Memory profiling (single-threaded, with output)
 cargo test --test memory_profiling --features dhat-profiling -- --test-threads=1 --nocapture
-
-# Run specific test
-cargo test --test integration_tests test_complete_payment_workflow
-
-# Run with output (for debugging tests that print)
-cargo test --test sighash_tests -- --nocapture
-
-# Run async tests (transaction module requires tokio)
-cargo test --test transaction_tests --features transaction -- test_mock_chain_tracker
-
-# Run all BEEF tests
-cargo test --test transaction_tests --features transaction -- beef
 ```
-
-## Key Types Used
-
-**Primitives** (`bsv_sdk::primitives`):
-- `ec::PrivateKey`, `ec::PublicKey`, `ec::recover_public_key` - secp256k1 keys
-- `symmetric::SymmetricKey` - AES-256-GCM encryption
-- `p256::P256PrivateKey`, `p256::P256PublicKey` - NIST P-256 keys
-- `bsv::schnorr::Schnorr` - Schnorr proof generation/verification
-- `bsv::shamir::{KeyShares, split_private_key}` - Shamir secret sharing
-- `drbg::HmacDrbg` - HMAC-based DRBG
-- `BigNumber` - Arbitrary precision integers
-
-**Compat** (`bsv_sdk::compat`, requires `compat` feature):
-- `bip39::Mnemonic` - BIP-39 mnemonic phrase handling
-- `bip39::WordCount` - Word count enum (Words12, Words15, Words18, Words21, Words24)
-- `bip39::Language` - Language enum (currently English only)
-
-**Script** (`bsv_sdk::script`):
-- `Script`, `LockingScript`, `UnlockingScript` - Script types
-- `Spend`, `SpendParams` - Script spend validator
-- `templates::{P2PKH, P2PK, Multisig, RPuzzle, RPuzzleType, PushDrop}` - Script templates
-- `ScriptTemplate`, `SignOutputs` - Template trait and sighash selection
-
-**Transaction** (`bsv_sdk::transaction`):
-- `Transaction`, `TransactionInput`, `TransactionOutput` - Transaction types
-- `Transaction::to_beef(allow_partial)` - Serialize tx with ancestry to BEEF V2 format
-- `Transaction::to_beef_v1(allow_partial)` - Serialize tx with ancestry to BEEF V1 format
-- `Transaction::to_atomic_beef(allow_partial)` - Serialize as atomic BEEF with target txid
-- `TransactionInput::with_source_transaction(tx, vout)` - Input with source tx for ancestry
-- `MerklePath` - BRC-74 BUMP merkle proof
-- `Beef`, `BEEF_V1`, `BEEF_V2` - BRC-62 BEEF container
-- `FeeModel`, `SatoshisPerKilobyte`, `FixedFee` - Fee computation
-- `Broadcaster`, `BroadcastResponse`, `BroadcastFailure`, `BroadcastStatus` - Broadcast (async)
-- `ArcBroadcaster`, `ArcConfig` - ARC broadcaster with HTTP (requires `http` feature)
-- `WhatsOnChainBroadcaster`, `WocBroadcastNetwork` - WoC broadcaster (requires `http` feature)
-- `TeranodeBroadcaster`, `TeranodeConfig` - Teranode broadcaster with EF format (requires `http` feature)
-- `ChainTracker`, `ChainTrackerError`, `AlwaysValidChainTracker`, `MockChainTracker` - Chain tracking (async)
-- `WhatsOnChainTracker`, `WocNetwork` - WoC chain tracker (requires `http` feature)
-
-**Wallet** (`bsv_sdk::wallet`, requires `wallet` feature):
-- `KeyDeriver`, `CachedKeyDeriver`, `KeyDeriverApi` - BRC-42 key derivation
-- `ProtoWallet` - Lightweight wallet implementation
-- `Protocol`, `SecurityLevel` - Protocol identification (Silent=0, App=1, Counterparty=2)
-- `Counterparty` - Self_, Anyone, or Other(PublicKey)
-- `wire::{WireReader, WireWriter}` - Binary protocol encoding
-- `Outpoint`, `QueryMode`, `OutputInclude`, `ActionStatus` - Wire protocol types
-
-**Identity** (`bsv_sdk::identity`, requires `identity` feature):
-- `KnownCertificateType` - IdentiCert, DiscordCert, PhoneCert, XCert, etc.
-- `DisplayableIdentity` - Identity with name, avatar, badge
-- `Contact`, `ContactsManager`, `ContactsManagerConfig` - Contact management
-- `IdentityQuery`, `IdentityClientConfig` - Identity queries and configuration
-- `BroadcastResult`, `BroadcastSuccess`, `BroadcastFailure` - Broadcast results
-
-**KVStore** (`bsv_sdk::kvstore`, requires `kvstore` feature):
-- `LocalKVStore` - Local key-value store with wallet backend
-- `KVStoreConfig` - Configuration (protocol_id, service_name, encrypt)
-- `KVStoreEntry`, `KVStoreToken`, `KVStoreFields` - Entry and token types
-- `KVStoreQuery`, `KVStoreContext` - Query and filtering
-- `KVStoreGetOptions`, `KVStoreSetOptions`, `KVStoreRemoveOptions` - Operation options
-- `KVStoreInterpreter` - PushDrop script interpretation
-
-**Messages** (`bsv_sdk::messages`, requires `messages` feature):
-- `sign`, `verify` - BRC-77 message signing/verification
-- `encrypt`, `decrypt` - BRC-78 message encryption/decryption
-- `SIGNED_VERSION`, `ENCRYPTED_VERSION` - Protocol version constants
-
-**Storage** (`bsv_sdk::storage`, requires `storage` feature):
-- `get_url_for_file`, `get_url_for_hash` - Generate UHRP URLs
-- `get_hash_from_url`, `get_hash_hex_from_url` - Extract hash from URL
-- `is_valid_url`, `normalize_url` - URL validation and normalization
-- `StorageDownloader`, `StorageDownloaderConfig` - Download from overlay
-- `StorageUploader`, `StorageUploaderConfig` - Upload to storage provider
-- `UploadableFile`, `DownloadResult`, `UploadFileResult` - File types
-- `UHRP_PREFIX`, `WEB_UHRP_PREFIX` - URL prefix constants
-
-**Registry** (`bsv_sdk::registry`, requires `registry` feature):
-- `DefinitionType` - Basket, Protocol, or Certificate
-- `BasketDefinitionData`, `ProtocolDefinitionData`, `CertificateDefinitionData` - Definition data types
-- `CertificateFieldDescriptor` - Field type definitions for certificates
-- `DefinitionData` - Enum wrapping all definition types
-- `TokenData` - Token/UTXO data for registry records
-- `RegistryRecord` - Definition with associated token data
-- `BasketQuery`, `ProtocolQuery`, `CertificateQuery` - Query builders
-- `RegisterDefinitionResult`, `RevokeDefinitionResult`, `UpdateDefinitionResult` - Operation results
-- `RegistryClientConfig` - Client configuration with network preset
-
-## Utility Functions
-
-**Hash Functions** (`bsv_sdk::primitives::hash`):
-- `sha256` (32 bytes), `sha256d` (32 bytes, double SHA256), `hash160` (20 bytes)
-- `sha256_hmac`, `sha512_hmac` - HMAC variants
-
-**Encoding** (`bsv_sdk::primitives`):
-- `from_hex`/`to_hex`, `from_base64`/`to_base64`, `from_base58`/`to_base58`, `from_base58_check`
-
-**Sighash** (`bsv_sdk::primitives::bsv::sighash`):
-- `compute_sighash`, `parse_transaction`, `SighashParams`, `TxInput`, `TxOutput`
-- Flags: `SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_FORKID`, `SIGHASH_ANYONECANPAY`
-
-## Adding New Tests
-
-**Cross-SDK Compatibility Tests:**
-1. Add JSON vectors to `tests/vectors/`
-2. Use `#[serde(rename_all = "camelCase")]` for deserialization (matching TypeScript/Go)
-3. Load with `fs::read_to_string` or `include_str!`
-4. Include vector index in panic messages: `panic!("Vector {}: {}", i, e)`
-5. Use `unwrap_or_else` for detailed error context
-
-**BIP-39 Compatibility Tests:**
-1. Add test vectors to `test_vectors()` function in `compat_bip39_tests.rs`
-2. Use `#[cfg(feature = "compat")]` gate for all compat tests
-3. Test both entropy→mnemonic and mnemonic→seed directions
-4. Add invalid cases to `bad_mnemonic_sentences()` for validation coverage
-
-**Transaction Module Tests:**
-1. Add const vectors to `tests/transaction/vectors/`
-2. Use `#[cfg(feature = "transaction")]` gate for all transaction tests
-3. Use `#[tokio::test]` for async tests (ChainTracker, Broadcaster)
-4. Implement `Broadcaster` with `#[async_trait(?Send)]`
-5. Group related tests in submodules (e.g., `beef_extended_tests`, `cross_sdk_tests`)
-
-**Wallet Module Tests:**
-1. Use `#[cfg(feature = "wallet")]` gate for all wallet tests
-2. Use TypeScript SDK patterns: `PrivateKey(42)`, `PrivateKey(69)` for test keys
-3. Test KeyDeriver, CachedKeyDeriver, and ProtoWallet separately in nested modules
-4. Use `Protocol::new(SecurityLevel::*, "name")` with 5+ char protocol names
-5. Wire protocol tests should verify roundtrip encoding/decoding
-
-**Identity Module Tests:**
-1. Use `#[cfg(feature = "identity")]` gate for all identity tests
-2. Use `#[tokio::test]` for ContactsManager async operations
-3. Test KnownCertificateType type IDs match TypeScript/Go SDKs
-4. Verify camelCase JSON serialization for cross-SDK compatibility
-
-**KVStore Module Tests:**
-1. Use `#[cfg(feature = "kvstore")]` gate for all kvstore tests
-2. Create MockWallet implementing WalletInterface for testing
-3. Test KVStoreInterpreter with manually constructed PushDrop scripts
-4. Verify field order matches specification (protocol_id, key, value, controller, tags, signature)
-
-**Messages Module Tests:**
-1. Use `#[cfg(feature = "messages")]` gate for all messages tests
-2. Use `key_from_scalar(n)` helper for deterministic test keys
-3. Test BRC-77 signing with specific recipient and "anyone" modes
-4. Test BRC-78 encryption roundtrips and error conditions
-5. Verify error format matches TypeScript/Go SDKs (MessageVersionMismatch, MessageRecipientMismatch)
-
-**Storage Module Tests:**
-1. Use `#[cfg(feature = "storage")]` gate for all storage tests
-2. Use TypeScript SDK test vectors (TS_EXAMPLE_HASH_HEX, TS_EXAMPLE_FILE_HEX, TS_EXAMPLE_URL_BASE58)
-3. Test URL generation, parsing, validation, and normalization
-4. Verify roundtrip: file → URL → hash matches SHA256(file)
-
-**Script Tests:**
-1. Use `SpendParams` struct for Spend constructor
-2. Set `source_satoshis: 1` for basic tests (or 0 for legacy sighash)
-3. Test both parsing (from_hex) and execution (validate)
-4. Script hex roundtrip should be case-insensitive match
-
-**Template Tests:**
-1. Test all template types: P2PKH, P2PK, Multisig, RPuzzle
-2. P2PK: signature-only unlocking (1 chunk, 74-byte estimate), use `is_p2pk()` for detection
-3. Multisig: use `lock_from_keys(&[pubkeys])` or ScriptTemplate::lock with concatenated 33-byte keys
-4. Multisig validation: threshold must be 1..=N, N must be 1..=16, use `is_multisig()` → `Some((m, n))`
-5. Use `sign_with_sighash` for direct signing, `unlock` for deferred signing templates
-
-**DRBG Tests:**
-1. `HmacDrbg::new()` for SHA-256, `new_with_hash(..., true)` for SHA-512
-2. Generate multiple times if required by vector specification (e.g., `add.len()` times)
-3. Expected output is from the final generate call
-
-**HTTP Integration Tests (Broadcaster/ChainTracker):**
-1. Use `#![cfg(all(feature = "transaction", feature = "http"))]` gate
-2. Use `wiremock` crate for mock HTTP servers (`MockServer::start().await`)
-3. Mount expectations with `Mock::given(method("POST")).and(path(...)).respond_with(...)`
-4. Create broadcaster/tracker with `::with_base_url(&mock_server.uri(), network)` to point at mock
-5. Test both success and error responses (400, 401, 500, malformed JSON)
-6. For Teranode, use `ef_capable_transaction()` (inputs need source_transaction for EF format)
-
-**Memory Profiling Tests:**
-1. Use `#[cfg(feature = "dhat-profiling")]` gate
-2. Only one dhat profiler can be active at a time (use `--test-threads=1`)
-3. Use `dhat::Profiler::new_heap()` to start profiling a section
-4. Print `dhat::HeapStats::get()` for allocation metrics
-
-## Notes on BSV vs BTC Script Vectors
-
-Some test vectors in `script_valid.json` may fail execution because:
-- BSV requires push-only unlocking scripts
-- BSV requires minimal push encoding
-- BSV has different clean stack requirements
-- Some vectors test BTC-specific behavior (P2SH, etc.)
-
-The BSV-specific `spend_valid.json` vectors should all pass. Vectors with `flags.contains("P2SH")` are skipped in `test_script_valid_vectors_execution`.
 
 ## Test Organization
 
 Tests are organized by feature area:
-- **primitives tests**: `cross_sdk_tests.rs`, `drbg_tests.rs`, `ec_tests.rs`, `integration_tests.rs`
-- **script tests**: `script_vectors_tests.rs`, `template_tests.rs` (P2PKH, P2PK, Multisig, RPuzzle)
-- **transaction tests**: `sighash_tests.rs`, `transaction_tests.rs`
-- **transaction HTTP tests**: `broadcaster_http_tests.rs`, `chaintracker_http_tests.rs` (requires `transaction` + `http`)
-- **wallet tests**: `wallet_tests.rs` (requires `wallet` feature)
-- **identity tests**: `identity_tests.rs` (requires `identity` feature)
-- **kvstore tests**: `kvstore_integration_tests.rs` (requires `kvstore` feature)
-- **messages tests**: `messages_tests.rs` (requires `messages` feature)
-- **storage tests**: `storage_tests.rs` (requires `storage` feature)
-- **compat tests**: `compat_bip39_tests.rs`, `compat_integration_tests.rs` (requires `compat` feature)
-- **auth tests**: `auth_cross_sdk_tests.rs`, `auth_integration_tests.rs` (requires `auth` feature)
-- **overlay tests**: `overlay_cross_sdk_tests.rs`, `overlay_integration_tests.rs` (requires `overlay` feature)
-- **registry tests**: `registry_integration_tests.rs` (requires `registry` feature)
-- **profiling tests**: `memory_profiling.rs` (requires `dhat-profiling` feature)
 
-The `transaction_tests.rs` file uses nested modules for organization:
-- `transaction_tests` - Main test module (gated by `#[cfg(feature = "transaction")]`)
-- `beef_extended_tests` - Extended BEEF format tests
-- `beef_ancestry_tests` - BEEF ancestry collection tests for `to_beef()` method
-- `cross_sdk_tests` - Cross-SDK compatibility using `beef_cross_sdk.rs` vectors
-- `merkle_path_advanced_tests` - Advanced MerklePath verification with ChainTracker
+| Area | Files |
+|------|-------|
+| **primitives** | `cross_sdk_tests`, `drbg_tests`, `ec_tests`, `integration_tests` |
+| **script** | `script_vectors_tests`, `template_tests` |
+| **transaction** | `sighash_tests`, `transaction_tests` |
+| **transaction HTTP** | `broadcaster_http_tests`, `chaintracker_http_tests`, `live_policy_http_tests` |
+| **wallet** | `wallet_tests`, `wire_method_roundtrip_tests` |
+| **messages** | `messages_tests` |
+| **compat** | `compat_bip39_tests`, `compat_integration_tests` |
+| **auth** | `auth_cross_sdk_tests`, `auth_integration_tests`, `auth_peer_e2e_tests` |
+| **overlay** | `overlay_cross_sdk_tests`, `overlay_integration_tests` |
+| **overlay HTTP** | `overlay_http_tests` |
+| **storage** | `storage_tests` |
+| **storage HTTP** | `storage_http_tests` |
+| **identity** | `identity_tests` |
+| **kvstore** | `kvstore_integration_tests`, `kvstore_global_tests` |
+| **registry** | `registry_integration_tests` |
+| **profiling** | `memory_profiling` |
 
-The `wallet_tests.rs` file uses nested modules for organization:
-- `key_deriver_tests` - KeyDeriver unit tests (14 tests)
-- `cached_key_deriver_tests` - CachedKeyDeriver caching tests (8 tests)
-- `proto_wallet_tests` - ProtoWallet cryptographic operations (16 tests)
-- `cross_sdk_tests` - BRC-2/BRC-3 compliance vectors from TypeScript SDK (4 tests)
-- `wire_protocol_tests` - Wire protocol encoding/decoding (14 tests)
+Notable multi-module test files use nested submodules:
+- `transaction_tests.rs`: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
+- `wallet_tests.rs`: `key_deriver_tests`, `cached_key_deriver_tests`, `proto_wallet_tests`, `cross_sdk_tests`, `wire_protocol_tests`
+- `identity_tests.rs`: `contacts_manager_tests`, `identity_client_tests`
+- `wire_method_roundtrip_tests.rs`: 15 submodules covering all 28 WalletInterface methods
 
-The `identity_tests.rs` file uses nested modules for organization:
-- `contacts_manager_tests` - ContactsManager async operations
-- `identity_client_tests` - IdentityClient configuration tests
+## Adding New Tests
+
+- **Cross-SDK vectors**: Add JSON to `tests/vectors/`, use `#[serde(rename_all = "camelCase")]`, include vector index in panic messages
+- **Feature gates**: Use `#![cfg(feature = "...")]` at file top, or `#![cfg(all(feature = "...", feature = "http"))]` for HTTP tests
+- **HTTP tests**: Use `wiremock` crate, create broadcaster/tracker with `::with_base_url(&mock_server.uri(), network)`
+- **Wire protocol**: Use loopback pattern with `WalletWireTransceiver` → `WalletWireProcessor` for method roundtrips
+- **Auth peer tests**: Use channel-based loopback transport for full BRC-31 handshake testing
+- **Async tests**: Use `#[tokio::test]` for anything involving ChainTracker, Broadcaster, Peer, or KVStore operations
+- **Test keys**: Follow TypeScript SDK patterns: `PrivateKey(42)`, `PrivateKey(69)` for deterministic test keys
+- **Protocol names**: Must be 5+ characters, use `Protocol::new(SecurityLevel::*, "name")`
+
+## Notes on BSV vs BTC Script Vectors
+
+Some `script_valid.json` vectors may fail execution because BSV requires push-only unlocking scripts, minimal push encoding, and has different clean stack requirements. Vectors with `flags.contains("P2SH")` are skipped. The BSV-specific `spend_valid.json` vectors should all pass.
 
 ## Related Documentation
 
-- `CLAUDE.md` - Root project documentation
-- `src/primitives/CLAUDE.md` - Primitives module documentation
-- `src/primitives/ec/CLAUDE.md` - Elliptic curve module documentation
-- `src/script/CLAUDE.md` - Script module documentation
-- `src/transaction/CLAUDE.md` - Transaction module documentation
-- `src/wallet/CLAUDE.md` - Wallet module documentation
-- `src/storage/CLAUDE.md` - Storage module documentation
-- `src/overlay/CLAUDE.md` - Overlay module documentation
-- `src/registry/CLAUDE.md` - Registry module documentation
-- `tests/transaction/vectors/CLAUDE.md` - Transaction test vectors documentation
+- `CLAUDE.md` — Root project documentation
+- `src/*/CLAUDE.md` — Per-module documentation (primitives, script, transaction, wallet, messages, compat, totp, auth, overlay, storage, registry, kvstore, identity)
+- `tests/transaction/vectors/CLAUDE.md` — Transaction test vectors documentation

@@ -19,7 +19,7 @@ This module provides cryptographic primitives compatible with the BSV TypeScript
 | `drbg.rs` | HMAC-DRBG for RFC 6979 deterministic signatures | 201 |
 | `p256.rs` | P-256 (secp256r1): P256PrivateKey, P256PublicKey, P256Signature | 910 |
 | `ec/` | secp256k1: PrivateKey, PublicKey, Signature, ECDSA, BRC-42 | ~2001 |
-| `bsv/` | Sighash, transaction signatures, Schnorr proofs, Shamir sharing | ~2507 |
+| `bsv/` | Sighash, transaction signatures, Schnorr proofs, Shamir sharing | ~2821 |
 
 ## Key Exports (from mod.rs)
 
@@ -207,10 +207,10 @@ Key exports: `PrivateKey`, `PublicKey`, `Signature`, `sign`, `verify`, `recover_
 | `sighash.rs` | 623 | BIP-143 style sighash computation |
 | `tx_signature.rs` | 309 | Transaction signature encoding/decoding with sighash scope |
 | `schnorr.rs` | 413 | Schnorr zero-knowledge proofs for ECDH verification |
-| `shamir.rs` | 693 | Shamir secret sharing for private key backup/recovery |
+| `shamir.rs` | 1007 | Shamir secret sharing for private key backup/recovery |
 | `polynomial.rs` | 394 | Polynomial operations over finite field (for Shamir) |
 
-Key exports: `compute_sighash`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_FORKID`, etc.)
+Key exports: `compute_sighash`, `build_sighash_preimage`, `compute_sighash_for_signing`, `compute_sighash_from_raw`, `parse_transaction`, `RawTransaction`, `SighashParams`, `TxInput`, `TxOutput`, `TransactionSignature`, `Schnorr`, `SchnorrProof`, `split_private_key`, `KeyShares`, `Polynomial`, `PointInFiniteField`, sighash constants (`SIGHASH_ALL`, `SIGHASH_NONE`, `SIGHASH_SINGLE`, `SIGHASH_ANYONECANPAY`, `SIGHASH_FORKID`)
 
 ## Error Handling
 

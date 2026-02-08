@@ -16,7 +16,7 @@ These utilities are used internally by the `Peer` implementation but are also ex
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports | ~16 |
 | `nonce.rs` | Cryptographic nonce creation and verification | ~204 |
-| `validation.rs` | Certificate validation and retrieval | ~423 |
+| `validation.rs` | Certificate validation, encoding checks, and retrieval | ~982 |
 
 ## Key Exports
 
@@ -38,6 +38,8 @@ pub use nonce::{
 pub use validation::{
     validate_certificates,
     validate_certificate,
+    validate_certificate_encoding,
+    validate_requested_certificate_set,
     get_verifiable_certificates,
     certificates_match_request,
 };
@@ -307,6 +309,64 @@ if !certificates_match_request(&peer_certs, &my_requirements) {
 validate_certificates(&wallet, &message, Some(&my_requirements), "myapp.com").await?;
 ```
 
+### validate_certificate_encoding
+
+```rust
+pub fn validate_certificate_encoding(
+    cert: &Certificate,
+) -> Result<()>
+```
+
+Validates the structural encoding of a certificate without cryptographic verification. Analogous to the TypeScript SDK's `validationHelpers.ts`.
+
+**Checks:**
+- Certificate type is exactly 32 bytes (always valid by construction)
+- Serial number is exactly 32 bytes (always valid by construction)
+- Subject and certifier are valid compressed public keys (33 bytes, round-trip parse)
+- All field names are non-empty and at most 50 bytes (UTF-8)
+- If signature is present, it is non-empty and valid DER encoding
+- If revocation outpoint is present, it is not the null sentinel (all-zero txid, vout 0)
+
+**Errors:** Returns `Error::CertificateValidationError(String)` describing the first failure found.
+
+**Example:**
+```rust
+use bsv_sdk::auth::utils::validate_certificate_encoding;
+
+let cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier);
+validate_certificate_encoding(&cert)?;
+```
+
+### validate_requested_certificate_set
+
+```rust
+pub fn validate_requested_certificate_set(
+    requested: &RequestedCertificateSet,
+) -> Result<()>
+```
+
+Validates that a `RequestedCertificateSet` is well-formed. Analogous to the TypeScript SDK's validation of certificate-related arguments.
+
+**Checks:**
+- At least one type must be specified (empty types = error)
+- All certifier entries are valid hex-encoded 33-byte compressed public keys (66 hex chars)
+- All type IDs are valid base64 strings that decode to exactly 32 bytes
+- All field names within each type are non-empty and at most 50 bytes (UTF-8)
+- No certifiers is valid (any certifier accepted); no fields for a type is valid (just checks type exists)
+
+**Errors:** Returns `Error::CertificateValidationError(String)` describing the first failure found.
+
+**Example:**
+```rust
+use bsv_sdk::auth::{RequestedCertificateSet, utils::validate_requested_certificate_set};
+
+let mut req = RequestedCertificateSet::new();
+req.add_certifier("02abc...".to_string());
+req.add_type("base64_type_id".to_string(), vec!["name".into(), "email".into()]);
+
+validate_requested_certificate_set(&req)?;
+```
+
 ## Usage Patterns
 
 ### Session Nonce Flow
@@ -381,7 +441,8 @@ Both modules use the SDK's unified error types:
 | Error | Description |
 |-------|-------------|
 | `Error::InvalidNonce(String)` | Nonce too short or malformed |
-| `Error::AuthError(String)` | Certificate validation failures |
+| `Error::AuthError(String)` | Certificate validation failures (runtime) |
+| `Error::CertificateValidationError(String)` | Structural encoding / request set validation failures |
 | `Error::Base64Error(String)` | Invalid base64 encoding |
 | `Error::WalletError(String)` | Wallet operation failures |
 
@@ -398,16 +459,45 @@ cargo test --features auth validation
 
 ### Test Coverage
 
-**nonce.rs tests:**
-- `test_validate_nonce_format` - Format validation
-- `test_get_nonce_random` - Random extraction
+**nonce.rs tests (2 tests):**
+- `test_validate_nonce_format` - Format validation (valid, too short, invalid base64)
+- `test_get_nonce_random` - Random extraction from nonce bytes
 
-**validation.rs tests:**
+**validation.rs tests (22 tests):**
+
+*certificates_match_request:*
 - `test_certificates_match_empty_request` - Empty request always matches
 - `test_certificates_match_certifier` - Certifier matching
 - `test_certificates_dont_match_wrong_certifier` - Wrong certifier rejection
 - `test_certificates_dont_match_missing_fields` - Missing keyring fields
 - `test_certificates_match_with_keyring` - Full keyring matching
+
+*validate_certificate_encoding:*
+- `test_validate_certificate_encoding_valid` - Signed cert with fields passes
+- `test_validate_certificate_encoding_no_signature` - Unsigned cert passes
+- `test_validate_certificate_encoding_empty_field_name` - Empty field name rejected
+- `test_validate_certificate_encoding_long_field_name` - Field name >50 bytes rejected
+- `test_validate_certificate_encoding_invalid_der_signature` - Invalid DER rejected
+- `test_validate_certificate_encoding_empty_signature` - Empty signature bytes rejected
+- `test_validate_certificate_encoding_with_revocation` - Valid revocation outpoint passes
+- `test_validate_certificate_encoding_null_revocation_outpoint` - Null sentinel rejected
+- `test_validate_certificate_encoding_50_byte_field_name` - Exactly 50 bytes passes
+- `test_validate_certificate_encoding_multiple_fields` - Multiple fields pass
+
+*validate_requested_certificate_set:*
+- `test_validate_requested_certificate_set_valid` - Well-formed request passes
+- `test_validate_requested_certificate_set_empty_types` - No types rejected
+- `test_validate_requested_certificate_set_invalid_certifier_hex` - Bad hex rejected
+- `test_validate_requested_certificate_set_wrong_length_certifier` - Short certifier rejected
+- `test_validate_requested_certificate_set_empty_certifier` - Empty certifier rejected
+- `test_validate_requested_certificate_set_invalid_type_base64` - Bad base64 type rejected
+- `test_validate_requested_certificate_set_wrong_length_type` - Wrong-length type rejected
+- `test_validate_requested_certificate_set_empty_field_name` - Empty field name rejected
+- `test_validate_requested_certificate_set_long_field_name` - Long field name rejected
+- `test_validate_requested_certificate_set_empty_type_id` - Empty type ID rejected
+- `test_validate_requested_certificate_set_no_certifiers_valid` - No certifiers is valid
+- `test_validate_requested_certificate_set_no_fields_valid` - No fields is valid
+- `test_validate_requested_certificate_set_multiple_types` - Multiple types pass
 
 ## Dependencies
 

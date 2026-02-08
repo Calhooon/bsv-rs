@@ -268,6 +268,58 @@ pub fn magic_hash(message: &[u8]) -> [u8; 32] {
     sha256d(writer.as_bytes())
 }
 
+/// Verifies a Bitcoin Signed Message using a DER-encoded signature and public key.
+///
+/// Unlike [`verify_message`] which recovers the public key from a compact
+/// 65-byte signature and compares against an address, this function verifies
+/// a DER-encoded ECDSA signature directly against a provided public key.
+///
+/// This is compatible with the TypeScript SDK's `BSM.verify()` function
+/// which accepts a `Signature` object (potentially DER-encoded) and a
+/// `PublicKey` directly.
+///
+/// # Arguments
+///
+/// * `der_signature` - The DER-encoded ECDSA signature
+/// * `public_key` - The public key to verify against
+/// * `message` - The original message
+///
+/// # Returns
+///
+/// `true` if the signature is valid for the given public key and message
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_sdk::compat::bsm;
+/// use bsv_sdk::primitives::ec::PrivateKey;
+///
+/// let key = PrivateKey::random();
+/// let message = b"Hello, BSV!";
+///
+/// // Sign the message and get compact signature
+/// let compact_sig = bsm::sign_message(&key, message).unwrap();
+///
+/// // Also verify using DER format
+/// let msg_hash = bsm::magic_hash(message);
+/// let der_sig = key.sign(&msg_hash).unwrap().to_der();
+/// assert!(bsm::verify_message_der(&der_sig, &key.public_key(), message).unwrap());
+/// ```
+pub fn verify_message_der(
+    der_signature: &[u8],
+    public_key: &PublicKey,
+    message: &[u8],
+) -> Result<bool> {
+    // Parse the DER signature
+    let sig = crate::primitives::ec::Signature::from_der(der_signature)?;
+
+    // Compute the message hash
+    let msg_hash = compute_message_hash(message);
+
+    // Verify the signature directly against the public key
+    Ok(public_key.verify(&msg_hash, &sig))
+}
+
 /// Computes the Bitcoin Signed Message hash for a message (internal alias).
 #[inline]
 fn compute_message_hash(message: &[u8]) -> [u8; 32] {
@@ -479,5 +531,140 @@ mod tests {
 
         let signature = sign_message(&key, &message).unwrap();
         assert!(verify_message(&address, &signature, &message).unwrap());
+    }
+
+    // =======================================
+    // Tests for verify_message_der
+    // =======================================
+
+    #[test]
+    fn test_verify_message_der_basic() {
+        let key = PrivateKey::random();
+        let message = b"Hello, BSV!";
+
+        // Sign the message hash with the private key (produces DER signature)
+        let msg_hash = magic_hash(message);
+        let sig = key.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+
+        // Verify using DER method
+        assert!(verify_message_der(&der, &key.public_key(), message).unwrap());
+    }
+
+    #[test]
+    fn test_verify_message_der_wrong_key() {
+        let key1 = PrivateKey::random();
+        let key2 = PrivateKey::random();
+        let message = b"Hello!";
+
+        let msg_hash = magic_hash(message);
+        let sig = key1.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+
+        // Should return false for wrong public key
+        assert!(!verify_message_der(&der, &key2.public_key(), message).unwrap());
+    }
+
+    #[test]
+    fn test_verify_message_der_wrong_message() {
+        let key = PrivateKey::random();
+        let message = b"Hello!";
+
+        let msg_hash = magic_hash(message);
+        let sig = key.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+
+        // Should return false for wrong message
+        assert!(!verify_message_der(&der, &key.public_key(), b"Goodbye!").unwrap());
+    }
+
+    #[test]
+    fn test_verify_message_der_invalid_der() {
+        let key = PrivateKey::random();
+        let message = b"Hello!";
+
+        // Invalid DER data
+        let result = verify_message_der(&[0x30, 0x00], &key.public_key(), message);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_verify_message_der_empty_message() {
+        let key = PrivateKey::random();
+        let message = b"";
+
+        let msg_hash = magic_hash(message);
+        let sig = key.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+
+        assert!(verify_message_der(&der, &key.public_key(), message).unwrap());
+    }
+
+    #[test]
+    fn test_verify_message_der_long_message() {
+        let key = PrivateKey::random();
+        let message = vec![b'a'; 10000];
+
+        let msg_hash = magic_hash(&message);
+        let sig = key.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+
+        assert!(verify_message_der(&der, &key.public_key(), &message).unwrap());
+    }
+
+    #[test]
+    fn test_verify_message_der_known_key() {
+        // Test with a known private key for reproducibility
+        let key = PrivateKey::from_hex(
+            "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35",
+        )
+        .unwrap();
+        let message = b"This is a test message";
+
+        let msg_hash = magic_hash(message);
+        let sig = key.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+
+        assert!(verify_message_der(&der, &key.public_key(), message).unwrap());
+    }
+
+    #[test]
+    fn test_verify_message_der_consistent_with_compact() {
+        // Verify that both DER and compact verification agree
+        let key = PrivateKey::random();
+        let message = b"Consistency check";
+
+        // Compact verification (standard BSM)
+        let compact_sig = sign_message(&key, message).unwrap();
+        let address = key.public_key().to_address();
+        let compact_result = verify_message(&address, &compact_sig, message).unwrap();
+
+        // DER verification
+        let msg_hash = magic_hash(message);
+        let sig = key.sign(&msg_hash).unwrap();
+        let der = sig.to_der();
+        let der_result = verify_message_der(&der, &key.public_key(), message).unwrap();
+
+        // Both should agree
+        assert_eq!(compact_result, der_result);
+        assert!(compact_result);
+    }
+
+    #[test]
+    fn test_verify_message_der_from_compact_roundtrip() {
+        // Verify that a compact signature can be converted to DER and verified
+        let key = PrivateKey::random();
+        let message = b"Roundtrip test";
+
+        let compact_sig = sign_message(&key, message).unwrap();
+
+        // Extract r and s from compact signature and create DER
+        let r: [u8; 32] = compact_sig[1..33].try_into().unwrap();
+        let s: [u8; 32] = compact_sig[33..65].try_into().unwrap();
+        let sig = crate::primitives::ec::Signature::new(r, s);
+        let der = sig.to_der();
+
+        // Verify using DER method
+        assert!(verify_message_der(&der, &key.public_key(), message).unwrap());
     }
 }

@@ -1,6 +1,6 @@
 # BSV SDK for Rust
 
-The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready.
+The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready, with 2,500+ tests and byte-for-byte compatibility with the [TypeScript](https://github.com/bitcoin-sv/ts-sdk) and [Go](https://github.com/bitcoin-sv/go-sdk) SDKs.
 
 [![Crates.io](https://img.shields.io/crates/v/bsv-sdk.svg)](https://crates.io/crates/bsv-sdk)
 [![Documentation](https://docs.rs/bsv-sdk/badge.svg)](https://docs.rs/bsv-sdk)
@@ -10,7 +10,7 @@ The official Rust implementation of the BSV blockchain SDK, providing a complete
 
 **Core Modules**
 - **Primitives** - SHA-256, RIPEMD-160, HMAC, PBKDF2, AES-256-GCM, secp256k1, P-256, BigNumber
-- **Script** - Full Bitcoin Script interpreter with all BSV opcodes, P2PKH/RPuzzle/PushDrop templates
+- **Script** - Full Bitcoin Script interpreter with all BSV opcodes, P2PKH/P2PK/Multisig/RPuzzle/PushDrop templates
 - **Transaction** - Construction, signing, fee calculation, BEEF/MerklePath SPV proofs
 - **Wallet** - BRC-42 key derivation, ProtoWallet, WalletClient with HTTP substrates
 
@@ -404,6 +404,8 @@ if validation.valid {
 | `ScriptChunk` | Individual opcode or data push |
 | `Spend` | Full script interpreter/validator |
 | `P2PKH` | Pay-to-Public-Key-Hash template |
+| `P2PK` | Pay-to-Public-Key template |
+| `Multisig` | M-of-N multisignature template (up to 16-of-16) |
 | `RPuzzle` | R-puzzle template for knowledge-based locking |
 | `PushDrop` | Data envelope template with P2PK lock |
 
@@ -416,7 +418,7 @@ if validation.valid {
 | `TransactionOutput` | Output with satoshis and locking script |
 | `MerklePath` | BRC-74 BUMP merkle proofs |
 | `Beef` | BRC-62/95/96 SPV proof container |
-| `FeeModel`, `SatoshisPerKilobyte` | Fee calculation |
+| `FeeModel`, `SatoshisPerKilobyte`, `LivePolicy` | Fee calculation (static and dynamic) |
 | `Broadcaster`, `ArcBroadcaster` | Transaction broadcasting |
 | `ChainTracker`, `WhatsOnChainTracker` | SPV chain verification |
 
@@ -447,7 +449,7 @@ if validation.valid {
 |-----------|-------------|
 | `Mnemonic`, `Language`, `WordCount` | BIP-39 mnemonic phrase generation and seed derivation |
 | `ExtendedKey`, `Network` | BIP-32 hierarchical deterministic key derivation |
-| `sign_message`, `verify_message` | Bitcoin Signed Message (BSM) format |
+| `sign_message`, `verify_message`, `verify_message_der` | Bitcoin Signed Message (BSM) format (compact and DER) |
 | `electrum_encrypt`, `electrum_decrypt` | Electrum ECIES encryption |
 | `bitcore_encrypt`, `bitcore_decrypt` | Bitcore ECIES encryption |
 
@@ -472,6 +474,8 @@ if validation.valid {
 | `VerifiableCertificate` | Certificate with verifier-specific keyring |
 | `Transport`, `SimplifiedFetchTransport` | BRC-104 HTTP transport layer |
 | `RequestedCertificateSet` | Certificate request specification |
+| `validate_certificate_encoding` | Certificate field validation |
+| `validate_requested_certificate_set` | Certificate request set validation |
 
 ### Overlay (`bsv_sdk::overlay`)
 
@@ -533,7 +537,7 @@ if validation.valid {
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `primitives` | Yes | Cryptographic primitives (hash, EC, encoding, AES-256-GCM) |
-| `script` | Yes | Script parsing, execution, templates (P2PKH, RPuzzle, PushDrop) |
+| `script` | Yes | Script parsing, execution, templates (P2PKH, P2PK, Multisig, RPuzzle, PushDrop) |
 | `transaction` | No | Transaction building, signing, BEEF/MerklePath, fee models |
 | `wallet` | No | BRC-42 key derivation, ProtoWallet, WalletClient |
 | `messages` | No | BRC-77/78 signed and encrypted messaging |
@@ -575,19 +579,24 @@ All implementations share test vectors to ensure cross-platform compatibility:
 
 | Category | Test Count | Description |
 |----------|------------|-------------|
+| Sighash Computation | 499 | Transaction signature hash vectors |
+| Script Execution | 2,620+ | Valid scripts, invalid scripts, spend vectors |
 | BRC-42 Key Derivation | 100+ | Invoice number generation, key pair derivation |
-| Sighash Computation | 499 | Transaction signature hash calculation |
-| Script Execution | 570+ | Full script interpreter test vectors |
-| Transaction Serialization | Multiple | Raw, BEEF, and MerklePath formats |
-| BIP-32/39 | Full suite | Official test vectors from BIP specifications |
-| Messages (BRC-77/78) | 33 | Sign/verify, encrypt/decrypt round-trips |
-| Storage/UHRP | 70 | URL encoding/decoding, download/upload |
-| KVStore | 74 | CRUD operations, encryption, queries |
+| Wire Protocol | 90 | All 28 WalletInterface method roundtrips |
+| Transaction/BEEF | 86 | Parsing, serialization, ancestry, cross-SDK BEEF |
+| GlobalKVStore | 85 | CRUD, batch, PushDrop interpreter, signatures |
+| LocalKVStore | 83 | Config, entries, queries, batch operations |
+| Storage/UHRP | 105 | URL encoding, upload/download, HTTP mocks |
 | Identity | 69 | Certificate handling, contact management |
+| Compat (BIP-32/39/BSM/ECIES) | 60 | Official TREZOR vectors, HD wallets, BSM, ECIES |
+| Overlay | 185 | SHIP/SLAP, admin tokens, HTTP mocks, reputation |
 | Wallet | 56 | KeyDeriver, CachedKeyDeriver, ProtoWallet |
-| Compat | 36 | BIP-32/39 helpers, BSM, ECIES |
+| Registry | 50 | Definitions, PushDrop roundtrips, cross-SDK |
+| Auth + Peer E2E | 58 | Sessions, certificates, mutual auth handshake |
+| Messages (BRC-77/78) | 33 | Sign/verify, encrypt/decrypt, cross-SDK vectors |
+| LivePolicy Fee Model | 20 | Dynamic fee rates via HTTP with wiremock |
 
-Total test coverage: **1,470+ unit tests**, **21 integration test files**, **159+ doc tests**
+**Total: 2,508 tests passing (1,293 unit + 1,047 integration + 168 doc tests) across 29 test files + 2,632 cross-SDK vectors + 4 fuzz targets + 72 benchmarks**
 
 ## Development
 
@@ -601,22 +610,26 @@ cargo build --features full
 # Run all tests
 cargo test --features full
 
+# Run all tests including HTTP mock tests
+cargo test --features "full,http"
+
 # Run tests for specific module
-cargo test primitives
-cargo test script --features script
-cargo test transaction --features transaction
-cargo test wallet --features wallet
-cargo test messages --features messages
-cargo test compat --features compat
-cargo test totp --features totp
-cargo test auth --features auth
-cargo test overlay --features overlay
-cargo test storage --features storage
-cargo test kvstore --features kvstore
-cargo test identity --features identity
+cargo test --features wallet --test wallet_tests
+cargo test --features wallet --test wire_method_roundtrip_tests
+cargo test --features auth --test auth_peer_e2e_tests
+cargo test --features "overlay,http" --test overlay_http_tests
+cargo test --features "storage,http" --test storage_http_tests
+cargo test --features kvstore --test kvstore_global_tests
+cargo test --features "transaction,http" --test live_policy_http_tests
 
 # Run benchmarks
 cargo bench
+
+# Run fuzz targets (requires cargo-fuzz)
+cargo fuzz run fuzz_script_parser
+cargo fuzz run fuzz_transaction_parser
+cargo fuzz run fuzz_wire_protocol
+cargo fuzz run fuzz_base58
 
 # Lint
 cargo clippy --all-targets --all-features
@@ -726,8 +739,9 @@ Independent modules (depend only on primitives):
 ## Contributing
 
 Contributions are welcome. Please ensure that:
-1. All tests pass (`cargo test --features full`)
+1. All tests pass (`cargo test --features "full,http"`)
 2. Code is formatted (`cargo fmt`)
 3. No clippy warnings (`cargo clippy --all-targets --all-features`)
 4. New functionality includes appropriate tests
 5. Cross-SDK compatibility is maintained where applicable
+6. HTTP-dependent tests use `wiremock` for mock servers

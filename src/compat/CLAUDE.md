@@ -15,7 +15,7 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 | `base58.rs` | Base58 encoding wrapper (~133 lines) |
 | `bip32.rs` | BIP-32 HD key derivation (~1288 lines) |
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
-| `bsm.rs` | Bitcoin Signed Message (~483 lines) |
+| `bsm.rs` | Bitcoin Signed Message (~670 lines) |
 | `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1033 lines) |
 
 ## Submodules
@@ -24,8 +24,8 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 |-----------|--------|-------------|
 | `base58` | Complete | Base58 encoding/decoding (Bitcoin alphabet) |
 | `bip32` | Complete | BIP-32 HD key derivation (xprv/xpub) |
-| `bip39` | Complete | BIP-39 mnemonic phrase generation and seed derivation |
-| `bsm` | Complete | Bitcoin Signed Message signing and verification |
+| `bip39` | Complete | BIP-39 mnemonic phrases, 9 languages, seed derivation |
+| `bsm` | Complete | Bitcoin Signed Message signing/verification (compact + DER) |
 | `ecies` | Complete | ECIES encryption (Electrum and Bitcore variants) |
 
 ## Re-exports
@@ -177,8 +177,17 @@ pub enum WordCount {
     pub fn checksum_bits(self) -> usize
 }
 
+// Implements Default (English)
 pub enum Language {
-    English,  // Default, only supported language
+    ChineseSimplified,
+    ChineseTraditional,
+    Czech,
+    English,   // #[default]
+    French,
+    Italian,
+    Japanese,  // Uses ideographic space (U+3000) as word separator
+    Korean,
+    Spanish,
 }
 
 pub struct Mnemonic {
@@ -202,20 +211,32 @@ pub struct Mnemonic {
     pub fn entropy(&self) -> Vec<u8>
     pub fn entropy_with_checksum(&self) -> Vec<u8>  // Matches Go SDK's MnemonicToByteArray
 
+    // Serialization
+    pub fn to_binary(&self) -> Vec<u8>              // UTF-8 encoded phrase
+    pub fn from_binary(data: &[u8]) -> Result<Self>  // Parse from UTF-8 bytes
+
     // Validation
     pub fn is_valid(&self) -> bool
+
+    // Also implements Display (outputs phrase())
 }
 
 // Wordlist verification
 pub fn verify_english_wordlist() -> bool
 ```
 
+### Multilingual Support
+
+9 languages are supported, each with a 2048-word wordlist per BIP-39 spec. Japanese uses ideographic space (U+3000) as word separator; all others use ASCII space.
+
+**NFKD normalization**: The implementation passes through strings unchanged (matching Go SDK). For maximum cross-SDK compatibility, use only ASCII characters in passphrases.
+
 ### Usage Example
 
 ```rust
-use bsv_sdk::compat::bip39::{Mnemonic, WordCount};
+use bsv_sdk::compat::bip39::{Mnemonic, WordCount, Language};
 
-// Generate new mnemonic
+// Generate new mnemonic (English by default)
 let mnemonic = Mnemonic::new(WordCount::Words12)?;
 
 // From entropy (test vector)
@@ -223,8 +244,19 @@ let entropy = [0u8; 16];
 let mnemonic = Mnemonic::from_entropy(&entropy)?;
 assert_eq!(mnemonic.phrase(), "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about");
 
+// Non-English mnemonic
+let mnemonic = Mnemonic::from_entropy_with_language(&entropy, Language::Japanese)?;
+let phrase = mnemonic.phrase(); // Words separated by U+3000
+
+// Parse back a non-English phrase
+let restored = Mnemonic::from_phrase_with_language(&phrase, Language::Japanese)?;
+
 // Convert to seed
 let seed = mnemonic.to_seed("TREZOR");
+
+// Binary serialization roundtrip
+let binary = mnemonic.to_binary();
+let restored = Mnemonic::from_binary(&binary)?;
 
 // Extract entropy with checksum
 let with_checksum = mnemonic.entropy_with_checksum();
@@ -240,6 +272,7 @@ Implements Bitcoin Signed Message format for message signing and verification.
 pub fn sign_message(private_key: &PrivateKey, message: &[u8]) -> Result<Vec<u8>>
 pub fn sign_message_with_compression(private_key: &PrivateKey, message: &[u8], compressed: bool) -> Result<Vec<u8>>
 pub fn verify_message(address: &str, signature: &[u8], message: &[u8]) -> Result<bool>
+pub fn verify_message_der(der_signature: &[u8], public_key: &PublicKey, message: &[u8]) -> Result<bool>
 pub fn recover_public_key_from_signature(signature: &[u8], message: &[u8]) -> Result<(PublicKey, bool)>
 pub fn magic_hash(message: &[u8]) -> [u8; 32]
 ```
@@ -268,12 +301,17 @@ let key = PrivateKey::random();
 let address = key.public_key().to_address();
 let message = b"Hello, BSV!";
 
-// Sign
+// Sign (compact 65-byte signature)
 let signature = bsm::sign_message(&key, message)?;
 assert_eq!(signature.len(), 65);
 
-// Verify
+// Verify against address (recovers pubkey from compact signature)
 assert!(bsm::verify_message(&address, &signature, message)?);
+
+// Verify using DER signature + public key (TS SDK compatible)
+let msg_hash = bsm::magic_hash(message);
+let der_sig = key.sign(&msg_hash)?.to_der();
+assert!(bsm::verify_message_der(&der_sig, &key.public_key(), message)?);
 
 // Recover public key
 let (recovered, compressed) = bsm::recover_public_key_from_signature(&signature, message)?;

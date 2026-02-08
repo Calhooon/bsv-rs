@@ -9,10 +9,10 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root with re-exports | 80 |
+| `mod.rs` | Module root with re-exports | 83 |
 | `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 455 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation with `start()` transport setup | 924 |
+| `peer.rs` | Core Peer implementation with `start()` transport setup | 936 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations | - |
 | `utils/` | Utility functions | - |
@@ -36,7 +36,7 @@ Transport layer implementations for auth messages:
 Utility functions:
 - `mod.rs` - Re-exports
 - `nonce.rs` - Nonce creation and verification
-- `validation.rs` - Certificate validation and matching
+- `validation.rs` - Certificate validation, matching, encoding validation, and request set validation
 
 ## Constants
 
@@ -382,6 +382,20 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(wallet: &W, request
 pub fn certificates_match_request(certs: &[VerifiableCertificate], requested: &RequestedCertificateSet) -> bool
 ```
 
+**Encoding validation functions** (new):
+```rust
+/// Validates structural encoding of a certificate: type/serial are [u8; 32],
+/// subject/certifier are valid compressed pubkeys, field names non-empty and
+/// <=50 bytes, signature (if present) is valid DER, revocation outpoint is
+/// not the null sentinel.
+pub fn validate_certificate_encoding(cert: &Certificate) -> Result<()>
+
+/// Validates a RequestedCertificateSet is well-formed: at least one type
+/// specified, certifier entries are valid 66-char hex pubkeys, type IDs are
+/// valid base64 decoding to 32 bytes, field names non-empty and <=50 bytes.
+pub fn validate_requested_certificate_set(requested: &RequestedCertificateSet) -> Result<()>
+```
+
 ## Usage Examples
 
 ### Basic Peer Authentication
@@ -464,6 +478,22 @@ let session = mgr.get_session(&identity_key_hex);
 
 // Prune stale sessions (older than 1 hour)
 let removed = mgr.prune_stale_sessions(3600 * 1000);
+```
+
+### Validating Certificate Encoding
+
+```rust
+use bsv_sdk::auth::{validate_certificate_encoding, Certificate};
+
+let cert = Certificate::new([1u8; 32], [2u8; 32], subject_key, certifier_key);
+validate_certificate_encoding(&cert)?; // Checks structural validity
+
+use bsv_sdk::auth::{validate_requested_certificate_set, RequestedCertificateSet};
+
+let mut req = RequestedCertificateSet::new();
+req.add_certifier(certifier_hex);
+req.add_type(type_base64, vec!["name".into()]);
+validate_requested_certificate_set(&req)?; // Checks request is well-formed
 ```
 
 ## Protocol Details
