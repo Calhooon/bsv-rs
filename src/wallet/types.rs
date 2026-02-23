@@ -708,6 +708,13 @@ pub struct CreateActionResult {
     /// Reference number for the action.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reference_number: Option<String>,
+    /// Full BEEF (transaction + ancestor proofs) when available.
+    #[serde(
+        with = "hex_bytes_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
+    pub beef: Option<Vec<u8>>,
 }
 
 // =============================================================================

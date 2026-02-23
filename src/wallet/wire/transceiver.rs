@@ -615,6 +615,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             input_type: None,
             inputs: None,
             reference_number: None,
+            beef: None,
         })
     }
 
