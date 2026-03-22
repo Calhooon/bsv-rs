@@ -204,7 +204,8 @@ pub type CertificateRequestCallback = Box<dyn Fn(PublicKey, RequestedCertificate
 ```rust
 impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub fn new(options: PeerOptions<W, T>) -> Self
-    pub fn start(&self)                      // Sets up transport callback for receiving messages
+    pub fn start(&self)                      // Sets up client-side transport callback (ignores InitialRequest)
+    pub fn start_server(self: &Arc<Self>)    // Sets up server-side transport callback (handles ALL message types)
 
     // Sending messages
     pub async fn to_peer(&self, message: &[u8], identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<()>
@@ -298,7 +299,7 @@ Three implementations:
 
 ## Usage Examples
 
-### Basic Peer Authentication
+### Client-Side Peer Authentication
 
 ```rust
 use bsv_sdk::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
@@ -316,8 +317,24 @@ let peer = Peer::new(PeerOptions {
     auto_persist_last_session: false,
     originator: Some("myapp.com".into()),
 });
-peer.start(); // Must call start() to receive responses
+peer.start(); // Client-side: handles responses but not incoming InitialRequest
 peer.to_peer(b"Hello, world!", None, None).await?;
+```
+
+### Server-Side Peer Authentication
+
+```rust
+use std::sync::Arc;
+
+let peer = Arc::new(Peer::new(PeerOptions {
+    wallet,
+    transport,
+    certificates_to_request: None,
+    session_manager: None,
+    auto_persist_last_session: false,
+    originator: Some("myserver.com".into()),
+}));
+peer.start_server(); // Server-side: handles ALL messages including InitialRequest
 ```
 
 ### Listening for Messages
@@ -367,7 +384,9 @@ peer.start();
 ### Peer Lifecycle
 
 1. **Create**: `Peer::new(options)` - constructs peer with wallet and transport
-2. **Start**: `peer.start()` - sets up transport callback to route incoming messages to handlers and pending handshake resolvers. Required for receiving responses.
+2. **Start**: Choose one:
+   - `peer.start()` - client-side callback (handles InitialResponse, General, Certificate messages; ignores InitialRequest)
+   - `peer.start_server()` - server-side callback (handles ALL message types including InitialRequest). Requires `Arc<Peer>` since it routes through `handle_incoming_message()`.
 3. **Communicate**: `to_peer()`, `request_certificates()`, etc.
 
 ### Authentication Flow

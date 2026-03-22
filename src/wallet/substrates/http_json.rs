@@ -3,21 +3,27 @@
 //! This module provides an HTTP-based wallet substrate that communicates
 //! using JSON-encoded payloads instead of the binary wire protocol.
 
-use crate::wallet::types::{Counterparty, Network, Protocol};
+use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
+use crate::wallet::types::{
+    Counterparty, Network, Protocol, RevealCounterpartyKeyLinkageResult,
+    RevealSpecificKeyLinkageResult,
+};
 use crate::wallet::{
-    AbortActionArgs, AbortActionResult, AcquireCertificateArgs, CreateActionArgs,
-    CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
+    AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
+    CreateActionArgs, CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
     CreateSignatureResult, DecryptArgs, DecryptResult, DiscoverByAttributesArgs,
     DiscoverByIdentityKeyArgs, DiscoverCertificatesResult, EncryptArgs, EncryptResult,
-    GetHeaderArgs, GetHeaderResult, GetPublicKeyArgs, GetPublicKeyResult, InternalizeActionArgs,
-    InternalizeActionResult, ListActionsArgs, ListActionsResult, ListCertificatesArgs,
-    ListCertificatesResult, ListOutputsArgs, ListOutputsResult, ProveCertificateArgs,
-    ProveCertificateResult, RelinquishCertificateArgs, RelinquishCertificateResult,
-    RelinquishOutputArgs, RelinquishOutputResult, SignActionArgs, SignActionResult, VerifyHmacArgs,
-    VerifyHmacResult, VerifySignatureArgs, VerifySignatureResult, WalletCertificate,
+    GetHeaderArgs, GetHeaderResult, GetHeightResult, GetNetworkResult, GetPublicKeyArgs,
+    GetPublicKeyResult, GetVersionResult, InternalizeActionArgs, InternalizeActionResult,
+    ListActionsArgs, ListActionsResult, ListCertificatesArgs, ListCertificatesResult,
+    ListOutputsArgs, ListOutputsResult, ProveCertificateArgs, ProveCertificateResult,
+    RelinquishCertificateArgs, RelinquishCertificateResult, RelinquishOutputArgs,
+    RelinquishOutputResult, SignActionArgs, SignActionResult, VerifyHmacArgs, VerifyHmacResult,
+    VerifySignatureArgs, VerifySignatureResult, WalletCertificate, WalletInterface,
 };
 
 use crate::Error;
+use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -57,6 +63,7 @@ use serde::{Deserialize, Serialize};
 ///     "myapp.example.com",
 /// ).await?;
 /// ```
+#[derive(Clone)]
 pub struct HttpWalletJson {
     client: Client,
     base_url: String,
@@ -193,21 +200,14 @@ impl HttpWalletJson {
             protocol_id: protocol_to_json(&args.protocol_id),
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
-            plaintext: base64::Engine::encode(
-                &base64::engine::general_purpose::STANDARD,
-                &args.plaintext,
-            ),
+            plaintext: args.plaintext,
         };
 
         let response: JsonEncryptResponse = self.request("encrypt", &request, originator).await?;
 
-        let ciphertext = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            &response.ciphertext,
-        )
-        .map_err(|e| Error::WalletError(format!("invalid base64 ciphertext: {}", e)))?;
-
-        Ok(EncryptResult { ciphertext })
+        Ok(EncryptResult {
+            ciphertext: response.ciphertext,
+        })
     }
 
     /// Decrypts data using the wallet's derived key.
@@ -220,21 +220,14 @@ impl HttpWalletJson {
             protocol_id: protocol_to_json(&args.protocol_id),
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
-            ciphertext: base64::Engine::encode(
-                &base64::engine::general_purpose::STANDARD,
-                &args.ciphertext,
-            ),
+            ciphertext: args.ciphertext,
         };
 
         let response: JsonDecryptResponse = self.request("decrypt", &request, originator).await?;
 
-        let plaintext = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            &response.plaintext,
-        )
-        .map_err(|e| Error::WalletError(format!("invalid base64 plaintext: {}", e)))?;
-
-        Ok(DecryptResult { plaintext })
+        Ok(DecryptResult {
+            plaintext: response.plaintext,
+        })
     }
 
     /// Creates an HMAC using the wallet's derived key.
@@ -247,25 +240,21 @@ impl HttpWalletJson {
             protocol_id: protocol_to_json(&args.protocol_id),
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
-            data: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &args.data),
+            data: args.data,
         };
 
         let response: JsonCreateHmacResponse =
             self.request("createHmac", &request, originator).await?;
 
-        let hmac_bytes =
-            base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &response.hmac)
-                .map_err(|e| Error::WalletError(format!("invalid base64 hmac: {}", e)))?;
-
-        if hmac_bytes.len() != 32 {
+        if response.hmac.len() != 32 {
             return Err(Error::WalletError(format!(
                 "invalid HMAC length: expected 32, got {}",
-                hmac_bytes.len()
+                response.hmac.len()
             )));
         }
 
         let mut hmac = [0u8; 32];
-        hmac.copy_from_slice(&hmac_bytes);
+        hmac.copy_from_slice(&response.hmac);
 
         Ok(CreateHmacResult { hmac })
     }
@@ -280,8 +269,8 @@ impl HttpWalletJson {
             protocol_id: protocol_to_json(&args.protocol_id),
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
-            data: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &args.data),
-            hmac: base64::Engine::encode(&base64::engine::general_purpose::STANDARD, args.hmac),
+            data: args.data,
+            hmac: args.hmac.to_vec(),
         };
 
         let response: JsonVerifyHmacResponse =
@@ -302,9 +291,7 @@ impl HttpWalletJson {
             protocol_id: protocol_to_json(&args.protocol_id),
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
-            data: args
-                .data
-                .map(|d| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &d)),
+            data: args.data,
             hash_to_directly_sign: args
                 .hash_to_directly_sign
                 .map(|h| crate::primitives::to_hex(&h)),
@@ -314,13 +301,9 @@ impl HttpWalletJson {
             .request("createSignature", &request, originator)
             .await?;
 
-        let signature = base64::Engine::decode(
-            &base64::engine::general_purpose::STANDARD,
-            &response.signature,
-        )
-        .map_err(|e| Error::WalletError(format!("invalid base64 signature: {}", e)))?;
-
-        Ok(CreateSignatureResult { signature })
+        Ok(CreateSignatureResult {
+            signature: response.signature,
+        })
     }
 
     /// Verifies a signature using the wallet's derived key.
@@ -334,16 +317,11 @@ impl HttpWalletJson {
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             for_self: args.for_self,
-            data: args
-                .data
-                .map(|d| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &d)),
+            data: args.data,
             hash_to_directly_verify: args
                 .hash_to_directly_verify
                 .map(|h| crate::primitives::to_hex(&h)),
-            signature: base64::Engine::encode(
-                &base64::engine::general_purpose::STANDARD,
-                &args.signature,
-            ),
+            signature: args.signature,
         };
 
         let response: JsonVerifySignatureResponse = self
@@ -595,6 +573,270 @@ impl HttpWalletJson {
 
         Ok(response.authenticated)
     }
+
+    // =========================================================================
+    // Key Linkage Methods
+    // =========================================================================
+
+    /// Reveals counterparty key linkage.
+    pub async fn reveal_counterparty_key_linkage(
+        &self,
+        args: RevealCounterpartyKeyLinkageArgs,
+        originator: &str,
+    ) -> Result<RevealCounterpartyKeyLinkageResult, Error> {
+        let request = JsonRevealCounterpartyRequest {
+            counterparty: crate::primitives::to_hex(&args.counterparty.to_compressed()),
+            verifier: crate::primitives::to_hex(&args.verifier.to_compressed()),
+            privileged: args.privileged,
+            privileged_reason: args.privileged_reason,
+        };
+
+        self.request("revealCounterpartyKeyLinkage", &request, originator)
+            .await
+    }
+
+    /// Reveals specific key linkage.
+    pub async fn reveal_specific_key_linkage(
+        &self,
+        args: RevealSpecificKeyLinkageArgs,
+        originator: &str,
+    ) -> Result<RevealSpecificKeyLinkageResult, Error> {
+        let request = JsonRevealSpecificRequest {
+            counterparty: counterparty_to_string(&args.counterparty),
+            verifier: crate::primitives::to_hex(&args.verifier.to_compressed()),
+            protocol_id: protocol_to_json(&args.protocol_id),
+            key_id: args.key_id,
+            privileged: args.privileged,
+            privileged_reason: args.privileged_reason,
+        };
+
+        self.request("revealSpecificKeyLinkage", &request, originator)
+            .await
+    }
+}
+
+// =============================================================================
+// WalletInterface Implementation
+// =============================================================================
+
+#[async_trait]
+impl WalletInterface for HttpWalletJson {
+    async fn get_public_key(
+        &self,
+        args: GetPublicKeyArgs,
+        originator: &str,
+    ) -> crate::Result<GetPublicKeyResult> {
+        self.get_public_key(args, originator).await
+    }
+
+    async fn encrypt(
+        &self,
+        args: EncryptArgs,
+        originator: &str,
+    ) -> crate::Result<EncryptResult> {
+        self.encrypt(args, originator).await
+    }
+
+    async fn decrypt(
+        &self,
+        args: DecryptArgs,
+        originator: &str,
+    ) -> crate::Result<DecryptResult> {
+        self.decrypt(args, originator).await
+    }
+
+    async fn create_hmac(
+        &self,
+        args: CreateHmacArgs,
+        originator: &str,
+    ) -> crate::Result<CreateHmacResult> {
+        self.create_hmac(args, originator).await
+    }
+
+    async fn verify_hmac(
+        &self,
+        args: VerifyHmacArgs,
+        originator: &str,
+    ) -> crate::Result<VerifyHmacResult> {
+        self.verify_hmac(args, originator).await
+    }
+
+    async fn create_signature(
+        &self,
+        args: CreateSignatureArgs,
+        originator: &str,
+    ) -> crate::Result<CreateSignatureResult> {
+        self.create_signature(args, originator).await
+    }
+
+    async fn verify_signature(
+        &self,
+        args: VerifySignatureArgs,
+        originator: &str,
+    ) -> crate::Result<VerifySignatureResult> {
+        self.verify_signature(args, originator).await
+    }
+
+    async fn reveal_counterparty_key_linkage(
+        &self,
+        args: RevealCounterpartyKeyLinkageArgs,
+        originator: &str,
+    ) -> crate::Result<RevealCounterpartyKeyLinkageResult> {
+        self.reveal_counterparty_key_linkage(args, originator).await
+    }
+
+    async fn reveal_specific_key_linkage(
+        &self,
+        args: RevealSpecificKeyLinkageArgs,
+        originator: &str,
+    ) -> crate::Result<RevealSpecificKeyLinkageResult> {
+        self.reveal_specific_key_linkage(args, originator).await
+    }
+
+    async fn create_action(
+        &self,
+        args: CreateActionArgs,
+        originator: &str,
+    ) -> crate::Result<CreateActionResult> {
+        self.create_action(args, originator).await
+    }
+
+    async fn sign_action(
+        &self,
+        args: SignActionArgs,
+        originator: &str,
+    ) -> crate::Result<SignActionResult> {
+        self.sign_action(args, originator).await
+    }
+
+    async fn abort_action(
+        &self,
+        args: AbortActionArgs,
+        originator: &str,
+    ) -> crate::Result<AbortActionResult> {
+        self.abort_action(args, originator).await
+    }
+
+    async fn list_actions(
+        &self,
+        args: ListActionsArgs,
+        originator: &str,
+    ) -> crate::Result<ListActionsResult> {
+        self.list_actions(args, originator).await
+    }
+
+    async fn internalize_action(
+        &self,
+        args: InternalizeActionArgs,
+        originator: &str,
+    ) -> crate::Result<InternalizeActionResult> {
+        self.internalize_action(args, originator).await
+    }
+
+    async fn list_outputs(
+        &self,
+        args: ListOutputsArgs,
+        originator: &str,
+    ) -> crate::Result<ListOutputsResult> {
+        self.list_outputs(args, originator).await
+    }
+
+    async fn relinquish_output(
+        &self,
+        args: RelinquishOutputArgs,
+        originator: &str,
+    ) -> crate::Result<RelinquishOutputResult> {
+        self.relinquish_output(args, originator).await
+    }
+
+    async fn acquire_certificate(
+        &self,
+        args: AcquireCertificateArgs,
+        originator: &str,
+    ) -> crate::Result<WalletCertificate> {
+        self.acquire_certificate(args, originator).await
+    }
+
+    async fn list_certificates(
+        &self,
+        args: ListCertificatesArgs,
+        originator: &str,
+    ) -> crate::Result<ListCertificatesResult> {
+        self.list_certificates(args, originator).await
+    }
+
+    async fn prove_certificate(
+        &self,
+        args: ProveCertificateArgs,
+        originator: &str,
+    ) -> crate::Result<ProveCertificateResult> {
+        self.prove_certificate(args, originator).await
+    }
+
+    async fn relinquish_certificate(
+        &self,
+        args: RelinquishCertificateArgs,
+        originator: &str,
+    ) -> crate::Result<RelinquishCertificateResult> {
+        self.relinquish_certificate(args, originator).await
+    }
+
+    async fn discover_by_identity_key(
+        &self,
+        args: DiscoverByIdentityKeyArgs,
+        originator: &str,
+    ) -> crate::Result<DiscoverCertificatesResult> {
+        self.discover_by_identity_key(args, originator).await
+    }
+
+    async fn discover_by_attributes(
+        &self,
+        args: DiscoverByAttributesArgs,
+        originator: &str,
+    ) -> crate::Result<DiscoverCertificatesResult> {
+        self.discover_by_attributes(args, originator).await
+    }
+
+    async fn is_authenticated(&self, originator: &str) -> crate::Result<AuthenticatedResult> {
+        Ok(AuthenticatedResult {
+            authenticated: self.is_authenticated(originator).await?,
+        })
+    }
+
+    async fn wait_for_authentication(
+        &self,
+        originator: &str,
+    ) -> crate::Result<AuthenticatedResult> {
+        Ok(AuthenticatedResult {
+            authenticated: self.wait_for_authentication(originator).await?,
+        })
+    }
+
+    async fn get_height(&self, originator: &str) -> crate::Result<GetHeightResult> {
+        Ok(GetHeightResult {
+            height: self.get_height(originator).await? as u32,
+        })
+    }
+
+    async fn get_header_for_height(
+        &self,
+        args: GetHeaderArgs,
+        originator: &str,
+    ) -> crate::Result<GetHeaderResult> {
+        self.get_header(args, originator).await
+    }
+
+    async fn get_network(&self, originator: &str) -> crate::Result<GetNetworkResult> {
+        Ok(GetNetworkResult {
+            network: self.get_network(originator).await?,
+        })
+    }
+
+    async fn get_version(&self, originator: &str) -> crate::Result<GetVersionResult> {
+        Ok(GetVersionResult {
+            version: self.get_version(originator).await?,
+        })
+    }
 }
 
 // =============================================================================
@@ -634,13 +876,13 @@ struct JsonEncryptRequest {
     key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     counterparty: Option<String>,
-    plaintext: String, // base64
+    plaintext: Vec<u8>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonEncryptResponse {
-    ciphertext: String, // base64
+    ciphertext: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -650,13 +892,13 @@ struct JsonDecryptRequest {
     key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     counterparty: Option<String>,
-    ciphertext: String, // base64
+    ciphertext: Vec<u8>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonDecryptResponse {
-    plaintext: String, // base64
+    plaintext: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -666,13 +908,13 @@ struct JsonCreateHmacRequest {
     key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     counterparty: Option<String>,
-    data: String, // base64
+    data: Vec<u8>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonCreateHmacResponse {
-    hmac: String, // base64
+    hmac: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -682,8 +924,8 @@ struct JsonVerifyHmacRequest {
     key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     counterparty: Option<String>,
-    data: String, // base64
-    hmac: String, // base64
+    data: Vec<u8>,
+    hmac: Vec<u8>,
 }
 
 #[derive(Deserialize)]
@@ -700,7 +942,7 @@ struct JsonCreateSignatureRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     counterparty: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<String>, // base64
+    data: Option<Vec<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hash_to_directly_sign: Option<String>, // hex
 }
@@ -708,7 +950,7 @@ struct JsonCreateSignatureRequest {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonCreateSignatureResponse {
-    signature: String, // base64
+    signature: Vec<u8>,
 }
 
 #[derive(Serialize)]
@@ -721,16 +963,40 @@ struct JsonVerifySignatureRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     for_self: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<String>, // base64
+    data: Option<Vec<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     hash_to_directly_verify: Option<String>, // hex
-    signature: String, // base64
+    signature: Vec<u8>,
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonVerifySignatureResponse {
     valid: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JsonRevealCounterpartyRequest {
+    counterparty: String, // hex pubkey
+    verifier: String,     // hex pubkey
+    #[serde(skip_serializing_if = "Option::is_none")]
+    privileged: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    privileged_reason: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JsonRevealSpecificRequest {
+    counterparty: String,           // "self", "anyone", or hex pubkey
+    verifier: String,               // hex pubkey
+    protocol_id: (u8, String),      // (security_level, protocol_name)
+    key_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    privileged: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    privileged_reason: Option<String>,
 }
 
 // =============================================================================

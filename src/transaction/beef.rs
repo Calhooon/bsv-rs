@@ -305,6 +305,119 @@ impl Beef {
         }
     }
 
+    /// Trims ancestor transactions that are no longer needed because their
+    /// dependents now have merkle proofs (BUMPs).
+    ///
+    /// In BEEF, a transaction with a BUMP is self-proving via its merkle path
+    /// and does not require its ancestor transactions to also be present.
+    /// This method walks the dependency graph from tip transactions (those not
+    /// spent by any other tx in the BEEF) and removes any transaction that is
+    /// only reachable through proven (bumped) transactions.
+    ///
+    /// This is useful after upgrading previously-unproven transactions with
+    /// newly-available merkle proofs, allowing their deep ancestor chains to
+    /// be removed.
+    pub fn trim_known_proven(&mut self) {
+        use std::collections::{HashSet, VecDeque};
+
+        let all_txids: HashSet<String> = self.txs.iter().map(|tx| tx.txid()).collect();
+
+        // Find which txids are referenced as inputs by other txs in the BEEF.
+        // Note: proven txs have empty input_txids (cleared by set_bump_index),
+        // so we also parse their raw tx bytes to recover the full reference graph.
+        let mut referenced_as_input: HashSet<String> = HashSet::new();
+        for tx in &mut self.txs {
+            let input_refs: Vec<String> = if !tx.input_txids.is_empty() {
+                tx.input_txids.clone()
+            } else if let Some(parsed) = tx.tx_mut() {
+                parsed
+                    .inputs
+                    .iter()
+                    .filter_map(|inp| inp.get_source_txid().ok())
+                    .collect::<Vec<String>>()
+            } else {
+                Vec::new()
+            };
+            for input_txid in &input_refs {
+                if all_txids.contains(input_txid) {
+                    referenced_as_input.insert(input_txid.clone());
+                }
+            }
+        }
+
+        // Tip transactions: not referenced as an input by any other tx in the BEEF
+        let tips: Vec<String> = all_txids
+            .iter()
+            .filter(|txid| !referenced_as_input.contains(*txid))
+            .cloned()
+            .collect();
+
+        // BFS from tips: mark needed txids, stop at proven txs
+        let mut needed: HashSet<String> = HashSet::new();
+        let mut queue: VecDeque<String> = VecDeque::from(tips);
+
+        while let Some(txid) = queue.pop_front() {
+            if needed.contains(&txid) {
+                continue;
+            }
+            needed.insert(txid.clone());
+
+            if let Some(tx) = self.find_txid(&txid) {
+                // Proven tx is self-sufficient — don't need its ancestors
+                if tx.bump_index().is_some() {
+                    continue;
+                }
+                // Unproven — need its input txids too
+                for input_txid in tx.input_txids.clone() {
+                    if all_txids.contains(&input_txid) && !needed.contains(&input_txid) {
+                        queue.push_back(input_txid);
+                    }
+                }
+            }
+        }
+
+        // Nothing to trim
+        if needed.len() == self.txs.len() {
+            return;
+        }
+
+        // Remove unneeded transactions
+        self.txs.retain(|tx| needed.contains(&tx.txid()));
+        self.rebuild_index();
+
+        // Clean up unused BUMPs and remap indices
+        let used_bump_indices: HashSet<usize> = self
+            .txs
+            .iter()
+            .filter_map(|tx| tx.bump_index())
+            .collect();
+
+        if used_bump_indices.len() < self.bumps.len() {
+            let mut new_bumps = Vec::new();
+            let mut index_map: HashMap<usize, usize> = HashMap::new();
+
+            for (old_idx, bump) in self.bumps.iter().enumerate() {
+                if used_bump_indices.contains(&old_idx) {
+                    let new_idx = new_bumps.len();
+                    index_map.insert(old_idx, new_idx);
+                    new_bumps.push(bump.clone());
+                }
+            }
+
+            self.bumps = new_bumps;
+
+            for tx in &mut self.txs {
+                if let Some(old_idx) = tx.bump_index() {
+                    if let Some(&new_idx) = index_map.get(&old_idx) {
+                        tx.set_bump_index(Some(new_idx));
+                    }
+                }
+            }
+        }
+
+        self.mark_mutated();
+    }
+
     /// Checks if this BEEF is structurally valid.
     ///
     /// Does NOT verify merkle roots against a chain tracker.
@@ -801,5 +914,118 @@ mod tests {
     fn test_default() {
         let beef = Beef::default();
         assert_eq!(beef.version, BEEF_V2);
+    }
+
+    #[test]
+    fn test_trim_known_proven_removes_deep_ancestors() {
+        // Build a BEEF with chain: TX_A (proven) <- TX_B (unproven) <- TX_C (unproven, tip)
+        // Then prove TX_B. After trim, TX_A should be removed since TX_B is now self-sufficient.
+        let mut beef = Beef::new();
+
+        // TX_A: a "coinbase-like" tx (no real inputs for our purposes)
+        let tx_a_raw = vec![
+            0x01, 0x00, 0x00, 0x00, // version
+            0x01, // input count
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // prev txid (all zeros = coinbase)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
+            0x00, // script length
+            0xff, 0xff, 0xff, 0xff, // sequence
+            0x01, // output count
+            0xe8, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 1000 satoshis
+            0x00, // script length
+            0x00, 0x00, 0x00, 0x00, // locktime
+        ];
+        let tx_a_id = {
+            let btx = beef.merge_raw_tx(tx_a_raw.clone(), None);
+            btx.txid()
+        };
+
+        // Give TX_A a proof (BUMP)
+        let bump_a = MerklePath::from_coinbase_txid(&tx_a_id, 100);
+        let bump_idx_a = beef.merge_bump(bump_a);
+        beef.find_txid_mut(&tx_a_id)
+            .unwrap()
+            .set_bump_index(Some(bump_idx_a));
+
+        // TX_B: spends TX_A (input references tx_a_id)
+        let tx_a_id_bytes = from_hex(&tx_a_id).unwrap();
+        let mut tx_b_raw = vec![0x01, 0x00, 0x00, 0x00, 0x01]; // version + 1 input
+        // prev txid (reversed tx_a_id)
+        let mut prev_txid = tx_a_id_bytes.clone();
+        prev_txid.reverse();
+        tx_b_raw.extend_from_slice(&prev_txid);
+        tx_b_raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // vout
+        tx_b_raw.push(0x00); // script length
+        tx_b_raw.extend_from_slice(&[0xff, 0xff, 0xff, 0xff]); // sequence
+        tx_b_raw.push(0x01); // output count
+        tx_b_raw.extend_from_slice(&[0xd0, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]); // 2000 sats
+        tx_b_raw.push(0x00); // script length
+        tx_b_raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // locktime
+        let tx_b_id = {
+            let btx = beef.merge_raw_tx(tx_b_raw, None);
+            btx.txid()
+        };
+
+        // TX_C: spends TX_B (tip, unproven)
+        let tx_b_id_bytes = from_hex(&tx_b_id).unwrap();
+        let mut tx_c_raw = vec![0x01, 0x00, 0x00, 0x00, 0x01];
+        let mut prev_txid_b = tx_b_id_bytes.clone();
+        prev_txid_b.reverse();
+        tx_c_raw.extend_from_slice(&prev_txid_b);
+        tx_c_raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+        tx_c_raw.push(0x00);
+        tx_c_raw.extend_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+        tx_c_raw.push(0x01);
+        tx_c_raw.extend_from_slice(&[0xb8, 0x0b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        tx_c_raw.push(0x00);
+        tx_c_raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+        let _tx_c_id = {
+            let btx = beef.merge_raw_tx(tx_c_raw, None);
+            btx.txid()
+        };
+
+        // Before trim: 3 txs (A proven, B unproven, C unproven)
+        assert_eq!(beef.txs.len(), 3);
+
+        // Now "prove" TX_B
+        let bump_b = MerklePath::from_coinbase_txid(&tx_b_id, 101);
+        let bump_idx_b = beef.merge_bump(bump_b);
+        beef.find_txid_mut(&tx_b_id)
+            .unwrap()
+            .set_bump_index(Some(bump_idx_b));
+
+        // Trim: TX_A should be removed (only ancestor of now-proven TX_B)
+        beef.trim_known_proven();
+
+        assert_eq!(beef.txs.len(), 2); // TX_B and TX_C remain
+        assert!(beef.find_txid(&tx_b_id).is_some()); // TX_B kept (proven, needed by TX_C)
+        assert!(beef.find_txid(&_tx_c_id).is_some()); // TX_C kept (tip)
+        assert!(beef.find_txid(&tx_a_id).is_none()); // TX_A removed (unnecessary)
+
+        // BUMP for TX_A's block should be removed, BUMP for TX_B's block kept
+        assert_eq!(beef.bumps.len(), 1);
+        assert_eq!(beef.bumps[0].block_height, 101);
+    }
+
+    #[test]
+    fn test_trim_known_proven_noop_when_nothing_to_trim() {
+        let mut beef = Beef::new();
+
+        // Single proven tx — nothing to trim
+        let raw = vec![
+            0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0x00,
+            0xff, 0xff, 0xff, 0xff, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+        let txid = beef.merge_raw_tx(raw, None).txid();
+        let bump = MerklePath::from_coinbase_txid(&txid, 100);
+        let bi = beef.merge_bump(bump);
+        beef.find_txid_mut(&txid).unwrap().set_bump_index(Some(bi));
+
+        beef.trim_known_proven();
+        assert_eq!(beef.txs.len(), 1); // Still there
     }
 }

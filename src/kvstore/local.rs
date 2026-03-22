@@ -1160,6 +1160,7 @@ mod tests {
                 input_type: None,
                 inputs: None,
                 reference_number: None,
+                beef: None,
             })
         }
 

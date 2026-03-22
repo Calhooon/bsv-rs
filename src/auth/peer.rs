@@ -148,11 +148,14 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         }
     }
 
-    /// Sets up the transport callback to receive and process incoming messages.
+    /// Sets up the transport callback for **client-side** peers.
     ///
     /// This must be called after creating the Peer for it to receive responses.
-    /// The callback is automatically set up for processing InitialResponse,
-    /// CertificateRequest/Response, and General messages.
+    /// The callback handles InitialResponse, CertificateRequest/Response, and
+    /// General messages but does **not** handle InitialRequest.
+    ///
+    /// For server-side peers that need to accept incoming handshakes, use
+    /// [`start_server()`](Self::start_server) instead.
     pub fn start(&self) {
         // Clone all the Arc references we need for the callback
         let session_manager = self.session_manager.clone();
@@ -282,13 +285,32 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                             callback(sender.clone(), certs.clone()).await?;
                         }
                     }
-                    _ => {
-                        // Ignore other message types (InitialRequest is server-side only)
+                    MessageType::InitialRequest => {
+                        // InitialRequest is not handled in this lightweight callback.
+                        // Use start_server() for server-side peers that need to accept
+                        // incoming InitialRequest handshakes.
                     }
                 }
 
                 Ok(())
             })
+        }));
+    }
+
+    /// Sets up the transport callback to handle ALL incoming message types,
+    /// including InitialRequest (needed for server-side peers).
+    ///
+    /// Unlike `start()`, this method requires the Peer to be wrapped in `Arc`
+    /// so the callback can call `handle_incoming_message()` which has access to
+    /// the wallet and transport for processing handshake requests.
+    ///
+    /// Use this instead of `start()` when your Peer acts as a server accepting
+    /// incoming connections (e.g., WebSocket server).
+    pub fn start_server(self: &Arc<Self>) {
+        let peer = Arc::clone(self);
+        self.transport.set_callback(Box::new(move |message| {
+            let peer = Arc::clone(&peer);
+            Box::pin(async move { peer.handle_incoming_message(message).await })
         }));
     }
 
