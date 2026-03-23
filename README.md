@@ -2,8 +2,8 @@
 
 The official Rust implementation of the BSV blockchain SDK, providing a complete toolkit for building BSV applications. Feature-complete and production-ready, with ~100,000 lines of Rust, 2,578 tests, 2,044+ cross-SDK test vectors, and byte-for-byte compatibility with the [TypeScript](https://github.com/bitcoin-sv/ts-sdk) and [Go](https://github.com/bitcoin-sv/go-sdk) SDKs — including binary wire protocol interoperability.
 
-[![Crates.io](https://img.shields.io/crates/v/bsv-sdk.svg)](https://crates.io/crates/bsv-sdk)
-[![Documentation](https://docs.rs/bsv-sdk/badge.svg)](https://docs.rs/bsv-sdk)
+[![Crates.io](https://img.shields.io/crates/v/bsv-rs.svg)](https://crates.io/crates/bsv-rs)
+[![Documentation](https://docs.rs/bsv-rs/badge.svg)](https://docs.rs/bsv-rs)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
 ## Features
@@ -35,7 +35,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bsv-sdk = "0.2"
+bsv-rs = "0.2"
 ```
 
 Or with specific features:
@@ -43,20 +43,20 @@ Or with specific features:
 ```toml
 [dependencies]
 # All modules
-bsv-sdk = { version = "0.2", features = ["full"] }
+bsv-rs = { version = "0.2", features = ["full"] }
 
 # With HTTP client (for ARC broadcaster, WhatsOnChain, WalletClient, storage)
-bsv-sdk = { version = "0.2", features = ["full", "http"] }
+bsv-rs = { version = "0.2", features = ["full", "http"] }
 
 # Just primitives and script (default)
-bsv-sdk = "0.2"
+bsv-rs = "0.2"
 
 # Common combinations
-bsv-sdk = { version = "0.2", features = ["wallet"] }           # Keys, transactions, signing
-bsv-sdk = { version = "0.2", features = ["auth", "http"] }     # Authentication with HTTP transport
-bsv-sdk = { version = "0.2", features = ["overlay", "http"] }  # Overlay network operations
-bsv-sdk = { version = "0.2", features = ["compat"] }           # BIP-32/39, BSM, ECIES
-bsv-sdk = { version = "0.2", features = ["websocket"] }        # Auth with WebSocket transport
+bsv-rs = { version = "0.2", features = ["wallet"] }           # Keys, transactions, signing
+bsv-rs = { version = "0.2", features = ["auth", "http"] }     # Authentication with HTTP transport
+bsv-rs = { version = "0.2", features = ["overlay", "http"] }  # Overlay network operations
+bsv-rs = { version = "0.2", features = ["compat"] }           # BIP-32/39, BSM, ECIES
+bsv-rs = { version = "0.2", features = ["websocket"] }        # Auth with WebSocket transport
 ```
 
 ## Quick Start

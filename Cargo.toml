@@ -1,10 +1,11 @@
 [package]
-name = "bsv-sdk"
+name = "bsv-rs"
 version = "0.2.0"
 edition = "2021"
 description = "BSV blockchain SDK for Rust - primitives, script, transactions, and more"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/bsv-blockchain/bsv-sdk-rust"
+repository = "https://github.com/Calhooon/bsv-rs"
+homepage = "https://github.com/Calhooon/bsv-rs"
 keywords = ["bitcoin", "bsv", "blockchain", "cryptocurrency", "sdk"]
 categories = ["cryptography", "encoding", "parser-implementations"]
 
