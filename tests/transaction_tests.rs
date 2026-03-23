@@ -1881,9 +1881,8 @@ mod transaction_tests {
 
             // Create input with padded unlocking script
             let input_script_data = vec![0u8; input_script_len];
-            let unlocking_script =
-                bsv_rs::script::UnlockingScript::from_binary(&input_script_data)
-                    .unwrap_or_else(|_| bsv_rs::script::UnlockingScript::new());
+            let unlocking_script = bsv_rs::script::UnlockingScript::from_binary(&input_script_data)
+                .unwrap_or_else(|_| bsv_rs::script::UnlockingScript::new());
 
             let mut input = TransactionInput::new("a".repeat(64), 0);
             input.unlocking_script = Some(unlocking_script);

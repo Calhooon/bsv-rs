@@ -902,10 +902,7 @@ fn test_admin_token_identity_key_hex() {
     assert_eq!(hex.len(), 66);
 
     // Should match original key
-    assert_eq!(
-        hex,
-        bsv_rs::primitives::to_hex(&public_key.to_compressed())
-    );
+    assert_eq!(hex, bsv_rs::primitives::to_hex(&public_key.to_compressed()));
 }
 
 #[test]

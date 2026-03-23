@@ -545,10 +545,7 @@ fn test_storage_downloader_config_local() {
         resolver: None,
         timeout_ms: Some(5000),
     };
-    assert_eq!(
-        config.network_preset,
-        bsv_rs::overlay::NetworkPreset::Local
-    );
+    assert_eq!(config.network_preset, bsv_rs::overlay::NetworkPreset::Local);
 }
 
 #[test]

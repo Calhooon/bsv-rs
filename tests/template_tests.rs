@@ -181,8 +181,7 @@ fn test_template_unlock_estimate_length() {
 
     // RPuzzle should also estimate 108 bytes
     let k = BigNumber::from_i64(1);
-    let rpuzzle_unlock =
-        RPuzzle::unlock(&k, &private_key, bsv_rs::script::SignOutputs::All, false);
+    let rpuzzle_unlock = RPuzzle::unlock(&k, &private_key, bsv_rs::script::SignOutputs::All, false);
     assert_eq!(rpuzzle_unlock.estimate_length(), 108);
 }
 
