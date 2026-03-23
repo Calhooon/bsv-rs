@@ -1491,10 +1491,10 @@ mod transaction_tests {
     mod p2pkh_e2e_tests {
         use bsv_sdk::primitives::ec::PrivateKey;
         use bsv_sdk::script::templates::P2PKH;
-        use bsv_sdk::script::{LockingScript, ScriptTemplate, SignOutputs};
+        use bsv_sdk::script::{ScriptTemplate, SignOutputs};
         use bsv_sdk::transaction::{
-            AlwaysValidChainTracker, ChangeDistribution, FeeModel, SatoshisPerKilobyte,
-            Transaction, TransactionInput, TransactionOutput,
+            AlwaysValidChainTracker, ChangeDistribution, SatoshisPerKilobyte, Transaction,
+            TransactionOutput,
         };
 
         /// Build a P2PKH source transaction with a single output of the given amount,
@@ -1566,7 +1566,7 @@ mod transaction_tests {
                 "Change output should have satoshis after fee()"
             );
 
-            let change_sats = spend_tx.outputs[1].satoshis.unwrap();
+            let _change_sats = spend_tx.outputs[1].satoshis.unwrap();
             let total_out = spend_tx.total_output_satoshis();
             // change = 100,000 - 1,000 - fee; total_out = 1,000 + change
             // total_out + fee should equal 100,000
@@ -1668,7 +1668,7 @@ mod transaction_tests {
                 "verify() should succeed, got error: {:?}",
                 result.err()
             );
-            assert_eq!(result.unwrap(), true, "verify() should return true");
+            assert!(result.unwrap(), "verify() should return true");
         }
 
         /// Test verify() with fee model validation.
@@ -1712,7 +1712,7 @@ mod transaction_tests {
                 "verify with fee model should succeed: {:?}",
                 result.err()
             );
-            assert_eq!(result.unwrap(), true);
+            assert!(result.unwrap());
         }
 
         /// Test that verify() fails when the fee is too low.
@@ -1873,11 +1873,7 @@ mod transaction_tests {
             // Output overhead: 9 bytes (sats + varint)
             // Total overhead: 60 bytes
             let overhead = 60;
-            let script_padding = if target_bytes > overhead {
-                target_bytes - overhead
-            } else {
-                0
-            };
+            let script_padding = target_bytes.saturating_sub(overhead);
 
             // Split padding between input script and output script
             let input_script_len = script_padding / 2;
@@ -1981,19 +1977,19 @@ mod transaction_tests {
         #[test]
         fn test_fee_formula_boundaries() {
             // 1 byte at 1 sat/KB -> ceil(1/1000) = 1 sat (minimum)
-            let fee_1 = (1u64 * 1).div_ceil(1000);
+            let fee_1 = 1u64.div_ceil(1000);
             assert_eq!(fee_1, 1, "Minimum fee should be 1 sat");
 
             // 999 bytes at 1 sat/KB -> ceil(999/1000) = 1 sat
-            let fee_999 = (999u64 * 1).div_ceil(1000);
+            let fee_999 = 999u64.div_ceil(1000);
             assert_eq!(fee_999, 1, "999 bytes at 1 sat/KB should be 1 sat");
 
             // 1000 bytes at 1 sat/KB -> exactly 1 sat
-            let fee_1000 = (1000u64 * 1).div_ceil(1000);
+            let fee_1000 = 1000u64.div_ceil(1000);
             assert_eq!(fee_1000, 1, "1000 bytes at 1 sat/KB should be 1 sat");
 
             // 1001 bytes at 1 sat/KB -> ceil(1001/1000) = 2 sats
-            let fee_1001 = (1001u64 * 1).div_ceil(1000);
+            let fee_1001 = 1001u64.div_ceil(1000);
             assert_eq!(fee_1001, 2, "1001 bytes at 1 sat/KB should be 2 sats");
         }
     }

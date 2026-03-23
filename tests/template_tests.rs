@@ -447,8 +447,8 @@ fn test_multisig_2_of_3_end_to_end() {
     assert!(chunks[0].data.is_none());
 
     // Chunks 1 and 2: signatures
-    for i in 1..=2 {
-        let sig = chunks[i].data.as_ref().unwrap();
+    for chunk in &chunks[1..=2] {
+        let sig = chunk.data.as_ref().unwrap();
         assert!(sig.len() >= 70 && sig.len() <= 73);
     }
 }
@@ -549,7 +549,11 @@ fn test_multisig_estimate_length_scaling() {
     let key = PrivateKey::random();
 
     // 1-of-N: 1 + 1*74 = 75
-    let unlock1 = Multisig::unlock(&[key.clone()], bsv_sdk::script::SignOutputs::All, false);
+    let unlock1 = Multisig::unlock(
+        std::slice::from_ref(&key),
+        bsv_sdk::script::SignOutputs::All,
+        false,
+    );
     assert_eq!(unlock1.estimate_length(), 75);
 
     // 2-of-N: 1 + 2*74 = 149

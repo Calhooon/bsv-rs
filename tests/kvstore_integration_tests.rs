@@ -131,8 +131,8 @@ impl MockWallet {
         let bytes = counter.to_le_bytes();
         txid[0..4].copy_from_slice(&bytes);
         // Fill remaining bytes with a pattern for uniqueness
-        for i in 4..32 {
-            txid[i] = (counter as u8).wrapping_add(i as u8);
+        for (i, byte) in txid.iter_mut().enumerate().skip(4) {
+            *byte = (counter as u8).wrapping_add(i as u8);
         }
         txid
     }

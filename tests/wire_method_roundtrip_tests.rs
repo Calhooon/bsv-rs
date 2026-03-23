@@ -568,10 +568,10 @@ mod signature_tests {
             .await;
 
         // Should either return valid=false or an error
-        match verify_result {
-            Ok(res) => assert!(!res.valid),
-            Err(_) => {} // Error is also acceptable (invalid signature)
+        if let Ok(res) = verify_result {
+            assert!(!res.valid);
         }
+        // Error is also acceptable (invalid signature)
     }
 }
 
@@ -1714,7 +1714,7 @@ mod complex_type_roundtrips {
 
         assert_eq!(read.satoshis, 50000);
         assert_eq!(read.locking_script, output.locking_script);
-        assert_eq!(read.spendable, true);
+        assert!(read.spendable);
         assert_eq!(read.custom_instructions, output.custom_instructions);
         assert_eq!(read.tags, output.tags);
         assert_eq!(read.output_index, 1);
@@ -1763,7 +1763,7 @@ mod complex_type_roundtrips {
         assert_eq!(read.txid, action.txid);
         assert_eq!(read.satoshis, -50000);
         assert_eq!(read.status, ActionStatus::Completed);
-        assert_eq!(read.is_outgoing, true);
+        assert!(read.is_outgoing);
         assert_eq!(read.description, "payment to merchant");
         assert_eq!(
             read.labels,
@@ -1802,7 +1802,7 @@ mod complex_type_roundtrips {
         assert_eq!(read.txid, [0u8; 32]);
         assert_eq!(read.satoshis, 0);
         assert_eq!(read.status, ActionStatus::Unprocessed);
-        assert_eq!(read.is_outgoing, false);
+        assert!(!read.is_outgoing);
         assert_eq!(read.labels, None);
         assert_eq!(read.version, 2);
         assert_eq!(read.lock_time, 500000);
@@ -1868,7 +1868,7 @@ mod complex_type_roundtrips {
 
         assert_eq!(read.satoshis, 75000);
         assert_eq!(read.locking_script, output.locking_script);
-        assert_eq!(read.spendable, true);
+        assert!(read.spendable);
         assert_eq!(read.custom_instructions, output.custom_instructions);
         assert_eq!(read.tags, output.tags);
         assert_eq!(read.outpoint.txid, output.outpoint.txid);
@@ -1898,7 +1898,7 @@ mod complex_type_roundtrips {
         assert_eq!(read.satoshis, 0);
         assert_eq!(read.locking_script, None);
         // Go wire format has no spendable field; defaults to true on read
-        assert_eq!(read.spendable, true);
+        assert!(read.spendable);
         assert_eq!(read.custom_instructions, None);
         assert!(read.tags.is_none());
         assert!(read.labels.is_none());
@@ -2331,7 +2331,7 @@ mod response_roundtrips {
         let read2 = reader.read_wallet_action().unwrap();
         assert_eq!(read2.satoshis, -3000);
         assert_eq!(read2.status, ActionStatus::Sending);
-        assert_eq!(read2.is_outgoing, true);
+        assert!(read2.is_outgoing);
     }
 
     /// Tests ListOutputsResult response wire format roundtrip.
@@ -2370,7 +2370,7 @@ mod response_roundtrips {
 
         let read_output = reader.read_wallet_output().unwrap();
         assert_eq!(read_output.satoshis, 10000);
-        assert_eq!(read_output.spendable, true);
+        assert!(read_output.spendable);
         assert!(reader.is_empty());
     }
 }

@@ -1377,11 +1377,11 @@ async fn test_verifiable_certificate_selective_disclosure() {
         "Decrypted 'name' should be 'Alice'"
     );
     assert!(
-        decrypted.get("email").is_none(),
+        !decrypted.contains_key("email"),
         "'email' should not be decryptable"
     );
     assert!(
-        decrypted.get("department").is_none(),
+        !decrypted.contains_key("department"),
         "'department' should not be decryptable"
     );
 }
@@ -1557,11 +1557,11 @@ async fn test_full_issuance_to_verification_chain() {
     assert_eq!(verifier_decrypted["name"], "Alice");
     assert_eq!(verifier_decrypted["email"], "alice@example.com");
     assert!(
-        verifier_decrypted.get("clearance_level").is_none(),
+        !verifier_decrypted.contains_key("clearance_level"),
         "Verifier should not see clearance_level"
     );
     assert!(
-        verifier_decrypted.get("department").is_none(),
+        !verifier_decrypted.contains_key("department"),
         "Verifier should not see department"
     );
 
