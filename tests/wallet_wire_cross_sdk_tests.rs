@@ -25,8 +25,8 @@ fn load_vector(filename: &str) -> (Value, Vec<u8>) {
         env!("CARGO_MANIFEST_DIR"),
         filename
     );
-    let content = std::fs::read_to_string(&path)
-        .unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
+    let content =
+        std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("Failed to read {}: {}", path, e));
     let parsed: Value = serde_json::from_str(&content).unwrap();
     let wire_hex = parsed["wire"].as_str().unwrap();
     let wire_bytes = hex::decode(wire_hex).unwrap();
@@ -435,7 +435,9 @@ fn test_relinquish_output_args_cross_sdk() {
 
     let mut writer = WireWriter::new();
     writer.write_string(json["basket"].as_str().unwrap());
-    writer.write_outpoint_string(json["output"].as_str().unwrap()).unwrap();
+    writer
+        .write_outpoint_string(json["output"].as_str().unwrap())
+        .unwrap();
     assert_eq!(writer.as_bytes(), params);
 }
 
@@ -518,16 +520,32 @@ fn test_acquire_certificate_result_cross_sdk() {
 
     // Go certificate format: type(32) → serial(32) → subject(33) → certifier(33) → outpoint → fields → signature(remaining)
     let type_bytes = reader.read_bytes(32).unwrap();
-    assert_eq!(type_bytes, base64_decode(json["type"].as_str().unwrap()).as_slice());
+    assert_eq!(
+        type_bytes,
+        base64_decode(json["type"].as_str().unwrap()).as_slice()
+    );
 
     let serial = reader.read_bytes(32).unwrap();
-    assert_eq!(serial, base64_decode(json["serialNumber"].as_str().unwrap()).as_slice());
+    assert_eq!(
+        serial,
+        base64_decode(json["serialNumber"].as_str().unwrap()).as_slice()
+    );
 
     let subject = reader.read_bytes(33).unwrap();
-    assert_eq!(subject, hex::decode(json["subject"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        subject,
+        hex::decode(json["subject"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     let certifier = reader.read_bytes(33).unwrap();
-    assert_eq!(certifier, hex::decode(json["certifier"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        certifier,
+        hex::decode(json["certifier"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     let outpoint = reader.read_outpoint_string().unwrap();
     assert_eq!(outpoint, json["revocationOutpoint"].as_str().unwrap());
@@ -541,7 +559,12 @@ fn test_acquire_certificate_result_cross_sdk() {
 
     // signature (remaining raw bytes, NO length prefix)
     let sig = reader.read_remaining();
-    assert_eq!(sig, hex::decode(json["signature"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        sig,
+        hex::decode(json["signature"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 }
 
 // ============================================================================
@@ -569,16 +592,32 @@ fn test_list_certificates_full_result_cross_sdk() {
     let cert = &json["certificates"][0];
 
     let type_bytes = cert_reader.read_bytes(32).unwrap();
-    assert_eq!(type_bytes, base64_decode(cert["type"].as_str().unwrap()).as_slice());
+    assert_eq!(
+        type_bytes,
+        base64_decode(cert["type"].as_str().unwrap()).as_slice()
+    );
 
     let serial = cert_reader.read_bytes(32).unwrap();
-    assert_eq!(serial, base64_decode(cert["serialNumber"].as_str().unwrap()).as_slice());
+    assert_eq!(
+        serial,
+        base64_decode(cert["serialNumber"].as_str().unwrap()).as_slice()
+    );
 
     let subject = cert_reader.read_bytes(33).unwrap();
-    assert_eq!(subject, hex::decode(cert["subject"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        subject,
+        hex::decode(cert["subject"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     let certifier = cert_reader.read_bytes(33).unwrap();
-    assert_eq!(certifier, hex::decode(cert["certifier"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        certifier,
+        hex::decode(cert["certifier"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     let outpoint = cert_reader.read_outpoint_string().unwrap();
     assert_eq!(outpoint, cert["revocationOutpoint"].as_str().unwrap());
@@ -590,7 +629,12 @@ fn test_list_certificates_full_result_cross_sdk() {
     }
 
     let sig = cert_reader.read_remaining();
-    assert_eq!(sig, hex::decode(cert["signature"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        sig,
+        hex::decode(cert["signature"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // Keyring flag (1 = present)
     let keyring_flag = reader.read_i8().unwrap();
@@ -636,15 +680,30 @@ fn test_reveal_counterparty_key_linkage_result_cross_sdk() {
 
     // prover (33 bytes)
     let prover = reader.read_bytes(33).unwrap();
-    assert_eq!(prover, hex::decode(json["prover"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        prover,
+        hex::decode(json["prover"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // verifier (33 bytes)
     let verifier = reader.read_bytes(33).unwrap();
-    assert_eq!(verifier, hex::decode(json["verifier"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        verifier,
+        hex::decode(json["verifier"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // counterparty (33 bytes)
     let cp = reader.read_bytes(33).unwrap();
-    assert_eq!(cp, hex::decode(json["counterparty"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        cp,
+        hex::decode(json["counterparty"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // revelationTime (string)
     let time = reader.read_string().unwrap();
@@ -658,7 +717,10 @@ fn test_reveal_counterparty_key_linkage_result_cross_sdk() {
     // encryptedLinkageProof (varint-len + bytes)
     let proof_len = reader.read_var_int().unwrap() as usize;
     let proof = reader.read_bytes(proof_len).unwrap();
-    assert_eq!(proof, json_to_bytes(&json["encryptedLinkageProof"]).as_slice());
+    assert_eq!(
+        proof,
+        json_to_bytes(&json["encryptedLinkageProof"]).as_slice()
+    );
 }
 
 // ============================================================================
@@ -674,15 +736,30 @@ fn test_reveal_specific_key_linkage_result_cross_sdk() {
 
     // prover (33 bytes)
     let prover = reader.read_bytes(33).unwrap();
-    assert_eq!(prover, hex::decode(json["prover"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        prover,
+        hex::decode(json["prover"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // verifier (33 bytes)
     let verifier = reader.read_bytes(33).unwrap();
-    assert_eq!(verifier, hex::decode(json["verifier"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        verifier,
+        hex::decode(json["verifier"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // counterparty (33 bytes)
     let cp = reader.read_bytes(33).unwrap();
-    assert_eq!(cp, hex::decode(json["counterparty"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        cp,
+        hex::decode(json["counterparty"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // Protocol ID
     let level = reader.read_u8().unwrap();
@@ -702,7 +779,10 @@ fn test_reveal_specific_key_linkage_result_cross_sdk() {
     // encryptedLinkageProof
     let proof_len = reader.read_var_int().unwrap() as usize;
     let proof = reader.read_bytes(proof_len).unwrap();
-    assert_eq!(proof, json_to_bytes(&json["encryptedLinkageProof"]).as_slice());
+    assert_eq!(
+        proof,
+        json_to_bytes(&json["encryptedLinkageProof"]).as_slice()
+    );
 
     // proofType
     let proof_type = reader.read_u8().unwrap();
@@ -729,10 +809,19 @@ fn test_list_actions_result_cross_sdk() {
 
     assert_eq!(hex::encode(action.txid), expected["txid"].as_str().unwrap());
     assert_eq!(action.satoshis, expected["satoshis"].as_i64().unwrap());
-    assert_eq!(action.is_outgoing, expected["isOutgoing"].as_bool().unwrap());
-    assert_eq!(action.description, expected["description"].as_str().unwrap());
+    assert_eq!(
+        action.is_outgoing,
+        expected["isOutgoing"].as_bool().unwrap()
+    );
+    assert_eq!(
+        action.description,
+        expected["description"].as_str().unwrap()
+    );
     assert_eq!(action.version, expected["version"].as_u64().unwrap() as u32);
-    assert_eq!(action.lock_time, expected["lockTime"].as_u64().unwrap() as u32);
+    assert_eq!(
+        action.lock_time,
+        expected["lockTime"].as_u64().unwrap() as u32
+    );
 
     // Outputs
     assert!(action.outputs.is_some());
@@ -740,10 +829,22 @@ fn test_list_actions_result_cross_sdk() {
     assert_eq!(outputs.len(), 1);
     let output = &outputs[0];
     let expected_output = &expected["outputs"][0];
-    assert_eq!(output.satoshis, expected_output["satoshis"].as_u64().unwrap());
-    assert_eq!(output.spendable, expected_output["spendable"].as_bool().unwrap());
-    assert_eq!(output.output_index, expected_output["outputIndex"].as_u64().unwrap() as u32);
-    assert_eq!(output.output_description, expected_output["outputDescription"].as_str().unwrap());
+    assert_eq!(
+        output.satoshis,
+        expected_output["satoshis"].as_u64().unwrap()
+    );
+    assert_eq!(
+        output.spendable,
+        expected_output["spendable"].as_bool().unwrap()
+    );
+    assert_eq!(
+        output.output_index,
+        expected_output["outputIndex"].as_u64().unwrap() as u32
+    );
+    assert_eq!(
+        output.output_description,
+        expected_output["outputDescription"].as_str().unwrap()
+    );
     assert_eq!(output.basket, expected_output["basket"].as_str().unwrap());
 }
 
@@ -796,16 +897,32 @@ fn test_discover_by_attributes_result_cross_sdk() {
     // Parse certificate: Go order: type(32) → serial(32) → subject(33) → certifier(33) → outpoint → fields → signature(remaining)
     let mut cert_reader = WireReader::new(cert_bytes);
     let type_bytes = cert_reader.read_bytes(32).unwrap();
-    assert_eq!(type_bytes, base64_decode(cert["type"].as_str().unwrap()).as_slice());
+    assert_eq!(
+        type_bytes,
+        base64_decode(cert["type"].as_str().unwrap()).as_slice()
+    );
 
     let serial = cert_reader.read_bytes(32).unwrap();
-    assert_eq!(serial, base64_decode(cert["serialNumber"].as_str().unwrap()).as_slice());
+    assert_eq!(
+        serial,
+        base64_decode(cert["serialNumber"].as_str().unwrap()).as_slice()
+    );
 
     let subject = cert_reader.read_bytes(33).unwrap();
-    assert_eq!(subject, hex::decode(cert["subject"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        subject,
+        hex::decode(cert["subject"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     let certifier = cert_reader.read_bytes(33).unwrap();
-    assert_eq!(certifier, hex::decode(cert["certifier"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        certifier,
+        hex::decode(cert["certifier"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     let outpoint = cert_reader.read_outpoint_string().unwrap();
     assert_eq!(outpoint, cert["revocationOutpoint"].as_str().unwrap());
@@ -816,7 +933,12 @@ fn test_discover_by_attributes_result_cross_sdk() {
     }
 
     let sig = cert_reader.read_remaining();
-    assert_eq!(sig, hex::decode(cert["signature"].as_str().unwrap()).unwrap().as_slice());
+    assert_eq!(
+        sig,
+        hex::decode(cert["signature"].as_str().unwrap())
+            .unwrap()
+            .as_slice()
+    );
 
     // CertifierInfo
     let certifier_info = &cert["certifierInfo"];
@@ -827,7 +949,10 @@ fn test_discover_by_attributes_result_cross_sdk() {
     assert_eq!(icon_url.as_deref(), certifier_info["iconUrl"].as_str());
 
     let description = reader.read_optional_string().unwrap();
-    assert_eq!(description.as_deref(), certifier_info["description"].as_str());
+    assert_eq!(
+        description.as_deref(),
+        certifier_info["description"].as_str()
+    );
 
     let trust = reader.read_u8().unwrap();
     assert_eq!(trust, certifier_info["trust"].as_u64().unwrap() as u8);
@@ -878,9 +1003,9 @@ fn test_discover_by_identity_key_result_cross_sdk() {
 
 #[tokio::test]
 async fn test_process_go_get_height_request() {
+    use bsv_sdk::primitives::PrivateKey;
     use bsv_sdk::wallet::wire::WalletWireProcessor;
     use bsv_sdk::wallet::ProtoWallet;
-    use bsv_sdk::primitives::PrivateKey;
 
     let (_, wire) = load_vector("getHeight-simple-args.json");
 
@@ -900,9 +1025,9 @@ async fn test_process_go_get_height_request() {
 
 #[tokio::test]
 async fn test_process_go_is_authenticated_request() {
+    use bsv_sdk::primitives::PrivateKey;
     use bsv_sdk::wallet::wire::WalletWireProcessor;
     use bsv_sdk::wallet::ProtoWallet;
-    use bsv_sdk::primitives::PrivateKey;
 
     let (_, wire) = load_vector("isAuthenticated-simple-args.json");
 
@@ -917,9 +1042,9 @@ async fn test_process_go_is_authenticated_request() {
 
 #[tokio::test]
 async fn test_process_go_get_network_request() {
+    use bsv_sdk::primitives::PrivateKey;
     use bsv_sdk::wallet::wire::WalletWireProcessor;
     use bsv_sdk::wallet::ProtoWallet;
-    use bsv_sdk::primitives::PrivateKey;
 
     // getNetwork has no args file, but we can construct a minimal request
     // call_code=27, originator_len=0
@@ -935,9 +1060,9 @@ async fn test_process_go_get_network_request() {
 
 #[tokio::test]
 async fn test_process_go_get_version_request() {
+    use bsv_sdk::primitives::PrivateKey;
     use bsv_sdk::wallet::wire::WalletWireProcessor;
     use bsv_sdk::wallet::ProtoWallet;
-    use bsv_sdk::primitives::PrivateKey;
 
     let wire = vec![28u8, 0u8]; // getVersion, empty originator
 
@@ -953,9 +1078,9 @@ async fn test_process_go_get_version_request() {
 
 #[tokio::test]
 async fn test_process_go_get_public_key_request() {
+    use bsv_sdk::primitives::PrivateKey;
     use bsv_sdk::wallet::wire::WalletWireProcessor;
     use bsv_sdk::wallet::ProtoWallet;
-    use bsv_sdk::primitives::PrivateKey;
 
     let (_, wire) = load_vector("getPublicKey-simple-args.json");
 
@@ -966,14 +1091,17 @@ async fn test_process_go_get_public_key_request() {
     assert_eq!(response[0], 0x00, "getPublicKey should succeed");
     // Response should be 33-byte compressed public key
     assert_eq!(response.len(), 34); // error byte + 33 bytes
-    assert!(response[1] == 0x02 || response[1] == 0x03, "should be compressed pubkey prefix");
+    assert!(
+        response[1] == 0x02 || response[1] == 0x03,
+        "should be compressed pubkey prefix"
+    );
 }
 
 #[tokio::test]
 async fn test_process_go_get_header_for_height_request() {
+    use bsv_sdk::primitives::PrivateKey;
     use bsv_sdk::wallet::wire::WalletWireProcessor;
     use bsv_sdk::wallet::ProtoWallet;
-    use bsv_sdk::primitives::PrivateKey;
 
     let (_, wire) = load_vector("getHeaderForHeight-simple-args.json");
 

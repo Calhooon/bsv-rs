@@ -850,7 +850,7 @@ mod tests {
         assert_eq!(OP_DATA_75, 0x4b);
 
         // Verify they don't collide with PUSHDATA opcodes
-        assert!(OP_DATA_75 < OP_PUSHDATA1);
+        const { assert!(OP_DATA_75 < OP_PUSHDATA1) };
 
         // Name lookups work
         assert_eq!(name_to_opcode("OP_DATA_1"), Some(0x01));

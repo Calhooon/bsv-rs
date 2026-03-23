@@ -222,7 +222,7 @@ impl ScriptTemplate for Multisig {
     ///
     /// The `params` slice must be a multiple of 33 bytes (each key is 33 bytes compressed).
     fn lock(&self, params: &[u8]) -> Result<LockingScript> {
-        if params.is_empty() || params.len() % 33 != 0 {
+        if params.is_empty() || !params.len().is_multiple_of(33) {
             return Err(Error::CryptoError(
                 "Params must be concatenated 33-byte compressed public keys".to_string(),
             ));
@@ -279,8 +279,8 @@ mod tests {
         assert_eq!(chunks[0].op, OP_2);
 
         // Middle chunks: 33-byte pubkeys
-        for i in 1..=3 {
-            assert_eq!(chunks[i].data.as_ref().unwrap().len(), 33);
+        for chunk in chunks.iter().take(3 + 1).skip(1) {
+            assert_eq!(chunk.data.as_ref().unwrap().len(), 33);
         }
 
         // OP_3
@@ -342,8 +342,8 @@ mod tests {
         assert!(chunks[0].data.is_none());
 
         // Second and third chunks are signatures
-        for i in 1..=2 {
-            let sig = chunks[i].data.as_ref().unwrap();
+        for chunk in chunks.iter().take(2 + 1).skip(1) {
+            let sig = chunk.data.as_ref().unwrap();
             assert!(sig.len() >= 70 && sig.len() <= 73);
             assert_eq!(*sig.last().unwrap(), 0x41u8);
         }

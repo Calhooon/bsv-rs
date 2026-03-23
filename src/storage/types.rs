@@ -134,6 +134,7 @@ impl RenewFileResult {
 }
 
 /// Response from upload info endpoint.
+#[cfg(feature = "http")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct UploadInfo {
     /// Status of the request.

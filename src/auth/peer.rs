@@ -181,12 +181,9 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                         // caller gets the real error instead of a timeout.
                         let result: Result<(String, String)> = (|| {
                             // yourNonce is the client's session nonce (echoed back by server)
-                            let client_nonce =
-                                message.your_nonce.as_ref().ok_or_else(|| {
-                                    Error::AuthError(
-                                        "InitialResponse missing your_nonce".into(),
-                                    )
-                                })?;
+                            let client_nonce = message.your_nonce.as_ref().ok_or_else(|| {
+                                Error::AuthError("InitialResponse missing your_nonce".into())
+                            })?;
 
                             // The server's session nonce. Our own process_initial_request()
                             // sets both `nonce` and `initial_nonce`, but the TS SDK only sends
@@ -212,8 +209,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                                 // identity key secondary index in the session manager.
                                 let session_result = {
                                     let mut mgr = session_manager.write().await;
-                                    if let Some(existing) =
-                                        mgr.get_session(&client_nonce).cloned()
+                                    if let Some(existing) = mgr.get_session(&client_nonce).cloned()
                                     {
                                         let mut updated = existing;
                                         updated.peer_identity_key =

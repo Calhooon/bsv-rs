@@ -386,11 +386,8 @@ impl Beef {
         self.rebuild_index();
 
         // Clean up unused BUMPs and remap indices
-        let used_bump_indices: HashSet<usize> = self
-            .txs
-            .iter()
-            .filter_map(|tx| tx.bump_index())
-            .collect();
+        let used_bump_indices: HashSet<usize> =
+            self.txs.iter().filter_map(|tx| tx.bump_index()).collect();
 
         if used_bump_indices.len() < self.bumps.len() {
             let mut new_bumps = Vec::new();
@@ -926,7 +923,8 @@ mod tests {
         let tx_a_raw = vec![
             0x01, 0x00, 0x00, 0x00, // version
             0x01, // input count
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // prev txid (all zeros = coinbase)
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, // prev txid (all zeros = coinbase)
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff,
             0x00, // script length
@@ -951,7 +949,7 @@ mod tests {
         // TX_B: spends TX_A (input references tx_a_id)
         let tx_a_id_bytes = from_hex(&tx_a_id).unwrap();
         let mut tx_b_raw = vec![0x01, 0x00, 0x00, 0x00, 0x01]; // version + 1 input
-        // prev txid (reversed tx_a_id)
+                                                               // prev txid (reversed tx_a_id)
         let mut prev_txid = tx_a_id_bytes.clone();
         prev_txid.reverse();
         tx_b_raw.extend_from_slice(&prev_txid);

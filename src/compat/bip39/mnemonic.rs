@@ -904,7 +904,7 @@ mod tests {
         let wordlist = &wordlists::JAPANESE;
         for word in &words {
             assert!(
-                wordlist.iter().any(|&w| w == *word),
+                wordlist.contains(word),
                 "Word '{}' not found in Japanese wordlist",
                 word
             );

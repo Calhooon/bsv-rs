@@ -629,19 +629,11 @@ impl WalletInterface for HttpWalletJson {
         self.get_public_key(args, originator).await
     }
 
-    async fn encrypt(
-        &self,
-        args: EncryptArgs,
-        originator: &str,
-    ) -> crate::Result<EncryptResult> {
+    async fn encrypt(&self, args: EncryptArgs, originator: &str) -> crate::Result<EncryptResult> {
         self.encrypt(args, originator).await
     }
 
-    async fn decrypt(
-        &self,
-        args: DecryptArgs,
-        originator: &str,
-    ) -> crate::Result<DecryptResult> {
+    async fn decrypt(&self, args: DecryptArgs, originator: &str) -> crate::Result<DecryptResult> {
         self.decrypt(args, originator).await
     }
 
@@ -989,9 +981,9 @@ struct JsonRevealCounterpartyRequest {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct JsonRevealSpecificRequest {
-    counterparty: String,           // "self", "anyone", or hex pubkey
-    verifier: String,               // hex pubkey
-    protocol_id: (u8, String),      // (security_level, protocol_name)
+    counterparty: String,      // "self", "anyone", or hex pubkey
+    verifier: String,          // hex pubkey
+    protocol_id: (u8, String), // (security_level, protocol_name)
     key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     privileged: Option<bool>,

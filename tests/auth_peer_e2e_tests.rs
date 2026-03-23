@@ -1111,10 +1111,7 @@ async fn test_ts_style_server_no_nonce_field() {
         .create_signature(CreateSignatureArgs {
             data: Some(signing_data),
             hash_to_directly_sign: None,
-            protocol_id: Protocol::new(
-                SecurityLevel::Counterparty,
-                "auth message signature",
-            ),
+            protocol_id: Protocol::new(SecurityLevel::Counterparty, "auth message signature"),
             key_id,
             counterparty: Some(Counterparty::Other(alice_key.public_key())),
         })
@@ -1138,10 +1135,7 @@ async fn test_ts_style_server_no_nonce_field() {
         session.err()
     );
     let session = session.unwrap();
-    assert!(
-        session.is_authenticated,
-        "Session should be authenticated"
-    );
+    assert!(session.is_authenticated, "Session should be authenticated");
     assert_eq!(
         session.peer_identity_key.unwrap().to_hex(),
         bob_key.public_key().to_hex(),

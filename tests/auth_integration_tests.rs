@@ -2152,7 +2152,10 @@ fn test_initial_response_json_deserialization_ts_format() {
 
     let msg: AuthMessage = serde_json::from_value(json).unwrap();
     assert_eq!(msg.message_type, MessageType::InitialResponse);
-    assert!(msg.nonce.is_none(), "TS-style response should have no nonce");
+    assert!(
+        msg.nonce.is_none(),
+        "TS-style response should have no nonce"
+    );
     assert!(msg.initial_nonce.is_some(), "Should have initialNonce");
     assert!(msg.your_nonce.is_some(), "Should have yourNonce");
     assert!(msg.validate().is_ok(), "Should pass validation");
@@ -2261,7 +2264,10 @@ fn test_initial_response_missing_both_nonces_fails_validation() {
     msg.signature = Some(vec![0x30, 0x44]);
 
     let result = msg.validate();
-    assert!(result.is_err(), "Should fail when both nonce and initial_nonce are missing");
+    assert!(
+        result.is_err(),
+        "Should fail when both nonce and initial_nonce are missing"
+    );
     let err_msg = result.unwrap_err().to_string();
     assert!(
         err_msg.contains("nonce or initial_nonce"),
