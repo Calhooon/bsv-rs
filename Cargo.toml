@@ -9,6 +9,10 @@ homepage = "https://github.com/Calhooon/bsv-rs"
 keywords = ["bitcoin", "bsv", "blockchain", "cryptocurrency", "sdk"]
 categories = ["cryptography", "encoding", "parser-implementations"]
 
+[lib]
+name = "bsv_sdk"
+path = "src/lib.rs"
+
 [dependencies]
 # Hashing
 sha2 = "0.10"
