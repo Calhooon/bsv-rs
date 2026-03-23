@@ -17,6 +17,15 @@ Thumbs.db
 *.pdb
 .claude-docs-logs/
 
+# Secrets / credentials
+*.env
+*.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.*
+
 # Fuzzing
 fuzz/target/
 fuzz/Cargo.lock

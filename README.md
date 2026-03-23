@@ -35,7 +35,7 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-bsv-rs = "0.2"
+bsv-rs = "0.3"
 ```
 
 Or with specific features:
@@ -49,7 +49,7 @@ bsv-rs = { version = "0.2", features = ["full"] }
 bsv-rs = { version = "0.2", features = ["full", "http"] }
 
 # Just primitives and script (default)
-bsv-rs = "0.2"
+bsv-rs = "0.3"
 
 # Common combinations
 bsv-rs = { version = "0.2", features = ["wallet"] }           # Keys, transactions, signing
