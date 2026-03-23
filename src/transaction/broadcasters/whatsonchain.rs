@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{Broadcaster, WhatsOnChainBroadcaster, WocBroadcastNetwork};
+//! use bsv_rs::transaction::{Broadcaster, WhatsOnChainBroadcaster, WocBroadcastNetwork};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -99,7 +99,7 @@ impl Default for WocBroadcastConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{WhatsOnChainBroadcaster, Broadcaster};
+/// use bsv_rs::transaction::{WhatsOnChainBroadcaster, Broadcaster};
 ///
 /// // Create mainnet broadcaster
 /// let broadcaster = WhatsOnChainBroadcaster::mainnet();

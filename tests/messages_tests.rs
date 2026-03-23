@@ -5,9 +5,9 @@
 
 #![cfg(feature = "messages")]
 
-use bsv_sdk::messages::{decrypt, encrypt, sign, verify, ENCRYPTED_VERSION, SIGNED_VERSION};
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::Error;
+use bsv_rs::messages::{decrypt, encrypt, sign, verify, ENCRYPTED_VERSION, SIGNED_VERSION};
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::Error;
 
 // =================
 // Helper Functions

@@ -23,8 +23,8 @@
 //! ### LocalKVStore (Private)
 //!
 //! ```rust,ignore
-//! use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
-//! use bsv_sdk::wallet::ProtoWallet;
+//! use bsv_rs::kvstore::{LocalKVStore, KVStoreConfig};
+//! use bsv_rs::wallet::ProtoWallet;
 //!
 //! // Create a local store with default configuration
 //! let wallet = ProtoWallet::new(None);
@@ -49,8 +49,8 @@
 //! ### GlobalKVStore (Public)
 //!
 //! ```rust,ignore
-//! use bsv_sdk::kvstore::{GlobalKVStore, KVStoreConfig, KVStoreQuery};
-//! use bsv_sdk::wallet::ProtoWallet;
+//! use bsv_rs::kvstore::{GlobalKVStore, KVStoreConfig, KVStoreQuery};
+//! use bsv_rs::wallet::ProtoWallet;
 //!
 //! // Create a global store
 //! let wallet = ProtoWallet::new(None);

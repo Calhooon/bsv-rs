@@ -79,7 +79,7 @@ Creates a cryptographic nonce for authentication sessions.
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::create_nonce;
+use bsv_rs::auth::utils::create_nonce;
 
 let nonce = create_nonce(&wallet, Some(&peer_key), "myapp.com").await?;
 // Returns something like: "Y3J5cHRvZ3JhcGhpY2FsbHlfc2VjdXJlX25vbmNl..."
@@ -110,7 +110,7 @@ Verifies that a nonce was created by the expected party.
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::verify_nonce;
+use bsv_rs::auth::utils::verify_nonce;
 
 let is_valid = verify_nonce(&peer_nonce, &wallet, Some(&peer_key), "myapp.com").await?;
 if !is_valid {
@@ -130,7 +130,7 @@ Quick format check without cryptographic verification. Validates:
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::validate_nonce_format;
+use bsv_rs::auth::utils::validate_nonce_format;
 
 // Fast check before expensive verification
 validate_nonce_format(&incoming_nonce)?;
@@ -146,7 +146,7 @@ Extracts the 16-byte random portion from a nonce. Useful for using the nonce as 
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::get_nonce_random;
+use bsv_rs::auth::utils::get_nonce_random;
 
 let random_bytes = get_nonce_random(&session_nonce)?;
 let session_id = hex::encode(&random_bytes);
@@ -199,7 +199,7 @@ Validates all certificates in an authentication message.
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::validate_certificates;
+use bsv_rs::auth::utils::validate_certificates;
 
 validate_certificates(
     &my_wallet,
@@ -225,7 +225,7 @@ Validates a single certificate. Called by `validate_certificates` for each certi
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::validate_certificate;
+use bsv_rs::auth::utils::validate_certificate;
 
 for cert in &message.certificates.unwrap_or_default() {
     validate_certificate(
@@ -265,8 +265,8 @@ Retrieves certificates from wallet matching a request and creates verifiable ver
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::get_verifiable_certificates;
-use bsv_sdk::auth::RequestedCertificateSet;
+use bsv_rs::auth::utils::get_verifiable_certificates;
+use bsv_rs::auth::RequestedCertificateSet;
 
 let mut requested = RequestedCertificateSet::new();
 requested.add_certifier(certifier_hex);
@@ -300,7 +300,7 @@ Quick check if certificates satisfy a request without cryptographic verification
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::certificates_match_request;
+use bsv_rs::auth::utils::certificates_match_request;
 
 if !certificates_match_request(&peer_certs, &my_requirements) {
     return Err(Error::AuthError("Certificates don't meet requirements".into()));
@@ -331,7 +331,7 @@ Validates the structural encoding of a certificate without cryptographic verific
 
 **Example:**
 ```rust
-use bsv_sdk::auth::utils::validate_certificate_encoding;
+use bsv_rs::auth::utils::validate_certificate_encoding;
 
 let cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier);
 validate_certificate_encoding(&cert)?;
@@ -358,7 +358,7 @@ Validates that a `RequestedCertificateSet` is well-formed. Analogous to the Type
 
 **Example:**
 ```rust
-use bsv_sdk::auth::{RequestedCertificateSet, utils::validate_requested_certificate_set};
+use bsv_rs::auth::{RequestedCertificateSet, utils::validate_requested_certificate_set};
 
 let mut req = RequestedCertificateSet::new();
 req.add_certifier("02abc...".to_string());
@@ -372,7 +372,7 @@ validate_requested_certificate_set(&req)?;
 ### Session Nonce Flow
 
 ```rust
-use bsv_sdk::auth::utils::{create_nonce, verify_nonce};
+use bsv_rs::auth::utils::{create_nonce, verify_nonce};
 
 // Initiator creates nonce
 let my_nonce = create_nonce(&wallet, None, "myapp.com").await?;
@@ -389,8 +389,8 @@ let peer_nonce = create_nonce(&wallet, Some(&initiator_key), "myapp.com").await?
 ### Certificate Validation Flow
 
 ```rust
-use bsv_sdk::auth::utils::{certificates_match_request, validate_certificates};
-use bsv_sdk::auth::RequestedCertificateSet;
+use bsv_rs::auth::utils::{certificates_match_request, validate_certificates};
+use bsv_rs::auth::RequestedCertificateSet;
 
 // Define what certificates we need
 let mut required = RequestedCertificateSet::new();
@@ -412,7 +412,7 @@ validate_certificates(&wallet, &message, Some(&required), "myapp.com").await?;
 ### Retrieving Certificates for Peer
 
 ```rust
-use bsv_sdk::auth::utils::get_verifiable_certificates;
+use bsv_rs::auth::utils::get_verifiable_certificates;
 
 // When peer requests certificates
 let certs = get_verifiable_certificates(

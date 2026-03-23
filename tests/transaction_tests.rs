@@ -16,8 +16,8 @@ mod transaction_tests {
         bigtx::*, bump_invalid::*, bump_valid::*, tx_invalid::*, tx_valid::*,
     };
     use async_trait::async_trait;
-    use bsv_sdk::script::LockingScript;
-    use bsv_sdk::transaction::{
+    use bsv_rs::script::LockingScript;
+    use bsv_rs::transaction::{
         AlwaysValidChainTracker, Beef, BroadcastFailure, BroadcastResponse, BroadcastResult,
         BroadcastStatus, Broadcaster, ChainTracker, FeeModel, FixedFee, MerklePath,
         MockChainTracker, SatoshisPerKilobyte, Transaction, TransactionInput, TransactionOutput,
@@ -521,7 +521,7 @@ mod transaction_tests {
 
     mod beef_extended_tests {
         use super::*;
-        use bsv_sdk::transaction::{BEEF_V1, BEEF_V2};
+        use bsv_rs::transaction::{BEEF_V1, BEEF_V2};
 
         fn create_test_transaction(n: u32) -> Transaction {
             let mut tx = Transaction::new();
@@ -823,7 +823,7 @@ mod transaction_tests {
 
     mod beef_ancestry_tests {
         use super::*;
-        use bsv_sdk::transaction::{Beef, MerklePath};
+        use bsv_rs::transaction::{Beef, MerklePath};
 
         /// Creates a test transaction with a unique version number
         fn create_test_tx(version: u32) -> Transaction {
@@ -1361,7 +1361,7 @@ mod transaction_tests {
     mod cross_sdk_tests {
         #[allow(unused_imports)]
         use crate::transaction::vectors::beef_cross_sdk::*;
-        use bsv_sdk::transaction::{Beef, MerklePath, BEEF_V1, BEEF_V2};
+        use bsv_rs::transaction::{Beef, MerklePath, BEEF_V1, BEEF_V2};
 
         #[test]
         fn test_brc74_merkle_path_from_hex() {
@@ -1489,10 +1489,10 @@ mod transaction_tests {
     // ===================
 
     mod p2pkh_e2e_tests {
-        use bsv_sdk::primitives::ec::PrivateKey;
-        use bsv_sdk::script::templates::P2PKH;
-        use bsv_sdk::script::{ScriptTemplate, SignOutputs};
-        use bsv_sdk::transaction::{
+        use bsv_rs::primitives::ec::PrivateKey;
+        use bsv_rs::script::templates::P2PKH;
+        use bsv_rs::script::{ScriptTemplate, SignOutputs};
+        use bsv_rs::transaction::{
             AlwaysValidChainTracker, ChangeDistribution, SatoshisPerKilobyte, Transaction,
             TransactionOutput,
         };
@@ -1675,7 +1675,7 @@ mod transaction_tests {
         /// The source tx needs a merkle_path so verify() doesn't try to check its fee.
         #[tokio::test]
         async fn test_p2pkh_verify_with_fee_model() {
-            use bsv_sdk::transaction::MerklePath;
+            use bsv_rs::transaction::MerklePath;
 
             let private_key = PrivateKey::from_hex(
                 "0000000000000000000000000000000000000000000000000000000000000001",
@@ -1718,7 +1718,7 @@ mod transaction_tests {
         /// Test that verify() fails when the fee is too low.
         #[tokio::test]
         async fn test_p2pkh_verify_fee_too_low() {
-            use bsv_sdk::transaction::MerklePath;
+            use bsv_rs::transaction::MerklePath;
 
             let private_key = PrivateKey::from_hex(
                 "0000000000000000000000000000000000000000000000000000000000000001",
@@ -1852,8 +1852,8 @@ mod transaction_tests {
     // ===================
 
     mod fee_model_realistic_tests {
-        use bsv_sdk::script::LockingScript;
-        use bsv_sdk::transaction::{
+        use bsv_rs::script::LockingScript;
+        use bsv_rs::transaction::{
             FeeModel, SatoshisPerKilobyte, Transaction, TransactionInput, TransactionOutput,
         };
 
@@ -1882,8 +1882,8 @@ mod transaction_tests {
             // Create input with padded unlocking script
             let input_script_data = vec![0u8; input_script_len];
             let unlocking_script =
-                bsv_sdk::script::UnlockingScript::from_binary(&input_script_data)
-                    .unwrap_or_else(|_| bsv_sdk::script::UnlockingScript::new());
+                bsv_rs::script::UnlockingScript::from_binary(&input_script_data)
+                    .unwrap_or_else(|_| bsv_rs::script::UnlockingScript::new());
 
             let mut input = TransactionInput::new("a".repeat(64), 0);
             input.unlocking_script = Some(unlocking_script);
@@ -1999,10 +1999,10 @@ mod transaction_tests {
     // ===================
 
     mod fee_change_tests {
-        use bsv_sdk::primitives::ec::PrivateKey;
-        use bsv_sdk::script::templates::P2PKH;
-        use bsv_sdk::script::{ScriptTemplate, SignOutputs};
-        use bsv_sdk::transaction::{ChangeDistribution, Transaction, TransactionOutput};
+        use bsv_rs::primitives::ec::PrivateKey;
+        use bsv_rs::script::templates::P2PKH;
+        use bsv_rs::script::{ScriptTemplate, SignOutputs};
+        use bsv_rs::transaction::{ChangeDistribution, Transaction, TransactionOutput};
 
         #[tokio::test]
         async fn test_fee_with_change_computation() {
@@ -2126,8 +2126,8 @@ mod transaction_tests {
     // ===================
 
     mod sign_error_tests {
-        use bsv_sdk::script::LockingScript;
-        use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+        use bsv_rs::script::LockingScript;
+        use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 
         /// Test: create tx with input lacking unlocking_script_template, call sign(), assert error.
         #[tokio::test]
@@ -2161,7 +2161,7 @@ mod transaction_tests {
         /// Test: fee model errors when input has no template and no unlocking script
         #[test]
         fn test_fee_model_error_when_template_missing() {
-            use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte};
+            use bsv_rs::transaction::{FeeModel, SatoshisPerKilobyte};
 
             let mut tx = Transaction::new();
             let input = TransactionInput::new("a".repeat(64), 0);
@@ -2186,7 +2186,7 @@ mod transaction_tests {
 
     mod merkle_path_advanced_tests {
         use crate::transaction::vectors::beef_cross_sdk::*;
-        use bsv_sdk::transaction::{ChainTracker, MerklePath, MockChainTracker};
+        use bsv_rs::transaction::{ChainTracker, MerklePath, MockChainTracker};
 
         /// Tests MerklePath verification using ChainTracker.
         /// This manually computes the root and compares with tracker.
@@ -2305,10 +2305,10 @@ mod transaction_tests {
     // ===================
 
     mod change_distribution_tests {
-        use bsv_sdk::primitives::ec::PrivateKey;
-        use bsv_sdk::script::templates::P2PKH;
-        use bsv_sdk::script::{ScriptTemplate, SignOutputs};
-        use bsv_sdk::transaction::{ChangeDistribution, Transaction, TransactionOutput};
+        use bsv_rs::primitives::ec::PrivateKey;
+        use bsv_rs::script::templates::P2PKH;
+        use bsv_rs::script::{ScriptTemplate, SignOutputs};
+        use bsv_rs::transaction::{ChangeDistribution, Transaction, TransactionOutput};
 
         /// Build a source transaction with a single P2PKH output of the given amount.
         fn build_source_tx(private_key: &PrivateKey, satoshis: u64) -> Transaction {
@@ -2425,7 +2425,7 @@ mod transaction_tests {
     // ===================
 
     mod ef_format_tests {
-        use bsv_sdk::transaction::Beef;
+        use bsv_rs::transaction::Beef;
 
         /// Go SDK TestEF exact vector: parse BEEF hex -> link source txs -> serialize to EF hex -> compare.
         /// Input: BRC62Hex (Go SDK constant, also in beef_cross_sdk.rs).
@@ -2478,10 +2478,10 @@ mod transaction_tests {
     // ===================
 
     mod sign_no_template_tests {
-        use bsv_sdk::primitives::ec::PrivateKey;
-        use bsv_sdk::script::templates::P2PKH;
-        use bsv_sdk::script::{LockingScript, ScriptTemplate, SignOutputs};
-        use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+        use bsv_rs::primitives::ec::PrivateKey;
+        use bsv_rs::script::templates::P2PKH;
+        use bsv_rs::script::{LockingScript, ScriptTemplate, SignOutputs};
+        use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 
         /// Test that sign() on a transaction where one input has no template
         /// leaves that input without an unlocking script, while inputs WITH

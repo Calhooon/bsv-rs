@@ -9,7 +9,7 @@
 //! This allows reputation data to survive application restarts.
 //!
 //! ```rust,ignore
-//! use bsv_sdk::overlay::host_reputation_tracker::{HostReputationTracker, ReputationStorage};
+//! use bsv_rs::overlay::host_reputation_tracker::{HostReputationTracker, ReputationStorage};
 //!
 //! // Custom storage implementation
 //! struct MyStorage { /* ... */ }
@@ -456,7 +456,7 @@ impl HostReputationTracker {
     /// older messages are dropped (lagged).
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::overlay::host_reputation_tracker::{HostReputationTracker, RankChangeEvent};
+    /// use bsv_rs::overlay::host_reputation_tracker::{HostReputationTracker, RankChangeEvent};
     ///
     /// let tracker = HostReputationTracker::new();
     /// let mut rx = tracker.subscribe();
@@ -481,7 +481,7 @@ impl HostReputationTracker {
     /// Returns a `tokio::task::JoinHandle` that can be used to abort the listener.
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::overlay::host_reputation_tracker::HostReputationTracker;
+    /// use bsv_rs::overlay::host_reputation_tracker::HostReputationTracker;
     ///
     /// let tracker = HostReputationTracker::new();
     /// let handle = tracker.on_rank_change(|event| {

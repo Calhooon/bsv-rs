@@ -20,9 +20,9 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::P2PK;
-//! use bsv_sdk::script::template::{ScriptTemplate, SignOutputs};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::P2PK;
+//! use bsv_rs::script::template::{ScriptTemplate, SignOutputs};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::random();
 //! let pubkey = private_key.public_key().to_compressed();

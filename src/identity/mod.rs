@@ -34,8 +34,8 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::identity::{IdentityClient, IdentityClientConfig};
-//! use bsv_sdk::wallet::ProtoWallet;
+//! use bsv_rs::identity::{IdentityClient, IdentityClientConfig};
+//! use bsv_rs::wallet::ProtoWallet;
 //!
 //! // Create client
 //! let wallet = ProtoWallet::new(None);

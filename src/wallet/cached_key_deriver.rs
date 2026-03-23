@@ -20,8 +20,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::wallet::{CachedKeyDeriver, Protocol, SecurityLevel, Counterparty, CacheConfig, KeyDeriverApi};
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::wallet::{CachedKeyDeriver, Protocol, SecurityLevel, Counterparty, CacheConfig, KeyDeriverApi};
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create with default cache size (1000)
 //! let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), None);
@@ -156,8 +156,8 @@ impl CachedKeyDeriver {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::wallet::{CachedKeyDeriver, CacheConfig};
-    /// use bsv_sdk::primitives::PrivateKey;
+    /// use bsv_rs::wallet::{CachedKeyDeriver, CacheConfig};
+    /// use bsv_rs::primitives::PrivateKey;
     ///
     /// // Default cache size
     /// let deriver = CachedKeyDeriver::new(Some(PrivateKey::random()), None);

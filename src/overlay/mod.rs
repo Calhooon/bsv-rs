@@ -19,7 +19,7 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::overlay::{LookupResolver, TopicBroadcaster, LookupQuestion};
+//! use bsv_rs::overlay::{LookupResolver, TopicBroadcaster, LookupQuestion};
 //!
 //! // Query a lookup service
 //! let resolver = LookupResolver::default();

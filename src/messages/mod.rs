@@ -11,8 +11,8 @@
 //! ### Signed Messages (BRC-77)
 //!
 //! ```rust
-//! use bsv_sdk::primitives::PrivateKey;
-//! use bsv_sdk::messages::{sign, verify};
+//! use bsv_rs::primitives::PrivateKey;
+//! use bsv_rs::messages::{sign, verify};
 //!
 //! let sender = PrivateKey::random();
 //! let recipient = PrivateKey::random();
@@ -34,8 +34,8 @@
 //! ### Encrypted Messages (BRC-78)
 //!
 //! ```rust
-//! use bsv_sdk::primitives::PrivateKey;
-//! use bsv_sdk::messages::{encrypt, decrypt};
+//! use bsv_rs::primitives::PrivateKey;
+//! use bsv_rs::messages::{encrypt, decrypt};
 //!
 //! let sender = PrivateKey::random();
 //! let recipient = PrivateKey::random();

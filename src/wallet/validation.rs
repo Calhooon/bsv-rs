@@ -16,7 +16,7 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::wallet::validation::{validate_satoshis, validate_hex_string, validate_basket};
+//! use bsv_rs::wallet::validation::{validate_satoshis, validate_hex_string, validate_basket};
 //!
 //! // Validate satoshi amount
 //! let sats = validate_satoshis(50000, "outputValue", Some(546)).unwrap();

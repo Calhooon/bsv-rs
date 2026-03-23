@@ -5,12 +5,12 @@
 
 #![cfg(feature = "auth")]
 
-use bsv_sdk::auth::transports::{HttpRequest, HttpResponse, MockTransport, Transport};
-use bsv_sdk::auth::{
+use bsv_rs::auth::transports::{HttpRequest, HttpResponse, MockTransport, Transport};
+use bsv_rs::auth::{
     AuthMessage, Certificate, MessageType, PeerSession, RequestedCertificateSet, SessionManager,
     VerifiableCertificate,
 };
-use bsv_sdk::primitives::PrivateKey;
+use bsv_rs::primitives::PrivateKey;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -159,8 +159,8 @@ fn test_auth_message_signing_data() {
 
     // InitialResponse signing data is yourNonce || initialNonce (initiator || responder)
     let mut msg = AuthMessage::new(MessageType::InitialResponse, key.clone());
-    msg.your_nonce = Some(bsv_sdk::primitives::to_base64(&[1, 2, 3, 4])); // initiator's nonce
-    msg.initial_nonce = Some(bsv_sdk::primitives::to_base64(&[5, 6, 7, 8])); // responder's nonce
+    msg.your_nonce = Some(bsv_rs::primitives::to_base64(&[1, 2, 3, 4])); // initiator's nonce
+    msg.initial_nonce = Some(bsv_rs::primitives::to_base64(&[5, 6, 7, 8])); // responder's nonce
 
     let signing_data = msg.signing_data();
     assert_eq!(signing_data, vec![1, 2, 3, 4, 5, 6, 7, 8]);
@@ -453,7 +453,7 @@ fn test_requested_certificate_set_matching() {
     assert!(!req.is_certifier_trusted("wrong-certifier"));
 
     // Add specific type with fields
-    let type_id = bsv_sdk::primitives::to_base64(&[1u8; 32]);
+    let type_id = bsv_rs::primitives::to_base64(&[1u8; 32]);
     req.add_type(&type_id, vec!["name".to_string(), "email".to_string()]);
 
     assert!(req.is_type_requested(&type_id));
@@ -852,8 +852,8 @@ fn test_certificate_with_invalid_der_signature_fails() {
 
 #[tokio::test]
 async fn test_nonce_create_verify_roundtrip() {
-    use bsv_sdk::auth::{create_nonce, verify_nonce};
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::{create_nonce, verify_nonce};
+    use bsv_rs::wallet::ProtoWallet;
 
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 
@@ -875,8 +875,8 @@ async fn test_nonce_create_verify_roundtrip() {
 
 #[tokio::test]
 async fn test_nonce_uniqueness() {
-    use bsv_sdk::auth::create_nonce;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::create_nonce;
+    use bsv_rs::wallet::ProtoWallet;
 
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 
@@ -891,8 +891,8 @@ async fn test_nonce_uniqueness() {
 
 #[tokio::test]
 async fn test_nonce_verify_fails_with_wrong_counterparty() {
-    use bsv_sdk::auth::{create_nonce, verify_nonce};
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::{create_nonce, verify_nonce};
+    use bsv_rs::wallet::ProtoWallet;
 
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
     let other_key = PrivateKey::random().public_key();
@@ -912,8 +912,8 @@ async fn test_nonce_verify_fails_with_wrong_counterparty() {
 
 #[tokio::test]
 async fn test_nonce_verify_fails_with_different_wallet() {
-    use bsv_sdk::auth::{create_nonce, verify_nonce};
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::{create_nonce, verify_nonce};
+    use bsv_rs::wallet::ProtoWallet;
 
     let wallet1 = ProtoWallet::new(Some(PrivateKey::random()));
     let wallet2 = ProtoWallet::new(Some(PrivateKey::random()));
@@ -930,8 +930,8 @@ async fn test_nonce_verify_fails_with_different_wallet() {
 
 #[tokio::test]
 async fn test_nonce_with_specific_counterparty_roundtrip() {
-    use bsv_sdk::auth::{create_nonce, verify_nonce};
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::{create_nonce, verify_nonce};
+    use bsv_rs::wallet::ProtoWallet;
 
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
     let counterparty_key = PrivateKey::random().public_key();
@@ -960,13 +960,13 @@ async fn test_nonce_with_specific_counterparty_roundtrip() {
 
 #[tokio::test]
 async fn test_nonce_verify_invalid_format() {
-    use bsv_sdk::auth::verify_nonce;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::verify_nonce;
+    use bsv_rs::wallet::ProtoWallet;
 
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 
     // Verify a too-short nonce should return an error
-    let short_nonce = bsv_sdk::primitives::to_base64(&[0u8; 16]);
+    let short_nonce = bsv_rs::primitives::to_base64(&[0u8; 16]);
     let result = verify_nonce(&short_nonce, &wallet, None, "test-app").await;
     assert!(
         result.is_err(),
@@ -980,8 +980,8 @@ async fn test_nonce_verify_invalid_format() {
 
 #[tokio::test]
 async fn test_master_certificate_issue_for_subject() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1073,8 +1073,8 @@ async fn test_master_certificate_issue_for_subject() {
 
 #[tokio::test]
 async fn test_master_certificate_decrypt_fields() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1124,8 +1124,8 @@ async fn test_master_certificate_decrypt_fields() {
 
 #[tokio::test]
 async fn test_master_certificate_decrypt_single_field() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1177,8 +1177,8 @@ async fn test_master_certificate_decrypt_single_field() {
 
 #[tokio::test]
 async fn test_master_certificate_create_keyring_for_verifier() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1243,8 +1243,8 @@ async fn test_master_certificate_create_keyring_for_verifier() {
 
 #[tokio::test]
 async fn test_verifiable_certificate_full_chain() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1320,8 +1320,8 @@ async fn test_verifiable_certificate_full_chain() {
 
 #[tokio::test]
 async fn test_verifiable_certificate_selective_disclosure() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1392,8 +1392,8 @@ async fn test_verifiable_certificate_selective_disclosure() {
 
 #[tokio::test]
 async fn test_verifiable_certificate_wrong_key_decryption_fails() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1453,8 +1453,8 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
 
 #[tokio::test]
 async fn test_full_issuance_to_verification_chain() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1596,7 +1596,7 @@ fn test_wallet_certificate_conversion_roundtrip() {
         .insert("name".to_string(), b"encrypted_name".to_vec());
     cert.fields
         .insert("email".to_string(), b"encrypted_email".to_vec());
-    cert.revocation_outpoint = Some(bsv_sdk::wallet::types::Outpoint::new([0xCC; 32], 7));
+    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xCC; 32], 7));
     cert.sign(&certifier_key).unwrap();
 
     // Convert to WalletCertificate
@@ -1643,9 +1643,9 @@ fn test_wallet_certificate_conversion_roundtrip() {
     let email_b64 = wallet_cert.fields.get("email").unwrap();
 
     // Decode base64 fields back and verify they match original bytes
-    let name_bytes = bsv_sdk::primitives::from_base64(name_b64).unwrap();
+    let name_bytes = bsv_rs::primitives::from_base64(name_b64).unwrap();
     assert_eq!(name_bytes, b"encrypted_name");
-    let email_bytes = bsv_sdk::primitives::from_base64(email_b64).unwrap();
+    let email_bytes = bsv_rs::primitives::from_base64(email_b64).unwrap();
     assert_eq!(email_bytes, b"encrypted_email");
 }
 
@@ -1719,8 +1719,8 @@ fn test_wallet_certificate_conversion_empty_fields() {
 
 #[tokio::test]
 async fn test_master_certificate_issue_with_random_serial() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1767,8 +1767,8 @@ async fn test_master_certificate_issue_with_random_serial() {
 
 #[tokio::test]
 async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -1805,8 +1805,8 @@ async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
 
 #[tokio::test]
 async fn test_self_signed_master_certificate() {
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     // One wallet acts as BOTH certifier and subject
     let self_key = PrivateKey::random();
@@ -1900,7 +1900,7 @@ fn test_tampered_revocation_outpoint_fails_verification() {
         subject_key,
         certifier_key.public_key(),
     );
-    cert.revocation_outpoint = Some(bsv_sdk::wallet::types::Outpoint::new([0xAA; 32], 0));
+    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xAA; 32], 0));
     cert.fields
         .insert("name".to_string(), b"encrypted_name".to_vec());
 
@@ -1911,7 +1911,7 @@ fn test_tampered_revocation_outpoint_fails_verification() {
     );
 
     // Tamper with the revocation outpoint
-    cert.revocation_outpoint = Some(bsv_sdk::wallet::types::Outpoint::new([0xBB; 32], 5));
+    cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xBB; 32], 5));
 
     let result = cert.verify().unwrap();
     assert!(
@@ -1994,8 +1994,8 @@ fn test_certificate_with_empty_fields_map() {
 async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
     // Full async test: construct a properly-issued certificate, then replace the
     // keyring with garbage data and attempt to decrypt -- should error.
-    use bsv_sdk::auth::MasterCertificate;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::MasterCertificate;
+    use bsv_rs::wallet::ProtoWallet;
 
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random();
@@ -2108,8 +2108,8 @@ fn test_ts_style_initial_response_signing_data_uses_initial_nonce() {
     let initiator_bytes = [1u8, 2, 3, 4];
     let responder_bytes = [5u8, 6, 7, 8];
 
-    msg.your_nonce = Some(bsv_sdk::primitives::to_base64(&initiator_bytes));
-    msg.initial_nonce = Some(bsv_sdk::primitives::to_base64(&responder_bytes));
+    msg.your_nonce = Some(bsv_rs::primitives::to_base64(&initiator_bytes));
+    msg.initial_nonce = Some(bsv_rs::primitives::to_base64(&responder_bytes));
     // No nonce field - TS style
 
     let signing_data = msg.signing_data();
@@ -2186,8 +2186,8 @@ fn test_initial_response_json_deserialization_go_format() {
 async fn test_ts_style_initial_response_through_mock_transport() {
     // Simulate a TS server: receives InitialRequest, responds with InitialResponse
     // that has initialNonce and yourNonce but NO nonce field.
-    use bsv_sdk::auth::{Peer, PeerOptions};
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::auth::{Peer, PeerOptions};
+    use bsv_rs::wallet::ProtoWallet;
 
     let client_key = PrivateKey::random();
     let server_key = PrivateKey::random();
@@ -2221,7 +2221,7 @@ async fn test_ts_style_initial_response_through_mock_transport() {
     }
 
     // Craft a TS-style InitialResponse (no nonce field)
-    let server_nonce = bsv_sdk::primitives::to_base64(&[0xBB; 32]);
+    let server_nonce = bsv_rs::primitives::to_base64(&[0xBB; 32]);
     let mut ts_response = AuthMessage::new(MessageType::InitialResponse, server_key.public_key());
     ts_response.initial_nonce = Some(server_nonce.clone());
     ts_response.your_nonce = Some(our_nonce.clone());

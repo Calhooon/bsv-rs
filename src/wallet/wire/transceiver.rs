@@ -30,8 +30,8 @@ use crate::Error;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::wallet::wire::{WalletWire, WalletWireTransceiver};
-/// use bsv_sdk::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
+/// use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver};
+/// use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
 ///
 /// // Create transceiver with some wire transport
 /// let wire = MyWireTransport::new();

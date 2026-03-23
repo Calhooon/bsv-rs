@@ -13,7 +13,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::Beef;
+//! use bsv_rs::transaction::Beef;
 //!
 //! // Parse from hex
 //! let beef = Beef::from_hex("...")?;

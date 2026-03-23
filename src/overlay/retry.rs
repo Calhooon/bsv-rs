@@ -38,7 +38,7 @@ fn is_double_spend_error(error: &Error) -> bool {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::overlay::with_double_spend_retry;
+/// use bsv_rs::overlay::with_double_spend_retry;
 ///
 /// let result = with_double_spend_retry(None, || async {
 ///     // Perform overlay broadcast operation

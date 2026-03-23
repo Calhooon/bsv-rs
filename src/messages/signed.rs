@@ -25,8 +25,8 @@ use super::SIGNED_VERSION;
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::PrivateKey;
-/// use bsv_sdk::messages::sign;
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::messages::sign;
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();
@@ -105,8 +105,8 @@ pub fn sign(message: &[u8], signer: &PrivateKey, verifier: Option<&PublicKey>) -
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::PrivateKey;
-/// use bsv_sdk::messages::{sign, verify};
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::messages::{sign, verify};
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();

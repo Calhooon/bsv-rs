@@ -8,7 +8,7 @@
 //! ## Usage
 //!
 //! ```rust,ignore
-//! use bsv_sdk::auth::transports::websocket_transport::{WebSocketTransport, WebSocketTransportOptions};
+//! use bsv_rs::auth::transports::websocket_transport::{WebSocketTransport, WebSocketTransportOptions};
 //!
 //! let transport = WebSocketTransport::new(WebSocketTransportOptions {
 //!     base_url: "ws://localhost:8080".to_string(),

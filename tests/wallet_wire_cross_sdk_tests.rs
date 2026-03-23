@@ -65,7 +65,7 @@ fn base64_encode(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
-use bsv_sdk::wallet::wire::{WireReader, WireWriter};
+use bsv_rs::wallet::wire::{WireReader, WireWriter};
 
 // ============================================================================
 // Call code verification
@@ -73,7 +73,7 @@ use bsv_sdk::wallet::wire::{WireReader, WireWriter};
 
 #[test]
 fn test_all_call_codes_match_go_sdk() {
-    use bsv_sdk::wallet::wire::WalletCall;
+    use bsv_rs::wallet::wire::WalletCall;
 
     let expected: Vec<(u8, &str)> = vec![
         (1, "createAction"),
@@ -1003,9 +1003,9 @@ fn test_discover_by_identity_key_result_cross_sdk() {
 
 #[tokio::test]
 async fn test_process_go_get_height_request() {
-    use bsv_sdk::primitives::PrivateKey;
-    use bsv_sdk::wallet::wire::WalletWireProcessor;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::primitives::PrivateKey;
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::ProtoWallet;
 
     let (_, wire) = load_vector("getHeight-simple-args.json");
 
@@ -1025,9 +1025,9 @@ async fn test_process_go_get_height_request() {
 
 #[tokio::test]
 async fn test_process_go_is_authenticated_request() {
-    use bsv_sdk::primitives::PrivateKey;
-    use bsv_sdk::wallet::wire::WalletWireProcessor;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::primitives::PrivateKey;
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::ProtoWallet;
 
     let (_, wire) = load_vector("isAuthenticated-simple-args.json");
 
@@ -1042,9 +1042,9 @@ async fn test_process_go_is_authenticated_request() {
 
 #[tokio::test]
 async fn test_process_go_get_network_request() {
-    use bsv_sdk::primitives::PrivateKey;
-    use bsv_sdk::wallet::wire::WalletWireProcessor;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::primitives::PrivateKey;
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::ProtoWallet;
 
     // getNetwork has no args file, but we can construct a minimal request
     // call_code=27, originator_len=0
@@ -1060,9 +1060,9 @@ async fn test_process_go_get_network_request() {
 
 #[tokio::test]
 async fn test_process_go_get_version_request() {
-    use bsv_sdk::primitives::PrivateKey;
-    use bsv_sdk::wallet::wire::WalletWireProcessor;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::primitives::PrivateKey;
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::ProtoWallet;
 
     let wire = vec![28u8, 0u8]; // getVersion, empty originator
 
@@ -1078,9 +1078,9 @@ async fn test_process_go_get_version_request() {
 
 #[tokio::test]
 async fn test_process_go_get_public_key_request() {
-    use bsv_sdk::primitives::PrivateKey;
-    use bsv_sdk::wallet::wire::WalletWireProcessor;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::primitives::PrivateKey;
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::ProtoWallet;
 
     let (_, wire) = load_vector("getPublicKey-simple-args.json");
 
@@ -1099,9 +1099,9 @@ async fn test_process_go_get_public_key_request() {
 
 #[tokio::test]
 async fn test_process_go_get_header_for_height_request() {
-    use bsv_sdk::primitives::PrivateKey;
-    use bsv_sdk::wallet::wire::WalletWireProcessor;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::primitives::PrivateKey;
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::ProtoWallet;
 
     let (_, wire) = load_vector("getHeaderForHeight-simple-args.json");
 

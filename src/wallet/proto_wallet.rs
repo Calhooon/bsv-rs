@@ -22,8 +22,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, Counterparty};
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::wallet::{ProtoWallet, Protocol, SecurityLevel, Counterparty};
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create a ProtoWallet from a root key
 //! let wallet = ProtoWallet::new(Some(PrivateKey::random()));
@@ -271,8 +271,8 @@ pub struct RevealSpecificKeyLinkageResult {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs};
-/// use bsv_sdk::primitives::PrivateKey;
+/// use bsv_rs::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs};
+/// use bsv_rs::primitives::PrivateKey;
 ///
 /// let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 ///
@@ -301,8 +301,8 @@ impl ProtoWallet {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::wallet::ProtoWallet;
-    /// use bsv_sdk::primitives::PrivateKey;
+    /// use bsv_rs::wallet::ProtoWallet;
+    /// use bsv_rs::primitives::PrivateKey;
     ///
     /// let wallet = ProtoWallet::new(Some(PrivateKey::random()));
     /// let anyone_wallet = ProtoWallet::new(None);
@@ -1068,7 +1068,7 @@ impl WalletInterface for ProtoWallet {
 
     async fn get_version(&self, _originator: &str) -> Result<GetVersionResult> {
         Ok(GetVersionResult {
-            version: "bsv-sdk-0.1.0".to_string(),
+            version: "bsv-rs-0.3.0".to_string(),
         })
     }
 }

@@ -22,8 +22,8 @@
 //! # Examples
 //!
 //! ```rust
-//! use bsv_sdk::compat::bsm;
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::compat::bsm;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::random();
 //! let message = b"Hello, BSV!";
@@ -59,8 +59,8 @@ const BSM_MAGIC: &[u8] = b"Bitcoin Signed Message:\n";
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bsm;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::bsm;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 /// let signature = bsm::sign_message(&key, b"Hello!").unwrap();
@@ -123,8 +123,8 @@ pub fn sign_message_with_compression(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bsm;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::bsm;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 /// let address = key.public_key().to_address();
@@ -163,8 +163,8 @@ pub fn verify_message(address: &str, signature: &[u8], message: &[u8]) -> Result
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bsm;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::bsm;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 /// let message = b"Hello!";
@@ -248,7 +248,7 @@ pub fn recover_public_key_from_signature(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bsm;
+/// use bsv_rs::compat::bsm;
 ///
 /// let hash = bsm::magic_hash(b"Hello, BSV!");
 /// assert_eq!(hash.len(), 32);
@@ -291,8 +291,8 @@ pub fn magic_hash(message: &[u8]) -> [u8; 32] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bsm;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::bsm;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 /// let message = b"Hello, BSV!";

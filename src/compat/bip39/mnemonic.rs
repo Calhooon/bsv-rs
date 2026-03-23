@@ -144,7 +144,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::{Mnemonic, WordCount};
+    /// use bsv_rs::compat::bip39::{Mnemonic, WordCount};
     ///
     /// let mnemonic = Mnemonic::new(WordCount::Words12).unwrap();
     /// assert_eq!(mnemonic.words().len(), 12);
@@ -176,7 +176,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let entropy = [0u8; 16]; // 128 bits = 12 words
     /// let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
@@ -258,7 +258,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
     /// let mnemonic = Mnemonic::from_phrase(phrase).unwrap();
@@ -354,7 +354,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let entropy = [0u8; 16];
     /// let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
@@ -390,7 +390,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
     /// let mnemonic = Mnemonic::from_phrase(phrase).unwrap();
@@ -425,7 +425,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let original_entropy = [0u8; 16];
     /// let mnemonic = Mnemonic::from_entropy(&original_entropy).unwrap();
@@ -445,7 +445,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let entropy = [0u8; 16]; // 128 bits
     /// let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
@@ -550,7 +550,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let entropy = [0u8; 16];
     /// let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
@@ -581,7 +581,7 @@ impl Mnemonic {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip39::Mnemonic;
+    /// use bsv_rs::compat::bip39::Mnemonic;
     ///
     /// let phrase = b"abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
     /// let mnemonic = Mnemonic::from_binary(phrase).unwrap();

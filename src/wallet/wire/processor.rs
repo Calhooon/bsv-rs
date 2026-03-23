@@ -13,8 +13,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::wallet::wire::WalletWireProcessor;
-//! use bsv_sdk::wallet::ProtoWallet;
+//! use bsv_rs::wallet::wire::WalletWireProcessor;
+//! use bsv_rs::wallet::ProtoWallet;
 //!
 //! let wallet = ProtoWallet::new(None);
 //! let processor = WalletWireProcessor::new(wallet);
@@ -49,8 +49,8 @@ use std::marker::PhantomData;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::wallet::wire::WalletWireProcessor;
-/// use bsv_sdk::wallet::ProtoWallet;
+/// use bsv_rs::wallet::wire::WalletWireProcessor;
+/// use bsv_rs::wallet::ProtoWallet;
 ///
 /// let wallet = ProtoWallet::new(None);
 /// let processor = WalletWireProcessor::new(wallet);

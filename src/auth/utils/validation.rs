@@ -343,8 +343,8 @@ pub fn certificates_match_request(
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::auth::utils::validate_certificate_encoding;
-/// use bsv_sdk::auth::Certificate;
+/// use bsv_rs::auth::utils::validate_certificate_encoding;
+/// use bsv_rs::auth::Certificate;
 ///
 /// let cert = Certificate::new(
 ///     [1u8; 32], [2u8; 32],
@@ -442,7 +442,7 @@ pub fn validate_certificate_encoding(cert: &crate::auth::certificates::Certifica
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::auth::{RequestedCertificateSet, utils::validate_requested_certificate_set};
+/// use bsv_rs::auth::{RequestedCertificateSet, utils::validate_requested_certificate_set};
 ///
 /// let mut req = RequestedCertificateSet::new();
 /// req.add_certifier("02abc...".to_string());

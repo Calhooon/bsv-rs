@@ -117,7 +117,7 @@ pub struct Signature { ... }   // new(), from_der(), from_compact(), from_compac
 
 ### Hashing and Encryption
 ```rust
-use bsv_sdk::primitives::{sha256, sha256d, hash160, SymmetricKey};
+use bsv_rs::primitives::{sha256, sha256d, hash160, SymmetricKey};
 
 let digest = sha256(b"hello world");
 let double_hash = sha256d(b"hello world");  // Transaction hashes
@@ -130,8 +130,8 @@ let plaintext = key.decrypt(&ciphertext)?;
 
 ### Elliptic Curve Operations
 ```rust
-use bsv_sdk::primitives::{PrivateKey, PublicKey};
-use bsv_sdk::primitives::hash::sha256;
+use bsv_rs::primitives::{PrivateKey, PublicKey};
+use bsv_rs::primitives::hash::sha256;
 
 let private_key = PrivateKey::random();
 let public_key = private_key.public_key();
@@ -148,7 +148,7 @@ let address = public_key.to_address();  // P2PKH mainnet
 
 ### BRC-42 Key Derivation
 ```rust
-use bsv_sdk::primitives::PrivateKey;
+use bsv_rs::primitives::PrivateKey;
 
 let alice = PrivateKey::random();
 let bob = PrivateKey::random();
@@ -159,7 +159,7 @@ assert_eq!(alice_child.public_key().to_compressed(), bob_derived.to_compressed()
 
 ### ECDH Shared Secret
 ```rust
-use bsv_sdk::primitives::PrivateKey;
+use bsv_rs::primitives::PrivateKey;
 
 let alice = PrivateKey::random();
 let bob = PrivateKey::random();
@@ -170,7 +170,7 @@ assert_eq!(shared_ab.to_compressed(), shared_ba.to_compressed());
 
 ### BigNumber for Key Math
 ```rust
-use bsv_sdk::primitives::BigNumber;
+use bsv_rs::primitives::BigNumber;
 
 let private_key = BigNumber::from_hex("0123...").unwrap();
 let hmac_value = BigNumber::from_hex("fedc...").unwrap();
@@ -181,7 +181,7 @@ let key_bytes = new_key.to_bytes_be(32);
 
 ### Binary Serialization
 ```rust
-use bsv_sdk::primitives::{Reader, Writer};
+use bsv_rs::primitives::{Reader, Writer};
 
 let mut writer = Writer::new();
 writer.write_u32_le(0x01000000).write_var_int(1).write_var_bytes(b"data");
@@ -195,7 +195,7 @@ let data = reader.read_var_bytes()?;
 
 ### P-256 Operations
 ```rust
-use bsv_sdk::primitives::p256::{P256PrivateKey, P256PublicKey};
+use bsv_rs::primitives::p256::{P256PrivateKey, P256PublicKey};
 
 let private_key = P256PrivateKey::random();
 let public_key = private_key.public_key();
@@ -205,15 +205,15 @@ let signature = private_key.sign(b"Hello, P-256!");
 assert!(public_key.verify(b"Hello, P-256!", &signature));
 
 // Sign a pre-hashed message
-let hash = bsv_sdk::primitives::hash::sha256(b"Hello, P-256!");
+let hash = bsv_rs::primitives::hash::sha256(b"Hello, P-256!");
 let sig2 = private_key.sign_hash(&hash);
 assert!(public_key.verify_hash(&hash, &sig2));
 ```
 
 ### Shamir Secret Sharing
 ```rust
-use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
-use bsv_sdk::primitives::PrivateKey;
+use bsv_rs::primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_rs::primitives::PrivateKey;
 
 let key = PrivateKey::random();
 

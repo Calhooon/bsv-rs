@@ -26,8 +26,8 @@ use super::ENCRYPTED_VERSION;
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::PrivateKey;
-/// use bsv_sdk::messages::encrypt;
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::messages::encrypt;
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();
@@ -100,8 +100,8 @@ pub fn encrypt(message: &[u8], sender: &PrivateKey, recipient: &PublicKey) -> Re
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::PrivateKey;
-/// use bsv_sdk::messages::{encrypt, decrypt};
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::messages::{encrypt, decrypt};
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();

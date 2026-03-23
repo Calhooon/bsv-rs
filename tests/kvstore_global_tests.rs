@@ -19,15 +19,15 @@
 
 #![cfg(feature = "kvstore")]
 
-use bsv_sdk::kvstore::{
+use bsv_rs::kvstore::{
     GlobalKVStore, KVStoreConfig, KVStoreContext, KVStoreEntry, KVStoreFields, KVStoreGetOptions,
     KVStoreInterpreter, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
-use bsv_sdk::overlay::NetworkPreset;
-use bsv_sdk::primitives::{to_hex, PrivateKey, PublicKey};
-use bsv_sdk::script::templates::PushDrop;
-use bsv_sdk::script::LockingScript;
-use bsv_sdk::wallet::{
+use bsv_rs::overlay::NetworkPreset;
+use bsv_rs::primitives::{to_hex, PrivateKey, PublicKey};
+use bsv_rs::script::templates::PushDrop;
+use bsv_rs::script::LockingScript;
+use bsv_rs::wallet::{
     AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
     CreateActionArgs, CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
     CreateSignatureResult, DecryptArgs, DecryptResult, DiscoverByAttributesArgs,
@@ -42,7 +42,7 @@ use bsv_sdk::wallet::{
     VerifySignatureResult, WalletCertificate, WalletInterface, WalletRevealCounterpartyArgs,
     WalletRevealSpecificArgs,
 };
-use bsv_sdk::{Error, Result};
+use bsv_rs::{Error, Result};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 // =============================================================================

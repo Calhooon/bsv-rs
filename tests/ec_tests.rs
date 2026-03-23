@@ -1,7 +1,7 @@
 //! Integration tests for the EC module with BRC-42 test vectors.
 
-use bsv_sdk::primitives::ec::{PrivateKey, PublicKey};
-use bsv_sdk::primitives::hash::sha256;
+use bsv_rs::primitives::ec::{PrivateKey, PublicKey};
+use bsv_rs::primitives::hash::sha256;
 use serde::Deserialize;
 use std::fs;
 
@@ -282,7 +282,7 @@ fn test_deterministic_signatures() {
 
 #[test]
 fn test_public_key_recovery() {
-    use bsv_sdk::primitives::ec::recover_public_key;
+    use bsv_rs::primitives::ec::recover_public_key;
 
     let private_key = PrivateKey::random();
     let public_key = private_key.public_key();
@@ -424,14 +424,14 @@ fn test_rfc6979_vector_6_computer_disease() {
 
 #[test]
 fn test_malformed_der_empty() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     let result = Signature::from_der(&[]);
     assert!(result.is_err(), "Empty DER should fail");
 }
 
 #[test]
 fn test_malformed_der_bad_magic() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // First byte should be 0x30, not 0x31
     let sig: Vec<u8> = vec![
         0x31, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -446,7 +446,7 @@ fn test_malformed_der_bad_magic() {
 
 #[test]
 fn test_malformed_der_bad_r_marker() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // R integer marker should be 0x02, not 0x03
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x03, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -461,7 +461,7 @@ fn test_malformed_der_bad_r_marker() {
 
 #[test]
 fn test_malformed_der_bad_s_marker() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // S integer marker should be 0x02, not 0x03
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -476,7 +476,7 @@ fn test_malformed_der_bad_s_marker() {
 
 #[test]
 fn test_malformed_der_short_total_len() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // Total length byte is 0x43 (1 less than correct 0x44) but data structure is otherwise valid.
     // The Rust parser is permissive here (only checks der.len() >= total_len + 2) and will
     // still parse correctly since the R and S markers are at the right positions in the data.
@@ -495,7 +495,7 @@ fn test_malformed_der_short_total_len() {
 
 #[test]
 fn test_malformed_der_invalid_message_length() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // Total length is 0x00 but content has valid R/S structure.
     // The Rust parser is permissive (only checks der.len() >= total_len + 2)
     // so this actually parses. Go SDK rejects it.
@@ -514,7 +514,7 @@ fn test_malformed_der_invalid_message_length() {
 
 #[test]
 fn test_malformed_der_long_total_len() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // Total length byte is 0x45 (69 bytes) but only 68 bytes of content follow
     let sig: Vec<u8> = vec![
         0x30, 0x45, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -532,7 +532,7 @@ fn test_malformed_der_long_total_len() {
 
 #[test]
 fn test_malformed_der_long_r() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // R length says 0x42 (66 bytes) but only 32 bytes follow
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x42, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -547,7 +547,7 @@ fn test_malformed_der_long_r() {
 
 #[test]
 fn test_malformed_der_long_s() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // S length says 0x21 (33 bytes) but only 32 bytes follow
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -565,7 +565,7 @@ fn test_malformed_der_long_s() {
 
 #[test]
 fn test_malformed_der_short_s() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // S length says 0x19 (25 bytes) but 32 bytes present -- S marker at wrong offset
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -583,7 +583,7 @@ fn test_malformed_der_short_s() {
 
 #[test]
 fn test_malformed_der_zero_len_r() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // R has length 0x00
     let sig: Vec<u8> = vec![
         0x30, 0x24, 0x02, 0x00, 0x02, 0x20, 0x18, 0x15, 0x22, 0xec, 0x8e, 0xca, 0x07, 0xde, 0x48,
@@ -597,7 +597,7 @@ fn test_malformed_der_zero_len_r() {
 
 #[test]
 fn test_malformed_der_zero_len_s() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // S has length 0x00
     let sig: Vec<u8> = vec![
         0x30, 0x24, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -610,7 +610,7 @@ fn test_malformed_der_zero_len_s() {
 
 #[test]
 fn test_malformed_der_valid_signature_parses_ok() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // Known valid DER signature from Bitcoin blockchain
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -634,7 +634,7 @@ fn test_malformed_der_valid_signature_parses_ok() {
 
 #[test]
 fn test_malformed_der_trailing_data_accepted() {
-    use bsv_sdk::primitives::ec::Signature;
+    use bsv_rs::primitives::ec::Signature;
     // Valid DER with trailing byte -- blockchain signatures sometimes have trailing hashtype
     let sig: Vec<u8> = vec![
         0x30, 0x44, 0x02, 0x20, 0x4e, 0x45, 0xe1, 0x69, 0x32, 0xb8, 0xaf, 0x51, 0x49, 0x61, 0xa1,
@@ -689,7 +689,7 @@ fn test_known_answer_ecdsa_sign() {
 
     // Verify DER roundtrip
     let der = sig.to_der();
-    let recovered = bsv_sdk::primitives::ec::Signature::from_der(&der).unwrap();
+    let recovered = bsv_rs::primitives::ec::Signature::from_der(&der).unwrap();
     assert_eq!(recovered.r(), sig.r(), "DER roundtrip R mismatch");
     assert_eq!(recovered.s(), sig.s(), "DER roundtrip S mismatch");
 
@@ -707,11 +707,11 @@ fn test_known_answer_ecdsa_sign() {
 
 #[cfg(feature = "transaction")]
 mod custom_k_tests {
-    use bsv_sdk::primitives::ec::PrivateKey;
-    use bsv_sdk::primitives::BigNumber;
-    use bsv_sdk::script::templates::{RPuzzle, RPuzzleType};
-    use bsv_sdk::script::{ScriptTemplate, SignOutputs};
-    use bsv_sdk::transaction::{Transaction, TransactionOutput};
+    use bsv_rs::primitives::ec::PrivateKey;
+    use bsv_rs::primitives::BigNumber;
+    use bsv_rs::script::templates::{RPuzzle, RPuzzleType};
+    use bsv_rs::script::{ScriptTemplate, SignOutputs};
+    use bsv_rs::transaction::{Transaction, TransactionOutput};
 
     /// k=1 means R = G (the generator point), whose x-coordinate is well-known.
     #[test]
@@ -798,7 +798,7 @@ mod custom_k_tests {
     /// and verifies the signature R-value matches the expected value.
     #[tokio::test]
     async fn test_rpuzzle_lock_unlock_e2e() {
-        use bsv_sdk::script::LockingScript;
+        use bsv_rs::script::LockingScript;
 
         // Use a known K value (k=2)
         let k =
@@ -881,8 +881,8 @@ mod custom_k_tests {
     /// Test RPuzzle with Hash160 puzzle type end-to-end.
     #[tokio::test]
     async fn test_rpuzzle_hash160_lock_unlock_e2e() {
-        use bsv_sdk::primitives::hash::hash160;
-        use bsv_sdk::script::LockingScript;
+        use bsv_rs::primitives::hash::hash160;
+        use bsv_rs::script::LockingScript;
 
         let k =
             BigNumber::from_hex("0000000000000000000000000000000000000000000000000000000000000003")

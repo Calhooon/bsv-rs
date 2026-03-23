@@ -250,7 +250,7 @@ These are not publicly exported but are key to understanding the implementation:
 ### Computing a Sighash
 
 ```rust
-use bsv_sdk::primitives::bsv::sighash::{
+use bsv_rs::primitives::bsv::sighash::{
     compute_sighash, parse_transaction, SighashParams,
     SIGHASH_ALL, SIGHASH_FORKID,
 };
@@ -278,8 +278,8 @@ let sighash = compute_sighash(&SighashParams {
 ### Creating and Parsing Transaction Signatures
 
 ```rust
-use bsv_sdk::primitives::bsv::tx_signature::TransactionSignature;
-use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
+use bsv_rs::primitives::bsv::tx_signature::TransactionSignature;
+use bsv_rs::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
 
 // Parse from checksig format (DER || sighash_byte)
 let checksig_bytes = hex::decode("3044...41").unwrap();
@@ -304,8 +304,8 @@ println!("{}", tx_sig);  // Outputs hex-encoded checksig format
 ### Proving ECDH Computation with Schnorr
 
 ```rust
-use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::primitives::bsv::schnorr::Schnorr;
+use bsv_rs::primitives::ec::PrivateKey;
+use bsv_rs::primitives::bsv::schnorr::Schnorr;
 
 // Alice and Bob have key pairs
 let alice = PrivateKey::random();
@@ -335,8 +335,8 @@ assert!(valid);
 ### Splitting and Recovering Private Keys
 
 ```rust
-use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_rs::primitives::ec::PrivateKey;
 
 // Generate a key to protect
 let key = PrivateKey::random();

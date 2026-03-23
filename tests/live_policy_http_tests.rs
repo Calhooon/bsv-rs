@@ -8,7 +8,7 @@
 
 #![cfg(all(feature = "transaction", feature = "http"))]
 
-use bsv_sdk::transaction::{
+use bsv_rs::transaction::{
     FeeModel, LivePolicy, LivePolicyConfig, Transaction, DEFAULT_CACHE_TTL_SECS,
     DEFAULT_FALLBACK_RATE, DEFAULT_POLICY_URL,
 };

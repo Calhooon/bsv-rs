@@ -144,8 +144,8 @@ impl RenewFileResult {
 ### Generate URLs
 
 ```rust
-use bsv_sdk::storage::{get_url_for_file, get_url_for_hash};
-use bsv_sdk::primitives::hash::sha256;
+use bsv_rs::storage::{get_url_for_file, get_url_for_hash};
+use bsv_rs::primitives::hash::sha256;
 
 // From file content
 let url = get_url_for_file(b"Hello, World!").unwrap();
@@ -158,7 +158,7 @@ let url = get_url_for_hash(&hash).unwrap();
 ### Parse URLs
 
 ```rust
-use bsv_sdk::storage::{get_hash_from_url, get_hash_hex_from_url, normalize_url};
+use bsv_rs::storage::{get_hash_from_url, get_hash_hex_from_url, normalize_url};
 
 // Get 32-byte hash
 let hash: [u8; 32] = get_hash_from_url("uhrp://...").unwrap();
@@ -174,7 +174,7 @@ let encoded = normalize_url("web+uhrp://abc123"); // Returns "abc123"
 ### Validate URLs
 
 ```rust
-use bsv_sdk::storage::is_valid_url;
+use bsv_rs::storage::is_valid_url;
 
 assert!(is_valid_url("uhrp://..."));
 assert!(!is_valid_url("https://example.com"));
@@ -221,7 +221,7 @@ impl Default for StorageDownloader {
 ### Usage
 
 ```rust
-use bsv_sdk::storage::{StorageDownloader, StorageDownloaderConfig};
+use bsv_rs::storage::{StorageDownloader, StorageDownloaderConfig};
 
 let downloader = StorageDownloader::new(StorageDownloaderConfig::default());
 
@@ -288,7 +288,7 @@ impl StorageUploader {
 ### Usage
 
 ```rust
-use bsv_sdk::storage::{StorageUploader, StorageUploaderConfig, UploadableFile};
+use bsv_rs::storage::{StorageUploader, StorageUploaderConfig, UploadableFile};
 
 let config = StorageUploaderConfig::new("https://storage.example.com")
     .with_retention_minutes(24 * 60); // 1 day

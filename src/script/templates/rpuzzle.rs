@@ -33,10 +33,10 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::{RPuzzle, RPuzzleType};
-//! use bsv_sdk::script::template::SignOutputs;
-//! use bsv_sdk::primitives::ec::PrivateKey;
-//! use bsv_sdk::primitives::BigNumber;
+//! use bsv_rs::script::templates::{RPuzzle, RPuzzleType};
+//! use bsv_rs::script::template::SignOutputs;
+//! use bsv_rs::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::BigNumber;
 //!
 //! // Generate a random K value
 //! let k = BigNumber::from_bytes_be(&random_32_bytes);
@@ -128,7 +128,7 @@ impl RPuzzleType {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::script::templates::{RPuzzle, RPuzzleType};
+/// use bsv_rs::script::templates::{RPuzzle, RPuzzleType};
 ///
 /// // Create a raw R-Puzzle
 /// let template = RPuzzle::new(RPuzzleType::Raw);
@@ -209,10 +209,10 @@ impl RPuzzle {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::RPuzzle;
-    /// use bsv_sdk::script::template::SignOutputs;
-    /// use bsv_sdk::primitives::ec::PrivateKey;
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::script::templates::RPuzzle;
+    /// use bsv_rs::script::template::SignOutputs;
+    /// use bsv_rs::primitives::ec::PrivateKey;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let k = BigNumber::from_hex("...")?;
     /// let private_key = PrivateKey::random();

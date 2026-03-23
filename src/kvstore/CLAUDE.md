@@ -285,7 +285,7 @@ pub(crate) fn decode_value_with_ttl(stored: &str) -> (String, bool);
 
 ```rust
 use std::time::Duration;
-use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig, KVStoreSetOptions};
+use bsv_rs::kvstore::{LocalKVStore, KVStoreConfig, KVStoreSetOptions};
 
 let opts = KVStoreSetOptions::new()
     .with_ttl(Duration::from_secs(3600)); // Expires in 1 hour
@@ -385,9 +385,9 @@ impl KVStoreFields {
 ### LocalKVStore Basic Usage
 
 ```rust
-use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
-use bsv_sdk::wallet::ProtoWallet;
-use bsv_sdk::primitives::PrivateKey;
+use bsv_rs::kvstore::{LocalKVStore, KVStoreConfig};
+use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::primitives::PrivateKey;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -423,7 +423,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Batch Operations
 
 ```rust
-use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
+use bsv_rs::kvstore::{LocalKVStore, KVStoreConfig};
 
 // Batch set multiple values
 let entries = vec![("key1", "value1"), ("key2", "value2"), ("key3", "value3")];
@@ -441,7 +441,7 @@ store.batch_remove(&["key1", "key2"]).await?;
 
 ```rust
 use std::time::Duration;
-use bsv_sdk::kvstore::KVStoreSetOptions;
+use bsv_rs::kvstore::KVStoreSetOptions;
 
 // Set with 5-minute TTL
 let opts = KVStoreSetOptions::new()
@@ -460,8 +460,8 @@ assert_eq!(val, "abc123");
 ### GlobalKVStore with Tags
 
 ```rust
-use bsv_sdk::kvstore::{GlobalKVStore, KVStoreConfig, KVStoreSetOptions, KVStoreQuery};
-use bsv_sdk::wallet::ProtoWallet;
+use bsv_rs::kvstore::{GlobalKVStore, KVStoreConfig, KVStoreSetOptions, KVStoreQuery};
+use bsv_rs::wallet::ProtoWallet;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -492,7 +492,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Custom Configuration
 
 ```rust
-use bsv_sdk::kvstore::KVStoreConfig;
+use bsv_rs::kvstore::KVStoreConfig;
 
 let config = KVStoreConfig::new()
     .with_protocol_id("my-app-storage")
@@ -508,7 +508,7 @@ let config = KVStoreConfig::new()
 The module uses specific error types:
 
 ```rust
-use bsv_sdk::Error;
+use bsv_rs::Error;
 
 // LocalKVStore creation can fail
 match LocalKVStore::new(wallet, config) {
@@ -570,7 +570,7 @@ Enable the kvstore feature in `Cargo.toml`:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["kvstore"] }
+bsv-rs = { version = "0.3", features = ["kvstore"] }
 ```
 
 The kvstore feature requires the `overlay` feature (which enables `wallet` and `tokio`).

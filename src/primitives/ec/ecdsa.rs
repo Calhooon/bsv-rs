@@ -25,8 +25,8 @@ use super::{PrivateKey, PublicKey, Signature};
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::ec::{PrivateKey, sign, verify};
-/// use bsv_sdk::primitives::hash::sha256;
+/// use bsv_rs::primitives::ec::{PrivateKey, sign, verify};
+/// use bsv_rs::primitives::hash::sha256;
 ///
 /// let key = PrivateKey::random();
 /// let msg_hash = sha256(b"Hello!");
@@ -53,8 +53,8 @@ pub fn sign(msg_hash: &[u8; 32], private_key: &PrivateKey) -> Result<Signature> 
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::ec::{PrivateKey, sign, verify};
-/// use bsv_sdk::primitives::hash::sha256;
+/// use bsv_rs::primitives::ec::{PrivateKey, sign, verify};
+/// use bsv_rs::primitives::hash::sha256;
 ///
 /// let key = PrivateKey::random();
 /// let msg_hash = sha256(b"Hello!");
@@ -105,8 +105,8 @@ pub fn verify(msg_hash: &[u8; 32], signature: &Signature, public_key: &PublicKey
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::ec::{PrivateKey, sign, recover_public_key};
-/// use bsv_sdk::primitives::hash::sha256;
+/// use bsv_rs::primitives::ec::{PrivateKey, sign, recover_public_key};
+/// use bsv_rs::primitives::hash::sha256;
 ///
 /// let key = PrivateKey::random();
 /// let msg_hash = sha256(b"Hello!");

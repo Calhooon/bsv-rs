@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create a key deriver from a root private key
 //! let root_key = PrivateKey::random();
@@ -66,8 +66,8 @@ impl KeyDeriver {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::wallet::KeyDeriver;
-    /// use bsv_sdk::primitives::PrivateKey;
+    /// use bsv_rs::wallet::KeyDeriver;
+    /// use bsv_rs::primitives::PrivateKey;
     ///
     /// let deriver = KeyDeriver::new(Some(PrivateKey::random()));
     /// let anyone_deriver = KeyDeriver::new(None);
@@ -131,8 +131,8 @@ impl KeyDeriver {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-    /// use bsv_sdk::primitives::PrivateKey;
+    /// use bsv_rs::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
+    /// use bsv_rs::primitives::PrivateKey;
     ///
     /// let deriver = KeyDeriver::new(Some(PrivateKey::random()));
     /// let protocol = Protocol::new(SecurityLevel::App, "my application");
@@ -180,8 +180,8 @@ impl KeyDeriver {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-    /// use bsv_sdk::primitives::PrivateKey;
+    /// use bsv_rs::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
+    /// use bsv_rs::primitives::PrivateKey;
     ///
     /// let deriver = KeyDeriver::new(Some(PrivateKey::random()));
     /// let protocol = Protocol::new(SecurityLevel::App, "my application");

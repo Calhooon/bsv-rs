@@ -26,7 +26,7 @@ use crate::Result;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+/// use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 ///
 /// let mut tx = Transaction::new();
 /// tx.add_input(TransactionInput::new("abc123...".to_string(), 0))?;
@@ -894,8 +894,8 @@ impl Transaction {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::transaction::Transaction;
-    /// use bsv_sdk::script::templates::P2PKH;
+    /// use bsv_rs::transaction::Transaction;
+    /// use bsv_rs::script::templates::P2PKH;
     ///
     /// let source_tx = Transaction::from_hex("...")?;
     /// let mut tx = Transaction::new();
@@ -935,8 +935,8 @@ impl Transaction {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::transaction::Transaction;
-    /// use bsv_sdk::script::{LockingScript, templates::P2PKH};
+    /// use bsv_rs::transaction::Transaction;
+    /// use bsv_rs::script::{LockingScript, templates::P2PKH};
     ///
     /// let mut tx = Transaction::new();
     /// let locking_script = LockingScript::from_hex("76a914...88ac")?;
@@ -1009,8 +1009,8 @@ impl Transaction {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::transaction::{Transaction, Utxo};
-    /// use bsv_sdk::script::LockingScript;
+    /// use bsv_rs::transaction::{Transaction, Utxo};
+    /// use bsv_rs::script::LockingScript;
     ///
     /// let utxos = vec![
     ///     Utxo {

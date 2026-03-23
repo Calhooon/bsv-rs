@@ -7,8 +7,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
-//! use bsv_sdk::primitives::BigNumber;
+//! use bsv_rs::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
+//! use bsv_rs::primitives::BigNumber;
 //!
 //! // Create points from shares
 //! let p1 = PointInFiniteField::new(BigNumber::from_u64(1), BigNumber::from_hex("abc123").unwrap());
@@ -46,8 +46,8 @@ impl PointInFiniteField {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::polynomial::PointInFiniteField;
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::bsv::polynomial::PointInFiniteField;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let point = PointInFiniteField::new(
     ///     BigNumber::from_u64(1),
@@ -75,7 +75,7 @@ impl PointInFiniteField {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::polynomial::PointInFiniteField;
+    /// use bsv_rs::primitives::bsv::polynomial::PointInFiniteField;
     ///
     /// let point = PointInFiniteField::from_string("2.3J").unwrap();
     /// ```
@@ -106,8 +106,8 @@ impl PointInFiniteField {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::polynomial::PointInFiniteField;
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::bsv::polynomial::PointInFiniteField;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let point = PointInFiniteField::new(
     ///     BigNumber::from_u64(1),
@@ -166,8 +166,8 @@ impl Polynomial {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let points = vec![
     ///     PointInFiniteField::new(BigNumber::from_u64(1), BigNumber::from_u64(10)),
@@ -204,8 +204,8 @@ impl Polynomial {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::bsv::polynomial::{PointInFiniteField, Polynomial};
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// // A simple linear polynomial passing through (1, 1) and (2, 2)
     /// let points = vec![

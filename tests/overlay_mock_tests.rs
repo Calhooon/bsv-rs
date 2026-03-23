@@ -6,8 +6,8 @@
 #![cfg(feature = "full")]
 
 use async_trait::async_trait;
-use bsv_sdk::overlay::*;
-use bsv_sdk::{Error, Result};
+use bsv_rs::overlay::*;
+use bsv_rs::{Error, Result};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
@@ -443,7 +443,7 @@ async fn test_topic_broadcaster_with_mock_local() {
     let broadcaster = TopicBroadcaster::new(vec!["tm_test_topic".to_string()], config).unwrap();
 
     // Create a minimal transaction for broadcast
-    let tx = bsv_sdk::transaction::Transaction::new();
+    let tx = bsv_rs::transaction::Transaction::new();
     let result = broadcaster.broadcast_tx(&tx).await;
 
     // The tx serialization to BEEF may fail since it's a minimal empty tx.
@@ -500,7 +500,7 @@ async fn test_topic_broadcaster_all_reject() {
 
     let broadcaster = TopicBroadcaster::new(vec!["tm_test_topic".to_string()], config).unwrap();
 
-    let tx = bsv_sdk::transaction::Transaction::new();
+    let tx = bsv_rs::transaction::Transaction::new();
     let result = broadcaster.broadcast_tx(&tx).await;
 
     // Should fail - either BEEF error (empty tx) or all hosts rejected

@@ -167,7 +167,7 @@ The `Certificate::to_binary()` method produces a deterministic binary representa
 ### Issuing a Certificate
 
 ```rust
-use bsv_sdk::auth::certificates::MasterCertificate;
+use bsv_rs::auth::certificates::MasterCertificate;
 
 // Certifier issues certificate to subject
 let master_cert = MasterCertificate::issue_for_subject(
@@ -187,7 +187,7 @@ let master_cert = MasterCertificate::issue_for_subject(
 ### Creating a Verifiable Certificate
 
 ```rust
-use bsv_sdk::auth::certificates::{MasterCertificate, VerifiableCertificate};
+use bsv_rs::auth::certificates::{MasterCertificate, VerifiableCertificate};
 
 // Subject creates keyring for verifier, revealing only "name"
 let keyring = MasterCertificate::create_keyring_for_verifier(

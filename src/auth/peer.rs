@@ -82,8 +82,8 @@ pub struct PeerOptions<W: WalletInterface, T: Transport> {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
-/// use bsv_sdk::wallet::ProtoWallet;
+/// use bsv_rs::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
+/// use bsv_rs::wallet::ProtoWallet;
 ///
 /// let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 /// let transport = SimplifiedFetchTransport::new("https://example.com");

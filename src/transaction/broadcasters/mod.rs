@@ -14,7 +14,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! bsv-sdk = { version = "0.2", features = ["transaction", "http"] }
+//! bsv-rs = { version = "0.3", features = ["transaction", "http"] }
 //! ```
 
 mod arc;

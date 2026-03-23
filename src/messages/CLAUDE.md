@@ -81,8 +81,8 @@ For messages that anyone can verify (signed without a specific recipient), the S
 ### Sign for Specific Recipient
 
 ```rust
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::messages::{sign, verify};
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::messages::{sign, verify};
 
 let sender = PrivateKey::random();
 let recipient = PrivateKey::random();
@@ -99,8 +99,8 @@ assert!(valid);
 ### Sign for Anyone
 
 ```rust
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::messages::{sign, verify};
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::messages::{sign, verify};
 
 let sender = PrivateKey::random();
 let message = b"Public announcement";
@@ -116,8 +116,8 @@ assert!(valid);
 ### Encrypt and Decrypt
 
 ```rust
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::messages::{encrypt, decrypt};
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::messages::{encrypt, decrypt};
 
 let sender = PrivateKey::random();
 let recipient = PrivateKey::random();

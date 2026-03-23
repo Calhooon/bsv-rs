@@ -105,7 +105,7 @@ impl Default for TotpValidateOptions {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::totp::{Totp, TotpOptions};
+/// use bsv_rs::totp::{Totp, TotpOptions};
 ///
 /// let secret = b"12345678901234567890";
 ///
@@ -133,7 +133,7 @@ impl Totp {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::totp::{Totp, TotpOptions, Algorithm};
+    /// use bsv_rs::totp::{Totp, TotpOptions, Algorithm};
     ///
     /// let secret = b"12345678901234567890";
     ///
@@ -181,7 +181,7 @@ impl Totp {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::totp::{Totp, TotpValidateOptions, TotpOptions};
+    /// use bsv_rs::totp::{Totp, TotpValidateOptions, TotpOptions};
     ///
     /// let secret = b"12345678901234567890";
     /// let code = Totp::generate(secret, None);

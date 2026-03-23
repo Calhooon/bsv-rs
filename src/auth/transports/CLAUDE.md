@@ -219,7 +219,7 @@ pub mod headers {
 ### Creating an HTTP Transport
 
 ```rust
-use bsv_sdk::auth::transports::SimplifiedFetchTransport;
+use bsv_rs::auth::transports::SimplifiedFetchTransport;
 
 let transport = SimplifiedFetchTransport::new("https://example.com");
 assert_eq!(transport.base_url(), "https://example.com");
@@ -228,7 +228,7 @@ assert_eq!(transport.base_url(), "https://example.com");
 ### Creating a WebSocket Transport
 
 ```rust
-use bsv_sdk::auth::transports::{WebSocketTransport, WebSocketTransportOptions};
+use bsv_rs::auth::transports::{WebSocketTransport, WebSocketTransportOptions};
 
 let transport = WebSocketTransport::new(WebSocketTransportOptions {
     base_url: "wss://example.com/ws".to_string(),
@@ -241,7 +241,7 @@ assert_eq!(transport.read_deadline_secs(), 60);
 ### Creating HTTP Request Payloads
 
 ```rust
-use bsv_sdk::auth::transports::HttpRequest;
+use bsv_rs::auth::transports::HttpRequest;
 
 let request = HttpRequest {
     request_id: [42u8; 32],
@@ -262,8 +262,8 @@ assert_eq!(decoded.url_postfix(), "/api/v1/users");
 ### Using MockTransport in Tests
 
 ```rust
-use bsv_sdk::auth::transports::{MockTransport, Transport};
-use bsv_sdk::auth::types::{AuthMessage, MessageType};
+use bsv_rs::auth::transports::{MockTransport, Transport};
+use bsv_rs::auth::types::{AuthMessage, MessageType};
 
 #[tokio::test]
 async fn test_auth_flow() {
@@ -356,10 +356,10 @@ Varint sizes (Bitcoin-style):
 
 ```toml
 # HTTP transport requires the http feature
-bsv-sdk = { version = "0.2", features = ["auth", "http"] }
+bsv-rs = { version = "0.3", features = ["auth", "http"] }
 
 # WebSocket transport requires the websocket feature (adds tokio-tungstenite, futures-util)
-bsv-sdk = { version = "0.2", features = ["auth", "websocket"] }
+bsv-rs = { version = "0.3", features = ["auth", "websocket"] }
 ```
 
 Without the `http` feature, `SimplifiedFetchTransport::send()` returns an error:

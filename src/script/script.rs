@@ -53,7 +53,7 @@ impl Script {
     /// # Example
     ///
     /// ```
-    /// use bsv_sdk::script::Script;
+    /// use bsv_rs::script::Script;
     ///
     /// let script = Script::from_asm("OP_DUP OP_HASH160 abcd1234 OP_EQUALVERIFY OP_CHECKSIG").unwrap();
     /// ```
@@ -132,7 +132,7 @@ impl Script {
     /// # Example
     ///
     /// ```
-    /// use bsv_sdk::script::Script;
+    /// use bsv_rs::script::Script;
     ///
     /// let script = Script::from_hex("76a914000000000000000000000000000000000000000088ac").unwrap();
     /// ```
@@ -158,7 +158,7 @@ impl Script {
     /// # Example
     ///
     /// ```
-    /// use bsv_sdk::script::Script;
+    /// use bsv_rs::script::Script;
     ///
     /// let script = Script::from_binary(&[0x76, 0xa9]).unwrap();
     /// ```

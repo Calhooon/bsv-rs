@@ -27,7 +27,7 @@ impl UploadableFile {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::storage::UploadableFile;
+    /// use bsv_rs::storage::UploadableFile;
     ///
     /// let file = UploadableFile::new(b"Hello, World!".to_vec(), "text/plain");
     /// assert_eq!(file.mime_type, "text/plain");

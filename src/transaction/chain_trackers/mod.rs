@@ -14,13 +14,13 @@
 //!
 //! ```toml
 //! [dependencies]
-//! bsv-sdk = { version = "0.2", features = ["transaction", "http"] }
+//! bsv-rs = { version = "0.3", features = ["transaction", "http"] }
 //! ```
 //!
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{ChainTracker, WhatsOnChainTracker};
+//! use bsv_rs::transaction::{ChainTracker, WhatsOnChainTracker};
 //!
 //! #[tokio::main]
 //! async fn main() {

@@ -1,6 +1,6 @@
 //! DRBG test vectors from NIST SP 800-90A
 
-use bsv_sdk::primitives::drbg::HmacDrbg;
+use bsv_rs::primitives::drbg::HmacDrbg;
 use serde::Deserialize;
 
 #[derive(Deserialize)]

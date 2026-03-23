@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::primitives::bsv::tx_signature::TransactionSignature;
-//! use bsv_sdk::primitives::ec::Signature;
+//! use bsv_rs::primitives::bsv::tx_signature::TransactionSignature;
+//! use bsv_rs::primitives::ec::Signature;
 //!
 //! // Parse a signature from checksig format
 //! let checksig_bytes = hex::decode("3044...41").unwrap();
@@ -88,7 +88,7 @@ impl TransactionSignature {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::primitives::bsv::tx_signature::TransactionSignature;
+    /// use bsv_rs::primitives::bsv::tx_signature::TransactionSignature;
     ///
     /// let checksig = hex::decode("30440220...0141").unwrap();
     /// let sig = TransactionSignature::from_checksig_format(&checksig).unwrap();

@@ -18,9 +18,9 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::P2PKH;
-//! use bsv_sdk::script::template::{ScriptTemplate, SignOutputs, SigningContext};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::P2PKH;
+//! use bsv_rs::script::template::{ScriptTemplate, SignOutputs, SigningContext};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::random();
 //! let pubkey_hash = private_key.public_key().hash160();
@@ -55,8 +55,8 @@ use crate::Result;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::script::templates::P2PKH;
-/// use bsv_sdk::script::template::ScriptTemplate;
+/// use bsv_rs::script::templates::P2PKH;
+/// use bsv_rs::script::template::ScriptTemplate;
 ///
 /// let template = P2PKH::new();
 ///
@@ -90,7 +90,7 @@ impl P2PKH {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::P2PKH;
+    /// use bsv_rs::script::templates::P2PKH;
     ///
     /// let locking = P2PKH::lock_from_address("1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2")?;
     /// ```
@@ -130,9 +130,9 @@ impl P2PKH {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::P2PKH;
-    /// use bsv_sdk::script::template::{SignOutputs, SigningContext};
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::script::templates::P2PKH;
+    /// use bsv_rs::script::template::{SignOutputs, SigningContext};
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let private_key = PrivateKey::random();
     /// let unlock = P2PKH::unlock(&private_key, SignOutputs::All, false);
@@ -234,8 +234,8 @@ impl ScriptTemplate for P2PKH {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::P2PKH;
-    /// use bsv_sdk::script::template::ScriptTemplate;
+    /// use bsv_rs::script::templates::P2PKH;
+    /// use bsv_rs::script::template::ScriptTemplate;
     ///
     /// let template = P2PKH::new();
     /// let locking = template.lock(&pubkey_hash)?;

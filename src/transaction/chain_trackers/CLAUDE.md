@@ -23,7 +23,7 @@ These implementations require the `http` feature to be enabled for actual networ
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["transaction", "http"] }
+bsv-rs = { version = "0.3", features = ["transaction", "http"] }
 ```
 
 Without the `http` feature, the tracker methods will return `ChainTrackerError::NetworkError` indicating the feature is not enabled.
@@ -98,7 +98,7 @@ impl Debug for WhatsOnChainTracker {
 ### WhatsOnChain Usage
 
 ```rust
-use bsv_sdk::transaction::{ChainTracker, WhatsOnChainTracker, WocNetwork};
+use bsv_rs::transaction::{ChainTracker, WhatsOnChainTracker, WocNetwork};
 
 // Create mainnet tracker (default)
 let tracker = WhatsOnChainTracker::mainnet();
@@ -178,7 +178,7 @@ The Block Headers Service API supports multiple field names for compatibility:
 ### Block Headers Service Usage
 
 ```rust
-use bsv_sdk::transaction::{
+use bsv_rs::transaction::{
     ChainTracker, BlockHeadersServiceTracker, BlockHeadersServiceConfig,
     DEFAULT_HEADERS_URL
 };
@@ -241,7 +241,7 @@ Both trackers return `ChainTrackerError` variants:
 ## SPV Verification with BEEF
 
 ```rust
-use bsv_sdk::transaction::{Beef, ChainTracker, WhatsOnChainTracker};
+use bsv_rs::transaction::{Beef, ChainTracker, WhatsOnChainTracker};
 
 async fn verify_beef(beef_hex: &str) -> Result<bool, Box<dyn std::error::Error>> {
     let mut beef = Beef::from_hex(beef_hex)?;

@@ -14,14 +14,14 @@
 #![cfg(feature = "auth")]
 
 use async_trait::async_trait;
-use bsv_sdk::auth::transports::{Transport, TransportCallback};
-use bsv_sdk::auth::{
+use bsv_rs::auth::transports::{Transport, TransportCallback};
+use bsv_rs::auth::{
     AuthMessage, Certificate, MessageType, Peer, PeerOptions, RequestedCertificateSet,
     VerifiableCertificate,
 };
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::wallet::ProtoWallet;
-use bsv_sdk::Result;
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
@@ -51,7 +51,7 @@ impl Transport for ChannelTransport {
     async fn send(&self, message: &AuthMessage) -> Result<()> {
         self.sender
             .send(message.clone())
-            .map_err(|e| bsv_sdk::Error::AuthError(format!("Channel send failed: {}", e)))?;
+            .map_err(|e| bsv_rs::Error::AuthError(format!("Channel send failed: {}", e)))?;
         Ok(())
     }
 
@@ -444,7 +444,7 @@ async fn test_handle_initial_request_creates_session() {
     // Create an InitialRequest from Alice
     let alice_pub = alice_key.public_key();
     let mut initial_request = AuthMessage::new(MessageType::InitialRequest, alice_pub.clone());
-    initial_request.initial_nonce = Some(bsv_sdk::primitives::to_base64(&[0xAA; 32]));
+    initial_request.initial_nonce = Some(bsv_rs::primitives::to_base64(&[0xAA; 32]));
 
     // Deliver to Bob directly via handle_incoming_message
     bob.handle_incoming_message(initial_request).await.unwrap();
@@ -631,7 +631,7 @@ async fn test_certificate_request_callback_invoked() {
     let mut requested = RequestedCertificateSet::new();
     requested.add_certifier(certifier_key.to_hex());
     requested.add_type(
-        bsv_sdk::primitives::to_base64(&[1u8; 32]),
+        bsv_rs::primitives::to_base64(&[1u8; 32]),
         vec!["name".to_string(), "email".to_string()],
     );
 
@@ -1032,7 +1032,7 @@ async fn test_both_peers_have_sessions_after_handshake() {
 /// The responder manually crafts a TS-shaped response to verify cross-SDK compat.
 #[tokio::test]
 async fn test_ts_style_server_no_nonce_field() {
-    use bsv_sdk::auth::create_nonce;
+    use bsv_rs::auth::create_nonce;
 
     let alice_key = PrivateKey::random();
     let bob_key = PrivateKey::random();
@@ -1098,14 +1098,14 @@ async fn test_ts_style_server_no_nonce_field() {
         .unwrap();
 
     // Build signing data: initiator_nonce || responder_nonce (decoded from base64)
-    let initiator_bytes = bsv_sdk::primitives::from_base64(&initiator_nonce).unwrap();
-    let responder_bytes = bsv_sdk::primitives::from_base64(&responder_nonce).unwrap();
+    let initiator_bytes = bsv_rs::primitives::from_base64(&initiator_nonce).unwrap();
+    let responder_bytes = bsv_rs::primitives::from_base64(&responder_nonce).unwrap();
     let mut signing_data = Vec::new();
     signing_data.extend_from_slice(&initiator_bytes);
     signing_data.extend_from_slice(&responder_bytes);
 
     // Sign using bob's wallet (sync ProtoWallet method)
-    use bsv_sdk::wallet::{Counterparty, CreateSignatureArgs, Protocol, SecurityLevel};
+    use bsv_rs::wallet::{Counterparty, CreateSignatureArgs, Protocol, SecurityLevel};
     let key_id = format!("{} {}", initiator_nonce, responder_nonce);
     let sig_result = bob_wallet
         .create_signature(CreateSignatureArgs {

@@ -44,8 +44,8 @@ use serde::{Deserialize, Serialize};
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::wallet::substrates::HttpWalletJson;
-/// use bsv_sdk::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
+/// use bsv_rs::wallet::substrates::HttpWalletJson;
+/// use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
 ///
 /// let client = HttpWalletJson::new(
 ///     Some("myapp.example.com".into()),

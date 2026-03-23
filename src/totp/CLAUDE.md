@@ -55,7 +55,7 @@ impl Totp {
 ### Basic Generation and Validation
 
 ```rust
-use bsv_sdk::totp::{Totp, TotpOptions, Algorithm};
+use bsv_rs::totp::{Totp, TotpOptions, Algorithm};
 
 // Shared secret (typically from base32-decoded QR code)
 let secret = b"12345678901234567890";
@@ -74,7 +74,7 @@ assert!(!Totp::validate(secret, "000000", None));
 ### Using Different Algorithms
 
 ```rust
-use bsv_sdk::totp::{Totp, TotpOptions, Algorithm};
+use bsv_rs::totp::{Totp, TotpOptions, Algorithm};
 
 let secret = b"12345678901234567890123456789012"; // Longer secret for SHA-256
 
@@ -91,7 +91,7 @@ assert_eq!(code.len(), 8);
 ### Testing with Fixed Timestamp
 
 ```rust
-use bsv_sdk::totp::{Totp, TotpOptions};
+use bsv_rs::totp::{Totp, TotpOptions};
 
 let secret = b"12345678901234567890";
 
@@ -108,7 +108,7 @@ assert_eq!(code, "94287082");
 ### Custom Skew for Clock Drift
 
 ```rust
-use bsv_sdk::totp::{Totp, TotpOptions, TotpValidateOptions};
+use bsv_rs::totp::{Totp, TotpOptions, TotpValidateOptions};
 
 let secret = b"12345678901234567890";
 let code = Totp::generate(secret, None);
@@ -200,14 +200,14 @@ Enable the TOTP module:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["totp"] }
+bsv-rs = { version = "0.3", features = ["totp"] }
 ```
 
 The `totp` feature is included in `full`:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["full"] }
+bsv-rs = { version = "0.3", features = ["full"] }
 ```
 
 ## Dependencies

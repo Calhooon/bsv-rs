@@ -20,7 +20,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::MerklePath;
+//! use bsv_rs::transaction::MerklePath;
 //!
 //! // Parse from hex
 //! let merkle_path = MerklePath::from_hex("...")?;

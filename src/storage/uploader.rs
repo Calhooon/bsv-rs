@@ -57,7 +57,7 @@ impl StorageUploaderConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::storage::{StorageUploader, StorageUploaderConfig, UploadableFile};
+/// use bsv_rs::storage::{StorageUploader, StorageUploaderConfig, UploadableFile};
 ///
 /// let config = StorageUploaderConfig::new("https://storage.example.com");
 /// let uploader = StorageUploader::new(config);

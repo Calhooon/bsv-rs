@@ -17,8 +17,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput, ChangeDistribution};
-//! use bsv_sdk::script::LockingScript;
+//! use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput, ChangeDistribution};
+//! use bsv_rs::script::LockingScript;
 //!
 //! // Create a new transaction
 //! let mut tx = Transaction::new();
@@ -47,7 +47,7 @@
 //! # Fee Models
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte};
+//! use bsv_rs::transaction::{FeeModel, SatoshisPerKilobyte};
 //!
 //! // 100 satoshis per kilobyte
 //! let fee_model = SatoshisPerKilobyte::new(100);
@@ -57,7 +57,7 @@
 //! # BEEF Format
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{Beef, MerklePath};
+//! use bsv_rs::transaction::{Beef, MerklePath};
 //!
 //! // Parse BEEF from hex
 //! let beef = Beef::from_hex("0100beef...")?;
@@ -74,7 +74,7 @@
 //! # Chain Tracking
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{ChainTracker, MockChainTracker};
+//! use bsv_rs::transaction::{ChainTracker, MockChainTracker};
 //!
 //! // Create a mock tracker for testing
 //! let mut tracker = MockChainTracker::new(1000);

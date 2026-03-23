@@ -133,8 +133,8 @@ pub fn calculate_recovery_id(msg_hash: &[u8; 32], signature: &Signature, public_
 ### Key Generation and Signing
 
 ```rust
-use bsv_sdk::primitives::ec::{PrivateKey, sign, verify};
-use bsv_sdk::primitives::hash::sha256;
+use bsv_rs::primitives::ec::{PrivateKey, sign, verify};
+use bsv_rs::primitives::hash::sha256;
 
 // Generate random key pair
 let private_key = PrivateKey::random();
@@ -154,7 +154,7 @@ assert!(public_key.verify(&msg_hash, &signature));
 ### WIF Encoding (Wallet Import/Export)
 
 ```rust
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::primitives::ec::PrivateKey;
 
 // Parse WIF
 let wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn";
@@ -168,7 +168,7 @@ let testnet_wif = key.to_wif_with_prefix(0xef);  // Testnet
 ### Address Generation
 
 ```rust
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::primitives::ec::PrivateKey;
 
 let key = PrivateKey::from_hex(
     "0000000000000000000000000000000000000000000000000000000000000001"
@@ -186,7 +186,7 @@ let testnet_addr = pubkey.to_address_with_prefix(0x6f);
 ### ECDH Shared Secret
 
 ```rust
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::primitives::ec::PrivateKey;
 
 let alice = PrivateKey::random();
 let bob = PrivateKey::random();
@@ -201,7 +201,7 @@ assert_eq!(alice_shared.to_compressed(), bob_shared.to_compressed());
 ### BRC-42 Key Derivation
 
 ```rust
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::primitives::ec::PrivateKey;
 
 let alice_priv = PrivateKey::random();
 let bob_priv = PrivateKey::random();
@@ -220,8 +220,8 @@ assert_eq!(bob_child_priv.public_key().to_compressed(), bob_child_pub.to_compres
 ### Public Key Recovery
 
 ```rust
-use bsv_sdk::primitives::ec::{PrivateKey, sign, recover_public_key};
-use bsv_sdk::primitives::hash::sha256;
+use bsv_rs::primitives::ec::{PrivateKey, sign, recover_public_key};
+use bsv_rs::primitives::hash::sha256;
 
 let key = PrivateKey::random();
 let pubkey = key.public_key();
@@ -242,7 +242,7 @@ for recovery_id in 0..2 {
 ### Point Arithmetic
 
 ```rust
-use bsv_sdk::primitives::ec::{PrivateKey, PublicKey};
+use bsv_rs::primitives::ec::{PrivateKey, PublicKey};
 
 // Generator point multiplication
 let mut scalar = [0u8; 32];
@@ -294,7 +294,7 @@ The HMAC uses compressed shared secret as the key and invoice number bytes as th
 - Deserializes from any valid hex public key (compressed or uncompressed)
 
 ```rust
-use bsv_sdk::primitives::ec::{PrivateKey, PublicKey};
+use bsv_rs::primitives::ec::{PrivateKey, PublicKey};
 
 // Serializes to JSON as a hex string
 let pubkey = PrivateKey::random().public_key();

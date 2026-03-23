@@ -302,9 +302,9 @@ Three implementations:
 ### Client-Side Peer Authentication
 
 ```rust
-use bsv_sdk::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
-use bsv_sdk::wallet::ProtoWallet;
-use bsv_sdk::primitives::PrivateKey;
+use bsv_rs::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
+use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::primitives::PrivateKey;
 
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let transport = SimplifiedFetchTransport::new("https://example.com");
@@ -361,7 +361,7 @@ peer.request_certificates(requested, Some(&peer_identity_key), None).await?;
 ### WebSocket Transport
 
 ```rust
-use bsv_sdk::auth::{Peer, PeerOptions, WebSocketTransport, WebSocketTransportOptions};
+use bsv_rs::auth::{Peer, PeerOptions, WebSocketTransport, WebSocketTransportOptions};
 
 let transport = WebSocketTransport::new(WebSocketTransportOptions {
     base_url: "wss://example.com/ws".to_string(),
@@ -449,13 +449,13 @@ Payload format for General messages: **Request** `[request_id: 32][method: varin
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["auth"] }
+bsv-rs = { version = "0.3", features = ["auth"] }
 
 # With HTTP transport
-bsv-sdk = { version = "0.2", features = ["auth", "http"] }
+bsv-rs = { version = "0.3", features = ["auth", "http"] }
 
 # With WebSocket transport
-bsv-sdk = { version = "0.2", features = ["auth", "websocket"] }
+bsv-rs = { version = "0.3", features = ["auth", "websocket"] }
 ```
 
 The `auth` feature requires `wallet` and `messages` features (included automatically).

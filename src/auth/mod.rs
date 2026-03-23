@@ -23,9 +23,9 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
-//! use bsv_sdk::wallet::ProtoWallet;
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::auth::{Peer, PeerOptions, SimplifiedFetchTransport};
+//! use bsv_rs::wallet::ProtoWallet;
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create wallet and transport
 //! let wallet = ProtoWallet::new(Some(PrivateKey::random()));

@@ -11,9 +11,9 @@
 //! - Memory usage awareness through RSS tracking
 //! - Cross-platform support (Linux, macOS, Windows)
 
-use bsv_sdk::primitives::bsv::shamir::split_private_key;
-use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::primitives::symmetric::SymmetricKey;
+use bsv_rs::primitives::bsv::shamir::split_private_key;
+use bsv_rs::primitives::ec::PrivateKey;
+use bsv_rs::primitives::symmetric::SymmetricKey;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use memory_stats::memory_stats;
 
@@ -130,7 +130,7 @@ fn bench_shamir_memory(c: &mut Criterion) {
     let start_rss = current_rss();
     group.bench_function("recover_3_of_5", |b| {
         b.iter(|| {
-            let subset = bsv_sdk::primitives::bsv::shamir::KeyShares::new(
+            let subset = bsv_rs::primitives::bsv::shamir::KeyShares::new(
                 shares.points[0..3].to_vec(),
                 3,
                 shares.integrity.clone(),
@@ -152,7 +152,7 @@ fn bench_signing_memory(c: &mut Criterion) {
 
     let key = PrivateKey::random();
     let pubkey = key.public_key();
-    let msg_hash = bsv_sdk::primitives::hash::sha256(b"benchmark message for signing");
+    let msg_hash = bsv_rs::primitives::hash::sha256(b"benchmark message for signing");
 
     // ECDSA sign
     let start_rss = current_rss();

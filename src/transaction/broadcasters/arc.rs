@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{ArcBroadcaster, Broadcaster, Transaction};
+//! use bsv_rs::transaction::{ArcBroadcaster, Broadcaster, Transaction};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -62,7 +62,7 @@ impl Default for ArcConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{ArcBroadcaster, Broadcaster};
+/// use bsv_rs::transaction::{ArcBroadcaster, Broadcaster};
 ///
 /// // Create with default URL
 /// let broadcaster = ArcBroadcaster::default();

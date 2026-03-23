@@ -13,9 +13,9 @@
 //! # Example: P2PKH
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::P2PKH;
-//! use bsv_sdk::script::template::{ScriptTemplate, SignOutputs, SigningContext};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::P2PKH;
+//! use bsv_rs::script::template::{ScriptTemplate, SignOutputs, SigningContext};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::random();
 //! let pubkey_hash = private_key.public_key().hash160();
@@ -35,10 +35,10 @@
 //! # Example: R-Puzzle
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::{RPuzzle, RPuzzleType};
-//! use bsv_sdk::script::template::{ScriptTemplate, SignOutputs};
-//! use bsv_sdk::primitives::ec::PrivateKey;
-//! use bsv_sdk::primitives::BigNumber;
+//! use bsv_rs::script::templates::{RPuzzle, RPuzzleType};
+//! use bsv_rs::script::template::{ScriptTemplate, SignOutputs};
+//! use bsv_rs::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::BigNumber;
 //!
 //! // Generate a random K value
 //! let k = BigNumber::from_bytes_be(&random_bytes);
@@ -50,7 +50,7 @@
 //!
 //! // Or use hashed R value (smaller script)
 //! let template = RPuzzle::new(RPuzzleType::Hash160);
-//! let r_hash = bsv_sdk::primitives::hash160(&r_value);
+//! let r_hash = bsv_rs::primitives::hash160(&r_value);
 //! let locking = template.lock(&r_hash)?;
 //!
 //! // Unlock using the K value
@@ -62,8 +62,8 @@
 //! # Example: PushDrop
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::{PushDrop, LockPosition};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::{PushDrop, LockPosition};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::random();
 //! let public_key = private_key.public_key();

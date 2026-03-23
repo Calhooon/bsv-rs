@@ -84,7 +84,7 @@ Enum representing the 9 known certificate types in the BSV ecosystem:
 | `CoolCert` | `AGfk/WrT1eBDXpz3mcw386Zww2HmqcIn3uY6x4Af1eo=` | cool (boolean) |
 
 ```rust
-use bsv_sdk::identity::KnownCertificateType;
+use bsv_rs::identity::KnownCertificateType;
 
 // Get type ID for a certificate type
 let type_id = KnownCertificateType::XCert.type_id();
@@ -104,7 +104,7 @@ let all_types = KnownCertificateType::all();
 User-friendly representation of an identity for UI display:
 
 ```rust
-use bsv_sdk::identity::DisplayableIdentity;
+use bsv_rs::identity::DisplayableIdentity;
 
 let identity = DisplayableIdentity {
     name: "Alice".to_string(),
@@ -128,7 +128,7 @@ let unknown = DisplayableIdentity::unknown();
 Stored contact with identity information and metadata:
 
 ```rust
-use bsv_sdk::identity::{Contact, DisplayableIdentity};
+use bsv_rs::identity::{Contact, DisplayableIdentity};
 
 let contact = Contact {
     identity_key: "02abc123...".to_string(),
@@ -150,7 +150,7 @@ let contact = Contact::from_identity(display);
 Query parameters for identity resolution with builder pattern:
 
 ```rust
-use bsv_sdk::identity::IdentityQuery;
+use bsv_rs::identity::IdentityQuery;
 use std::collections::HashMap;
 
 // Query by identity key
@@ -208,9 +208,9 @@ pub struct CertifierInfo {
 Main client for identity operations. Generic over wallet implementation:
 
 ```rust
-use bsv_sdk::identity::{IdentityClient, IdentityClientConfig};
-use bsv_sdk::wallet::ProtoWallet;
-use bsv_sdk::PrivateKey;
+use bsv_rs::identity::{IdentityClient, IdentityClientConfig};
+use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::PrivateKey;
 
 // Create a wallet
 let private_key = PrivateKey::random();
@@ -315,7 +315,7 @@ let displayable = IdentityClient::<ProtoWallet>::parse_identity(&cert);
 Direct contact management with encrypted storage, search, and caching:
 
 ```rust
-use bsv_sdk::identity::{ContactsManager, ContactsManagerConfig, Contact};
+use bsv_rs::identity::{ContactsManager, ContactsManagerConfig, Contact};
 
 let config = ContactsManagerConfig::with_originator("myapp.example.com");
 let manager = ContactsManager::new(wallet, config);
@@ -413,7 +413,7 @@ result.into_result();  // Result<BroadcastSuccess, BroadcastFailure>
 UHRP hashes for certificate type avatars:
 
 ```rust
-use bsv_sdk::identity::StaticAvatarUrls;
+use bsv_rs::identity::StaticAvatarUrls;
 
 StaticAvatarUrls::EMAIL;   // Envelope icon
 StaticAvatarUrls::PHONE;   // Phone icon
@@ -426,7 +426,7 @@ StaticAvatarUrls::SELF;    // Self certificate avatar
 Constants for unverified/unknown identities:
 
 ```rust
-use bsv_sdk::identity::DefaultIdentityValues;
+use bsv_rs::identity::DefaultIdentityValues;
 
 DefaultIdentityValues::NAME;           // "Unknown Identity"
 DefaultIdentityValues::AVATAR_URL;     // UHRP hash for default avatar

@@ -3,16 +3,16 @@
 //! These tests validate that all modules work together correctly,
 //! testing complete workflows from key generation to transaction signing.
 
-use bsv_sdk::primitives::bsv::schnorr::Schnorr;
-use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
-use bsv_sdk::primitives::bsv::sighash::{
+use bsv_rs::primitives::bsv::schnorr::Schnorr;
+use bsv_rs::primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_rs::primitives::bsv::sighash::{
     compute_sighash, SighashParams, TxInput, TxOutput, SIGHASH_ALL, SIGHASH_FORKID,
 };
-use bsv_sdk::primitives::ec::{recover_public_key, PrivateKey};
-use bsv_sdk::primitives::hash::{hash160, sha256, sha256_hmac, sha256d, sha512_hmac};
-use bsv_sdk::primitives::p256::{P256PrivateKey, P256PublicKey};
-use bsv_sdk::primitives::symmetric::SymmetricKey;
-use bsv_sdk::primitives::{from_base58, from_base64, from_hex, to_base58, to_base64, to_hex};
+use bsv_rs::primitives::ec::{recover_public_key, PrivateKey};
+use bsv_rs::primitives::hash::{hash160, sha256, sha256_hmac, sha256d, sha512_hmac};
+use bsv_rs::primitives::p256::{P256PrivateKey, P256PublicKey};
+use bsv_rs::primitives::symmetric::SymmetricKey;
+use bsv_rs::primitives::{from_base58, from_base64, from_hex, to_base58, to_base64, to_hex};
 
 // ============================================================================
 // Full Key Derivation Workflow Tests
@@ -441,7 +441,7 @@ fn test_address_encoding_integration() {
     let manual_address = pub_key.to_address();
 
     // Address should be Base58Check encoded hash160 with version byte 0x00
-    let (version, payload) = bsv_sdk::primitives::from_base58_check(&manual_address).unwrap();
+    let (version, payload) = bsv_rs::primitives::from_base58_check(&manual_address).unwrap();
     assert_eq!(version, vec![0x00]);
     assert_eq!(payload, h160.to_vec());
 }

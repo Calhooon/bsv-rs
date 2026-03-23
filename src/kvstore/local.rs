@@ -32,8 +32,8 @@ use tokio::sync::Mutex;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
-/// use bsv_sdk::wallet::ProtoWallet;
+/// use bsv_rs::kvstore::{LocalKVStore, KVStoreConfig};
+/// use bsv_rs::wallet::ProtoWallet;
 ///
 /// let wallet = ProtoWallet::new(None);
 /// let config = KVStoreConfig::default();

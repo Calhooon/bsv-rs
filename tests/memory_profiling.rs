@@ -12,10 +12,10 @@
 
 #![cfg(feature = "dhat-profiling")]
 
-use bsv_sdk::primitives::bsv::shamir::split_private_key;
-use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::primitives::hash;
-use bsv_sdk::primitives::symmetric::SymmetricKey;
+use bsv_rs::primitives::bsv::shamir::split_private_key;
+use bsv_rs::primitives::ec::PrivateKey;
+use bsv_rs::primitives::hash;
+use bsv_rs::primitives::symmetric::SymmetricKey;
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
@@ -154,7 +154,7 @@ fn test_shamir_allocations() {
         let _profiler = dhat::Profiler::new_heap();
 
         for _ in 0..50 {
-            let subset = bsv_sdk::primitives::bsv::shamir::KeyShares::new(
+            let subset = bsv_rs::primitives::bsv::shamir::KeyShares::new(
                 shares.points[0..3].to_vec(),
                 3,
                 shares.integrity.clone(),

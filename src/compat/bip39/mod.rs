@@ -16,7 +16,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use bsv_sdk::compat::bip39::{Mnemonic, WordCount};
+//! use bsv_rs::compat::bip39::{Mnemonic, WordCount};
 //!
 //! // Generate a new 12-word mnemonic
 //! let mnemonic = Mnemonic::new(WordCount::Words12).unwrap();

@@ -117,7 +117,7 @@ Japanese uses ideographic space (U+3000) as the word separator per BIP-39 spec; 
 The wordlist is typically accessed indirectly through the `Mnemonic` struct:
 
 ```rust
-use bsv_sdk::compat::bip39::{Mnemonic, Language, WordCount};
+use bsv_rs::compat::bip39::{Mnemonic, Language, WordCount};
 
 // Default language (English)
 let mnemonic = Mnemonic::new(WordCount::Words12)?;
@@ -133,7 +133,7 @@ let mnemonic = Mnemonic::from_phrase_with_language(phrase, Language::French)?;
 Direct access to wordlists:
 
 ```rust
-use bsv_sdk::compat::bip39::wordlists::{ENGLISH, JAPANESE, SPANISH};
+use bsv_rs::compat::bip39::wordlists::{ENGLISH, JAPANESE, SPANISH};
 
 // Look up word at specific index
 let word = ENGLISH[0];      // "abandon"

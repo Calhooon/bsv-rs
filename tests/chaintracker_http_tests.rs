@@ -8,7 +8,7 @@
 
 #![cfg(all(feature = "transaction", feature = "http"))]
 
-use bsv_sdk::transaction::{ChainTracker, ChainTrackerError, WhatsOnChainTracker, WocNetwork};
+use bsv_rs::transaction::{ChainTracker, ChainTrackerError, WhatsOnChainTracker, WocNetwork};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 

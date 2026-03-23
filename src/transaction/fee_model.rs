@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{FeeModel, SatoshisPerKilobyte, Transaction};
+//! use bsv_rs::transaction::{FeeModel, SatoshisPerKilobyte, Transaction};
 //!
 //! let fee_model = SatoshisPerKilobyte::new(100); // 100 sat/KB
 //! let tx = Transaction::new();
@@ -27,7 +27,7 @@ use crate::Result;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{FeeModel, Transaction};
+/// use bsv_rs::transaction::{FeeModel, Transaction};
 ///
 /// struct FixedFee(u64);
 ///
@@ -57,7 +57,7 @@ pub trait FeeModel: Send + Sync {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{FixedFee, FeeModel, Transaction};
+/// use bsv_rs::transaction::{FixedFee, FeeModel, Transaction};
 ///
 /// let fee_model = FixedFee::new(500);
 /// let tx = Transaction::new();

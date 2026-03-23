@@ -15,7 +15,7 @@
 //! # Example: Building Scripts
 //!
 //! ```rust
-//! use bsv_sdk::script::{Script, LockingScript, op};
+//! use bsv_rs::script::{Script, LockingScript, op};
 //!
 //! // Create a P2PKH locking script from ASM
 //! let script = Script::from_asm("OP_DUP OP_HASH160 0000000000000000000000000000000000000000 OP_EQUALVERIFY OP_CHECKSIG").unwrap();
@@ -40,9 +40,9 @@
 //! # Example: Using Templates
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::P2PKH;
-//! use bsv_sdk::script::template::{ScriptTemplate, SignOutputs};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::P2PKH;
+//! use bsv_rs::script::template::{ScriptTemplate, SignOutputs};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::random();
 //! let pubkey_hash = private_key.public_key().hash160();

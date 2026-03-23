@@ -83,23 +83,23 @@ The `Error` enum provides unified error handling across all modules using `thise
 
 ```rust
 // Import error types
-use bsv_sdk::{Error, Result};
+use bsv_rs::{Error, Result};
 
 // Import primitives directly from crate root
-use bsv_sdk::{PrivateKey, PublicKey, sha256};
+use bsv_rs::{PrivateKey, PublicKey, sha256};
 
 // Or import from module
-use bsv_sdk::primitives::{PrivateKey, sha256};
+use bsv_rs::primitives::{PrivateKey, sha256};
 
 // Feature-gated imports
 #[cfg(feature = "transaction")]
-use bsv_sdk::{Transaction, TransactionInput, TransactionOutput};
+use bsv_rs::{Transaction, TransactionInput, TransactionOutput};
 ```
 
 ### Quick Start Example
 
 ```rust
-use bsv_sdk::{PrivateKey, sha256};
+use bsv_rs::{PrivateKey, sha256};
 
 // Generate a key pair
 let private_key = PrivateKey::random();
@@ -116,7 +116,7 @@ assert!(public_key.verify(&hash, &signature));
 ### Error Handling
 
 ```rust
-use bsv_sdk::{from_hex, Error, Result};
+use bsv_rs::{from_hex, Error, Result};
 
 fn parse_key(hex: &str) -> Result<Vec<u8>> {
     from_hex(hex).map_err(|_| Error::InvalidHex(hex.to_string()))

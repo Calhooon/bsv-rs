@@ -5,16 +5,16 @@
 //! These benchmarks measure the performance of cryptographic operations
 //! across all modules in the BSV primitives library.
 
-use bsv_sdk::primitives::bsv::schnorr::Schnorr;
-use bsv_sdk::primitives::bsv::shamir::split_private_key;
-use bsv_sdk::primitives::bsv::sighash::{
+use bsv_rs::primitives::bsv::schnorr::Schnorr;
+use bsv_rs::primitives::bsv::shamir::split_private_key;
+use bsv_rs::primitives::bsv::sighash::{
     compute_sighash, SighashParams, TxInput, TxOutput, SIGHASH_ALL, SIGHASH_FORKID,
 };
-use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::primitives::hash;
-use bsv_sdk::primitives::p256::P256PrivateKey;
-use bsv_sdk::primitives::symmetric::SymmetricKey;
-use bsv_sdk::primitives::{from_hex, to_base58, to_hex};
+use bsv_rs::primitives::ec::PrivateKey;
+use bsv_rs::primitives::hash;
+use bsv_rs::primitives::p256::P256PrivateKey;
+use bsv_rs::primitives::symmetric::SymmetricKey;
+use bsv_rs::primitives::{from_hex, to_base58, to_hex};
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 // ============================================================================
@@ -252,7 +252,7 @@ fn bench_encoding(c: &mut Criterion) {
 
     let b58_str = to_base58(&data);
     group.bench_function("from_base58 (1KB)", |b| {
-        b.iter(|| bsv_sdk::primitives::from_base58(black_box(&b58_str)))
+        b.iter(|| bsv_rs::primitives::from_base58(black_box(&b58_str)))
     });
 
     group.finish();
@@ -322,7 +322,7 @@ fn bench_shamir(c: &mut Criterion) {
 
     group.bench_function("recover_private_key (3 of 5)", |b| {
         b.iter(|| {
-            let subset = bsv_sdk::primitives::bsv::shamir::KeyShares::new(
+            let subset = bsv_rs::primitives::bsv::shamir::KeyShares::new(
                 shares.points[0..3].to_vec(),
                 3,
                 shares.integrity.clone(),
@@ -339,7 +339,7 @@ fn bench_shamir(c: &mut Criterion) {
     let backup = shares.to_backup_format();
     group.bench_function("from_backup_format", |b| {
         b.iter(|| {
-            bsv_sdk::primitives::bsv::shamir::KeyShares::from_backup_format(black_box(&backup))
+            bsv_rs::primitives::bsv::shamir::KeyShares::from_backup_format(black_box(&backup))
         })
     });
 

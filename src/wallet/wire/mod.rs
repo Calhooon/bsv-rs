@@ -53,7 +53,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::wallet::wire::{WalletWire, WalletWireTransceiver};
+//! use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver};
 //!
 //! // Implement transport
 //! struct HttpWire { /* ... */ }
@@ -93,7 +93,7 @@ use crate::Error;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::wallet::wire::WalletWire;
+/// use bsv_rs::wallet::wire::WalletWire;
 ///
 /// struct WebSocketWire {
 ///     url: String,

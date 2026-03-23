@@ -7,7 +7,7 @@
 
 #![cfg(all(feature = "transaction", feature = "http"))]
 
-use bsv_sdk::transaction::{
+use bsv_rs::transaction::{
     ArcBroadcaster, ArcConfig, BroadcastStatus, Broadcaster, TeranodeBroadcaster, TeranodeConfig,
     Transaction, TransactionOutput, WhatsOnChainBroadcaster, WocBroadcastNetwork,
 };
@@ -40,7 +40,7 @@ fn ef_capable_transaction() -> Transaction {
         source_tx
             .add_output(TransactionOutput::new(
                 1_000_000,
-                bsv_sdk::script::LockingScript::from_hex(
+                bsv_rs::script::LockingScript::from_hex(
                     "76a914000000000000000000000000000000000000000088ac",
                 )
                 .unwrap(),

@@ -6,7 +6,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use bsv_sdk::compat::base58;
+//! use bsv_rs::compat::base58;
 //!
 //! // Encode bytes to Base58
 //! let encoded = base58::encode(&[0x00, 0x00, 0x00, 0x28, 0x7f, 0xb4, 0xcd]);
@@ -35,7 +35,7 @@ use crate::primitives::encoding::{from_base58, to_base58};
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::base58;
+/// use bsv_rs::compat::base58;
 ///
 /// assert_eq!(base58::encode(&[0x00]), "1");
 /// assert_eq!(base58::encode(&[0x00, 0x00, 0x00]), "111");
@@ -59,7 +59,7 @@ pub fn encode(data: &[u8]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::base58;
+/// use bsv_rs::compat::base58;
 ///
 /// assert_eq!(base58::decode("111").unwrap(), vec![0x00, 0x00, 0x00]);
 /// assert!(base58::decode("0OIl").is_err()); // Invalid characters

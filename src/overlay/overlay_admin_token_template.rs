@@ -52,8 +52,8 @@ impl OverlayAdminTokenData {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::overlay::overlay_admin_token_template::decode_overlay_admin_token;
-/// use bsv_sdk::script::LockingScript;
+/// use bsv_rs::overlay::overlay_admin_token_template::decode_overlay_admin_token;
+/// use bsv_rs::script::LockingScript;
 ///
 /// let script = LockingScript::from_hex("...")?;
 /// let token = decode_overlay_admin_token(&script)?;
@@ -123,8 +123,8 @@ pub fn decode_overlay_admin_token(script: &LockingScript) -> Result<OverlayAdmin
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::overlay::{create_overlay_admin_token, Protocol};
-/// use bsv_sdk::primitives::PrivateKey;
+/// use bsv_rs::overlay::{create_overlay_admin_token, Protocol};
+/// use bsv_rs::primitives::PrivateKey;
 ///
 /// let private_key = PrivateKey::random();
 /// let public_key = private_key.public_key();

@@ -26,8 +26,8 @@
 //! without requiring a shared secret to be transmitted.
 //!
 //! ```rust
-//! use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create derivers for Alice and Bob
 //! let alice_deriver = KeyDeriver::new(Some(PrivateKey::random()));
@@ -55,8 +55,8 @@
 //! [`ProtoWallet`] provides foundational cryptographic operations without blockchain interaction:
 //!
 //! ```rust
-//! use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs};
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs};
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create a ProtoWallet
 //! let wallet = ProtoWallet::new(Some(PrivateKey::random()));
@@ -76,8 +76,8 @@
 //! For performance-critical applications, use [`CachedKeyDeriver`]:
 //!
 //! ```rust
-//! use bsv_sdk::wallet::{CachedKeyDeriver, CacheConfig, Protocol, SecurityLevel, Counterparty, KeyDeriverApi};
-//! use bsv_sdk::primitives::PrivateKey;
+//! use bsv_rs::wallet::{CachedKeyDeriver, CacheConfig, Protocol, SecurityLevel, Counterparty, KeyDeriverApi};
+//! use bsv_rs::primitives::PrivateKey;
 //!
 //! // Create with custom cache size
 //! let config = CacheConfig { max_size: 500 };
@@ -103,7 +103,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! bsv-sdk = { version = "0.2", features = ["wallet"] }
+//! bsv-rs = { version = "0.3", features = ["wallet"] }
 //! ```
 
 mod cached_key_deriver;

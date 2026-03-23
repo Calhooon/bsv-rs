@@ -4,7 +4,7 @@
 
 #![cfg(feature = "compat")]
 
-use bsv_sdk::compat::bip39::{Language, Mnemonic, WordCount};
+use bsv_rs::compat::bip39::{Language, Mnemonic, WordCount};
 
 /// Test vector structure matching the Go SDK.
 struct TestVector {
@@ -585,6 +585,6 @@ fn test_random_entropy_roundtrip_256() {
 // Test wordlist verification
 #[test]
 fn test_wordlist_verification() {
-    use bsv_sdk::compat::bip39::verify_english_wordlist;
+    use bsv_rs::compat::bip39::verify_english_wordlist;
     assert!(verify_english_wordlist());
 }

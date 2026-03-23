@@ -21,9 +21,9 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::Multisig;
-//! use bsv_sdk::script::template::SignOutputs;
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::Multisig;
+//! use bsv_rs::script::template::SignOutputs;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let key1 = PrivateKey::random();
 //! let key2 = PrivateKey::random();

@@ -68,8 +68,8 @@ pub enum SubstrateType {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::wallet::{WalletClient, SubstrateType};
-/// use bsv_sdk::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
+/// use bsv_rs::wallet::{WalletClient, SubstrateType};
+/// use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
 ///
 /// // Create client with auto-detection
 /// let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.example.com".into()));

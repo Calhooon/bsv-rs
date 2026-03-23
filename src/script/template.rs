@@ -6,8 +6,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::P2PKH;
-//! use bsv_sdk::script::template::ScriptTemplate;
+//! use bsv_rs::script::templates::P2PKH;
+//! use bsv_rs::script::template::ScriptTemplate;
 //!
 //! let template = P2PKH::new();
 //! let locking_script = template.lock(&pubkey_hash)?;
@@ -127,8 +127,8 @@ pub fn compute_sighash_scope(sign_outputs: SignOutputs, anyone_can_pay: bool) ->
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::script::templates::P2PKH;
-/// use bsv_sdk::script::template::ScriptTemplate;
+/// use bsv_rs::script::templates::P2PKH;
+/// use bsv_rs::script::template::ScriptTemplate;
 ///
 /// let template = P2PKH::new();
 /// let locking_script = template.lock(&pubkey_hash)?;

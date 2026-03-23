@@ -46,7 +46,7 @@ pub use bip39::{Language, Mnemonic, WordCount};
 Thin wrapper over existing `primitives::encoding` functions using the Bitcoin alphabet.
 
 ```rust
-use bsv_sdk::compat::base58;
+use bsv_rs::compat::base58;
 
 // Encode bytes to Base58
 let encoded = base58::encode(&[0x00, 0x00, 0x00, 0x28, 0x7f, 0xb4, 0xcd]);
@@ -122,8 +122,8 @@ Derivation paths support multiple formats:
 ### Usage Example
 
 ```rust
-use bsv_sdk::compat::bip32::{ExtendedKey, Network, HARDENED_KEY_START};
-use bsv_sdk::compat::bip39::Mnemonic;
+use bsv_rs::compat::bip32::{ExtendedKey, Network, HARDENED_KEY_START};
+use bsv_rs::compat::bip39::Mnemonic;
 
 // From seed
 let seed = [0u8; 32];
@@ -234,7 +234,7 @@ pub fn verify_english_wordlist() -> bool
 ### Usage Example
 
 ```rust
-use bsv_sdk::compat::bip39::{Mnemonic, WordCount, Language};
+use bsv_rs::compat::bip39::{Mnemonic, WordCount, Language};
 
 // Generate new mnemonic (English by default)
 let mnemonic = Mnemonic::new(WordCount::Words12)?;
@@ -294,8 +294,8 @@ recovery_flag = recovery_id + 27 + (compressed ? 4 : 0)
 ### Usage Example
 
 ```rust
-use bsv_sdk::compat::bsm;
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::compat::bsm;
+use bsv_rs::primitives::ec::PrivateKey;
 
 let key = PrivateKey::random();
 let address = key.public_key().to_address();
@@ -371,8 +371,8 @@ pub fn decrypt_shared_base64(data: &str, to: &PrivateKey, from: &PublicKey) -> R
 ### Usage Example
 
 ```rust
-use bsv_sdk::compat::ecies;
-use bsv_sdk::primitives::ec::PrivateKey;
+use bsv_rs::compat::ecies;
+use bsv_rs::primitives::ec::PrivateKey;
 
 let alice = PrivateKey::random();
 let bob = PrivateKey::random();
@@ -432,14 +432,14 @@ Enable the compat module with the `compat` feature:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["compat"] }
+bsv-rs = { version = "0.3", features = ["compat"] }
 ```
 
 Or use `full` to enable all features:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["full"] }
+bsv-rs = { version = "0.3", features = ["full"] }
 ```
 
 ## Cross-SDK Compatibility

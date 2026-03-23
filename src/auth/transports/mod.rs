@@ -14,7 +14,7 @@
 //! Implement the [`Transport`] trait to create custom transports:
 //!
 //! ```rust,ignore
-//! use bsv_sdk::auth::transports::Transport;
+//! use bsv_rs::auth::transports::Transport;
 //!
 //! struct MyTransport;
 //!

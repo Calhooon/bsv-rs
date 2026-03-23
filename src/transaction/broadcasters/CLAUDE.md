@@ -26,7 +26,7 @@ The broadcasters require HTTP functionality. Enable via Cargo.toml:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["transaction", "http"] }
+bsv-rs = { version = "0.3", features = ["transaction", "http"] }
 ```
 
 Without the `http` feature, calling `broadcast()` returns an error with code `NO_HTTP`.
@@ -247,7 +247,7 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 ### Basic Broadcasting (ARC)
 
 ```rust
-use bsv_sdk::transaction::{ArcBroadcaster, Broadcaster, Transaction};
+use bsv_rs::transaction::{ArcBroadcaster, Broadcaster, Transaction};
 
 #[tokio::main]
 async fn main() {
@@ -273,7 +273,7 @@ async fn main() {
 ### Teranode Broadcasting
 
 ```rust
-use bsv_sdk::transaction::{TeranodeBroadcaster, Broadcaster, Transaction};
+use bsv_rs::transaction::{TeranodeBroadcaster, Broadcaster, Transaction};
 
 // No default URL - must be provided
 let broadcaster = TeranodeBroadcaster::new(
@@ -290,7 +290,7 @@ match broadcaster.broadcast(&tx).await {
 ### With API Key Authentication
 
 ```rust
-use bsv_sdk::transaction::{ArcBroadcaster, Broadcaster};
+use bsv_rs::transaction::{ArcBroadcaster, Broadcaster};
 
 let broadcaster = ArcBroadcaster::new(
     "https://arc.taal.com",
@@ -301,7 +301,7 @@ let broadcaster = ArcBroadcaster::new(
 ### Custom Configuration
 
 ```rust
-use bsv_sdk::transaction::broadcasters::{ArcBroadcaster, ArcConfig};
+use bsv_rs::transaction::broadcasters::{ArcBroadcaster, ArcConfig};
 
 let config = ArcConfig {
     url: "https://arc.gorillapool.io".to_string(),
@@ -315,7 +315,7 @@ let broadcaster = ArcBroadcaster::with_config(config);
 ### WhatsOnChain Broadcasting
 
 ```rust
-use bsv_sdk::transaction::{WhatsOnChainBroadcaster, Broadcaster, WocBroadcastNetwork};
+use bsv_rs::transaction::{WhatsOnChainBroadcaster, Broadcaster, WocBroadcastNetwork};
 
 // Create mainnet broadcaster
 let broadcaster = WhatsOnChainBroadcaster::mainnet();
@@ -339,7 +339,7 @@ match broadcaster.broadcast(&tx).await {
 ### WhatsOnChain with Custom Base URL (Testing)
 
 ```rust
-use bsv_sdk::transaction::{WhatsOnChainBroadcaster, WocBroadcastNetwork};
+use bsv_rs::transaction::{WhatsOnChainBroadcaster, WocBroadcastNetwork};
 
 // Use a mock server for testing
 let broadcaster = WhatsOnChainBroadcaster::with_base_url(
@@ -353,7 +353,7 @@ let broadcaster = WhatsOnChainBroadcaster::with_base_url(
 ### Broadcasting Multiple Transactions
 
 ```rust
-use bsv_sdk::transaction::{ArcBroadcaster, Broadcaster, Transaction};
+use bsv_rs::transaction::{ArcBroadcaster, Broadcaster, Transaction};
 
 let broadcaster = ArcBroadcaster::default();
 let transactions = vec![tx1, tx2, tx3];

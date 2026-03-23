@@ -14,8 +14,8 @@
 //! # Example: Sighash Computation
 //!
 //! ```rust,ignore
-//! use bsv_sdk::primitives::bsv::sighash::{compute_sighash, parse_transaction, SighashParams};
-//! use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
+//! use bsv_rs::primitives::bsv::sighash::{compute_sighash, parse_transaction, SighashParams};
+//! use bsv_rs::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
 //!
 //! // Parse a raw transaction
 //! let raw_tx = hex::decode("0100000001...").unwrap();
@@ -38,8 +38,8 @@
 //! # Example: Shamir Secret Sharing
 //!
 //! ```rust
-//! use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::bsv::shamir::{split_private_key, KeyShares};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! // Generate a random private key
 //! let key = PrivateKey::random();

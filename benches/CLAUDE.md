@@ -247,8 +247,8 @@ Covered operations:
 The benchmarks use:
 - `criterion` - Benchmarking framework (with `harness = false`)
 - `memory-stats` - Cross-platform RSS memory tracking (memory_bench only)
-- `bsv_sdk::primitives` - All cryptographic primitives being measured
-- `bsv_sdk::script` - Script parsing, templates (P2PKH, P2PK, Multisig, PushDrop), and serialization
+- `bsv_rs::primitives` - All cryptographic primitives being measured
+- `bsv_rs::script` - Script parsing, templates (P2PKH, P2PK, Multisig, PushDrop), and serialization
 
 Optional:
 - `dhat` - Detailed heap allocation profiling (via `dhat-profiling` feature)

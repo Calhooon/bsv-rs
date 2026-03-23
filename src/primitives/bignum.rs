@@ -18,7 +18,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use bsv_sdk::primitives::BigNumber;
+//! use bsv_rs::primitives::BigNumber;
 //!
 //! // Create from hex
 //! let n = BigNumber::from_hex("deadbeef").unwrap();
@@ -87,7 +87,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n1 = BigNumber::from_hex("deadbeef").unwrap();
     /// let n2 = BigNumber::from_hex("0xDEADBEEF").unwrap();
@@ -134,7 +134,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_dec_str("12345").unwrap();
     /// assert_eq!(n.to_dec_string(), "12345");
@@ -158,7 +158,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_bytes_be(&[0x12, 0x34]);
     /// assert_eq!(n.to_hex(), "1234");
@@ -177,7 +177,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_bytes_le(&[0x34, 0x12]);
     /// assert_eq!(n.to_hex(), "1234");
@@ -214,7 +214,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// assert_eq!(BigNumber::zero().to_hex(), "0");
     /// assert_eq!(BigNumber::from_hex("ff").unwrap().to_hex(), "ff");
@@ -240,7 +240,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_hex("1234").unwrap();
     /// assert_eq!(n.to_bytes_be(4), vec![0x00, 0x00, 0x12, 0x34]);
@@ -276,7 +276,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_hex("1234").unwrap();
     /// assert_eq!(n.to_bytes_le(4), vec![0x34, 0x12, 0x00, 0x00]);
@@ -309,7 +309,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_hex("1234").unwrap();
     /// assert_eq!(n.to_bytes_be_min(), vec![0x12, 0x34]);
@@ -340,7 +340,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let n = BigNumber::from_i64(12345);
     /// assert_eq!(n.to_dec_string(), "12345");
@@ -398,7 +398,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let a = BigNumber::from_i64(-10);
     /// let b = BigNumber::from_i64(3);
@@ -529,7 +529,7 @@ impl BigNumber {
     /// # Examples
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::BigNumber;
+    /// use bsv_rs::primitives::BigNumber;
     ///
     /// let a = BigNumber::from_i64(3);
     /// let m = BigNumber::from_i64(7);

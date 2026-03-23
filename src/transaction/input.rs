@@ -14,8 +14,8 @@ use crate::script::{LockingScript, ScriptTemplateUnlock, UnlockingScript};
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::Utxo;
-/// use bsv_sdk::script::LockingScript;
+/// use bsv_rs::transaction::Utxo;
+/// use bsv_rs::script::LockingScript;
 ///
 /// let utxo = Utxo {
 ///     txid: "abc123...".to_string(),
@@ -48,7 +48,7 @@ pub struct Utxo {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::TransactionInput;
+/// use bsv_rs::transaction::TransactionInput;
 ///
 /// // Create an input referencing a specific UTXO
 /// let input = TransactionInput::new(

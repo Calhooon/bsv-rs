@@ -150,7 +150,7 @@ ProtoWallet does NOT:
 ProtoWallet implements `WalletInterface` (via `#[async_trait]`) with full support for cryptographic operations:
 - Key operations: All 9 methods fully implemented (synchronous internally, wrapped as async)
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
-- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns `Network::Mainnet`, `get_version` returns `"bsv-sdk-0.1.0"`, `get_height` returns 0, `get_header_for_height` returns error
+- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns `Network::Mainnet`, `get_version` returns `"bsv-rs-0.1.0"`, `get_height` returns 0, `get_header_for_height` returns error
 
 #### Schnorr Proof for Counterparty Key Linkage
 
@@ -313,10 +313,10 @@ let pub_key = cached.derive_public_key(&protocol, "key-1", &Counterparty::Self_,
 ```toml
 [dependencies]
 # Basic wallet functionality (key derivation, ProtoWallet, validation)
-bsv-sdk = { version = "0.2", features = ["wallet"] }
+bsv-rs = { version = "0.3", features = ["wallet"] }
 
 # With remote wallet communication (WalletClient)
-bsv-sdk = { version = "0.2", features = ["wallet", "http"] }
+bsv-rs = { version = "0.3", features = ["wallet", "http"] }
 ```
 
 ## Argument and Result Types

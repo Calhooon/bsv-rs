@@ -25,8 +25,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::wallet::substrates::HttpWalletWire;
-//! use bsv_sdk::wallet::wire::WalletWireTransceiver;
+//! use bsv_rs::wallet::substrates::HttpWalletWire;
+//! use bsv_rs::wallet::wire::WalletWireTransceiver;
 //!
 //! // Create HTTP wire substrate
 //! let wire = HttpWalletWire::new(Some("myapp.example.com".into()), None);

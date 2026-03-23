@@ -43,8 +43,8 @@ struct ContactsCache {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::identity::{ContactsManager, ContactsManagerConfig, Contact};
-/// use bsv_sdk::wallet::ProtoWallet;
+/// use bsv_rs::identity::{ContactsManager, ContactsManagerConfig, Contact};
+/// use bsv_rs::wallet::ProtoWallet;
 ///
 /// let wallet = ProtoWallet::new(None);
 /// let manager = ContactsManager::new(wallet, ContactsManagerConfig::default());

@@ -18,8 +18,8 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::templates::PushDrop;
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::templates::PushDrop;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let privkey = PrivateKey::random();
 //! let pubkey = privkey.public_key();
@@ -63,8 +63,8 @@ pub enum LockPosition {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::script::templates::PushDrop;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::script::templates::PushDrop;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let privkey = PrivateKey::random();
 /// let pubkey = privkey.public_key();
@@ -100,8 +100,8 @@ impl PushDrop {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::PushDrop;
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::script::templates::PushDrop;
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let privkey = PrivateKey::random();
     /// let pubkey = privkey.public_key();
@@ -127,8 +127,8 @@ impl PushDrop {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::{PushDrop, LockPosition};
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::script::templates::{PushDrop, LockPosition};
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let privkey = PrivateKey::random();
     /// let pubkey = privkey.public_key();
@@ -247,8 +247,8 @@ impl PushDrop {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::PushDrop;
-    /// use bsv_sdk::script::LockingScript;
+    /// use bsv_rs::script::templates::PushDrop;
+    /// use bsv_rs::script::LockingScript;
     ///
     /// let script = LockingScript::from_hex("...")?;
     /// let pushdrop = PushDrop::decode(&script)?;
@@ -399,9 +399,9 @@ impl PushDrop {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::PushDrop;
-    /// use bsv_sdk::script::template::{SignOutputs, SigningContext};
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::script::templates::PushDrop;
+    /// use bsv_rs::script::template::{SignOutputs, SigningContext};
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let private_key = PrivateKey::random();
     /// let public_key = private_key.public_key();
@@ -473,9 +473,9 @@ impl PushDrop {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::templates::PushDrop;
-    /// use bsv_sdk::script::template::SignOutputs;
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::script::templates::PushDrop;
+    /// use bsv_rs::script::template::SignOutputs;
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let private_key = PrivateKey::random();
     /// let sighash: [u8; 32] = compute_sighash_externally();

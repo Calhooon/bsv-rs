@@ -60,7 +60,7 @@ pub struct SatoshisPerKilobyte {
 ### Basic Fee Calculation
 
 ```rust
-use bsv_sdk::transaction::{SatoshisPerKilobyte, FeeModel, Transaction};
+use bsv_rs::transaction::{SatoshisPerKilobyte, FeeModel, Transaction};
 
 // Create fee model with 100 satoshis per kilobyte (standard BSV rate)
 let fee_model = SatoshisPerKilobyte::new(100);
@@ -202,7 +202,7 @@ impl FeeModel for LivePolicy {
 ### LivePolicy Usage
 
 ```rust
-use bsv_sdk::transaction::{LivePolicy, FeeModel, Transaction};
+use bsv_rs::transaction::{LivePolicy, FeeModel, Transaction};
 
 // Create with default configuration
 let fee_model = LivePolicy::default();

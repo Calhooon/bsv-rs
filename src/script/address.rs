@@ -7,8 +7,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::script::Address;
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::script::Address;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let private_key = PrivateKey::from_hex(
 //!     "0000000000000000000000000000000000000000000000000000000000000001",
@@ -67,7 +67,7 @@ impl Address {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::script::Address;
+    /// use bsv_rs::script::Address;
     ///
     /// let addr = Address::new_from_string("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH").unwrap();
     /// assert_eq!(addr.to_string(), "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH");
@@ -117,7 +117,7 @@ impl Address {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::script::Address;
+    /// use bsv_rs::script::Address;
     ///
     /// let hash = [0u8; 20];
     /// let addr = Address::new_from_public_key_hash(&hash, true).unwrap();
@@ -162,8 +162,8 @@ impl Address {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::script::Address;
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::script::Address;
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::random();
     /// let addr = Address::new_from_public_key(&key.public_key(), true).unwrap();
@@ -206,7 +206,7 @@ impl Address {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::script::Address;
+    /// use bsv_rs::script::Address;
     ///
     /// assert!(Address::is_valid_address("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH"));
     /// assert!(!Address::is_valid_address("invalid"));

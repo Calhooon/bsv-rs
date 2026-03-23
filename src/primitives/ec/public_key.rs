@@ -193,7 +193,7 @@ impl PublicKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let alice_priv = PrivateKey::random();
     /// let bob_priv = PrivateKey::random();

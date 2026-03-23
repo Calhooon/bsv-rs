@@ -48,7 +48,7 @@ impl Default for StorageDownloaderConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::storage::{StorageDownloader, StorageDownloaderConfig};
+/// use bsv_rs::storage::{StorageDownloader, StorageDownloaderConfig};
 ///
 /// let downloader = StorageDownloader::new(StorageDownloaderConfig::default());
 /// let result = downloader.download("uhrp://...").await?;

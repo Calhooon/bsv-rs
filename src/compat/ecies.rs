@@ -29,8 +29,8 @@
 //! # Examples
 //!
 //! ```rust
-//! use bsv_sdk::compat::ecies;
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::compat::ecies;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! let alice = PrivateKey::random();
 //! let bob = PrivateKey::random();
@@ -90,8 +90,8 @@ const ELECTRUM_MAGIC: &[u8] = b"BIE1";
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();
@@ -153,8 +153,8 @@ pub fn electrum_encrypt(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();
@@ -261,8 +261,8 @@ pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) 
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();
@@ -330,8 +330,8 @@ pub fn bitcore_encrypt(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let sender = PrivateKey::random();
 /// let recipient = PrivateKey::random();
@@ -432,8 +432,8 @@ pub fn decrypt_single(data: &[u8], key: &PrivateKey) -> Result<Vec<u8>> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 /// let encrypted = ecies::encrypt_single_base64(b"Hello!", &key).unwrap();
@@ -462,8 +462,8 @@ pub fn encrypt_single_base64(message: &[u8], key: &PrivateKey) -> Result<String>
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 /// let encrypted = ecies::encrypt_single_base64(b"Hello!", &key).unwrap();
@@ -495,8 +495,8 @@ pub fn decrypt_single_base64(data: &str, key: &PrivateKey) -> Result<Vec<u8>> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let alice = PrivateKey::random();
 /// let bob = PrivateKey::random();
@@ -541,8 +541,8 @@ pub fn encrypt_shared_base64(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::ecies;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::compat::ecies;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let alice = PrivateKey::random();
 /// let bob = PrivateKey::random();

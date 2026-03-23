@@ -5,15 +5,15 @@
 
 #![cfg(feature = "registry")]
 
-use bsv_sdk::overlay::NetworkPreset;
-use bsv_sdk::registry::{
+use bsv_rs::overlay::NetworkPreset;
+use bsv_rs::registry::{
     BasketDefinitionData, BasketQuery, BroadcastFailure, BroadcastSuccess,
     CertificateDefinitionData, CertificateFieldDescriptor, CertificateQuery, DefinitionData,
     DefinitionType, ProtocolDefinitionData, ProtocolQuery, RegisterDefinitionResult,
     RegistryClientConfig, RegistryRecord, RevokeDefinitionResult, TokenData,
     UpdateDefinitionResult,
 };
-use bsv_sdk::wallet::{Protocol as WalletProtocol, SecurityLevel};
+use bsv_rs::wallet::{Protocol as WalletProtocol, SecurityLevel};
 
 // =================
 // DefinitionType Tests
@@ -781,7 +781,7 @@ fn test_pushdrop_roundtrip_certificate() {
 
 #[test]
 fn test_registry_constants() {
-    use bsv_sdk::registry::{
+    use bsv_rs::registry::{
         LS_BASKETMAP, LS_CERTMAP, LS_PROTOMAP, REGISTRANT_KEY_ID, REGISTRANT_TOKEN_AMOUNT,
         TM_BASKETMAP, TM_CERTMAP, TM_PROTOMAP,
     };

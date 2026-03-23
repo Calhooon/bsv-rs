@@ -10,7 +10,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::{Spend, LockingScript, UnlockingScript};
+//! use bsv_rs::script::{Spend, LockingScript, UnlockingScript};
 //!
 //! let spend = Spend::new(SpendParams {
 //!     source_txid: [0u8; 32],

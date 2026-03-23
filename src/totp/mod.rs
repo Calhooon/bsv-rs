@@ -10,7 +10,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use bsv_sdk::totp::{Totp, TotpOptions, Algorithm};
+//! use bsv_rs::totp::{Totp, TotpOptions, Algorithm};
 //!
 //! // Shared secret (typically from a base32-decoded QR code)
 //! let secret = b"12345678901234567890";

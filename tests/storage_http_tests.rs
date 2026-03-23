@@ -18,7 +18,7 @@
 
 #![cfg(all(feature = "storage", feature = "http"))]
 
-use bsv_sdk::storage::{
+use bsv_rs::storage::{
     get_url_for_file, is_valid_url, StorageUploader, StorageUploaderConfig, UploadableFile,
 };
 use wiremock::matchers::{body_string_contains, header, method, path, query_param};
@@ -954,7 +954,7 @@ async fn test_uploader_content_type_header_verification() {
 // uploader tests above, which also use reqwest internally.
 // =============================================================================
 
-use bsv_sdk::storage::{StorageDownloader, StorageDownloaderConfig};
+use bsv_rs::storage::{StorageDownloader, StorageDownloaderConfig};
 
 /// Test that the downloader rejects invalid UHRP URLs in the resolve() method.
 #[tokio::test]
@@ -1070,7 +1070,7 @@ async fn test_downloader_config_no_timeout() {
 /// This verifies the content-addressing chain: file -> hash -> URL -> hash.
 #[tokio::test]
 async fn test_downloader_uhrp_url_parsing() {
-    use bsv_sdk::storage::get_hash_from_url;
+    use bsv_rs::storage::get_hash_from_url;
 
     let test_content = b"test content for download verification";
     let url = get_url_for_file(test_content).unwrap();
@@ -1080,7 +1080,7 @@ async fn test_downloader_uhrp_url_parsing() {
 
     // Verify we can extract the hash back from the URL
     let hash = get_hash_from_url(&url).unwrap();
-    let expected_hash = bsv_sdk::primitives::hash::sha256(test_content);
+    let expected_hash = bsv_rs::primitives::hash::sha256(test_content);
     assert_eq!(
         hash, expected_hash,
         "Hash extracted from UHRP URL should match SHA-256 of original content"

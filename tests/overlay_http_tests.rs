@@ -10,7 +10,7 @@
 
 #![cfg(all(feature = "overlay", feature = "http"))]
 
-use bsv_sdk::overlay::{
+use bsv_rs::overlay::{
     HttpsOverlayBroadcastFacilitator, HttpsOverlayLookupFacilitator, LookupAnswer, LookupQuestion,
     OverlayBroadcastFacilitator, OverlayLookupFacilitator, TaggedBEEF,
 };

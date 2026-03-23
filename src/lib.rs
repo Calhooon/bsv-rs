@@ -23,7 +23,7 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use bsv_sdk::primitives::{PrivateKey, sha256};
+//! use bsv_rs::primitives::{PrivateKey, sha256};
 //!
 //! // Generate a key pair
 //! let private_key = PrivateKey::random();

@@ -12,8 +12,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::primitives::ec::{PrivateKey, PublicKey, Signature};
-//! use bsv_sdk::primitives::hash::sha256;
+//! use bsv_rs::primitives::ec::{PrivateKey, PublicKey, Signature};
+//! use bsv_rs::primitives::hash::sha256;
 //!
 //! // Generate a random key pair
 //! let private_key = PrivateKey::random();
@@ -34,7 +34,7 @@
 //! # BRC-42 Key Derivation
 //!
 //! ```rust
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! // Alice and Bob each have key pairs
 //! let alice_priv = PrivateKey::random();
@@ -56,7 +56,7 @@
 //! # WIF Encoding
 //!
 //! ```rust
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! // Parse a WIF private key
 //! let wif = "KwDiBf89QgGbjEhKnhXJuH7LrciVrZi3qYjgd9M7rFU73sVHnoWn";

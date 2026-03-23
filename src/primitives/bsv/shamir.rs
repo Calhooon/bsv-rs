@@ -7,8 +7,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::primitives::bsv::shamir::{split_private_key, KeyShares};
-//! use bsv_sdk::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::bsv::shamir::{split_private_key, KeyShares};
+//! use bsv_rs::primitives::ec::PrivateKey;
 //!
 //! // Generate a random private key
 //! let key = PrivateKey::random();
@@ -94,7 +94,7 @@ impl KeyShares {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::shamir::KeyShares;
+    /// use bsv_rs::primitives::bsv::shamir::KeyShares;
     ///
     /// let backup = vec![
     ///     "2.someY.3.abcd".to_string(),
@@ -162,8 +162,8 @@ impl KeyShares {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::shamir::split_private_key;
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::primitives::bsv::shamir::split_private_key;
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::random();
     /// let shares = split_private_key(&key, 2, 3).unwrap();
@@ -203,8 +203,8 @@ impl KeyShares {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::primitives::bsv::shamir::split_private_key;
-    /// use bsv_sdk::primitives::ec::PrivateKey;
+    /// use bsv_rs::primitives::bsv::shamir::split_private_key;
+    /// use bsv_rs::primitives::ec::PrivateKey;
     ///
     /// let key = PrivateKey::random();
     /// let shares = split_private_key(&key, 3, 5).unwrap();
@@ -264,8 +264,8 @@ impl KeyShares {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::bsv::shamir::split_private_key;
-/// use bsv_sdk::primitives::ec::PrivateKey;
+/// use bsv_rs::primitives::bsv::shamir::split_private_key;
+/// use bsv_rs::primitives::ec::PrivateKey;
 ///
 /// let key = PrivateKey::random();
 ///

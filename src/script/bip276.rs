@@ -20,7 +20,7 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::script::bip276::{encode_bip276, decode_bip276, NETWORK_MAINNET, NETWORK_TESTNET};
+//! use bsv_rs::script::bip276::{encode_bip276, decode_bip276, NETWORK_MAINNET, NETWORK_TESTNET};
 //!
 //! let encoded = encode_bip276(NETWORK_MAINNET, 1, b"fake script");
 //! assert_eq!(encoded, "bitcoin-script:010166616b65207363726970746f0cd86a");
@@ -63,7 +63,7 @@ pub const NETWORK_TESTNET: u8 = 2;
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::script::bip276::{encode_bip276, NETWORK_MAINNET};
+/// use bsv_rs::script::bip276::{encode_bip276, NETWORK_MAINNET};
 ///
 /// let encoded = encode_bip276(NETWORK_MAINNET, 1, b"fake script");
 /// assert_eq!(encoded, "bitcoin-script:010166616b65207363726970746f0cd86a");
@@ -104,7 +104,7 @@ pub fn encode_bip276(network: u8, script_type: u8, script: &[u8]) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::script::bip276::{decode_bip276, NETWORK_MAINNET};
+/// use bsv_rs::script::bip276::{decode_bip276, NETWORK_MAINNET};
 ///
 /// let (network, script_type, data) = decode_bip276(
 ///     "bitcoin-script:010166616b65207363726970746f0cd86a"

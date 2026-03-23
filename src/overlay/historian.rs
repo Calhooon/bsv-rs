@@ -54,7 +54,7 @@ pub struct HistorianConfig<T, C> {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::overlay::Historian;
+/// use bsv_rs::overlay::Historian;
 ///
 /// // Define an interpreter that extracts token amounts
 /// let interpreter = Box::new(|tx, output_idx, ctx| {

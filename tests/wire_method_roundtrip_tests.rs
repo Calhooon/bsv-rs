@@ -17,10 +17,10 @@
 
 #![cfg(feature = "wallet")]
 
-use bsv_sdk::primitives::{PrivateKey, PublicKey};
-use bsv_sdk::wallet::wire::{WalletCall, WalletWire, WalletWireProcessor, WalletWireTransceiver};
-use bsv_sdk::wallet::wire::{WireReader, WireWriter};
-use bsv_sdk::wallet::{
+use bsv_rs::primitives::{PrivateKey, PublicKey};
+use bsv_rs::wallet::wire::{WalletCall, WalletWire, WalletWireProcessor, WalletWireTransceiver};
+use bsv_rs::wallet::wire::{WireReader, WireWriter};
+use bsv_rs::wallet::{
     AbortActionArgs, AcquireCertificateArgs, AcquisitionProtocol, ActionStatus, BasketInsertion,
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, DiscoverByAttributesArgs,
@@ -32,7 +32,7 @@ use bsv_sdk::wallet::{
     TrustSelf, VerifyHmacArgs, VerifySignatureArgs, WalletAction, WalletActionInput,
     WalletActionOutput, WalletCertificate, WalletOutput, WalletPayment,
 };
-use bsv_sdk::Error;
+use bsv_rs::Error;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -80,7 +80,7 @@ fn create_two_party_loopback() -> (
 /// Helper to create a valid 33-byte compressed public key hex string.
 fn sample_pubkey_hex() -> String {
     let pk = PrivateKey::random();
-    bsv_sdk::primitives::to_hex(&pk.public_key().to_compressed())
+    bsv_rs::primitives::to_hex(&pk.public_key().to_compressed())
 }
 
 /// Helper to create a sample 32-byte txid.
@@ -95,13 +95,13 @@ fn sample_txid() -> [u8; 32] {
 /// Helper to create a sample outpoint string.
 fn sample_outpoint_string() -> String {
     let txid = sample_txid();
-    format!("{}.0", bsv_sdk::primitives::to_hex(&txid))
+    format!("{}.0", bsv_rs::primitives::to_hex(&txid))
 }
 
 /// Helper to create a sample WalletCertificate.
 fn sample_wallet_certificate() -> WalletCertificate {
     // certificate_type and serial_number must be valid base64 encoding of 32 bytes
-    use bsv_sdk::primitives::to_base64;
+    use bsv_rs::primitives::to_base64;
     WalletCertificate {
         certificate_type: to_base64(&[0xaa; 32]),
         subject: sample_pubkey_hex(),
@@ -495,7 +495,7 @@ mod signature_tests {
     #[tokio::test]
     async fn test_roundtrip_signature_with_direct_hash() {
         let transceiver = create_loopback();
-        let hash = bsv_sdk::primitives::sha256(b"pre-hashed data");
+        let hash = bsv_rs::primitives::sha256(b"pre-hashed data");
 
         let sig_result = transceiver
             .create_signature(
@@ -884,8 +884,8 @@ mod action_tests {
             .sign_action(
                 SignActionArgs {
                     spends,
-                    reference: bsv_sdk::primitives::to_base64(&[0x01, 0x02, 0x03]),
-                    options: Some(bsv_sdk::wallet::SignActionOptions {
+                    reference: bsv_rs::primitives::to_base64(&[0x01, 0x02, 0x03]),
+                    options: Some(bsv_rs::wallet::SignActionOptions {
                         accept_delayed_broadcast: Some(true),
                         return_txid_only: Some(false),
                         no_send: Some(true),
@@ -906,7 +906,7 @@ mod action_tests {
         let result = transceiver
             .abort_action(
                 AbortActionArgs {
-                    reference: bsv_sdk::primitives::to_base64(&[0xAA, 0xBB, 0xCC]),
+                    reference: bsv_rs::primitives::to_base64(&[0xAA, 0xBB, 0xCC]),
                 },
                 "test",
             )
@@ -979,8 +979,8 @@ mod action_tests {
                         output_index: 0,
                         protocol: "wallet payment".to_string(),
                         payment_remittance: Some(WalletPayment {
-                            derivation_prefix: bsv_sdk::primitives::to_base64(b"prefix"),
-                            derivation_suffix: bsv_sdk::primitives::to_base64(b"suffix"),
+                            derivation_prefix: bsv_rs::primitives::to_base64(b"prefix"),
+                            derivation_suffix: bsv_rs::primitives::to_base64(b"suffix"),
                             sender_identity_key: sample_pubkey_hex(),
                         }),
                         insertion_remittance: None,
@@ -1143,24 +1143,24 @@ mod certificate_tests {
         let result = transceiver
             .acquire_certificate(
                 AcquireCertificateArgs {
-                    certificate_type: bsv_sdk::primitives::to_base64(&[0u8; 32]),
-                    certifier: bsv_sdk::primitives::to_hex(&certifier_key.to_compressed()),
+                    certificate_type: bsv_rs::primitives::to_base64(&[0u8; 32]),
+                    certifier: bsv_rs::primitives::to_hex(&certifier_key.to_compressed()),
                     acquisition_protocol: AcquisitionProtocol::Direct,
                     fields: {
                         let mut m = HashMap::new();
                         m.insert("name".to_string(), "Test User".to_string());
                         m
                     },
-                    serial_number: Some(bsv_sdk::primitives::to_base64(&[1u8; 32])),
+                    serial_number: Some(bsv_rs::primitives::to_base64(&[1u8; 32])),
                     revocation_outpoint: Some(sample_outpoint_string()),
-                    signature: Some(bsv_sdk::primitives::to_hex(&[0x30, 0x44, 0x02, 0x20])),
+                    signature: Some(bsv_rs::primitives::to_hex(&[0x30, 0x44, 0x02, 0x20])),
                     certifier_url: None,
                     keyring_revealer: None, // defaults to certifier
                     keyring_for_subject: Some({
                         let mut m = HashMap::new();
                         m.insert(
                             "name".to_string(),
-                            bsv_sdk::primitives::to_base64(b"key-for-name"),
+                            bsv_rs::primitives::to_base64(b"key-for-name"),
                         );
                         m
                     }),
@@ -1182,8 +1182,8 @@ mod certificate_tests {
         let result = transceiver
             .acquire_certificate(
                 AcquireCertificateArgs {
-                    certificate_type: bsv_sdk::primitives::to_base64(&[0xFFu8; 32]),
-                    certifier: bsv_sdk::primitives::to_hex(&certifier_key.to_compressed()),
+                    certificate_type: bsv_rs::primitives::to_base64(&[0xFFu8; 32]),
+                    certifier: bsv_rs::primitives::to_hex(&certifier_key.to_compressed()),
                     acquisition_protocol: AcquisitionProtocol::Issuance,
                     fields: HashMap::new(),
                     serial_number: None,
@@ -1210,7 +1210,7 @@ mod certificate_tests {
             .list_certificates(
                 ListCertificatesArgs {
                     certifiers: vec![sample_pubkey_hex()],
-                    types: vec![bsv_sdk::primitives::to_base64(&[0u8; 32])],
+                    types: vec![bsv_rs::primitives::to_base64(&[0u8; 32])],
                     limit: Some(10),
                     offset: Some(0),
                     privileged: Some(false),
@@ -1231,7 +1231,7 @@ mod certificate_tests {
             .list_certificates(
                 ListCertificatesArgs {
                     certifiers: vec![sample_pubkey_hex()],
-                    types: vec![bsv_sdk::primitives::to_base64(&[0u8; 32])],
+                    types: vec![bsv_rs::primitives::to_base64(&[0u8; 32])],
                     limit: None,
                     offset: None,
                     privileged: None,
@@ -1254,7 +1254,7 @@ mod certificate_tests {
                 ProveCertificateArgs {
                     certificate: sample_wallet_certificate(),
                     fields_to_reveal: vec!["name".to_string()],
-                    verifier: bsv_sdk::primitives::to_hex(&verifier_key.to_compressed()),
+                    verifier: bsv_rs::primitives::to_hex(&verifier_key.to_compressed()),
                     privileged: Some(false),
                     privileged_reason: None,
                 },
@@ -1273,9 +1273,9 @@ mod certificate_tests {
         let result = transceiver
             .relinquish_certificate(
                 RelinquishCertificateArgs {
-                    certificate_type: bsv_sdk::primitives::to_base64(&[0u8; 32]),
-                    serial_number: bsv_sdk::primitives::to_base64(&[1u8; 32]),
-                    certifier: bsv_sdk::primitives::to_hex(&certifier_key.to_compressed()),
+                    certificate_type: bsv_rs::primitives::to_base64(&[0u8; 32]),
+                    serial_number: bsv_rs::primitives::to_base64(&[1u8; 32]),
+                    certifier: bsv_rs::primitives::to_hex(&certifier_key.to_compressed()),
                 },
                 "test",
             )
@@ -2123,7 +2123,7 @@ mod complex_type_roundtrips {
     #[test]
     fn test_txid_hex_roundtrip() {
         let txid = sample_txid();
-        let hex = bsv_sdk::primitives::to_hex(&txid);
+        let hex = bsv_rs::primitives::to_hex(&txid);
 
         let mut writer = WireWriter::new();
         writer.write_txid_hex(&hex).unwrap();
@@ -2140,7 +2140,7 @@ mod complex_type_roundtrips {
         let hex = sample_pubkey_hex();
 
         let mut writer = WireWriter::new();
-        let bytes = bsv_sdk::primitives::from_hex(&hex).unwrap();
+        let bytes = bsv_rs::primitives::from_hex(&hex).unwrap();
         writer.write_bytes(&bytes);
 
         let mut reader = WireReader::new(writer.as_bytes());

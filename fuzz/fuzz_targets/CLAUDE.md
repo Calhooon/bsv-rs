@@ -18,14 +18,14 @@ This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte 
 
 ### fuzz_base58
 
-Tests encoding primitives in `bsv_sdk::primitives`:
+Tests encoding primitives in `bsv_rs::primitives`:
 - Decoding: `from_base58`, `from_base58_check`, `from_hex`, `from_base64` with arbitrary UTF-8 input
 - Roundtrip: `to_base58` -> `from_base58` asserts decoded bytes match original
 - Roundtrip: `to_hex` -> `from_hex` asserts decoded bytes match original
 
 ### fuzz_script_parser
 
-Tests `bsv_sdk::script::Script`:
+Tests `bsv_rs::script::Script`:
 - `Script::from_binary` with arbitrary bytes, then roundtrip via `to_binary`
 - Exercises `is_p2pkh()`, `is_p2pk()`, `is_p2sh()`, `is_data()`, `is_multisig()` type detectors
 - Exercises `to_asm()`, `to_hex()`, `chunks()` serialization methods
@@ -34,13 +34,13 @@ Tests `bsv_sdk::script::Script`:
 ### fuzz_transaction_parser
 
 Tests transaction-level parsing:
-- `bsv_sdk::primitives::bsv::sighash::parse_transaction` — low-level sighash transaction parser
-- `bsv_sdk::transaction::Transaction::from_binary` — full transaction parsing with roundtrip via `to_binary`, `id()`, and `to_hex()`
-- `bsv_sdk::transaction::MerklePath::from_binary` — Merkle path parsing with roundtrip via `to_binary()`
+- `bsv_rs::primitives::bsv::sighash::parse_transaction` — low-level sighash transaction parser
+- `bsv_rs::transaction::Transaction::from_binary` — full transaction parsing with roundtrip via `to_binary`, `id()`, and `to_hex()`
+- `bsv_rs::transaction::MerklePath::from_binary` — Merkle path parsing with roundtrip via `to_binary()`
 
 ### fuzz_wire_protocol
 
-Tests `bsv_sdk::wallet::wire::WireReader` deserialization:
+Tests `bsv_rs::wallet::wire::WireReader` deserialization:
 - `read_var_int()` — variable-length integer decoding
 - `read_string()` — length-prefixed string decoding
 - `read_optional_string()` — optional string decoding
@@ -75,7 +75,7 @@ cargo fuzz run fuzz_base58 -- -max_total_time=60
 cargo fuzz run fuzz_script_parser corpus/fuzz_script_parser
 ```
 
-The fuzz crate depends on `bsv-sdk` with the `full` feature flag enabled (see `fuzz/Cargo.toml`), so all modules are available to all targets.
+The fuzz crate depends on `bsv-rs` with the `full` feature flag enabled (see `fuzz/Cargo.toml`), so all modules are available to all targets.
 
 ## Related
 

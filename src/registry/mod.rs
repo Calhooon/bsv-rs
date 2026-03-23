@@ -17,8 +17,8 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData};
-//! use bsv_sdk::wallet::ProtoWallet;
+//! use bsv_rs::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData};
+//! use bsv_rs::wallet::ProtoWallet;
 //!
 //! // Create a registry client
 //! let wallet = ProtoWallet::new(Some(PrivateKey::random()));
@@ -57,7 +57,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! bsv-sdk = { version = "0.2", features = ["registry"] }
+//! bsv-rs = { version = "0.3", features = ["registry"] }
 //! ```
 
 pub mod client;

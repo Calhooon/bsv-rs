@@ -64,7 +64,7 @@ bsv-rs = { version = "0.2", features = ["websocket"] }        # Auth with WebSoc
 ### Key Generation and Signing
 
 ```rust
-use bsv_sdk::{PrivateKey, PublicKey, sha256};
+use bsv_rs::{PrivateKey, PublicKey, sha256};
 
 // Generate a key pair
 let private_key = PrivateKey::random();
@@ -85,8 +85,8 @@ assert!(public_key.verify(&msg_hash, &signature));
 ### Working with Scripts
 
 ```rust
-use bsv_sdk::script::{Script, LockingScript, op};
-use bsv_sdk::script::templates::P2PKH;
+use bsv_rs::script::{Script, LockingScript, op};
+use bsv_rs::script::templates::P2PKH;
 
 // Create a P2PKH locking script from an address
 let locking = P2PKH::lock_from_address("1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2").unwrap();
@@ -113,8 +113,8 @@ if script.is_p2pkh() {
 ### Building Transactions
 
 ```rust
-use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput, ChangeDistribution};
-use bsv_sdk::script::LockingScript;
+use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput, ChangeDistribution};
+use bsv_rs::script::LockingScript;
 
 // Create a new transaction
 let mut tx = Transaction::new();
@@ -143,8 +143,8 @@ let txid = tx.id();
 ### BRC-42 Key Derivation
 
 ```rust
-use bsv_sdk::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
-use bsv_sdk::PrivateKey;
+use bsv_rs::wallet::{KeyDeriver, Protocol, SecurityLevel, Counterparty};
+use bsv_rs::PrivateKey;
 
 // Create key derivers for Alice and Bob
 let alice = KeyDeriver::new(Some(PrivateKey::random()));
@@ -169,8 +169,8 @@ assert_eq!(bob_private.public_key().to_compressed(), bob_public.to_compressed())
 ### ProtoWallet Operations
 
 ```rust
-use bsv_sdk::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs, EncryptArgs, Counterparty};
-use bsv_sdk::PrivateKey;
+use bsv_rs::wallet::{ProtoWallet, Protocol, SecurityLevel, CreateSignatureArgs, EncryptArgs, Counterparty};
+use bsv_rs::PrivateKey;
 
 let alice = ProtoWallet::new(Some(PrivateKey::random()));
 let bob = ProtoWallet::new(Some(PrivateKey::random()));
@@ -205,8 +205,8 @@ let decrypted = bob.decrypt(DecryptArgs {
 ### BRC-77/78 Messages (Signed & Encrypted)
 
 ```rust
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::messages::{sign, verify, encrypt, decrypt};
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::messages::{sign, verify, encrypt, decrypt};
 
 let sender = PrivateKey::random();
 let recipient = PrivateKey::random();
@@ -227,8 +227,8 @@ let plaintext = decrypt(&ciphertext, &recipient).unwrap();
 ### BIP-32/39 HD Keys and Mnemonics
 
 ```rust
-use bsv_sdk::compat::bip32::{ExtendedKey, Network, generate_hd_key_from_mnemonic};
-use bsv_sdk::compat::bip39::{Mnemonic, WordCount};
+use bsv_rs::compat::bip32::{ExtendedKey, Network, generate_hd_key_from_mnemonic};
+use bsv_rs::compat::bip39::{Mnemonic, WordCount};
 
 // Generate a new mnemonic
 let mnemonic = Mnemonic::new(WordCount::Words12).unwrap();
@@ -249,7 +249,7 @@ let xpub = xprv.neuter().unwrap();
 ### TOTP Two-Factor Authentication
 
 ```rust
-use bsv_sdk::totp::{Totp, TotpOptions, TotpValidateOptions, Algorithm};
+use bsv_rs::totp::{Totp, TotpOptions, TotpValidateOptions, Algorithm};
 
 // Shared secret (typically from base32-decoded QR code)
 let secret = b"12345678901234567890";
@@ -272,7 +272,7 @@ let code = Totp::generate(secret, Some(options));
 ### Overlay Network Lookup and Broadcast
 
 ```rust
-use bsv_sdk::overlay::{LookupResolver, LookupQuestion, TopicBroadcaster, TopicBroadcasterConfig};
+use bsv_rs::overlay::{LookupResolver, LookupQuestion, TopicBroadcaster, TopicBroadcasterConfig};
 
 // Query a lookup service
 let resolver = LookupResolver::default();
@@ -290,7 +290,7 @@ let result = broadcaster.broadcast_tx(&tx).await;
 ### UHRP File Storage
 
 ```rust
-use bsv_sdk::storage::{StorageDownloader, get_url_for_file, get_hash_from_url};
+use bsv_rs::storage::{StorageDownloader, get_url_for_file, get_hash_from_url};
 
 // Generate UHRP URL from file content
 let url = get_url_for_file(b"Hello, World!").unwrap();
@@ -307,8 +307,8 @@ let hash: [u8; 32] = get_hash_from_url(&url).unwrap();
 ### Key-Value Storage
 
 ```rust
-use bsv_sdk::kvstore::{LocalKVStore, KVStoreConfig};
-use bsv_sdk::wallet::ProtoWallet;
+use bsv_rs::kvstore::{LocalKVStore, KVStoreConfig};
+use bsv_rs::wallet::ProtoWallet;
 
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let config = KVStoreConfig::new().with_protocol_id("my-app");
@@ -325,7 +325,7 @@ let keys = store.keys().await?;
 ### Identity Resolution
 
 ```rust
-use bsv_sdk::identity::{IdentityClient, IdentityClientConfig, IdentityQuery};
+use bsv_rs::identity::{IdentityClient, IdentityClientConfig, IdentityQuery};
 
 let client = IdentityClient::new(wallet, IdentityClientConfig::default());
 
@@ -345,7 +345,7 @@ let results = client.resolve_by_attributes(
 ### Broadcasting Transactions
 
 ```rust
-use bsv_sdk::transaction::{ArcBroadcaster, Broadcaster};
+use bsv_rs::transaction::{ArcBroadcaster, Broadcaster};
 
 let broadcaster = ArcBroadcaster::new("https://arc.taal.com", Some(api_key));
 
@@ -358,7 +358,7 @@ match broadcaster.broadcast(&tx).await {
 ### SPV Verification with BEEF
 
 ```rust
-use bsv_sdk::transaction::{Beef, WhatsOnChainTracker, ChainTracker};
+use bsv_rs::transaction::{Beef, WhatsOnChainTracker, ChainTracker};
 
 // Parse BEEF data
 let beef = Beef::from_hex("0100beef...")?;
@@ -376,7 +376,7 @@ if validation.valid {
 
 ## Module Overview
 
-### Primitives (`bsv_sdk::primitives`)
+### Primitives (`bsv_rs::primitives`)
 
 | Component | Description |
 |-----------|-------------|
@@ -395,7 +395,7 @@ if validation.valid {
 | `to_base58_check`, `from_base58_check` | Base58Check with checksums |
 | `to_base64`, `from_base64` | Base64 encoding |
 
-### Script (`bsv_sdk::script`)
+### Script (`bsv_rs::script`)
 
 | Component | Description |
 |-----------|-------------|
@@ -410,7 +410,7 @@ if validation.valid {
 | `RPuzzle` | R-puzzle template for knowledge-based locking |
 | `PushDrop` | Data envelope template with P2PK lock |
 
-### Transaction (`bsv_sdk::transaction`)
+### Transaction (`bsv_rs::transaction`)
 
 | Component | Description |
 |-----------|-------------|
@@ -423,7 +423,7 @@ if validation.valid {
 | `Broadcaster`, `ArcBroadcaster` | Transaction broadcasting |
 | `ChainTracker`, `WhatsOnChainTracker` | SPV chain verification |
 
-### Wallet (`bsv_sdk::wallet`)
+### Wallet (`bsv_rs::wallet`)
 
 | Component | Description |
 |-----------|-------------|
@@ -437,7 +437,7 @@ if validation.valid {
 | `SecurityLevel` | Key derivation security levels (0, 1, 2) |
 | `Counterparty` | Key derivation counterparty specification |
 
-### Messages (`bsv_sdk::messages`)
+### Messages (`bsv_rs::messages`)
 
 | Component | Description |
 |-----------|-------------|
@@ -446,7 +446,7 @@ if validation.valid {
 | `encrypt` | BRC-78 message encryption using ECDH + AES-256-GCM |
 | `decrypt` | BRC-78 message decryption |
 
-### Compat (`bsv_sdk::compat`)
+### Compat (`bsv_rs::compat`)
 
 | Component | Description |
 |-----------|-------------|
@@ -456,7 +456,7 @@ if validation.valid {
 | `electrum_encrypt`, `electrum_decrypt` | Electrum ECIES encryption |
 | `bitcore_encrypt`, `bitcore_decrypt` | Bitcore ECIES encryption |
 
-### TOTP (`bsv_sdk::totp`)
+### TOTP (`bsv_rs::totp`)
 
 | Component | Description |
 |-----------|-------------|
@@ -465,7 +465,7 @@ if validation.valid {
 | `TotpValidateOptions` | Validation with clock drift skew tolerance |
 | `Algorithm` | HMAC algorithm selection (SHA-1, SHA-256, SHA-512) |
 
-### Auth (`bsv_sdk::auth`)
+### Auth (`bsv_rs::auth`)
 
 | Component | Description |
 |-----------|-------------|
@@ -481,7 +481,7 @@ if validation.valid {
 | `validate_certificate_encoding` | Certificate field validation |
 | `validate_requested_certificate_set` | Certificate request set validation |
 
-### Overlay (`bsv_sdk::overlay`)
+### Overlay (`bsv_rs::overlay`)
 
 | Component | Description |
 |-----------|-------------|
@@ -493,7 +493,7 @@ if validation.valid {
 | `Historian`, `SyncHistorian` | Transaction ancestry traversal |
 | `NetworkPreset` | Mainnet/Testnet/Local network configuration |
 
-### Storage (`bsv_sdk::storage`)
+### Storage (`bsv_rs::storage`)
 
 | Component | Description |
 |-----------|-------------|
@@ -504,7 +504,7 @@ if validation.valid {
 | `is_valid_url`, `normalize_url` | URL validation and normalization |
 | `UploadableFile`, `DownloadResult` | File transfer types |
 
-### Registry (`bsv_sdk::registry`)
+### Registry (`bsv_rs::registry`)
 
 | Component | Description |
 |-----------|-------------|
@@ -515,7 +515,7 @@ if validation.valid {
 | `RegistryRecord` | Combined definition and on-chain token reference |
 | `DefinitionType` | Basket, Protocol, or Certificate enum |
 
-### KVStore (`bsv_sdk::kvstore`)
+### KVStore (`bsv_rs::kvstore`)
 
 | Component | Description |
 |-----------|-------------|
@@ -525,7 +525,7 @@ if validation.valid {
 | `KVStoreEntry`, `KVStoreQuery` | Entry and query types |
 | `KVStoreInterpreter` | PushDrop token interpreter |
 
-### Identity (`bsv_sdk::identity`)
+### Identity (`bsv_rs::identity`)
 
 | Component | Description |
 |-----------|-------------|

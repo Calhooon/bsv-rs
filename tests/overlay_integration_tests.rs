@@ -5,16 +5,16 @@
 
 #![cfg(feature = "overlay")]
 
-use bsv_sdk::overlay::{
+use bsv_rs::overlay::{
     create_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token, is_ship_token,
     is_slap_token, AdmittanceInstructions, HostReputationTracker, LookupAnswer, LookupQuestion,
     LookupResolver, LookupResolverConfig, NetworkPreset, OutputListItem, Protocol,
     ReputationConfig, ReputationStorage, RequireAck, Steak, SyncHistorian, TaggedBEEF,
     TopicBroadcaster, TopicBroadcasterConfig,
 };
-use bsv_sdk::primitives::PrivateKey;
-use bsv_sdk::script::LockingScript;
-use bsv_sdk::transaction::{Transaction, TransactionInput, TransactionOutput};
+use bsv_rs::primitives::PrivateKey;
+use bsv_rs::script::LockingScript;
+use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -128,7 +128,7 @@ fn test_lookup_answer_output_list() {
 
     assert_eq!(
         answer.answer_type(),
-        bsv_sdk::overlay::LookupAnswerType::OutputList
+        bsv_rs::overlay::LookupAnswerType::OutputList
     );
 
     if let LookupAnswer::OutputList { outputs: out } = answer {
@@ -154,7 +154,7 @@ fn test_lookup_answer_freeform() {
 
     assert_eq!(
         answer.answer_type(),
-        bsv_sdk::overlay::LookupAnswerType::Freeform
+        bsv_rs::overlay::LookupAnswerType::Freeform
     );
 
     if let LookupAnswer::Freeform { result: r } = answer {
@@ -904,7 +904,7 @@ fn test_admin_token_identity_key_hex() {
     // Should match original key
     assert_eq!(
         hex,
-        bsv_sdk::primitives::to_hex(&public_key.to_compressed())
+        bsv_rs::primitives::to_hex(&public_key.to_compressed())
     );
 }
 
@@ -937,7 +937,7 @@ fn test_host_response_success() {
         },
     );
 
-    let response = bsv_sdk::overlay::HostResponse::success("https://host.com".to_string(), steak);
+    let response = bsv_rs::overlay::HostResponse::success("https://host.com".to_string(), steak);
 
     assert!(response.success);
     assert_eq!(response.host, "https://host.com");
@@ -947,7 +947,7 @@ fn test_host_response_success() {
 
 #[test]
 fn test_host_response_failure() {
-    let response = bsv_sdk::overlay::HostResponse::failure(
+    let response = bsv_rs::overlay::HostResponse::failure(
         "https://host.com".to_string(),
         "Connection refused".to_string(),
     );
@@ -964,7 +964,7 @@ fn test_host_response_failure() {
 
 #[test]
 fn test_service_metadata_default() {
-    let metadata = bsv_sdk::overlay::ServiceMetadata::default();
+    let metadata = bsv_rs::overlay::ServiceMetadata::default();
 
     assert!(metadata.name.is_empty());
     assert!(metadata.description.is_none());
@@ -975,7 +975,7 @@ fn test_service_metadata_default() {
 
 #[test]
 fn test_service_metadata_creation() {
-    let metadata = bsv_sdk::overlay::ServiceMetadata {
+    let metadata = bsv_rs::overlay::ServiceMetadata {
         name: "My Service".to_string(),
         description: Some("A test service".to_string()),
         icon_url: Some("https://example.com/icon.png".to_string()),
@@ -1059,16 +1059,16 @@ fn test_protocol_json_roundtrip() {
 #[test]
 fn test_overlay_constants() {
     // Verify constants have reasonable values (using const blocks for compile-time checks)
-    const _: () = assert!(bsv_sdk::overlay::MAX_TRACKER_WAIT_TIME_MS > 0);
-    const _: () = assert!(bsv_sdk::overlay::MAX_SHIP_QUERY_TIMEOUT_MS > 0);
-    const _: () = assert!(bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_TTL_MS > 0);
-    const _: () = assert!(bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_MAX_ENTRIES > 0);
-    const _: () = assert!(bsv_sdk::overlay::DEFAULT_TX_MEMO_TTL_MS > 0);
-    const _: () = assert!(bsv_sdk::overlay::DEFAULT_TX_MEMO_MAX_ENTRIES > 0);
+    const _: () = assert!(bsv_rs::overlay::MAX_TRACKER_WAIT_TIME_MS > 0);
+    const _: () = assert!(bsv_rs::overlay::MAX_SHIP_QUERY_TIMEOUT_MS > 0);
+    const _: () = assert!(bsv_rs::overlay::DEFAULT_HOSTS_CACHE_TTL_MS > 0);
+    const _: () = assert!(bsv_rs::overlay::DEFAULT_HOSTS_CACHE_MAX_ENTRIES > 0);
+    const _: () = assert!(bsv_rs::overlay::DEFAULT_TX_MEMO_TTL_MS > 0);
+    const _: () = assert!(bsv_rs::overlay::DEFAULT_TX_MEMO_MAX_ENTRIES > 0);
 
     // TX memo TTL should be longer than hosts cache TTL
     const _: () = assert!(
-        bsv_sdk::overlay::DEFAULT_TX_MEMO_TTL_MS >= bsv_sdk::overlay::DEFAULT_HOSTS_CACHE_TTL_MS
+        bsv_rs::overlay::DEFAULT_TX_MEMO_TTL_MS >= bsv_rs::overlay::DEFAULT_HOSTS_CACHE_TTL_MS
     );
 }
 
@@ -1080,10 +1080,10 @@ fn test_overlay_constants() {
 fn test_ship_broadcaster_alias() {
     // SHIPBroadcaster and SHIPCast are aliases for TopicBroadcaster
     let result =
-        bsv_sdk::overlay::SHIPBroadcaster::new(vec!["tm_test".to_string()], Default::default());
+        bsv_rs::overlay::SHIPBroadcaster::new(vec!["tm_test".to_string()], Default::default());
     assert!(result.is_ok());
 
-    let result = bsv_sdk::overlay::SHIPCast::new(vec!["tm_test".to_string()], Default::default());
+    let result = bsv_rs::overlay::SHIPCast::new(vec!["tm_test".to_string()], Default::default());
     assert!(result.is_ok());
 }
 
@@ -1094,8 +1094,8 @@ fn test_ship_broadcaster_alias() {
 #[test]
 fn test_global_reputation_tracker() {
     // Get the global singleton
-    let tracker1 = bsv_sdk::overlay::get_overlay_host_reputation_tracker();
-    let tracker2 = bsv_sdk::overlay::get_overlay_host_reputation_tracker();
+    let tracker1 = bsv_rs::overlay::get_overlay_host_reputation_tracker();
+    let tracker2 = bsv_rs::overlay::get_overlay_host_reputation_tracker();
 
     // Should be the same instance (test by modifying and reading)
     let unique_host = format!("https://test-{}.example.com", rand::random());

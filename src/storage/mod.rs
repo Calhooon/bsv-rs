@@ -29,7 +29,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use bsv_sdk::storage::{get_url_for_file, get_hash_from_url, is_valid_url};
+//! use bsv_rs::storage::{get_url_for_file, get_hash_from_url, is_valid_url};
 //!
 //! // Generate a UHRP URL for file content
 //! let content = b"Hello, World!";
@@ -45,7 +45,7 @@
 //! ## Downloading Files
 //!
 //! ```rust,ignore
-//! use bsv_sdk::storage::{StorageDownloader, StorageDownloaderConfig};
+//! use bsv_rs::storage::{StorageDownloader, StorageDownloaderConfig};
 //!
 //! let downloader = StorageDownloader::new(StorageDownloaderConfig::default());
 //!
@@ -60,7 +60,7 @@
 //! ## Uploading Files
 //!
 //! ```rust,ignore
-//! use bsv_sdk::storage::{StorageUploader, StorageUploaderConfig, UploadableFile};
+//! use bsv_rs::storage::{StorageUploader, StorageUploaderConfig, UploadableFile};
 //!
 //! let config = StorageUploaderConfig::new("https://storage.example.com");
 //! let uploader = StorageUploader::new(config);

@@ -13,8 +13,8 @@
 
 #![cfg(feature = "wallet")]
 
-use bsv_sdk::primitives::{PrivateKey, PublicKey};
-use bsv_sdk::wallet::{
+use bsv_rs::primitives::{PrivateKey, PublicKey};
+use bsv_rs::wallet::{
     CacheConfig, CachedKeyDeriver, Counterparty, CreateHmacArgs, CreateSignatureArgs, DecryptArgs,
     EncryptArgs, GetPublicKeyArgs, KeyDeriver, KeyDeriverApi, ProtoWallet, Protocol, SecurityLevel,
     VerifyHmacArgs, VerifySignatureArgs,
@@ -726,7 +726,7 @@ mod proto_wallet_tests {
     fn test_signature_with_direct_hash() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
         let protocol = Protocol::new(SecurityLevel::App, "hash signature");
-        let hash = bsv_sdk::primitives::sha256(b"prehashed data");
+        let hash = bsv_rs::primitives::sha256(b"prehashed data");
 
         let signed = wallet
             .create_signature(CreateSignatureArgs {
@@ -1007,7 +1007,7 @@ mod cross_sdk_tests {
 
 mod wire_protocol_tests {
     use super::*;
-    use bsv_sdk::wallet::wire::{WireReader, WireWriter};
+    use bsv_rs::wallet::wire::{WireReader, WireWriter};
 
     #[test]
     fn test_varint_roundtrip() {
@@ -1188,7 +1188,7 @@ mod wire_protocol_tests {
 
     #[test]
     fn test_outpoint_roundtrip() {
-        use bsv_sdk::wallet::Outpoint;
+        use bsv_rs::wallet::Outpoint;
 
         let mut writer = WireWriter::new();
         let mut txid = [0u8; 32];
@@ -1240,7 +1240,7 @@ mod wire_protocol_tests {
 
     #[test]
     fn test_query_mode_roundtrip() {
-        use bsv_sdk::wallet::QueryMode;
+        use bsv_rs::wallet::QueryMode;
 
         let mut writer = WireWriter::new();
         writer.write_query_mode(QueryMode::Any);
@@ -1262,7 +1262,7 @@ mod wire_protocol_tests {
 
     #[test]
     fn test_output_include_roundtrip() {
-        use bsv_sdk::wallet::OutputInclude;
+        use bsv_rs::wallet::OutputInclude;
 
         let mut writer = WireWriter::new();
         writer.write_output_include(OutputInclude::LockingScripts);
@@ -1319,7 +1319,7 @@ mod wire_protocol_tests {
 
     #[test]
     fn test_action_status_roundtrip() {
-        use bsv_sdk::wallet::ActionStatus;
+        use bsv_rs::wallet::ActionStatus;
 
         let mut writer = WireWriter::new();
         writer.write_action_status(Some(ActionStatus::Completed));

@@ -14,8 +14,8 @@
 //! # Example
 //!
 //! ```rust
-//! use bsv_sdk::primitives::ec::PrivateKey;
-//! use bsv_sdk::primitives::bsv::schnorr::Schnorr;
+//! use bsv_rs::primitives::ec::PrivateKey;
+//! use bsv_rs::primitives::bsv::schnorr::Schnorr;
 //!
 //! // Alice and Bob have key pairs
 //! let alice = PrivateKey::random();

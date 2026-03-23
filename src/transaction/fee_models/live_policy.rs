@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{LivePolicy, FeeModel, Transaction};
+//! use bsv_rs::transaction::{LivePolicy, FeeModel, Transaction};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -87,7 +87,7 @@ struct CachedRate {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{LivePolicy, FeeModel};
+/// use bsv_rs::transaction::{LivePolicy, FeeModel};
 ///
 /// let fee_model = LivePolicy::default();
 ///

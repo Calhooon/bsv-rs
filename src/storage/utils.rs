@@ -46,7 +46,7 @@ const MIN_HASH_LENGTH: usize = 32;
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::storage::normalize_url;
+/// use bsv_rs::storage::normalize_url;
 ///
 /// let normalized = normalize_url("uhrp://5P3xLaNMFwAQGpDxgwvkGDHCw8o8rvbFQ9c2W1wMxwNHX1hm");
 /// assert!(!normalized.starts_with("uhrp://"));
@@ -89,8 +89,8 @@ pub fn normalize_url(url: &str) -> String {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::storage::get_url_for_hash;
-/// use bsv_sdk::primitives::hash::sha256;
+/// use bsv_rs::storage::get_url_for_hash;
+/// use bsv_rs::primitives::hash::sha256;
 ///
 /// let hash = sha256(b"hello world");
 /// let url = get_url_for_hash(&hash).unwrap();
@@ -133,7 +133,7 @@ pub fn get_url_for_hash(hash: &[u8]) -> Result<String> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::storage::get_url_for_file;
+/// use bsv_rs::storage::get_url_for_file;
 ///
 /// let url = get_url_for_file(b"hello world").unwrap();
 /// assert!(url.starts_with("uhrp://"));
@@ -166,7 +166,7 @@ pub fn get_url_for_file(data: &[u8]) -> Result<String> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::storage::{get_url_for_file, get_hash_from_url};
+/// use bsv_rs::storage::{get_url_for_file, get_hash_from_url};
 ///
 /// let url = get_url_for_file(b"hello world").unwrap();
 /// let hash = get_hash_from_url(&url).unwrap();
@@ -227,7 +227,7 @@ pub fn get_hash_from_url(url: &str) -> Result<[u8; 32]> {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::storage::{is_valid_url, get_url_for_file};
+/// use bsv_rs::storage::{is_valid_url, get_url_for_file};
 ///
 /// let url = get_url_for_file(b"hello").unwrap();
 /// assert!(is_valid_url(&url));
@@ -252,7 +252,7 @@ pub fn is_valid_url(url: &str) -> bool {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::storage::{get_url_for_file, get_hash_hex_from_url};
+/// use bsv_rs::storage::{get_url_for_file, get_hash_hex_from_url};
 ///
 /// let url = get_url_for_file(b"hello").unwrap();
 /// let hash_hex = get_hash_hex_from_url(&url).unwrap();

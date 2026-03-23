@@ -117,7 +117,7 @@ pub enum Language {
 ### Generate a New Mnemonic
 
 ```rust
-use bsv_sdk::compat::bip39::{Mnemonic, WordCount};
+use bsv_rs::compat::bip39::{Mnemonic, WordCount};
 
 // Generate 12-word mnemonic (128 bits entropy)
 let mnemonic = Mnemonic::new(WordCount::Words12)?;
@@ -132,7 +132,7 @@ assert_eq!(mnemonic.words().len(), 24);
 ### Create from Entropy
 
 ```rust
-use bsv_sdk::compat::bip39::Mnemonic;
+use bsv_rs::compat::bip39::Mnemonic;
 
 // All zeros produces the well-known test vector
 let entropy = [0u8; 16]; // 128 bits = 12 words
@@ -154,7 +154,7 @@ assert_eq!(
 ### Parse and Validate Existing Phrase
 
 ```rust
-use bsv_sdk::compat::bip39::Mnemonic;
+use bsv_rs::compat::bip39::Mnemonic;
 
 let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 let mnemonic = Mnemonic::from_phrase(phrase)?;
@@ -169,7 +169,7 @@ assert!(mnemonic.is_valid());
 ### Convert to Seed
 
 ```rust
-use bsv_sdk::compat::bip39::Mnemonic;
+use bsv_rs::compat::bip39::Mnemonic;
 
 let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 let mnemonic = Mnemonic::from_phrase(phrase)?;
@@ -189,7 +189,7 @@ assert_eq!(seed.len(), 64);
 ### Extract Entropy
 
 ```rust
-use bsv_sdk::compat::bip39::Mnemonic;
+use bsv_rs::compat::bip39::Mnemonic;
 
 let original = hex::decode("7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f")?;
 let mnemonic = Mnemonic::from_entropy(&original)?;
@@ -205,7 +205,7 @@ assert_eq!(with_checksum.len(), 17);
 ### Binary Serialization
 
 ```rust
-use bsv_sdk::compat::bip39::Mnemonic;
+use bsv_rs::compat::bip39::Mnemonic;
 
 let entropy = [0u8; 16];
 let mnemonic = Mnemonic::from_entropy(&entropy)?;
@@ -226,7 +226,7 @@ assert!(mnemonic.is_valid());
 ### Multi-Language Mnemonics
 
 ```rust
-use bsv_sdk::compat::bip39::{Mnemonic, Language};
+use bsv_rs::compat::bip39::{Mnemonic, Language};
 
 // Generate a Japanese mnemonic from entropy
 let entropy = [0u8; 16];
@@ -246,7 +246,7 @@ assert_eq!(mnemonic.entropy(), restored.entropy());
 ### Verify Wordlist Integrity
 
 ```rust
-use bsv_sdk::compat::bip39::verify_english_wordlist;
+use bsv_rs::compat::bip39::verify_english_wordlist;
 
 // Verifies the embedded wordlist matches BIP-39 specification
 assert!(verify_english_wordlist());

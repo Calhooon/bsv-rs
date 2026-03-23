@@ -13,8 +13,8 @@ use crate::script::LockingScript;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::TransactionOutput;
-/// use bsv_sdk::script::LockingScript;
+/// use bsv_rs::transaction::TransactionOutput;
+/// use bsv_rs::script::LockingScript;
 ///
 /// // Create a regular output
 /// let output = TransactionOutput::new(

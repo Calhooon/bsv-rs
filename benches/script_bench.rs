@@ -2,9 +2,9 @@
 //!
 //! Run with: cargo bench --bench script_bench
 
-use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::script::templates::{Multisig, PushDrop, P2PK, P2PKH};
-use bsv_sdk::script::{Script, ScriptTemplate};
+use bsv_rs::primitives::ec::PrivateKey;
+use bsv_rs::script::templates::{Multisig, PushDrop, P2PK, P2PKH};
+use bsv_rs::script::{Script, ScriptTemplate};
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // ============================================================================
@@ -111,7 +111,7 @@ fn bench_template_sign(c: &mut Criterion) {
             P2PKH::sign_with_sighash(
                 black_box(&key),
                 black_box(&sighash),
-                bsv_sdk::script::SignOutputs::All,
+                bsv_rs::script::SignOutputs::All,
                 false,
             )
         })
@@ -122,7 +122,7 @@ fn bench_template_sign(c: &mut Criterion) {
             P2PK::sign_with_sighash(
                 black_box(&key),
                 black_box(&sighash),
-                bsv_sdk::script::SignOutputs::All,
+                bsv_rs::script::SignOutputs::All,
                 false,
             )
         })
@@ -134,7 +134,7 @@ fn bench_template_sign(c: &mut Criterion) {
             Multisig::sign_with_sighash(
                 black_box(&keys),
                 black_box(&sighash),
-                bsv_sdk::script::SignOutputs::All,
+                bsv_rs::script::SignOutputs::All,
                 false,
             )
         })

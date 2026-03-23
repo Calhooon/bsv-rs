@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{Broadcaster, BroadcastResponse, Transaction};
+//! use bsv_rs::transaction::{Broadcaster, BroadcastResponse, Transaction};
 //! use async_trait::async_trait;
 //!
 //! struct MyBroadcaster {
@@ -139,7 +139,7 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{Broadcaster, BroadcastResult, Transaction};
+/// use bsv_rs::transaction::{Broadcaster, BroadcastResult, Transaction};
 /// use async_trait::async_trait;
 ///
 /// struct MyBroadcaster {

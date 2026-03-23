@@ -76,7 +76,7 @@ impl Transaction {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::transaction::Transaction;
+    /// use bsv_rs::transaction::Transaction;
     ///
     /// let tx = Transaction::from_hex("0100000001...")?;
     /// let json = tx.to_json()?;
@@ -108,7 +108,7 @@ impl Transaction {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::transaction::Transaction;
+    /// use bsv_rs::transaction::Transaction;
     ///
     /// let json = r#"{"hex": "0100000001...", "version": 1, "lockTime": 0, ...}"#;
     /// let tx = Transaction::from_json(json)?;

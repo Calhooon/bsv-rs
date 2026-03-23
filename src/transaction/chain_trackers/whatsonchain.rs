@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{ChainTracker, WhatsOnChainTracker, WocNetwork};
+//! use bsv_rs::transaction::{ChainTracker, WhatsOnChainTracker, WocNetwork};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -64,7 +64,7 @@ impl WocNetwork {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{ChainTracker, WhatsOnChainTracker};
+/// use bsv_rs::transaction::{ChainTracker, WhatsOnChainTracker};
 ///
 /// let tracker = WhatsOnChainTracker::mainnet();
 /// let height = tracker.current_height().await?;

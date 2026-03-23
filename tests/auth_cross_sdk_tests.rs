@@ -5,9 +5,9 @@
 
 #![cfg(feature = "auth")]
 
-use bsv_sdk::auth::certificates::Certificate;
-use bsv_sdk::primitives::{from_base64, from_hex, to_base64, to_hex, PublicKey};
-use bsv_sdk::wallet::types::Outpoint;
+use bsv_rs::auth::certificates::Certificate;
+use bsv_rs::primitives::{from_base64, from_hex, to_base64, to_hex, PublicKey};
+use bsv_rs::wallet::types::Outpoint;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;

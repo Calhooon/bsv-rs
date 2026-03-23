@@ -8,7 +8,7 @@
 //! - script_valid.json: ~590+ valid script parsing vectors
 //! - script_invalid.json: ~500+ invalid scripts that should fail
 
-use bsv_sdk::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
+use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
 use serde::Deserialize;
 use std::fs;
 
@@ -652,7 +652,7 @@ fn test_op_div() {
 /// Test hash operations
 #[test]
 fn test_hash_operations() {
-    use bsv_sdk::primitives::sha256;
+    use bsv_rs::primitives::sha256;
 
     // Test OP_SHA256
     let data = vec![0x01, 0x02, 0x03];

@@ -31,8 +31,8 @@ use reqwest::Client;
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::wallet::substrates::HttpWalletWire;
-/// use bsv_sdk::wallet::wire::WalletWireTransceiver;
+/// use bsv_rs::wallet::substrates::HttpWalletWire;
+/// use bsv_rs::wallet::wire::WalletWireTransceiver;
 ///
 /// // Create wire transport
 /// let wire = HttpWalletWire::new(

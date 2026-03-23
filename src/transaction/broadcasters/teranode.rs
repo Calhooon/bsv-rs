@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{TeranodeBroadcaster, Broadcaster, Transaction};
+//! use bsv_rs::transaction::{TeranodeBroadcaster, Broadcaster, Transaction};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -49,7 +49,7 @@ pub struct TeranodeConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{TeranodeBroadcaster, Broadcaster};
+/// use bsv_rs::transaction::{TeranodeBroadcaster, Broadcaster};
 ///
 /// let broadcaster = TeranodeBroadcaster::new(
 ///     "https://teranode.example.com",

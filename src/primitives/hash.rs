@@ -11,7 +11,7 @@
 //! ## Basic hashing
 //!
 //! ```rust
-//! use bsv_sdk::primitives::hash;
+//! use bsv_rs::primitives::hash;
 //!
 //! // SHA-256
 //! let digest = hash::sha256(b"abc");
@@ -31,7 +31,7 @@
 //! ## HMAC
 //!
 //! ```rust
-//! use bsv_sdk::primitives::hash;
+//! use bsv_rs::primitives::hash;
 //!
 //! let key = b"secret_key";
 //! let message = b"message to authenticate";
@@ -42,7 +42,7 @@
 //! ## PBKDF2
 //!
 //! ```rust
-//! use bsv_sdk::primitives::hash;
+//! use bsv_rs::primitives::hash;
 //!
 //! let password = b"password";
 //! let salt = b"salt";
@@ -75,7 +75,7 @@ use sha2::{Digest, Sha256, Sha512};
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha1;
+/// use bsv_rs::primitives::hash::sha1;
 ///
 /// let hash = sha1(b"abc");
 /// assert_eq!(
@@ -102,7 +102,7 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha256;
+/// use bsv_rs::primitives::hash::sha256;
 ///
 /// let hash = sha256(b"abc");
 /// assert_eq!(
@@ -129,7 +129,7 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha512;
+/// use bsv_rs::primitives::hash::sha512;
 ///
 /// let hash = sha512(b"abc");
 /// assert_eq!(
@@ -156,7 +156,7 @@ pub fn sha512(data: &[u8]) -> [u8; 64] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::ripemd160;
+/// use bsv_rs::primitives::hash::ripemd160;
 ///
 /// let hash = ripemd160(b"abc");
 /// assert_eq!(
@@ -186,7 +186,7 @@ pub fn ripemd160(data: &[u8]) -> [u8; 20] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha256d;
+/// use bsv_rs::primitives::hash::sha256d;
 ///
 /// let hash = sha256d(b"hello");
 /// // The result is SHA256(SHA256("hello"))
@@ -211,7 +211,7 @@ pub fn sha256d(data: &[u8]) -> [u8; 32] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::hash160;
+/// use bsv_rs::primitives::hash::hash160;
 ///
 /// let hash = hash160(b"public_key_bytes");
 /// assert_eq!(hash.len(), 20);
@@ -241,7 +241,7 @@ pub fn hash160(data: &[u8]) -> [u8; 20] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha1_hmac;
+/// use bsv_rs::primitives::hash::sha1_hmac;
 ///
 /// let key = b"secret";
 /// let message = b"message";
@@ -270,7 +270,7 @@ pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha256_hmac;
+/// use bsv_rs::primitives::hash::sha256_hmac;
 ///
 /// let key = b"secret";
 /// let message = b"message";
@@ -299,7 +299,7 @@ pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::sha512_hmac;
+/// use bsv_rs::primitives::hash::sha512_hmac;
 ///
 /// let key = b"secret";
 /// let message = b"message";
@@ -330,7 +330,7 @@ pub fn sha512_hmac(key: &[u8], data: &[u8]) -> [u8; 64] {
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::primitives::hash::pbkdf2_sha512;
+/// use bsv_rs::primitives::hash::pbkdf2_sha512;
 ///
 /// let password = b"password";
 /// let salt = b"salt";

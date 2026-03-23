@@ -10,7 +10,7 @@
 //! # Example Implementation
 //!
 //! ```rust,ignore
-//! use bsv_sdk::script::transaction::{TransactionInputContext, TransactionOutputContext};
+//! use bsv_rs::script::transaction::{TransactionInputContext, TransactionOutputContext};
 //!
 //! impl TransactionInputContext for TransactionInput {
 //!     fn source_txid(&self) -> &[u8; 32] { &self.prev_txid }

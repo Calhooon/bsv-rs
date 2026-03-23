@@ -116,8 +116,8 @@ impl RegistryClientConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData, DefinitionData};
-/// use bsv_sdk::wallet::ProtoWallet;
+/// use bsv_rs::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData, DefinitionData};
+/// use bsv_rs::wallet::ProtoWallet;
 ///
 /// let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 /// let client = RegistryClient::new(wallet, RegistryClientConfig::default());

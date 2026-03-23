@@ -28,7 +28,7 @@ fn varint_size(val: usize) -> usize {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{SatoshisPerKilobyte, FeeModel, Transaction};
+/// use bsv_rs::transaction::{SatoshisPerKilobyte, FeeModel, Transaction};
 ///
 /// // 100 satoshis per kilobyte (standard BSV fee rate)
 /// let fee_model = SatoshisPerKilobyte::new(100);
@@ -51,7 +51,7 @@ impl SatoshisPerKilobyte {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::transaction::SatoshisPerKilobyte;
+    /// use bsv_rs::transaction::SatoshisPerKilobyte;
     ///
     /// let fee_model = SatoshisPerKilobyte::new(100); // 100 sat/KB
     /// ```

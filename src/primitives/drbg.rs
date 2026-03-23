@@ -29,7 +29,7 @@ impl HmacDrbg {
     ///
     /// # Example
     /// ```
-    /// use bsv_sdk::primitives::drbg::HmacDrbg;
+    /// use bsv_rs::primitives::drbg::HmacDrbg;
     ///
     /// let entropy = [0u8; 32];
     /// let nonce = [0u8; 16];

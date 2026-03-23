@@ -55,8 +55,8 @@ HttpWalletWire::with_client(client: Client, originator: Option<String>, base_url
 ### Usage
 
 ```rust
-use bsv_sdk::wallet::substrates::HttpWalletWire;
-use bsv_sdk::wallet::wire::WalletWireTransceiver;
+use bsv_rs::wallet::substrates::HttpWalletWire;
+use bsv_rs::wallet::wire::WalletWireTransceiver;
 
 // Create wire transport
 let wire = HttpWalletWire::new(
@@ -111,8 +111,8 @@ HttpWalletJson::with_client(client: Client, originator: Option<String>, base_url
 ### Usage
 
 ```rust
-use bsv_sdk::wallet::substrates::HttpWalletJson;
-use bsv_sdk::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
+use bsv_rs::wallet::substrates::HttpWalletJson;
+use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
 
 let client = HttpWalletJson::new(
     Some("myapp.example.com".into()),
@@ -202,7 +202,7 @@ All substrate implementations require the `http` feature:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["wallet", "http"] }
+bsv-rs = { version = "0.3", features = ["wallet", "http"] }
 ```
 
 ## Error Handling

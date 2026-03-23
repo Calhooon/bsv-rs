@@ -8,7 +8,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{ChainTracker, BlockHeadersServiceTracker};
+//! use bsv_rs::transaction::{ChainTracker, BlockHeadersServiceTracker};
 //!
 //! #[tokio::main]
 //! async fn main() {
@@ -64,7 +64,7 @@ impl Default for BlockHeadersServiceConfig {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{ChainTracker, BlockHeadersServiceTracker};
+/// use bsv_rs::transaction::{ChainTracker, BlockHeadersServiceTracker};
 ///
 /// let tracker = BlockHeadersServiceTracker::default();
 /// let height = tracker.current_height().await?;

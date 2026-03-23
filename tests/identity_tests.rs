@@ -9,12 +9,12 @@
 
 #![cfg(feature = "identity")]
 
-use bsv_sdk::identity::{
+use bsv_rs::identity::{
     BroadcastFailure, BroadcastResult, BroadcastSuccess, CertifierInfo, Contact,
     ContactsManagerConfig, DefaultIdentityValues, DisplayableIdentity, IdentityClientConfig,
     IdentityQuery, KnownCertificateType, StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
-use bsv_sdk::overlay::NetworkPreset;
+use bsv_rs::overlay::NetworkPreset;
 use std::collections::HashMap;
 
 // =================
@@ -713,7 +713,7 @@ fn test_default_socialcert_certifier() {
     assert!(DEFAULT_SOCIALCERT_CERTIFIER.starts_with("02"));
 
     // Verify it's valid hex
-    let bytes = bsv_sdk::primitives::from_hex(DEFAULT_SOCIALCERT_CERTIFIER);
+    let bytes = bsv_rs::primitives::from_hex(DEFAULT_SOCIALCERT_CERTIFIER);
     assert!(bytes.is_ok());
     assert_eq!(bytes.unwrap().len(), 33); // 33 bytes for compressed public key
 }
@@ -724,8 +724,8 @@ fn test_default_socialcert_certifier() {
 
 mod contacts_manager_tests {
     use super::*;
-    use bsv_sdk::identity::ContactsManager;
-    use bsv_sdk::wallet::ProtoWallet;
+    use bsv_rs::identity::ContactsManager;
+    use bsv_rs::wallet::ProtoWallet;
 
     fn create_test_contact(key: &str, name: &str) -> Contact {
         Contact {
@@ -1058,7 +1058,7 @@ fn test_certificate_type_ids_are_base64() {
         let type_id = cert_type.type_id();
 
         // Should be valid base64
-        let decoded = bsv_sdk::primitives::from_base64(type_id);
+        let decoded = bsv_rs::primitives::from_base64(type_id);
         assert!(
             decoded.is_ok(),
             "Type ID for {:?} is not valid base64",

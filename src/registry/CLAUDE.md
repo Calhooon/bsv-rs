@@ -338,8 +338,8 @@ impl RegistryClientConfig {
 ### Register a Definition
 
 ```rust
-use bsv_sdk::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData};
-use bsv_sdk::wallet::ProtoWallet;
+use bsv_rs::registry::{RegistryClient, RegistryClientConfig, BasketDefinitionData};
+use bsv_rs::wallet::ProtoWallet;
 
 let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 let client = RegistryClient::new(wallet, RegistryClientConfig::default());
@@ -407,10 +407,10 @@ This module requires the `registry` feature:
 
 ```toml
 [dependencies]
-bsv-sdk = { version = "0.2", features = ["registry"] }
+bsv-rs = { version = "0.3", features = ["registry"] }
 
 # Or with all features
-bsv-sdk = { version = "0.2", features = ["full"] }
+bsv-rs = { version = "0.3", features = ["full"] }
 ```
 
 The `registry` feature automatically enables the `overlay` feature.

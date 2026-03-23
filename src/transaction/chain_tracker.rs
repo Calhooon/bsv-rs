@@ -7,7 +7,7 @@
 //! # Example
 //!
 //! ```rust,ignore
-//! use bsv_sdk::transaction::{ChainTracker, ChainTrackerError};
+//! use bsv_rs::transaction::{ChainTracker, ChainTrackerError};
 //! use async_trait::async_trait;
 //!
 //! struct MyChainTracker;
@@ -60,7 +60,7 @@ pub enum ChainTrackerError {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::{ChainTracker, ChainTrackerError};
+/// use bsv_rs::transaction::{ChainTracker, ChainTrackerError};
 /// use async_trait::async_trait;
 ///
 /// struct WhatsOnChainTracker {
@@ -119,7 +119,7 @@ pub trait ChainTracker: Send + Sync {
 /// # Example
 ///
 /// ```rust,ignore
-/// use bsv_sdk::transaction::MockChainTracker;
+/// use bsv_rs::transaction::MockChainTracker;
 ///
 /// let mut tracker = MockChainTracker::new(1000); // Current height = 1000
 /// tracker.add_root(999, "abc123...".to_string());

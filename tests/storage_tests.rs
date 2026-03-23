@@ -5,8 +5,8 @@
 
 #![cfg(feature = "storage")]
 
-use bsv_sdk::primitives::hash::sha256;
-use bsv_sdk::storage::{
+use bsv_rs::primitives::hash::sha256;
+use bsv_rs::storage::{
     get_hash_from_url, get_hash_hex_from_url, get_url_for_file, get_url_for_hash, is_valid_url,
     normalize_url, DownloadResult, StorageDownloader, StorageDownloaderConfig, StorageUploader,
     StorageUploaderConfig, UploadFileResult, UploadableFile, UHRP_PREFIX, WEB_UHRP_PREFIX,
@@ -501,7 +501,7 @@ fn test_storage_downloader_config_default() {
     let config = StorageDownloaderConfig::default();
     assert_eq!(
         config.network_preset,
-        bsv_sdk::overlay::NetworkPreset::Mainnet
+        bsv_rs::overlay::NetworkPreset::Mainnet
     );
     assert!(config.resolver.is_none());
     assert_eq!(config.timeout_ms, Some(30000));
@@ -528,26 +528,26 @@ fn test_storage_downloader_config_no_timeout() {
 #[test]
 fn test_storage_downloader_config_testnet() {
     let config = StorageDownloaderConfig {
-        network_preset: bsv_sdk::overlay::NetworkPreset::Testnet,
+        network_preset: bsv_rs::overlay::NetworkPreset::Testnet,
         resolver: None,
         timeout_ms: Some(30000),
     };
     assert_eq!(
         config.network_preset,
-        bsv_sdk::overlay::NetworkPreset::Testnet
+        bsv_rs::overlay::NetworkPreset::Testnet
     );
 }
 
 #[test]
 fn test_storage_downloader_config_local() {
     let config = StorageDownloaderConfig {
-        network_preset: bsv_sdk::overlay::NetworkPreset::Local,
+        network_preset: bsv_rs::overlay::NetworkPreset::Local,
         resolver: None,
         timeout_ms: Some(5000),
     };
     assert_eq!(
         config.network_preset,
-        bsv_sdk::overlay::NetworkPreset::Local
+        bsv_rs::overlay::NetworkPreset::Local
     );
 }
 
@@ -561,7 +561,7 @@ fn test_storage_downloader_creation() {
 #[test]
 fn test_storage_downloader_creation_with_config() {
     let config = StorageDownloaderConfig {
-        network_preset: bsv_sdk::overlay::NetworkPreset::Testnet,
+        network_preset: bsv_rs::overlay::NetworkPreset::Testnet,
         resolver: None,
         timeout_ms: Some(15000),
     };

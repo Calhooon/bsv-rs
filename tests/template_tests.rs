@@ -3,11 +3,11 @@
 //! These tests verify end-to-end functionality of the P2PKH and RPuzzle templates,
 //! including script creation, signing, and spend validation.
 
-use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
-use bsv_sdk::primitives::ec::PrivateKey;
-use bsv_sdk::primitives::BigNumber;
-use bsv_sdk::script::templates::{Multisig, RPuzzle, RPuzzleType, P2PK, P2PKH};
-use bsv_sdk::script::ScriptTemplate;
+use bsv_rs::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
+use bsv_rs::primitives::ec::PrivateKey;
+use bsv_rs::primitives::BigNumber;
+use bsv_rs::script::templates::{Multisig, RPuzzle, RPuzzleType, P2PK, P2PKH};
+use bsv_rs::script::ScriptTemplate;
 
 /// Test that P2PKH locking script can be spent with the correct key.
 #[test]
@@ -33,7 +33,7 @@ fn test_p2pkh_end_to_end_spend() {
     let unlocking_script = P2PKH::sign_with_sighash(
         &private_key,
         &mock_sighash,
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     )
     .unwrap();
@@ -115,14 +115,14 @@ fn test_rpuzzle_hashed_lock() {
     let r_value = [0x42u8; 32];
 
     // Test with HASH160
-    let hash160 = bsv_sdk::primitives::hash160(&r_value);
+    let hash160 = bsv_rs::primitives::hash160(&r_value);
     let template = RPuzzle::new(RPuzzleType::Hash160);
     let locking = template.lock(&hash160).unwrap();
 
     assert!(locking.to_asm().contains("OP_HASH160"));
 
     // Test with SHA256
-    let sha256 = bsv_sdk::primitives::sha256(&r_value);
+    let sha256 = bsv_rs::primitives::sha256(&r_value);
     let template = RPuzzle::new(RPuzzleType::Sha256);
     let locking = template.lock(&sha256).unwrap();
 
@@ -146,7 +146,7 @@ fn test_rpuzzle_unlock_k_value() {
         &k,
         &private_key,
         &mock_sighash,
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     )
     .unwrap();
@@ -176,21 +176,21 @@ fn test_template_unlock_estimate_length() {
     let private_key = PrivateKey::random();
 
     // P2PKH should estimate 108 bytes
-    let p2pkh_unlock = P2PKH::unlock(&private_key, bsv_sdk::script::SignOutputs::All, false);
+    let p2pkh_unlock = P2PKH::unlock(&private_key, bsv_rs::script::SignOutputs::All, false);
     assert_eq!(p2pkh_unlock.estimate_length(), 108);
 
     // RPuzzle should also estimate 108 bytes
     let k = BigNumber::from_i64(1);
     let rpuzzle_unlock =
-        RPuzzle::unlock(&k, &private_key, bsv_sdk::script::SignOutputs::All, false);
+        RPuzzle::unlock(&k, &private_key, bsv_rs::script::SignOutputs::All, false);
     assert_eq!(rpuzzle_unlock.estimate_length(), 108);
 }
 
 /// Test different sighash types.
 #[test]
 fn test_sighash_types() {
-    use bsv_sdk::primitives::bsv::sighash::{SIGHASH_ANYONECANPAY, SIGHASH_NONE, SIGHASH_SINGLE};
-    use bsv_sdk::script::SignOutputs;
+    use bsv_rs::primitives::bsv::sighash::{SIGHASH_ANYONECANPAY, SIGHASH_NONE, SIGHASH_SINGLE};
+    use bsv_rs::script::SignOutputs;
 
     let private_key = PrivateKey::random();
     let sighash = [1u8; 32];
@@ -255,7 +255,7 @@ fn test_p2pkh_spend_validation() {
     let unlocking_script = P2PKH::sign_with_sighash(
         &private_key,
         &mock_sighash,
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     )
     .unwrap();
@@ -286,11 +286,11 @@ fn test_rpuzzle_type_hash_functions() {
     // Verify hashes match the primitives functions
     assert_eq!(
         RPuzzleType::Sha256.hash(data),
-        bsv_sdk::primitives::sha256(data).to_vec()
+        bsv_rs::primitives::sha256(data).to_vec()
     );
     assert_eq!(
         RPuzzleType::Hash160.hash(data),
-        bsv_sdk::primitives::hash160(data).to_vec()
+        bsv_rs::primitives::hash160(data).to_vec()
     );
 }
 
@@ -342,7 +342,7 @@ fn test_p2pk_end_to_end() {
     let unlocking = P2PK::sign_with_sighash(
         &private_key,
         &mock_sighash,
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     )
     .unwrap();
@@ -377,8 +377,8 @@ fn test_p2pk_compressed_vs_uncompressed_detection() {
 fn test_p2pk_vs_p2pkh_estimate_length() {
     let private_key = PrivateKey::random();
 
-    let p2pk_unlock = P2PK::unlock(&private_key, bsv_sdk::script::SignOutputs::All, false);
-    let p2pkh_unlock = P2PKH::unlock(&private_key, bsv_sdk::script::SignOutputs::All, false);
+    let p2pk_unlock = P2PK::unlock(&private_key, bsv_rs::script::SignOutputs::All, false);
+    let p2pkh_unlock = P2PKH::unlock(&private_key, bsv_rs::script::SignOutputs::All, false);
 
     // P2PK: sig only (74), P2PKH: sig + pubkey (108)
     assert_eq!(p2pk_unlock.estimate_length(), 74);
@@ -433,7 +433,7 @@ fn test_multisig_2_of_3_end_to_end() {
     let unlocking = Multisig::sign_with_sighash(
         &[key1.clone(), key2.clone()],
         &mock_sighash,
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     )
     .unwrap();
@@ -482,7 +482,7 @@ fn test_multisig_3_of_3() {
     let unlocking = Multisig::sign_with_sighash(
         &keys,
         &mock_sighash,
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     )
     .unwrap();
@@ -551,7 +551,7 @@ fn test_multisig_estimate_length_scaling() {
     // 1-of-N: 1 + 1*74 = 75
     let unlock1 = Multisig::unlock(
         std::slice::from_ref(&key),
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     );
     assert_eq!(unlock1.estimate_length(), 75);
@@ -559,7 +559,7 @@ fn test_multisig_estimate_length_scaling() {
     // 2-of-N: 1 + 2*74 = 149
     let unlock2 = Multisig::unlock(
         &[key.clone(), key.clone()],
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     );
     assert_eq!(unlock2.estimate_length(), 149);
@@ -567,7 +567,7 @@ fn test_multisig_estimate_length_scaling() {
     // 3-of-N: 1 + 3*74 = 223
     let unlock3 = Multisig::unlock(
         &[key.clone(), key.clone(), key.clone()],
-        bsv_sdk::script::SignOutputs::All,
+        bsv_rs::script::SignOutputs::All,
         false,
     );
     assert_eq!(unlock3.estimate_length(), 223);
@@ -597,7 +597,7 @@ fn test_multisig_hex_roundtrip() {
         .unwrap();
 
     let hex = locking.to_hex();
-    let parsed = bsv_sdk::script::LockingScript::from_hex(&hex).unwrap();
+    let parsed = bsv_rs::script::LockingScript::from_hex(&hex).unwrap();
     assert_eq!(parsed.to_hex(), hex);
     assert_eq!(parsed.as_script().is_multisig(), Some((1, 2)));
 }

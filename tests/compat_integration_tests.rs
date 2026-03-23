@@ -4,14 +4,14 @@
 
 #![cfg(feature = "compat")]
 
-use bsv_sdk::compat::base58;
-use bsv_sdk::compat::bip32::{
+use bsv_rs::compat::base58;
+use bsv_rs::compat::bip32::{
     generate_hd_key_from_mnemonic, ExtendedKey, Network, HARDENED_KEY_START,
 };
-use bsv_sdk::compat::bip39::{Language, Mnemonic, WordCount};
-use bsv_sdk::compat::bsm;
-use bsv_sdk::compat::ecies;
-use bsv_sdk::primitives::{from_hex, PrivateKey};
+use bsv_rs::compat::bip39::{Language, Mnemonic, WordCount};
+use bsv_rs::compat::bsm;
+use bsv_rs::compat::ecies;
+use bsv_rs::primitives::{from_hex, PrivateKey};
 
 // =================
 // BIP-39 + BIP-32 Integration Tests

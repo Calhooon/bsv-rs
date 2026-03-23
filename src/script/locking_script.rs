@@ -109,7 +109,7 @@ impl LockingScript {
     /// # Example
     ///
     /// ```rust,ignore
-    /// use bsv_sdk::script::LockingScript;
+    /// use bsv_rs::script::LockingScript;
     ///
     /// let script = LockingScript::from_hex("76a914...88ac")?;
     /// if let Some(address) = script.to_address() {

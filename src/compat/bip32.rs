@@ -13,7 +13,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use bsv_sdk::compat::bip32::{ExtendedKey, Network, HARDENED_KEY_START};
+//! use bsv_rs::compat::bip32::{ExtendedKey, Network, HARDENED_KEY_START};
 //!
 //! // Generate master key from seed
 //! let seed = [0u8; 32];
@@ -106,7 +106,7 @@ impl ExtendedKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip32::{ExtendedKey, Network};
+    /// use bsv_rs::compat::bip32::{ExtendedKey, Network};
     ///
     /// let seed = [0u8; 32];
     /// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
@@ -176,7 +176,7 @@ impl ExtendedKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip32::ExtendedKey;
+    /// use bsv_rs::compat::bip32::ExtendedKey;
     ///
     /// let xprv = "xprv9s21ZrQH143K3QTDL4LXw2F7HEK3wJUD2nW2nRk4stbPy6cq3jPPqjiChkVvvNKmPGJxWUtg6LnF5kejMRNNU3TGtRBeJgk33yuGBxrMPHi";
     /// let key = ExtendedKey::from_string(xprv).unwrap();
@@ -299,7 +299,7 @@ impl ExtendedKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip32::{ExtendedKey, Network, HARDENED_KEY_START};
+    /// use bsv_rs::compat::bip32::{ExtendedKey, Network, HARDENED_KEY_START};
     ///
     /// let seed = [0u8; 32];
     /// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
@@ -420,7 +420,7 @@ impl ExtendedKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip32::{ExtendedKey, Network};
+    /// use bsv_rs::compat::bip32::{ExtendedKey, Network};
     ///
     /// let seed = [0u8; 32];
     /// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
@@ -488,7 +488,7 @@ impl ExtendedKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip32::{ExtendedKey, Network};
+    /// use bsv_rs::compat::bip32::{ExtendedKey, Network};
     ///
     /// let seed = [0u8; 32];
     /// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
@@ -527,7 +527,7 @@ impl ExtendedKey {
     /// # Example
     ///
     /// ```rust
-    /// use bsv_sdk::compat::bip32::{ExtendedKey, Network};
+    /// use bsv_rs::compat::bip32::{ExtendedKey, Network};
     ///
     /// let seed = [0u8; 32];
     /// let xprv = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
@@ -685,8 +685,8 @@ pub fn generate_hd_key(seed_length: usize, network: Network) -> Result<ExtendedK
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bip32::{generate_hd_key_from_mnemonic, Network};
-/// use bsv_sdk::compat::bip39::Mnemonic;
+/// use bsv_rs::compat::bip32::{generate_hd_key_from_mnemonic, Network};
+/// use bsv_rs::compat::bip39::Mnemonic;
 ///
 /// let mnemonic = Mnemonic::from_phrase(
 ///     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
@@ -723,7 +723,7 @@ pub fn generate_hd_key_from_mnemonic(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bip32::{generate_key_pair_strings, Network};
+/// use bsv_rs::compat::bip32::{generate_key_pair_strings, Network};
 ///
 /// let (xpriv, xpub) = generate_key_pair_strings(32, Network::Mainnet).unwrap();
 /// assert!(xpriv.starts_with("xprv"));
@@ -760,7 +760,7 @@ pub fn generate_key_pair_strings(seed_length: usize, network: Network) -> Result
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bip32::{derive_addresses_for_path, ExtendedKey, Network};
+/// use bsv_rs::compat::bip32::{derive_addresses_for_path, ExtendedKey, Network};
 ///
 /// let seed = [0u8; 32];
 /// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
@@ -814,7 +814,7 @@ pub fn derive_addresses_for_path(
 /// # Example
 ///
 /// ```rust
-/// use bsv_sdk::compat::bip32::{derive_public_keys_for_path, ExtendedKey, Network};
+/// use bsv_rs::compat::bip32::{derive_public_keys_for_path, ExtendedKey, Network};
 ///
 /// let seed = [0u8; 32];
 /// let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();

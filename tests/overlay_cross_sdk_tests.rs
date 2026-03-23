@@ -5,11 +5,11 @@
 
 #![cfg(feature = "overlay")]
 
-use bsv_sdk::overlay::{
+use bsv_rs::overlay::{
     create_overlay_admin_token, decode_overlay_admin_token, AdmittanceInstructions, LookupAnswer,
     LookupQuestion, NetworkPreset, Protocol, TaggedBEEF,
 };
-use bsv_sdk::primitives::{from_hex, PublicKey};
+use bsv_rs::primitives::{from_hex, PublicKey};
 use serde::Deserialize;
 use std::fs;
 
@@ -177,9 +177,9 @@ fn test_admin_token_protocol_detection() {
             create_overlay_admin_token(protocol, &identity_key, &v.domain, &v.topic_or_service);
 
         // Test protocol detection
-        let is_ship = bsv_sdk::overlay::is_ship_token(&script);
-        let is_slap = bsv_sdk::overlay::is_slap_token(&script);
-        let is_admin = bsv_sdk::overlay::is_overlay_admin_token(&script);
+        let is_ship = bsv_rs::overlay::is_ship_token(&script);
+        let is_slap = bsv_rs::overlay::is_slap_token(&script);
+        let is_admin = bsv_rs::overlay::is_overlay_admin_token(&script);
 
         assert!(is_admin, "Vector {}: should be admin token", i);
 
