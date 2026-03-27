@@ -484,6 +484,12 @@ impl<'a> Reader<'a> {
         self.pos
     }
 
+    /// Returns a slice of the underlying data from `from_pos` to the current position.
+    /// Useful for capturing raw bytes consumed by a series of read operations.
+    pub fn consumed_since(&self, from_pos: usize) -> &'a [u8] {
+        &self.data[from_pos..self.pos]
+    }
+
     // ------------------------------------------------------------------------
     // Unsigned integers (little-endian)
     // ------------------------------------------------------------------------
@@ -1675,6 +1681,35 @@ mod tests {
         let mut writer = Writer::new();
         writer.write_var_int(2u64.pow(33));
         assert_eq!(writer.len(), 9);
+    }
+
+    #[test]
+    fn test_reader_consumed_since() {
+        let data = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+        let mut reader = Reader::new(&data);
+
+        // Read 2 bytes, then mark start
+        reader.read_u8().unwrap();
+        reader.read_u8().unwrap();
+        let start = reader.position();
+        assert_eq!(start, 2);
+
+        // Read 3 more bytes
+        reader.read_u8().unwrap();
+        reader.read_u8().unwrap();
+        reader.read_u8().unwrap();
+
+        // consumed_since should return bytes [2..5]
+        let consumed = reader.consumed_since(start);
+        assert_eq!(consumed, &[0x03, 0x04, 0x05]);
+
+        // consumed_since(0) returns everything read so far
+        let all = reader.consumed_since(0);
+        assert_eq!(all, &[0x01, 0x02, 0x03, 0x04, 0x05]);
+
+        // consumed_since(current position) returns empty slice
+        let empty = reader.consumed_since(reader.position());
+        assert!(empty.is_empty());
     }
 
     #[test]

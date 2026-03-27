@@ -284,24 +284,39 @@ impl BeefTx {
                 }
                 Some(TxDataFormat::RawTxAndBumpIndex) => {
                     let bump_index = reader.read_var_int_num()?;
+                    let tx_start = reader.position();
                     let tx = Transaction::from_reader_internal(reader)?;
-                    Ok(Self::from_tx(tx, Some(bump_index)))
+                    let raw_tx = reader.consumed_since(tx_start).to_vec();
+                    let mut btx = Self::from_raw_tx(raw_tx, Some(bump_index));
+                    btx.tx = Some(tx);
+                    btx.update_input_txids();
+                    Ok(btx)
                 }
                 Some(TxDataFormat::RawTx) | None => {
+                    let tx_start = reader.position();
                     let tx = Transaction::from_reader_internal(reader)?;
-                    Ok(Self::from_tx(tx, None))
+                    let raw_tx = reader.consumed_since(tx_start).to_vec();
+                    let mut btx = Self::from_raw_tx(raw_tx, None);
+                    btx.tx = Some(tx);
+                    btx.update_input_txids();
+                    Ok(btx)
                 }
             }
         } else {
             // V1 format
+            let tx_start = reader.position();
             let tx = Transaction::from_reader_internal(reader)?;
+            let raw_tx = reader.consumed_since(tx_start).to_vec();
             let has_bump = reader.read_u8()? != 0;
             let bump_index = if has_bump {
                 Some(reader.read_var_int_num()?)
             } else {
                 None
             };
-            Ok(Self::from_tx(tx, bump_index))
+            let mut btx = Self::from_raw_tx(raw_tx, bump_index);
+            btx.tx = Some(tx);
+            btx.update_input_txids();
+            Ok(btx)
         }
     }
 }

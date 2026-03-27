@@ -1,6 +1,6 @@
 [package]
 name = "bsv-rs"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2021"
 description = "BSV blockchain SDK for Rust - primitives, script, transactions, and more"
 license = "MIT OR Apache-2.0"
