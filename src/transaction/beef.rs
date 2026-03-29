@@ -1068,6 +1068,349 @@ mod tests {
         );
     }
 
+    /// Helper: builds a raw transaction that spends a given previous txid at vout 0.
+    /// If `prev_txid` is None, creates a coinbase-like tx (all-zero prev hash).
+    /// `satoshis` controls the output value.
+    /// `extra_script_bytes` can be provided to inflate the locking script.
+    fn make_raw_tx(
+        prev_txid: Option<&str>,
+        satoshis: u64,
+        extra_script_bytes: Option<&[u8]>,
+    ) -> Vec<u8> {
+        let mut raw = vec![0x01, 0x00, 0x00, 0x00]; // version
+        raw.push(0x01); // 1 input
+
+        // prev txid (reversed for wire format) or all zeros
+        match prev_txid {
+            Some(txid_hex) => {
+                let mut txid_bytes = from_hex(txid_hex).unwrap();
+                txid_bytes.reverse();
+                raw.extend_from_slice(&txid_bytes);
+            }
+            None => {
+                raw.extend_from_slice(&[0u8; 32]);
+            }
+        }
+        raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // vout=0
+        raw.push(0x00); // empty unlocking script
+        raw.extend_from_slice(&[0xff, 0xff, 0xff, 0xff]); // sequence
+
+        raw.push(0x01); // 1 output
+        raw.extend_from_slice(&satoshis.to_le_bytes()); // satoshis
+
+        // locking script
+        match extra_script_bytes {
+            Some(script) => {
+                // write script length as varint
+                let len = script.len() as u64;
+                if len < 0xFD {
+                    raw.push(len as u8);
+                } else if len <= 0xFFFF {
+                    raw.push(0xFD);
+                    raw.extend_from_slice(&(len as u16).to_le_bytes());
+                } else {
+                    raw.push(0xFE);
+                    raw.extend_from_slice(&(len as u32).to_le_bytes());
+                }
+                raw.extend_from_slice(script);
+            }
+            None => {
+                raw.push(0x00); // empty script
+            }
+        }
+        raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // locktime
+        raw
+    }
+
+    /// Helper: adds a raw tx to a beef and returns its txid.
+    fn add_raw_tx(beef: &mut Beef, raw: Vec<u8>, bump_index: Option<usize>) -> String {
+        beef.merge_raw_tx(raw, bump_index).txid()
+    }
+
+    /// Helper: adds a raw tx to a beef, creates a coinbase-style BUMP for it, and
+    /// sets the bump index. Returns the txid.
+    fn add_proven_tx(beef: &mut Beef, raw: Vec<u8>, block_height: u32) -> String {
+        let txid = add_raw_tx(beef, raw, None);
+        let bump = MerklePath::from_coinbase_txid(&txid, block_height);
+        let bi = beef.merge_bump(bump);
+        beef.find_txid_mut(&txid).unwrap().set_bump_index(Some(bi));
+        txid
+    }
+
+    // ── Test 1: merge_beef preserves raw tx bytes ────────────────────────
+
+    #[test]
+    fn test_merge_beef_preserves_raw_tx_bytes() {
+        // Create BEEF A with a large-script tx (simulating PushDrop-style data).
+        let mut beef_a = Beef::new();
+        let big_script: Vec<u8> = (0..512).map(|i| (i % 256) as u8).collect();
+        let raw_a = make_raw_tx(None, 5000, Some(&big_script));
+        let txid_a = add_proven_tx(&mut beef_a, raw_a.clone(), 100);
+
+        // Create BEEF B with a different tx.
+        let mut beef_b = Beef::new();
+        let raw_b = make_raw_tx(None, 3000, None);
+        let txid_b = add_proven_tx(&mut beef_b, raw_b.clone(), 101);
+
+        // Merge B into A.
+        beef_a.merge_beef(&beef_b);
+
+        // Serialize, parse back.
+        let bin = beef_a.to_binary();
+        let parsed = Beef::from_binary(&bin).unwrap();
+
+        // Verify raw bytes of both txs survived the round-trip.
+        let found_a = parsed.find_txid(&txid_a).unwrap();
+        assert_eq!(found_a.raw_tx().unwrap(), &raw_a, "TX A raw bytes differ after merge round-trip");
+
+        let found_b = parsed.find_txid(&txid_b).unwrap();
+        assert_eq!(found_b.raw_tx().unwrap(), &raw_b, "TX B raw bytes differ after merge round-trip");
+    }
+
+    // ── Test 2: trim with 5 txs, 2 deep ancestors removed ───────────────
+
+    #[test]
+    fn test_trim_known_proven_removes_deep_ancestors_5tx() {
+        // Chain: A0 (proven) <- A1 (unproven) <- B (unproven) <- C (unproven) <- D (tip, unproven)
+        // Then prove B. After trim, A0 and A1 (deep ancestors of proven B) should be removed.
+        // Remaining: B, C, D (3 txs).
+        let mut beef = Beef::new();
+
+        let raw_a0 = make_raw_tx(None, 10_000, None);
+        let txid_a0 = add_proven_tx(&mut beef, raw_a0, 100);
+
+        let raw_a1 = make_raw_tx(Some(&txid_a0), 9000, None);
+        let txid_a1 = add_raw_tx(&mut beef, raw_a1, None);
+
+        let raw_b = make_raw_tx(Some(&txid_a1), 8000, None);
+        let txid_b = add_raw_tx(&mut beef, raw_b, None);
+
+        let raw_c = make_raw_tx(Some(&txid_b), 7000, None);
+        let txid_c = add_raw_tx(&mut beef, raw_c, None);
+
+        let raw_d = make_raw_tx(Some(&txid_c), 6000, None);
+        let txid_d = add_raw_tx(&mut beef, raw_d, None);
+
+        assert_eq!(beef.txs.len(), 5);
+
+        // Now prove B.
+        let bump_b = MerklePath::from_coinbase_txid(&txid_b, 200);
+        let bi = beef.merge_bump(bump_b);
+        beef.find_txid_mut(&txid_b).unwrap().set_bump_index(Some(bi));
+
+        beef.trim_known_proven();
+
+        assert_eq!(beef.txs.len(), 3, "Should keep B, C, D only");
+        assert!(beef.find_txid(&txid_a0).is_none(), "A0 should be trimmed");
+        assert!(beef.find_txid(&txid_a1).is_none(), "A1 should be trimmed");
+        assert!(beef.find_txid(&txid_b).is_some(), "B should remain (proven)");
+        assert!(beef.find_txid(&txid_c).is_some(), "C should remain");
+        assert!(beef.find_txid(&txid_d).is_some(), "D should remain (tip)");
+    }
+
+    // ── Test 3: V1 <-> V2 round-trip preserving data ────────────────────
+
+    #[test]
+    fn test_beef_v1_v2_roundtrip() {
+        // Build a V2 BEEF with 2 txs.
+        let mut beef_v2 = Beef::with_version(BEEF_V2);
+        let raw_1 = make_raw_tx(None, 1000, None);
+        let txid_1 = add_proven_tx(&mut beef_v2, raw_1.clone(), 50);
+        let raw_2 = make_raw_tx(Some(&txid_1), 500, None);
+        let txid_2 = add_raw_tx(&mut beef_v2, raw_2.clone(), None);
+
+        // Serialize as V2, parse back.
+        let v2_bin = beef_v2.to_binary();
+        let mut parsed_v2 = Beef::from_binary(&v2_bin).unwrap();
+        assert_eq!(parsed_v2.version, BEEF_V2);
+        assert_eq!(parsed_v2.txs.len(), 2);
+
+        // Switch to V1, serialize, parse back.
+        parsed_v2.version = BEEF_V1;
+        let v1_bin = parsed_v2.to_binary();
+        let parsed_v1 = Beef::from_binary(&v1_bin).unwrap();
+
+        assert_eq!(parsed_v1.version, BEEF_V1);
+        assert_eq!(parsed_v1.txs.len(), 2);
+
+        // Verify both txids present and raw bytes preserved.
+        let found_1 = parsed_v1.find_txid(&txid_1).unwrap();
+        assert_eq!(found_1.raw_tx().unwrap(), &raw_1);
+        let found_2 = parsed_v1.find_txid(&txid_2).unwrap();
+        assert_eq!(found_2.raw_tx().unwrap(), &raw_2);
+
+        // Verify bump is preserved.
+        assert_eq!(parsed_v1.bumps.len(), 1);
+        assert!(parsed_v1.bumps[0].contains(&txid_1));
+    }
+
+    // ── Test 4: V1 serialization format (raw_tx BEFORE has_bump) ────────
+
+    #[test]
+    fn test_beef_v1_serialization_format() {
+        let mut beef = Beef::with_version(BEEF_V1);
+        let raw_tx = make_raw_tx(None, 2000, None);
+        let txid = add_proven_tx(&mut beef, raw_tx.clone(), 300);
+        let _ = txid; // used indirectly via the bump
+
+        let bin = beef.to_binary();
+
+        // V1 format:
+        //   4 bytes: version (0x0100BEEF LE -> 01 00 BE EF)
+        //   varint:  bump count
+        //   bumps...
+        //   varint:  tx count
+        //   For each tx:
+        //     raw_tx bytes
+        //     1 byte: has_bump (0 or 1)
+        //     [varint bump_index if has_bump == 1]
+        //
+        // Verify the version marker.
+        assert_eq!(&bin[0..4], &[0x01, 0x00, 0xBE, 0xEF]);
+
+        // After version + bumps + tx-count varint, we should find raw_tx bytes
+        // followed by has_bump=1 and bump_index=0.
+        // Find the raw_tx inside the serialized BEEF.
+        let tx_start = bin
+            .windows(raw_tx.len())
+            .position(|w| w == raw_tx.as_slice())
+            .expect("raw tx bytes not found in BEEF binary");
+
+        let after_tx = tx_start + raw_tx.len();
+        // has_bump byte should be 1 (proven).
+        assert_eq!(bin[after_tx], 0x01, "has_bump should be 1 for proven tx");
+        // bump index should be 0 (varint encoding of 0).
+        assert_eq!(bin[after_tx + 1], 0x00, "bump index should be 0");
+    }
+
+    // ── Test 5: Large OP_PUSHDATA2 script round-trip ────────────────────
+
+    #[test]
+    fn test_beef_large_pushdata_scripts() {
+        // Create a transaction with a locking script > 256 bytes (needs OP_PUSHDATA2).
+        let mut beef = Beef::new();
+
+        // 400-byte script filled with a recognizable pattern.
+        let script: Vec<u8> = (0..400).map(|i| ((i * 7 + 3) % 256) as u8).collect();
+        let raw_tx = make_raw_tx(None, 10_000, Some(&script));
+        let txid = add_raw_tx(&mut beef, raw_tx.clone(), None);
+
+        // Round-trip through serialization.
+        let bin = beef.to_binary();
+        let parsed = Beef::from_binary(&bin).unwrap();
+
+        let found = parsed.find_txid(&txid).unwrap();
+        let recovered_raw = found.raw_tx().unwrap();
+        assert_eq!(recovered_raw, &raw_tx, "raw tx with large script should survive round-trip");
+
+        // Verify the script bytes are embedded in the raw tx.
+        let script_pos = recovered_raw
+            .windows(script.len())
+            .position(|w| w == script.as_slice())
+            .expect("script bytes not found in recovered raw tx");
+        assert!(script_pos > 0, "script should be at a nonzero offset in the tx");
+    }
+
+    // ── Test 6: merge_beef remaps bump indices correctly ────────────────
+
+    #[test]
+    fn test_merge_beef_bump_indices_remapped() {
+        // BEEF A: tx_a proven at block 100 (bump index 0 in A).
+        let mut beef_a = Beef::new();
+        let raw_a = make_raw_tx(None, 1000, None);
+        let txid_a = add_proven_tx(&mut beef_a, raw_a, 100);
+
+        // BEEF B: tx_b proven at block 200 (bump index 0 in B — different from A).
+        let mut beef_b = Beef::new();
+        let raw_b = make_raw_tx(None, 2000, None);
+        let txid_b = add_proven_tx(&mut beef_b, raw_b, 200);
+
+        // Before merge, both have bump index 0 in their respective BEEFs.
+        assert_eq!(beef_a.find_txid(&txid_a).unwrap().bump_index(), Some(0));
+        assert_eq!(beef_b.find_txid(&txid_b).unwrap().bump_index(), Some(0));
+
+        // Merge B into A.
+        beef_a.merge_beef(&beef_b);
+
+        // After merge, A should have 2 bumps.
+        assert_eq!(beef_a.bumps.len(), 2);
+
+        // tx_a should still reference the bump at block 100.
+        let btx_a = beef_a.find_txid(&txid_a).unwrap();
+        let bump_a = btx_a.bump_index().unwrap();
+        assert_eq!(beef_a.bumps[bump_a].block_height, 100);
+        assert!(beef_a.bumps[bump_a].contains(&txid_a));
+
+        // tx_b should reference the bump at block 200 (remapped index).
+        let btx_b = beef_a.find_txid(&txid_b).unwrap();
+        let bump_b = btx_b.bump_index().unwrap();
+        assert_eq!(beef_a.bumps[bump_b].block_height, 200);
+        assert!(beef_a.bumps[bump_b].contains(&txid_b));
+
+        // The bump indices should be different.
+        assert_ne!(bump_a, bump_b, "Bump indices should differ after merge");
+    }
+
+    // ── Test 7: trim reduces size for ARC compatibility ─────────────────
+
+    #[test]
+    fn test_trim_reduces_size_for_arc_compatibility() {
+        // Build a BEEF:
+        //   A0 (proven, block 10) <- A1 (proven, block 11) <- B (unproven)
+        //                                                      <- C (unproven, tip)
+        // Also add an unrelated proven tx D at block 12.
+        // Total: 4 txs. After trim, A0 should be removed (deep ancestor of
+        // proven A1). Remaining: A1, B, C, D => but A1 is proven, B depends on
+        // A1 (unproven), C depends on B.
+        // Actually let's build a cleaner chain:
+        //   A0 (proven) <- A1 (unproven) <- A2 (unproven) <- tip
+        // Then prove A1. After trim, A0 removed. Remaining: A1, A2, tip (3 txs).
+        let mut beef = Beef::new();
+
+        let raw_a0 = make_raw_tx(None, 50_000, None);
+        let txid_a0 = add_proven_tx(&mut beef, raw_a0, 10);
+
+        let raw_a1 = make_raw_tx(Some(&txid_a0), 40_000, None);
+        let txid_a1 = add_raw_tx(&mut beef, raw_a1, None);
+
+        let raw_a2 = make_raw_tx(Some(&txid_a1), 30_000, None);
+        let txid_a2 = add_raw_tx(&mut beef, raw_a2, None);
+
+        // Add two more unrelated proven txs to bulk up.
+        let raw_d = make_raw_tx(None, 20_000, None);
+        let txid_d = add_proven_tx(&mut beef, raw_d, 12);
+
+        let raw_e = make_raw_tx(None, 15_000, None);
+        let txid_e = add_proven_tx(&mut beef, raw_e, 13);
+
+        assert_eq!(beef.txs.len(), 5);
+
+        let size_before = beef.to_binary().len();
+
+        // Prove A1.
+        let bump_a1 = MerklePath::from_coinbase_txid(&txid_a1, 11);
+        let bi = beef.merge_bump(bump_a1);
+        beef.find_txid_mut(&txid_a1).unwrap().set_bump_index(Some(bi));
+
+        beef.trim_known_proven();
+
+        let size_after = beef.to_binary().len();
+
+        // A0 removed, bump for block 10 removed.
+        assert!(beef.find_txid(&txid_a0).is_none(), "A0 should be trimmed");
+        assert!(beef.find_txid(&txid_a1).is_some());
+        assert!(beef.find_txid(&txid_a2).is_some());
+        assert!(beef.find_txid(&txid_d).is_some());
+        assert!(beef.find_txid(&txid_e).is_some());
+        assert_eq!(beef.txs.len(), 4);
+        assert!(
+            size_after < size_before,
+            "Trimmed BEEF ({} bytes) should be smaller than original ({} bytes)",
+            size_after,
+            size_before
+        );
+    }
+
     #[test]
     fn test_trim_known_proven_noop_when_nothing_to_trim() {
         let mut beef = Beef::new();
