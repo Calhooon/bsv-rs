@@ -1411,6 +1411,203 @@ mod tests {
         );
     }
 
+    // ── BEEF-to-EF extraction tests ────────────────────────────────────
+
+    /// Helper: builds a raw transaction with 2 inputs spending two different
+    /// previous txids at vout 0. Both use empty unlocking scripts.
+    fn make_raw_tx_2_inputs(
+        prev_txid_a: &str,
+        prev_txid_b: &str,
+        satoshis: u64,
+    ) -> Vec<u8> {
+        let mut raw = vec![0x01, 0x00, 0x00, 0x00]; // version
+        raw.push(0x02); // 2 inputs
+
+        // Input 0: prev_txid_a
+        let mut txid_a = from_hex(prev_txid_a).unwrap();
+        txid_a.reverse();
+        raw.extend_from_slice(&txid_a);
+        raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // vout=0
+        raw.push(0x00); // empty unlocking script
+        raw.extend_from_slice(&[0xff, 0xff, 0xff, 0xff]); // sequence
+
+        // Input 1: prev_txid_b
+        let mut txid_b = from_hex(prev_txid_b).unwrap();
+        txid_b.reverse();
+        raw.extend_from_slice(&txid_b);
+        raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // vout=0
+        raw.push(0x00); // empty unlocking script
+        raw.extend_from_slice(&[0xff, 0xff, 0xff, 0xff]); // sequence
+
+        raw.push(0x01); // 1 output
+        raw.extend_from_slice(&satoshis.to_le_bytes());
+        raw.push(0x00); // empty locking script
+        raw.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // locktime
+        raw
+    }
+
+    #[test]
+    fn test_beef_to_ef_basic() {
+        use crate::script::UnlockingScript;
+
+        // Create a BEEF with 1 proven parent + 1 new (unproven) tx
+        let mut beef = Beef::new();
+
+        // Parent tx: coinbase-like, output of 10000 sats
+        let parent_raw = make_raw_tx(None, 10_000, None);
+        let parent_txid = add_proven_tx(&mut beef, parent_raw.clone(), 100);
+
+        // New tx: spends parent's output
+        let new_raw = make_raw_tx(Some(&parent_txid), 9000, None);
+        let new_txid = add_raw_tx(&mut beef, new_raw.clone(), None);
+
+        // Parse the new tx from raw bytes
+        let mut new_tx = Transaction::from_binary(&new_raw).unwrap();
+        assert_eq!(new_tx.id(), new_txid);
+
+        // Parse the parent from raw bytes and attach as source_transaction
+        let parent_tx = Transaction::from_binary(&parent_raw).unwrap();
+        new_tx.inputs[0].source_transaction = Some(Box::new(parent_tx));
+
+        // Set an empty unlocking script (required by to_ef)
+        new_tx.inputs[0].unlocking_script = Some(UnlockingScript::new());
+
+        // Call to_ef()
+        let ef_bytes = new_tx.to_ef().unwrap();
+
+        // Verify EF bytes start with version (4 bytes) then EF marker
+        assert_eq!(&ef_bytes[0..4], &[0x01, 0x00, 0x00, 0x00], "version should be 1");
+        assert_eq!(
+            &ef_bytes[4..10],
+            &[0x00, 0x00, 0x00, 0x00, 0x00, 0xEF],
+            "EF marker should follow version"
+        );
+
+        // Round-trip: parse with from_ef(), verify txid matches
+        let parsed = Transaction::from_ef(&ef_bytes).unwrap();
+        assert_eq!(parsed.id(), new_txid, "EF round-trip should preserve txid");
+
+        // Verify the source satoshis are embedded
+        let source_sats = parsed.inputs[0].source_satoshis().unwrap();
+        assert_eq!(source_sats, 10_000, "source satoshis should be from parent output");
+    }
+
+    #[test]
+    fn test_beef_to_ef_multiple_inputs() {
+        use crate::script::UnlockingScript;
+
+        // Create a BEEF with 2 proven parents + 1 new tx with 2 inputs
+        let mut beef = Beef::new();
+
+        let parent_a_raw = make_raw_tx(None, 5000, None);
+        let parent_a_txid = add_proven_tx(&mut beef, parent_a_raw.clone(), 100);
+
+        let parent_b_raw = make_raw_tx(None, 7000, None);
+        let parent_b_txid = add_proven_tx(&mut beef, parent_b_raw.clone(), 101);
+
+        // New tx spends both parents
+        let new_raw = make_raw_tx_2_inputs(&parent_a_txid, &parent_b_txid, 11_000);
+        let new_txid = add_raw_tx(&mut beef, new_raw.clone(), None);
+
+        // Parse and attach source_transactions
+        let mut new_tx = Transaction::from_binary(&new_raw).unwrap();
+        assert_eq!(new_tx.inputs.len(), 2);
+
+        let parent_a_tx = Transaction::from_binary(&parent_a_raw).unwrap();
+        let parent_b_tx = Transaction::from_binary(&parent_b_raw).unwrap();
+
+        new_tx.inputs[0].source_transaction = Some(Box::new(parent_a_tx));
+        new_tx.inputs[0].unlocking_script = Some(UnlockingScript::new());
+
+        new_tx.inputs[1].source_transaction = Some(Box::new(parent_b_tx));
+        new_tx.inputs[1].unlocking_script = Some(UnlockingScript::new());
+
+        // Call to_ef() — should succeed with both inputs
+        let ef_bytes = new_tx.to_ef().unwrap();
+
+        // Verify EF marker
+        assert_eq!(&ef_bytes[4..10], &[0x00, 0x00, 0x00, 0x00, 0x00, 0xEF]);
+
+        // Round-trip through from_ef()
+        let parsed = Transaction::from_ef(&ef_bytes).unwrap();
+        assert_eq!(parsed.id(), new_txid, "EF round-trip txid mismatch");
+        assert_eq!(parsed.inputs.len(), 2, "should have 2 inputs");
+
+        // Verify both parent outputs are embedded
+        assert_eq!(
+            parsed.inputs[0].source_satoshis().unwrap(),
+            5000,
+            "input 0 should embed parent A's 5000 sats"
+        );
+        assert_eq!(
+            parsed.inputs[1].source_satoshis().unwrap(),
+            7000,
+            "input 1 should embed parent B's 7000 sats"
+        );
+    }
+
+    #[test]
+    fn test_beef_to_ef_large_pushdata_script() {
+        use crate::script::UnlockingScript;
+
+        // Parent has a PushDrop-style locking script > 256 bytes
+        let mut beef = Beef::new();
+        let big_script: Vec<u8> = (0..400).map(|i| ((i * 13 + 7) % 256) as u8).collect();
+        let parent_raw = make_raw_tx(None, 20_000, Some(&big_script));
+        let parent_txid = add_proven_tx(&mut beef, parent_raw.clone(), 200);
+
+        // New tx spends the parent
+        let new_raw = make_raw_tx(Some(&parent_txid), 19_000, None);
+        let _new_txid = add_raw_tx(&mut beef, new_raw.clone(), None);
+
+        let mut new_tx = Transaction::from_binary(&new_raw).unwrap();
+        let parent_tx = Transaction::from_binary(&parent_raw).unwrap();
+
+        // Verify parent has the big script in its output
+        let parent_script_bytes = parent_tx.outputs[0].locking_script.to_binary();
+        assert_eq!(parent_script_bytes.len(), big_script.len());
+
+        new_tx.inputs[0].source_transaction = Some(Box::new(parent_tx));
+        new_tx.inputs[0].unlocking_script = Some(UnlockingScript::new());
+
+        let ef_bytes = new_tx.to_ef().unwrap();
+
+        // Round-trip and verify the full script is preserved
+        let parsed = Transaction::from_ef(&ef_bytes).unwrap();
+        let embedded_script = parsed.inputs[0].source_locking_script().unwrap().to_binary();
+        assert_eq!(
+            embedded_script, big_script,
+            "EF should preserve the full >256-byte locking script"
+        );
+    }
+
+    #[test]
+    fn test_beef_to_ef_missing_parent_fails() {
+        // Create a new tx that spends a parent, but DON'T attach source_transaction
+        let mut beef = Beef::new();
+
+        let parent_raw = make_raw_tx(None, 10_000, None);
+        let parent_txid = add_proven_tx(&mut beef, parent_raw.clone(), 100);
+
+        let new_raw = make_raw_tx(Some(&parent_txid), 9000, None);
+        let _new_txid = add_raw_tx(&mut beef, new_raw.clone(), None);
+
+        // Parse the new tx but do NOT attach source_transaction
+        let mut new_tx = Transaction::from_binary(&new_raw).unwrap();
+        // Set unlocking script so we get past that check
+        new_tx.inputs[0].unlocking_script = Some(crate::script::UnlockingScript::new());
+
+        // to_ef() should fail because source_transaction is missing
+        let result = new_tx.to_ef();
+        assert!(result.is_err(), "to_ef() should fail without source_transaction");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("source transactions"),
+            "Error should mention source transactions, got: {}",
+            err_msg
+        );
+    }
+
     #[test]
     fn test_trim_known_proven_noop_when_nothing_to_trim() {
         let mut beef = Beef::new();
