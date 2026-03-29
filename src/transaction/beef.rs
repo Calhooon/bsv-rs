@@ -1161,10 +1161,18 @@ mod tests {
 
         // Verify raw bytes of both txs survived the round-trip.
         let found_a = parsed.find_txid(&txid_a).unwrap();
-        assert_eq!(found_a.raw_tx().unwrap(), &raw_a, "TX A raw bytes differ after merge round-trip");
+        assert_eq!(
+            found_a.raw_tx().unwrap(),
+            &raw_a,
+            "TX A raw bytes differ after merge round-trip"
+        );
 
         let found_b = parsed.find_txid(&txid_b).unwrap();
-        assert_eq!(found_b.raw_tx().unwrap(), &raw_b, "TX B raw bytes differ after merge round-trip");
+        assert_eq!(
+            found_b.raw_tx().unwrap(),
+            &raw_b,
+            "TX B raw bytes differ after merge round-trip"
+        );
     }
 
     // ── Test 2: trim with 5 txs, 2 deep ancestors removed ───────────────
@@ -1196,14 +1204,19 @@ mod tests {
         // Now prove B.
         let bump_b = MerklePath::from_coinbase_txid(&txid_b, 200);
         let bi = beef.merge_bump(bump_b);
-        beef.find_txid_mut(&txid_b).unwrap().set_bump_index(Some(bi));
+        beef.find_txid_mut(&txid_b)
+            .unwrap()
+            .set_bump_index(Some(bi));
 
         beef.trim_known_proven();
 
         assert_eq!(beef.txs.len(), 3, "Should keep B, C, D only");
         assert!(beef.find_txid(&txid_a0).is_none(), "A0 should be trimmed");
         assert!(beef.find_txid(&txid_a1).is_none(), "A1 should be trimmed");
-        assert!(beef.find_txid(&txid_b).is_some(), "B should remain (proven)");
+        assert!(
+            beef.find_txid(&txid_b).is_some(),
+            "B should remain (proven)"
+        );
         assert!(beef.find_txid(&txid_c).is_some(), "C should remain");
         assert!(beef.find_txid(&txid_d).is_some(), "D should remain (tip)");
     }
@@ -1301,14 +1314,20 @@ mod tests {
 
         let found = parsed.find_txid(&txid).unwrap();
         let recovered_raw = found.raw_tx().unwrap();
-        assert_eq!(recovered_raw, &raw_tx, "raw tx with large script should survive round-trip");
+        assert_eq!(
+            recovered_raw, &raw_tx,
+            "raw tx with large script should survive round-trip"
+        );
 
         // Verify the script bytes are embedded in the raw tx.
         let script_pos = recovered_raw
             .windows(script.len())
             .position(|w| w == script.as_slice())
             .expect("script bytes not found in recovered raw tx");
-        assert!(script_pos > 0, "script should be at a nonzero offset in the tx");
+        assert!(
+            script_pos > 0,
+            "script should be at a nonzero offset in the tx"
+        );
     }
 
     // ── Test 6: merge_beef remaps bump indices correctly ────────────────
@@ -1390,7 +1409,9 @@ mod tests {
         // Prove A1.
         let bump_a1 = MerklePath::from_coinbase_txid(&txid_a1, 11);
         let bi = beef.merge_bump(bump_a1);
-        beef.find_txid_mut(&txid_a1).unwrap().set_bump_index(Some(bi));
+        beef.find_txid_mut(&txid_a1)
+            .unwrap()
+            .set_bump_index(Some(bi));
 
         beef.trim_known_proven();
 
@@ -1415,11 +1436,7 @@ mod tests {
 
     /// Helper: builds a raw transaction with 2 inputs spending two different
     /// previous txids at vout 0. Both use empty unlocking scripts.
-    fn make_raw_tx_2_inputs(
-        prev_txid_a: &str,
-        prev_txid_b: &str,
-        satoshis: u64,
-    ) -> Vec<u8> {
+    fn make_raw_tx_2_inputs(prev_txid_a: &str, prev_txid_b: &str, satoshis: u64) -> Vec<u8> {
         let mut raw = vec![0x01, 0x00, 0x00, 0x00]; // version
         raw.push(0x02); // 2 inputs
 
@@ -1476,7 +1493,11 @@ mod tests {
         let ef_bytes = new_tx.to_ef().unwrap();
 
         // Verify EF bytes start with version (4 bytes) then EF marker
-        assert_eq!(&ef_bytes[0..4], &[0x01, 0x00, 0x00, 0x00], "version should be 1");
+        assert_eq!(
+            &ef_bytes[0..4],
+            &[0x01, 0x00, 0x00, 0x00],
+            "version should be 1"
+        );
         assert_eq!(
             &ef_bytes[4..10],
             &[0x00, 0x00, 0x00, 0x00, 0x00, 0xEF],
@@ -1489,7 +1510,10 @@ mod tests {
 
         // Verify the source satoshis are embedded
         let source_sats = parsed.inputs[0].source_satoshis().unwrap();
-        assert_eq!(source_sats, 10_000, "source satoshis should be from parent output");
+        assert_eq!(
+            source_sats, 10_000,
+            "source satoshis should be from parent output"
+        );
     }
 
     #[test]
@@ -1574,7 +1598,10 @@ mod tests {
 
         // Round-trip and verify the full script is preserved
         let parsed = Transaction::from_ef(&ef_bytes).unwrap();
-        let embedded_script = parsed.inputs[0].source_locking_script().unwrap().to_binary();
+        let embedded_script = parsed.inputs[0]
+            .source_locking_script()
+            .unwrap()
+            .to_binary();
         assert_eq!(
             embedded_script, big_script,
             "EF should preserve the full >256-byte locking script"
@@ -1599,7 +1626,10 @@ mod tests {
 
         // to_ef() should fail because source_transaction is missing
         let result = new_tx.to_ef();
-        assert!(result.is_err(), "to_ef() should fail without source_transaction");
+        assert!(
+            result.is_err(),
+            "to_ef() should fail without source_transaction"
+        );
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("source transactions"),
