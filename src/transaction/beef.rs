@@ -291,6 +291,11 @@ impl Beef {
     }
 
     /// Merges another BEEF into this one.
+    ///
+    /// Bumps are merged first and may receive new indices in self. Transactions
+    /// are then merged WITHOUT passing bump indices from the source — instead,
+    /// `try_to_validate_bump_index` discovers the correct index by scanning
+    /// self.bumps. This matches the TypeScript SDK's `mergeBeefTx` behavior.
     pub fn merge_beef(&mut self, other: &Beef) {
         for bump in &other.bumps {
             self.merge_bump(bump.clone());
@@ -300,8 +305,11 @@ impl Beef {
             if tx.is_txid_only() {
                 self.merge_txid_only(tx.txid());
             } else if let Some(raw) = tx.raw_tx() {
-                // Preserve the original raw bytes to avoid re-serialization
-                self.merge_raw_tx(raw.to_vec(), tx.bump_index());
+                // Do NOT pass tx.bump_index() — it's the old index from
+                // `other` which is invalid after bumps were re-indexed.
+                // merge_raw_tx calls try_to_validate_bump_index to discover
+                // the correct index by scanning self.bumps.
+                self.merge_raw_tx(raw.to_vec(), None);
             } else if let Some(t) = tx.tx() {
                 self.merge_transaction(t.clone());
             }
