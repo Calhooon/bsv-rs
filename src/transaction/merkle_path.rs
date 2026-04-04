@@ -554,9 +554,26 @@ impl MerklePath {
         }
     }
 
-    /// Returns true if this path contains the given txid.
+    /// Returns true if this path contains the given txid in its leaf level.
     pub fn contains(&self, txid: &str) -> bool {
-        self.path[0].iter().any(|l| l.hash.as_deref() == Some(txid))
+        self.path[0]
+            .iter()
+            .any(|l| l.hash.as_deref() == Some(txid))
+    }
+
+    /// Returns true if this path contains the given txid, and marks the
+    /// matching leaf as `txid = true`. This is used during BEEF merging
+    /// to both check containment and ensure the leaf is properly flagged
+    /// for subsequent validation. Matches the TS SDK's pattern where
+    /// `tryToValidateBumpIndex` sets `node.txid = true` after finding a match.
+    pub fn contains_and_mark(&mut self, txid: &str) -> bool {
+        for leaf in &mut self.path[0] {
+            if leaf.hash.as_deref() == Some(txid) {
+                leaf.txid = true;
+                return true;
+            }
+        }
+        false
     }
 
     /// Returns all txids in this path.
@@ -652,13 +669,81 @@ mod tests {
     }
 
     #[test]
-    fn test_contains() {
+    fn test_contains_matches_txid_leaf() {
         let path = MerklePath::from_hex(BUMP_HEX_1).unwrap();
-        // The path should contain its level 0 hashes
-        if let Some(first_hash) = &path.path[0][0].hash {
-            assert!(path.contains(first_hash));
-        }
+        // Find the first leaf that IS a txid
+        let txid_leaf = path.path[0].iter().find(|l| l.txid).unwrap();
+        let txid = txid_leaf.hash.as_ref().unwrap();
+        assert!(path.contains(txid));
         assert!(!path.contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_contains_matches_any_hash() {
+        // contains() matches any hash in path[0] (backward compatible)
+        let txid_hash = "a".repeat(64);
+        let sibling_hash = "b".repeat(64);
+
+        let path = MerklePath {
+            block_height: 100,
+            path: vec![vec![
+                MerklePathLeaf {
+                    offset: 0,
+                    hash: Some(txid_hash.clone()),
+                    txid: true,
+                    duplicate: false,
+                },
+                MerklePathLeaf {
+                    offset: 1,
+                    hash: Some(sibling_hash.clone()),
+                    txid: false,
+                    duplicate: false,
+                },
+            ]],
+        };
+
+        assert!(path.contains(&txid_hash));
+        assert!(path.contains(&sibling_hash)); // contains matches ALL hashes
+        // txids() only returns flagged txids
+        assert_eq!(path.txids(), vec![txid_hash]);
+    }
+
+    #[test]
+    fn test_contains_and_mark_sets_txid_flag() {
+        let txid_hash = "a".repeat(64);
+        let sibling_hash = "b".repeat(64);
+
+        let mut path = MerklePath {
+            block_height: 100,
+            path: vec![vec![
+                MerklePathLeaf {
+                    offset: 0,
+                    hash: Some(txid_hash.clone()),
+                    txid: false, // Not yet marked
+                    duplicate: false,
+                },
+                MerklePathLeaf {
+                    offset: 1,
+                    hash: Some(sibling_hash.clone()),
+                    txid: false,
+                    duplicate: false,
+                },
+            ]],
+        };
+
+        // Before marking: txids() is empty
+        assert!(path.txids().is_empty());
+
+        // contains_and_mark sets the flag
+        assert!(path.contains_and_mark(&txid_hash));
+        assert_eq!(path.txids(), vec![txid_hash.clone()]);
+
+        // Sibling can also be marked if needed
+        assert!(path.contains_and_mark(&sibling_hash));
+        assert_eq!(path.txids().len(), 2);
+
+        // Non-existent hash returns false
+        assert!(!path.contains_and_mark(&"c".repeat(64)));
     }
 
     #[test]

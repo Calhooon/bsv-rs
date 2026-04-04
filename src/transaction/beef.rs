@@ -178,12 +178,21 @@ impl Beef {
     }
 
     /// Updates bump indices for transactions proven by a bump.
+    /// Only assigns the bump if the txid appears as a flagged leaf (txid=true).
+    /// This prevents a tx from being claimed by a bump where it appears only
+    /// as a sibling hash. Matches TS SDK behavior where the txid flag is
+    /// checked/set during bump index assignment.
     fn update_bump_indices(&mut self, bump_index: usize) {
         let bump = &self.bumps[bump_index];
         for tx in &mut self.txs {
             if tx.bump_index().is_none() {
                 let txid = tx.txid();
-                if bump.contains(&txid) {
+                // Only assign if the leaf has txid=true (a proper proven tx,
+                // not just a sibling hash used for proof computation)
+                let is_txid_leaf = bump.path[0].iter().any(|l| {
+                    l.txid && l.hash.as_deref() == Some(&txid)
+                });
+                if is_txid_leaf {
                     tx.set_bump_index(Some(bump_index));
                 }
             }
@@ -282,8 +291,22 @@ impl Beef {
         }
 
         let txid = self.txs[tx_idx].txid();
+
+        // First pass: prefer bumps where the leaf has txid=true
         for (i, bump) in self.bumps.iter().enumerate() {
-            if bump.contains(&txid) {
+            let is_txid_leaf = bump.path[0].iter().any(|l| {
+                l.txid && l.hash.as_deref() == Some(&txid)
+            });
+            if is_txid_leaf {
+                self.txs[tx_idx].set_bump_index(Some(i));
+                return;
+            }
+        }
+
+        // Second pass: fall back to any hash match and mark it as txid
+        // (for backward compat with paths that don't set the txid flag)
+        for (i, bump) in self.bumps.iter_mut().enumerate() {
+            if bump.contains_and_mark(&txid) {
                 self.txs[tx_idx].set_bump_index(Some(i));
                 return;
             }
@@ -833,6 +856,7 @@ impl Default for Beef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transaction::MerklePathLeaf;
 
     #[test]
     fn test_new_beef() {
@@ -1657,5 +1681,124 @@ mod tests {
 
         beef.trim_known_proven();
         assert_eq!(beef.txs.len(), 1); // Still there
+    }
+
+    #[test]
+    fn test_merge_beef_bump_index_not_assigned_from_sibling() {
+        // Reproduces the production bug where tx[1] gets assigned bump[0]
+        // because tx[1]'s txid appears as a SIBLING hash in bump[0]'s path.
+        //
+        // Setup: Two independent proven txs (TX_A and TX_B) in separate BEEFs.
+        // TX_B's txid appears as a sibling in TX_A's merkle path.
+        // After merge_beef, TX_B must reference its OWN bump, not TX_A's.
+
+        let tx_a_raw = make_raw_tx(None, 1000, None);
+        let tx_b_raw = make_raw_tx(None, 2000, Some(&[0x01])); // different script → different txid
+
+        let tx_a_id = BeefTx::from_raw_tx(tx_a_raw.clone(), None).txid();
+        let tx_b_id = BeefTx::from_raw_tx(tx_b_raw.clone(), None).txid();
+
+        // Build BEEF 1 with TX_A proven. Its merkle path has TX_B's txid as a sibling.
+        let mut beef1 = Beef::new();
+        add_raw_tx(&mut beef1, tx_a_raw, None);
+
+        let bump_a = MerklePath {
+            block_height: 100,
+            path: vec![vec![
+                MerklePathLeaf {
+                    offset: 0,
+                    hash: Some(tx_a_id.clone()),
+                    txid: true,
+                    duplicate: false,
+                },
+                MerklePathLeaf {
+                    offset: 1,
+                    hash: Some(tx_b_id.clone()), // TX_B appears as sibling!
+                    txid: false,                   // NOT a txid — just a sibling hash
+                    duplicate: false,
+                },
+            ]],
+        };
+        let bi_a = beef1.merge_bump(bump_a);
+        beef1
+            .find_txid_mut(&tx_a_id)
+            .unwrap()
+            .set_bump_index(Some(bi_a));
+
+        // Build BEEF 2 with TX_B proven in a different block.
+        let mut beef2 = Beef::new();
+        add_raw_tx(&mut beef2, tx_b_raw, None);
+
+        let bump_b = MerklePath::from_coinbase_txid(&tx_b_id, 200);
+        let bi_b = beef2.merge_bump(bump_b);
+        beef2
+            .find_txid_mut(&tx_b_id)
+            .unwrap()
+            .set_bump_index(Some(bi_b));
+
+        // Merge BEEF 2 into BEEF 1.
+        beef1.merge_beef(&beef2);
+
+        // TX_A should still point to bump[0] (height=100)
+        let tx_a = beef1.find_txid(&tx_a_id).unwrap();
+        assert_eq!(
+            tx_a.bump_index(),
+            Some(0),
+            "TX_A should keep bump[0]"
+        );
+
+        // TX_B must point to its OWN bump (height=200), NOT bump[0].
+        let tx_b = beef1.find_txid(&tx_b_id).unwrap();
+        let tx_b_bump_idx = tx_b.bump_index().expect("TX_B should have a bump index");
+        assert_eq!(
+            beef1.bumps[tx_b_bump_idx].block_height, 200,
+            "TX_B's bump must be at height 200 (its own proof), not height 100 (where it's a sibling)"
+        );
+
+        // The BEEF should be valid
+        assert!(
+            beef1.is_valid(false),
+            "Merged BEEF should be valid"
+        );
+    }
+
+    #[test]
+    fn test_update_bump_indices_ignores_siblings() {
+        // Verify that update_bump_indices (called by merge_bump) does not
+        // assign bump indices based on sibling hashes.
+        let mut beef = Beef::new();
+
+        let tx_raw = make_raw_tx(None, 1000, None);
+        let tx_id = add_raw_tx(&mut beef, tx_raw, None);
+
+        // Create a bump where tx_id is a SIBLING (txid=false), not a leaf
+        let other_txid = "c".repeat(64);
+        let bump = MerklePath {
+            block_height: 100,
+            path: vec![vec![
+                MerklePathLeaf {
+                    offset: 0,
+                    hash: Some(other_txid),
+                    txid: true,
+                    duplicate: false,
+                },
+                MerklePathLeaf {
+                    offset: 1,
+                    hash: Some(tx_id.clone()),
+                    txid: false, // Our tx appears as sibling only
+                    duplicate: false,
+                },
+            ]],
+        };
+
+        beef.merge_bump(bump);
+
+        // The tx should NOT have been assigned this bump
+        let tx = beef.find_txid(&tx_id).unwrap();
+        assert_eq!(
+            tx.bump_index(),
+            None,
+            "Transaction must not be assigned a bump where it appears only as a sibling"
+        );
     }
 }
