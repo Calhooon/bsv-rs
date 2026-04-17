@@ -285,6 +285,22 @@ impl Beef {
     }
 
     /// Tries to validate a bump index for a new transaction.
+    ///
+    /// STRICT MATCHING ONLY: assigns `bump_index` if-and-only-if some bump's
+    /// level-0 leaf has `txid=true` AND `hash == tx.txid()`. If no such leaf
+    /// exists, `bump_index` remains `None`.
+    ///
+    /// A previous iteration of this function included a permissive second
+    /// pass that matched ANY leaf hash at level 0 (including sibling hashes
+    /// used only for merkle computation) and mutated the leaf's `txid` flag
+    /// to `true`. That was incorrect: a tx's txid can legitimately appear as
+    /// a sibling hash in an unrelated bump, and marking it as a txid-leaf
+    /// there would claim a proof that does not belong to it.
+    ///
+    /// The Go SDK (`go-sdk/transaction/beef.go:tryToValidateBumpIndex`) only
+    /// validates/discards already-assigned paths and does not auto-discover
+    /// from siblings. This matches that strict semantics. The TS SDK still
+    /// has the permissive variant; fixing it there is a separate effort.
     fn try_to_validate_bump_index(&mut self, tx_idx: usize) {
         if self.txs[tx_idx].bump_index().is_some() {
             return;
@@ -292,21 +308,18 @@ impl Beef {
 
         let txid = self.txs[tx_idx].txid();
 
-        // First pass: prefer bumps where the leaf has txid=true
+        // Strict match: leaf has txid=true AND hash == tx.txid().
         for (i, bump) in self.bumps.iter().enumerate() {
-            let is_txid_leaf = bump.path[0].iter().any(|l| {
-                l.txid && l.hash.as_deref() == Some(&txid)
-            });
+            let is_txid_leaf = bump
+                .path
+                .first()
+                .map(|level0| {
+                    level0
+                        .iter()
+                        .any(|l| l.txid && l.hash.as_deref() == Some(&txid))
+                })
+                .unwrap_or(false);
             if is_txid_leaf {
-                self.txs[tx_idx].set_bump_index(Some(i));
-                return;
-            }
-        }
-
-        // Second pass: fall back to any hash match and mark it as txid
-        // (for backward compat with paths that don't set the txid flag)
-        for (i, bump) in self.bumps.iter_mut().enumerate() {
-            if bump.contains_and_mark(&txid) {
                 self.txs[tx_idx].set_bump_index(Some(i));
                 return;
             }
@@ -1759,6 +1772,57 @@ mod tests {
         assert!(
             beef1.is_valid(false),
             "Merged BEEF should be valid"
+        );
+    }
+
+    #[test]
+    fn test_try_to_validate_bump_index_strict_no_sibling_fallback() {
+        // When a tx's txid only appears as a SIBLING hash (txid=false) in an
+        // unrelated bump, `try_to_validate_bump_index` must leave the tx's
+        // bump_index as None — not fall back to the sibling match.
+        //
+        // Regression test for: consolidation failing with "BEEF structure is
+        // invalid" because a tx's bump_index was being set to a bump that
+        // contained its hash only as a sibling (used only for merkle
+        // computation of some OTHER tx's proof). Go SDK reference:
+        // `go-sdk/transaction/beef.go:tryToValidateBumpIndex` — strict only.
+        let mut beef = Beef::new();
+
+        // Build a bump that proves SOME OTHER tx (txid=true for it) and
+        // happens to include `tx_id` as a sibling hash (txid=false).
+        let tx_raw = make_raw_tx(None, 1234, None);
+        let tx_id = BeefTx::from_raw_tx(tx_raw.clone(), None).txid();
+        let other_txid = "d".repeat(64);
+
+        let bump = MerklePath {
+            block_height: 500,
+            path: vec![vec![
+                MerklePathLeaf {
+                    offset: 0,
+                    hash: Some(other_txid),
+                    txid: true,
+                    duplicate: false,
+                },
+                MerklePathLeaf {
+                    offset: 1,
+                    hash: Some(tx_id.clone()), // our tx appears here as SIBLING
+                    txid: false,
+                    duplicate: false,
+                },
+            ]],
+        };
+        beef.merge_bump(bump);
+
+        // Now add our tx via merge_raw_tx (bump_index=None, forcing
+        // try_to_validate_bump_index to run). Before the fix this would
+        // fall back to the sibling match and set bump_index=Some(0).
+        beef.merge_raw_tx(tx_raw, None);
+
+        let tx = beef.find_txid(&tx_id).unwrap();
+        assert_eq!(
+            tx.bump_index(),
+            None,
+            "tx must not be assigned to a bump where it appears only as a sibling hash"
         );
     }
 
