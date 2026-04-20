@@ -612,6 +612,28 @@ All implementations share test vectors to ensure cross-platform compatibility:
 
 **Total: 2,578 tests (1,339 unit + 1,071 integration + 168 doc tests) across 31 test files + 2,044 cross-SDK vectors + 54 wire protocol vectors + 4 fuzz targets + 4 benchmark suites**
 
+### Known limitation: `auth::utils::create_nonce` cross-peer interop
+
+Starting in v0.3.6, `create_nonce` emits the canonical 48-byte wire format
+(16 random || 32 HMAC) to match the TypeScript and Go SDKs' `createNonce`.
+`verify_nonce` also accepts the legacy 32-byte format from bsv-rs ≤ 0.3.5 so
+an in-flight session / derivation prefix created just before upgrade still
+verifies. The dual-accept path will be removed in v0.3.7.
+
+However, `verify_nonce` is **not fully cross-SDK-peer interoperable** yet:
+the ts-sdk and go-sdk references disagree on the HMAC inputs. `ts-sdk` uses
+`protocolID: [2, 'server hmac']` with `keyID = Utils.toUTF8(randomBytes)`;
+`go-sdk` uses `SecurityLevelEveryApp (1)` with `keyID = string(randomBytes)`.
+Because the HMAC is keyed by those inputs, a nonce produced by ts-sdk's
+server cannot be verified by go-sdk's server and vice versa — this is a
+reference-implementation divergence, not a bsv-rs bug. bsv-rs currently
+follows the go-sdk security level with its own `to_base64` keyID encoding.
+
+In practice this never fires in production, because `verify_nonce` is only
+ever called on nonces the same peer created (anti-replay check on BRC-29
+`derivationPrefix`, BRC-31 session nonces). Cross-peer `verify_nonce`
+interop is a theoretical concern pending upstream spec alignment.
+
 ## Development
 
 ```bash
