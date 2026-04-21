@@ -79,9 +79,11 @@ pub use host_reputation_tracker::{
 pub use lookup_resolver::{LookupResolver, LookupResolverConfig};
 
 // Re-exports from overlay_admin_token_template
+#[allow(deprecated)]
+pub use overlay_admin_token_template::create_overlay_admin_token;
 pub use overlay_admin_token_template::{
-    create_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token, is_ship_token,
-    is_slap_token, OverlayAdminTokenData,
+    create_signed_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token,
+    is_ship_token, is_slap_token, OverlayAdminTokenData,
 };
 
 // Re-exports from topic_broadcaster
