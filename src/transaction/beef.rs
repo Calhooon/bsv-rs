@@ -189,9 +189,9 @@ impl Beef {
                 let txid = tx.txid();
                 // Only assign if the leaf has txid=true (a proper proven tx,
                 // not just a sibling hash used for proof computation)
-                let is_txid_leaf = bump.path[0].iter().any(|l| {
-                    l.txid && l.hash.as_deref() == Some(&txid)
-                });
+                let is_txid_leaf = bump.path[0]
+                    .iter()
+                    .any(|l| l.txid && l.hash.as_deref() == Some(&txid));
                 if is_txid_leaf {
                     tx.set_bump_index(Some(bump_index));
                 }
@@ -1727,7 +1727,7 @@ mod tests {
                 MerklePathLeaf {
                     offset: 1,
                     hash: Some(tx_b_id.clone()), // TX_B appears as sibling!
-                    txid: false,                   // NOT a txid — just a sibling hash
+                    txid: false,                 // NOT a txid — just a sibling hash
                     duplicate: false,
                 },
             ]],
@@ -1754,11 +1754,7 @@ mod tests {
 
         // TX_A should still point to bump[0] (height=100)
         let tx_a = beef1.find_txid(&tx_a_id).unwrap();
-        assert_eq!(
-            tx_a.bump_index(),
-            Some(0),
-            "TX_A should keep bump[0]"
-        );
+        assert_eq!(tx_a.bump_index(), Some(0), "TX_A should keep bump[0]");
 
         // TX_B must point to its OWN bump (height=200), NOT bump[0].
         let tx_b = beef1.find_txid(&tx_b_id).unwrap();
@@ -1769,10 +1765,7 @@ mod tests {
         );
 
         // The BEEF should be valid
-        assert!(
-            beef1.is_valid(false),
-            "Merged BEEF should be valid"
-        );
+        assert!(beef1.is_valid(false), "Merged BEEF should be valid");
     }
 
     #[test]

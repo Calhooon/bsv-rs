@@ -2,8 +2,19 @@
 //!
 //! Tests full overlay workflows including lookup resolution, topic broadcasting,
 //! host reputation tracking, transaction history traversal, and admin token handling.
+//!
+//! **Historical note:** the admin-token assertions in this file were written
+//! against the legacy [`create_overlay_admin_token`] (4-field unsigned), now
+//! `#[deprecated]` in favor of the 5-field signed
+//! [`create_signed_overlay_admin_token`] that matches @bsv/sdk 1.10.1. The
+//! file-level allow keeps the legacy regression coverage running while new
+//! parity assertions live in `overlay_admin_token_ts_parity_tests.rs`.
+//!
+//! [`create_overlay_admin_token`]: bsv_rs::overlay::create_overlay_admin_token
+//! [`create_signed_overlay_admin_token`]: bsv_rs::overlay::create_signed_overlay_admin_token
 
 #![cfg(feature = "overlay")]
+#![allow(deprecated)]
 
 use bsv_rs::overlay::{
     create_overlay_admin_token, decode_overlay_admin_token, is_overlay_admin_token, is_ship_token,

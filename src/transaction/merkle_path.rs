@@ -556,9 +556,7 @@ impl MerklePath {
 
     /// Returns true if this path contains the given txid in its leaf level.
     pub fn contains(&self, txid: &str) -> bool {
-        self.path[0]
-            .iter()
-            .any(|l| l.hash.as_deref() == Some(txid))
+        self.path[0].iter().any(|l| l.hash.as_deref() == Some(txid))
     }
 
     /// Returns true if this path contains the given txid, and marks the
@@ -704,7 +702,7 @@ mod tests {
 
         assert!(path.contains(&txid_hash));
         assert!(path.contains(&sibling_hash)); // contains matches ALL hashes
-        // txids() only returns flagged txids
+                                               // txids() only returns flagged txids
         assert_eq!(path.txids(), vec![txid_hash]);
     }
 

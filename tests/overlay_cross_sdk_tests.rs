@@ -2,8 +2,21 @@
 //!
 //! Tests admin token encoding/decoding and type serialization
 //! for compatibility with TypeScript and Go BSV SDKs.
+//!
+//! **Historical note:** this file was written against the legacy
+//! [`create_overlay_admin_token`] (4-field unsigned) which is now
+//! `#[deprecated]` in favor of [`create_signed_overlay_admin_token`]
+//! (5-field signed, matches @bsv/sdk 1.10.1). The legacy assertions
+//! remain here as regression coverage for the decode path, which still
+//! accepts both shapes. The TS-parity byte-exact assertions on the
+//! new signed helper live in
+//! `tests/overlay_admin_token_ts_parity_tests.rs`.
+//!
+//! [`create_overlay_admin_token`]: bsv_rs::overlay::create_overlay_admin_token
+//! [`create_signed_overlay_admin_token`]: bsv_rs::overlay::create_signed_overlay_admin_token
 
 #![cfg(feature = "overlay")]
+#![allow(deprecated)]
 
 use bsv_rs::overlay::{
     create_overlay_admin_token, decode_overlay_admin_token, AdmittanceInstructions, LookupAnswer,

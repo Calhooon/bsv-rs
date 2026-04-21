@@ -1,0 +1,56 @@
+{
+  "description": "Byte-exact parity vectors for create_signed_overlay_admin_token against @bsv/sdk 1.10.1 (the version nanostore.babbage.systems / overlay-us-1.bsvb.tech run). Regenerated from tests/parity/ts-fixtures/generate.mjs in the bsv-storage-cloudflare sibling \u2014 see that script for the canonical TS inputs.",
+  "ts_sdk_version": "1.10.1",
+  "cases": [
+    {
+      "description": "SHIP token \u2014 ship_tm_uhrp \u2014 byte-exact against @bsv/sdk 1.10.1",
+      "protocol": "SHIP",
+      "admin_priv_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "domain": "https://overlay.example.com",
+      "topic_or_service": "tm_uhrp",
+      "expected_locking_script_hex": "2102d7245996c0abb8323c4780f4e7c5f7938e5498e35daa5325641df6fa5129f86bac0453484950210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981b68747470733a2f2f6f7665726c61792e6578616d706c652e636f6d07746d5f75687270473045022100d5c816e5dfb6fbdc972d8a8ad0738fb00a1ada4b48eb220f3785cd55d9aaff52022079ffd78b05cb0bbce1f3c74a0e5de346c10df35718bcfc2eabcfa9837318d99f6d6d75",
+      "_source_fixture": "tests/parity/ts-fixtures/generate.mjs",
+      "_source_ts_sdk_version": "1.10.1"
+    },
+    {
+      "description": "SHIP token \u2014 ship_tm_ship \u2014 byte-exact against @bsv/sdk 1.10.1",
+      "protocol": "SHIP",
+      "admin_priv_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "domain": "https://overlay.example.com",
+      "topic_or_service": "tm_ship",
+      "expected_locking_script_hex": "2102d7245996c0abb8323c4780f4e7c5f7938e5498e35daa5325641df6fa5129f86bac0453484950210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981b68747470733a2f2f6f7665726c61792e6578616d706c652e636f6d07746d5f73686970473045022100d66e0542a5baf68f2b562a1ab712fd0ef9f5a8ce1852d923ad782bb613eadb9b0220562a56643ebaf613c75b39bf63b88edc70d380c7fbd29aef8d4bd845041ce43e6d6d75",
+      "_source_fixture": "tests/parity/ts-fixtures/generate.mjs",
+      "_source_ts_sdk_version": "1.10.1"
+    },
+    {
+      "description": "SHIP token \u2014 ship_long_topic \u2014 byte-exact against @bsv/sdk 1.10.1",
+      "protocol": "SHIP",
+      "admin_priv_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "domain": "https://overlay.example.com",
+      "topic_or_service": "tm_some_very_specific_descriptor_topic",
+      "expected_locking_script_hex": "2102d7245996c0abb8323c4780f4e7c5f7938e5498e35daa5325641df6fa5129f86bac0453484950210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981b68747470733a2f2f6f7665726c61792e6578616d706c652e636f6d26746d5f736f6d655f766572795f73706563696669635f64657363726970746f725f746f70696346304402205bd5be4bc2d1066c9914004d88b0fa4e89c89463ca2785655bb1456dac3d926f02202c02a36656a72081deb5287a3c3cff6a2aa73c2c49f05997443cfa093d5a460c6d6d75",
+      "_source_fixture": "tests/parity/ts-fixtures/generate.mjs",
+      "_source_ts_sdk_version": "1.10.1"
+    },
+    {
+      "description": "SLAP token \u2014 slap_ls_uhrp \u2014 byte-exact against @bsv/sdk 1.10.1",
+      "protocol": "SLAP",
+      "admin_priv_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "domain": "https://overlay.example.com",
+      "topic_or_service": "ls_uhrp",
+      "expected_locking_script_hex": "2102b333cd66503a8e369c238e71e3559133fb9a216c81564dafc640c94989cfe06fac04534c4150210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981b68747470733a2f2f6f7665726c61792e6578616d706c652e636f6d076c735f75687270463044022012010a941d8ad94b3fffad4ca69a17d34921b119d076983b5c7832a66965e055022020fb4aa5aa5d7acccfcb284f34f65cb5f30be999b3dc8b86be378980d5e008656d6d75",
+      "_source_fixture": "tests/parity/ts-fixtures/generate.mjs",
+      "_source_ts_sdk_version": "1.10.1"
+    },
+    {
+      "description": "SLAP token \u2014 slap_ls_ship \u2014 byte-exact against @bsv/sdk 1.10.1",
+      "protocol": "SLAP",
+      "admin_priv_hex": "0000000000000000000000000000000000000000000000000000000000000001",
+      "domain": "https://overlay.example.com",
+      "topic_or_service": "ls_ship",
+      "expected_locking_script_hex": "2102b333cd66503a8e369c238e71e3559133fb9a216c81564dafc640c94989cfe06fac04534c4150210279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817981b68747470733a2f2f6f7665726c61792e6578616d706c652e636f6d076c735f73686970473045022100f961a314337e5450b5c86fe64c5ef6116414c1d79900d945f3efb5ac01b8ece702203d20f18a7ce5dbc1b7ff601281a4fb6ec002b342ce665502a70c5705d23067506d6d75",
+      "_source_fixture": "tests/parity/ts-fixtures/generate.mjs",
+      "_source_ts_sdk_version": "1.10.1"
+    }
+  ]
+}

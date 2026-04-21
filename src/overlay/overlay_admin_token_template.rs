@@ -9,9 +9,7 @@ use crate::primitives::hash::sha256;
 use crate::primitives::{PrivateKey, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
-use crate::wallet::{
-    Counterparty, KeyDeriver, KeyDeriverApi, Protocol as WalletProtocol, SecurityLevel,
-};
+use crate::wallet::{Counterparty, KeyDeriver, Protocol as WalletProtocol, SecurityLevel};
 use crate::{Error, Result};
 
 /// BRC-43 protocol names for SHIP/SLAP key derivation.
@@ -277,10 +275,19 @@ pub fn create_signed_overlay_admin_token(
     // BRC-42 symmetry this is the same point the TS wallet returns from
     // `getPublicKey({counterparty: 'anyone', forSelf: true})`.
     let locking_pubkey = deriver
-        .derive_public_key(&wallet_protocol, OVERLAY_ADMIN_KEY_ID, &Counterparty::Anyone, true)
+        .derive_public_key(
+            &wallet_protocol,
+            OVERLAY_ADMIN_KEY_ID,
+            &Counterparty::Anyone,
+            true,
+        )
         .expect("BRC-42 derive_public_key is infallible for well-formed inputs");
     let signing_priv = deriver
-        .derive_private_key(&wallet_protocol, OVERLAY_ADMIN_KEY_ID, &Counterparty::Anyone)
+        .derive_private_key(
+            &wallet_protocol,
+            OVERLAY_ADMIN_KEY_ID,
+            &Counterparty::Anyone,
+        )
         .expect("BRC-42 derive_private_key is infallible for well-formed inputs");
 
     let identity_pubkey = root_key.public_key();
@@ -455,8 +462,11 @@ mod tests {
             "https://overlay.example.com",
             "tm_uhrp",
         );
-        assert_ne!(signed.to_hex(), unsigned.to_hex(),
-            "signed (5-field) and unsigned (4-field) variants must produce different bytes");
+        assert_ne!(
+            signed.to_hex(),
+            unsigned.to_hex(),
+            "signed (5-field) and unsigned (4-field) variants must produce different bytes"
+        );
     }
 
     #[test]
@@ -528,6 +538,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_is_overlay_admin_token() {
         let private_key = PrivateKey::random();
         let public_key = private_key.public_key();
@@ -548,6 +559,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_identity_key_hex() {
         let private_key = PrivateKey::random();
         let public_key = private_key.public_key();
