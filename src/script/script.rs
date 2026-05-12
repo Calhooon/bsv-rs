@@ -871,6 +871,49 @@ mod tests {
     }
 
     #[test]
+    fn test_set_chunk_opcode_replaces_chunk() {
+        // set_chunk_opcode is publicly exported but had no direct test coverage.
+        // It overwrites the chunk at `index` with a new opcode-only chunk
+        // (dropping any associated data) and invalidates caches.
+        let mut script = Script::from_asm("OP_DUP OP_HASH160").unwrap();
+
+        // Replace chunk 0 (OP_DUP, opcode 0x76) with OP_NOP (0x61).
+        script.set_chunk_opcode(0, OP_NOP);
+        assert_eq!(script.to_asm(), "OP_NOP OP_HASH160");
+
+        // Caches are invalidated, so the serialized bytes match the new chunks.
+        let hex = script.to_hex();
+        assert!(hex.starts_with("61")); // OP_NOP
+    }
+
+    #[test]
+    fn test_set_chunk_opcode_drops_data_on_replace() {
+        // When the chunk being replaced was a data push, the data must be
+        // dropped — the new chunk is opcode-only.
+        let mut script = Script::new();
+        script.write_bin(&[0xab, 0xcd]); // a 2-byte push
+        script.write_opcode(OP_CHECKSIG);
+
+        // Replace the data-push chunk with OP_DUP. Length should drop because
+        // the 2 data bytes are gone.
+        let before_hex = script.to_hex();
+        script.set_chunk_opcode(0, OP_DUP);
+        let after_hex = script.to_hex();
+        assert_ne!(before_hex, after_hex);
+        assert_eq!(after_hex, "76ac"); // OP_DUP || OP_CHECKSIG
+    }
+
+    #[test]
+    fn test_set_chunk_opcode_out_of_bounds_noop() {
+        // Out-of-bounds index must be a silent no-op (matches existing impl
+        // that checks `index < chunks.len()`).
+        let mut script = Script::from_asm("OP_DUP").unwrap();
+        let before = script.to_hex();
+        script.set_chunk_opcode(10, OP_NOP);
+        assert_eq!(script.to_hex(), before);
+    }
+
+    #[test]
     fn test_find_and_delete() {
         let mut script = Script::from_asm("OP_DUP OP_HASH160 OP_DUP").unwrap();
         let target = Script::from_asm("OP_DUP").unwrap();
