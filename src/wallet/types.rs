@@ -1825,6 +1825,57 @@ mod tests {
         assert!(cp_anyone.public_key().is_none());
     }
 
+    // QueryMode/OutputInclude expose as_str() and FromStr but neither had
+    // direct tests in types.rs. The wire-protocol roundtrip in wallet_tests.rs
+    // doesn't go through these string conversions. Pin both, including the
+    // case-insensitive input the FromStr impls accept.
+    #[test]
+    fn test_query_mode_from_str_and_as_str() {
+        use std::str::FromStr;
+
+        assert_eq!(QueryMode::Any.as_str(), "any");
+        assert_eq!(QueryMode::All.as_str(), "all");
+
+        assert_eq!(QueryMode::from_str("any").unwrap(), QueryMode::Any);
+        assert_eq!(QueryMode::from_str("all").unwrap(), QueryMode::All);
+
+        // Case-insensitive — FromStr lowercases the input.
+        assert_eq!(QueryMode::from_str("Any").unwrap(), QueryMode::Any);
+        assert_eq!(QueryMode::from_str("ALL").unwrap(), QueryMode::All);
+
+        assert!(QueryMode::from_str("either").is_err());
+        assert!(QueryMode::from_str("").is_err());
+    }
+
+    #[test]
+    fn test_output_include_from_str_and_as_str() {
+        use std::str::FromStr;
+
+        assert_eq!(OutputInclude::LockingScripts.as_str(), "locking scripts");
+        assert_eq!(
+            OutputInclude::EntireTransactions.as_str(),
+            "entire transactions"
+        );
+
+        assert_eq!(
+            OutputInclude::from_str("locking scripts").unwrap(),
+            OutputInclude::LockingScripts
+        );
+        assert_eq!(
+            OutputInclude::from_str("entire transactions").unwrap(),
+            OutputInclude::EntireTransactions
+        );
+
+        // Case-insensitive.
+        assert_eq!(
+            OutputInclude::from_str("LOCKING SCRIPTS").unwrap(),
+            OutputInclude::LockingScripts
+        );
+
+        assert!(OutputInclude::from_str("scripts").is_err());
+        assert!(OutputInclude::from_str("").is_err());
+    }
+
     #[test]
     fn test_counterparty_from_hex_valid_compressed() {
         // Generator point as compressed pubkey
