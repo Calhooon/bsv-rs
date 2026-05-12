@@ -539,6 +539,51 @@ mod tests {
     use crate::primitives::ec::PrivateKey;
 
     #[test]
+    fn test_pushdrop_decode_rejects_too_short_script() {
+        // Single-chunk scripts can't be valid PushDrop (need at least pubkey
+        // and OP_CHECKSIG, or at minimum 2 chunks total).
+        let script = LockingScript::from_hex("76").unwrap(); // single OP_DUP
+        let result = PushDrop::decode(&script);
+        assert!(matches!(result, Err(Error::ScriptParseError(_))));
+    }
+
+    #[test]
+    fn test_pushdrop_decode_rejects_lock_before_without_checksig() {
+        // A 33-byte data push (looks like a compressed pubkey) followed by
+        // something that's not OP_CHECKSIG — must error on the "expected
+        // OP_CHECKSIG after pubkey" branch of decode_lock_before.
+        let privkey = PrivateKey::random();
+        let pubkey = privkey.public_key();
+        let compressed = pubkey.to_compressed();
+
+        // Build: <pubkey> OP_DUP (instead of OP_CHECKSIG)
+        let mut script = crate::script::Script::new();
+        script.write_bin(&compressed);
+        script.write_opcode(crate::script::op::OP_DUP);
+        let locking = LockingScript::from_script(script);
+
+        let result = PushDrop::decode(&locking);
+        assert!(matches!(result, Err(Error::ScriptParseError(_))));
+    }
+
+    #[test]
+    fn test_pushdrop_decode_rejects_lock_after_without_trailing_checksig() {
+        // Lock-after pattern requires final chunk to be OP_CHECKSIG. Build a
+        // script that ends with OP_DROP instead — must error on the
+        // "Expected OP_CHECKSIG at end" branch of decode_lock_after.
+        let mut script = crate::script::Script::new();
+        script.write_bin(b"field1");
+        script.write_bin(b"field2");
+        script.write_opcode(crate::script::op::OP_2DROP);
+        // Note: no pubkey + OP_CHECKSIG tail. First chunk is data of length
+        // != 33|65, so decode routes to decode_lock_after.
+        let locking = LockingScript::from_script(script);
+
+        let result = PushDrop::decode(&locking);
+        assert!(matches!(result, Err(Error::ScriptParseError(_))));
+    }
+
+    #[test]
     fn test_pushdrop_lock_before() {
         let privkey = PrivateKey::random();
         let pubkey = privkey.public_key();
