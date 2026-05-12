@@ -798,6 +798,48 @@ mod tests {
         );
     }
 
+    // Cross-SDK parity: RFC 4231 HMAC-SHA-512 vectors. sha512_hmac is a
+    // public export but had no direct test coverage — it was only exercised
+    // implicitly via BIP-32 chain-code derivation. These vectors anchor the
+    // raw HMAC-SHA-512 behavior, including the long-key path (test 6).
+    #[test]
+    fn test_sha512_hmac_rfc4231_1() {
+        // Test case 1: 20-byte key 0x0b, data "Hi There"
+        let key = hex::decode("0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b").unwrap();
+        let data = b"Hi There";
+        let result = sha512_hmac(&key, data);
+        assert_eq!(
+            hex::encode(result),
+            "87aa7cdea5ef619d4ff0b4241a1d6cb02379f4e2ce4ec2787ad0b30545e17cdedaa833b7d6b8a702038b274eaea3f4e4be9d914eeb61f1702e696c203a126854"
+        );
+    }
+
+    #[test]
+    fn test_sha512_hmac_rfc4231_2() {
+        // Test case 2: "Jefe" key, "what do ya want for nothing?"
+        let key = b"Jefe";
+        let data = b"what do ya want for nothing?";
+        let result = sha512_hmac(key, data);
+        assert_eq!(
+            hex::encode(result),
+            "164b7a7bfcf819e2e395fbe73b56e0a387bd64222e831fd610270cd7ea2505549758bf75c05a994a6d034f65f8f0e6fdcaeab1a34d4a6b4b636e070a38bce737"
+        );
+    }
+
+    #[test]
+    fn test_sha512_hmac_rfc4231_6_long_key() {
+        // Test case 6: 131-byte key of 0xaa (larger than 128-byte SHA-512
+        // block — must be hashed down first). Data: "Test Using Larger Than
+        // Block-Size Key - Hash Key First"
+        let key = vec![0xaau8; 131];
+        let data = b"Test Using Larger Than Block-Size Key - Hash Key First";
+        let result = sha512_hmac(&key, data);
+        assert_eq!(
+            hex::encode(result),
+            "80b24263c7c1a3ebb71493c1dd7be8b49b46d1f41b4aeec1121b013783f8f3526b56d037e05f2598bd0fd2215d6a1e5295e64f73f63f0aec8b915a985d786598"
+        );
+    }
+
     // Cross-SDK parity: RFC 2202 test cases 4, 6, and 7. Test 4 exercises a
     // 25-byte key with 50-byte data (0xcd repeated). Tests 6/7 specifically
     // exercise the "key longer than block size" code path where the key must
