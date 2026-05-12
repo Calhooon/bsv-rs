@@ -588,3 +588,74 @@ fn test_network_enum() {
     assert!(matches!(mainnet, Network::Mainnet));
     assert!(matches!(testnet, Network::Testnet));
 }
+
+// =========================================================================
+// Cross-SDK parity: BIP-32 xprv → (private key, public key, address)
+// Vectors derived from go-sdk/compat/bip32/hd_key_test.go Example* outputs.
+// Anchors byte-exact equivalence of xprv parsing + key extraction across
+// Rust, Go, and TypeScript SDK consumers of an HD key.
+// =========================================================================
+
+#[test]
+fn test_cross_sdk_go_xprv_extracts_expected_keys_and_address() {
+    let xprv = "xprv9s21ZrQH143K3PZSwbEeXEYq74EbnfMngzAiMCZcfjzyRpUvt2vQJnaHRTZjeuEmLXeN6BzYRoFsEckfobxE9XaRzeLGfQoxzPzTRyRb6oE";
+
+    let hd_key = ExtendedKey::from_string(xprv).expect("parse xprv");
+
+    // Roundtrip string preserves the exact encoding (Go SDK invariant)
+    assert_eq!(hd_key.to_string(), xprv);
+
+    // Private key byte parity with Go SDK ExampleGetPrivateKeyFromHDKey
+    let private_key = hd_key.private_key().expect("derive private key");
+    assert_eq!(
+        hex::encode(private_key.to_bytes()),
+        "0ccf07f2cbe10dbe6f6034b7efbf62fc83cac3d44f49d67aa22ac8893d294e7a"
+    );
+
+    // Compressed public key byte parity with Go SDK ExampleGetPublicKeyFromHDKey
+    let public_key = hd_key.public_key().expect("derive public key");
+    assert_eq!(
+        hex::encode(public_key.to_compressed()),
+        "03a25f6c10eedcd41eebac22c6bbc5278690fa1aab3afc2bbe8f2277c85e5c5def"
+    );
+
+    // P2PKH address parity with Go SDK ExampleGetAddressFromHDKey /
+    // ExampleGetAddressStringFromHDKey
+    let address = hd_key.address(true).expect("derive address");
+    assert_eq!(address, "18G2YRH3nRKRx8pnqVFUM5nAJhTZJ3YA4W");
+}
+
+#[test]
+fn test_cross_sdk_go_xprv_extracts_second_vector_private_key() {
+    let xprv = "xprv9s21ZrQH143K4FdJCmPQe1CFUvK3PKVrcp3b5xVr5Bs3cP5ab6ytszeHggTmHoqTXpaa8CgYPxZZzigSGCDjtyWdUDJqPogb1JGWAPkBLdF";
+
+    let hd_key = ExtendedKey::from_string(xprv).expect("parse xprv");
+    assert_eq!(hd_key.to_string(), xprv);
+
+    // Private key byte parity with Go SDK TestGetPrivateKeyFromHDKey
+    let private_key = hd_key.private_key().expect("derive private key");
+    assert_eq!(
+        hex::encode(private_key.to_bytes()),
+        "8511f5e1e35ab748e7639aa68666df71857866af13fda1d081d5917948a6cd34"
+    );
+}
+
+#[test]
+fn test_cross_sdk_invalid_xprv_strings_rejected() {
+    // Vectors from go-sdk TestGenerateHDKeyFromString negative cases — these
+    // should all fail to parse as ExtendedKey.
+    let bad_inputs = [
+        "",
+        "0",
+        "1234567",
+        "xprv9s21ZrQH143K3PZSwbEeXEYq74EbnfMngzAiMCZcfjzyRpUv", // truncated
+    ];
+    for input in bad_inputs {
+        let result = ExtendedKey::from_string(input);
+        assert!(
+            result.is_err(),
+            "Should reject invalid xprv string: {:?}",
+            input
+        );
+    }
+}
