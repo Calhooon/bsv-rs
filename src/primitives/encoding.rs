@@ -1078,6 +1078,51 @@ mod tests {
         assert_eq!(encoded, "14cxpo3MBCYYWCgF74SWTdcmxipnGUsPw3");
     }
 
+    // from_base58_check_with_prefix_length is publicly exported but only used
+    // internally with prefix_length=1. UHRP storage uses prefix_length=2
+    // (version bytes 0xce 0x00), and BIP-32 extended keys use prefix_length=4
+    // (e.g. 0x04, 0x88, 0xad, 0xe4 for mainnet xprv). These tests anchor both
+    // variable-length prefix paths so a future refactor can't silently lose
+    // them.
+    #[test]
+    fn test_base58check_prefix_length_2_uhrp() {
+        // SHA-256 of empty input is a well-known constant
+        let hash_hex = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        let payload = from_hex(hash_hex).unwrap();
+        let version = [0xce, 0x00]; // UHRP version prefix
+
+        let encoded = to_base58_check(&payload, &version);
+        let (decoded_version, decoded_payload) =
+            from_base58_check_with_prefix_length(&encoded, 2).unwrap();
+
+        assert_eq!(decoded_version, version);
+        assert_eq!(decoded_payload, payload);
+    }
+
+    #[test]
+    fn test_base58check_prefix_length_4_bip32() {
+        // BIP-32 xprv prefix bytes
+        let bip32_xprv_prefix = [0x04, 0x88, 0xad, 0xe4];
+        // 74-byte BIP-32 serialized key body (depth + fingerprint +
+        // childnum + chaincode + key). We use a deterministic test payload.
+        let payload: Vec<u8> = (0..74).collect();
+
+        let encoded = to_base58_check(&payload, &bip32_xprv_prefix);
+        let (version, decoded_payload) =
+            from_base58_check_with_prefix_length(&encoded, 4).unwrap();
+
+        assert_eq!(version, bip32_xprv_prefix);
+        assert_eq!(decoded_payload, payload);
+    }
+
+    #[test]
+    fn test_base58check_prefix_length_rejects_short_input() {
+        // Data shorter than prefix + 4 (checksum) must error.
+        // "abc" is 3 base58 chars → very short bytes payload.
+        let result = from_base58_check_with_prefix_length("abc", 4);
+        assert!(result.is_err());
+    }
+
     // ------------------------------------------------------------------------
     // Base64 tests
     // ------------------------------------------------------------------------
