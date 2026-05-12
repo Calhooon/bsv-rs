@@ -260,4 +260,40 @@ mod tests {
         assert_eq!(script_type, 1);
         assert_eq!(decoded, data);
     }
+
+    // Cross-SDK parity: Go SDK bug #286 regression.
+    // Go SDK previously used `\d{2}` regex which only matches 0-9, not hex A-F,
+    // so network/script_type bytes >= 0xa0 failed to decode. Our hex-based
+    // implementation should accept the full 0x00-0xff range for both fields.
+    // Source: go-sdk/script/bip276_test.go ("decode with hex digits A-F in network/version")
+    #[test]
+    fn test_roundtrip_hex_af_network_and_type() {
+        let original_data = b"test";
+        // Network=0xff, script_type=0xaa — both contain A-F hex digits
+        let encoded = encode_bip276(0xff, 0xaa, original_data);
+        let (network, script_type, data) = decode_bip276(&encoded).unwrap();
+        assert_eq!(network, 0xff);
+        assert_eq!(script_type, 0xaa);
+        assert_eq!(data, original_data);
+    }
+
+    // Cross-SDK parity: verify network/version field order in the wire format.
+    // Format is: prefix:<network_hex><script_type_hex><script_hex><checksum_hex>.
+    // If the order were swapped on either side, network/type would be transposed.
+    // Source: go-sdk/script/bip276_test.go ("decode network and version field order")
+    #[test]
+    fn test_decode_field_order_network_then_type() {
+        let original_data = b"hello";
+        let encoded = encode_bip276(NETWORK_TESTNET, 1, original_data);
+        let (network, script_type, data) = decode_bip276(&encoded).unwrap();
+        assert_eq!(
+            network, NETWORK_TESTNET,
+            "Network byte must be in the first hex pair"
+        );
+        assert_eq!(
+            script_type, 1,
+            "Script type byte must be in the second hex pair"
+        );
+        assert_eq!(data, original_data);
+    }
 }
