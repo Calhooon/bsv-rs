@@ -721,6 +721,36 @@ fn b64_encode(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
+// =========================================================================
+// Cross-SDK parity: Electrum ECIES self-encrypt vector from Go SDK
+// Source: go-sdk/compat/ecies/ecies_test.go (TestElectrumEncryptDecryptSingle)
+//
+// Verifies that bsv-rs electrum_encrypt with same-key sender/recipient
+// produces the exact byte-identical ciphertext as go-sdk ElectrumEncrypt
+// (no_key=false). This exercises the no-ephemeral-key code path with the
+// sender's pubkey embedded in the wire format.
+// =========================================================================
+#[test]
+fn test_cross_sdk_electrum_self_encrypt_matches_go_sdk() {
+    use base64::Engine;
+    let pk =
+        PrivateKey::from_wif("L211enC224G1kV8pyyq7bjVd9SxZebnRYEzzM3i7ZHCc1c5E7dQu").unwrap();
+    let msg = b"hello world";
+
+    let encrypted = ecies::electrum_encrypt(msg, &pk.public_key(), &pk, false).unwrap();
+    let encrypted_b64 = base64::engine::general_purpose::STANDARD.encode(&encrypted);
+
+    assert_eq!(
+        encrypted_b64,
+        "QklFMQO7zpX/GS4XpthCy6/hT38ZKsBGbn8JKMGHOY5ifmaoT890Krt9cIRk/ULXaB5uC08owRICzenFbm31pZGu0gCM2uOxpofwHacKidwZ0Q7aEw==",
+        "Electrum ECIES self-encrypt ciphertext must match go-sdk byte-for-byte"
+    );
+
+    // And round-trip the other direction
+    let decrypted = ecies::electrum_decrypt(&encrypted, &pk, None).unwrap();
+    assert_eq!(decrypted, msg);
+}
+
 #[test]
 fn test_cross_sdk_bsm_compressed_signatures_match_go_sdk() {
     for (priv_hex, msg, expected_b64) in GO_SDK_BSM_COMPRESSED_VECTORS {
