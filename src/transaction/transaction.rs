@@ -1796,6 +1796,30 @@ mod tests {
         assert_eq!(tx.lock_time, 0);
     }
 
+    // from_hex's error paths (invalid hex chars, truncated body) had no
+    // direct test coverage — only happy-path parsing was exercised.
+    #[test]
+    fn test_from_hex_rejects_invalid_hex_chars() {
+        // 'z' is not a hex digit.
+        let result = Transaction::from_hex("zz000000");
+        assert!(result.is_err());
+
+        // Odd-length hex strings are also rejected.
+        let result = Transaction::from_hex("01000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_hex_rejects_truncated_input() {
+        // Valid hex but too short to be a transaction (only version bytes).
+        let result = Transaction::from_hex("01000000");
+        assert!(result.is_err());
+
+        // Empty hex string also rejected.
+        let result = Transaction::from_hex("");
+        assert!(result.is_err());
+    }
+
     #[test]
     fn test_to_hex_roundtrip() {
         let tx = Transaction::from_hex(TEST_TX_HEX).unwrap();
