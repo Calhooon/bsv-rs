@@ -1537,6 +1537,39 @@ mod tests {
     }
 
     #[test]
+    fn test_to_u64_rejects_negative() {
+        // Negative BigNumbers can never be u64.
+        let neg = BigNumber::from_i64(-1);
+        assert!(neg.to_u64().is_none());
+
+        let big_neg = BigNumber::from_i64(i64::MIN);
+        assert!(big_neg.to_u64().is_none());
+    }
+
+    #[test]
+    fn test_to_i64_overflow_positive() {
+        // 2^63 — one larger than i64::MAX (= 2^63 - 1)
+        let too_big = BigNumber::from_hex("8000000000000000").unwrap();
+        assert!(too_big.to_i64().is_none());
+
+        // i64::MAX itself fits
+        let max = BigNumber::from_hex("7fffffffffffffff").unwrap();
+        assert_eq!(max.to_i64(), Some(i64::MAX));
+    }
+
+    #[test]
+    fn test_to_i64_overflow_negative() {
+        // -(2^63 + 1) overflows i64 (i64::MIN == -2^63)
+        let too_neg_str = (-(1i128 << 63) - 1).to_string();
+        let too_neg = BigNumber::from_dec_str(&too_neg_str).unwrap();
+        assert!(too_neg.to_i64().is_none());
+
+        // i64::MIN itself fits
+        let min = BigNumber::from_i64(i64::MIN);
+        assert_eq!(min.to_i64(), Some(i64::MIN));
+    }
+
+    #[test]
     fn test_hash_trait() {
         use std::collections::HashSet;
         let mut set = HashSet::new();
