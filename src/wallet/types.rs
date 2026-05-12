@@ -1826,6 +1826,39 @@ mod tests {
     }
 
     #[test]
+    fn test_counterparty_from_hex_valid_compressed() {
+        // Generator point as compressed pubkey
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let cp = Counterparty::from_hex(g_hex).unwrap();
+
+        assert!(!cp.is_self());
+        assert!(!cp.is_anyone());
+
+        let pk = cp.public_key().expect("Other variant exposes its pubkey");
+        assert_eq!(pk.to_hex(), g_hex);
+
+        // Variant match
+        assert!(matches!(cp, Counterparty::Other(_)));
+    }
+
+    #[test]
+    fn test_counterparty_from_hex_invalid_input() {
+        // Non-hex characters
+        assert!(Counterparty::from_hex("not-hex-at-all").is_err());
+        // Hex but wrong length (not 33/65 bytes)
+        assert!(Counterparty::from_hex("0279be667e").is_err());
+        // Hex but wrong curve point (all-zero is invalid)
+        assert!(
+            Counterparty::from_hex(
+                "020000000000000000000000000000000000000000000000000000000000000000"
+            )
+            .is_err()
+        );
+        // Empty string
+        assert!(Counterparty::from_hex("").is_err());
+    }
+
+    #[test]
     fn test_hex_bytes_serialization() {
         // Test that Vec<u8> fields serialize as hex strings, not JSON arrays
         let output = CreateActionOutput {
