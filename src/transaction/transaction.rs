@@ -2081,6 +2081,59 @@ mod tests {
         assert!(tx.outputs[0].locking_script.as_script().is_data());
     }
 
+    // add_p2pkh_output had no direct test coverage. Exercises the happy
+    // path for mainnet + testnet plus the input-validation error paths.
+    #[test]
+    fn test_add_p2pkh_output_mainnet_with_amount() {
+        // Address from src/script/address.rs tests
+        let mut tx = Transaction::new();
+        tx.add_p2pkh_output("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH", Some(75_000))
+            .unwrap();
+        assert_eq!(tx.outputs.len(), 1);
+        assert_eq!(tx.outputs[0].satoshis, Some(75_000));
+        assert!(tx.outputs[0].locking_script.as_script().is_p2pkh());
+    }
+
+    #[test]
+    fn test_add_p2pkh_output_testnet_address() {
+        // mfaWoDuTsFfiunLTqZx4fKpVsUctiDV9jk has version 0x6f (testnet).
+        let mut tx = Transaction::new();
+        tx.add_p2pkh_output("mfaWoDuTsFfiunLTqZx4fKpVsUctiDV9jk", Some(1_000))
+            .unwrap();
+        assert_eq!(tx.outputs.len(), 1);
+        assert!(tx.outputs[0].locking_script.as_script().is_p2pkh());
+    }
+
+    #[test]
+    fn test_add_p2pkh_output_change_output() {
+        // satoshis=None creates a change output (computed during fee()).
+        let mut tx = Transaction::new();
+        tx.add_p2pkh_output("1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH", None)
+            .unwrap();
+        assert_eq!(tx.outputs.len(), 1);
+        assert!(tx.outputs[0].change, "must be marked as change output");
+        assert!(tx.outputs[0].satoshis.is_none());
+    }
+
+    #[test]
+    fn test_add_p2pkh_output_rejects_invalid_address() {
+        // Non-base58 string
+        let mut tx = Transaction::new();
+        assert!(tx.add_p2pkh_output("not-an-address", Some(100)).is_err());
+
+        // P2SH address (version 0x05) — must reject (not P2PKH version).
+        // "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy" is a valid mainnet P2SH addr.
+        assert!(tx
+            .add_p2pkh_output("3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy", Some(100))
+            .is_err());
+
+        // Empty string
+        assert!(tx.add_p2pkh_output("", Some(100)).is_err());
+
+        // No output should have been added on failures.
+        assert!(tx.outputs.is_empty());
+    }
+
     #[test]
     fn test_add_op_return_parts_output() {
         let mut tx = Transaction::new();
