@@ -1172,6 +1172,56 @@ mod tests {
     }
 
     // P0-CRYPTO-8: Fix test_derive_path_variants -- all 5 variants must
+    // derive_path's error paths (non-numeric index, hardened overflow on
+    // bare public xpubs, malformed components) had no direct test coverage.
+    #[test]
+    fn test_derive_path_invalid_index_rejected() {
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // Non-numeric index
+        let err = master.derive_path("m/abc").unwrap_err();
+        assert!(matches!(err, Error::InvalidDerivationPath(_)));
+
+        // Negative index (the parser doesn't accept signs)
+        let err = master.derive_path("m/-1").unwrap_err();
+        assert!(matches!(err, Error::InvalidDerivationPath(_)));
+
+        // Index too large to fit in u32
+        let err = master.derive_path("m/4294967296").unwrap_err();
+        assert!(matches!(err, Error::InvalidDerivationPath(_)));
+
+        // Empty hardened marker (just the apostrophe)
+        let err = master.derive_path("m/'").unwrap_err();
+        assert!(matches!(err, Error::InvalidDerivationPath(_)));
+    }
+
+    #[test]
+    fn test_derive_path_hardened_overflow_rejected() {
+        // Any non-hardened index can range 0..2^31 — combined with hardened
+        // they fill 2^32. So `2147483648'` would be 2147483648 + 2^31 =
+        // overflow.
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+
+        // 2147483648' is one beyond the legal hardened range — overflows
+        // checked_add(HARDENED_KEY_START).
+        let err = master.derive_path("m/2147483648'").unwrap_err();
+        assert!(matches!(err, Error::InvalidDerivationPath(_)));
+    }
+
+    #[test]
+    fn test_derive_path_empty_returns_self() {
+        // Empty path / lone "m" / lone "M" should return a clone of self.
+        let seed = from_hex("000102030405060708090a0b0c0d0e0f").unwrap();
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        let master_str = master.to_string();
+
+        assert_eq!(master.derive_path("").unwrap().to_string(), master_str);
+        assert_eq!(master.derive_path("m").unwrap().to_string(), master_str);
+        assert_eq!(master.derive_path("M").unwrap().to_string(), master_str);
+    }
+
     // produce the same key, and that key matches the known BIP-32 vector.
     #[test]
     fn test_derive_path_variants() {
