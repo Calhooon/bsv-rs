@@ -797,4 +797,47 @@ mod tests {
             "75a48a19d4cbe100644e8ac1397eea747a2d33ab"
         );
     }
+
+    // Cross-SDK parity: RFC 2202 test cases 4, 6, and 7. Test 4 exercises a
+    // 25-byte key with 50-byte data (0xcd repeated). Tests 6/7 specifically
+    // exercise the "key longer than block size" code path where the key must
+    // first be hashed down to 20 bytes — TS SDK Hash.additional.test.ts
+    // explicitly tests this path.
+    #[test]
+    fn test_sha1_hmac_rfc2202_4() {
+        // Test case 4: 25-byte key 0x01..0x19, 50-byte data 0xcd
+        let key = hex::decode("0102030405060708090a0b0c0d0e0f10111213141516171819").unwrap();
+        let data = vec![0xcdu8; 50];
+        let result = sha1_hmac(&key, &data);
+        assert_eq!(
+            hex::encode(result),
+            "4c9007f4026250c6bc8414f9bf50c86c2d7235da"
+        );
+    }
+
+    #[test]
+    fn test_sha1_hmac_rfc2202_6_long_key() {
+        // Test case 6: 80-byte key of 0xaa (longer than 64-byte SHA-1 block),
+        // data = "Test Using Larger Than Block-Size Key - Hash Key First"
+        let key = vec![0xaau8; 80];
+        let data = b"Test Using Larger Than Block-Size Key - Hash Key First";
+        let result = sha1_hmac(&key, data);
+        assert_eq!(
+            hex::encode(result),
+            "aa4ae5e15272d00e95705637ce8a3b55ed402112"
+        );
+    }
+
+    #[test]
+    fn test_sha1_hmac_rfc2202_7_long_key_long_data() {
+        // Test case 7: same 80-byte key, longer data
+        let key = vec![0xaau8; 80];
+        let data =
+            b"Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data";
+        let result = sha1_hmac(&key, data);
+        assert_eq!(
+            hex::encode(result),
+            "e8e99d0f45237d786d6bbaa7965c7808bbff1a91"
+        );
+    }
 }
