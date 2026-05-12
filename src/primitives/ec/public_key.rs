@@ -538,6 +538,35 @@ mod tests {
     }
 
     #[test]
+    fn test_public_key_mul_scalar_zero_returns_point_at_infinity() {
+        // P * 0 = identity. The public API rejects this with PointAtInfinity
+        // rather than returning the identity as a "valid" key.
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let g = PublicKey::from_hex(g_hex).unwrap();
+        let zero = [0u8; 32];
+
+        let result = g.mul_scalar(&zero);
+        assert!(matches!(result, Err(Error::PointAtInfinity)));
+    }
+
+    #[test]
+    fn test_public_key_mul_scalar_curve_order_returns_point_at_infinity() {
+        // P * n = identity (since n is the curve order). Verifies the scalar
+        // is reduced mod n before multiplication, not just rejected as oversized.
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let g = PublicKey::from_hex(g_hex).unwrap();
+
+        // secp256k1 curve order n
+        let n_hex = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
+        let n_bytes_vec = hex::decode(n_hex).unwrap();
+        let mut n_bytes = [0u8; 32];
+        n_bytes.copy_from_slice(&n_bytes_vec);
+
+        let result = g.mul_scalar(&n_bytes);
+        assert!(matches!(result, Err(Error::PointAtInfinity)));
+    }
+
+    #[test]
     fn test_from_scalar_mul_generator() {
         // Scalar = 1 should give us the generator point
         let mut scalar_one = [0u8; 32];
