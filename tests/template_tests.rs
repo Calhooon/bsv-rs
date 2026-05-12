@@ -584,6 +584,36 @@ fn test_multisig_max_keys() {
     assert_eq!(locking.as_script().is_multisig(), Some((16, 16)));
 }
 
+// Cross-SDK parity: real-world P2PKH script-to-address vectors from Go SDK.
+// Source: go-sdk/script/script_test.go (TestScriptAddresses).
+//
+// Anchors that Script::is_p2pkh + extract_pubkey_hash and
+// LockingScript::to_address agree byte-exactly with go-sdk's Address()/
+// Addresses() for a known mainnet P2PKH scriptPubKey.
+#[test]
+fn test_cross_sdk_go_p2pkh_script_to_address() {
+    let script_hex = "76a9149df0707f3f8e534441c055aca4bb816fbc1eadf488ac";
+    let locking = bsv_rs::script::LockingScript::from_hex(script_hex).unwrap();
+
+    assert!(locking.as_script().is_p2pkh(), "script must be P2PKH");
+
+    let pubkey_hash = locking
+        .as_script()
+        .extract_pubkey_hash()
+        .expect("P2PKH pubkey hash extracts");
+    assert_eq!(
+        hex::encode(pubkey_hash),
+        "9df0707f3f8e534441c055aca4bb816fbc1eadf4"
+    );
+
+    let address = locking.to_address().expect("derive P2PKH address");
+    assert_eq!(
+        address.to_string(),
+        "1FQ789GuMRYki3t79XK3AWQ8gxzVNLzvXr",
+        "mainnet P2PKH address must match go-sdk TestScriptAddresses"
+    );
+}
+
 /// Test multisig hex roundtrip.
 #[test]
 fn test_multisig_hex_roundtrip() {
