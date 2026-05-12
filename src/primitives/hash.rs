@@ -408,6 +408,45 @@ mod tests {
     }
 
     #[test]
+    fn test_sha256_empty() {
+        // SHA-256 of empty input — NIST FIPS-180-4 reference value, also
+        // shows up everywhere as a canonical "no data" hash.
+        let hash = sha256(b"");
+        assert_eq!(
+            hex::encode(hash),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+    }
+
+    #[test]
+    fn test_sha512_empty() {
+        let hash = sha512(b"");
+        assert_eq!(
+            hex::encode(hash),
+            "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+        );
+    }
+
+    #[test]
+    fn test_sha256d_empty() {
+        // sha256d (Bitcoin double-SHA256) of empty input
+        let hash = sha256d(b"");
+        // Double-SHA256 of nothing
+        assert_eq!(
+            hex::encode(hash),
+            "5df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c9456"
+        );
+    }
+
+    #[test]
+    fn test_hash160_empty() {
+        // hash160 = RIPEMD160(SHA256(...)). Empty-input value is the
+        // canonical "nothing" P2PKH hash.
+        let hash = hash160(b"");
+        assert_eq!(hex::encode(hash), "b472a266d0bd89c13706a4132ccfb16f7c3b9fcb");
+    }
+
+    #[test]
     fn test_sha256_long() {
         let hash = sha256(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
         assert_eq!(
