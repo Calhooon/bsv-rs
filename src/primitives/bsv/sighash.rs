@@ -620,4 +620,51 @@ mod tests {
         let hash = compute_hash_outputs(&outputs, 0, SIGHASH_NONE);
         assert_eq!(hash, [0u8; 32]);
     }
+
+    // compute_sighash returns the digest in display order (byte-reversed
+    // for human-readable txids etc.), while compute_sighash_for_signing
+    // returns it in internal/ECDSA order. They MUST be byte-reverses of
+    // each other for the same SighashParams. This contract had no direct
+    // test coverage — only compute_sighash itself was exercised via the
+    // 500 cross-SDK vectors.
+    #[test]
+    fn test_compute_sighash_for_signing_is_byte_reverse_of_display() {
+        let inputs = vec![TxInput {
+            txid: [0xaau8; 32],
+            output_index: 0,
+            script: vec![],
+            sequence: 0xffffffff,
+        }];
+        let outputs = vec![TxOutput {
+            satoshis: 50_000,
+            script: vec![0x76, 0xa9, 0x14],
+        }];
+        let params = SighashParams {
+            version: 1,
+            inputs: &inputs,
+            outputs: &outputs,
+            locktime: 0,
+            input_index: 0,
+            subscript: &[0x76, 0xa9, 0x14],
+            satoshis: 100_000,
+            scope: SIGHASH_ALL | SIGHASH_FORKID,
+        };
+
+        let display = compute_sighash(&params);
+        let signing = compute_sighash_for_signing(&params);
+
+        let mut reversed = signing;
+        reversed.reverse();
+        assert_eq!(
+            display, reversed,
+            "compute_sighash must equal byte-reversed compute_sighash_for_signing"
+        );
+
+        // And they must NOT be byte-identical (sanity: the reverse really
+        // matters for non-palindrome hashes).
+        assert_ne!(
+            display, signing,
+            "the two functions must produce different byte orders"
+        );
+    }
 }
