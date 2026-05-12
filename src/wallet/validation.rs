@@ -1134,6 +1134,33 @@ mod tests {
     }
 
     #[test]
+    fn test_validate_originator_dotted_parts() {
+        // Each dot-separated part must be 1-63 bytes — exercises the part
+        // length loop independently of the total length check.
+
+        // Empty part: "" between two dots — total length OK but part fails.
+        assert!(validate_originator(Some("foo..bar")).is_err());
+
+        // Trailing/leading dot creates an empty part.
+        assert!(validate_originator(Some(".example.com")).is_err());
+        assert!(validate_originator(Some("example.com.")).is_err());
+
+        // 63-character part is the maximum allowed.
+        let max_part = "a".repeat(63);
+        assert!(validate_originator(Some(&max_part)).is_ok());
+
+        // 64-character part exceeds the per-part limit (but total < 250).
+        let too_long_part = "a".repeat(64);
+        assert!(validate_originator(Some(&too_long_part)).is_err());
+
+        // Trimming + lowercasing: input is normalized.
+        let normalized = validate_originator(Some("  Example.COM  "))
+            .unwrap()
+            .unwrap();
+        assert_eq!(normalized, "example.com");
+    }
+
+    #[test]
     fn test_validate_query_mode() {
         assert_eq!(validate_query_mode(None, "test").unwrap(), QueryMode::Any);
         assert_eq!(
