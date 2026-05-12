@@ -588,3 +588,128 @@ fn test_wordlist_verification() {
     use bsv_rs::compat::bip39::verify_english_wordlist;
     assert!(verify_english_wordlist());
 }
+
+// ========================================================================
+// BIP-39 → BIP-32 master xprv parity (TREZOR vectors from TypeScript SDK)
+// Source: ts-sdk/src/compat/__tests/Mnemonic.vectors.ts (english array)
+// ========================================================================
+//
+// Each entry is (entropy_hex, expected_xprv) using passphrase "TREZOR".
+// Verifies the full BIP-39 entropy → mnemonic → seed → BIP-32 master xprv chain
+// against the official TREZOR test vectors, ensuring byte-parity with TS/Go SDKs.
+const TREZOR_BIP32_XPRV_VECTORS: &[(&str, &str)] = &[
+    (
+        "00000000000000000000000000000000",
+        "xprv9s21ZrQH143K3h3fDYiay8mocZ3afhfULfb5GX8kCBdno77K4HiA15Tg23wpbeF1pLfs1c5SPmYHrEpTuuRhxMwvKDwqdKiGJS9XFKzUsAF",
+    ),
+    (
+        "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+        "xprv9s21ZrQH143K2gA81bYFHqU68xz1cX2APaSq5tt6MFSLeXnCKV1RVUJt9FWNTbrrryem4ZckN8k4Ls1H6nwdvDTvnV7zEXs2HgPezuVccsq",
+    ),
+    (
+        "80808080808080808080808080808080",
+        "xprv9s21ZrQH143K2shfP28KM3nr5Ap1SXjz8gc2rAqqMEynmjt6o1qboCDpxckqXavCwdnYds6yBHZGKHv7ef2eTXy461PXUjBFQg6PrwY4Gzq",
+    ),
+    (
+        "ffffffffffffffffffffffffffffffff",
+        "xprv9s21ZrQH143K2V4oox4M8Zmhi2Fjx5XK4Lf7GKRvPSgydU3mjZuKGCTg7UPiBUD7ydVPvSLtg9hjp7MQTYsW67rZHAXeccqYqrsx8LcXnyd",
+    ),
+    (
+        "000000000000000000000000000000000000000000000000",
+        "xprv9s21ZrQH143K3mEDrypcZ2usWqFgzKB6jBBx9B6GfC7fu26X6hPRzVjzkqkPvDqp6g5eypdk6cyhGnBngbjeHTe4LsuLG1cCmKJka5SMkmU",
+    ),
+    (
+        "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+        "xprv9s21ZrQH143K3Lv9MZLj16np5GzLe7tDKQfVusBni7toqJGcnKRtHSxUwbKUyUWiwpK55g1DUSsw76TF1T93VT4gz4wt5RM23pkaQLnvBh7",
+    ),
+    (
+        "808080808080808080808080808080808080808080808080",
+        "xprv9s21ZrQH143K3VPCbxbUtpkh9pRG371UCLDz3BjceqP1jz7XZsQ5EnNkYAEkfeZp62cDNj13ZTEVG1TEro9sZ9grfRmcYWLBhCocViKEJae",
+    ),
+    (
+        "ffffffffffffffffffffffffffffffffffffffffffffffff",
+        "xprv9s21ZrQH143K36Ao5jHRVhFGDbLP6FCx8BEEmpru77ef3bmA928BxsqvVM27WnvvyfWywiFN8K6yToqMaGYfzS6Db1EHAXT5TuyCLBXUfdm",
+    ),
+    (
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "xprv9s21ZrQH143K32qBagUJAMU2LsHg3ka7jqMcV98Y7gVeVyNStwYS3U7yVVoDZ4btbRNf4h6ibWpY22iRmXq35qgLs79f312g2kj5539ebPM",
+    ),
+    (
+        "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+        "xprv9s21ZrQH143K3Y1sd2XVu9wtqxJRvybCfAetjUrMMco6r3v9qZTBeXiBZkS8JxWbcGJZyio8TrZtm6pkbzG8SYt1sxwNLh3Wx7to5pgiVFU",
+    ),
+    (
+        "8080808080808080808080808080808080808080808080808080808080808080",
+        "xprv9s21ZrQH143K3CSnQNYC3MqAAqHwxeTLhDbhF43A4ss4ciWNmCY9zQGvAKUSqVUf2vPHBTSE1rB2pg4avopqSiLVzXEU8KziNnVPauTqLRo",
+    ),
+    (
+        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "xprv9s21ZrQH143K2WFF16X85T2QCpndrGwx6GueB72Zf3AHwHJaknRXNF37ZmDrtHrrLSHvbuRejXcnYxoZKvRquTPyp2JiNG3XcjQyzSEgqCB",
+    ),
+    (
+        "77c2b00716cec7213839159e404db50d",
+        "xprv9s21ZrQH143K3xC5SRKnxV4R829AcnKE7XjZu2PixyZh3CexnsvmkBsi5rzqXMhxTkfLJFB6FuHJPWxxvcH5eYvCDvWcYAMXpbpGGiVUDfH",
+    ),
+    (
+        "b63a9c59a6e641f288ebc103017f1da9f8290b3da6bdef7b",
+        "xprv9s21ZrQH143K4YsWLquHbdGRh1mRrj5DTdRaj1cUrhftfXx4YJ3Zy41H52GR8nywKkpRSTdM71uZTRztscUdAAPL2Z6JQdW4xVPyzxh5zCG",
+    ),
+    (
+        "3e141609b97933b66a060dcddc71fad1d91677db872031e85f4c015c5e7e8982",
+        "xprv9s21ZrQH143K44JSkE9N3huFVGqK5YUroYxjd5eBotHvyBcDXNvjF3uxSiGDuGo7ub2GJgLc3HtvQbQkzies2qNjeM1p8nyTWEzNHuyVqss",
+    ),
+    (
+        "0460ef47585604c5660618db2e6a7e7f",
+        "xprv9s21ZrQH143K2fzHWz7Z7PQj54R9Acrra9W28nnMLzgHonTebXnRD35dmvyaB41A1U1o59duUJ7dF9227Hr84AFY8aAeGNhnetXuecd6t67",
+    ),
+    (
+        "72f60ebac5dd8add8d2a25a797102c3ce21bc029c200076f",
+        "xprv9s21ZrQH143K2gts9Sq6Aq67GTVeWXuJM1Eieknp95mWujAcuD2VixUsqaRuU9Hm3Z7Rh9JzukebGqwfbu6gJv42KRBvK4f4K9Cc84r7jaB",
+    ),
+    (
+        "2c85efc7f24ee4573d2b81a6ec66cee209b2dcbd09d8eddc51e0215b0b68e416",
+        "xprv9s21ZrQH143K39y7KHx56XraMbqrS7VBxVqSSCUhFvE8MsaBCr9T7zsZwNH7jvdcii9ToB91qvgeacds6ubaNU3TDxvY2bhZMmESAAssoYD",
+    ),
+    (
+        "eaebabb2383351fd31d703840b32e9e2",
+        "xprv9s21ZrQH143K2mweKbPaebAU2b8poVVeqRgi1UBPybm9pLoCRKGgFgD2LbLHvHNsXDk3n1zjT7RujoLyb9huymgMXZLtL2UWqBHgKxdTjFk",
+    ),
+    (
+        "7ac45cfe7722ee6c7ba84fbc2d5bd61b45cb2fe5eb65aa78",
+        "xprv9s21ZrQH143K4M1N4f2Ma5YRADyBqU7wtb18qiZwWTk1rpx49XTsRCUa2iaPhDRBEVAMdGqDCn5iJTvsAUrPQ8NhVYdwZSf5mekdqwcRUS9",
+    ),
+    (
+        "4fa1a8bc3e6d80ee1316050e862c1812031493212b7ec3f3bb1b08f168cabeef",
+        "xprv9s21ZrQH143K3BDzEvudRjun23x1nqxchPCmyTsRBNmUZwFP6Hsim6UnwpcEA6De2kVpC6UDoVKUFFh9h47cY4DL5363KwwvGQ3jVzU6rXP",
+    ),
+    (
+        "18ab19a9f54a9274f03e5209a2ac8a91",
+        "xprv9s21ZrQH143K2fopRUQMvgrFpXJHmAbGYfwdpKcRh9cp9E2aHDbQA5V9mXRwCRj2nzjwpAXH4sdhGV8xJxpv2BEZxEJrSDsdqwAYBXcF3eu",
+    ),
+    (
+        "18a2e1d81b8ecfb2a333adcb0c17a5b9eb76cc5d05db91a4",
+        "xprv9s21ZrQH143K38yVDKj2uhq6e6jXBtMQATbysyZUGyG14JHvFRsHnvEDsW1xMedAm56UYZzwTDLL33ntWgTLkrynyvE4FLDP4DZpJRbMhMn",
+    ),
+    (
+        "15da872c95a13dd738fbf50e427583ad61f18fd99f628c417a61cf8343c90419",
+        "xprv9s21ZrQH143K47KSAu4o7EV43wqj2sxVHSHGLmY4ZThKffiHSBN2CNb8RtY6sdaNKZKq7mxa9WS3Kv2iBKtGkmD3L9iDBq1x959Uq3hKM32",
+    ),
+];
+
+#[test]
+fn test_trezor_mnemonic_to_bip32_xprv() {
+    use bsv_rs::compat::bip32::{ExtendedKey, Network};
+
+    for (entropy_hex, expected_xprv) in TREZOR_BIP32_XPRV_VECTORS {
+        let entropy = hex::decode(entropy_hex).unwrap();
+        let mnemonic = Mnemonic::from_entropy(&entropy).unwrap();
+        let seed = mnemonic.to_seed("TREZOR");
+        let master = ExtendedKey::new_master(&seed, Network::Mainnet).unwrap();
+        assert_eq!(
+            master.to_string(),
+            *expected_xprv,
+            "BIP-32 xprv mismatch for entropy: {}",
+            entropy_hex
+        );
+    }
+}
