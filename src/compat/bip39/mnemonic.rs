@@ -911,6 +911,38 @@ mod tests {
         }
     }
 
+    // Go SDK uses regular ASCII space for all wordlists including Japanese,
+    // whereas BIP-39 and bsv-rs use ideographic space (U+3000) for Japanese
+    // output. To stay interoperable with Go SDK output, bsv-rs must still
+    // accept a Japanese phrase split by ASCII space on the parse side.
+    #[test]
+    fn test_japanese_mnemonic_accepts_ascii_space_input() {
+        let entropy = [0u8; 16];
+        let canonical =
+            Mnemonic::from_entropy_with_language(&entropy, Language::Japanese).unwrap();
+
+        // Build the Go-SDK-style phrase: same words, but ASCII spaces instead
+        // of U+3000.
+        let ascii_phrase: String = canonical
+            .phrase()
+            .split('\u{3000}')
+            .collect::<Vec<_>>()
+            .join(" ");
+        assert!(ascii_phrase.contains(' '));
+        assert!(!ascii_phrase.contains('\u{3000}'));
+
+        // Parsing the ASCII-spaced phrase as Japanese should succeed and
+        // recover identical entropy.
+        let parsed =
+            Mnemonic::from_phrase_with_language(&ascii_phrase, Language::Japanese).unwrap();
+        assert_eq!(parsed.entropy(), canonical.entropy());
+        assert_eq!(parsed.language(), Language::Japanese);
+
+        // And the canonical output still uses ideographic spaces — i.e. we
+        // accept either separator on input but always emit U+3000 on output.
+        assert!(parsed.phrase().contains('\u{3000}'));
+    }
+
     #[test]
     fn test_language_word_count() {
         // Verify each wordlist has exactly 2048 words
