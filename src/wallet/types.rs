@@ -1769,6 +1769,57 @@ mod tests {
         assert_eq!(outpoint.to_string(), outpoint_str);
     }
 
+    // Cross-SDK serde contract: Outpoint serializes as a string "txid.vout"
+    // but its custom deserializer accepts EITHER the string form OR an
+    // object form {"txid": "...", "vout": N}. The dual-input support is a
+    // documented compatibility shim that had no direct test coverage.
+    #[test]
+    fn test_outpoint_serde_dual_format_input() {
+        let txid_hex = "0000000000000000000000000000000000000000000000000000000000000001";
+
+        // 1. String form (matches what serialize() outputs).
+        let from_string: Outpoint =
+            serde_json::from_str(&format!(r#""{}.7""#, txid_hex)).unwrap();
+        assert_eq!(from_string.vout, 7);
+        assert_eq!(from_string.txid[31], 1);
+
+        // 2. Object form (cross-SDK compatibility shim).
+        let from_object: Outpoint = serde_json::from_str(&format!(
+            r#"{{"txid":"{}","vout":7}}"#,
+            txid_hex
+        ))
+        .unwrap();
+        assert_eq!(from_object.vout, 7);
+        assert_eq!(from_object.txid[31], 1);
+
+        // Both deserialization paths produce identical values.
+        assert_eq!(from_string, from_object);
+
+        // 3. Serialize always emits string form, regardless of how
+        // deserialization happened.
+        let json = serde_json::to_string(&from_object).unwrap();
+        assert_eq!(json, format!(r#""{}.7""#, txid_hex));
+    }
+
+    #[test]
+    fn test_outpoint_serde_object_form_missing_fields() {
+        // Object form missing required fields must error cleanly.
+        assert!(
+            serde_json::from_str::<Outpoint>(r#"{"txid":"00"}"#).is_err(),
+            "object form must require vout"
+        );
+        assert!(
+            serde_json::from_str::<Outpoint>(r#"{"vout":1}"#).is_err(),
+            "object form must require txid"
+        );
+
+        // Bad txid hex (wrong length / non-hex) must error.
+        assert!(
+            serde_json::from_str::<Outpoint>(r#"{"txid":"00","vout":1}"#).is_err(),
+            "txid must be 32 bytes"
+        );
+    }
+
     #[test]
     fn test_outpoint_invalid_format() {
         assert!(Outpoint::from_string("invalid").is_err());
