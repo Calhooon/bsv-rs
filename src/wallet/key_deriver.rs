@@ -488,6 +488,58 @@ impl KeyDeriverApi for KeyDeriver {
 mod tests {
     use super::*;
 
+    // derive_private_key_raw is publicly exported as a way to bypass BRC-43
+    // protocol-name validation when callers need to embed arbitrary invoice
+    // strings (e.g. legacy tokens or BRC-42-only flows that pre-date BRC-43).
+    // The high-level derive_private_key wraps it but the raw path itself had
+    // no direct test coverage.
+    #[test]
+    fn test_derive_private_key_raw_matches_derive_private_key() {
+        // Compose a BRC-43 invoice number the same way derive_private_key
+        // does (`{security_level}-{protocol_name}-{key_id}`) and check that
+        // the raw path produces an identical key to the validated path.
+        let root = PrivateKey::random();
+        let deriver = KeyDeriver::new(Some(root));
+        let counterparty = Counterparty::Anyone;
+
+        let protocol = Protocol::new(SecurityLevel::App, "raw match check");
+        let key_id = "raw-match-key";
+        let invoice = format!(
+            "{}-{}-{}",
+            protocol.security_level.as_u8(),
+            protocol.protocol_name,
+            key_id
+        );
+
+        let from_validated = deriver
+            .derive_private_key(&protocol, key_id, &counterparty)
+            .unwrap();
+        let from_raw = deriver
+            .derive_private_key_raw(&invoice, &counterparty)
+            .unwrap();
+
+        assert_eq!(from_validated.to_bytes(), from_raw.to_bytes());
+    }
+
+    #[test]
+    fn test_derive_private_key_raw_accepts_arbitrary_invoice_string() {
+        // The raw path must accept invoice numbers that would fail BRC-43
+        // validation (e.g. empty protocol_name, no dashes, illegal chars).
+        // Verifies that we don't accidentally route through the validator.
+        let root = PrivateKey::random();
+        let deriver = KeyDeriver::new(Some(root));
+
+        for invoice in ["", "no-dashes-just-text", "x", "weird!@#$%chars"] {
+            let result =
+                deriver.derive_private_key_raw(invoice, &Counterparty::Anyone);
+            assert!(
+                result.is_ok(),
+                "raw derivation must accept any string, failed on {:?}",
+                invoice
+            );
+        }
+    }
+
     #[test]
     fn test_key_deriver_creation() {
         let key = PrivateKey::random();
