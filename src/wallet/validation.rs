@@ -1167,4 +1167,44 @@ mod tests {
         assert!(!is_hex_string("deadbee")); // Odd length
         assert!(!is_hex_string("ghijkl")); // Invalid chars
     }
+
+    // validate_keyring_revealer is publicly exported but had no direct
+    // tests. It accepts either the special literal "certifier" or a
+    // 66-char hex string (a 33-byte compressed pubkey).
+    #[test]
+    fn test_validate_keyring_revealer() {
+        // Special literal value
+        assert_eq!(
+            validate_keyring_revealer("certifier", "kr").unwrap(),
+            "certifier"
+        );
+
+        // Valid 66-char compressed pubkey hex
+        let valid_pubkey =
+            "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        assert_eq!(valid_pubkey.len(), 66);
+        assert_eq!(
+            validate_keyring_revealer(valid_pubkey, "kr").unwrap(),
+            valid_pubkey
+        );
+
+        // Wrong length hex (too short)
+        assert!(validate_keyring_revealer("0279be667e", "kr").is_err());
+
+        // Wrong length hex (too long)
+        let too_long = format!("{}ff", valid_pubkey);
+        assert!(validate_keyring_revealer(&too_long, "kr").is_err());
+
+        // Non-hex string of correct character length (66 non-hex chars).
+        // Builds a 66-char string of all 'z' (an invalid hex character) so
+        // the length check passes but the hex content check rejects it.
+        let non_hex_66: String = std::iter::repeat_n('z', 66).collect();
+        assert!(validate_keyring_revealer(&non_hex_66, "kr").is_err());
+
+        // Empty string
+        assert!(validate_keyring_revealer("", "kr").is_err());
+
+        // Wrong literal — case-sensitive (not "Certifier")
+        assert!(validate_keyring_revealer("Certifier", "kr").is_err());
+    }
 }
