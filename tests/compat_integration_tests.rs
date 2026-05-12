@@ -640,6 +640,123 @@ fn test_cross_sdk_go_xprv_extracts_second_vector_private_key() {
     );
 }
 
+// =========================================================================
+// Cross-SDK parity: BSM (Bitcoin Signed Message) deterministic signature vectors
+// Source: go-sdk/compat/bsm/sign_test.go (TestSignMessage,
+// TestSignMessageUncompressed, ExampleSignMessage)
+//
+// BSM uses RFC 6979 deterministic-k ECDSA, so a (private key, message) pair
+// MUST yield a byte-exact signature across all SDKs. These vectors anchor that
+// equivalence between bsv-rs and go-sdk in particular.
+// =========================================================================
+
+const GO_SDK_BSM_COMPRESSED_VECTORS: &[(&str, &str, &str)] = &[
+    (
+        "0499f8239bfe10eb0f5e53d543635a423c96529dd85fa4bad42049a0b435ebdd",
+        "test message",
+        "IFxPx8JHsCiivB+DW/RgNpCLT6yG3j436cUNWKekV3ORBrHNChIjeVReyAco7PVmmDtVD3POs9FhDlm/nk5I6O8=",
+    ),
+    (
+        "ef0b8bad0be285099534277fde328f8f19b3be9cadcd4c08e6ac0b5f863745ac",
+        "This is a test message",
+        "H+zZagsyz7ioC/ZOa5EwsaKice0vs2BvZ0ljgkFHxD3vGsMlGeD4sXHEcfbI4h8lP29VitSBdf4A+nHXih7svf4=",
+    ),
+    (
+        "93596babb564cbbdc84f2370c710b9bcc94333495b60af719b5fcf9ba00ba82c",
+        "This is a test message",
+        "IIuDw09ffPgEDuxEw5yHVp1+mi4QpuhAwLyQdpMTfsHCOkMqTKXuP7dSNWMEJqZsiQ8eKMDRvf2wZ4e5bxcu4O0=",
+    ),
+    (
+        "50381cf8f52936faae4a05a073a03d688a9fa206d005e87a39da436c75476d78",
+        "This is a test message",
+        "ILBmbjCY2Z7eSXGXZoBI3x2ZRaYUYOGtEaDjXetaY+zNDtMOvagsOGEHnVT3f5kXlEbuvmPydHqLnyvZP3cDOWk=",
+    ),
+    (
+        "c7726663147afd1add392d129086e57c0b05aa66a6ded564433c04bd55741434",
+        "This is a test message",
+        "IOI207QUnTLr2Ll+s4kUxNgLgorkc/Z5Pc+XNvUBYLy2TxaU6oHEJ2TTJ1mZVrtUyHm6e315v1tIjeosW3Odfqw=",
+    ),
+    (
+        "c7726663147afd1add392d129086e57c0b05aa66a6ded564433c04bd55741434",
+        "1",
+        "IMcRFG1VNN9TDGXpCU+9CqKLNOuhwQiXI5hZpkTOuYHKBDOWayNuAABofYLqUHYTMiMf9mYFQ0sPgFJZz3F7ELQ=",
+    ),
+];
+
+const GO_SDK_BSM_UNCOMPRESSED_VECTORS: &[(&str, &str, &str)] = &[
+    (
+        "0499f8239bfe10eb0f5e53d543635a423c96529dd85fa4bad42049a0b435ebdd",
+        "test message",
+        "HFxPx8JHsCiivB+DW/RgNpCLT6yG3j436cUNWKekV3ORBrHNChIjeVReyAco7PVmmDtVD3POs9FhDlm/nk5I6O8=",
+    ),
+    (
+        "ef0b8bad0be285099534277fde328f8f19b3be9cadcd4c08e6ac0b5f863745ac",
+        "This is a test message",
+        "G+zZagsyz7ioC/ZOa5EwsaKice0vs2BvZ0ljgkFHxD3vGsMlGeD4sXHEcfbI4h8lP29VitSBdf4A+nHXih7svf4=",
+    ),
+    (
+        "93596babb564cbbdc84f2370c710b9bcc94333495b60af719b5fcf9ba00ba82c",
+        "This is a test message",
+        "HIuDw09ffPgEDuxEw5yHVp1+mi4QpuhAwLyQdpMTfsHCOkMqTKXuP7dSNWMEJqZsiQ8eKMDRvf2wZ4e5bxcu4O0=",
+    ),
+    (
+        "50381cf8f52936faae4a05a073a03d688a9fa206d005e87a39da436c75476d78",
+        "This is a test message",
+        "HLBmbjCY2Z7eSXGXZoBI3x2ZRaYUYOGtEaDjXetaY+zNDtMOvagsOGEHnVT3f5kXlEbuvmPydHqLnyvZP3cDOWk=",
+    ),
+    (
+        "c7726663147afd1add392d129086e57c0b05aa66a6ded564433c04bd55741434",
+        "This is a test message",
+        "HOI207QUnTLr2Ll+s4kUxNgLgorkc/Z5Pc+XNvUBYLy2TxaU6oHEJ2TTJ1mZVrtUyHm6e315v1tIjeosW3Odfqw=",
+    ),
+    (
+        "c7726663147afd1add392d129086e57c0b05aa66a6ded564433c04bd55741434",
+        "1",
+        "HMcRFG1VNN9TDGXpCU+9CqKLNOuhwQiXI5hZpkTOuYHKBDOWayNuAABofYLqUHYTMiMf9mYFQ0sPgFJZz3F7ELQ=",
+    ),
+];
+
+fn b64_encode(bytes: &[u8]) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+#[test]
+fn test_cross_sdk_bsm_compressed_signatures_match_go_sdk() {
+    for (priv_hex, msg, expected_b64) in GO_SDK_BSM_COMPRESSED_VECTORS {
+        let key_bytes = from_hex(priv_hex).unwrap();
+        let key = PrivateKey::from_bytes(&key_bytes).unwrap();
+        let signature = bsm::sign_message(&key, msg.as_bytes()).unwrap();
+        assert_eq!(
+            b64_encode(&signature),
+            *expected_b64,
+            "BSM compressed sig mismatch for key={} msg={}",
+            priv_hex,
+            msg
+        );
+        // Sanity: must verify against the derived address
+        let address = key.public_key().to_address();
+        assert!(bsm::verify_message(&address, &signature, msg.as_bytes()).unwrap());
+    }
+}
+
+#[test]
+fn test_cross_sdk_bsm_uncompressed_signatures_match_go_sdk() {
+    for (priv_hex, msg, expected_b64) in GO_SDK_BSM_UNCOMPRESSED_VECTORS {
+        let key_bytes = from_hex(priv_hex).unwrap();
+        let key = PrivateKey::from_bytes(&key_bytes).unwrap();
+        let signature =
+            bsm::sign_message_with_compression(&key, msg.as_bytes(), false).unwrap();
+        assert_eq!(
+            b64_encode(&signature),
+            *expected_b64,
+            "BSM uncompressed sig mismatch for key={} msg={}",
+            priv_hex,
+            msg
+        );
+    }
+}
+
 #[test]
 fn test_cross_sdk_invalid_xprv_strings_rejected() {
     // Vectors from go-sdk TestGenerateHDKeyFromString negative cases — these
