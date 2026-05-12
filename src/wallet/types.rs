@@ -1863,6 +1863,37 @@ mod tests {
         assert!(validate_protocol_name("test protocol").is_err()); // Ends with " protocol"
     }
 
+    // The validate_protocol_name function has a special-case max length of
+    // 430 chars (vs 400 default) when the name starts with the literal
+    // "specific linkage revelation ". That path had no test coverage.
+    #[test]
+    fn test_validate_protocol_name_specific_linkage_revelation_limit() {
+        // A "specific linkage revelation" protocol name can be 430 chars.
+        let prefix = "specific linkage revelation ";
+        let pad_len = 430 - prefix.len();
+        let exact_max = format!("{}{}", prefix, "a".repeat(pad_len));
+        assert_eq!(exact_max.len(), 430);
+        assert!(validate_protocol_name(&exact_max).is_ok());
+
+        // 431 chars must fail.
+        let over_max = format!("{}{}", prefix, "a".repeat(pad_len + 1));
+        assert_eq!(over_max.len(), 431);
+        assert!(validate_protocol_name(&over_max).is_err());
+
+        // Without the special prefix, the 400-char default applies.
+        let general_400: String = "a".repeat(400);
+        assert!(validate_protocol_name(&general_400).is_ok());
+        let general_401: String = "a".repeat(401);
+        assert!(validate_protocol_name(&general_401).is_err());
+
+        // The prefix must be exact — extra chars before don't trigger 430.
+        // 401 chars total, but no "specific linkage revelation" prefix, so
+        // the 400-char general limit applies and rejects.
+        let near_prefix = format!("x{}{}", prefix, "a".repeat(pad_len));
+        assert!(near_prefix.len() > 400);
+        assert!(validate_protocol_name(&near_prefix).is_err());
+    }
+
     #[test]
     fn test_counterparty_variants() {
         let cp_self = Counterparty::Self_;
