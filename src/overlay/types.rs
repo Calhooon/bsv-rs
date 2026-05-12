@@ -282,21 +282,24 @@ impl HostResponse {
 }
 
 /// Metadata about an overlay service.
+///
+/// Matches the wire shape of `@bsv/overlay@2.0.2` `Metadata` —
+/// `{ name, shortDescription?, iconURL?, version?, informationURL? }`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ServiceMetadata {
     /// Service name.
     pub name: String,
-    /// Service description.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Short description. Serialises as `shortDescription` to match mainline.
+    #[serde(rename = "shortDescription", skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     /// Icon URL.
-    #[serde(rename = "iconUrl", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "iconURL", skip_serializing_if = "Option::is_none")]
     pub icon_url: Option<String>,
     /// Service version.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     /// Additional info URL.
-    #[serde(rename = "infoUrl", skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "informationURL", skip_serializing_if = "Option::is_none")]
     pub info_url: Option<String>,
 }
 
