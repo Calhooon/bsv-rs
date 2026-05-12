@@ -751,6 +751,42 @@ fn test_cross_sdk_electrum_self_encrypt_matches_go_sdk() {
     assert_eq!(decrypted, msg);
 }
 
+// Cross-SDK parity: BSM "Texas" verify + recover vector from TS SDK.
+// Source: ts-sdk/src/compat/__tests/BSM.test.ts ("Should verify a signed
+// message in base64" + "calculate the recovery number for a signature").
+//
+// Anchors that bsv-rs recover_public_key_from_signature + verify_message
+// accept the exact signature/key/message tuple TS SDK accepts, and that the
+// recovered public key compresses to the same 33-byte sequence.
+#[test]
+fn test_cross_sdk_bsm_texas_verify_and_recover() {
+    use base64::Engine;
+    use bsv_rs::primitives::PublicKey;
+
+    let sig_b64 = "IAV89EkfHSzAIA8cEWbbKHUYzJqcShkpWaXGJ5+mf4+YIlf3XNlr0bj9X60sNe1A7+x9qyk+zmXropMDY4370n8=";
+    let signature = base64::engine::general_purpose::STANDARD
+        .decode(sig_b64)
+        .unwrap();
+    let message = b"Texas";
+    let expected_pubkey_hex =
+        "03d4d1a6c5d8c03b0e671bc1891b69afaecb40c0686188fe9019f93581b43e8334";
+
+    // Recover the public key from the signature and verify it matches the TS expectation
+    let (recovered_pubkey, was_compressed) =
+        bsm::recover_public_key_from_signature(&signature, message).unwrap();
+    assert_eq!(
+        hex::encode(recovered_pubkey.to_compressed()),
+        expected_pubkey_hex,
+        "Recovered pubkey must match TS SDK expectation byte-for-byte"
+    );
+    assert!(was_compressed, "Recovery flag 0x20 implies compressed key");
+
+    // Verify via address path too (closes the loop with the public verify API)
+    let expected_pubkey = PublicKey::from_hex(expected_pubkey_hex).unwrap();
+    let address = expected_pubkey.to_address();
+    assert!(bsm::verify_message(&address, &signature, message).unwrap());
+}
+
 #[test]
 fn test_cross_sdk_bsm_compressed_signatures_match_go_sdk() {
     for (priv_hex, msg, expected_b64) in GO_SDK_BSM_COMPRESSED_VECTORS {
