@@ -166,6 +166,50 @@ mod tests {
     }
 
     #[test]
+    fn test_p2pk_lock_uncompressed() {
+        // Cross-SDK parity: TS SDK P2PK supports both compressed (33B) and
+        // uncompressed (65B) keys, and the SAFE_PREFIXES tests cover all three
+        // legal uncompressed prefixes (0x04, 0x06, 0x07). Lock through all
+        // three and verify is_p2pk + roundtrip.
+        let private_key = PrivateKey::from_hex(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
+        let uncompressed = private_key.public_key().to_uncompressed();
+        assert_eq!(uncompressed.len(), 65);
+        assert_eq!(uncompressed[0], 0x04);
+
+        let template = P2PK::new();
+
+        for prefix in [0x04u8, 0x06, 0x07] {
+            let mut key = uncompressed;
+            key[0] = prefix;
+            let locking = template.lock(&key).unwrap();
+
+            let chunks = locking.chunks();
+            assert_eq!(chunks.len(), 2);
+            assert_eq!(chunks[0].data.as_ref().unwrap().len(), 65);
+            assert_eq!(chunks[0].data.as_ref().unwrap()[0], prefix);
+            assert_eq!(chunks[1].op, OP_CHECKSIG);
+
+            // The script-type detector must classify uncompressed P2PK too.
+            assert!(
+                locking.as_script().is_p2pk(),
+                "is_p2pk must recognize 65-byte key with prefix 0x{:02x}",
+                prefix
+            );
+
+            // get_public_key should extract back the raw pubkey bytes
+            let extracted = locking
+                .as_script()
+                .get_public_key()
+                .expect("extract uncompressed pubkey from P2PK");
+            assert_eq!(extracted.len(), 65);
+            assert_eq!(extracted[0], prefix);
+        }
+    }
+
+    #[test]
     fn test_p2pk_lock_invalid_length() {
         let template = P2PK::new();
 
