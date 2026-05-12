@@ -1145,6 +1145,39 @@ mod tests {
         assert!(from_utf8_bytes(&[0xFF, 0xFE]).is_err());
     }
 
+    // Cross-SDK parity: TS SDK requires toUTF8 to never panic on truncated
+    // multi-byte UTF-8 sequences (out-of-bounds reads in JS). The Rust impl
+    // routes through std::str::from_utf8 which returns Err instead — these
+    // tests pin that contract for inputs that match the TS test cases.
+    // Source: ts-sdk/src/primitives/__tests/utils.test.ts "toUTF8 bounds checks"
+    #[test]
+    fn test_from_utf8_bytes_truncated_2byte_sequence() {
+        // 0xC3 is the first byte of a 2-byte sequence (e.g., 0xC3 0xA9 = é);
+        // by itself it's an incomplete sequence.
+        let result = from_utf8_bytes(&[0xC3]);
+        assert!(
+            result.is_err(),
+            "truncated 2-byte UTF-8 must be rejected, not silently truncated"
+        );
+    }
+
+    #[test]
+    fn test_from_utf8_bytes_truncated_3byte_sequence() {
+        // 0xE2 starts a 3-byte sequence (e.g., 0xE2 0x82 0xAC = €).
+        // Both 1-byte and 2-byte prefixes must error cleanly.
+        assert!(from_utf8_bytes(&[0xE2]).is_err());
+        assert!(from_utf8_bytes(&[0xE2, 0x82]).is_err());
+    }
+
+    #[test]
+    fn test_from_utf8_bytes_truncated_4byte_sequence() {
+        // 0xF0 starts a 4-byte sequence (e.g., U+1F600 emoji).
+        // All three short prefixes must error cleanly.
+        assert!(from_utf8_bytes(&[0xF0]).is_err());
+        assert!(from_utf8_bytes(&[0xF0, 0x9F]).is_err());
+        assert!(from_utf8_bytes(&[0xF0, 0x9F, 0x98]).is_err());
+    }
+
     // ------------------------------------------------------------------------
     // Reader tests
     // ------------------------------------------------------------------------
