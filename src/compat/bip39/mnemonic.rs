@@ -911,6 +911,40 @@ mod tests {
         }
     }
 
+    // Parsing an English phrase with a non-English Language must fail with
+    // InvalidMnemonicWord on the very first word — the wordlists don't
+    // intersect, so this is a useful sanity check that the language
+    // parameter actually drives word lookup rather than being ignored.
+    #[test]
+    fn test_from_phrase_rejects_english_words_as_spanish() {
+        let english_phrase = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+        let result = Mnemonic::from_phrase_with_language(english_phrase, Language::Spanish);
+        match result {
+            Err(Error::InvalidMnemonicWord(word)) => {
+                // First lookup is "abandon" — not in Spanish wordlist.
+                assert_eq!(word, "abandon");
+            }
+            other => panic!("expected InvalidMnemonicWord, got {:?}", other),
+        }
+    }
+
+    // Same sanity check from the opposite direction — Spanish words shouldn't
+    // parse as English. Uses entropy [0u8; 16] which yields a deterministic
+    // Spanish phrase whose first word is in the Spanish wordlist.
+    #[test]
+    fn test_from_phrase_rejects_spanish_words_as_english() {
+        let entropy = [0u8; 16];
+        let spanish = Mnemonic::from_entropy_with_language(&entropy, Language::Spanish).unwrap();
+        let spanish_phrase = spanish.phrase();
+
+        // Default English parse must reject this.
+        assert!(matches!(
+            Mnemonic::from_phrase(&spanish_phrase),
+            Err(Error::InvalidMnemonicWord(_))
+        ));
+    }
+
     // Go SDK uses regular ASCII space for all wordlists including Japanese,
     // whereas BIP-39 and bsv-rs use ideographic space (U+3000) for Japanese
     // output. To stay interoperable with Go SDK output, bsv-rs must still
