@@ -588,6 +588,22 @@ mod tests {
     }
 
     #[test]
+    fn test_public_key_add_returns_point_at_infinity_error() {
+        // P + (-P) = identity, which our API rejects with PointAtInfinity.
+        // Construct -P by flipping the compressed prefix byte from 0x02 to 0x03
+        // (or vice versa). Same x-coordinate, negated y.
+        let g_hex = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+        let g = PublicKey::from_hex(g_hex).unwrap();
+
+        let mut neg_bytes = g.to_compressed();
+        neg_bytes[0] = if neg_bytes[0] == 0x02 { 0x03 } else { 0x02 };
+        let neg_g = PublicKey::from_bytes(&neg_bytes).unwrap();
+
+        let result = g.add(&neg_g);
+        assert!(matches!(result, Err(Error::PointAtInfinity)));
+    }
+
+    #[test]
     fn test_public_key_add_associative() {
         // Test that (A + B) + C = A + (B + C)
         use crate::primitives::PrivateKey;
