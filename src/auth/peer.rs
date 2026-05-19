@@ -22,9 +22,49 @@ use crate::wallet::{
 use crate::{Error, Result};
 use rand::RngCore;
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::{oneshot, RwLock};
+
+/// Wait for `future` to complete, or time out after `timeout_ms` milliseconds.
+///
+/// On native targets this delegates to `tokio::time::timeout`, which requires
+/// a Tokio runtime with the `time` driver enabled. On `wasm32-unknown-unknown`
+/// (with the `wasm` feature enabled) it instead races the future against a
+/// `futures_timer::Delay`, which has no runtime dependency and therefore works
+/// inside Cloudflare Workers, browser `wasm-bindgen-futures` executors, and
+/// other JS-async-style environments that do not provide a Tokio time driver.
+///
+/// A timeout is reported as `Error::AuthError("Handshake timeout".into())` so
+/// the existing call-site error semantics are preserved.
+#[cfg(not(all(target_arch = "wasm32", feature = "wasm")))]
+async fn wait_with_timeout<F>(future: F, timeout_ms: u64) -> Result<F::Output>
+where
+    F: Future,
+{
+    tokio::time::timeout(Duration::from_millis(timeout_ms), future)
+        .await
+        .map_err(|_| Error::AuthError("Handshake timeout".into()))
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm"))]
+async fn wait_with_timeout<F>(future: F, timeout_ms: u64) -> Result<F::Output>
+where
+    F: Future,
+{
+    use futures::future::{select, Either};
+    use futures::pin_mut;
+
+    let delay = futures_timer::Delay::new(Duration::from_millis(timeout_ms));
+    pin_mut!(future);
+    pin_mut!(delay);
+    match select(future, delay).await {
+        Either::Left((output, _)) => Ok(output),
+        Either::Right(((), _)) => Err(Error::AuthError("Handshake timeout".into())),
+    }
+}
 
 /// Type alias for general message callbacks.
 pub type GeneralMessageCallback = Box<
@@ -678,9 +718,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 
         // Wait for response with timeout
         let timeout = max_wait_time.unwrap_or(30000);
-        let result = tokio::time::timeout(tokio::time::Duration::from_millis(timeout), rx)
-            .await
-            .map_err(|_| Error::AuthError("Handshake timeout".into()))?
+        let result = wait_with_timeout(rx, timeout)
+            .await?
             .map_err(|_| Error::AuthError("Handshake cancelled".into()))??;
 
         Ok(result)
