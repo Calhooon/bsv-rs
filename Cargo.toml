@@ -1,6 +1,6 @@
 [package]
 name = "bsv-rs"
-version = "0.3.8"
+version = "0.3.9"
 edition = "2021"
 description = "BSV blockchain SDK for Rust - primitives, script, transactions, and more"
 license = "MIT OR Apache-2.0"
@@ -70,6 +70,10 @@ futures = "0.3"
 # Runtime-agnostic timer (wasm32 only — CF Workers have no tokio time-driver)
 futures-timer = { version = "3", optional = true }
 
+# JS host bindings (wasm32 only — std::time::SystemTime is unimplemented on
+# wasm32-unknown-unknown, so wall-clock helpers use `js_sys::Date::now()` there)
+js-sys = { version = "0.3", optional = true }
+
 # URL encoding (for storage module)
 urlencoding = "2.1"
 
@@ -98,7 +102,7 @@ storage = ["overlay"]
 registry = ["overlay"]
 kvstore = ["overlay"]
 identity = ["auth", "overlay"]
-wasm = ["getrandom/js", "dep:futures-timer"]
+wasm = ["getrandom/js", "dep:futures-timer", "dep:js-sys"]
 full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity"]
 http = ["dep:reqwest"]
 websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]

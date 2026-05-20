@@ -390,11 +390,13 @@ impl RequestedCertificateSet {
 }
 
 /// Returns current time in milliseconds since Unix epoch.
+///
+/// On `wasm32-unknown-unknown` (e.g. Cloudflare Workers) this uses
+/// `js_sys::Date::now()` because `std::time::SystemTime::now()` is
+/// unimplemented and panics there. On all other targets the behavior is
+/// unchanged. See `crate::util::time` for the cfg-gated implementation.
 pub fn current_time_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as u64)
-        .unwrap_or(0)
+    crate::util::time::current_time_ms()
 }
 
 #[cfg(test)]

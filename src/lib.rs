@@ -41,6 +41,10 @@
 pub mod error;
 pub use error::{Error, Result};
 
+// Internal utilities (wasm32-safe time helpers, etc.). Not part of the
+// public API — see `src/util/mod.rs`.
+pub(crate) mod util;
+
 // Feature-gated modules
 #[cfg(feature = "primitives")]
 pub mod primitives;
