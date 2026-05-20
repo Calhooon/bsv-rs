@@ -663,10 +663,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 fn get_iso_timestamp() -> String {
     // Simple timestamp without chrono dependency
     // Format: "2024-01-01T00:00:00.000Z"
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
+    let now = crate::util::time::duration_since_unix_epoch();
     let secs = now.as_secs();
     let millis = now.subsec_millis();
 

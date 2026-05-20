@@ -26,7 +26,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast;
 
 /// Default capacity for the rank change broadcast channel.
@@ -551,10 +550,7 @@ impl HostReputationTracker {
 
 /// Get current time in milliseconds since epoch.
 fn now_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
+    crate::util::time::current_time_ms()
 }
 
 // Global singleton

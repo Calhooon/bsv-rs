@@ -3,7 +3,6 @@
 //! Implements RFC 6238 for generating time-based OTPs commonly used in 2FA.
 
 use crate::primitives::hash::{sha1_hmac, sha256_hmac, sha512_hmac};
-use std::time::{SystemTime, UNIX_EPOCH};
 use subtle::ConstantTimeEq;
 
 /// HMAC algorithm for TOTP generation.
@@ -279,10 +278,7 @@ fn generate_hotp(secret: &[u8], counter: u64, options: &TotpOptions) -> String {
 
 /// Get current Unix timestamp in seconds.
 fn current_unix_seconds() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("System time is before Unix epoch")
-        .as_secs()
+    crate::util::time::current_time_secs()
 }
 
 /// Constant-time string comparison to prevent timing attacks.

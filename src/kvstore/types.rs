@@ -478,11 +478,7 @@ struct TtlEnvelope {
 ///
 /// The value is wrapped in a JSON envelope: `{"v":"<value>","e":<unix_ts>}`
 pub(crate) fn encode_value_with_ttl(value: &str, ttl: std::time::Duration) -> String {
-    let expiration = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs()
-        + ttl.as_secs();
+    let expiration = crate::util::time::current_time_secs() + ttl.as_secs();
 
     let envelope = TtlEnvelope {
         v: value.to_string(),
@@ -500,10 +496,7 @@ pub(crate) fn encode_value_with_ttl(value: &str, ttl: std::time::Duration) -> St
 pub(crate) fn decode_value_with_ttl(stored: &str) -> (String, bool) {
     // Try to parse as TTL envelope
     if let Ok(envelope) = serde_json::from_str::<TtlEnvelope>(stored) {
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
+        let now = crate::util::time::current_time_secs();
 
         let is_expired = now >= envelope.e;
         (envelope.v, is_expired)

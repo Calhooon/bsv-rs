@@ -636,10 +636,7 @@ impl Default for LookupResolver {
 
 /// Get current time in milliseconds since epoch.
 fn now_ms() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_millis() as u64
+    crate::util::time::current_time_ms()
 }
 
 #[cfg(test)]

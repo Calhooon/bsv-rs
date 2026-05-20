@@ -11,7 +11,6 @@ use crate::script::templates::PushDrop;
 use crate::transaction::Transaction;
 use crate::{Error, Result};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::types::DownloadResult;
 use super::utils::is_valid_url;
@@ -101,10 +100,7 @@ impl StorageDownloader {
             _ => return Ok(Vec::new()),
         };
 
-        let current_time = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
+        let current_time = crate::util::time::current_time_secs() as i64;
 
         let mut hosts = Vec::new();
 
