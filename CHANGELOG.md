@@ -5,6 +5,23 @@ All notable changes to `bsv-rs` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.11] — 2026-05-20
+
+### Fixed
+
+- **wasm32 `Peer::to_peer` / BRC-103 handshake hang.** The `wasm` feature now
+  enables `futures-timer/wasm-bindgen`. The wasm `wait_with_timeout` helper
+  (the `Peer` handshake timeout) races the handshake future against a
+  `futures_timer::Delay`, but the `wasm` feature previously pulled
+  `futures-timer` *without* its `wasm-bindgen` feature. On
+  `wasm32-unknown-unknown` that selected `futures-timer`'s native timer-thread
+  backend, so `Delay::new` panicked (`thread::spawn` is unsupported) on the
+  first poll — hanging/aborting any `Peer::to_peer` call that initiates a
+  handshake inside a Cloudflare Worker or browser `wasm-bindgen-futures`
+  executor. Enabling `futures-timer/wasm-bindgen` flips it to the
+  `gloo-timers`/`setTimeout` backend, which works in those environments.
+  Pure additive feature wiring (no API change) → patch bump.
+
 ## [0.3.7] — 2026-04-21
 
 ### Added
