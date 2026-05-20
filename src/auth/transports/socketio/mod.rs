@@ -36,12 +36,12 @@
 //!
 //! # Application-event envelope
 //!
-//! Post-handshake [`MessageType::General`] payloads use the canonical
-//! `{eventName, data}` JSON envelope. [`build_envelope_payload`] and
-//! [`parse_app_event_payload`] encode and decode it byte-exactly against
-//! the TS canonical (`encodeEventPayload`); [`AppEvent`] is the decoded
-//! form. See [`install_app_event_listener`] to subscribe a [`Peer`] to a
-//! stream of decoded events.
+//! Post-handshake [`MessageType::General`](crate::auth::MessageType::General)
+//! payloads use the canonical `{eventName, data}` JSON envelope.
+//! [`build_envelope_payload`] and [`parse_app_event_payload`] encode and
+//! decode it byte-exactly against the TS canonical (`encodeEventPayload`);
+//! [`AppEvent`] is the decoded form. See [`install_app_event_listener`] to
+//! subscribe a [`Peer`](crate::auth::Peer) to a stream of decoded events.
 //!
 //! # Example
 //!
@@ -104,8 +104,8 @@ use codec::{EngineIoPacket, SocketIoPacket};
 /// transport maps it into [`crate::Error::AuthError`] at the boundary.
 ///
 /// Implementors must be `Send + Sync` so [`SocketIoTransport`] satisfies
-/// the [`Transport`] bound and can be shared across the [`Peer`] and the
-/// dispatch task.
+/// the [`Transport`] bound and can be shared across the
+/// [`Peer`](crate::auth::Peer) and the dispatch task.
 pub trait SocketIoSink: Send + Sync {
     /// Encode `pkt` (wrapped in an Engine.IO `Message(4)`) and write it
     /// to the wire. Returns `Err` if the underlying transport is closed.
@@ -344,9 +344,9 @@ pub struct AppEvent {
 /// id (pass it to `Peer::stop_listening_for_general_messages` on teardown
 /// if needed).
 ///
-/// Requires `Peer::start()` to have been called on the same [`Peer`] so
-/// the start-callback routes inbound Generals to the
-/// `general_message_callbacks` map this helper subscribes to.
+/// Requires `Peer::start()` to have been called on the same
+/// [`Peer`](crate::auth::Peer) so the start-callback routes inbound
+/// Generals to the `general_message_callbacks` map this helper subscribes to.
 pub async fn install_app_event_listener<W, T>(
     peer: &crate::auth::Peer<W, T>,
 ) -> (futures::channel::mpsc::UnboundedReceiver<AppEvent>, u32)

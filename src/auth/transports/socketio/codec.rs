@@ -49,9 +49,9 @@
 //!   - `0`              → CONNECT to default namespace (client → server)
 //!   - `0{"sid":"x"}`   → server CONNECT ack to default ns
 //!   - `0/admin,`       → CONNECT to /admin
-//!   - `2["foo","bar"]` → EVENT [foo, bar] on default ns
-//!   - `2/admin,["x"]`  → EVENT [x] on /admin
-//!   - `212["foo"]`     → EVENT [foo] on default ns with ack id 12
+//!   - `2["foo","bar"]` → EVENT `[foo, bar]` on default ns
+//!   - `2/admin,["x"]`  → EVENT `[x]` on /admin
+//!   - `212["foo"]`     → EVENT `[foo]` on default ns with ack id 12
 //!
 //! Only the no-namespace and default-`/` namespace cases are exercised
 //! by [`SocketIoTransport`](super::SocketIoTransport), but the parser
