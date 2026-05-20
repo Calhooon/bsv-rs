@@ -120,6 +120,11 @@ pub use compat::{Language, Mnemonic, WordCount};
 pub use totp::{Algorithm as TotpAlgorithm, Totp, TotpOptions, TotpValidateOptions};
 
 // Convenience re-exports from auth
+#[cfg(feature = "socketio")]
+pub use auth::{
+    install_app_event_listener, run_dispatch, AppEvent, SocketIoFrameSource, SocketIoSink,
+    SocketIoTransport,
+};
 #[cfg(feature = "auth")]
 pub use auth::{
     AuthMessage, Certificate, MasterCertificate, MessageType, Peer, PeerOptions, PeerSession,
