@@ -7,6 +7,8 @@
 //!
 //! - [`SimplifiedFetchTransport`] - HTTP-based transport (requires `http` feature)
 //! - `WebSocketTransport` - WebSocket-based transport (requires `websocket` feature)
+//! - `SocketIoTransport` - Socket.IO + BRC-103 transport, generic over a
+//!   WS substrate (requires `socketio` feature). See [`socketio`].
 //! - [`MockTransport`] - Mock transport for testing
 //!
 //! ## Custom Transports
@@ -40,6 +42,9 @@ pub mod http;
 #[cfg(feature = "websocket")]
 pub mod websocket_transport;
 
+#[cfg(feature = "socketio")]
+pub mod socketio;
+
 pub use http::{
     headers, HttpRequest, HttpResponse, MockTransport, SimplifiedFetchTransport, Transport,
     TransportCallback,
@@ -47,3 +52,9 @@ pub use http::{
 
 #[cfg(feature = "websocket")]
 pub use websocket_transport::{WebSocketTransport, WebSocketTransportOptions};
+
+#[cfg(feature = "socketio")]
+pub use socketio::{
+    install_app_event_listener, run_dispatch, AppEvent, SocketIoFrameSource, SocketIoSink,
+    SocketIoTransport,
+};

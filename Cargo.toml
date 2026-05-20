@@ -103,9 +103,14 @@ registry = ["overlay"]
 kvstore = ["overlay"]
 identity = ["auth", "overlay"]
 wasm = ["getrandom/js", "dep:futures-timer", "dep:js-sys"]
-full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity"]
+full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity", "socketio"]
 http = ["dep:reqwest"]
 websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
+# Socket.IO 5 / Engine.IO 4 + BRC-103 transport. Substrate-agnostic:
+# pulls in no new dependency (uses serde_json + async-trait + futures,
+# all already required by `auth`), so enabling it cannot break a wasm32
+# `auth` build.
+socketio = ["auth"]
 dhat-profiling = ["dep:dhat"]
 
 [[bench]]

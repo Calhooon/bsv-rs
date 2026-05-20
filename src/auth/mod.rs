@@ -72,6 +72,11 @@ pub mod utils;
 pub use certificates::{Certificate, MasterCertificate, VerifiableCertificate};
 pub use peer::{Peer, PeerOptions};
 pub use session_manager::SessionManager;
+#[cfg(feature = "socketio")]
+pub use transports::{
+    install_app_event_listener, run_dispatch, AppEvent, SocketIoFrameSource, SocketIoSink,
+    SocketIoTransport,
+};
 pub use transports::{MockTransport, SimplifiedFetchTransport, Transport};
 #[cfg(feature = "websocket")]
 pub use transports::{WebSocketTransport, WebSocketTransportOptions};
