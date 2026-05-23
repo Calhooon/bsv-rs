@@ -213,6 +213,53 @@ impl SymmetricKey {
         Ok(result)
     }
 
+    /// Encrypts plaintext using AES-256-GCM with a **caller-supplied** 32-byte IV.
+    ///
+    /// Additive, behavior-compatible counterpart to [`encrypt`](Self::encrypt):
+    /// identical cipher (AES-256-GCM, 32-byte IV), identical output layout
+    /// (`IV (32) || ciphertext || auth_tag (16)`), identical to the @bsv/sdk (TS)
+    /// and go-sdk `SymmetricKey` wire — the ONLY difference is that the IV is
+    /// supplied by the caller instead of randomly generated. A ciphertext from
+    /// this method is therefore byte-identical to what [`encrypt`] (or any
+    /// conformant SDK) would have produced had it drawn the same IV, and decrypts
+    /// cleanly under every SDK's `decrypt`.
+    ///
+    /// It exists so cross-implementation conformance vectors can byte-lock a
+    /// ciphertext (the IV is otherwise the only nondeterminism).
+    ///
+    /// # Security
+    ///
+    /// Production code MUST use [`encrypt`](Self::encrypt). Reusing a `(key, IV)`
+    /// pair across two AES-GCM encryptions is catastrophic (it leaks the
+    /// authentication subkey). Only call this with a unique IV — e.g. a pinned
+    /// test vector, or an IV whose uniqueness is externally guaranteed.
+    ///
+    /// # Arguments
+    ///
+    /// * `iv` - The 32-byte initialization vector (nonce).
+    /// * `plaintext` - The data to encrypt.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cipher construction or encryption fails.
+    pub fn encrypt_with_iv(&self, iv: &[u8; IV_SIZE], plaintext: &[u8]) -> Result<Vec<u8>> {
+        let cipher = Aes256Gcm32::new_from_slice(&self.key)
+            .map_err(|e| Error::CryptoError(format!("Failed to create cipher: {}", e)))?;
+
+        #[allow(deprecated)]
+        let nonce = Nonce::<U32>::from_slice(iv);
+
+        let ciphertext_with_tag = cipher
+            .encrypt(nonce, plaintext)
+            .map_err(|_| Error::CryptoError("Encryption failed".to_string()))?;
+
+        let mut result = Vec::with_capacity(IV_SIZE + ciphertext_with_tag.len());
+        result.extend_from_slice(iv);
+        result.extend_from_slice(&ciphertext_with_tag);
+
+        Ok(result)
+    }
+
     /// Decrypts ciphertext using AES-256-GCM.
     ///
     /// Expects input in the format: `IV (32 bytes) || ciphertext || auth_tag (16 bytes)`
@@ -915,6 +962,42 @@ mod tests {
                     );
                 }
             }
+        }
+
+        #[test]
+        fn test_encrypt_with_iv_deterministic_and_roundtrips() {
+            let key = SymmetricKey::from_bytes(&[0x42u8; 32]).expect("key");
+            let iv = [0x07u8; 32];
+            let plaintext = b"deterministic vector plaintext";
+
+            // Same key + IV + plaintext => byte-identical ciphertext (the property
+            // that makes a cross-impl ciphertext byte-lock possible).
+            let ct1 = key.encrypt_with_iv(&iv, plaintext).expect("encrypt_with_iv");
+            let ct2 = key.encrypt_with_iv(&iv, plaintext).expect("encrypt_with_iv");
+            assert_eq!(ct1, ct2, "encrypt_with_iv MUST be deterministic for a fixed IV");
+
+            // The pinned IV is the 32-byte prefix, and the canonical decrypt path
+            // recovers the plaintext.
+            assert_eq!(&ct1[..32], &iv, "output is IV(32) || ct || tag(16)");
+            assert_eq!(ct1.len(), 32 + plaintext.len() + 16);
+            assert_eq!(key.decrypt(&ct1).expect("decrypt"), plaintext);
+
+            // A different IV yields a different ciphertext body.
+            let ct3 = key.encrypt_with_iv(&[0x08u8; 32], plaintext).expect("encrypt_with_iv");
+            assert_ne!(ct1, ct3);
+        }
+
+        #[test]
+        fn test_encrypt_matches_encrypt_with_iv_on_extracted_iv() {
+            // `encrypt` is just `encrypt_with_iv` with a random IV: re-encrypting
+            // under the IV `encrypt` chose reproduces the exact ciphertext.
+            let key = SymmetricKey::random();
+            let plaintext = b"hello bsv";
+            let ct = key.encrypt(plaintext).expect("encrypt");
+            let mut iv = [0u8; 32];
+            iv.copy_from_slice(&ct[..32]);
+            let ct2 = key.encrypt_with_iv(&iv, plaintext).expect("encrypt_with_iv");
+            assert_eq!(ct, ct2);
         }
 
         #[test]
