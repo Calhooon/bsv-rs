@@ -493,8 +493,21 @@ impl SimplifiedFetchTransport {
     pub fn new(base_url: &str) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
+            // Egress-NAT'd hosts (e.g. Cloudflare Containers) silently drop idle
+            // keep-alive sockets. reqwest's default pool then reuses a half-dead
+            // connection and the next request HANGS INDEFINITELY — `Client::new()`
+            // sets no timeout, so there is nothing to break the hang. This wedged
+            // the BRC-104 General POST (`/sendMessage`) from the deployed MPC
+            // cosigner. Bound every request (overall + connect) and disable
+            // idle-socket reuse so a dropped keep-alive forces a fresh connection
+            // instead of a hang.
             #[cfg(feature = "http")]
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(30))
+                .connect_timeout(std::time::Duration::from_secs(10))
+                .pool_max_idle_per_host(0)
+                .build()
+                .unwrap_or_else(|_| reqwest::Client::new()),
             callback: Arc::new(StdRwLock::new(None)),
         }
     }
