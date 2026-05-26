@@ -220,8 +220,8 @@ impl SymmetricKey {
     /// (`IV (32) || ciphertext || auth_tag (16)`), identical to the @bsv/sdk (TS)
     /// and go-sdk `SymmetricKey` wire — the ONLY difference is that the IV is
     /// supplied by the caller instead of randomly generated. A ciphertext from
-    /// this method is therefore byte-identical to what [`encrypt`] (or any
-    /// conformant SDK) would have produced had it drawn the same IV, and decrypts
+    /// this method is therefore byte-identical to what [`encrypt`](Self::encrypt)
+    /// (or any conformant SDK) would have produced had it drawn the same IV, and decrypts
     /// cleanly under every SDK's `decrypt`.
     ///
     /// It exists so cross-implementation conformance vectors can byte-lock a
@@ -972,9 +972,16 @@ mod tests {
 
             // Same key + IV + plaintext => byte-identical ciphertext (the property
             // that makes a cross-impl ciphertext byte-lock possible).
-            let ct1 = key.encrypt_with_iv(&iv, plaintext).expect("encrypt_with_iv");
-            let ct2 = key.encrypt_with_iv(&iv, plaintext).expect("encrypt_with_iv");
-            assert_eq!(ct1, ct2, "encrypt_with_iv MUST be deterministic for a fixed IV");
+            let ct1 = key
+                .encrypt_with_iv(&iv, plaintext)
+                .expect("encrypt_with_iv");
+            let ct2 = key
+                .encrypt_with_iv(&iv, plaintext)
+                .expect("encrypt_with_iv");
+            assert_eq!(
+                ct1, ct2,
+                "encrypt_with_iv MUST be deterministic for a fixed IV"
+            );
 
             // The pinned IV is the 32-byte prefix, and the canonical decrypt path
             // recovers the plaintext.
@@ -983,7 +990,9 @@ mod tests {
             assert_eq!(key.decrypt(&ct1).expect("decrypt"), plaintext);
 
             // A different IV yields a different ciphertext body.
-            let ct3 = key.encrypt_with_iv(&[0x08u8; 32], plaintext).expect("encrypt_with_iv");
+            let ct3 = key
+                .encrypt_with_iv(&[0x08u8; 32], plaintext)
+                .expect("encrypt_with_iv");
             assert_ne!(ct1, ct3);
         }
 
@@ -996,7 +1005,9 @@ mod tests {
             let ct = key.encrypt(plaintext).expect("encrypt");
             let mut iv = [0u8; 32];
             iv.copy_from_slice(&ct[..32]);
-            let ct2 = key.encrypt_with_iv(&iv, plaintext).expect("encrypt_with_iv");
+            let ct2 = key
+                .encrypt_with_iv(&iv, plaintext)
+                .expect("encrypt_with_iv");
             assert_eq!(ct, ct2);
         }
 
