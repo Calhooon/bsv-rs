@@ -39,7 +39,7 @@
 //! ```
 
 use crate::error::{Error, Result};
-use crate::primitives::encoding::{Reader, Writer};
+use crate::primitives::encoding::{bounded_capacity, Reader, Writer};
 use crate::primitives::hash::sha256d;
 
 // ============================================================================
@@ -135,7 +135,9 @@ pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction> {
 
     // Input count (varint)
     let input_count = reader.read_var_int_num()?;
-    let mut inputs = Vec::with_capacity(input_count);
+    // Each input is >= 41 bytes (txid 32 + vout 4 + script len 1 + sequence 4);
+    // bound the pre-allocation so a bogus count varint cannot OOM-abort here.
+    let mut inputs = Vec::with_capacity(bounded_capacity(input_count, reader.remaining(), 41));
 
     for _ in 0..input_count {
         // Previous transaction ID (32 bytes)
@@ -162,7 +164,9 @@ pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction> {
 
     // Output count (varint)
     let output_count = reader.read_var_int_num()?;
-    let mut outputs = Vec::with_capacity(output_count);
+    // Each output is >= 9 bytes (satoshis 8 + script len 1); bound the
+    // pre-allocation so a bogus count cannot OOM-abort before any read.
+    let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
 
     for _ in 0..output_count {
         // Value (8 bytes LE)

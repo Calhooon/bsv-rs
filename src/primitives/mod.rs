@@ -26,8 +26,8 @@ pub use bignum::BigNumber;
 pub use drbg::HmacDrbg;
 pub use ec::{PrivateKey, PublicKey, Signature};
 pub use encoding::{
-    from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes, to_base58,
-    to_base58_check, to_base64, to_hex, to_utf8_bytes, Reader, Writer,
+    bounded_capacity, from_base58, from_base58_check, from_base64, from_hex, from_utf8_bytes,
+    to_base58, to_base58_check, to_base64, to_hex, to_utf8_bytes, Reader, Writer,
 };
 pub use hash::{
     hash160, pbkdf2_sha512, ripemd160, sha1, sha1_hmac, sha256, sha256_hmac, sha256d, sha512,

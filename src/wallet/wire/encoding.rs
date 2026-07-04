@@ -5,7 +5,7 @@
 //! for the WalletWire protocol.
 
 use crate::primitives::encoding::{Reader, Writer};
-use crate::primitives::{from_base64, from_hex, to_base64, to_hex, PublicKey};
+use crate::primitives::{bounded_capacity, from_base64, from_hex, to_base64, to_hex, PublicKey};
 use crate::wallet::types::{
     ActionStatus, BasketInsertion, Counterparty, IdentityCertificate, IdentityCertifier,
     InternalizeOutput, Outpoint, OutputInclude, Protocol, QueryMode, SecurityLevel, SendWithResult,
@@ -168,7 +168,7 @@ impl<'a> WireReader<'a> {
             return Ok(Vec::new());
         }
 
-        let mut strings = Vec::with_capacity(count as usize);
+        let mut strings = Vec::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
             strings.push(self.read_optional_string()?.unwrap_or_default());
         }
@@ -353,7 +353,7 @@ impl<'a> WireReader<'a> {
             return Ok(HashMap::new());
         }
 
-        let mut map = HashMap::with_capacity(count as usize);
+        let mut map = HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
         for _ in 0..count {
             let key = self.read_string()?;
             let value = self.read_string()?;
@@ -369,7 +369,7 @@ impl<'a> WireReader<'a> {
             return Ok(None);
         }
 
-        let mut map = HashMap::with_capacity(count as usize);
+        let mut map = HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
         for _ in 0..count {
             let key = self.read_string()?;
             let value = self.read_string()?;
@@ -408,7 +408,7 @@ impl<'a> WireReader<'a> {
             return Ok(None);
         }
 
-        let mut results = Vec::with_capacity(count as usize);
+        let mut results = Vec::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
             results.push(self.read_send_with_result()?);
         }
@@ -433,7 +433,7 @@ impl<'a> WireReader<'a> {
             return Ok(HashMap::new());
         }
 
-        let mut spends = HashMap::with_capacity(count as usize);
+        let mut spends = HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
             let index = self.read_var_int()? as u32;
             let spend = self.read_sign_action_spend()?;
@@ -691,7 +691,8 @@ impl<'a> WireReader<'a> {
         let inputs = if inputs_count == NIL_SENTINEL {
             None
         } else {
-            let mut inputs = Vec::with_capacity(inputs_count as usize);
+            let mut inputs =
+                Vec::with_capacity(bounded_capacity(inputs_count as usize, self.remaining(), 1));
             for _ in 0..inputs_count {
                 inputs.push(self.read_wallet_action_input()?);
             }
@@ -703,7 +704,8 @@ impl<'a> WireReader<'a> {
         let outputs = if outputs_count == NIL_SENTINEL {
             None
         } else {
-            let mut outputs = Vec::with_capacity(outputs_count as usize);
+            let mut outputs =
+                Vec::with_capacity(bounded_capacity(outputs_count as usize, self.remaining(), 1));
             for _ in 0..outputs_count {
                 outputs.push(self.read_wallet_action_output()?);
             }

@@ -3,7 +3,7 @@
 //! A certificate binds identity attributes to a public key,
 //! signed by a trusted certifier.
 
-use crate::primitives::{sha256, PrivateKey, PublicKey, Signature};
+use crate::primitives::{bounded_capacity, sha256, PrivateKey, PublicKey, Signature};
 use crate::wallet::types::Outpoint;
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -195,7 +195,10 @@ impl Certificate {
 
         // Fields
         let field_count = reader.read_varint()? as usize;
-        let mut fields = HashMap::with_capacity(field_count);
+        // Each field is >= 2 bytes (name len varint + value len varint); bound
+        // the pre-allocation so a bogus count cannot OOM-abort before any read.
+        let mut fields =
+            HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 2));
         for _ in 0..field_count {
             let name_len = reader.read_varint()? as usize;
             let name = String::from_utf8(reader.read_bytes(name_len)?.to_vec())

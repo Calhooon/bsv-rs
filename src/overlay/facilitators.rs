@@ -353,7 +353,7 @@ fn parse_json_lookup_answer(json: serde_json::Value) -> Result<LookupAnswer> {
 /// Parse binary lookup response (compact outpoints + BEEF format).
 #[cfg(feature = "http")]
 fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
-    use crate::primitives::{to_hex, Reader};
+    use crate::primitives::{bounded_capacity, to_hex, Reader};
 
     let mut reader = Reader::new(data);
 
@@ -363,7 +363,9 @@ fn parse_binary_lookup_response(data: &[u8]) -> Result<LookupAnswer> {
         .map_err(|e| Error::OverlayError(format!("Failed to read outpoint count: {}", e)))?
         as usize;
 
-    let mut outpoints = Vec::with_capacity(n_outpoints);
+    // Each outpoint is >= 34 bytes (txid 32 + vout varint 1 + context len 1);
+    // bound the pre-allocation so a bogus count cannot OOM-abort before any read.
+    let mut outpoints = Vec::with_capacity(bounded_capacity(n_outpoints, reader.remaining(), 34));
 
     for _ in 0..n_outpoints {
         // Read 32-byte txid

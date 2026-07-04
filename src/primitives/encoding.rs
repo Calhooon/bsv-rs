@@ -431,6 +431,34 @@ pub fn from_utf8_bytes(data: &[u8]) -> Result<String> {
 // Binary Reader
 // ============================================================================
 
+/// Computes a safe pre-allocation capacity for a collection whose element
+/// count was read from untrusted input.
+///
+/// A malicious length prefix — e.g. a `0xFE`/`0xFF` varint decoding to
+/// billions — makes `Vec::with_capacity(count)` abort the process with a
+/// capacity-overflow / OOM panic *before a single element is read*. That is a
+/// trivially cheap denial-of-service against any streaming parser (and on
+/// `wasm32`, where `usize` is 32-bit and the build is `panic = abort`, it is
+/// unrecoverable — `.ok()` cannot catch it).
+///
+/// Bounding the hint by the number of bytes still available (`remaining`)
+/// divided by the smallest possible encoded size of one element
+/// (`min_elem_bytes`) makes the pre-allocation impossible to inflate past what
+/// the buffer could ever actually contain.
+///
+/// This only affects the *capacity hint*: the element read loop still returns
+/// `Err` the instant the buffer is exhausted, so the parse result is unchanged
+/// for both valid and invalid input. For valid input `count <= remaining /
+/// min_elem_bytes` always holds (each element consumes at least
+/// `min_elem_bytes`), so the hint equals `count` and no reallocation occurs.
+///
+/// `min_elem_bytes` is clamped to a minimum of 1 to avoid division by zero;
+/// pass the true minimum encoded size of one element for the tightest bound.
+#[inline]
+pub fn bounded_capacity(count: usize, remaining: usize, min_elem_bytes: usize) -> usize {
+    count.min(remaining / min_elem_bytes.max(1))
+}
+
 /// A binary reader for parsing Bitcoin data structures.
 ///
 /// `Reader` provides methods for reading integers in little-endian format
