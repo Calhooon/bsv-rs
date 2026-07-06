@@ -32,3 +32,9 @@ fuzz/Cargo.lock
 fuzz/corpus/
 fuzz/artifacts/
 .playwright-mcp/
+
+# session/tool artifacts (never published)
+/graphify-out/
+/LOOP_GOAL.md
+/LOOP_LOG.md
+/examples/brc29_32byte_repro.rs

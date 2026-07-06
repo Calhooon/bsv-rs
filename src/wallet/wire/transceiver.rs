@@ -4,6 +4,7 @@
 //! and deserializes the responses.
 
 use super::encoding::{WireReader, WireWriter};
+use crate::primitives::bounded_capacity;
 use super::{WalletCall, WalletWire};
 use crate::primitives::{from_base64, from_hex, to_base64, to_hex};
 use crate::wallet::types::Network;
@@ -579,7 +580,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse no_send_change (Go uses VarInt(MaxUint64) for nil)
         let no_send_change_len = reader.read_var_int()?;
         let no_send_change = if no_send_change_len != u64::MAX {
-            let mut outpoints = Vec::with_capacity(no_send_change_len as usize);
+            let mut outpoints = Vec::with_capacity(bounded_capacity(
+                no_send_change_len as usize,
+                reader.remaining(),
+                36,
+            ));
             for _ in 0..no_send_change_len {
                 outpoints.push(reader.read_outpoint()?);
             }
@@ -742,7 +747,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let total_actions = reader.read_var_int()? as u32;
-        let mut actions = Vec::with_capacity(total_actions as usize);
+        let mut actions =
+            Vec::with_capacity(bounded_capacity(total_actions as usize, reader.remaining(), 1));
 
         for _ in 0..total_actions {
             actions.push(reader.read_wallet_action()?);
@@ -881,7 +887,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             Some(reader.read_bytes(beef_len as usize)?.to_vec())
         };
 
-        let mut outputs = Vec::with_capacity(total_outputs as usize);
+        let mut outputs =
+            Vec::with_capacity(bounded_capacity(total_outputs as usize, reader.remaining(), 1));
         for _ in 0..total_outputs {
             outputs.push(reader.read_wallet_output()?);
         }
@@ -1079,7 +1086,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let total_certificates = reader.read_var_int()? as u32;
-        let mut certificates = Vec::with_capacity(total_certificates as usize);
+        let mut certificates = Vec::with_capacity(bounded_capacity(
+            total_certificates as usize,
+            reader.remaining(),
+            1,
+        ));
 
         for _ in 0..total_certificates {
             let cert_len = reader.read_var_int()? as usize;
@@ -1089,7 +1100,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             // Keyring
             let keyring = if reader.read_i8()? == 1 {
                 let num_fields = reader.read_var_int()? as usize;
-                let mut keyring = std::collections::HashMap::with_capacity(num_fields);
+                let mut keyring = std::collections::HashMap::with_capacity(bounded_capacity(
+                    num_fields,
+                    reader.remaining(),
+                    1,
+                ));
                 for _ in 0..num_fields {
                     let key = reader.read_string()?;
                     let value_len = reader.read_var_int()? as usize;
@@ -1186,7 +1201,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let num_fields = reader.read_var_int()? as usize;
-        let mut keyring_for_verifier = std::collections::HashMap::with_capacity(num_fields);
+        let mut keyring_for_verifier = std::collections::HashMap::with_capacity(
+            bounded_capacity(num_fields, reader.remaining(), 1),
+        );
         for _ in 0..num_fields {
             let key = reader.read_string()?;
             let value_len = reader.read_var_int()? as usize;
@@ -1378,7 +1395,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(data);
 
         let total_certificates = reader.read_var_int()? as u32;
-        let mut certificates = Vec::with_capacity(total_certificates as usize);
+        let mut certificates = Vec::with_capacity(bounded_capacity(
+            total_certificates as usize,
+            reader.remaining(),
+            1,
+        ));
 
         for _ in 0..total_certificates {
             let cert_len = reader.read_var_int()? as usize;
@@ -1401,7 +1422,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             // Publicly revealed keyring
             let num_public = reader.read_var_int()? as usize;
             let publicly_revealed_keyring = if num_public > 0 {
-                let mut keyring = std::collections::HashMap::with_capacity(num_public);
+                let mut keyring = std::collections::HashMap::with_capacity(bounded_capacity(
+                    num_public,
+                    reader.remaining(),
+                    1,
+                ));
                 for _ in 0..num_public {
                     let key = reader.read_string()?;
                     let value_len = reader.read_var_int()? as usize;
@@ -1416,7 +1441,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             // Decrypted fields
             let num_decrypted = reader.read_var_int()? as usize;
             let decrypted_fields = if num_decrypted > 0 {
-                let mut fields = std::collections::HashMap::with_capacity(num_decrypted);
+                let mut fields = std::collections::HashMap::with_capacity(bounded_capacity(
+                    num_decrypted,
+                    reader.remaining(),
+                    1,
+                ));
                 for _ in 0..num_decrypted {
                     let key = reader.read_string()?;
                     let value = reader.read_string()?;

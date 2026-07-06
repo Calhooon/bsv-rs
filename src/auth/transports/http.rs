@@ -19,6 +19,7 @@ use crate::auth::types::AuthMessage;
 
 #[cfg(feature = "http")]
 use crate::auth::types::MessageType;
+use crate::primitives::bounded_capacity;
 use crate::{Error, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -160,7 +161,13 @@ impl HttpRequest {
         } else {
             0
         };
-        let mut headers = Vec::with_capacity(count);
+        // Bound the pre-allocation: each header is >= 2 bytes (key len varint +
+        // value len varint), so a bogus count cannot OOM-abort before any read.
+        let mut headers = Vec::with_capacity(bounded_capacity(
+            count,
+            payload.len().saturating_sub(cursor),
+            2,
+        ));
         for _ in 0..count {
             // Read key
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
@@ -343,7 +350,13 @@ impl HttpResponse {
         } else {
             0
         };
-        let mut headers = Vec::with_capacity(count);
+        // Bound the pre-allocation: each header is >= 2 bytes (key len varint +
+        // value len varint), so a bogus count cannot OOM-abort before any read.
+        let mut headers = Vec::with_capacity(bounded_capacity(
+            count,
+            payload.len().saturating_sub(cursor),
+            2,
+        ));
         for _ in 0..count {
             let (key_len, bytes_read) = read_varint(&payload[cursor..])?;
             cursor += bytes_read;

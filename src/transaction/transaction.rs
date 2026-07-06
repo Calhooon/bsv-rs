@@ -13,9 +13,37 @@ use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
-use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
+use crate::primitives::{bounded_capacity, from_hex, sha256d, to_hex, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
+
+/// Number of placeholder outputs to fabricate for an EF source transaction whose
+/// spent output index is `source_output_index`, or `None` if that many outputs
+/// would exceed the fabrication budget (an implausibly large / adversarial vout
+/// that no real transaction could have).
+///
+/// EF (BRC-30) carries only the ONE spent output per input, so `from_ef` builds a
+/// stand-in source tx with the real output at position `source_output_index`.
+/// That index is an attacker-controlled `u32` (up to `u32::MAX`); fabricating
+/// billions of default outputs would OOM-abort the parser.
+///
+/// The count is computed and compared in **`u64`** so the `+ 1` cannot overflow
+/// on any target. On `wasm32` `usize` is 32-bit, so the earlier
+/// `source_output_index as usize + 1` wrapped `u32::MAX` to `0` — silently
+/// passing the budget check and then indexing a zero-length vec (index-OOB panic
+/// ⇒ `panic = abort`). Doing the arithmetic in `u64` and only narrowing *after*
+/// the guard (where the value is known ≤ the small budget) closes that.
+fn ef_source_placeholder_len(source_output_index: u32) -> Option<usize> {
+    const MAX_FABRICATED_BYTES: usize = 16 * 1024 * 1024;
+    let max_outputs = MAX_FABRICATED_BYTES / core::mem::size_of::<TransactionOutput>().max(1);
+    let needed = source_output_index as u64 + 1; // u64: cannot overflow on 32-bit
+    if needed > max_outputs as u64 {
+        return None;
+    }
+    // `needed <= max_outputs` (a small, platform-independent budget), so the
+    // narrowing to `usize` is exact on every target.
+    Some(needed as usize)
+}
 
 /// Represents a complete Bitcoin transaction.
 ///
@@ -200,7 +228,11 @@ impl Transaction {
 
         // Parse inputs with source data
         let input_count = reader.read_var_int_num()?;
-        let mut inputs = Vec::with_capacity(input_count);
+        // Bound the pre-allocation by what the buffer can actually hold: a bogus
+        // count varint must never trigger a capacity-overflow / OOM abort before
+        // any input is read. Each EF input is >= 50 bytes (txid 32 + vout 4 +
+        // script len 1 + sequence 4 + source satoshis 8 + source script len 1).
+        let mut inputs = Vec::with_capacity(bounded_capacity(input_count, reader.remaining(), 50));
 
         for _ in 0..input_count {
             // Read TXID (reversed in EF format)
@@ -228,10 +260,22 @@ impl Transaction {
             let locking_script_bytes = reader.read_bytes(locking_script_len)?;
             let locking_script = LockingScript::from_binary(locking_script_bytes)?;
 
-            // Create a minimal source transaction with just the output we need
+            // Create a minimal source transaction with just the output we need.
+            // The real output must live at `source_output_index`, so the
+            // placeholder vec has to be that long — but `source_output_index` is
+            // an attacker-controlled u32 (up to ~4.29e9). Fabricating billions of
+            // default outputs would OOM-abort the parser, so reject indices whose
+            // placeholder allocation would exceed a sane memory budget. The count
+            // is computed in u64 (see `ef_source_placeholder_len`) so the `+ 1`
+            // cannot overflow on 32-bit targets (wasm32).
+            let needed = ef_source_placeholder_len(source_output_index).ok_or_else(|| {
+                crate::Error::TransactionError(format!(
+                    "EF source output index {} is implausibly large",
+                    source_output_index
+                ))
+            })?;
             let mut source_tx = Transaction::new();
-            source_tx.outputs =
-                vec![TransactionOutput::default(); source_output_index as usize + 1];
+            source_tx.outputs = vec![TransactionOutput::default(); needed];
             source_tx.outputs[source_output_index as usize] = TransactionOutput {
                 satoshis: Some(source_satoshis),
                 locking_script,
@@ -250,7 +294,9 @@ impl Transaction {
 
         // Parse outputs
         let output_count = reader.read_var_int_num()?;
-        let mut outputs = Vec::with_capacity(output_count);
+        // Each output is >= 9 bytes (satoshis 8 + script len 1); bound the
+        // pre-allocation so a bogus count cannot OOM-abort before any read.
+        let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
 
         for _ in 0..output_count {
             let satoshis = reader.read_u64_le()?;
@@ -294,7 +340,10 @@ impl Transaction {
         let version = reader.read_u32_le()?;
 
         let input_count = reader.read_var_int_num()?;
-        let mut inputs = Vec::with_capacity(input_count);
+        // Each input is >= 41 bytes (txid 32 + vout 4 + script len 1 +
+        // sequence 4); bound the pre-allocation so a bogus count varint cannot
+        // OOM-abort before any input is read.
+        let mut inputs = Vec::with_capacity(bounded_capacity(input_count, reader.remaining(), 41));
 
         for _ in 0..input_count {
             // Read TXID (stored reversed)
@@ -324,7 +373,9 @@ impl Transaction {
         }
 
         let output_count = reader.read_var_int_num()?;
-        let mut outputs = Vec::with_capacity(output_count);
+        // Each output is >= 9 bytes (satoshis 8 + script len 1); bound the
+        // pre-allocation so a bogus count cannot OOM-abort before any read.
+        let mut outputs = Vec::with_capacity(bounded_capacity(output_count, reader.remaining(), 9));
 
         for _ in 0..output_count {
             let satoshis = reader.read_u64_le()?;
@@ -1776,6 +1827,85 @@ mod tests {
 
     // Test transaction hex (simple P2PKH spend)
     const TEST_TX_HEX: &str = "0100000001c997a5e56e104102fa209c6a852dd90660a20b2d9c352423edce25857fcd3704000000004847304402204e45e16932b8af514961a1d3a1a25fdf3f4f7732e9d624c6c61548ab5fb8cd410220181522ec8eca07de4860a4acdd12909d831cc56cbbac4622082221a8768d1d0901ffffffff0200ca9a3b00000000434104ae1a62fe09c5f51b13905f07f06b99a2f7159b2225f374cd378d71302fa28414e7aab37397f554a7df5f142c21c1b7303b8a0626f1baded5c72a704f7e6cd84cac00286bee0000000043410411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3ac00000000";
+
+    // ── Panic-hardening: adversarial count varints must Err, never OOM-abort ──
+    //
+    // A bogus input/output count varint (e.g. 0xFE FF FF FF FF = u32::MAX) used
+    // to reach `Vec::with_capacity(count)` *before* any element was read,
+    // aborting the process with a capacity-overflow / OOM panic — a cheap DoS.
+    // These parses must now return `Err`. (A panic here fails the test on
+    // native; on wasm it would abort, so `bounded_capacity` is load-bearing.)
+
+    #[test]
+    fn test_from_binary_bogus_input_count_errs_not_panics() {
+        // version(4) + input_count varint 0xFE u32::MAX, then nothing.
+        let bin = [
+            0x00, 0x00, 0x00, 0x00, // version = 0
+            0xFE, 0xFF, 0xFF, 0xFF, 0xFF, // input_count = 0xFFFFFFFF
+        ];
+        assert!(Transaction::from_binary(&bin).is_err());
+    }
+
+    #[test]
+    fn test_from_binary_bogus_output_count_errs_not_panics() {
+        let bin = [
+            0x00, 0x00, 0x00, 0x00, // version = 0
+            0x00, // input_count = 0
+            0xFE, 0xFF, 0xFF, 0xFF, 0xFF, // output_count = 0xFFFFFFFF
+        ];
+        assert!(Transaction::from_binary(&bin).is_err());
+    }
+
+    #[test]
+    fn test_from_beef_bogus_input_count_errs_not_panics() {
+        // BEEF V1 (0xEFBE0001, LE) + 0 bumps + 1 tx whose input_count is bogus.
+        let beef = [
+            0x01, 0x00, 0xBE, 0xEF, // BEEF_V1
+            0x00, // bump_count = 0
+            0x01, // tx_count = 1
+            0x00, 0x00, 0x00, 0x00, // tx version = 0
+            0xFE, 0xFF, 0xFF, 0xFF, 0xFF, // input_count = 0xFFFFFFFF
+        ];
+        assert!(Transaction::from_beef(&beef, None).is_err());
+    }
+
+    #[test]
+    fn test_from_ef_bogus_source_output_index_errs_not_panics() {
+        // A well-formed EF input whose source_output_index is u32::MAX would
+        // fabricate ~4.29e9 placeholder outputs; that must be rejected, not
+        // OOM-abort.
+        let mut ef: Vec<u8> = Vec::new();
+        ef.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]); // version
+        ef.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0xEF]); // EF marker
+        ef.push(0x01); // input_count = 1
+        ef.extend_from_slice(&[0u8; 32]); // source txid
+        ef.extend_from_slice(&[0xFF, 0xFF, 0xFF, 0xFF]); // source_output_index = u32::MAX
+        ef.push(0x00); // unlocking script len = 0
+        ef.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]); // sequence
+        ef.extend_from_slice(&[0u8; 8]); // source satoshis
+        ef.push(0x00); // source locking script len = 0
+        assert!(Transaction::from_ef(&ef).is_err());
+    }
+
+    /// PURE GUARD — the EF placeholder-length computation is overflow-safe on
+    /// EVERY target word size. `ef_source_placeholder_len` computes `needed` in
+    /// u64, so `u32::MAX + 1` cannot wrap to `0` (the 32-bit trap the native-only
+    /// functional test above masks — on wasm32 `usize` is 32-bit). These
+    /// assertions are correct on both widths and would FAIL on a 32-bit build if
+    /// the guard regressed to `source_output_index as usize + 1`, which there
+    /// returns `Some(0)` → a zero-length placeholder → an index-OOB abort.
+    #[test]
+    fn test_ef_source_placeholder_len_is_overflow_safe() {
+        // The value a 32-bit `usize + 1` would wrap `u32::MAX` to — the bug.
+        assert_eq!(u32::MAX.wrapping_add(1), 0);
+        // Small, plausible vouts: accepted, sized to exactly index + 1.
+        assert_eq!(ef_source_placeholder_len(0), Some(1));
+        assert_eq!(ef_source_placeholder_len(4), Some(5));
+        assert_eq!(ef_source_placeholder_len(1000), Some(1001));
+        // Adversarial vouts: rejected outright, never wrapped to Some(0).
+        assert_eq!(ef_source_placeholder_len(u32::MAX), None);
+        assert_eq!(ef_source_placeholder_len(u32::MAX - 1), None);
+    }
 
     #[test]
     fn test_new_transaction() {

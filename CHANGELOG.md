@@ -5,6 +5,40 @@ All notable changes to `bsv-rs` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.14] — 2026-07-04
+
+### Fixed
+
+- **Panic / OOM-abort on adversarial length prefixes (bounded pre-allocation).**
+  Every parser that pre-allocated a collection sized by an attacker-controlled
+  count read from the input (`Vec::with_capacity(count)`,
+  `HashMap::with_capacity(count)`, `vec![default; count]`) could be made to
+  abort the process with a capacity-overflow / OOM panic *before a single
+  element was read*. A ~20-byte crafted BEEF whose transaction input-count
+  varint is `0xFE FF FF FF FF` (u32::MAX) makes `Transaction::from_beef` /
+  `Transaction::from_binary` allocate billions of `TransactionInput`s and
+  abort — a trivially cheap denial-of-service (and on `wasm32`, where the build
+  is `panic = abort`, it is unrecoverable: `.ok()` cannot catch it).
+
+  All such sites now bound the pre-allocation to what the remaining buffer could
+  actually contain via the new `primitives::bounded_capacity(count, remaining,
+  min_elem_bytes)` helper — `count.min(remaining / min_elem_bytes)`. The read
+  loop already errors the instant the buffer is exhausted, so parse results are
+  unchanged for both valid and malicious input; only the (now bounded) capacity
+  hint changes. A bogus count now yields `Err`, never a panic.
+
+  Hardened sites: `transaction::Transaction::{from_reader, from_ef}`
+  (input/output counts, and the EF `source_output_index` placeholder-output
+  fabrication, which is now rejected above a 16 MiB allocation budget — the
+  placeholder length is computed in `u64` via `ef_source_placeholder_len` so the
+  `+ 1` cannot overflow on 32-bit targets: on `wasm32` `source_output_index as
+  usize + 1` wrapped `u32::MAX` to `0`, defeating the budget check and then
+  index-OOB-panicking on a zero-length vec),
+  `primitives::bsv::sighash::parse_transaction`, `overlay` binary lookup
+  responses, `wallet::wire` (string arrays/maps, action/output/certificate
+  arrays, keyrings), and `auth` certificate/header parsing. Purely defensive;
+  no API change beyond the additive `bounded_capacity` export → patch bump.
+
 ## [0.3.11] — 2026-05-20
 
 ### Fixed
