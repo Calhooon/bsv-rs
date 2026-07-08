@@ -118,8 +118,8 @@ impl FeeModel for SatoshisPerKilobyte {
     /// Computes the fee for a given transaction.
     ///
     /// The fee is calculated by estimating the transaction size and multiplying
-    /// by the satoshis per kilobyte rate. The result is rounded up using
-    /// ceiling division to ensure miners receive at least the minimum fee.
+    /// by the satoshis per kilobyte rate, floor-divided per the node formula
+    /// with a 1-satoshi minimum (matches go-sdk/ts-sdk post-fix behavior).
     ///
     /// # Arguments
     ///
@@ -133,7 +133,10 @@ impl FeeModel for SatoshisPerKilobyte {
 
         // Calculate fee with ceiling division
         // This ensures miners get the extra satoshi for any fractional KB
-        let fee = (size as u64 * self.value).div_ceil(1000);
+        // Node formula (go-sdk#267 class): FLOOR division with a 1-sat
+        // minimum — ceiling overpaid by 1 sat on every fractional KB
+        // (conformance fee-model-mismatch.0001: 1001 B @ 1 sat/kB = 1, not 2).
+        let fee = ((size as u64 * self.value) / 1000).max(1);
 
         Ok(fee)
     }

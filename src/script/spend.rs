@@ -835,17 +835,55 @@ impl Spend {
                 if buf.is_empty() {
                     self.push_stack(vec![])?;
                 } else {
-                    // Convert to BigNumber, shift, convert back
-                    let bn = BigNumber::from_bytes_be(&buf);
-                    let n_u32 = n as u32;
-                    let shifted = if opcode == OP_LSHIFT {
-                        // Left shift
-                        bn.mul(&BigNumber::from_u64(1u64 << n_u32.min(63)))
+                    // Node semantics (and ts-sdk post-#493): LSHIFT/RSHIFT are
+                    // WIDTH-PRESERVING bitwise shifts on the raw byte buffer —
+                    // bits shifted past the end are discarded, the result is
+                    // exactly buf.len() bytes. The previous BigNumber
+                    // mul/to_bytes_be(buf.len()) implementation PANICKED on
+                    // overflow ("BigNumber requires N bytes") and clamped the
+                    // shift count to 63 bits (conformance vectors
+                    // lshift-truncation.0001/.0003).
+                    let len = buf.len();
+                    let result: Vec<u8> = if (n as u128) >= (len as u128) * 8 {
+                        vec![0u8; len]
                     } else {
-                        // Right shift
-                        bn.div(&BigNumber::from_u64(1u64 << n_u32.min(63)))
+                        let byte_shift = (n as usize) / 8;
+                        let bit_shift = (n as usize) % 8;
+                        let mut out = vec![0u8; len];
+                        for i in 0..len {
+                            if opcode == OP_LSHIFT {
+                                let src = i + byte_shift;
+                                let hi = if src < len { buf[src] } else { 0 };
+                                let lo = if bit_shift > 0 && src + 1 < len {
+                                    buf[src + 1]
+                                } else {
+                                    0
+                                };
+                                out[i] = if bit_shift == 0 {
+                                    hi
+                                } else {
+                                    (hi << bit_shift) | (lo >> (8 - bit_shift))
+                                };
+                            } else {
+                                // OP_RSHIFT
+                                if i >= byte_shift {
+                                    let src = i - byte_shift;
+                                    let hi = buf[src];
+                                    let carry = if bit_shift > 0 && src >= 1 {
+                                        buf[src - 1]
+                                    } else {
+                                        0
+                                    };
+                                    out[i] = if bit_shift == 0 {
+                                        hi
+                                    } else {
+                                        (hi >> bit_shift) | (carry << (8 - bit_shift))
+                                    };
+                                }
+                            }
+                        }
+                        out
                     };
-                    let result = shifted.to_bytes_be(buf.len());
                     self.push_stack(result)?;
                 }
             }

@@ -554,10 +554,9 @@ fn conformance_serialization() {
 /// 1001-byte tx at 1 sat/kB the node expects 1 sat; bsv-rs computes 2. This
 /// OVERPAYS fees (never underpays): every 1..999 excess byte range rounds up
 /// a full satoshi. ***
-const TX_REGRESSION_KNOWN_FAILURES: &[(&str, &str)] = &[(
-    "regression.transactions.fee-model-mismatch.0001",
-    "floor(1001*1/1000)=1 expected; bsv-rs div_ceil gives 2 (node formula is floor, min 1)",
-)];
+// (fee-model-mismatch.0001 FIXED 2026-07-08: SatoshisPerKilobyte now floors
+// with a 1-sat minimum per the node formula — fee_models/sats_per_kb.rs.)
+const TX_REGRESSION_KNOWN_FAILURES: &[(&str, &str)] = &[];
 
 /// Builds a transaction whose `SatoshisPerKilobyte::estimate_size` is exactly
 /// `target` bytes: 1 input with an L-byte unlocking script + 1 output with a

@@ -1898,8 +1898,9 @@ mod transaction_tests {
             tx
         }
 
-        /// Port of Go SDK TestCalculateFee vectors.
-        /// Tests the fee calculation formula: ceil(txSize * satoshisPerKB / 1000).
+        /// Port of Go SDK TestCalculateFee vectors, updated to the post-
+        /// go-sdk#267 node formula: floor(txSize * satoshisPerKB / 1000),
+        /// minimum 1 sat (see conformance regression fee-model-mismatch).
         #[test]
         fn test_fee_model_go_vectors() {
             // These vectors are directly from the Go SDK: sats_per_kb_test.go
@@ -1914,9 +1915,10 @@ mod transaction_tests {
                     240,
                     1,
                     1,
-                    "240 bytes at 1 sat/KB: edge case, ceil(0.24) = 1",
+                    "240 bytes at 1 sat/KB: floor(0.24)=0 clamped to the 1-sat minimum",
                 ),
-                (240, 10, 3, "240 bytes at 10 sats/KB: ceil(2.4) = 3"),
+                // node formula (go-sdk#267): floor(2.4) = 2, not ceil = 3
+                (240, 10, 2, "240 bytes at 10 sats/KB: floor(2.4) = 2"),
                 (
                     250,
                     500,
@@ -1948,8 +1950,11 @@ mod transaction_tests {
                 let tx = build_tx_of_approx_size(*tx_size);
                 let actual_size = tx.to_binary().len();
 
-                // Compute what the fee SHOULD be for actual_size bytes
-                let computed_fee = (actual_size as u64 * sats_per_kb).div_ceil(1000);
+                // Compute what the fee SHOULD be for actual_size bytes —
+                // node formula: FLOOR with a 1-sat minimum (go-sdk#267;
+                // conformance regression fee-model-mismatch). The previous
+                // div_ceil expectation mirrored the pre-fix Go bug.
+                let computed_fee = ((actual_size as u64 * sats_per_kb) / 1000).max(1);
 
                 let fee_model = SatoshisPerKilobyte::new(*sats_per_kb);
                 let model_fee = fee_model.compute_fee(&tx).expect("compute_fee should work");
@@ -1961,9 +1966,10 @@ mod transaction_tests {
                     description
                 );
 
-                // Also verify the Go SDK formula directly:
-                // For the exact target sizes, verify the expected fee
-                let direct_fee = (*tx_size as u64 * sats_per_kb).div_ceil(1000);
+                // Also verify the node formula directly for the exact target
+                // sizes (all vectors here are whole-KB multiples, so floor
+                // and ceil agree on the expected values).
+                let direct_fee = ((*tx_size as u64 * sats_per_kb) / 1000).max(1);
                 assert_eq!(
                     direct_fee, *expected_fee,
                     "Direct formula should match Go expected fee for {}",

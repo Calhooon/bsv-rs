@@ -222,7 +222,12 @@ impl Script {
                 pos = end;
             } else if op == OP_PUSHDATA1 {
                 let len = if pos < length { bytes[pos] as usize } else { 0 };
-                pos += 1;
+                // .min(length): a bare trailing 0x4c (truncated PUSHDATA1)
+                // previously advanced pos past the buffer and PANICKED on the
+                // start>end slice below — attacker-suppliable script bytes
+                // must never panic (conformance regression script-012;
+                // PUSHDATA2/4 arms already clamp).
+                pos = (pos + 1).min(length);
                 let end = (pos + len).min(length);
                 let data = bytes[pos..end].to_vec();
                 chunks.push(ScriptChunk::new(op, Some(data)));

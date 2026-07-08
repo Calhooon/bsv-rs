@@ -385,13 +385,12 @@ fn is_p2sh_hex(script_pubkey_hex: &str) -> bool {
 /// VALID but bsv-rs rejects them ("OP_CHECKMULTISIG requires correct
 /// encoding..."). ***
 ///
-/// *** BUG 2 (script-012): Script::from_binary([0x4c]) — OP_PUSHDATA1 with a
-/// missing length byte — PANICS (slice index out of range,
-/// src/script/script.rs pushdata arm) instead of parsing to an empty-data
-/// chunk like ts-sdk (or returning Err). Money code parsing attacker-supplied
-/// scripts must not be able to panic. ***
+/// *** BUG 2 (script-012) — FIXED 2026-07-08: Script::from_binary([0x4c])
+/// (truncated OP_PUSHDATA1) used to PANIC; it now parses to an empty-data
+/// chunk like ts-sdk. ***
 const EVALUATION_KNOWN_FAILURES: &[(&str, &str)] = &[
-    ("script-012", "PANIC in Script::from_binary on truncated OP_PUSHDATA1 (see BUG 2 above)"),
+    // (script-012 FIXED 2026-07-08: truncated OP_PUSHDATA1 now parses to an
+    // empty-data chunk like ts-sdk — src/script/script.rs pushdata arm.)
     // BUG 1 — eager OP_CHECKMULTISIG encoding validation (see above):
     ("node.script.bitcoin-sv.0698", "eager CHECKMULTISIG encoding check (BUG 1)"),
     ("node.script.bitcoin-sv.0699", "eager CHECKMULTISIG encoding check (BUG 1)"),
@@ -1143,10 +1142,10 @@ fn finish_evaluation(summary: Summary) {
     // Robustness-bug panics (see EVALUATION_KNOWN_FAILURES BUG 2). A new
     // panic anywhere in the corpus fails here even if its valid/invalid
     // outcome happens to match.
-    assert_eq!(
-        summary.panics,
-        vec!["script-012".to_string()],
-        "bsv-rs panicked on unexpected vectors"
+    assert!(
+        summary.panics.is_empty(),
+        "bsv-rs panicked on vectors: {:?}",
+        summary.panics
     );
 }
 
@@ -1251,14 +1250,9 @@ fn shift_via_interpreter(value: &[u8], shift_bits: i64, shift_op: u8, want: &[u8
 /// bits like the node and the fixed ts-sdk/go-sdk do. src/script/spend.rs
 /// (OP_LSHIFT arm) + src/primitives/bignum.rs::to_bytes_be. ***
 const REGRESSION_KNOWN_FAILURES: &[(&str, &str)] = &[
-    (
-        "regression.script.lshift-truncation.0001",
-        "0x6a09e667 << 30 must truncate to 0xc0000000; bsv-rs panics in BigNumber::to_bytes_be",
-    ),
-    (
-        "regression.script.lshift-truncation.0003",
-        "0xff << 1 must truncate to 0xfe; bsv-rs panics in BigNumber::to_bytes_be",
-    ),
+    // (lshift-truncation.0001/.0003 FIXED 2026-07-08: OP_LSHIFT/OP_RSHIFT are
+    // now width-preserving bitwise byte shifts — no BigNumber, no panic, no
+    // 63-bit clamp. src/script/spend.rs.)
     // *** BUG (ASM parity): ScriptChunk::to_asm renders OP_0 as "0" (and
     // OP_1NEGATE as "-1"), while ts-sdk renders "OP_0"/"OP_1NEGATE". Scripts
     // round-tripped through ASM across the two SDKs disagree.
