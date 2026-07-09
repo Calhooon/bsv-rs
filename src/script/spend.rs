@@ -142,6 +142,10 @@ pub struct Spend {
     memory_limit: usize,
     stack_mem: usize,
     alt_stack_mem: usize,
+    require_push_only: bool,
+    require_minimal: bool,
+    require_low_s: bool,
+    require_clean_stack: bool,
 }
 
 impl Spend {
@@ -168,9 +172,34 @@ impl Spend {
             memory_limit: params.memory_limit.unwrap_or(DEFAULT_MEMORY_LIMIT),
             stack_mem: 0,
             alt_stack_mem: 0,
+            require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING,
+            // ts-sdk parity: transactions with version > 1 run "relaxed"
+            // (post-Genesis semantics) — MINIMALDATA, LOW_S and CLEANSTACK are
+            // not enforced (mirrors ts-sdk Spend.isRelaxed()).
+            require_minimal: REQUIRE_MINIMAL_PUSH && params.transaction_version <= 1,
+            require_low_s: REQUIRE_LOW_S_SIGNATURES && params.transaction_version <= 1,
+            require_clean_stack: REQUIRE_CLEAN_STACK && params.transaction_version <= 1,
         };
         spend.reset();
         spend
+    }
+
+    /// Overrides MINIMALDATA enforcement (script-number and push minimality).
+    ///
+    /// Default follows ts-sdk: enforced for version <= 1 transactions, relaxed
+    /// for version > 1 (post-Genesis semantics).
+    pub fn set_require_minimal(&mut self, require: bool) {
+        self.require_minimal = require;
+    }
+
+    /// Allows opting out of the push-only unlocking-script check.
+    ///
+    /// The TypeScript `@bsv/sdk` Spend engine does not enforce push-only
+    /// unlocking scripts; some OP_PUSH_TX-style covenant designs place
+    /// executable code in the unlocking script and verify under that engine.
+    /// Default remains `true` (enforced).
+    pub fn set_require_push_only(&mut self, require: bool) {
+        self.require_push_only = require;
     }
 
     /// Resets the interpreter state for re-execution.
@@ -192,7 +221,7 @@ impl Spend {
     /// `Ok(true)` if the spend is valid, or an error describing why validation failed.
     pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError> {
         // Check that unlocking script is push-only
-        if REQUIRE_PUSH_ONLY_UNLOCKING && !self.unlocking_script.is_push_only() {
+        if self.require_push_only && !self.unlocking_script.is_push_only() {
             return Err(self.error(
                 "Unlocking scripts can only contain push operations, and no other opcodes.",
             ));
@@ -216,7 +245,7 @@ impl Spend {
         }
 
         // Clean stack rule
-        if REQUIRE_CLEAN_STACK && self.stack.len() != 1 {
+        if self.require_clean_stack && self.stack.len() != 1 {
             return Err(self.error(&format!(
                 "The clean stack rule requires exactly one item to be on the stack after script execution, found {}.",
                 self.stack.len()
@@ -257,10 +286,20 @@ impl Spend {
             )));
         }
 
-        // Switch from unlocking to locking script when unlocking is complete
+        // Switch from unlocking to locking script when unlocking is complete.
+        // ts-sdk parity: conditionals must be terminated, the alt stack is
+        // cleared, and the last code separator does not carry across scripts.
         if self.context == ExecutionContext::UnlockingScript
             && self.program_counter >= self.unlocking_script.chunks().len()
         {
+            if !self.if_stack.is_empty() {
+                return Err(self.error(
+                    "Every OP_IF, OP_NOTIF, or OP_ELSE must be terminated with OP_ENDIF prior to the end of the unlocking script.",
+                ));
+            }
+            self.alt_stack.clear();
+            self.alt_stack_mem = 0;
+            self.last_code_separator = None;
             self.context = ExecutionContext::LockingScript;
             self.program_counter = 0;
         }
@@ -303,7 +342,7 @@ impl Spend {
         // Execute opcode
         if is_executing && current_opcode <= OP_PUSHDATA4 {
             // Push data operations
-            if REQUIRE_MINIMAL_PUSH && !is_chunk_minimal_push(operation) {
+            if self.require_minimal && !is_chunk_minimal_push(operation) {
                 return Err(self.error(&format!(
                     "This data is not minimally-encoded. (PC: {})",
                     self.program_counter
@@ -568,7 +607,7 @@ impl Spend {
                     )));
                 }
                 let n_bytes = self.pop_stack()?;
-                let bn = ScriptNum::from_bytes(&n_bytes, REQUIRE_MINIMAL_PUSH)
+                let bn = ScriptNum::from_bytes(&n_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
 
                 let n = bn.to_i64().unwrap_or(i64::MAX);
@@ -669,7 +708,7 @@ impl Spend {
                 let pos_bytes = self.pop_stack()?;
                 let data = self.pop_stack()?;
 
-                let pos_bn = ScriptNum::from_bytes(&pos_bytes, REQUIRE_MINIMAL_PUSH)
+                let pos_bn = ScriptNum::from_bytes(&pos_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
                 let pos = pos_bn.to_i64().unwrap_or(-1);
 
@@ -692,7 +731,7 @@ impl Spend {
                     );
                 }
                 let size_bytes = self.pop_stack()?;
-                let size_bn = ScriptNum::from_bytes(&size_bytes, REQUIRE_MINIMAL_PUSH)
+                let size_bn = ScriptNum::from_bytes(&size_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
                 let size = size_bn.to_i64().unwrap_or(-1);
 
@@ -821,7 +860,7 @@ impl Spend {
                 let n_bytes = self.pop_stack()?;
                 let buf = self.pop_stack()?;
 
-                let n_bn = ScriptNum::from_bytes(&n_bytes, REQUIRE_MINIMAL_PUSH)
+                let n_bn = ScriptNum::from_bytes(&n_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
                 let n = n_bn.to_i64().unwrap_or(-1);
 
@@ -899,7 +938,7 @@ impl Spend {
                     )));
                 }
                 let buf = self.pop_stack()?;
-                let mut bn = ScriptNum::from_bytes(&buf, REQUIRE_MINIMAL_PUSH)
+                let mut bn = ScriptNum::from_bytes(&buf, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
 
                 bn = match opcode {
@@ -949,9 +988,9 @@ impl Spend {
                 }
                 let buf2 = self.pop_stack()?;
                 let buf1 = self.pop_stack()?;
-                let bn1 = ScriptNum::from_bytes(&buf1, REQUIRE_MINIMAL_PUSH)
+                let bn1 = ScriptNum::from_bytes(&buf1, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
-                let bn2 = ScriptNum::from_bytes(&buf2, REQUIRE_MINIMAL_PUSH)
+                let bn2 = ScriptNum::from_bytes(&buf2, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
 
                 let result = match opcode {
@@ -1062,11 +1101,11 @@ impl Spend {
                 let max_bytes = self.pop_stack()?;
                 let min_bytes = self.pop_stack()?;
                 let x_bytes = self.pop_stack()?;
-                let max_bn = ScriptNum::from_bytes(&max_bytes, REQUIRE_MINIMAL_PUSH)
+                let max_bn = ScriptNum::from_bytes(&max_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
-                let min_bn = ScriptNum::from_bytes(&min_bytes, REQUIRE_MINIMAL_PUSH)
+                let min_bn = ScriptNum::from_bytes(&min_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
-                let x_bn = ScriptNum::from_bytes(&x_bytes, REQUIRE_MINIMAL_PUSH)
+                let x_bn = ScriptNum::from_bytes(&x_bytes, self.require_minimal)
                     .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
 
                 let in_range = x_bn >= min_bn && x_bn < max_bn;
@@ -1209,7 +1248,7 @@ impl Spend {
         }
 
         let n_keys_bytes = self.pop_stack()?;
-        let n_keys_bn = ScriptNum::from_bytes(&n_keys_bytes, REQUIRE_MINIMAL_PUSH)
+        let n_keys_bn = ScriptNum::from_bytes(&n_keys_bytes, self.require_minimal)
             .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
         let n_keys = n_keys_bn.to_i64().unwrap_or(-1);
 
@@ -1246,7 +1285,7 @@ impl Spend {
         }
 
         let n_sigs_bytes = self.pop_stack()?;
-        let n_sigs_bn = ScriptNum::from_bytes(&n_sigs_bytes, REQUIRE_MINIMAL_PUSH)
+        let n_sigs_bn = ScriptNum::from_bytes(&n_sigs_bytes, self.require_minimal)
             .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
         let n_sigs = n_sigs_bn.to_i64().unwrap_or(-1);
 
@@ -1280,7 +1319,12 @@ impl Spend {
         };
         let start_idx = self.last_code_separator.map(|i| i + 1).unwrap_or(0);
         let chunks = base_script.chunks();
-        let subscript_chunks: Vec<ScriptChunk> = chunks.into_iter().skip(start_idx).collect();
+        let mut subscript_chunks: Vec<ScriptChunk> = chunks.into_iter().skip(start_idx).collect();
+        // See build_subscript: unlock-context subscripts continue into the
+        // full locking script (combined-script semantics, ts-sdk parity).
+        if self.context == ExecutionContext::UnlockingScript {
+            subscript_chunks.extend(self.locking_script.as_script().chunks());
+        }
         let mut subscript = Script::from_chunks(subscript_chunks);
 
         for sig in &sigs {
@@ -1378,7 +1422,7 @@ impl Spend {
         let tx_sig = TransactionSignature::from_checksig_format(sig)
             .map_err(|_| self.error("The signature format is invalid."))?;
 
-        if REQUIRE_LOW_S_SIGNATURES && !tx_sig.has_low_s() {
+        if self.require_low_s && !tx_sig.has_low_s() {
             return Err(self.error("The signature must have a low S value."));
         }
 
@@ -1425,7 +1469,15 @@ impl Spend {
 
         let start_idx = self.last_code_separator.map(|i| i + 1).unwrap_or(0);
         let chunks = base_script.chunks();
-        let subscript_chunks: Vec<ScriptChunk> = chunks.into_iter().skip(start_idx).collect();
+        let mut subscript_chunks: Vec<ScriptChunk> = chunks.into_iter().skip(start_idx).collect();
+        // When a CHECKSIG executes in the unlocking script, the subscript
+        // continues across the unlock/lock boundary into the full locking
+        // script (legacy combined-script semantics; matches BSV node consensus
+        // and ts-sdk). Without this, signatures taken over such a subscript
+        // (e.g. OP_PUSH_TX-style contracts) are wrongly rejected.
+        if self.context == ExecutionContext::UnlockingScript {
+            subscript_chunks.extend(self.locking_script.as_script().chunks());
+        }
         let mut subscript = Script::from_chunks(subscript_chunks);
 
         // Remove the signature from the subscript

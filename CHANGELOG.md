@@ -5,6 +5,44 @@ All notable changes to `bsv-rs` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.16] — 2026-07-09
+
+### Fixed — Spend engine ts-sdk parity
+
+Four `Spend` divergences from the TypeScript `@bsv/sdk` engine, surfaced by
+executing large OP_PUSH_TX-style covenant scripts that are valid under ts-sdk
+and accepted by mainnet nodes but failed bsv-rs local validation:
+
+- **Version-based relaxed mode.** ts-sdk runs transactions with version > 1
+  under post-Genesis "relaxed" semantics (`Spend.isRelaxed()`): MINIMALDATA,
+  LOW_S and CLEANSTACK are not enforced. bsv-rs enforced all three
+  unconditionally. `Spend` now mirrors ts-sdk (version <= 1 keeps the strict
+  behavior), with explicit overrides via `set_require_minimal()`.
+  27 previously-unsupported cross-SDK conformance vectors now execute and
+  pass (census repinned in `tests/conformance_scripts.rs`).
+- **Combined-script CHECKSIG subscript.** When a CHECKSIG executes in the
+  unlocking script after an OP_CODESEPARATOR, the signed subscript continues
+  across the unlock/lock boundary into the full locking script (legacy
+  combined-script consensus semantics, matching ts-sdk and node behavior).
+  bsv-rs previously truncated the subscript at the unlocking script, wrongly
+  rejecting OP_PUSH_TX-style in-script signatures. The unlock→lock context
+  switch now also resets `last_code_separator`, clears the alt stack, and
+  requires terminated conditionals, as ts-sdk does.
+- **High-S signature verification.** `ecdsa::verify` normalizes signatures to
+  low-S before k256 `verify_prehash`, which rejects high-S by default. ECDSA
+  (and consensus) accepts both `(r, s)` and `(r, n − s)`; low-S remains a
+  script-layer *policy*, now correctly scoped to strict (version <= 1) mode.
+- **Push-only opt-out.** `Spend::set_require_push_only(false)` allows
+  executable code in unlocking scripts, which ts-sdk permits (the default
+  remains enforced).
+
+### Added
+
+- `Transaction::invalidate_caches()` is now public: `inputs`/`outputs` are
+  public fields, and mutating them directly (e.g. setting an output's
+  satoshis or an input's `unlocking_script`) left `to_binary()`/`hash()`/
+  `id()` returning stale cached serializations with no way to flush them.
+
 ## [0.3.14] — 2026-07-04
 
 ### Fixed

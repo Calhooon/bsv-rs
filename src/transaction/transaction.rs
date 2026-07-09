@@ -748,7 +748,12 @@ impl Transaction {
     }
 
     /// Invalidates all serialization caches.
-    fn invalidate_caches(&self) {
+    ///
+    /// Public because `inputs`/`outputs` are public fields: after mutating
+    /// them directly (e.g. setting `outputs[i].satoshis` or an input's
+    /// `unlocking_script`), call this so `to_binary()`/`hash()`/`id()` reflect
+    /// the mutation instead of returning stale cached bytes.
+    pub fn invalidate_caches(&self) {
         *self.cached_hash.borrow_mut() = None;
         *self.raw_bytes_cache.borrow_mut() = None;
         *self.hex_cache.borrow_mut() = None;

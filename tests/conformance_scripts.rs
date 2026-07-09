@@ -1158,7 +1158,12 @@ fn finish_evaluation(summary: Summary) {
 /// the assert and forces a re-audit.
 const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ("UTXO_AFTER_CHRONICLE opcode semantics not implemented in bsv-rs", 5),
-    ("bsv-rs always enforces CLEANSTACK (no off switch)", 225),
+    // 2026-07-09 repin (225 -> 195): Spend now mirrors ts-sdk's version-based
+    // relaxed mode (tx version > 1 disables CLEANSTACK/LOW_S/MINIMALDATA).
+    // 30 version-2 fixtures that previously died at the always-on clean-stack
+    // check now execute; 27 pass conformantly (moved to `run`) and 3 progress
+    // to the CLTV/CSV gap below (5 -> 8). Zero new mismatches.
+    ("bsv-rs always enforces CLEANSTACK (no off switch)", 195),
     ("bsv-rs always enforces LOW_S (no off switch)", 9),
     ("bsv-rs always enforces MINIMALDATA (no off switch)", 181),
     ("bsv-rs always enforces NULLDUMMY (no off switch)", 4),
@@ -1175,7 +1180,7 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     // (`build_sighash_preimage` is BIP-143-only), so the 756 executed
     // sighash vectors cover the FORKID `regular_hash` side only.
     ("legacy/OTDA sighash not implemented in bsv-rs", 1244),
-    ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 5),
+    ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 8),
     ("no DISCOURAGE_UPGRADABLE_NOPS flag in bsv-rs", 20),
     ("no MINIMALIF flag in bsv-rs", 6),
     ("no P2SH redeem-script evaluation in bsv-rs (post-genesis rules)", 72),

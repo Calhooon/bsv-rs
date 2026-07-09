@@ -83,6 +83,12 @@ pub fn verify(msg_hash: &[u8; 32], signature: &Signature, public_key: &PublicKey
         Err(_) => return false,
     };
 
+    // k256 rejects high-S signatures during verification, but ECDSA (and
+    // Bitcoin consensus) accepts them — (r, s) and (r, n − s) are equally
+    // valid. Normalize to low-S first so high-S signatures verify, matching
+    // ts-sdk. Low-S *policy* is enforced separately at the script layer.
+    let k256_sig = k256_sig.normalize_s().unwrap_or(k256_sig);
+
     // Verify
     verifying_key.verify_prehash(msg_hash, &k256_sig).is_ok()
 }
