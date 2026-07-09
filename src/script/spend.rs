@@ -146,6 +146,13 @@ pub struct Spend {
     require_minimal: bool,
     require_low_s: bool,
     require_clean_stack: bool,
+
+    // Parsed-chunk caches. `Script::chunks()` deep-clones the whole chunk
+    // vector; calling it from `step()` made execution O(N²) in script size,
+    // which is prohibitive for large covenant scripts (a ~500 KB script
+    // would take hours). Cached once here; `step()` indexes the cache.
+    unlocking_chunks: Vec<crate::script::chunk::ScriptChunk>,
+    locking_chunks: Vec<crate::script::chunk::ScriptChunk>,
 }
 
 impl Spend {
@@ -165,6 +172,8 @@ impl Spend {
             lock_time: params.lock_time,
             context: ExecutionContext::UnlockingScript,
             program_counter: 0,
+            unlocking_chunks: Vec::new(),
+            locking_chunks: Vec::new(),
             last_code_separator: None,
             stack: Vec::new(),
             alt_stack: Vec::new(),
@@ -180,6 +189,8 @@ impl Spend {
             require_low_s: REQUIRE_LOW_S_SIGNATURES && params.transaction_version <= 1,
             require_clean_stack: REQUIRE_CLEAN_STACK && params.transaction_version <= 1,
         };
+        spend.unlocking_chunks = spend.unlocking_script.chunks();
+        spend.locking_chunks = spend.locking_script.chunks();
         spend.reset();
         spend
     }
@@ -231,7 +242,7 @@ impl Spend {
         while self.step()? {
             // Continue until script ends
             if self.context == ExecutionContext::LockingScript
-                && self.program_counter >= self.locking_script.chunks().len()
+                && self.program_counter >= self.locking_chunks.len()
             {
                 break;
             }
@@ -290,7 +301,7 @@ impl Spend {
         // ts-sdk parity: conditionals must be terminated, the alt stack is
         // cleared, and the last code separator does not carry across scripts.
         if self.context == ExecutionContext::UnlockingScript
-            && self.program_counter >= self.unlocking_script.chunks().len()
+            && self.program_counter >= self.unlocking_chunks.len()
         {
             if !self.if_stack.is_empty() {
                 return Err(self.error(
@@ -304,17 +315,24 @@ impl Spend {
             self.program_counter = 0;
         }
 
-        // Get current script and check if we're done
-        let current_chunks = match self.context {
-            ExecutionContext::UnlockingScript => self.unlocking_script.chunks(),
-            ExecutionContext::LockingScript => self.locking_script.chunks(),
+        // Get current script and check if we're done (cached chunks: the
+        // per-step deep clone of the whole script was O(N²) — see field docs)
+        let current_len = match self.context {
+            ExecutionContext::UnlockingScript => self.unlocking_chunks.len(),
+            ExecutionContext::LockingScript => self.locking_chunks.len(),
         };
 
-        if self.program_counter >= current_chunks.len() {
+        if self.program_counter >= current_len {
             return Ok(false);
         }
 
-        let operation = &current_chunks[self.program_counter];
+        let op_owned = match self.context {
+            ExecutionContext::UnlockingScript => {
+                self.unlocking_chunks[self.program_counter].clone()
+            }
+            ExecutionContext::LockingScript => self.locking_chunks[self.program_counter].clone(),
+        };
+        let operation = &op_owned;
         let current_opcode = operation.op;
 
         // Check for oversized data push
@@ -440,8 +458,8 @@ impl Spend {
             OP_RETURN => {
                 // Jump to end of current script
                 let end = match self.context {
-                    ExecutionContext::UnlockingScript => self.unlocking_script.chunks().len(),
-                    ExecutionContext::LockingScript => self.locking_script.chunks().len(),
+                    ExecutionContext::UnlockingScript => self.unlocking_chunks.len(),
+                    ExecutionContext::LockingScript => self.locking_chunks.len(),
                 };
                 self.program_counter = end;
                 self.if_stack.clear();
