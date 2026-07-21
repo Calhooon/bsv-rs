@@ -62,6 +62,33 @@ pub fn compute_sighash_from_raw(
 ) -> Result<[u8; 32]>
 ```
 
+### SighashCache (midstate reuse)
+
+```rust
+/// BIP-143 midstate cache over one transaction (rust-bitcoin pattern).
+/// hashPrevouts/hashSequence/hashOutputs computed lazily ONCE per scope class
+/// and reused across inputs — the free functions recompute all three per call
+/// (O(n²) hashing when signing n inputs; ~9× measured at n=50).
+/// Safe to serve mixed sighash scopes from one instance.
+pub struct SighashCache<'t> { /* private */ }
+
+impl<'t> SighashCache<'t> {
+    pub fn new(tx: &'t RawTransaction) -> Self
+    pub fn from_parts(version: i32, inputs: &'t [TxInput], outputs: &'t [TxOutput], locktime: u32) -> Self
+    pub fn hash_prevouts(&mut self, scope: u32) -> [u8; 32]
+    pub fn hash_sequence(&mut self, scope: u32) -> [u8; 32]
+    pub fn hash_outputs(&mut self, input_index: usize, scope: u32) -> [u8; 32]
+    pub fn preimage(&mut self, input_index: usize, subscript: &[u8], satoshis: u64, scope: u32) -> Result<Vec<u8>>
+    pub fn sighash(&mut self, ...) -> Result<[u8; 32]>              // display order
+    pub fn sighash_for_signing(&mut self, ...) -> Result<[u8; 32]>  // signing order (ECDSA)
+}
+```
+
+`build_sighash_preimage` / `compute_sighash` / `compute_sighash_for_signing`
+are thin wrappers over a fresh single-use cache — there is exactly one
+preimage implementation. Out-of-range `input_index` is an `Err` on the cache
+API (the free functions keep their historical panic).
+
 ### Transaction Structures
 
 ```rust

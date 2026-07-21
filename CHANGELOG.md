@@ -5,6 +5,42 @@ All notable changes to `bsv-rs` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — midstate-reuse sighash API (`SighashCache`)
+
+- **`primitives::bsv::sighash::SighashCache`** — a cache over one
+  transaction's BIP-143 midstates (`hashPrevouts`, `hashSequence`,
+  `hashOutputs`), following rust-bitcoin's `SighashCache` pattern. Each
+  midstate is computed lazily at most once per scope class and reused across
+  inputs; the free functions recompute all three per call, making per-input
+  signing of an n-input transaction O(n²) in hashing (a measured ~9× penalty
+  at n=50). One cache instance safely serves mixed sighash scopes
+  (ALL/NONE/SINGLE × ANYONECANPAY × FORKID). API:
+  `SighashCache::new(&RawTransaction)` / `from_parts(...)`,
+  `hash_prevouts(scope)`, `hash_sequence(scope)`,
+  `hash_outputs(input_index, scope)`,
+  `preimage(input_index, subscript, satoshis, scope)`,
+  `sighash(...)` (display order), `sighash_for_signing(...)` (signing order).
+- `build_sighash_preimage` (and therefore `compute_sighash` /
+  `compute_sighash_for_signing`) is now a thin wrapper over a fresh
+  single-use `SighashCache` — one preimage implementation in the crate,
+  public API and behavior unchanged. Byte-equality is pinned by scope-class
+  unit tests, by the 499-vector cross-SDK sighash suite run through the cache
+  across every input, and by the 5,116-vector ts-stack conformance census
+  (`tests/conformance_scripts.rs`), whose sighash path now exercises the
+  cache directly.
+
+### Documented
+
+- RFC 6979 digest-domain note on `PrivateKey::sign` and in the `sighash`
+  module docs: for a digest >= n (P ≈ 2⁻¹²⁸ for sha256d output), k256 seeds
+  the nonce DRBG with `bits2octets(digest)` per the RFC while libsecp256k1
+  and `@bsv/sdk` seed it with the raw digest bytes — deterministic signature
+  bytes differ across stacks in that regime only; in-range digests are signed
+  byte-identically. Pinned by `rfc6979_in_range_digest_der_is_pinned` and
+  `rfc6979_digest_ge_n_der_is_pinned` in `tests/ec_tests.rs`.
+
 ## [0.3.16] — 2026-07-09
 
 ### Fixed — Spend engine ts-sdk parity

@@ -32,9 +32,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use bsv_rs::primitives::bsv::sighash::{
-    build_sighash_preimage, parse_transaction, SighashParams, TxOutput,
-};
+use bsv_rs::primitives::bsv::sighash::{parse_transaction, SighashCache, TxOutput};
 use bsv_rs::primitives::sha256d;
 use bsv_rs::script::{op, LockingScript, Script, ScriptChunk, Spend, SpendParams, UnlockingScript};
 use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
@@ -591,16 +589,18 @@ fn eval_node_sighash_vector(
         let raw_tx = from_hex(s(input, "tx_hex"));
         let tx = parse_transaction(&raw_tx).map_err(|e| format!("tx parse failed: {}", e))?;
         let subscript = from_hex(s(input, "script_hex"));
-        let preimage = build_sighash_preimage(&SighashParams {
-            version: tx.version,
-            inputs: &tx.inputs,
-            outputs: &tx.outputs,
-            locktime: tx.locktime,
-            input_index: n(input, "input_index") as usize,
-            subscript: &subscript,
-            satoshis: 0, // fixture context: no amount (matches the TS runner)
-            scope,
-        });
+        // The census sighash path runs through the midstate-reuse cache API —
+        // the same code path `build_sighash_preimage` wraps — so the 5,116
+        // vectors pin the cache implementation directly.
+        let mut sighash_cache = SighashCache::new(&tx);
+        let preimage = sighash_cache
+            .preimage(
+                n(input, "input_index") as usize,
+                &subscript,
+                0, // fixture context: no amount (matches the TS runner)
+                scope,
+            )
+            .map_err(|e| format!("sighash preimage failed: {}", e))?;
         let mut digest = sha256d(&preimage);
         digest.reverse(); // display order, as in the fixture
         Ok(to_hex(&digest))

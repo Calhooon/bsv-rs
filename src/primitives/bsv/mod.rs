@@ -69,7 +69,7 @@ pub use schnorr::{Schnorr, SchnorrProof};
 pub use shamir::{split_private_key, KeyShares};
 pub use sighash::{
     build_sighash_preimage, compute_sighash, compute_sighash_for_signing, compute_sighash_from_raw,
-    parse_transaction, RawTransaction, SighashParams, TxInput, TxOutput, SIGHASH_ALL,
+    parse_transaction, RawTransaction, SighashCache, SighashParams, TxInput, TxOutput, SIGHASH_ALL,
     SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
 };
 pub use tx_signature::TransactionSignature;

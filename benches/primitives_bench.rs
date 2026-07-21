@@ -8,7 +8,8 @@
 use bsv_rs::primitives::bsv::schnorr::Schnorr;
 use bsv_rs::primitives::bsv::shamir::split_private_key;
 use bsv_rs::primitives::bsv::sighash::{
-    compute_sighash, SighashParams, TxInput, TxOutput, SIGHASH_ALL, SIGHASH_FORKID,
+    compute_sighash, compute_sighash_for_signing, SighashCache, SighashParams, TxInput, TxOutput,
+    SIGHASH_ALL, SIGHASH_FORKID,
 };
 use bsv_rs::primitives::ec::PrivateKey;
 use bsv_rs::primitives::hash;
@@ -394,6 +395,64 @@ fn bench_sighash(c: &mut Criterion) {
 
     group.bench_function("compute_sighash (5 inputs, 5 outputs)", |b| {
         b.iter(|| compute_sighash(black_box(&params)))
+    });
+
+    // ------------------------------------------------------------------
+    // Midstate reuse: sign-all-inputs of a 50-input tx, free function
+    // (midstates recomputed per input, O(n²) hashing) vs SighashCache
+    // (midstates once). This reproduces the kill-test's 9.4×-at-n=50 delta
+    // through the public API.
+    // ------------------------------------------------------------------
+    const N: usize = 50;
+    let big_inputs: Vec<TxInput> = (0..N)
+        .map(|i| {
+            let mut txid = [0u8; 32];
+            txid[0] = i as u8;
+            txid[31] = 0x50;
+            TxInput {
+                txid,
+                output_index: i as u32,
+                script: vec![],
+                sequence: 0xffffffff,
+            }
+        })
+        .collect();
+    let big_outputs: Vec<TxOutput> = (0..2)
+        .map(|i| TxOutput {
+            satoshis: 1000 + i as u64,
+            script: subscript.clone(),
+        })
+        .collect();
+    let scope = SIGHASH_ALL | SIGHASH_FORKID;
+
+    group.bench_function("sighash x50 inputs, free fn (no midstate reuse)", |b| {
+        b.iter(|| {
+            for i in 0..N {
+                black_box(compute_sighash_for_signing(black_box(&SighashParams {
+                    version: 1,
+                    inputs: &big_inputs,
+                    outputs: &big_outputs,
+                    locktime: 0,
+                    input_index: i,
+                    subscript: &subscript,
+                    satoshis: 700 + i as u64,
+                    scope,
+                })));
+            }
+        })
+    });
+
+    group.bench_function("sighash x50 inputs, SighashCache (midstates once)", |b| {
+        b.iter(|| {
+            let mut cache = SighashCache::from_parts(1, &big_inputs, &big_outputs, 0);
+            for i in 0..N {
+                black_box(
+                    cache
+                        .sighash_for_signing(i, black_box(&subscript), 700 + i as u64, scope)
+                        .unwrap(),
+                );
+            }
+        })
     });
 
     group.finish();

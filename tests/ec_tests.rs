@@ -933,3 +933,65 @@ mod custom_k_tests {
         );
     }
 }
+
+// ============================================================================
+// RFC 6979 digest-domain pins
+//
+// Recorded with the SighashCache (midstate-reuse) upstreaming; see the
+// "ECDSA digest handling (RFC 6979, digest >= n)" doc note in
+// src/primitives/bsv/sighash.rs. Deterministic ECDSA means these exact DER
+// bytes must never change under the current k256 pin — a dependency bump that
+// alters either pin requires a cross-SDK re-audit of the sign core.
+// ============================================================================
+
+/// In-range digests (< n — every digest sha256d realistically emits,
+/// P(digest >= n) ≈ 2⁻¹²⁸) use the RFC 6979 nonce derivation on which k256
+/// (bsv-rs), libsecp256k1, and @bsv/sdk all agree byte-for-byte. Pinned so a
+/// k256 upgrade that changes deterministic signing for in-range digests is
+/// caught immediately.
+#[test]
+fn rfc6979_in_range_digest_der_is_pinned() {
+    let key = {
+        let mut k = [0u8; 32];
+        k[31] = 2;
+        k
+    };
+    let private_key = PrivateKey::from_bytes(&key).unwrap();
+    let digest = [0x01u8; 32]; // well below n
+
+    let signature = private_key.sign(&digest).unwrap();
+    assert_eq!(
+        hex::encode(signature.to_der()),
+        "304402200d10c237d89a0f0c6f974d8d8a4283bbd1cf1d326332cdf0dbc418c88246e431022038d4f3b0f50965345a1faa1845f52ade58ced5915f335ad58fdddf46eead8879",
+        "in-range RFC 6979 deterministic signature changed — re-audit the sign core against libsecp256k1/@bsv/sdk"
+    );
+    assert!(private_key.public_key().verify(&digest, &signature));
+}
+
+/// RECORDED ASYMMETRY (non-blocking): for a digest >= n, k256 seeds the
+/// RFC 6979 nonce DRBG with bits2octets(digest) per the RFC, while
+/// libsecp256k1 and @bsv/sdk seed it with the raw digest bytes — so the
+/// deterministic signature BYTES differ across stacks in that regime, though
+/// every stack emits a valid low-S signature over the same reduced message.
+/// Unreachable through the sighash path in practice (P ≈ 2⁻¹²⁸ for sha256d
+/// output). This pin freezes the current k256 behavior so a dependency bump
+/// that changes it is noticed.
+#[test]
+fn rfc6979_digest_ge_n_der_is_pinned() {
+    let key = {
+        let mut k = [0u8; 32];
+        k[31] = 2;
+        k
+    };
+    let private_key = PrivateKey::from_bytes(&key).unwrap();
+    let digest = [0xffu8; 32]; // > n (the secp256k1 group order)
+
+    let signature = private_key.sign(&digest).unwrap();
+    assert_eq!(
+        hex::encode(signature.to_der()),
+        "30440220270c504ade45b9bf70ed7dd54f2f253671c4568e3b2a2319d2efc6942b58f7960220076b9b8b0449bc498635d324e2f50365964e65ef0fcbcec9b9941e69f91b0aaa",
+        "k256 digest>=n RFC 6979 behavior changed — re-audit the cross-stack nonce asymmetry pins"
+    );
+    // Still a valid signature over the (reduced) message.
+    assert!(private_key.public_key().verify(&digest, &signature));
+}

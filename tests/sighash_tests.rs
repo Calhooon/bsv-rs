@@ -1,6 +1,8 @@
 //! Integration tests for sighash computation with 499 test vectors.
 
-use bsv_rs::primitives::bsv::sighash::{compute_sighash, parse_transaction, SighashParams};
+use bsv_rs::primitives::bsv::sighash::{
+    compute_sighash, compute_sighash_for_signing, parse_transaction, SighashCache, SighashParams,
+};
 use serde::Deserialize;
 
 /// Test vector for sighash computation.
@@ -224,4 +226,78 @@ fn test_parse_all_vectors_transactions() {
         parse_failures, total
     );
     println!("All {} transactions parsed successfully!", total);
+}
+
+/// The midstate-reuse `SighashCache` must be byte-identical to the free
+/// functions on every cross-SDK vector — and not only at the vector's own
+/// input index: one shared cache is run across EVERY input of each vector's
+/// transaction (with the vector's scope and subscript), so cached midstates
+/// are actually reused and compared against fresh per-call computation. The
+/// vector's own input is additionally checked against `expected_hash`.
+#[test]
+fn test_sighash_cache_matches_vectors_and_free_functions() {
+    let vectors = load_sighash_vectors();
+    let mut checked_inputs = 0usize;
+
+    for (i, v) in vectors.iter().enumerate() {
+        let raw_tx = hex::decode(&v.raw_tx).expect("raw_tx hex");
+        let tx = match parse_transaction(&raw_tx) {
+            Ok(tx) => tx,
+            Err(_) => continue,
+        };
+        let subscript = hex::decode(&v.script).expect("script hex");
+        let scope = v.hash_type as u32;
+        if v.input_index >= tx.inputs.len() {
+            continue;
+        }
+
+        let mut cache = SighashCache::new(&tx);
+        for input_index in 0..tx.inputs.len() {
+            let params = SighashParams {
+                version: tx.version,
+                inputs: &tx.inputs,
+                outputs: &tx.outputs,
+                locktime: tx.locktime,
+                input_index,
+                subscript: &subscript,
+                satoshis: 0, // test vectors use 0
+                scope,
+            };
+            let cached_display = cache
+                .sighash(input_index, &subscript, 0, scope)
+                .expect("in-range index");
+            assert_eq!(
+                cached_display,
+                compute_sighash(&params),
+                "vector {} input {}: cache vs compute_sighash",
+                i,
+                input_index
+            );
+            assert_eq!(
+                cache
+                    .sighash_for_signing(input_index, &subscript, 0, scope)
+                    .expect("in-range index"),
+                compute_sighash_for_signing(&params),
+                "vector {} input {}: cache vs compute_sighash_for_signing",
+                i,
+                input_index
+            );
+            if input_index == v.input_index {
+                assert_eq!(
+                    hex::encode(cached_display),
+                    v.expected_hash.to_lowercase(),
+                    "vector {}: cache vs expected_hash",
+                    i
+                );
+            }
+            checked_inputs += 1;
+        }
+    }
+
+    println!(
+        "SighashCache checked {} inputs across {} vectors",
+        checked_inputs,
+        vectors.len()
+    );
+    assert!(checked_inputs >= vectors.len(), "coverage sanity");
 }
