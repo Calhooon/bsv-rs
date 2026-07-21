@@ -907,6 +907,7 @@ impl Spend {
                         let byte_shift = (n as usize) / 8;
                         let bit_shift = (n as usize) % 8;
                         let mut out = vec![0u8; len];
+                        #[allow(clippy::needless_range_loop)]
                         for i in 0..len {
                             if opcode == OP_LSHIFT {
                                 let src = i + byte_shift;

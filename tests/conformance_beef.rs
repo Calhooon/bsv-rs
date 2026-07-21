@@ -156,7 +156,7 @@ fn merkle_root_from_display_txids(txids: &[&str]) -> String {
         })
         .collect();
     while level.len() > 1 {
-        if level.len() % 2 != 0 {
+        if !level.len().is_multiple_of(2) {
             level.push(level.last().unwrap().clone());
         }
         level = level
@@ -232,7 +232,7 @@ fn conformance_merkle_path() {
             | "mp-single-tx-001" => {
                 let mp = MerklePath::from_hex(s(input, "bump_hex")).expect(id);
                 let root = mp.compute_root(Some(s(input, "txid"))).expect(id);
-                let height_ok = !expected.get("block_height").is_some()
+                let height_ok = expected.get("block_height").is_none()
                     || mp.block_height as i64 == n(expected, "block_height");
                 suite.check(
                     id,
@@ -652,7 +652,7 @@ fn conformance_transactions_regressions() {
         match parsed {
             Ok(beef) => suite.check(
                 id,
-                want_parse && (!beef.txs.is_empty()) == want_txid,
+                want_parse && beef.txs.is_empty() != want_txid,
                 format!("parsed, txs={}", beef.txs.len()),
             ),
             Err(e) => suite.check(id, !want_parse, format!("parse err: {}", e)),
