@@ -455,6 +455,50 @@ fn bench_sighash(c: &mut Criterion) {
         })
     });
 
+    // The exact naive-composition shape the kill-test measured 9.4× against:
+    // parse the raw tx AND recompute the midstates per input
+    // (compute_sighash_from_raw), as a caller holding only raw bytes would.
+    let raw_tx = {
+        let mut w = bsv_rs::primitives::encoding::Writer::new();
+        w.write_i32_le(1);
+        w.write_var_int(N as u64);
+        for input in &big_inputs {
+            w.write_bytes(&input.txid);
+            w.write_u32_le(input.output_index);
+            w.write_var_int(input.script.len() as u64);
+            w.write_bytes(&input.script);
+            w.write_u32_le(input.sequence);
+        }
+        w.write_var_int(big_outputs.len() as u64);
+        for output in &big_outputs {
+            w.write_u64_le(output.satoshis);
+            w.write_var_int(output.script.len() as u64);
+            w.write_bytes(&output.script);
+        }
+        w.write_u32_le(0);
+        w.into_bytes()
+    };
+
+    group.bench_function(
+        "sighash x50 inputs, from_raw per input (parse + no reuse)",
+        |b| {
+            b.iter(|| {
+                for i in 0..N {
+                    black_box(
+                        bsv_rs::primitives::bsv::sighash::compute_sighash_from_raw(
+                            black_box(&raw_tx),
+                            i,
+                            &subscript,
+                            700 + i as u64,
+                            scope,
+                        )
+                        .unwrap(),
+                    );
+                }
+            })
+        },
+    );
+
     group.finish();
 }
 
