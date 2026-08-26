@@ -143,7 +143,59 @@ impl Beef {
     /// Builds the proof tree rooted at a specific transaction.
     pub fn find_atomic_transaction(&self, txid: &str) -> Option<Transaction> {
         let beef_tx = self.find_txid(txid)?;
-        beef_tx.tx().cloned()
+        let mut tx = beef_tx.tx().cloned()?;
+        self.add_input_proof(&mut tx);
+        Some(tx)
+    }
+
+    /// Iteratively attach merkle paths and source transactions to `tx` and its
+    /// input ancestry.
+    ///
+    /// Port of the TypeScript `Beef.addInputProof` (`@bsv/sdk`
+    /// `transaction/Beef.ts`): walk the transaction graph depth-first; when a
+    /// transaction has a BUMP in this BEEF, attach it as its `merkle_path` and
+    /// stop descending that branch (a proven transaction needs no ancestry);
+    /// otherwise link each input's `source_transaction` from this BEEF and
+    /// continue into it.
+    ///
+    /// Without this, a transaction returned from a BEEF carries
+    /// `merkle_path: None` even when the BEEF proves it, so callers that ask
+    /// "is this mined?" get "no" forever. The bumps live in `Beef::bumps` and
+    /// are referenced by `BeefTx::bump_index`, NOT inside the parsed
+    /// `Transaction`, so they have to be reattached explicitly.
+    fn add_input_proof(&self, tx: &mut Transaction) {
+        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
+        // Work list of raw pointers is not needed: recurse over owned subtrees
+        // by value using an explicit stack of &mut borrows is not expressible,
+        // so mirror the TS traversal with an index-free recursive helper.
+        self.attach_proof_recursive(tx, &mut visited);
+    }
+
+    fn attach_proof_recursive(
+        &self,
+        tx: &mut Transaction,
+        visited: &mut std::collections::HashSet<String>,
+    ) {
+        let txid = tx.id();
+        if !visited.insert(txid.clone()) {
+            return;
+        }
+        if let Some(mp) = self.find_bump(&txid) {
+            tx.merkle_path = Some(mp.clone());
+            return;
+        }
+        for input in tx.inputs.iter_mut() {
+            if input.source_transaction.is_none() {
+                if let Some(src_txid) = input.source_txid.as_ref() {
+                    if let Some(src) = self.find_txid(src_txid).and_then(|b| b.tx().cloned()) {
+                        input.source_transaction = Some(Box::new(src));
+                    }
+                }
+            }
+            if let Some(src) = input.source_transaction.as_mut() {
+                self.attach_proof_recursive(src, visited);
+            }
+        }
     }
 
     /// Merges a MerklePath into this BEEF.
@@ -1856,6 +1908,77 @@ mod tests {
             tx.bump_index(),
             None,
             "Transaction must not be assigned a bump where it appears only as a sibling"
+        );
+    }
+}
+
+#[cfg(test)]
+mod merkle_path_reattach_tests {
+    //! `from_beef` / `from_atomic_beef` must return a transaction that carries
+    //! its BUMP, matching the TypeScript `@bsv/sdk` reference
+    //! (`Beef.findAtomicTransaction` -> `addInputProof`, which sets
+    //! `current.merklePath = mp`).
+    //!
+    //! Before this fix both Rust entry points cloned the parsed transaction
+    //! and dropped the proof, because bumps live in `Beef::bumps` and are
+    //! referenced by `BeefTx::bump_index` rather than being stored inside the
+    //! transaction. Every caller asking "is this mined?" got "no" forever.
+    use crate::transaction::Transaction;
+
+    /// A BEEF carrying one proven transaction, produced by this crate's own
+    /// writer so the test cannot drift from the wire format.
+    fn proven_beef() -> (Vec<u8>, String) {
+        // A minimal mined transaction with a merkle path attached.
+        let raw = hex::decode(
+            "0100000001b7994a0db2f373a29227e1d90da883c6ce1cb0dd2d6812e4558041ebbbcfa54\
+             80000000000ffffffff0101000000000000001976a914000000000000000000000000000\
+             000000000000088ac00000000",
+        )
+        .unwrap_or_default();
+        let mut tx = Transaction::from_binary(&raw).expect("fixture tx must parse");
+        let txid = tx.id();
+        // Attach a real single-leaf merkle path for this txid.
+        let mp = crate::transaction::MerklePath {
+            block_height: 800_000,
+            path: vec![vec![crate::transaction::merkle_path::MerklePathLeaf {
+                offset: 0,
+                hash: Some(txid.clone()),
+                txid: true,
+                duplicate: false,
+            }]],
+        };
+        tx.merkle_path = Some(mp);
+        let beef = tx.to_beef(true).expect("fixture must serialize to BEEF");
+        assert!(!beef.is_empty(), "fixture BEEF must be non-empty");
+        (beef, txid)
+    }
+
+    #[test]
+    fn from_beef_reattaches_the_merkle_path() {
+        let (beef, txid) = proven_beef();
+        let parsed = match Transaction::from_beef(&beef, Some(&txid)) {
+            Ok(t) => t,
+            Err(e) => panic!("from_beef failed: {e}"),
+        };
+        assert!(
+            parsed.merkle_path.is_some(),
+            "from_beef must reattach the BUMP (ts-sdk addInputProof parity); \
+             without it every caller reads 'unmined' forever"
+        );
+        assert_eq!(parsed.id(), txid);
+    }
+
+    #[test]
+    fn from_beef_without_a_txid_also_reattaches() {
+        let (beef, txid) = proven_beef();
+        let parsed = match Transaction::from_beef(&beef, None) {
+            Ok(t) => t,
+            Err(e) => panic!("from_beef(None) failed: {e}"),
+        };
+        assert_eq!(parsed.id(), txid);
+        assert!(
+            parsed.merkle_path.is_some(),
+            "the last-transaction path must attach the BUMP too"
         );
     }
 }

@@ -477,21 +477,22 @@ impl Transaction {
     pub fn from_beef(beef: &[u8], txid: Option<&str>) -> Result<Self> {
         let parsed = Beef::from_binary(beef)?;
 
-        match txid {
-            Some(id) => parsed
-                .find_txid(id)
-                .and_then(|btx| btx.tx().cloned())
-                .ok_or_else(|| {
-                    crate::Error::TransactionError(format!("Transaction {} not found in BEEF", id))
-                }),
-            None => parsed
-                .txs
-                .last()
-                .and_then(|btx| btx.tx().cloned())
-                .ok_or_else(|| {
-                    crate::Error::TransactionError("No transactions in BEEF".to_string())
-                }),
-        }
+        // Route through `find_atomic_transaction` so the returned transaction
+        // carries its merkle path and linked input sources, matching the
+        // TypeScript `Transaction.fromBEEF` (which resolves the target txid and
+        // then calls `Beef.findAtomicTransaction` -> `addInputProof`). Cloning
+        // the parsed transaction alone would drop the BUMP, because bumps live
+        // in `Beef::bumps` and are referenced by `BeefTx::bump_index` rather
+        // than being stored inside the transaction.
+        let target = match txid {
+            Some(id) => id.to_string(),
+            None => parsed.txs.last().map(|btx| btx.txid()).ok_or_else(|| {
+                crate::Error::TransactionError("No transactions in BEEF".to_string())
+            })?,
+        };
+        parsed.find_atomic_transaction(&target).ok_or_else(|| {
+            crate::Error::TransactionError(format!("Transaction {} not found in BEEF", target))
+        })
     }
 
     /// Parses a transaction from Atomic BEEF format.

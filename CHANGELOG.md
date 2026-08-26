@@ -41,6 +41,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   byte-identically. Pinned by `rfc6979_in_range_digest_der_is_pinned` and
   `rfc6979_digest_ge_n_der_is_pinned` in `tests/ec_tests.rs`.
 
+## [0.3.19] — 2026-08-25
+
+### Fixed — BEEF merkle-path reattachment (ts-sdk parity)
+
+- **`Transaction::from_beef` and `Beef::find_atomic_transaction` dropped the
+  merkle path.** Both cloned the parsed transaction out of the BEEF, so the
+  returned transaction carried `merkle_path: None` even when the BEEF proved
+  it — every caller asking "is this mined?" got "no" forever. Bumps live in
+  `Beef::bumps` and are referenced by `BeefTx::bump_index` rather than being
+  stored inside the transaction, so they must be reattached explicitly.
+  This diverged from the TypeScript reference: `@bsv/sdk`'s
+  `Transaction.fromBEEF` resolves the target txid and calls
+  `Beef.findAtomicTransaction`, which runs `addInputProof` to set
+  `current.merklePath` and link input sources.
+- **`Beef::add_input_proof`** (private) ports that traversal: walk the
+  transaction graph, attach the BUMP where one exists and stop descending that
+  branch (a proven transaction needs no ancestry), otherwise link each input's
+  `source_transaction` from the BEEF and continue into it. `from_beef` now
+  routes through `find_atomic_transaction` the way `fromBEEF` routes through
+  `findAtomicTransaction`, so both entry points behave identically.
+- Regression tests are proven non-vacuous (reverting the fix fails them), and
+  the fixture builds its BEEF through this crate's own writer so it cannot
+  drift from the wire format.
+
 ## [0.3.16] — 2026-07-09
 
 ### Fixed — Spend engine ts-sdk parity
