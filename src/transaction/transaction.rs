@@ -484,11 +484,23 @@ impl Transaction {
         // the parsed transaction alone would drop the BUMP, because bumps live
         // in `Beef::bumps` and are referenced by `BeefTx::bump_index` rather
         // than being stored inside the transaction.
+        // Target resolution order is the TS SDK's, verbatim
+        // (`Transaction.fromAnyBeef`, ts-stack packages/sdk
+        // src/transaction/Transaction.ts): `txid ?? beef.atomicTxid ??
+        // lastTx.txid`. The middle preference matters: an Atomic BEEF names its
+        // subject in the header, and wallet serializers do NOT all place the
+        // subject last in wire order. Falling straight to `txs.last()` handed
+        // back a PARENT for such beefs — the mis-pick behind the
+        // zanaadu#284 stored-BEEF corruption and a wrong-subject hazard for any
+        // caller validating "the" transaction of an atomic submit.
         let target = match txid {
             Some(id) => id.to_string(),
-            None => parsed.txs.last().map(|btx| btx.txid()).ok_or_else(|| {
-                crate::Error::TransactionError("No transactions in BEEF".to_string())
-            })?,
+            None => match parsed.atomic_txid.clone() {
+                Some(atomic) => atomic,
+                None => parsed.txs.last().map(|btx| btx.txid()).ok_or_else(|| {
+                    crate::Error::TransactionError("No transactions in BEEF".to_string())
+                })?,
+            },
         };
         parsed.find_atomic_transaction(&target).ok_or_else(|| {
             crate::Error::TransactionError(format!("Transaction {} not found in BEEF", target))
@@ -2608,5 +2620,78 @@ mod tests {
         let ctx = SigningContext::new(&raw_tx, 0, 0, &locking_script);
         let result = template.sign(&ctx);
         assert!(result.is_ok());
+    }
+}
+
+#[cfg(test)]
+mod from_beef_subject_tests {
+    use super::Transaction;
+    use crate::transaction::Beef;
+
+    /// A real two-tx BEEF (parent + child spending it, with a BUMP) — the same
+    /// fixture the overlay engine's tests use. Parsed here and re-serialized in
+    /// controlled wire orders.
+    const CHAIN_BEEF_HEX: &str = "0100beef01fe636d0c0007021400fe507c0c7aa754cef1f7889d5fd395cf1f785dd7de98eed895dbedfe4e5bc70d1502ac4e164f5bc16746bb0868404292ac8318bbac3800e4aad13a014da427adce3e010b00bc4ff395efd11719b277694cface5aa50d085a0bb81f613f70313acd28cf4557010400574b2d9142b8d28b61d88e3b2c3f44d858411356b49a28a4643b6d1a6a092a5201030051a05fc84d531b5d250c23f4f886f6812f9fe3f402d61607f977b4ecd2701c19010000fd781529d58fc2523cf396a7f25440b409857e7e221766c57214b1d38c7b481f01010062f542f45ea3660f86c013ced80534cb5fd4c19d66c56e7e8c5d4bf2d40acc5e010100b121e91836fd7cd5102b654e9f72f3cf6fdbfd0b161c53a9c54b12c841126331020100000001cd4e4cac3c7b56920d1e7655e7e260d31f29d9a388d04910f1bbd72304a79029010000006b483045022100e75279a205a547c445719420aa3138bf14743e3f42618e5f86a19bde14bb95f7022064777d34776b05d816daf1699493fcdf2ef5a5ab1ad710d9c97bfb5b8f7cef3641210263e2dee22b1ddc5e11f6fab8bcd2378bdd19580d640501ea956ec0e786f93e76ffffffff013e660000000000001976a9146bfd5c7fbe21529d45803dbcf0c87dd3c71efbc288ac0000000001000100000001ac4e164f5bc16746bb0868404292ac8318bbac3800e4aad13a014da427adce3e000000006a47304402203a61a2e931612b4bda08d541cfb980885173b8dcf64a3471238ae7abcd368d6402204cbf24f04b9aa2256d8901f0ed97866603d2be8324c2bfb7a37bf8fc90edd5b441210263e2dee22b1ddc5e11f6fab8bcd2378bdd19580d640501ea956ec0e786f93e76ffffffff013c660000000000001976a9146bfd5c7fbe21529d45803dbcf0c87dd3c71efbc288ac0000000000";
+
+    /// Re-serialize the fixture chain so the SUBJECT IS NOT LAST in wire order
+    /// (the shape real wallet serializers emit — the zanaadu#284 trigger).
+    /// `to_writer` on purpose: `to_binary` re-sorts parents-first and hides it.
+    fn wire_order_beef(subject_first: bool) -> (Vec<u8>, String, String) {
+        let parsed = Beef::from_binary(&crate::primitives::encoding::from_hex(CHAIN_BEEF_HEX).unwrap()).unwrap();
+        let parent = parsed.txs[0].tx().unwrap().clone();
+        let child = parsed.txs[1].tx().unwrap().clone();
+        let (parent_id, child_id) = (parent.id(), child.id());
+        assert_ne!(parent_id, child_id);
+
+        let mut beef = Beef::new();
+        if subject_first {
+            beef.merge_transaction(child);
+            beef.merge_transaction(parent);
+        } else {
+            beef.merge_transaction(parent);
+            beef.merge_transaction(child);
+        }
+
+        let mut w = crate::primitives::encoding::Writer::new();
+        beef.to_writer(&mut w);
+        (w.into_bytes(), child_id, parent_id)
+    }
+
+    fn as_atomic(bytes: &[u8], subject: &str) -> Vec<u8> {
+        let mut w = crate::primitives::encoding::Writer::new();
+        w.write_u32_le(crate::transaction::beef_tx::ATOMIC_BEEF);
+        let mut le = crate::primitives::encoding::from_hex(subject).unwrap();
+        le.reverse();
+        w.write_bytes(&le);
+        w.write_bytes(bytes);
+        w.into_bytes()
+    }
+
+    /// TS parity (`Transaction.fromAnyBeef`, ts-stack packages/sdk): the target
+    /// is `txid ?? atomicTxid ?? last`. With the subject FIRST in wire order,
+    /// txs.last() is the PARENT — the old behavior returned it.
+    #[test]
+    fn none_prefers_the_atomic_subject_over_wire_order() {
+        let (bytes, child_id, parent_id) = wire_order_beef(true);
+        let tx = Transaction::from_beef(&as_atomic(&bytes, &child_id), None).unwrap();
+        assert_eq!(tx.id(), child_id, "atomic subject must win over txs.last()");
+        assert_ne!(tx.id(), parent_id);
+    }
+
+    /// A plain (non-atomic) BEEF has no subject header; the last-tx fallback is
+    /// the documented TS behavior and keeps working unchanged.
+    #[test]
+    fn none_falls_back_to_last_tx_for_plain_beef() {
+        let (bytes, child_id, _parent_id) = wire_order_beef(false);
+        let tx = Transaction::from_beef(&bytes, None).unwrap();
+        assert_eq!(tx.id(), child_id);
+    }
+
+    /// An explicit txid outranks both the atomic header and wire order.
+    #[test]
+    fn explicit_txid_outranks_everything() {
+        let (bytes, child_id, parent_id) = wire_order_beef(true);
+        let tx = Transaction::from_beef(&as_atomic(&bytes, &child_id), Some(&parent_id)).unwrap();
+        assert_eq!(tx.id(), parent_id);
     }
 }
