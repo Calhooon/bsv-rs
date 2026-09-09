@@ -148,53 +148,69 @@ impl Beef {
         Some(tx)
     }
 
-    /// Iteratively attach merkle paths and source transactions to `tx` and its
-    /// input ancestry.
+    /// Attach merkle paths and source transactions to `tx` and its whole
+    /// input ancestry, so that EVERY input's `source_transaction` is fully
+    /// linked, however many inputs source the same transaction.
     ///
     /// Port of the TypeScript `Beef.addInputProof` (`@bsv/sdk`
-    /// `transaction/Beef.ts`): walk the transaction graph depth-first; when a
-    /// transaction has a BUMP in this BEEF, attach it as its `merkle_path` and
-    /// stop descending that branch (a proven transaction needs no ancestry);
-    /// otherwise link each input's `source_transaction` from this BEEF and
-    /// continue into it.
+    /// `transaction/Beef.ts`): a transaction with a BUMP in this BEEF gets it
+    /// as its `merkle_path` and is not descended (a proven transaction needs
+    /// no ancestry); an unproven one has each input's `source_transaction`
+    /// linked from this BEEF and is descended in turn.
     ///
-    /// Without this, a transaction returned from a BEEF carries
-    /// `merkle_path: None` even when the BEEF proves it, so callers that ask
-    /// "is this mined?" get "no" forever. The bumps live in `Beef::bumps` and
-    /// are referenced by `BeefTx::bump_index`, NOT inside the parsed
-    /// `Transaction`, so they have to be reattached explicitly.
+    /// The TS walk keeps one `Transaction` object per txid and assigns it to
+    /// every input by reference, so linking it once links it everywhere.
+    /// Rust stores `source_transaction` as an owned `Box`, one copy per
+    /// input. The earlier port walked with a `visited` set keyed by txid and
+    /// attached a bare clone to every input after the first: two inputs
+    /// sourcing the same unproven parent (a covenant output plus that
+    /// transaction's own change, the ordinary shape of a wallet's second
+    /// spend) left the second copy without sources or a merkle path, and
+    /// `Transaction::verify` then failed it with "Input N has no source
+    /// transaction" for a BEEF that carried everything (zanaadu beta,
+    /// 2026-09-08). This walk memoizes the fully linked transaction per txid
+    /// and reuses it for every later input, so the result equals the TS
+    /// structure and the work is linear in the BEEF, never exponential along
+    /// a chain where each spend sources two outputs of its parent.
     fn add_input_proof(&self, tx: &mut Transaction) {
-        let mut visited: std::collections::HashSet<String> = std::collections::HashSet::new();
-        // Work list of raw pointers is not needed: recurse over owned subtrees
-        // by value using an explicit stack of &mut borrows is not expressible,
-        // so mirror the TS traversal with an index-free recursive helper.
-        self.attach_proof_recursive(tx, &mut visited);
+        let mut linked: std::collections::HashMap<String, Transaction> =
+            std::collections::HashMap::new();
+        self.attach_proof_memoized(tx, &mut linked);
     }
 
-    fn attach_proof_recursive(
+    fn attach_proof_memoized(
         &self,
         tx: &mut Transaction,
-        visited: &mut std::collections::HashSet<String>,
+        linked: &mut std::collections::HashMap<String, Transaction>,
     ) {
         let txid = tx.id();
-        if !visited.insert(txid.clone()) {
-            return;
+        if tx.merkle_path.is_none() {
+            if let Some(mp) = self.find_bump(&txid) {
+                tx.merkle_path = Some(mp.clone());
+            }
         }
-        if let Some(mp) = self.find_bump(&txid) {
-            tx.merkle_path = Some(mp.clone());
-            return;
+        if tx.merkle_path.is_some() {
+            return; // proven: no ancestry needed
         }
         for input in tx.inputs.iter_mut() {
-            if input.source_transaction.is_none() {
-                if let Some(src_txid) = input.source_txid.as_ref() {
-                    if let Some(src) = self.find_txid(src_txid).and_then(|b| b.tx().cloned()) {
-                        input.source_transaction = Some(Box::new(src));
-                    }
-                }
+            let Some(src_txid) = input.source_txid.clone() else {
+                continue;
+            };
+            if let Some(done) = linked.get(&src_txid) {
+                input.source_transaction = Some(Box::new(done.clone()));
+                continue;
             }
-            if let Some(src) = input.source_transaction.as_mut() {
-                self.attach_proof_recursive(src, visited);
-            }
+            // Take the caller's own source when it carries one, else this BEEF's.
+            let mut src = match input.source_transaction.take() {
+                Some(own) => *own,
+                None => match self.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
+                    Some(found) => found,
+                    None => continue, // not in this BEEF: left unlinked, as before
+                },
+            };
+            self.attach_proof_memoized(&mut src, linked);
+            linked.insert(src_txid, src.clone());
+            input.source_transaction = Some(Box::new(src));
         }
     }
 
@@ -1979,6 +1995,107 @@ mod merkle_path_reattach_tests {
         assert!(
             parsed.merkle_path.is_some(),
             "the last-transaction path must attach the BUMP too"
+        );
+    }
+
+    /// Two inputs of one spend sourcing the SAME unproven parent (a covenant
+    /// head output plus that transaction's own change): the walk must link
+    /// BOTH inputs fully, and `Transaction::verify` must then execute every
+    /// script instead of failing on a bare clone. Found live on zanaadu beta
+    /// (2026-09-08); the TS SDK never sees it because its inputs share one
+    /// object by reference.
+    #[tokio::test]
+    async fn two_inputs_from_one_unproven_parent_are_both_linked() {
+        use crate::primitives::PrivateKey;
+        use crate::script::template::SignOutputs;
+        use crate::script::templates::P2PKH;
+        use crate::script::ScriptTemplate;
+        use crate::transaction::{TransactionInput, TransactionOutput};
+
+        let key = PrivateKey::random();
+        let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
+        // F (proven) -> M (unproven, two outputs) -> R spending M:0 AND M:1.
+        let mut funding = Transaction::new();
+        funding.inputs.push(TransactionInput {
+            source_txid: Some("aa".repeat(32)),
+            source_output_index: 0,
+            unlocking_script: Some(crate::script::UnlockingScript::from_script(
+                crate::script::Script::new(),
+            )),
+            ..Default::default()
+        });
+        funding
+            .outputs
+            .push(TransactionOutput::new(100_000, lock.clone()));
+        let funding_txid = funding.id();
+        funding.merkle_path = Some(crate::transaction::MerklePath {
+            block_height: 800_000,
+            path: vec![vec![crate::transaction::merkle_path::MerklePathLeaf {
+                offset: 0,
+                hash: Some(funding_txid.clone()),
+                txid: true,
+                duplicate: false,
+            }]],
+        });
+        let mut middle = Transaction::new();
+        middle
+            .add_input_from_tx(funding, 0, P2PKH::unlock(&key, SignOutputs::All, false))
+            .unwrap();
+        middle
+            .outputs
+            .push(TransactionOutput::new(40_000, lock.clone()));
+        middle
+            .outputs
+            .push(TransactionOutput::new(50_000, lock.clone()));
+        middle.sign().await.unwrap();
+        let mut subject = Transaction::new();
+        subject
+            .add_input_from_tx(
+                middle.clone(),
+                0,
+                P2PKH::unlock(&key, SignOutputs::All, false),
+            )
+            .unwrap();
+        subject
+            .add_input_from_tx(
+                middle.clone(),
+                1,
+                P2PKH::unlock(&key, SignOutputs::All, false),
+            )
+            .unwrap();
+        subject.outputs.push(TransactionOutput::new(80_000, lock));
+        subject.sign().await.unwrap();
+        let beef = subject.to_beef(false).unwrap();
+        let subject_txid = subject.id();
+
+        let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
+        for (vin, input) in parsed.inputs.iter().enumerate() {
+            let src = input
+                .source_transaction
+                .as_ref()
+                .unwrap_or_else(|| panic!("input {vin} must carry its source"));
+            let grand = src.inputs[0]
+                .source_transaction
+                .as_ref()
+                .unwrap_or_else(|| {
+                    panic!("input {vin}: the unproven parent must carry ITS source")
+                });
+            assert!(
+                grand.merkle_path.is_some(),
+                "input {vin}: the proven grandparent must carry its merkle path"
+            );
+        }
+        assert!(
+            matches!(
+                parsed
+                    .verify(
+                        &crate::transaction::MockChainTracker::always_valid(800_010),
+                        None
+                    )
+                    .await,
+                Ok(true)
+            ),
+            "every input's script executes against a fully linked ancestry"
         );
     }
 }

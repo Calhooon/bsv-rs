@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — BEEF ancestry linking for every input (ts-sdk parity)
+
+- **`Beef::find_atomic_transaction` / `Transaction::from_beef` link EVERY input's
+  `source_transaction` fully, however many inputs source the same
+  transaction.** The previous walk kept a `visited` set keyed by txid and
+  attached a bare clone to every input after the first, so two inputs sourcing
+  the same unproven parent (a covenant output plus that transaction's own
+  change, the ordinary shape of a wallet's second spend) left the second copy
+  with no sources and no merkle path, and `Transaction::verify` failed it with
+  `Input N has no source transaction` for a BEEF that carried everything. The
+  TS SDK never sees this because its inputs share one `Transaction` object by
+  reference; Rust owns a `Box` per input. The walk now memoizes the fully
+  linked transaction per txid and reuses it for every later input: the linked
+  structure equals the TS one and the work is linear in the BEEF, never
+  exponential along a chain whose spends source two outputs of their parent.
+  Regression test `two_inputs_from_one_unproven_parent_are_both_linked`; found
+  live on zanaadu beta (2026-09-08) the first day its overlay executed scripts
+  on submit.
+
 ### Added — midstate-reuse sighash API (`SighashCache`)
 
 - **`primitives::bsv::sighash::SighashCache`** — a cache over one
