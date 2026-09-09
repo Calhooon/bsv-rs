@@ -4,8 +4,8 @@
 //! and deserializes the responses.
 
 use super::encoding::{WireReader, WireWriter};
-use crate::primitives::bounded_capacity;
 use super::{WalletCall, WalletWire};
+use crate::primitives::bounded_capacity;
 use crate::primitives::{from_base64, from_hex, to_base64, to_hex};
 use crate::wallet::types::Network;
 use crate::wallet::{
@@ -747,8 +747,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let total_actions = reader.read_var_int()? as u32;
-        let mut actions =
-            Vec::with_capacity(bounded_capacity(total_actions as usize, reader.remaining(), 1));
+        let mut actions = Vec::with_capacity(bounded_capacity(
+            total_actions as usize,
+            reader.remaining(),
+            1,
+        ));
 
         for _ in 0..total_actions {
             actions.push(reader.read_wallet_action()?);
@@ -887,8 +890,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             Some(reader.read_bytes(beef_len as usize)?.to_vec())
         };
 
-        let mut outputs =
-            Vec::with_capacity(bounded_capacity(total_outputs as usize, reader.remaining(), 1));
+        let mut outputs = Vec::with_capacity(bounded_capacity(
+            total_outputs as usize,
+            reader.remaining(),
+            1,
+        ));
         for _ in 0..total_outputs {
             outputs.push(reader.read_wallet_output()?);
         }
@@ -1201,9 +1207,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let num_fields = reader.read_var_int()? as usize;
-        let mut keyring_for_verifier = std::collections::HashMap::with_capacity(
-            bounded_capacity(num_fields, reader.remaining(), 1),
-        );
+        let mut keyring_for_verifier = std::collections::HashMap::with_capacity(bounded_capacity(
+            num_fields,
+            reader.remaining(),
+            1,
+        ));
         for _ in 0..num_fields {
             let key = reader.read_string()?;
             let value_len = reader.read_var_int()? as usize;

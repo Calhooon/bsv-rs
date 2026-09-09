@@ -74,7 +74,9 @@ pub mod unlocking_script;
 pub use address::Address;
 pub use bip276::*;
 pub use chunk::ScriptChunk;
-pub use evaluation_error::{ExecutionContext, ScriptEvaluationError};
+pub use evaluation_error::{
+    ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
+};
 pub use locking_script::LockingScript;
 pub use script::Script;
 pub use script_num::ScriptNum;

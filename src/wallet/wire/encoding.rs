@@ -433,7 +433,8 @@ impl<'a> WireReader<'a> {
             return Ok(HashMap::new());
         }
 
-        let mut spends = HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
+        let mut spends =
+            HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
             let index = self.read_var_int()? as u32;
             let spend = self.read_sign_action_spend()?;
@@ -704,8 +705,11 @@ impl<'a> WireReader<'a> {
         let outputs = if outputs_count == NIL_SENTINEL {
             None
         } else {
-            let mut outputs =
-                Vec::with_capacity(bounded_capacity(outputs_count as usize, self.remaining(), 1));
+            let mut outputs = Vec::with_capacity(bounded_capacity(
+                outputs_count as usize,
+                self.remaining(),
+                1,
+            ));
             for _ in 0..outputs_count {
                 outputs.push(self.read_wallet_action_output()?);
             }

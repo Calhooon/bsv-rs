@@ -158,6 +158,7 @@ pub trait SpendValidation: TransactionContext {
                         if_stack: vec![],
                         stack_mem: 0,
                         alt_stack_mem: 0,
+                        resource_limit: None,
                     }));
                 }
                 Err(e) => return Err(e),

@@ -178,8 +178,14 @@ fn crediting_txid(locking_script: &LockingScript, amount: u64) -> [u8; 32] {
         0xffff_ffff,
     );
     input.unlocking_script = Some(UnlockingScript::from_chunks(vec![
-        ScriptChunk { op: op::OP_0, data: None },
-        ScriptChunk { op: op::OP_0, data: None },
+        ScriptChunk {
+            op: op::OP_0,
+            data: None,
+        },
+        ScriptChunk {
+            op: op::OP_0,
+            data: None,
+        },
     ]));
     input.sequence = 0xffff_ffff;
     let output = TransactionOutput {
@@ -203,8 +209,7 @@ fn run_node_script(input: &Value) -> Result<bool, String> {
     let unlocking = if sig_hex.is_empty() {
         UnlockingScript::new()
     } else {
-        UnlockingScript::from_hex(sig_hex)
-            .map_err(|e| format!("unlocking script parse: {}", e))?
+        UnlockingScript::from_hex(sig_hex).map_err(|e| format!("unlocking script parse: {}", e))?
     };
     let amount = n(input, "amount_satoshis") as u64;
     let source_txid = crediting_txid(&locking, amount);
@@ -216,7 +221,10 @@ fn run_node_script(input: &Value) -> Result<bool, String> {
         locking_script: locking,
         transaction_version: n(input, "tx_version") as i32,
         other_inputs: vec![],
-        outputs: vec![TxOutput { satoshis: amount, script: vec![] }],
+        outputs: vec![TxOutput {
+            satoshis: amount,
+            script: vec![],
+        }],
         input_index: 0,
         unlocking_script: unlocking,
         input_sequence: 0xffff_ffff,
@@ -252,8 +260,8 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
         match ctx.result_code {
             // Pre-genesis limits (script/number/push/stack/op-count sizes) —
             // bsv-rs runs BSV unlimited semantics.
-            "SCRIPTNUM_OVERFLOW" | "OPERAND_SIZE" | "SCRIPT_SIZE" | "PUSH_SIZE"
-            | "STACK_SIZE" | "OP_COUNT" | "PUBKEY_COUNT" | "SIG_COUNT" => {
+            "SCRIPTNUM_OVERFLOW" | "OPERAND_SIZE" | "SCRIPT_SIZE" | "PUSH_SIZE" | "STACK_SIZE"
+            | "OP_COUNT" | "PUBKEY_COUNT" | "SIG_COUNT" => {
                 Some("pre-genesis limits (bsv-rs runs post-genesis/unlimited rules)")
             }
             // Opcodes valid post-genesis but rejected by the fixture's
@@ -311,7 +319,9 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
             // Post-genesis, OP_VERIF/OP_VERNOTIF in an UNEXECUTED branch are
             // tolerated; bsv-rs implements the pre-genesis/default rule that
             // rejects them anywhere.
-            return Some("flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs");
+            return Some(
+                "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
+            );
         }
         if msg.contains("currently disabled") && has("UTXO_AFTER_CHRONICLE") {
             // Chronicle re-enables OP_VER/OP_2MUL/OP_2DIV; bsv-rs keeps them
@@ -390,22 +400,70 @@ const EVALUATION_KNOWN_FAILURES: &[(&str, &str)] = &[
     // (script-012 FIXED 2026-07-08: truncated OP_PUSHDATA1 now parses to an
     // empty-data chunk like ts-sdk — src/script/script.rs pushdata arm.)
     // BUG 1 — eager OP_CHECKMULTISIG encoding validation (see above):
-    ("node.script.bitcoin-sv.0698", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.0699", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.1433", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.1535", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.1536", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.1537", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.1539", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.bitcoin-sv.1541", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.0666", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.0667", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.1384", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.1486", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.1487", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.1488", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.1490", "eager CHECKMULTISIG encoding check (BUG 1)"),
-    ("node.script.teranode.1492", "eager CHECKMULTISIG encoding check (BUG 1)"),
+    (
+        "node.script.bitcoin-sv.0698",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.0699",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.1433",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.1535",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.1536",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.1537",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.1539",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.bitcoin-sv.1541",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.0666",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.0667",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.1384",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.1486",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.1487",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.1488",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.1490",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
+    (
+        "node.script.teranode.1492",
+        "eager CHECKMULTISIG encoding check (BUG 1)",
+    ),
 ];
 
 #[test]
@@ -489,7 +547,11 @@ fn eval_node_script_vector(
     }
     let flags: Vec<String> = input["flags"]
         .as_array()
-        .map(|a| a.iter().map(|f| f.as_str().unwrap_or("").to_string()).collect())
+        .map(|a| {
+            a.iter()
+                .map(|f| f.as_str().unwrap_or("").to_string())
+                .collect()
+        })
         .unwrap_or_default();
     let result_code = s(expected, "result");
     record_mismatch(
@@ -520,10 +582,12 @@ fn eval_node_script_vector(
 /// Shared mismatch recording: unsupported class, known failure, or failure.
 fn record_mismatch(id: &str, ctx: &MismatchContext<'_>, got: bool, summary: &mut Summary) {
     if let Some(class) = classify_node_mismatch(ctx) {
-        summary.unsupported.entry(class).or_default().push(id.to_string());
-    } else if let Some((_, detail)) =
-        EVALUATION_KNOWN_FAILURES.iter().find(|(k, _)| *k == id)
-    {
+        summary
+            .unsupported
+            .entry(class)
+            .or_default()
+            .push(id.to_string());
+    } else if let Some((_, detail)) = EVALUATION_KNOWN_FAILURES.iter().find(|(k, _)| *k == id) {
         summary.run += 1;
         summary.known_failures_hit.push(format!(
             "{}: expected valid={}, got {} — {}",
@@ -615,7 +679,9 @@ fn eval_node_sighash_vector(
         None => {
             summary.run += 1;
             summary.panics.push(id.to_string());
-            summary.failures.push(format!("{}: panicked computing sighash", id));
+            summary
+                .failures
+                .push(format!("{}: panicked computing sighash", id));
             return None;
         }
     };
@@ -672,9 +738,10 @@ fn eval_node_transaction_vector(
         _ => {
             if expected_valid {
                 summary.run += 1;
-                summary
-                    .failures
-                    .push(format!("{}: expected-valid tx failed to parse/round-trip", id));
+                summary.failures.push(format!(
+                    "{}: expected-valid tx failed to parse/round-trip",
+                    id
+                ));
             } else {
                 summary.run += 1;
                 summary.passed += 1;
@@ -835,7 +902,11 @@ fn eval_misc_vector(
     };
     match outcome {
         MiscOutcome::Unsupported(class) => {
-            summary.unsupported.entry(class).or_default().push(id.to_string());
+            summary
+                .unsupported
+                .entry(class)
+                .or_default()
+                .push(id.to_string());
             None
         }
         MiscOutcome::Pass => {
@@ -846,7 +917,9 @@ fn eval_misc_vector(
         MiscOutcome::Fail(msg) => {
             summary.run += 1;
             if let Some((_, detail)) = EVALUATION_KNOWN_FAILURES.iter().find(|(k, _)| *k == id) {
-                summary.known_failures_hit.push(format!("{}: {} — {}", id, msg, detail));
+                summary
+                    .known_failures_hit
+                    .push(format!("{}: {} — {}", id, msg, detail));
             } else {
                 summary.failures.push(format!("{}: {}", id, msg));
             }
@@ -912,7 +985,10 @@ fn run_misc_vector(input: &Value, expected: &Value) -> MiscOutcome {
     if let Some(hex) = input.get("hex").and_then(Value::as_str) {
         let parsed = Script::from_hex(hex);
         if b(expected, "throws") {
-            return check(parsed.is_err(), format!("expected parse error for '{}'", hex));
+            return check(
+                parsed.is_err(),
+                format!("expected parse error for '{}'", hex),
+            );
         }
         let script = match parsed {
             Ok(p) => p,
@@ -963,7 +1039,11 @@ fn run_misc_vector(input: &Value, expected: &Value) -> MiscOutcome {
         let got = script.chunks()[0].op as i64;
         return check(
             got == n(expected, "chunk_0_op"),
-            format!("chunk_0_op: expected {}, got {}", n(expected, "chunk_0_op"), got),
+            format!(
+                "chunk_0_op: expected {}, got {}",
+                n(expected, "chunk_0_op"),
+                got
+            ),
         );
     }
 
@@ -1064,12 +1144,21 @@ fn verify_chunk_expectations(script: &Script, expected: &Value) -> MiscOutcome {
     }
     if let Some(op0) = expected.get("chunk_0_op").and_then(Value::as_i64) {
         if chunks.is_empty() || chunks[0].op as i64 != op0 {
-            return MiscOutcome::Fail(format!("chunk_0_op: got {:?}", chunks.first().map(|c| c.op)));
+            return MiscOutcome::Fail(format!(
+                "chunk_0_op: got {:?}",
+                chunks.first().map(|c| c.op)
+            ));
         }
     }
     if let Some(data0) = expected.get("chunk_0_data").and_then(Value::as_array) {
-        let want: Vec<u8> = data0.iter().map(|x| x.as_u64().unwrap_or(0) as u8).collect();
-        let got = chunks.first().and_then(|c| c.data.clone()).unwrap_or_default();
+        let want: Vec<u8> = data0
+            .iter()
+            .map(|x| x.as_u64().unwrap_or(0) as u8)
+            .collect();
+        let got = chunks
+            .first()
+            .and_then(|c| c.data.clone())
+            .unwrap_or_default();
         if got != want {
             return MiscOutcome::Fail(format!("chunk_0_data: got {:?}", got));
         }
@@ -1138,7 +1227,10 @@ fn finish_evaluation(summary: Summary) {
     // full-transaction-consensus tx_invalid fixtures the reference TS runner
     // also skips).
     assert_eq!(summary.skipped.len(), 37, "corpus-skipped vectors");
-    assert_eq!(summary.passed + summary.known_failures_hit.len(), summary.run);
+    assert_eq!(
+        summary.passed + summary.known_failures_hit.len(),
+        summary.run
+    );
     // Robustness-bug panics (see EVALUATION_KNOWN_FAILURES BUG 2). A new
     // panic anywhere in the corpus fails here even if its valid/invalid
     // outcome happens to match.
@@ -1157,7 +1249,10 @@ fn finish_evaluation(summary: Summary) {
 /// FORKID-only sighash. Any drift (corpus update, SDK behavior change) fails
 /// the assert and forces a re-audit.
 const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
-    ("UTXO_AFTER_CHRONICLE opcode semantics not implemented in bsv-rs", 5),
+    (
+        "UTXO_AFTER_CHRONICLE opcode semantics not implemented in bsv-rs",
+        5,
+    ),
     // 2026-07-09 repin (225 -> 195): Spend now mirrors ts-sdk's version-based
     // relaxed mode (tx version > 1 disables CLEANSTACK/LOW_S/MINIMALDATA).
     // 30 version-2 fixtures that previously died at the always-on clean-stack
@@ -1167,12 +1262,30 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ("bsv-rs always enforces LOW_S (no off switch)", 9),
     ("bsv-rs always enforces MINIMALDATA (no off switch)", 181),
     ("bsv-rs always enforces NULLDUMMY (no off switch)", 4),
-    ("bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)", 319),
-    ("bsv-rs always enforces strict DER/pubkey encodings (no off switch)", 54),
-    ("bsv-rs always requires SIGHASH_FORKID (cannot reject FORKID-bit sigs)", 6),
-    ("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)", 36),
-    ("flag-dependent ELSE/ENDIF structure rules not expressible in bsv-rs", 30),
-    ("flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs", 12),
+    (
+        "bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)",
+        319,
+    ),
+    (
+        "bsv-rs always enforces strict DER/pubkey encodings (no off switch)",
+        54,
+    ),
+    (
+        "bsv-rs always requires SIGHASH_FORKID (cannot reject FORKID-bit sigs)",
+        6,
+    ),
+    (
+        "bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)",
+        36,
+    ),
+    (
+        "flag-dependent ELSE/ENDIF structure rules not expressible in bsv-rs",
+        30,
+    ),
+    (
+        "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
+        12,
+    ),
     // NOTE: this is HALF the sighash corpus. The fixture's `regular_hash`
     // uses the original (legacy) digest algorithm whenever the FORKID bit is
     // absent (or the Chronicle bit applies), and `original_hash` is ALWAYS
@@ -1183,10 +1296,19 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 8),
     ("no DISCOURAGE_UPGRADABLE_NOPS flag in bsv-rs", 20),
     ("no MINIMALIF flag in bsv-rs", 6),
-    ("no P2SH redeem-script evaluation in bsv-rs (post-genesis rules)", 72),
+    (
+        "no P2SH redeem-script evaluation in bsv-rs (post-genesis rules)",
+        72,
+    ),
     ("no isRelaxed evaluation mode in bsv-rs", 3),
-    ("pre-genesis OP_RETURN semantics (bsv-rs implements post-genesis skip)", 34),
-    ("pre-genesis limits (bsv-rs runs post-genesis/unlimited rules)", 14),
+    (
+        "pre-genesis OP_RETURN semantics (bsv-rs implements post-genesis skip)",
+        34,
+    ),
+    (
+        "pre-genesis limits (bsv-rs runs post-genesis/unlimited rules)",
+        14,
+    ),
 ];
 
 // ============================================================================
@@ -1197,17 +1319,29 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
 /// OP_1NEGATE / direct push), as required by the always-on MINIMALDATA rule.
 fn minimal_push(bytes: &[u8]) -> ScriptChunk {
     if bytes.is_empty() {
-        return ScriptChunk { op: op::OP_0, data: None };
+        return ScriptChunk {
+            op: op::OP_0,
+            data: None,
+        };
     }
     if bytes.len() == 1 {
         if (1..=16).contains(&bytes[0]) {
-            return ScriptChunk { op: op::OP_1 + bytes[0] - 1, data: None };
+            return ScriptChunk {
+                op: op::OP_1 + bytes[0] - 1,
+                data: None,
+            };
         }
         if bytes[0] == 0x81 {
-            return ScriptChunk { op: op::OP_1NEGATE, data: None };
+            return ScriptChunk {
+                op: op::OP_1NEGATE,
+                data: None,
+            };
         }
     }
-    ScriptChunk { op: bytes.len() as u8, data: Some(bytes.to_vec()) }
+    ScriptChunk {
+        op: bytes.len() as u8,
+        data: Some(bytes.to_vec()),
+    }
 }
 
 /// Evaluates `<value> <shift> OP_LSHIFT/OP_RSHIFT <expected> OP_EQUAL` through
@@ -1222,9 +1356,15 @@ fn shift_via_interpreter(value: &[u8], shift_bits: i64, shift_op: u8, want: &[u8
     };
     let locking = LockingScript::from_script(Script::from_chunks(vec![
         shift_num,
-        ScriptChunk { op: shift_op, data: None },
+        ScriptChunk {
+            op: shift_op,
+            data: None,
+        },
         minimal_push(want),
-        ScriptChunk { op: op::OP_EQUAL, data: None },
+        ScriptChunk {
+            op: op::OP_EQUAL,
+            data: None,
+        },
     ]));
     let mut spend = Spend::new(SpendParams {
         source_txid: [0u8; 32],
@@ -1276,7 +1416,10 @@ fn conformance_scripts_regressions() {
 
     // script-lshift-truncation + script-shift-endianness: OP_LSHIFT/OP_RSHIFT
     // byte-order and truncation semantics through the interpreter.
-    for file in ["script-lshift-truncation.json", "script-shift-endianness.json"] {
+    for file in [
+        "script-lshift-truncation.json",
+        "script-shift-endianness.json",
+    ] {
         let json = load_json(&dir.join("vectors/regressions").join(file));
         for vector in json["vectors"].as_array().expect("vectors") {
             let id = s(vector, "id");
@@ -1311,7 +1454,11 @@ fn conformance_scripts_regressions() {
                         s(input, "value_hex"),
                         shift_bits,
                         s(expected, "result_hex"),
-                        if got.is_none() { "PANICKED (BigNumber::to_bytes_be overflow)" } else { "produced a different result" }
+                        if got.is_none() {
+                            "PANICKED (BigNumber::to_bytes_be overflow)"
+                        } else {
+                            "produced a different result"
+                        }
                     );
                     if REGRESSION_KNOWN_FAILURES.iter().any(|(k, _)| *k == id) {
                         summary.known_failures_hit.push(detail);
@@ -1391,5 +1538,8 @@ fn conformance_scripts_regressions() {
         "KNOWN_FAILURES drift (fixed bug? new bug?): {:?}",
         summary.known_failures_hit
     );
-    assert_eq!(summary.passed + summary.known_failures_hit.len(), summary.run);
+    assert_eq!(
+        summary.passed + summary.known_failures_hit.len(),
+        summary.run
+    );
 }

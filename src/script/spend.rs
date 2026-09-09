@@ -30,7 +30,9 @@
 //! let valid = spend.validate()?;
 //! ```
 
-use super::evaluation_error::{ExecutionContext, ScriptEvaluationError};
+use super::evaluation_error::{
+    ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
+};
 use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
@@ -283,18 +285,14 @@ impl Spend {
     ///
     /// `Ok(true)` if execution should continue, `Ok(false)` if the script is complete.
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError> {
-        // Check memory limits
+        // Check memory limits — a LOCAL budget, reported as a resource limit
+        // (the reference's `ScriptResourceLimitError`), never as a verdict on
+        // the script.
         if self.stack_mem > self.memory_limit {
-            return Err(self.error(&format!(
-                "Stack memory usage has exceeded {} bytes",
-                self.memory_limit
-            )));
+            return Err(self.resource_error(ScriptResource::Stack, self.stack_mem));
         }
         if self.alt_stack_mem > self.memory_limit {
-            return Err(self.error(&format!(
-                "Alt stack memory usage has exceeded {} bytes",
-                self.memory_limit
-            )));
+            return Err(self.resource_error(ScriptResource::AltStack, self.alt_stack_mem));
         }
 
         // Switch from unlocking to locking script when unlocking is complete.
@@ -760,6 +758,15 @@ impl Spend {
                     )));
                 }
                 let size = size as usize;
+                // Reference parity (0.3.23): the element the script asks for is
+                // refused BEFORE it is allocated when it alone exceeds the
+                // local memory budget — the TypeScript SDK's `element-size`
+                // resource check. Without this a 9-byte script could make the
+                // evaluator allocate up to MAX_SCRIPT_ELEMENT_SIZE (1 GB) and
+                // only then trip the stack budget on the push.
+                if size > self.memory_limit {
+                    return Err(self.resource_error(ScriptResource::ElementSize, size));
+                }
 
                 let rawnum = self.pop_stack()?;
                 let minimal = ScriptNum::minimally_encode(&rawnum);
@@ -1633,22 +1640,35 @@ impl Spend {
 
     fn ensure_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
         if self.stack_mem + additional > self.memory_limit {
-            return Err(self.error(&format!(
-                "Stack memory usage has exceeded {} bytes",
-                self.memory_limit
-            )));
+            return Err(self.resource_error(ScriptResource::Stack, self.stack_mem + additional));
         }
         Ok(())
     }
 
     fn ensure_alt_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
         if self.alt_stack_mem + additional > self.memory_limit {
-            return Err(self.error(&format!(
-                "Alt stack memory usage has exceeded {} bytes",
-                self.memory_limit
-            )));
+            return Err(
+                self.resource_error(ScriptResource::AltStack, self.alt_stack_mem + additional)
+            );
         }
         Ok(())
+    }
+
+    /// A LOCAL resource-limit error (the reference's `ScriptResourceLimitError`):
+    /// the same message shape (`<label> has exceeded <limit> bytes`) plus the
+    /// structured `resource_limit` a caller can branch on.
+    fn resource_error(&self, resource: ScriptResource, attempted: usize) -> ScriptEvaluationError {
+        let label = match resource {
+            ScriptResource::Stack => "Stack memory usage",
+            ScriptResource::AltStack => "Alt stack memory usage",
+            ScriptResource::ElementSize => "Script element allocation",
+        };
+        self.error(&format!("{label} has exceeded {} bytes", self.memory_limit))
+            .with_resource_limit(ScriptResourceLimit {
+                resource,
+                limit: self.memory_limit,
+                attempted,
+            })
     }
 
     // ========================================================================

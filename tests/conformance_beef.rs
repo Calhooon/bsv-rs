@@ -122,8 +122,17 @@ impl Suite {
         for f in &self.failures {
             println!("  FAILURE: {}", f);
         }
-        assert!(self.failures.is_empty(), "{} failures:\n{}", name, self.failures.join("\n"));
-        assert_eq!(self.run, expect_run, "{}: executed-vector count drift", name);
+        assert!(
+            self.failures.is_empty(),
+            "{} failures:\n{}",
+            name,
+            self.failures.join("\n")
+        );
+        assert_eq!(
+            self.run, expect_run,
+            "{}: executed-vector count drift",
+            name
+        );
         assert_eq!(
             self.unsupported.len(),
             expect_unsupported,
@@ -200,7 +209,11 @@ fn conformance_merkle_path() {
     let Some(dir) = corpus_dir() else { return };
     let file = load_json(&dir.join("vectors/sdk/transactions/merkle-path.json"));
     let vectors = file["vectors"].as_array().expect("vectors");
-    assert_eq!(vectors.len(), 16, "merkle-path.json vector count changed — review");
+    assert_eq!(
+        vectors.len(),
+        16,
+        "merkle-path.json vector count changed — review"
+    );
 
     let mut suite = Suite::default();
     for vector in vectors {
@@ -275,33 +288,40 @@ fn conformance_merkle_path() {
                 suite.run += 1;
                 if ok {
                     suite.passed += 1;
-                } else if let Some((_, known)) =
-                    MP_KNOWN_FAILURES.iter().find(|(k, _)| *k == id)
-                {
-                    suite.known_failures_hit.push(format!("{}: {} — {}", id, detail, known));
+                } else if let Some((_, known)) = MP_KNOWN_FAILURES.iter().find(|(k, _)| *k == id) {
+                    suite
+                        .known_failures_hit
+                        .push(format!("{}: {} — {}", id, detail, known));
                 } else {
                     suite.failures.push(format!("{}: {}", id, detail));
                 }
             }
             "mp-coinbase-001" => {
-                let mp = MerklePath::from_coinbase_txid(
-                    s(input, "txid"),
-                    n(input, "height") as u32,
-                );
+                let mp =
+                    MerklePath::from_coinbase_txid(s(input, "txid"), n(input, "height") as u32);
                 let root = mp.compute_root(Some(s(input, "txid"))).expect(id);
                 suite.check(
                     id,
                     mp.to_hex() == s(expected, "bump_hex")
                         && mp.block_height as i64 == n(expected, "block_height")
                         && root == s(expected, "merkle_root"),
-                    format!("hex={} height={} root={}", mp.to_hex(), mp.block_height, root),
+                    format!(
+                        "hex={} height={} root={}",
+                        mp.to_hex(),
+                        mp.block_height,
+                        root
+                    ),
                 );
             }
             "mp-block125632-001" | "mp-extract-001" => {
                 // Full-block root computation. bsv-rs has no full-block tree
                 // builder; fold with the SDK's sha256d exactly like the
                 // reference runner's computeMerkleRootFromDisplayTxids.
-                let key = if id == "mp-extract-001" { "full_block_txids" } else { "txids" };
+                let key = if id == "mp-extract-001" {
+                    "full_block_txids"
+                } else {
+                    "txids"
+                };
                 let txids: Vec<&str> = input[key]
                     .as_array()
                     .unwrap()
@@ -352,8 +372,7 @@ fn conformance_merkle_path() {
                 // combine() round-trip: combining with itself must not change
                 // the serialized form.
                 let clone = mp.clone();
-                if mp.combine(&clone).is_ok() && mp.to_hex() != s(expected, "serialized_bump_hex")
-                {
+                if mp.combine(&clone).is_ok() && mp.to_hex() != s(expected, "serialized_bump_hex") {
                     ok = false;
                     detail = format!("post-combine to_hex={}", mp.to_hex());
                 }
@@ -380,12 +399,20 @@ fn conformance_merkle_path() {
                      no-ops these error-case shapes)",
                 );
             }
-            other => panic!("unrecognized merkle-path vector id '{}' — new corpus vector?", other),
+            other => panic!(
+                "unrecognized merkle-path vector id '{}' — new corpus vector?",
+                other
+            ),
         }
     }
     // 12 executed (1 of them a pinned KNOWN failure) + 4 enumerated-
     // unsupported = 16 total, all accounted for.
-    suite.finish("sdk.transactions.merklepath", 12, 4, MP_KNOWN_FAILURES.len());
+    suite.finish(
+        "sdk.transactions.merklepath",
+        12,
+        4,
+        MP_KNOWN_FAILURES.len(),
+    );
 }
 
 // ============================================================================
@@ -395,8 +422,13 @@ fn conformance_merkle_path() {
 /// Re-serializes from parsed fields — `Transaction::from_hex` caches raw
 /// bytes, so `tx.to_hex()` echoes the input and cannot catch lenient parses.
 fn reserialize(tx: &Transaction) -> String {
-    Transaction::with_params(tx.version, tx.inputs.clone(), tx.outputs.clone(), tx.lock_time)
-        .to_hex()
+    Transaction::with_params(
+        tx.version,
+        tx.inputs.clone(),
+        tx.outputs.clone(),
+        tx.lock_time,
+    )
+    .to_hex()
 }
 
 #[test]
@@ -404,7 +436,11 @@ fn conformance_serialization() {
     let Some(dir) = corpus_dir() else { return };
     let file = load_json(&dir.join("vectors/sdk/transactions/serialization.json"));
     let vectors = file["vectors"].as_array().expect("vectors");
-    assert_eq!(vectors.len(), 15, "serialization.json vector count changed — review");
+    assert_eq!(
+        vectors.len(),
+        15,
+        "serialization.json vector count changed — review"
+    );
 
     let mut suite = Suite::default();
     for vector in vectors {
@@ -425,7 +461,12 @@ fn conformance_serialization() {
                 suite.check(
                     id,
                     ok,
-                    format!("version={} txid={} roundtrip={}", tx.version, tx.id(), reserialize(&tx)),
+                    format!(
+                        "version={} txid={} roundtrip={}",
+                        tx.version,
+                        tx.id(),
+                        reserialize(&tx)
+                    ),
                 );
             }
             "tx-003" => {
@@ -463,7 +504,11 @@ fn conformance_serialization() {
                 // Non-atomic BEEF V1 into from_atomic_beef must error.
                 // (Assert throws-ness only — never error-string parity.)
                 let result = Transaction::from_atomic_beef(&from_hex(s(input, "beef_hex")));
-                suite.check(id, result.is_err(), "expected Err for non-atomic BEEF".to_string());
+                suite.check(
+                    id,
+                    result.is_err(),
+                    "expected Err for non-atomic BEEF".to_string(),
+                );
             }
             "tx-007" | "tx-009" | "tx-010" => {
                 suite.unsupported(
@@ -528,11 +573,18 @@ fn conformance_serialization() {
                     id,
                     offsets.inputs.len() as i64 == n(expected, "inputs_count")
                         && offsets.outputs.len() as i64 == n(expected, "outputs_count"),
-                    format!("inputs={} outputs={}", offsets.inputs.len(), offsets.outputs.len()),
+                    format!(
+                        "inputs={} outputs={}",
+                        offsets.inputs.len(),
+                        offsets.outputs.len()
+                    ),
                 );
             }
             other => {
-                panic!("unrecognized serialization vector id '{}' — new corpus vector?", other)
+                panic!(
+                    "unrecognized serialization vector id '{}' — new corpus vector?",
+                    other
+                )
             }
         }
     }
@@ -563,7 +615,10 @@ const TX_REGRESSION_KNOWN_FAILURES: &[(&str, &str)] = &[];
 /// 1-byte locking script. Layout: 4 (version) + 1 (n_in) + 40 + varint(L) + L
 /// + 1 (n_out) + 8 + 1 + 1 + 4 (locktime) = 60 + varint(L) + L.
 fn tx_of_estimated_size(target: usize) -> Transaction {
-    assert!(target > 63 + 253, "calibration assumes a 3-byte varint script length");
+    assert!(
+        target > 63 + 253,
+        "calibration assumes a 3-byte varint script length"
+    );
     let script_len = target - 60 - 3; // 3-byte varint for 253 <= L < 65536
     let mut input = TransactionInput::new(
         "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
@@ -581,7 +636,9 @@ fn tx_of_estimated_size(target: usize) -> Transaction {
     };
     let tx = Transaction::with_params(1, vec![input], vec![output], 0);
     // Self-check the calibration: at 1000 sat/kB, ceil(size*1000/1000) == size.
-    let probe = SatoshisPerKilobyte::new(1000).compute_fee(&tx).expect("probe fee");
+    let probe = SatoshisPerKilobyte::new(1000)
+        .compute_fee(&tx)
+        .expect("probe fee");
     assert_eq!(probe as usize, target, "size calibration drift");
     tx
 }
@@ -607,7 +664,11 @@ fn conformance_transactions_regressions() {
         cat.extend_from_slice(&from_hex(s(input, "right_hex")));
         let parent = to_hex(&sha256d(&cat));
         let want = s(&vector["expected"], "parent_hex");
-        suite.check(id, parent == want, format!("parent={} want={}", parent, want));
+        suite.check(
+            id,
+            parent == want,
+            format!("parent={} want={}", parent, want),
+        );
         parents.push((id.to_string(), parent));
     }
     // End-to-end: the same 5-leaf tree via MerklePath::compute_root must
@@ -733,8 +794,7 @@ fn conformance_transactions_regressions() {
                 // Serialized layout with 1 input, 0 outputs: the 4 sequence
                 // bytes precede the output count + locktime (last 5 bytes).
                 let mut txin = TransactionInput::new(
-                    "0000000000000000000000000000000000000000000000000000000000000000"
-                        .to_string(),
+                    "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
                     0,
                 );
                 txin.unlocking_script = Some(UnlockingScript::new());
@@ -784,6 +844,15 @@ fn conformance_transactions_regressions() {
 
     // 5 odd-node + 1 end-to-end + 1 beef-v2 (1 skipped) + 2 hydration +
     // 3 sequence-zero + 3 fee = 15 executed.
-    assert_eq!(suite.skipped.len(), 1, "corpus-directed skips (parity_class intended)");
-    suite.finish("transactions regressions", 15, 0, TX_REGRESSION_KNOWN_FAILURES.len());
+    assert_eq!(
+        suite.skipped.len(),
+        1,
+        "corpus-directed skips (parity_class intended)"
+    );
+    suite.finish(
+        "transactions regressions",
+        15,
+        0,
+        TX_REGRESSION_KNOWN_FAILURES.len(),
+    );
 }

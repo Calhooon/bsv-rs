@@ -28,6 +28,41 @@ impl fmt::Display for ExecutionContext {
 ///
 /// Contains the full execution state at the time of failure, enabling
 /// detailed debugging and error reporting.
+/// A LOCAL interpreter resource the evaluation ran out of — the TypeScript
+/// SDK's `ScriptResourceLimitError` (`ScriptResource`): `'stack'`,
+/// `'alt-stack'`, `'element-size'`. Resource exhaustion is a verdict about the
+/// EVALUATOR's budget, never about the script's validity on the network, and
+/// a caller (an overlay door, a wallet) must be able to tell the two apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScriptResource {
+    /// The main stack's memory budget (`memory_limit`).
+    Stack,
+    /// The alt stack's memory budget (`memory_limit`).
+    AltStack,
+    /// A single element the script asked to allocate (`OP_NUM2BIN`'s size
+    /// operand), refused BEFORE the allocation.
+    ElementSize,
+}
+
+impl fmt::Display for ScriptResource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ScriptResource::Stack => write!(f, "stack"),
+            ScriptResource::AltStack => write!(f, "alt-stack"),
+            ScriptResource::ElementSize => write!(f, "element-size"),
+        }
+    }
+}
+
+/// The resource a [`ScriptEvaluationError`] ran out of, with the limit and
+/// the attempted usage (the reference's `ScriptResourceLimitError` fields).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScriptResourceLimit {
+    pub resource: ScriptResource,
+    pub limit: usize,
+    pub attempted: usize,
+}
+
 #[derive(Debug, Clone)]
 pub struct ScriptEvaluationError {
     /// The error message describing what went wrong.
@@ -50,6 +85,11 @@ pub struct ScriptEvaluationError {
     pub stack_mem: usize,
     /// Memory usage of the alt stack in bytes.
     pub alt_stack_mem: usize,
+    /// `Some` when the evaluation stopped because a LOCAL resource budget was
+    /// exhausted (the TypeScript SDK throws a distinct
+    /// `ScriptResourceLimitError` for these); `None` for every verdict about
+    /// the script itself. Added in 0.3.23 (reference parity).
+    pub resource_limit: Option<ScriptResourceLimit>,
 }
 
 impl ScriptEvaluationError {
@@ -78,7 +118,22 @@ impl ScriptEvaluationError {
             if_stack,
             stack_mem,
             alt_stack_mem,
+            resource_limit: None,
         }
+    }
+
+    /// Mark this error as a LOCAL resource exhaustion (the reference's
+    /// `ScriptResourceLimitError`): the evaluator's budget, not the script's
+    /// validity.
+    pub fn with_resource_limit(mut self, limit: ScriptResourceLimit) -> Self {
+        self.resource_limit = Some(limit);
+        self
+    }
+
+    /// Whether the evaluation stopped on a LOCAL resource budget (see
+    /// [`ScriptEvaluationError::resource_limit`]) rather than on the script.
+    pub fn is_resource_limit(&self) -> bool {
+        self.resource_limit.is_some()
     }
 
     /// Formats the stack as a hex string list.

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.23] - 2026-09-09
+
+### Fixed — reference parity in the script interpreter (`Spend`)
+
+- `OP_NUM2BIN` refuses a size operand larger than the local memory budget BEFORE
+  allocating it (the TypeScript SDK's `element-size` check). Previously a
+  9-byte script (`OP_1 <1e9> OP_NUM2BIN`) allocated up to
+  `MAX_SCRIPT_ELEMENT_SIZE` (1 GB) and only then tripped the stack budget on
+  the push — on a Cloudflare Worker that is an isolate kill, not a refusal.
+- Resource exhaustion is its own error class: `ScriptEvaluationError` gains
+  `resource_limit: Option<ScriptResourceLimit { resource: ScriptResource
+  (Stack | AltStack | ElementSize), limit, attempted }>` and
+  `is_resource_limit()`, mirroring the SDK's `ScriptResourceLimitError`
+  (`'stack' | 'alt-stack' | 'element-size'`, the same message shape
+  `<label> has exceeded <limit> bytes`). A caller whose bar is the network
+  (an overlay door) can now tell the evaluator's budget from the script's
+  verdict without matching message text. Every other error keeps
+  `resource_limit: None`. (`ScriptEvaluationError` gained a public field; a
+  struct literal elsewhere needs `resource_limit: None`.)
+- Found by the bsv-low W-A money gate's delta-verify (2026-09-09).
+
 ## [0.3.22] - 2026-09-09
 
 ### Fixed — BEEF linking is linear and verify walks by txid
