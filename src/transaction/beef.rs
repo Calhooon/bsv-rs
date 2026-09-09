@@ -149,8 +149,12 @@ impl Beef {
     }
 
     /// Attach merkle paths and source transactions to `tx` and its whole
-    /// input ancestry, so that EVERY input's `source_transaction` is fully
-    /// linked, however many inputs source the same transaction.
+    /// input ancestry, LINEARLY: every distinct unproven parent is linked in
+    /// full exactly once (memoized by txid), and every later input that
+    /// sources the same txid gets a BARE STUB of it: the parent transaction
+    /// itself (its outputs are what the input spends), carrying its BUMP when
+    /// this BEEF proves it, with every one of ITS inputs' `source_transaction`
+    /// left `None`.
     ///
     /// Port of the TypeScript `Beef.addInputProof` (`@bsv/sdk`
     /// `transaction/Beef.ts`): a transaction with a BUMP in this BEEF gets it
@@ -160,28 +164,61 @@ impl Beef {
     ///
     /// The TS walk keeps one `Transaction` object per txid and assigns it to
     /// every input by reference, so linking it once links it everywhere.
-    /// Rust stores `source_transaction` as an owned `Box`, one copy per
-    /// input. The earlier port walked with a `visited` set keyed by txid and
-    /// attached a bare clone to every input after the first: two inputs
-    /// sourcing the same unproven parent (a covenant output plus that
-    /// transaction's own change, the ordinary shape of a wallet's second
-    /// spend) left the second copy without sources or a merkle path, and
-    /// `Transaction::verify` then failed it with "Input N has no source
-    /// transaction" for a BEEF that carried everything (zanaadu beta,
-    /// 2026-09-08). This walk memoizes the fully linked transaction per txid
-    /// and reuses it for every later input, so the result equals the TS
-    /// structure and the work is linear in the BEEF, never exponential along
-    /// a chain where each spend sources two outputs of its parent.
+    /// Rust stores `source_transaction` as an owned `Box`, one copy per input,
+    /// so the reference structure cannot be reproduced exactly and the two
+    /// naive answers are both wrong:
+    ///
+    /// - link only the first occurrence and hand later inputs a bare clone
+    ///   (0.3.20): the structure stays linear, but the old object-graph
+    ///   `Transaction::verify` reached the bare clone and refused a complete
+    ///   BEEF with "Input N has no source transaction", and two inputs
+    ///   sourcing the same unproven parent (a covenant output plus that
+    ///   transaction's own change) is the ordinary shape of a wallet's
+    ///   second spend;
+    /// - link every input in full by cloning the memoized parent (0.3.21):
+    ///   correct for that walk, but EXPONENTIAL. On a diamond chain, where
+    ///   each level spends both outputs of the previous unproven level (a
+    ///   wallet's ordinary change chain), every level then carries two full
+    ///   copies of the level below it: 24 levels = 2^24 subtrees, and
+    ///   `from_beef` died on memory before verification even started.
+    ///
+    /// So the structure stays linear as in 0.3.20 (one full link per txid plus
+    /// one cheap stub per repeat), and [`Transaction::verify`] no longer cares
+    /// which copy it reaches: it gathers the reachable transactions by txid and
+    /// looks every input's source up in that map.
     fn add_input_proof(&self, tx: &mut Transaction) {
-        let mut linked: std::collections::HashMap<String, Transaction> =
-            std::collections::HashMap::new();
-        self.attach_proof_memoized(tx, &mut linked);
+        // Keyed by txid, the value being the stub handed to later inputs.
+        // Presence also means "this txid has been linked in full once".
+        let mut stubs: HashMap<String, Transaction> = HashMap::new();
+        self.attach_proof_memoized(tx, &mut stubs);
+    }
+
+    /// A bare copy of `tx`: the transaction with its BUMP when the BEEF proves
+    /// it, and with every input's `source_transaction` dropped, so no ancestry
+    /// is duplicated. The ancestry is lifted out before the clone and put back
+    /// after, so building a stub never copies a subtree.
+    fn bare_stub(tx: &mut Transaction, bump: Option<&MerklePath>) -> Transaction {
+        let ancestry: Vec<Option<Box<Transaction>>> = tx
+            .inputs
+            .iter_mut()
+            .map(|input| input.source_transaction.take())
+            .collect();
+        let mut stub = tx.clone();
+        for (input, source) in tx.inputs.iter_mut().zip(ancestry) {
+            input.source_transaction = source;
+        }
+        if stub.merkle_path.is_none() {
+            if let Some(mp) = bump {
+                stub.merkle_path = Some(mp.clone());
+            }
+        }
+        stub
     }
 
     fn attach_proof_memoized(
         &self,
         tx: &mut Transaction,
-        linked: &mut std::collections::HashMap<String, Transaction>,
+        stubs: &mut HashMap<String, Transaction>,
     ) {
         let txid = tx.id();
         if tx.merkle_path.is_none() {
@@ -196,8 +233,11 @@ impl Beef {
             let Some(src_txid) = input.source_txid.clone() else {
                 continue;
             };
-            if let Some(done) = linked.get(&src_txid) {
-                input.source_transaction = Some(Box::new(done.clone()));
+            if let Some(stub) = stubs.get(&src_txid) {
+                // Already linked in full once: this input gets the stub, which
+                // carries the output being spent (and the proof when there is
+                // one) without repeating the ancestry underneath it.
+                input.source_transaction = Some(Box::new(stub.clone()));
                 continue;
             }
             // Take the caller's own source when it carries one, else this BEEF's.
@@ -208,8 +248,13 @@ impl Beef {
                     None => continue, // not in this BEEF: left unlinked, as before
                 },
             };
-            self.attach_proof_memoized(&mut src, linked);
-            linked.insert(src_txid, src.clone());
+            // Memoize the stub BEFORE descending: a BEEF whose source links
+            // form a cycle then terminates instead of recursing forever, and
+            // for the honest DAG case the order makes no difference (a
+            // transaction is never reachable from inside its own ancestry).
+            let stub = Self::bare_stub(&mut src, self.find_bump(&src_txid));
+            stubs.insert(src_txid, stub);
+            self.attach_proof_memoized(&mut src, stubs);
             input.source_transaction = Some(Box::new(src));
         }
     }
@@ -2069,22 +2114,41 @@ mod merkle_path_reattach_tests {
         let subject_txid = subject.id();
 
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
+        // Every input carries the parent it spends, so its output (satoshis and
+        // locking script) is right there...
         for (vin, input) in parsed.inputs.iter().enumerate() {
             let src = input
                 .source_transaction
                 .as_ref()
                 .unwrap_or_else(|| panic!("input {vin} must carry its source"));
-            let grand = src.inputs[0]
-                .source_transaction
-                .as_ref()
-                .unwrap_or_else(|| {
-                    panic!("input {vin}: the unproven parent must carry ITS source")
-                });
+            assert_eq!(
+                src.id(),
+                middle.id(),
+                "input {vin} must carry the parent it names"
+            );
             assert!(
-                grand.merkle_path.is_some(),
-                "input {vin}: the proven grandparent must carry its merkle path"
+                src.outputs.len() > input.source_output_index as usize,
+                "input {vin}: the parent must carry the output being spent"
             );
         }
+        // ...but the ancestry BELOW that parent is linked exactly once: input 0
+        // gets the fully linked copy, input 1 a bare stub. Linking both in full
+        // is what made 0.3.21 exponential on a chain of such spends.
+        let first = parsed.inputs[0].source_transaction.as_ref().unwrap();
+        let grand = first.inputs[0]
+            .source_transaction
+            .as_ref()
+            .expect("input 0: the first copy of the unproven parent is linked in full");
+        assert!(
+            grand.merkle_path.is_some(),
+            "input 0: the proven grandparent must carry its merkle path"
+        );
+        let second = parsed.inputs[1].source_transaction.as_ref().unwrap();
+        assert!(
+            second.inputs[0].source_transaction.is_none(),
+            "input 1 must get a BARE STUB of the parent, not a second full copy"
+        );
+        // Neither `verify` nor anything else may care which copy it reaches.
         assert!(
             matches!(
                 parsed
@@ -2095,7 +2159,232 @@ mod merkle_path_reattach_tests {
                     .await,
                 Ok(true)
             ),
-            "every input's script executes against a fully linked ancestry"
+            "every input's script executes with its source found by txid"
         );
+    }
+
+    /// A DIAMOND CHAIN: every level spends both outputs of the previous
+    /// unproven level, which is what an ordinary wallet change chain looks
+    /// like. 0.3.21 linked every input by cloning the memoized parent, so each
+    /// level carried two full copies of the level below it and 24 levels meant
+    /// 2^24 subtrees: `from_beef` died on memory before verification started
+    /// (found by the zanaadu overlay engine's regression suite, 2026-09-08).
+    /// The linking must be linear in the BEEF and `verify` must still pass.
+    ///
+    /// The test itself builds the BEEF by hand and signs each level against a
+    /// SHALLOW copy of its parent, so the fixture stays linear too.
+    #[tokio::test]
+    async fn a_deep_diamond_chain_links_and_verifies_in_linear_time() {
+        const LEVELS: u32 = 24;
+
+        let (beef, subject_txid) = diamond_chain_beef(LEVELS, None).await;
+
+        let started = std::time::Instant::now();
+        let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
+            .expect("a 24-deep diamond of unproven spends must parse and link");
+        let verified = parsed
+            .verify(
+                &crate::transaction::MockChainTracker::always_valid(800_010),
+                None,
+            )
+            .await;
+        let elapsed = started.elapsed();
+
+        assert!(
+            matches!(verified, Ok(true)),
+            "a 24-deep diamond of valid unproven spends verifies: {verified:?}"
+        );
+        assert!(
+            elapsed.as_secs() < 5,
+            "linking plus verification must be linear in the chain, took {elapsed:?}"
+        );
+        // The linked structure itself must stay small: one full link per
+        // distinct parent plus one bare stub per repeat input, so a couple of
+        // source objects per level, never 2^level.
+        let sources = count_linked_sources(&parsed);
+        assert!(
+            sources <= 4 * (LEVELS as usize + 1),
+            "the linked ancestry must be linear: {sources} source objects for {LEVELS} levels"
+        );
+        assert!(
+            sources >= LEVELS as usize,
+            "every level must still be reachable: {sources} source objects"
+        );
+        println!("24-deep diamond: {sources} source objects, linked+verified in {elapsed:?}");
+    }
+
+    /// The same chain with one byte of the signature flipped in a MIDDLE
+    /// level: the by-txid walk must still reach that level and refuse it. A
+    /// walk that stopped at the first bare stub, or that trusted a proof-less
+    /// copy it could not descend, would let this through.
+    #[tokio::test]
+    async fn a_corrupted_signature_in_the_middle_of_the_chain_is_refused() {
+        let (beef, subject_txid) = diamond_chain_beef(12, Some(6)).await;
+        let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
+            .expect("the corrupted chain still parses and links");
+        match parsed
+            .verify(
+                &crate::transaction::MockChainTracker::always_valid(800_010),
+                None,
+            )
+            .await
+        {
+            Err(e) => assert!(
+                e.to_string()
+                    .contains("Script validation failed for input "),
+                "the interpreter's own refusal must surface, got: {e}"
+            ),
+            Ok(v) => {
+                panic!("a corrupted signature in the middle level must be refused, got Ok({v})")
+            }
+        }
+    }
+
+    /// The value rule the by-txid walk now carries: an unproven spend whose
+    /// outputs pay out more than its inputs bring in is refused, even though
+    /// every one of its scripts passes (TS `Transaction.verify`,
+    /// `outputTotal > inputTotal`). Nothing else in the SDK checked it.
+    #[tokio::test]
+    async fn an_unproven_spend_creating_satoshis_is_refused() {
+        use crate::primitives::PrivateKey;
+        use crate::script::template::SignOutputs;
+        use crate::script::templates::P2PKH;
+        use crate::script::{Script, ScriptTemplate, UnlockingScript};
+        use crate::transaction::{MerklePath, TransactionInput, TransactionOutput};
+
+        let key = PrivateKey::random();
+        let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
+        let mut funding = Transaction::new();
+        funding.inputs.push(TransactionInput {
+            source_txid: Some("aa".repeat(32)),
+            source_output_index: 0,
+            unlocking_script: Some(UnlockingScript::from_script(Script::new())),
+            ..Default::default()
+        });
+        funding
+            .outputs
+            .push(TransactionOutput::new(10_000, lock.clone()));
+        let funding_txid = funding.id();
+        funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
+
+        let mut spend = Transaction::new();
+        spend
+            .add_input_from_tx(funding, 0, P2PKH::unlock(&key, SignOutputs::All, false))
+            .unwrap();
+        // 10,000 sats in, 11,000 out: the signature is valid over exactly this.
+        spend.outputs.push(TransactionOutput::new(11_000, lock));
+        spend.sign().await.unwrap();
+        let beef = spend.to_beef(false).unwrap();
+        let subject_txid = spend.id();
+
+        let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
+        let verified = parsed
+            .verify(
+                &crate::transaction::MockChainTracker::always_valid(800_010),
+                None,
+            )
+            .await;
+        assert!(
+            matches!(verified, Ok(false)),
+            "a spend that creates satoshis must be refused, got {verified:?}"
+        );
+    }
+
+    /// Number of `source_transaction` objects reachable from `tx`.
+    fn count_linked_sources(tx: &Transaction) -> usize {
+        tx.inputs
+            .iter()
+            .filter_map(|input| input.source_transaction.as_deref())
+            .map(|src| 1 + count_linked_sources(src))
+            .sum()
+    }
+
+    /// A `levels`-deep chain of unproven spends over one proven funding
+    /// transaction, every level after the first spending BOTH outputs of the
+    /// level below it, returned as `(beef, subject_txid)`.
+    ///
+    /// `corrupt_level`, when given, flips one byte inside the signature of
+    /// that level's first input after signing it; the levels above it are
+    /// then built over the corrupted transaction, so the chain stays
+    /// structurally sound and only that one script fails.
+    async fn diamond_chain_beef(levels: u32, corrupt_level: Option<u32>) -> (Vec<u8>, String) {
+        use crate::primitives::PrivateKey;
+        use crate::script::template::SignOutputs;
+        use crate::script::templates::P2PKH;
+        use crate::script::{Script, ScriptTemplate, UnlockingScript};
+        use crate::transaction::{Beef, MerklePath, TransactionInput, TransactionOutput};
+
+        /// A copy carrying no ancestry, so the fixture never materializes one.
+        fn shallow(tx: &Transaction) -> Transaction {
+            let mut copy = tx.clone();
+            for input in copy.inputs.iter_mut() {
+                input.source_transaction = None;
+            }
+            copy
+        }
+
+        let key = PrivateKey::random();
+        let lock = P2PKH::new().lock(&key.public_key().hash160()).unwrap();
+
+        let mut funding = Transaction::new();
+        funding.inputs.push(TransactionInput {
+            source_txid: Some("aa".repeat(32)),
+            source_output_index: 0,
+            unlocking_script: Some(UnlockingScript::from_script(Script::new())),
+            ..Default::default()
+        });
+        let mut sats: u64 = 4_000_000;
+        funding
+            .outputs
+            .push(TransactionOutput::new(sats, lock.clone()));
+        let funding_txid = funding.id();
+        funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
+
+        let mut beef = Beef::new();
+        let bump_index = beef.merge_bump(funding.merkle_path.clone().unwrap());
+        beef.merge_raw_tx(funding.to_binary(), Some(bump_index));
+
+        let mut prev = shallow(&funding);
+        for level in 0..levels {
+            let mut tx = Transaction::new();
+            tx.add_input_from_tx(
+                prev.clone(),
+                0,
+                P2PKH::unlock(&key, SignOutputs::All, false),
+            )
+            .unwrap();
+            if level > 0 {
+                tx.add_input_from_tx(
+                    prev.clone(),
+                    1,
+                    P2PKH::unlock(&key, SignOutputs::All, false),
+                )
+                .unwrap();
+            }
+            sats -= 1_000; // a little less out than in: the value rule
+            tx.outputs
+                .push(TransactionOutput::new(sats / 2, lock.clone()));
+            tx.outputs
+                .push(TransactionOutput::new(sats - sats / 2, lock.clone()));
+            tx.sign().await.unwrap();
+            if corrupt_level == Some(level) {
+                // [0x47/0x48 push][0x30 len][0x02 rlen][r...]: byte 10 is in r.
+                let mut raw = tx.inputs[0].unlocking_script.as_ref().unwrap().to_binary();
+                raw[10] ^= 0x01;
+                tx.inputs[0].unlocking_script = Some(UnlockingScript::from_script(
+                    Script::from_binary(&raw).unwrap(),
+                ));
+            }
+            beef.merge_raw_tx(tx.to_binary(), None);
+            prev = shallow(&tx);
+        }
+
+        let subject_txid = prev.id();
+        assert_eq!(
+            beef.txs.len(),
+            levels as usize + 1,
+            "the fixture BEEF holds the funding plus every level, each once"
+        );
+        (beef.to_binary(), subject_txid)
     }
 }

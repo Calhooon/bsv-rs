@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — BEEF linking is linear and verify walks by txid
+
+- **`Beef::find_atomic_transaction` / `Transaction::from_beef` link each
+  distinct unproven parent ONCE, and every later input sourcing the same txid
+  gets a bare stub.** 0.3.21 linked every input in full by cloning the
+  memoized parent, which is EXPONENTIAL IN MEMORY on a diamond chain: when
+  each level spends both outputs of the previous unproven level (a wallet's
+  ordinary change chain), every level then carries two full copies of the
+  level below it, so 24 levels means 2^24 subtrees and `from_beef` dies on
+  memory before verification even starts. The stub is the parent transaction
+  itself (its outputs are what the input spends, and it carries the BUMP when
+  the BEEF proves it), with every one of ITS inputs' `source_transaction` left
+  `None`, so structure and work are linear in the BEEF. A 24-level diamond now
+  links to 47 source objects (2 per level) instead of ~2^24, in 57 ms.
+  Building a stub never copies a subtree, and the memo is filled before the
+  descent, so a BEEF whose source links form a cycle terminates instead of
+  recursing forever.
+- **`Transaction::verify` walks BY TXID, not by object graph.** It first
+  gathers every transaction reachable through `source_transaction` into a map
+  keyed by txid (a copy carrying a merkle path wins outright, otherwise the
+  copy with the most linked sources, and only the winner is descended), then
+  processes each txid exactly once: a proven transaction is checked against
+  the chain tracker and not descended; an unproven one is fee-checked when a
+  fee model is given, and has every input's script executed with the source
+  looked up BY TXID (the txid the input names, falling back to the id of
+  whatever source object it holds, as TS does). Nothing is cloned in the walk,
+  and no result depends on which copy of a parent an input happens to hold, so
+  the linear structure above verifies exactly like a fully duplicated one.
+  This is what 0.3.20 lacked: its walk reached a bare clone and refused a
+  complete BEEF with `Input N has no source transaction`, which is what pushed
+  0.3.21 into cloning everything. Error texts are unchanged (`Input N has no
+  source transaction`, `Script validation failed for input N: ...`, `Fee is
+  too low`, `Invalid merkle path for transaction ...`).
+- **The reference's value rule is now enforced**: an unproven transaction whose
+  outputs pay out more than its inputs bring in makes `verify` return
+  `Ok(false)`, matching the TS SDK's `outputTotal > inputTotal` check, which
+  the Rust walk had never carried. A transaction with no inputs at all is
+  exempt (there is no ancestry to weigh it against; it is a synthetic root,
+  never something the walk can judge).
+- Regression tests: `a_deep_diamond_chain_links_and_verifies_in_linear_time`
+  (24 levels: `from_beef` + `verify` in well under a second, and an upper
+  bound on the number of linked source objects), the middle-level
+  `a_corrupted_signature_in_the_middle_of_the_chain_is_refused`,
+  `an_unproven_spend_creating_satoshis_is_refused`, and
+  `two_inputs_from_one_unproven_parent_are_both_linked` (now asserting the
+  linear structure: input 0 fully linked, input 1 a stub, both verifying).
+  The exponential shape was found by the zanaadu overlay engine's own
+  regression suite (2026-09-08).
+
 ## [0.3.21] - 2026-09-09
 
 ### Fixed — BEEF ancestry linking for every input (ts-sdk parity)

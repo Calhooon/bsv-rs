@@ -1650,17 +1650,85 @@ impl Transaction {
         self.outputs.iter().filter_map(|o| o.satoshis).sum()
     }
 
+    /// Every transaction reachable from `self` through `source_transaction`
+    /// links, keyed by txid.
+    ///
+    /// A txid reached more than once keeps ONE copy: any copy carrying a
+    /// merkle path wins outright (a proven transaction needs no ancestry at
+    /// all), otherwise the copy with the most linked sources wins, and only
+    /// the winner is descended. That makes the gather independent of which
+    /// object copy a particular input happens to hold (`Beef::add_input_proof`
+    /// links each distinct parent once and hands later inputs a bare stub),
+    /// and keeps the work linear even on a graph linked by an older,
+    /// duplicating walk.
+    fn reachable_by_txid(&self) -> HashMap<String, &Transaction> {
+        /// How much ancestry a copy carries: a proof beats every link count.
+        fn linkage(tx: &Transaction) -> usize {
+            if tx.merkle_path.is_some() {
+                usize::MAX
+            } else {
+                tx.inputs
+                    .iter()
+                    .filter(|input| input.source_transaction.is_some())
+                    .count()
+            }
+        }
+
+        let mut by_txid: HashMap<String, &Transaction> = HashMap::new();
+        let mut stack: Vec<&Transaction> = vec![self];
+        while let Some(tx) = stack.pop() {
+            match by_txid.entry(tx.id()) {
+                std::collections::hash_map::Entry::Occupied(mut slot) => {
+                    if linkage(tx) <= linkage(slot.get()) {
+                        continue; // a copy at least as complete is already in
+                    }
+                    slot.insert(tx);
+                }
+                std::collections::hash_map::Entry::Vacant(slot) => {
+                    slot.insert(tx);
+                }
+            }
+            if tx.merkle_path.is_some() {
+                continue; // proven: its ancestry is not needed
+            }
+            for input in &tx.inputs {
+                if let Some(source) = input.source_transaction.as_deref() {
+                    stack.push(source);
+                }
+            }
+        }
+        by_txid
+    }
+
     /// Verifies this transaction using SPV (Simplified Payment Verification).
     ///
-    /// Performs a queue-based recursive verification of the transaction and its
-    /// ancestry chain. For each transaction:
+    /// The walk is BY TXID, not by object graph: every transaction reachable
+    /// through `source_transaction` links is gathered into a map keyed by txid
+    /// (see [`Transaction::reachable_by_txid`]) and each txid is then processed
+    /// exactly once:
     ///
-    /// 1. If the transaction has a merkle path, verifies it against the chain tracker
-    /// 2. Optionally validates that the fee meets the fee model requirements
-    /// 3. Validates all input scripts using the Spend interpreter
-    /// 4. Enqueues unverified source transactions for recursive verification
+    /// 1. a transaction carrying a merkle path is checked against the chain
+    ///    tracker and is not descended;
+    /// 2. an unproven one has its fee checked when a fee model is given, every
+    ///    input's script executed with the source looked up BY TXID in the map,
+    ///    and the reference's value rule applied (its outputs may not spend
+    ///    more than its inputs);
+    /// 3. the sources of an unproven transaction are queued by txid.
     ///
-    /// Matches the Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`.
+    /// Nothing is cloned and nothing depends on which copy of a parent an
+    /// input holds, so a BEEF that links each distinct parent once (the linear
+    /// structure `Beef::add_input_proof` builds, where later inputs sourcing
+    /// the same txid get a bare stub) verifies exactly like one that links
+    /// every input in full. The earlier object-graph walk forced that second
+    /// structure, which is exponential on a diamond chain (0.3.21).
+    ///
+    /// Matches the Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`,
+    /// whose inputs share one source object per txid by reference.
+    ///
+    /// The value rule is skipped for a transaction with no inputs at all:
+    /// there is no ancestry to weigh its outputs against, and such a
+    /// transaction is a synthetic root (a test fixture or a caller-built
+    /// source), never something this walk can judge.
     ///
     /// # Arguments
     ///
@@ -1672,18 +1740,21 @@ impl Transaction {
         fee_model: Option<&dyn super::FeeModel>,
     ) -> Result<bool> {
         use crate::primitives::bsv::sighash::{TxInput, TxOutput};
-        use crate::script::{LockingScript, Spend, SpendParams, UnlockingScript};
-        use std::collections::HashSet;
+        use crate::script::{Spend, SpendParams};
+
+        let by_txid = self.reachable_by_txid();
+        let overflow = || crate::Error::TransactionError("Input satoshis overflow".to_string());
 
         let mut verified_txids: HashSet<String> = HashSet::new();
-        let mut tx_queue: Vec<&Transaction> = vec![self];
+        let mut tx_queue: Vec<String> = vec![self.id()];
 
-        while let Some(tx) = tx_queue.pop() {
-            let txid = tx.id();
-
-            if verified_txids.contains(&txid) {
+        while let Some(txid) = tx_queue.pop() {
+            if !verified_txids.insert(txid.clone()) {
                 continue;
             }
+            let Some(tx) = by_txid.get(&txid).copied() else {
+                continue; // only txids found in the map are ever queued
+            };
 
             // If the transaction has a merkle path, verify it
             if let Some(ref merkle_path) = tx.merkle_path {
@@ -1696,7 +1767,6 @@ impl Transaction {
                     })?;
 
                 if is_valid {
-                    verified_txids.insert(txid);
                     continue;
                 } else {
                     return Err(crate::Error::TransactionError(format!(
@@ -1706,25 +1776,23 @@ impl Transaction {
                 }
             }
 
-            // Verify fee if fee model is provided
-            if let Some(fm) = fee_model {
-                let tx_fee = tx.get_fee()?;
-                let required_fee = fm.compute_fee(tx)?;
-                if tx_fee < required_fee {
-                    return Err(crate::Error::TransactionError("Fee is too low".to_string()));
-                }
-            }
-
-            // Verify each input's script
+            // Resolve every input's source output BY TXID, and total the
+            // inputs. The txid is the one the input names, falling back to the
+            // id of whatever source object it holds (TS `Transaction.verify`
+            // fills `sourceTXID` in the same way).
+            let mut sources: Vec<(String, &TransactionOutput)> =
+                Vec::with_capacity(tx.inputs.len());
+            let mut input_total: u64 = 0;
             for (vin, input) in tx.inputs.iter().enumerate() {
-                let source_tx = input.source_transaction.as_ref().ok_or_else(|| {
+                let missing = || {
                     crate::Error::TransactionError(format!(
                         "Input {} has no source transaction",
                         vin
                     ))
-                })?;
-
-                let source_output = source_tx
+                };
+                let source_txid = input.get_source_txid().map_err(|_| missing())?;
+                let source = by_txid.get(&source_txid).copied().ok_or_else(missing)?;
+                let source_output = source
                     .outputs
                     .get(input.source_output_index as usize)
                     .ok_or_else(|| {
@@ -1733,9 +1801,42 @@ impl Transaction {
                             vin
                         ))
                     })?;
+                input_total = input_total
+                    .checked_add(source_output.satoshis.unwrap_or(0))
+                    .ok_or_else(overflow)?;
+                sources.push((source_txid, source_output));
+            }
+            let mut output_total: u64 = 0;
+            for output in &tx.outputs {
+                output_total = output_total
+                    .checked_add(output.satoshis.unwrap_or(0))
+                    .ok_or_else(overflow)?;
+            }
 
+            // Verify fee if fee model is provided
+            if let Some(fm) = fee_model {
+                let tx_fee = input_total.saturating_sub(output_total);
+                let required_fee = fm.compute_fee(tx)?;
+                if tx_fee < required_fee {
+                    return Err(crate::Error::TransactionError("Fee is too low".to_string()));
+                }
+            }
+
+            let outputs: Vec<TxOutput> = tx
+                .outputs
+                .iter()
+                .map(|o| TxOutput {
+                    satoshis: o.satoshis.unwrap_or(0),
+                    script: o.locking_script.to_binary(),
+                })
+                .collect();
+
+            // Verify each input's script
+            for ((vin, input), (source_txid, source_output)) in
+                tx.inputs.iter().enumerate().zip(sources)
+            {
                 let source_satoshis = source_output.satoshis.unwrap_or(0);
-                let locking_script = source_output.locking_script.clone();
+                let locking_script = &source_output.locking_script;
                 let unlocking_script = input.unlocking_script.as_ref().ok_or_else(|| {
                     crate::Error::TransactionError(format!(
                         "Input {} is missing unlocking script",
@@ -1761,15 +1862,6 @@ impl Transaction {
                     })
                     .collect();
 
-                let outputs: Vec<TxOutput> = tx
-                    .outputs
-                    .iter()
-                    .map(|o| TxOutput {
-                        satoshis: o.satoshis.unwrap_or(0),
-                        script: o.locking_script.to_binary(),
-                    })
-                    .collect();
-
                 let source_txid_bytes = input.get_source_txid_bytes()?;
 
                 let mut spend = Spend::new(SpendParams {
@@ -1781,7 +1873,7 @@ impl Transaction {
                     )?),
                     transaction_version: tx.version as i32,
                     other_inputs,
-                    outputs,
+                    outputs: outputs.clone(),
                     input_index: vin,
                     unlocking_script: UnlockingScript::from_script(
                         crate::script::Script::from_binary(&unlocking_script.to_binary())?,
@@ -1798,14 +1890,17 @@ impl Transaction {
                     ))
                 })?;
 
-                // Enqueue unverified source transactions
-                let source_txid = source_tx.id();
+                // Enqueue unverified source transactions, by txid
                 if !verified_txids.contains(&source_txid) {
-                    tx_queue.push(source_tx);
+                    tx_queue.push(source_txid);
                 }
             }
 
-            verified_txids.insert(txid);
+            // The reference's value rule: an unmined transaction may not
+            // create satoshis (TS `Transaction.verify`, `outputTotal > inputTotal`).
+            if !tx.inputs.is_empty() && output_total > input_total {
+                return Ok(false);
+            }
         }
 
         Ok(true)
