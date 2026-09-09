@@ -297,7 +297,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                         let sender = message.identity_key.clone();
 
                         let cbs = general_message_callbacks.read().await;
-                        for (_, callback) in cbs.iter() {
+                        for callback in cbs.values() {
                             callback(sender.clone(), payload.clone()).await?;
                         }
                     }
@@ -307,7 +307,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                         let requested = message.requested_certificates.clone().unwrap_or_default();
 
                         let cbs = certificate_request_callbacks.read().await;
-                        for (_, callback) in cbs.iter() {
+                        for callback in cbs.values() {
                             callback(sender.clone(), requested.clone()).await?;
                         }
                     }
@@ -317,7 +317,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                         let certs = message.certificates.clone().unwrap_or_default();
 
                         let cbs = certificate_callbacks.read().await;
-                        for (_, callback) in cbs.iter() {
+                        for callback in cbs.values() {
                             callback(sender.clone(), certs.clone()).await?;
                         }
                     }
@@ -910,7 +910,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // Notify callbacks
         if let Some(ref requested) = message.requested_certificates {
             let cbs = self.certificate_request_callbacks.read().await;
-            for (_, callback) in cbs.iter() {
+            for callback in cbs.values() {
                 let _ = callback(message.identity_key.clone(), requested.clone()).await;
             }
         }
@@ -956,7 +956,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // Notify callbacks
         if let Some(ref certs) = message.certificates {
             let cbs = self.certificate_callbacks.read().await;
-            for (_, callback) in cbs.iter() {
+            for callback in cbs.values() {
                 let _ = callback(message.identity_key.clone(), certs.clone()).await;
             }
         }
@@ -996,7 +996,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // Notify callbacks
         if let Some(ref payload) = message.payload {
             let cbs = self.general_message_callbacks.read().await;
-            for (_, callback) in cbs.iter() {
+            for callback in cbs.values() {
                 let _ = callback(message.identity_key.clone(), payload.clone()).await;
             }
         }

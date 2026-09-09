@@ -2637,7 +2637,9 @@ mod from_beef_subject_tests {
     /// (the shape real wallet serializers emit — the zanaadu#284 trigger).
     /// `to_writer` on purpose: `to_binary` re-sorts parents-first and hides it.
     fn wire_order_beef(subject_first: bool) -> (Vec<u8>, String, String) {
-        let parsed = Beef::from_binary(&crate::primitives::encoding::from_hex(CHAIN_BEEF_HEX).unwrap()).unwrap();
+        let parsed =
+            Beef::from_binary(&crate::primitives::encoding::from_hex(CHAIN_BEEF_HEX).unwrap())
+                .unwrap();
         let parent = parsed.txs[0].tx().unwrap().clone();
         let child = parsed.txs[1].tx().unwrap().clone();
         let (parent_id, child_id) = (parent.id(), child.id());
