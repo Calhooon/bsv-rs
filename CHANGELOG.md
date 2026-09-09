@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.22] - 2026-09-09
+
 ### Fixed — BEEF linking is linear and verify walks by txid
 
 - **`Beef::find_atomic_transaction` / `Transaction::from_beef` link each
@@ -56,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The exponential shape was found by the zanaadu overlay engine's own
   regression suite (2026-09-08).
 
-## [0.3.21] - 2026-09-09
+## [0.3.21] - 2026-09-09 (YANKED: links every duplicate input by cloning, exponential on diamond chains; use 0.3.22)
 
 ### Fixed — BEEF ancestry linking for every input (ts-sdk parity)
 
