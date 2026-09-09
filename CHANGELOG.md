@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.21] - 2026-09-09
+
 ### Fixed — BEEF ancestry linking for every input (ts-sdk parity)
 
 - **`Beef::find_atomic_transaction` / `Transaction::from_beef` link EVERY input's
