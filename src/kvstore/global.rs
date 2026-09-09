@@ -71,7 +71,19 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             network_preset: network,
             ..Default::default()
         });
+        Self::with_resolver(wallet, config, network, resolver)
+    }
 
+    /// Create with a caller-built [`LookupResolver`] (a custom facilitator,
+    /// pinned SLAP trackers, host overrides, or a test double). `network` is
+    /// what the store reports and broadcasts under; the resolver is used as
+    /// given.
+    pub fn with_resolver(
+        wallet: W,
+        config: KVStoreConfig,
+        network: NetworkPreset,
+        resolver: LookupResolver,
+    ) -> Self {
         Self {
             wallet,
             config,

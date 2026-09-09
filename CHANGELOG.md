@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.24] - 2026-09-09
+
+### Added
+
+- `GlobalKVStore::with_resolver(wallet, config, network, resolver)`: build the
+  store over a caller-owned `LookupResolver` (a custom facilitator, pinned
+  SLAP trackers, host overrides, or a test double). `new`/`with_network` are
+  unchanged and route through it.
+- `examples/`: `keys`, `script`, `transaction`, `brc42`, `beef_spv`, `overlay`,
+  each a runnable program that CI compiles (`cargo build --examples
+  --all-features`). The README's code blocks are these files byte for byte,
+  pinned by `tests/readme_examples.rs`.
+
+### Fixed
+
+- Five `GlobalKVStore` tests asserted an overlay ERROR by relying on the
+  network being ABSENT ("without live SLAP hosts the resolver errors"): on
+  any machine with a route to the public SLAP trackers the real resolver
+  answered and the tests failed. They now inject a resolver with an empty
+  host list for the service (the resolver refuses before any request) and a
+  facilitator that refuses anyway. The full suite is green online and offline.
+
+### Documented
+
+- `README.md` and `CLAUDE.md` rewritten from scratch: what the crate is and is
+  not, the feature matrix from `Cargo.toml`, the interpreter's and BEEF's
+  contracts, the conformance discipline (shared vectors + the `ts-stack`
+  corpus), the wasm32 story, the known cross-SDK divergences, the release
+  procedure, and the measured test counts. The crate docs (`lib.rs`) match.
+- The BRC naming: the `auth` module implements BRC-103 mutual authentication
+  and its BRC-104 HTTP transport (the successors of BRC-31/Authrite); older
+  comments that still say BRC-31 describe the same protocol.
+
 ## [0.3.23] - 2026-09-09
 
 ### Fixed — reference parity in the script interpreter (`Spend`)
@@ -314,8 +347,17 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   differ and Go-produced tokens fail TS validators too. The Go SDK
   needs its own fix; `bsv-rs` matches the deployed reality.
 
-## [0.3.6] — 2025-12-??
+## Earlier releases (from the release commits; no entries were written at the time)
 
-Prior releases tracked in git history. This changelog begins with 0.3.7.
+- 0.3.20 (2026-09-09): the `Transaction::verify` walk that 0.3.21/0.3.22 replaced (refused a complete BEEF whose duplicate-input parents were bare clones).
+- 0.3.18 (2026-07-21): `SighashCache`, the midstate-reuse sighash API (documented under 0.3.21 above).
+- 0.3.17 (2026-07): the 0.3.16 parity work's follow-up release.
+- 0.3.15 (2026-07-07): three conformance-surfaced fixes (two panics, the fee formula).
+- 0.3.13 (2026-05-26): the BRC-104 transport timeout fix.
+- 0.3.10 (2026-05-20): `SocketIoTransport` (Socket.IO 5 / Engine.IO 4 + BRC-103, substrate-agnostic).
+- 0.3.9 (2026-05-19): the wasm32 `SystemTime::now` panic fixed (`js_sys::Date` behind the `wasm` feature).
+- 0.3.8 (2026-05-19): the wasm32 runtime-agnostic `Peer` timeout (`futures-timer`).
+- 0.3.6 (2026-04-20): the canonical 48-byte nonce, with the legacy 32-byte accept window.
+- 0.3.4 and earlier: tracked in git history.
 
 [0.3.7]: https://github.com/Calhooon/bsv-rs/releases/tag/v0.3.7

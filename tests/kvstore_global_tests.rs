@@ -23,7 +23,10 @@ use bsv_rs::kvstore::{
     GlobalKVStore, KVStoreConfig, KVStoreContext, KVStoreEntry, KVStoreFields, KVStoreGetOptions,
     KVStoreInterpreter, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
 };
-use bsv_rs::overlay::NetworkPreset;
+use bsv_rs::overlay::{
+    LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
+    OverlayLookupFacilitator,
+};
 use bsv_rs::primitives::{to_hex, PrivateKey, PublicKey};
 use bsv_rs::script::templates::PushDrop;
 use bsv_rs::script::LockingScript;
@@ -43,6 +46,47 @@ use bsv_rs::wallet::{
     WalletRevealSpecificArgs,
 };
 use bsv_rs::{Error, Result};
+use std::sync::Arc;
+
+/// A lookup facilitator that always fails: the overlay-error tests below must
+/// be HERMETIC. They used to rely on the network being ABSENT ("without live
+/// SLAP hosts the resolver errors"), so on any machine with a route to the
+/// public SLAP trackers the real resolver answered and the tests failed
+/// (5 of them, 2026-09-09). A test that needs an overlay error now injects
+/// this facilitator through `GlobalKVStore::with_resolver`.
+struct FailingLookupFacilitator;
+
+#[async_trait::async_trait(?Send)]
+impl OverlayLookupFacilitator for FailingLookupFacilitator {
+    async fn lookup(
+        &self,
+        url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
+        Err(Error::OverlayError(format!(
+            "hermetic lookup failure for {url}"
+        )))
+    }
+}
+
+/// A `GlobalKVStore` whose overlay lookups can never succeed, with no network
+/// reach: the service's host list is OVERRIDDEN TO EMPTY (the resolver refuses
+/// a query with no competent hosts before any request), the SLAP tracker list
+/// is empty (nothing to discover from), and the facilitator refuses anyway.
+fn hermetic_store() -> GlobalKVStore<MockWallet> {
+    let config = KVStoreConfig::default();
+    let mut host_overrides = std::collections::HashMap::new();
+    host_overrides.insert(config.service_name.clone(), Vec::<String>::new());
+    let resolver = LookupResolver::new(LookupResolverConfig {
+        network_preset: NetworkPreset::Local,
+        facilitator: Some(Arc::new(FailingLookupFacilitator)),
+        slap_trackers: Some(Vec::new()),
+        host_overrides: Some(host_overrides),
+        ..Default::default()
+    });
+    GlobalKVStore::with_resolver(MockWallet::new(), config, NetworkPreset::Local, resolver)
+}
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 // =============================================================================
@@ -572,8 +616,7 @@ async fn test_global_remove_wallet_get_public_key_error() {
 async fn test_global_get_nonexistent_key_overlay_error() {
     // Without live SLAP hosts, get() returns an OverlayError because
     // the resolver cannot find competent hosts for the lookup service.
-    let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store();
 
     let result = store.get("nonexistent_key", None).await;
     // Without a live overlay, the resolver returns an error.
@@ -592,8 +635,7 @@ async fn test_global_get_nonexistent_key_overlay_error() {
 async fn test_global_query_overlay_error_propagation() {
     // query() delegates to query_overlay. Without live SLAP hosts,
     // the resolver cannot find competent hosts and returns an error.
-    let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store();
 
     let query = KVStoreQuery::new().with_key("test_key");
     let result = store.query(query).await;
@@ -612,8 +654,7 @@ async fn test_global_query_overlay_error_propagation() {
 async fn test_global_get_by_controller_overlay_error() {
     // get_by_controller delegates to query(), which queries the overlay.
     // Without live SLAP hosts, the resolver returns an error.
-    let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store();
 
     let result = store.get_by_controller("02abc123def456").await;
     assert!(result.is_err());
@@ -631,8 +672,7 @@ async fn test_global_get_by_controller_overlay_error() {
 async fn test_global_get_by_tags_overlay_error() {
     // get_by_tags delegates to query(), which queries the overlay.
     // Without live SLAP hosts, the resolver returns an error.
-    let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store();
 
     let result = store.get_by_tags(&["important".to_string()], None).await;
     assert!(result.is_err());
@@ -1721,8 +1761,7 @@ async fn test_global_set_progresses_past_wallet_calls() {
     // which queries the overlay to check for existing tokens. Without live SLAP
     // hosts, the overlay query fails. The error type should be OverlayError
     // (not WalletError), proving the wallet's get_public_key call succeeded.
-    let wallet = MockWallet::new();
-    let store = GlobalKVStore::new(wallet, KVStoreConfig::default());
+    let store = hermetic_store();
 
     let result = store.set("test_key", "test_value", None).await;
     assert!(

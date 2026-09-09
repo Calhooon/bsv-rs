@@ -1,8 +1,8 @@
 [package]
 name = "bsv-rs"
-version = "0.3.23"
+version = "0.3.24"
 edition = "2021"
-description = "BSV blockchain SDK for Rust - primitives, script, transactions, and more"
+description = "BSV SDK for Rust: primitives, the script interpreter, transactions and BEEF/SPV, BRC-42 wallets, BRC-103 auth, the overlay network. Reference parity with the TypeScript SDK, native and wasm32."
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Calhooon/bsv-rs"
 homepage = "https://github.com/Calhooon/bsv-rs"
@@ -134,3 +134,27 @@ harness = false
 [[bench]]
 name = "script_bench"
 harness = false
+
+# The README's code blocks ARE these files (tests/readme_examples.rs pins the
+# bytes); `cargo build --examples --all-features` compiles every one.
+[[example]]
+name = "keys"
+
+[[example]]
+name = "script"
+
+[[example]]
+name = "transaction"
+required-features = ["transaction"]
+
+[[example]]
+name = "brc42"
+required-features = ["wallet"]
+
+[[example]]
+name = "beef_spv"
+required-features = ["transaction"]
+
+[[example]]
+name = "overlay"
+required-features = ["overlay", "http"]

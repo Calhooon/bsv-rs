@@ -1,40 +1,36 @@
-//! # BSV SDK
+//! # bsv-rs
 //!
-//! A comprehensive Rust SDK for building BSV (Bitcoin SV) applications.
-//! Feature-complete and production-ready.
+//! A Rust SDK for BSV: cryptographic primitives, the Bitcoin Script
+//! interpreter, transactions with BEEF/SPV, BRC-42 wallets, BRC-103 mutual
+//! authentication, and the overlay network (SHIP/SLAP/STEAK), with storage,
+//! registry, key-value and identity clients on top. It is a reference-parity
+//! port of the TypeScript `@bsv/sdk` (cross-checked against the Go SDK),
+//! pinned by shared test vectors and the `ts-stack` conformance corpus, and it
+//! builds for `wasm32-unknown-unknown` (Cloudflare Workers, browsers).
 //!
-//! ## Modules
+//! The README (`README.md`) is the guide: every code block in it is a file
+//! under `examples/` that CI compiles. Each module carries its own docs.
 //!
-//! - **primitives**: Cryptographic primitives (hash, EC, encoding, AES-256-GCM)
-//! - **script**: Bitcoin Script parsing, execution, and templates (P2PKH, RPuzzle, PushDrop)
-//! - **transaction**: Transaction construction, signing, BEEF/MerklePath SPV proofs
-//! - **wallet**: BRC-42 key derivation, ProtoWallet, WalletClient
+//! ## Feature flags
 //!
-//! ## Feature Flags
+//! `default = ["primitives", "script"]`. Opt in per module: `transaction`,
+//! `wallet`, `messages`, `compat`, `totp`, `auth`, `overlay`, `storage`,
+//! `registry`, `kvstore`, `identity`, `socketio`; `full` turns every module
+//! on. Transports and platforms: `http` (reqwest: ARC, WhatsOnChain, the
+//! HTTP wallet substrate, overlay hosts), `websocket` (a tokio-tungstenite
+//! auth transport, opt-in), `wasm` (the JS RNG, runtime-agnostic timers,
+//! `js_sys::Date` for wall-clock reads).
 //!
-//! - `primitives` (default): Core cryptographic primitives
-//! - `script` (default): Script parsing, execution, and templates
-//! - `transaction`: Transaction building, signing, BEEF format, fee models
-//! - `wallet`: BRC-42 key derivation, ProtoWallet, WalletClient
-//! - `full`: All features
-//! - `http`: HTTP client for ARC broadcaster, WhatsOnChain, WalletClient
-//! - `wasm`: WebAssembly support
-//!
-//! ## Quick Start
+//! ## Quick start
 //!
 //! ```rust
-//! use bsv_rs::primitives::{PrivateKey, sha256};
+//! use bsv_rs::primitives::{sha256, PrivateKey};
 //!
-//! // Generate a key pair
 //! let private_key = PrivateKey::random();
 //! let public_key = private_key.public_key();
-//!
-//! // Hash some data
-//! let hash = sha256(b"Hello, BSV!");
-//!
-//! // Sign a message
-//! let signature = private_key.sign(&hash).unwrap();
-//! assert!(public_key.verify(&hash, &signature));
+//! let digest = sha256(b"Hello, BSV!");
+//! let signature = private_key.sign(&digest).unwrap();
+//! assert!(public_key.verify(&digest, &signature));
 //! ```
 
 // Error types (shared across modules)

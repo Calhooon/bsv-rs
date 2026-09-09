@@ -1704,7 +1704,7 @@ impl Transaction {
     ///
     /// The walk is BY TXID, not by object graph: every transaction reachable
     /// through `source_transaction` links is gathered into a map keyed by txid
-    /// (see [`Transaction::reachable_by_txid`]) and each txid is then processed
+    /// (see the private `reachable_by_txid` walk) and each txid is then processed
     /// exactly once:
     ///
     /// 1. a transaction carrying a merkle path is checked against the chain
