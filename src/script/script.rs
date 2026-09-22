@@ -380,8 +380,11 @@ impl Script {
 
     /// Appends another script to this script.
     pub fn write_script(&mut self, script: &Script) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
         script.ensure_parsed();
         {
             let mut chunks = self.chunks.borrow_mut();
@@ -392,16 +395,22 @@ impl Script {
 
     /// Appends an opcode to the script.
     pub fn write_opcode(&mut self, op: u8) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
         self.chunks.borrow_mut().push(ScriptChunk::new_opcode(op));
         self
     }
 
     /// Appends binary data to the script, determining the appropriate opcode based on length.
     pub fn write_bin(&mut self, bin: &[u8]) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
 
         let len = bin.len();
         let op: u8;
@@ -435,8 +444,11 @@ impl Script {
     /// Numbers 0, -1, and 1-16 use special opcodes.
     /// Larger numbers are encoded in little-endian sign-magnitude format.
     pub fn write_number(&mut self, num: i64) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
 
         if num == 0 {
             self.chunks.borrow_mut().push(ScriptChunk::new_opcode(OP_0));
@@ -497,8 +509,11 @@ impl Script {
 
     /// Removes all OP_CODESEPARATOR opcodes from the script.
     pub fn remove_codeseparators(&mut self) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
 
         {
             let mut chunks = self.chunks.borrow_mut();
@@ -510,8 +525,11 @@ impl Script {
 
     /// Deletes the given script wherever it appears in the current script.
     pub fn find_and_delete(&mut self, script: &Script) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
         script.ensure_parsed();
 
         let target_hex = script.to_hex();
@@ -553,8 +571,11 @@ impl Script {
 
     /// Sets a specific chunk's opcode at the given index.
     pub fn set_chunk_opcode(&mut self, index: usize, op: u8) -> &mut Self {
-        self.invalidate_caches();
+        // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
+        // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and
+        // returned an EMPTY script (btg-token #11; the regression test names it).
         self.ensure_parsed();
+        self.invalidate_caches();
         {
             let mut chunks = self.chunks.borrow_mut();
             if index < chunks.len() {

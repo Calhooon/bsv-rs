@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.25] - 2026-09-22
+
+### Fixed
+
+- Every in-place mutator of `Script` (`write_script`, `write_opcode`, `write_bin`,
+  `write_number`, `remove_codeseparators`, `find_and_delete`, `set_chunk_opcode`)
+  invalidated the byte cache BEFORE parsing. On a script built with
+  `Script::from_binary` (raw bytes cached, chunks parsed lazily) that dropped the
+  only source of chunks, the parse ran on nothing, and the script came back EMPTY:
+  `set_chunk_opcode` on a 25-byte P2PKH lock serialized to 0 bytes. A downstream
+  mutation census (bolt-rs, 2026-08) tested a zero-byte lock and read it as a clean
+  result; btg-token #11 fixed it here rather than carry the trap. The order is now
+  parse, then invalidate, in all seven. Pinned by
+  `tests/script_mutators_keep_parsed_chunks.rs` (six tests, RED on 0.3.24, GREEN here).
+  No API or wire change; a `Script` built by `write_*` from empty was never affected.
+
 ## [0.3.24] - 2026-09-09
 
 ### Added
