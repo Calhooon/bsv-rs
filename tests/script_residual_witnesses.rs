@@ -1,5 +1,7 @@
-//! Regression: the five consensus divergences left after 0.3.26, on nine
-//! witness transactions (Calhooon/bsv-rs#12).
+//! Regression: the five consensus divergences left after 0.3.26, on ten
+//! witness transactions of eight rules (Calhooon/bsv-rs#12): two each for the
+//! truncated push and the undefined opcode, one each for the second OP_ELSE,
+//! OP_VER, OP_2DIV, OP_2MUL, 0xb7 as OP_RSHIFTNUM and the FORKID scriptCode.
 //!
 //! Each witness is a transaction (raw bytes, one input, one output) with the
 //! previous output it spends, the smallest case of a divergence a differential
@@ -25,7 +27,7 @@
 //! mining node decides) and in the TypeScript default mode, where the same
 //! consensus rules apply (the Chronicle opcodes follow the default's relaxed
 //! branch, version > 1, as in that SDK). The 0.3.26 verdict is recorded beside
-//! each; all nine move, by design: these rules were wrong in every mode.
+//! each; all ten move, by design: these rules were wrong in every mode.
 //!
 //! Every outpoint is synthetic; the previous outputs never existed on any chain.
 
@@ -285,7 +287,7 @@ fn sighash_scriptcode_a_forkid_signatures_push_is_not_deleted_so_it_cannot_verif
     check_all(&FINDANDDELETE_WITNESS);
 }
 
-/// All nine recorded 0.3.26 verdicts move under the block word: these were
+/// All ten recorded 0.3.26 verdicts move under the block word: these were
 /// consensus rules wrong in every mode, not policy.
 #[test]
 fn every_recorded_0_3_26_verdict_moves_under_the_block_word() {
