@@ -7,6 +7,108 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.26] - 2026-09-23
+
+### Added — the node's flag words (`script::flags`)
+
+- `ScriptFlags`: the script verification flag word with bitcoin-sv v1.2.2's
+  bit values (`src/script/script_flags.h:13-111`) and names (`from_names`,
+  `names`; the node's RPC table, `src/rpc/misc.cpp:1284-1305`), `from_bits`
+  (a bit this crate does not know is refused, never ignored), `check` (a word
+  this interpreter cannot honor, or one the reference itself refuses, is named:
+  no `SIGHASH_FORKID`, no `GENESIS`, no `UTXO_AFTER_GENESIS`, `CHRONICLE`
+  without `GENESIS`, `UTXO_AFTER_CHRONICLE` without `UTXO_AFTER_GENESIS`,
+  `CLEANSTACK` without `P2SH`), and the two derivations a node makes:
+  `ScriptFlags::block(era)`, the block-validation word
+  (`src/verify_script_flags.cpp:32-81` with the per-input flags of
+  `src/policy/policy.h:226-245`), and `ScriptFlags::standard(era)`, the mempool
+  word (`11-30`; `policy.h:178-223`). For a post-Chronicle block they are
+  `0x3D462F` and `0x3D47FF`; the standard word is the block word plus exactly
+  `NULLDUMMY | MINIMALDATA | DISCOURAGE_UPGRADABLE_NOPS | CLEANSTACK`, which a
+  block never carries (`policy.h:178-190`).
+- `ProtocolEra` (`PostGenesis`, `PostChronicle`) with the mainnet activation
+  heights 620,538 and 943,816 (`src/chainparams.cpp:18,23`) and
+  `ProtocolEra::mainnet(height)` (`src/protocol_era.cpp:21-39`).
+- `Spend::set_flags(word)` and `Spend::flags()`: every rule the interpreter
+  enforces is re-derived from the word and the transaction version exactly as
+  the reference derives it at the rule's site, under the reference's version
+  gate `EnforceNonMalleability` (`src/script/interpreter.cpp:40-44`: at
+  Chronicle a transaction of version 2 or above is malleable and every
+  malleability restriction is switched off for it). The rules and their
+  sites: MINIMALDATA (`433`), LOW_S (`282-288`), CLEANSTACK (`2436-2445`),
+  NULLDUMMY (`1664-1670`), NULLFAIL (`1491-1497`, `1640-1646`), MINIMALIF
+  (`795-803`), SIGPUSHONLY (`2321-2334`: post-Chronicle only for version <= 1),
+  DISCOURAGE_UPGRADABLE_NOPS (`522`, `565`, `765-771`), COMPRESSED_PUBKEYTYPE
+  (`322-327`). A word `check` refuses is reported by `validate` as `Invalid
+  verification flags: …`, as the reference reports `SCRIPT_ERR_INVALID_FLAGS`
+  (`2312-2313`, `2436-2437`). `set_require_minimal` and `set_require_push_only`
+  still override a derived rule when called afterwards. `SpendParams` is
+  unchanged; nothing a downstream builds with a literal moved.
+- Four rules the interpreter did not have, each active only under a word
+  that carries its flag: NULLFAIL (a signature that fails must be the empty
+  vector: `OP_CHECKSIG requires failing signatures to be empty.`; for
+  CHECKMULTISIG, every signature when the operation fails), MINIMALIF
+  (`OP_IF and OP_NOTIF require minimal truth values.`),
+  DISCOURAGE_UPGRADABLE_NOPS (an executed `OP_NOP1`-`OP_NOP10`: `… is
+  discouraged by verification flags.`; the three texts are the TypeScript
+  SDK's), COMPRESSED_PUBKEYTYPE (`The public key must be compressed.`).
+- `tests/script_flags_witnesses.rs`: seven witness transactions (200-byte
+  transactions with a synthetic previous output), each the smallest case of a
+  divergence the differential below found, each pinned under the block word,
+  the standard word and the default mode, with the 0.3.24 verdict recorded
+  beside it. `examples/script.rs` (and the README block that is that file)
+  shows the three verdicts of one untidy version-1 spend.
+
+### Fixed — a consensus oracle can select the block word (Calhooon/bsv-rs#10)
+
+- Used as a consensus validator, the interpreter judged a version-1 spend by
+  MINIMALDATA, CLEANSTACK and NULLDUMMY, relay-only rules that no block word
+  carries, so it rejected consensus-valid version-1 spends; it had no NULLFAIL
+  rule at all; and it applied NULLDUMMY regardless of the transaction version
+  where the reference gates it. Found by a differential run of 0.3.24 against
+  bitcoin-sv v1.2.2's flag derivation, one witness transaction per divergence.
+  On 0.3.25, in its only mode, all seven witnesses diverge from the block word
+  (RED, recorded in the pull request); on this release the block word agrees
+  with the reference on all seven, and any consumer that judges on the
+  network's behalf now selects it with one call.
+- The default mode's NULLDUMMY is gated on the transaction version like its
+  MINIMALDATA, LOW_S and CLEANSTACK (the TypeScript SDK's
+  `shouldEnforceNullDummy` is `!isRelaxed()`): a version-2 CHECKMULTISIG with
+  a non-empty dummy is accepted, as the reference accepts it in a block and at
+  relay. **This is the only default-mode verdict this release changes**; the
+  witness test pins it (one of seven recorded verdicts moves). Everything else
+  in the default mode is 0.3.25's: strict for version <= 1, relaxed for
+  version >= 2, push-only unlocking scripts at every version, no NULLFAIL.
+- `tests/script_mutators_keep_parsed_chunks.rs` reformatted (the 0.3.25 file
+  was not `cargo fmt --check`-clean).
+
+### Notes — cross-SDK parity
+
+- The TypeScript SDK's `verifyFlags` applies a flag as given: under explicit
+  flags it enforces NULLDUMMY, MINIMALDATA, LOW_S and CLEANSTACK at every
+  transaction version, and it has no `CHRONICLE` flag. This crate's words are
+  the NODE's words: `set_flags` applies the reference's version gate at the
+  reference's sites, so `ScriptFlags::standard(ProtocolEra::PostChronicle)` on
+  a version-2 spend enforces none of the four, exactly as a relaying node
+  does. The pre-Chronicle words (`ProtocolEra::PostGenesis`) have the gate
+  always on, which is the TypeScript explicit-flags behavior for those four.
+- The default mode still has no NULLFAIL rule at version <= 1 (TypeScript
+  parity), although the reference's block word has carried NULLFAIL since the
+  DAA fork (`src/verify_script_flags.cpp:65-69`): a version-1 spend with a
+  failing non-empty signature verifies here by default and fails on the
+  network. The Go SDK's interpreter takes the same rule as a flag
+  (`scriptflag.VerifyNullFail`). Select a word to get the node's answer.
+- `UTXO_AFTER_CHRONICLE` is accepted in a word, but the opcodes it re-enables
+  on the reference for a coin created after Chronicle (`OP_2MUL`, `OP_2DIV`,
+  `OP_VER`, `OP_VERIF`, `OP_VERNOTIF`; the Chronicle meanings of
+  `OP_NOP4`-`OP_NOP8`) are not implemented: a script using one is refused as
+  disabled, or treated as a NOP, regardless. The next interpreter gap.
+- The ts-stack conformance census (`tests/conformance_scripts.rs`) still runs
+  the default mode; its `unsupported` classes for NULLFAIL, MINIMALIF and
+  DISCOURAGE_UPGRADABLE_NOPS therefore stand, and the class that counted
+  "NULLDUMMY always enforced" is re-cut to the version gate. Driving the
+  node fixtures through `ScriptFlags::from_names` is the next census step.
+
 ## [0.3.25] - 2026-09-22
 
 ### Fixed

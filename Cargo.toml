@@ -1,6 +1,6 @@
 [package]
 name = "bsv-rs"
-version = "0.3.25"
+version = "0.3.26"
 edition = "2021"
 description = "BSV SDK for Rust: primitives, the script interpreter, transactions and BEEF/SPV, BRC-42 wallets, BRC-103 auth, the overlay network. Reference parity with the TypeScript SDK, native and wasm32."
 license = "MIT OR Apache-2.0"

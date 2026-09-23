@@ -10,6 +10,7 @@
 //! - Script number encoding (`script_num` module)
 //! - Script evaluation errors (`evaluation_error` module)
 //! - Spend validation (`Spend`)
+//! - Verification flag words: the node's block and standard words (`flags` module)
 //! - Script templates (`template` module, `templates` module)
 //!
 //! # Example: Building Scripts
@@ -59,6 +60,7 @@ pub mod address;
 pub mod bip276;
 pub mod chunk;
 pub mod evaluation_error;
+pub mod flags;
 pub mod locking_script;
 pub mod op;
 #[allow(clippy::module_inception)]
@@ -77,6 +79,7 @@ pub use chunk::ScriptChunk;
 pub use evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
+pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
 pub use locking_script::LockingScript;
 pub use script::Script;
 pub use script_num::ScriptNum;

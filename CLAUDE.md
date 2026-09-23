@@ -27,14 +27,14 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 | `src/error.rs` | The one `Error` enum (58 variants, feature-gated) and `Result<T>` |
 | `src/util/` | wasm32-safe time helpers (`pub(crate)`) |
 | `src/primitives/` | hash, EC (secp256k1, P-256, Shamir, ECDH), symmetric (AES-256-GCM), `BigNumber`, DRBG, encoding, `bsv/` (sighash, `SighashCache`) |
-| `src/script/` | `Script`/chunks/opcodes, `spend.rs` (the interpreter), `templates/` (P2PKH, P2PK, Multisig, RPuzzle, PushDrop) |
+| `src/script/` | `Script`/chunks/opcodes, `spend.rs` (the interpreter), `flags.rs` (the node's flag words: `ScriptFlags`, `ProtocolEra`), `templates/` (P2PKH, P2PK, Multisig, RPuzzle, PushDrop) |
 | `src/transaction/` | `Transaction`, inputs/outputs, `beef.rs`, `merkle_path.rs`, fee models, broadcasters (ARC, WoC, Teranode), chain trackers |
 | `src/wallet/` | `KeyDeriver`, `ProtoWallet`, `WalletClient`, `substrates/` (HTTP JSON), `wire/` (the BRC-100 binary protocol), validation |
 | `src/auth/` | `Peer`, sessions, certificates (BRC-52/53), `transports/` (HTTP, WebSocket, Socket.IO), utils (nonces, validation) |
 | `src/overlay/` | `LookupResolver`, `TopicBroadcaster`, facilitators, `Historian`, host reputation, admin tokens, double-spend retry |
 | `src/{messages,compat,totp,storage,registry,kvstore,identity}/` | as named |
 | `examples/` | The six README programs (`keys`, `script`, `transaction`, `brc42`, `beef_spv`, `overlay`); `[[example]]` entries carry `required-features` |
-| `tests/` | 36 integration files; `vectors/` (the shared JSON); `transaction/vectors/` (Rust constants); `conformance_*.rs` (the ts-stack census); `readme_examples.rs` |
+| `tests/` | 38 integration files; `vectors/` (the shared JSON); `transaction/vectors/` (Rust constants); `conformance_*.rs` (the ts-stack census); `readme_examples.rs`; `script_flags_witnesses.rs` (the flag words on seven witness transactions) |
 | `benches/` | Criterion: `hash_bench`, `primitives_bench`, `script_bench`, `memory_bench` |
 | `fuzz/` | `fuzz_script_parser`, `fuzz_transaction_parser`, `fuzz_wire_protocol`, `fuzz_base58` |
 | `.github/workflows/ci.yml` | The matrix, clippy, fmt, docs |
@@ -59,7 +59,7 @@ dhat-profiling = ["dep:dhat"]
 
 ## The contracts (the short form; the README has the long one)
 
-- `Spend` = the TS default evaluation mode: strict for version ≤ 1, relaxed for version ≥ 2; post-Genesis opcodes; the combined-script CHECKSIG subscript; 1 GiB max element, 32 MB default memory budget, `ScriptResourceLimit` as its own error class; `OP_NUM2BIN` refuses before allocating.
+- `Spend` = the TS default evaluation mode without a word (strict for version ≤ 1: MINIMALDATA, LOW_S, CLEANSTACK, NULLDUMMY; relaxed for version ≥ 2; push-only always; no NULLFAIL), or, with `set_flags`, the NODE's word: `ScriptFlags::block(era)` (consensus) / `ScriptFlags::standard(era)` (mempool policy), every rule at bitcoin-sv v1.2.2's site under its version gate (`src/script/flags.rs` carries the table and the citations; the reference clone is `~/bsv/bitcoin-sv` at `v1.2.2`, `879fc8b`). A consensus oracle selects the block word. Post-Genesis opcodes; the combined-script CHECKSIG subscript; 1 GiB max element, 32 MB default memory budget, `ScriptResourceLimit` as its own error class; `OP_NUM2BIN` refuses before allocating. Consensus and policy are different things and this crate says which is which: a rule that is policy is never enforced under the block word.
 - BEEF: linear linking (one full link per distinct parent, stubs after), `verify` by txid (proven: tracker, not descended; unproven: every input script executed, outputs ≤ inputs), cycles terminate, the merkle path reattached on `from_beef`.
 - Sighash lives in the templates; `SighashCache` for midstate reuse; RFC 6979 via k256 (`bits2octets` for a digest ≥ n, unlike libsecp256k1: signatures differ only in that regime, both verify).
 - Auth: BRC-103 (the code's older comments say BRC-31: the same protocol under its earlier name); nonces are the canonical 48-byte form since 0.3.6 (the 32-byte legacy accept window is still in place; remove it deliberately, with a changelog line).
@@ -73,10 +73,12 @@ dhat-profiling = ["dep:dhat"]
 - TS and Go disagree on the nonce HMAC inputs (`protocolID [2,'server hmac']` + UTF-8 keyID vs security level 1 + raw-bytes keyID); this crate follows Go's level with its own base64 keyID. `verify_nonce` is only ever called on a peer's own nonces, so nothing crosses the gap in practice.
 - Go signs overlay admin tokens with `counterparty = Self` (a different signing key); this crate matches the deployed TS validators (`@bsv/sdk 1.10.1`).
 - k256's RFC 6979 seeding for a digest ≥ n differs from libsecp256k1's; pinned in `tests/ec_tests.rs`.
+- TS's explicit `verifyFlags` applies a flag as given (NULLDUMMY, MINIMALDATA, LOW_S, CLEANSTACK at every version; no `CHRONICLE` flag); this crate's `set_flags` applies the node's version gate at the node's sites (0.3.26). The default mode keeps TS's no-NULLFAIL; the block word carries it.
+- `UTXO_AFTER_CHRONICLE`'s opcode re-enablements (OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF; NOP4–NOP8's Chronicle meanings) are not implemented; the bit is accepted and the gap stated in the changelog (0.3.26).
 
 ## Where the numbers come from
 
-`cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result"` summed: 0.3.24 measured 2,863 passed / 0 failed / 127 ignored (the `rust,ignore` doc illustrations). `find src -name '*.rs' | xargs wc -l` for the line count. The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
+`cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result"` summed: 0.3.26 measured 2,900 passed / 0 failed / 128 ignored (the `rust,ignore` doc illustrations; with the ts-stack corpus present). `find src -name '*.rs' | xargs wc -l` for the line count. The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
 
 ## Downstreams to keep in mind
 

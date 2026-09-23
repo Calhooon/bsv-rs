@@ -86,7 +86,9 @@ fn main() {
 ```rust
 // examples/script.rs
 use bsv_rs::script::templates::P2PKH;
-use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
+use bsv_rs::script::{
+    LockingScript, ProtocolEra, Script, ScriptFlags, Spend, SpendParams, UnlockingScript,
+};
 
 fn main() {
     // A P2PKH locking script from an address, and the same script parsed
@@ -139,6 +141,38 @@ fn main() {
     let err = refused.validate().unwrap_err();
     assert!(!err.is_resource_limit());
     println!("refused {}", err.message);
+
+    // A node validates under a FLAG WORD and derives two of them: the block
+    // word (what a mining node applies when it connects a block) and the
+    // standard word (the block word plus the relay-only restrictions of its
+    // mempool policy). Without a word `Spend` is the TypeScript SDK's default
+    // mode, which is neither; a consensus oracle selects the block word. Here
+    // a version-1 spend leaves two elements on the stack: refused by the
+    // default mode and by the standard word (CLEANSTACK, a relay rule), valid
+    // under the block word, exactly as it is in a block.
+    let untidy = || {
+        Spend::new(SpendParams {
+            source_txid: [0u8; 32],
+            source_output_index: 0,
+            source_satoshis: 1,
+            locking_script: LockingScript::from_asm("OP_1 OP_1").unwrap(),
+            transaction_version: 1,
+            other_inputs: vec![],
+            outputs: vec![],
+            input_index: 0,
+            unlocking_script: UnlockingScript::new(),
+            input_sequence: 0xffff_ffff,
+            lock_time: 0,
+            memory_limit: None,
+        })
+    };
+    assert!(untidy().validate().is_err());
+    let mut consensus = untidy();
+    consensus.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle));
+    assert!(consensus.validate().unwrap());
+    let mut relay = untidy();
+    relay.set_flags(ScriptFlags::standard(ProtocolEra::PostChronicle));
+    println!("relay   {}", relay.validate().unwrap_err().message);
 }
 ```
 
@@ -375,7 +409,7 @@ More: BRC-103 over HTTP or Socket.IO (`auth`, `socketio`), the wallet wire proto
 
 ## The contracts that matter
 
-**The interpreter is the TypeScript SDK's default evaluation mode.** `Spend` has no verify-flags parameter. A transaction of version 1 or lower runs strict: minimal pushes and minimally encoded numbers, low-S, NULLDUMMY, push-only unlocking scripts, a clean stack, strict DER and public-key encodings, `SIGHASH_FORKID` required. Version 2 and above runs the post-Genesis relaxed mode (MINIMALDATA, LOW_S and CLEANSTACK not enforced), as `Spend.isRelaxed()` does upstream; `set_require_minimal` and `set_require_push_only` override either way. The opcode set is post-Genesis BSV (OP_MUL, OP_CAT, OP_LSHIFT and the rest enabled; OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF disabled; no pre-Genesis size or count limits; no P2SH evaluation; CLTV and CSV are NOPs). A CHECKSIG's signed subscript continues across the unlock/lock boundary after an OP_CODESEPARATOR, so OP_PUSH_TX covenants verify. A script element may be up to 1 GiB; the working memory budget is 32 MB by default (`memory_limit`); exhausting it is a `ScriptResourceLimit` (`Stack`, `AltStack`, `ElementSize`) that `is_resource_limit()` tells apart from a refusal, and `OP_NUM2BIN` refuses an oversized size operand before allocating it.
+**The interpreter runs in the TypeScript SDK's default mode, or under a node's flag word.** Without a word, `Spend` is the TypeScript SDK's default evaluation mode: a transaction of version 1 or lower runs strict (minimal pushes and minimally encoded numbers, low-S, an empty CHECKMULTISIG dummy, push-only unlocking scripts, a clean stack, strict DER and public-key encodings, `SIGHASH_FORKID` required); version 2 and above runs the post-Genesis relaxed mode (MINIMALDATA, LOW_S, CLEANSTACK and NULLDUMMY not enforced), as `Spend.isRelaxed()` does upstream; `set_require_minimal` and `set_require_push_only` override either way. That mode is neither of the two words a node validates under. With `set_flags(ScriptFlags::block(era))` the interpreter applies the block-validation word bitcoin-sv v1.2.2 derives for a block of that era, and with `ScriptFlags::standard(era)` the mempool word (the block word plus exactly NULLDUMMY, MINIMALDATA, DISCOURAGE_UPGRADABLE_NOPS and CLEANSTACK); every rule, including NULLFAIL, MINIMALIF and the discouraged NOPs, is enforced at the reference's site under the reference's version gate (at Chronicle a transaction of version 2 or above is malleable and every malleability restriction is off for it). A caller judging a spend on the network's behalf selects the block word; `ScriptFlags` carries the reference's bit values and names, so a word can be compared with a node's own. The opcode set is post-Genesis BSV (OP_MUL, OP_CAT, OP_LSHIFT and the rest enabled; OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF disabled, also for a post-Chronicle UTXO, which is this crate's known gap; no pre-Genesis size or count limits; no P2SH evaluation; CLTV and CSV are NOPs). A CHECKSIG's signed subscript continues across the unlock/lock boundary after an OP_CODESEPARATOR, so OP_PUSH_TX covenants verify. A script element may be up to 1 GiB; the working memory budget is 32 MB by default (`memory_limit`); exhausting it is a `ScriptResourceLimit` (`Stack`, `AltStack`, `ElementSize`) that `is_resource_limit()` tells apart from a refusal, and `OP_NUM2BIN` refuses an oversized size operand before allocating it.
 
 **BEEF linking is linear and `verify` walks by txid.** `Transaction::from_beef` links each distinct unproven parent once and gives every later input sourcing the same txid a stub, so a diamond chain (each level spending both outputs of the last) links in time and memory linear in the BEEF; `verify` gathers the reachable transactions into a map by txid, checks a proven one against the `ChainTracker` and does not descend it, executes every input script of an unproven one against its source looked up by txid, and refuses an unproven transaction whose outputs exceed its inputs (a transaction with no inputs is a synthetic root and exempt). A BEEF whose links form a cycle terminates.
 
@@ -399,12 +433,12 @@ Parity with the reference SDKs is a discipline, not a claim:
 - **Cross-SDK wire protocol**: the BRC-100 wallet wire (`WalletWireTransceiver` / `WalletWireProcessor`) round-trips all 28 methods against vectors captured from the Go SDK's serializer.
 - **Known divergences are written down**, in `CHANGELOG.md` and in `CLAUDE.md`: the Go SDK's default counterparty (`Anyone` vs `Self`), Go's missing TOTP, overlay caching, historian, reputation and RPuzzle; the TypeScript TOTP default of 2 digits (this crate uses 6, per the RFC); the SDKs' disagreement on the nonce HMAC inputs (`verify_nonce` is only ever called on a peer's own nonces); the Go admin-token signing key; and RFC 6979 nonces for a digest at or above the curve order, where k256 follows the RFC and libsecp256k1 does not (signatures differ in that regime only, and both verify).
 
-## Numbers (measured at 0.3.24)
+## Numbers (measured at 0.3.26)
 
 | | |
 |---|---|
-| Source | 88,544 lines of Rust under `src/`, 13 feature-gated modules, one `Error` enum |
-| Tests | 2,863 passed, 0 failed (1,469 unit, 1,226 integration across 36 files, 168 doc tests); 127 doc examples are `ignore`d illustrations |
+| Source | 89,799 lines of Rust under `src/`, 13 feature-gated modules, one `Error` enum |
+| Tests | 2,900 passed, 0 failed (1,490 unit, 1,241 integration across 38 files, 169 doc tests); 128 doc examples are `ignore`d illustrations |
 | Vectors | 2,031 shared JSON vectors + the `ts-stack` corpus (5,116 script-domain vectors pinned) |
 | Fuzzing | 4 libFuzzer targets: the script parser, the transaction parser, the wire protocol, base58 |
 | Benchmarks | 4 Criterion suites: hashes, primitives, script, memory (with RSS tracking) |

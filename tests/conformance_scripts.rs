@@ -14,18 +14,24 @@
 //! count are pinned so corpus or harness drift is detected.
 //!
 //! IMPORTANT CONTEXT — why an unsupported allowlist exists at all:
-//! bsv-rs's `Spend` interpreter is a port of the ts-sdk *default* evaluation
-//! mode: it has NO verify-flags parameter. It unconditionally enforces
-//! MINIMALDATA (minimal pushes + minimally-encoded numbers), LOW_S, NULLDUMMY,
-//! SIGPUSHONLY (push-only unlocking scripts), CLEANSTACK, strict DER/pubkey
-//! encodings, and SIGHASH_FORKID-required, while running the post-genesis BSV
-//! opcode set (OP_MUL/OP_CAT/OP_LSHIFT... enabled; only OP_2MUL/OP_2DIV/
-//! OP_VER/OP_VERIF/OP_VERNOTIF disabled; no pre-genesis size/count limits; no
-//! P2SH redeem-script evaluation; OP_CHECKLOCKTIMEVERIFY/OP_CHECKSEQUENCEVERIFY
-//! are NOPs). The node fixtures, in contrast, are parameterized by node verify
-//! flags (P2SH, STRICTENC, UTXO_AFTER_GENESIS, ...). Vectors whose expected
-//! outcome depends on a flag configuration bsv-rs cannot express are counted
-//! per-class below, with the class totals pinned.
+//! this census runs bsv-rs's `Spend` interpreter in the ts-sdk *default*
+//! evaluation mode (no flag word passed). That mode enforces, for transaction
+//! version <= 1, MINIMALDATA (minimal pushes + minimally-encoded numbers),
+//! LOW_S, NULLDUMMY and CLEANSTACK, and at every version SIGPUSHONLY
+//! (push-only unlocking scripts), strict DER/pubkey encodings and
+//! SIGHASH_FORKID-required; it has no NULLFAIL, MINIMALIF or
+//! DISCOURAGE_UPGRADABLE_NOPS rule; and it runs the post-genesis BSV opcode
+//! set (OP_MUL/OP_CAT/OP_LSHIFT... enabled; only OP_2MUL/OP_2DIV/OP_VER/
+//! OP_VERIF/OP_VERNOTIF disabled; no pre-genesis size/count limits; no P2SH
+//! redeem-script evaluation; OP_CHECKLOCKTIMEVERIFY/OP_CHECKSEQUENCEVERIFY are
+//! NOPs). The node fixtures, in contrast, are parameterized by node verify
+//! flags (P2SH, STRICTENC, UTXO_AFTER_GENESIS, ...). Since 0.3.26
+//! `Spend::set_flags(ScriptFlags::from_names(..))` can express a node word
+//! (the rules above become the word's, with NULLFAIL, MINIMALIF and
+//! DISCOURAGE_UPGRADABLE_NOPS); driving the fixtures through it is the
+//! census's next step. Until then, vectors whose expected outcome depends on
+//! a flag configuration the default mode cannot express are counted per-class
+//! below, with the class totals pinned.
 #![cfg(feature = "transaction")]
 
 use serde_json::Value;
@@ -237,8 +243,8 @@ fn run_node_script(input: &Value) -> Result<bool, String> {
 /// Enumerated unsupported classes for node-script/node-transaction fixtures.
 ///
 /// A mismatch (bsv-rs result != expected) is only tolerated when it is
-/// attributable to a verify-flag capability bsv-rs's flagless interpreter
-/// cannot express. Anything else is a hard failure (or a pinned KNOWN_FAILURE).
+/// attributable to a verify-flag capability the default mode (no word) cannot
+/// express. Anything else is a hard failure (or a pinned KNOWN_FAILURE).
 ///
 /// got=true / expected=false → bsv-rs is missing a flag-ON enforcement:
 ///   classified via the fixture's expected node result code.
@@ -273,9 +279,11 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
             "INVALID_STACK_OPERATION" if has("UTXO_AFTER_CHRONICLE") => {
                 Some("UTXO_AFTER_CHRONICLE opcode semantics not implemented in bsv-rs")
             }
-            "DISCOURAGE_UPGRADABLE_NOPS" => Some("no DISCOURAGE_UPGRADABLE_NOPS flag in bsv-rs"),
-            "MINIMALIF" => Some("no MINIMALIF flag in bsv-rs"),
-            "NULLFAIL" => Some("no NULLFAIL flag in bsv-rs"),
+            "DISCOURAGE_UPGRADABLE_NOPS" => {
+                Some("DISCOURAGE_UPGRADABLE_NOPS is not in the default mode (only under a word)")
+            }
+            "MINIMALIF" => Some("MINIMALIF is not in the default mode (only under a word)"),
+            "NULLFAIL" => Some("NULLFAIL is not in the default mode (only under a word)"),
             // OP_CHECKLOCKTIMEVERIFY / OP_CHECKSEQUENCEVERIFY are NOPs in
             // bsv-rs (post-genesis), so locktime fixtures cannot reject.
             "UNSATISFIED_LOCKTIME" | "NEGATIVE_LOCKTIME" => {
@@ -334,25 +342,25 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
         if (msg.contains("not minimally-encoded") || msg.contains("Invalid script number"))
             && !has("MINIMALDATA")
         {
-            return Some("bsv-rs always enforces MINIMALDATA (no off switch)");
+            return Some("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)");
         }
         if msg.contains("clean stack") && !has("CLEANSTACK") {
-            return Some("bsv-rs always enforces CLEANSTACK (no off switch)");
+            return Some("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)");
         }
         if msg.contains("SIGHASH_FORKID") && !has("SIGHASH_FORKID") {
             return Some("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)");
         }
         if msg.contains("low S") && !has("LOW_S") {
-            return Some("bsv-rs always enforces LOW_S (no off switch)");
+            return Some("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)");
         }
         if msg.contains("dummy") && !has("NULLDUMMY") {
-            return Some("bsv-rs always enforces NULLDUMMY (no off switch)");
+            return Some("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)");
         }
         if (msg.contains("signature format is invalid") || msg.contains("public key"))
             && !has("STRICTENC")
             && !has("DERSIG")
         {
-            return Some("bsv-rs always enforces strict DER/pubkey encodings (no off switch)");
+            return Some("strict DER/pubkey encodings are always enforced (SIGHASH_FORKID implies STRICTENC on the reference too)");
         }
         None
     }
@@ -1245,7 +1253,7 @@ fn finish_evaluation(summary: Summary) {
 /// Audited empirically against corpus stats (5,116 vectors, META.json
 /// last_updated 2026-05-19) — see classify_node_mismatch for what each class
 /// means. THESE ARE NOT FAILURES — they are enumerated capability gaps of
-/// bsv-rs's flagless, always-strict, post-genesis interpreter and its
+/// the default mode (strict at version <= 1, post-genesis) and its
 /// FORKID-only sighash. Any drift (corpus update, SDK behavior change) fails
 /// the assert and forces a re-audit.
 const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
@@ -1258,16 +1266,16 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     // 30 version-2 fixtures that previously died at the always-on clean-stack
     // check now execute; 27 pass conformantly (moved to `run`) and 3 progress
     // to the CLTV/CSV gap below (5 -> 8). Zero new mismatches.
-    ("bsv-rs always enforces CLEANSTACK (no off switch)", 195),
-    ("bsv-rs always enforces LOW_S (no off switch)", 9),
-    ("bsv-rs always enforces MINIMALDATA (no off switch)", 181),
-    ("bsv-rs always enforces NULLDUMMY (no off switch)", 4),
+    ("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)", 195),
+    ("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)", 9),
+    ("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)", 181),
+    ("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)", 4),
     (
         "bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)",
         319,
     ),
     (
-        "bsv-rs always enforces strict DER/pubkey encodings (no off switch)",
+        "strict DER/pubkey encodings are always enforced (SIGHASH_FORKID implies STRICTENC on the reference too)",
         54,
     ),
     (
@@ -1294,8 +1302,8 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     // sighash vectors cover the FORKID `regular_hash` side only.
     ("legacy/OTDA sighash not implemented in bsv-rs", 1244),
     ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 8),
-    ("no DISCOURAGE_UPGRADABLE_NOPS flag in bsv-rs", 20),
-    ("no MINIMALIF flag in bsv-rs", 6),
+    ("DISCOURAGE_UPGRADABLE_NOPS is not in the default mode (only under a word)", 20),
+    ("MINIMALIF is not in the default mode (only under a word)", 6),
     (
         "no P2SH redeem-script evaluation in bsv-rs (post-genesis rules)",
         72,
