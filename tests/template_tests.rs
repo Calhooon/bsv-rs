@@ -10,6 +10,17 @@ use bsv_rs::script::templates::{Multisig, RPuzzle, RPuzzleType, P2PK, P2PKH};
 use bsv_rs::script::ScriptTemplate;
 
 /// Test that P2PKH locking script can be spent with the correct key.
+/// A DER signature with its sighash byte: it parses, re-encodes to the same
+/// bytes and is 9 to 73 bytes long (`IsValidSignatureEncoding`,
+/// interpreter.cpp:177-194). A fixed lower bound of 70 fails on a key whose
+/// `r` or `s` has a leading zero byte (#16).
+fn assert_checksig_signature(sig: &[u8]) {
+    let parsed = bsv_rs::primitives::bsv::TransactionSignature::from_checksig_format(sig)
+        .expect("a DER signature with a sighash byte");
+    assert_eq!(parsed.to_checksig_format(), sig);
+    assert!((9..=73).contains(&sig.len()), "{} bytes", sig.len());
+}
+
 #[test]
 fn test_p2pkh_end_to_end_spend() {
     // Generate a random key pair
@@ -44,7 +55,7 @@ fn test_p2pkh_end_to_end_spend() {
 
     // First chunk: signature (DER + sighash byte)
     let sig_data = chunks[0].data.as_ref().unwrap();
-    assert!(sig_data.len() >= 70 && sig_data.len() <= 73);
+    assert_checksig_signature(sig_data);
     assert_eq!(
         *sig_data.last().unwrap(),
         (SIGHASH_ALL | SIGHASH_FORKID) as u8
@@ -351,7 +362,7 @@ fn test_p2pk_end_to_end() {
     assert_eq!(chunks.len(), 1);
 
     let sig_data = chunks[0].data.as_ref().unwrap();
-    assert!(sig_data.len() >= 70 && sig_data.len() <= 73);
+    assert_checksig_signature(sig_data);
     assert_eq!(
         *sig_data.last().unwrap(),
         (SIGHASH_ALL | SIGHASH_FORKID) as u8
@@ -448,7 +459,7 @@ fn test_multisig_2_of_3_end_to_end() {
     // Chunks 1 and 2: signatures
     for chunk in &chunks[1..=2] {
         let sig = chunk.data.as_ref().unwrap();
-        assert!(sig.len() >= 70 && sig.len() <= 73);
+        assert_checksig_signature(sig);
     }
 }
 

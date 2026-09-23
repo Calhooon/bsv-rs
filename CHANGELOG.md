@@ -28,6 +28,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boundary tests in `spend.rs` (`s = n/2` low, `s = n/2 + 1` and `s = n - 1`
   high, `s = n`, `s = n + 1` and `r = n` the zero signature).
 
+### Tests
+
+- Nine assertions that a fresh signature is 70 to 73 bytes long replaced by
+  what the reference admits: the element parses as a DER signature with its
+  sighash byte, re-encodes to the same bytes and is 9 to 73 bytes long
+  (`IsValidSignatureEncoding`, `src/script/interpreter.cpp:177-194`); the
+  multisig unlock test signs with fixed keys. A minimal DER `r` or `s` is
+  shorter than 32 bytes when its leading byte is zero, so the old lower bound
+  failed on about one key in 13,000 (`test_multisig_unlock_has_dummy_op_0` on
+  `main`, Calhooon/bsv-rs#16). Test-only; the interpreter is unchanged.
+
 ### Corrected
 
 - The 0.3.27 entry and the header of `tests/script_residual_witnesses.rs`

@@ -197,7 +197,17 @@ mod tests {
         assert_eq!(chunks.len(), 1);
 
         let sig_data = chunks[0].data.as_ref().unwrap();
-        assert!(sig_data.len() >= 70 && sig_data.len() <= 73);
+        // A DER signature with its sighash byte: 9 to 73 bytes
+        // (`IsValidSignatureEncoding`, interpreter.cpp:177-194); a fixed lower
+        // bound of 70 is not a property of a valid signature (#16).
+        let parsed = TransactionSignature::from_checksig_format(sig_data)
+            .expect("a DER signature with a sighash byte");
+        assert_eq!(parsed.to_checksig_format(), *sig_data);
+        assert!(
+            (9..=73).contains(&sig_data.len()),
+            "{} bytes",
+            sig_data.len()
+        );
         assert_eq!(*sig_data.last().unwrap(), 0x41u8); // SIGHASH_ALL | SIGHASH_FORKID
     }
 

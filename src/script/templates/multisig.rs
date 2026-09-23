@@ -326,8 +326,16 @@ mod tests {
 
     #[test]
     fn test_multisig_unlock_has_dummy_op_0() {
-        let key1 = PrivateKey::random();
-        let key2 = PrivateKey::random();
+        // Fixed keys: RFC 6979 makes the signature bytes a function of the
+        // key and the digest, so the test is deterministic (#16).
+        let key1 = PrivateKey::from_hex(
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        )
+        .unwrap();
+        let key2 = PrivateKey::from_hex(
+            "0000000000000000000000000000000000000000000000000000000000000002",
+        )
+        .unwrap();
         let sighash = [1u8; 32];
 
         let unlocking =
@@ -341,10 +349,17 @@ mod tests {
         assert_eq!(chunks[0].op, OP_0);
         assert!(chunks[0].data.is_none());
 
-        // Second and third chunks are signatures
+        // Second and third chunks are signatures: a DER signature with its
+        // sighash byte, 9 to 73 bytes (`IsValidSignatureEncoding`,
+        // interpreter.cpp:177-194). A minimal DER `r` or `s` is shorter than
+        // 32 bytes when its leading byte is zero, so a fixed lower bound of 70
+        // failed on about one key in 13,000 (#16).
         for chunk in chunks.iter().take(2 + 1).skip(1) {
             let sig = chunk.data.as_ref().unwrap();
-            assert!(sig.len() >= 70 && sig.len() <= 73);
+            let parsed = TransactionSignature::from_checksig_format(sig)
+                .expect("a DER signature with a sighash byte");
+            assert_eq!(parsed.to_checksig_format(), *sig);
+            assert!((9..=73).contains(&sig.len()), "{} bytes", sig.len());
             assert_eq!(*sig.last().unwrap(), 0x41u8);
         }
     }
