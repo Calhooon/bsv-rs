@@ -28,6 +28,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   boundary tests in `spend.rs` (`s = n/2` low, `s = n/2 + 1` and `s = n - 1`
   high, `s = n`, `s = n + 1` and `r = n` the zero signature).
 
+### Fixed — the script-number length limit (Calhooon/bsv-rs#17)
+
+- The interpreter read a script number of any length. The reference builds
+  every number it reads with the maximum length of the coin's era and throws
+  `scriptnum_overflow_error` before the minimal-encoding check
+  (`src/script/script_num.cpp:62-68`; `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`,
+  `src/script/interpreter.cpp:1807-1810`): 750,000 bytes for a coin created
+  after Genesis and 32,000,000 after Chronicle on the block path
+  (`src/consensus/consensus.h:64`, `:66`), the node's
+  `-maxscriptnumlengthpolicy` on the mempool path, 10,000 by default
+  (`src/policy/policy.h:156`; `GetMaxScriptNumLength`,
+  `src/configscriptpolicy.cpp:79-110`, the era from the coin's flags,
+  `interpreter.cpp:2269-2274`). Under a word the interpreter now applies that
+  limit before the decode at every read (`ScriptFlags::max_script_num_length`,
+  `Spend::max_script_num_length`; the mempool path's policy through
+  `Spend::set_script_num_length_policy`, 0 selecting the consensus limit; a
+  word carrying the mempool word's four bits is judged on the mempool path,
+  `ScriptFlags::is_mempool_word`), on every arithmetic result before it is
+  pushed (`script_num.cpp:164`, `194`, `214`, `301-315`), at `OP_BIN2NUM`'s
+  result (`interpreter.cpp:1789-1790`, the same refusal as a non-minimal
+  result), and as the 4-byte limit on `OP_CHECKMULTISIG`'s two counts
+  (`1519-1525`, `1550-1552`). The message is `Script number overflow: N bytes,
+  the limit is M bytes.`. The default mode is unchanged: the TypeScript SDK
+  reads a number of any length. Found by the same differential run against
+  bitcoin-sv v1.2.2 (`879fc8b`): a version-2 spend of a coin created between
+  Genesis and Chronicle whose script builds the number 1 followed by 2^20 zero
+  bytes (1,048,577 bytes) and reads it with `OP_1ADD` was valid here under
+  every word and mode. Pinned by `tests/script_num_length_witness.rs` (the
+  witness under the block word and the standard word: overflow; the default
+  mode: valid; the same coin created after Chronicle: within 32,000,000,
+  valid) and by the boundary tests in `spend.rs` (750,000 / 750,001 for a coin
+  created after Genesis, 32,000,000 / 32,000,001 after Chronicle, 10,000 /
+  10,001 under the standard word, a policy of 0 falling back to the consensus
+  limit, the length test before the minimal-encoding test, a product longer
+  than the limit refused before the push, an `OP_BIN2NUM` result beyond the
+  limit refused, a 5-byte `OP_CHECKMULTISIG` count refused under a word).
 ### Tests
 
 - Nine assertions that a fresh signature is 70 to 73 bytes long replaced by

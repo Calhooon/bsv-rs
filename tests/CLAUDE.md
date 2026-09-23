@@ -36,6 +36,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `script_vectors_tests.rs` | 13 | default | Script interpreter with 1,488 vectors (458+598+432) |
 | `script_flags_witnesses.rs` | 9 | default | The flag words (`ScriptFlags::block` / `standard`, the default mode) on seven witness transactions: policy-as-consensus at version 1 (five), the NULLDUMMY version gate, NULLFAIL (Calhooon/bsv-rs#10) |
 | `script_low_s_order_witness.rs` | 3 | default | A signature with `s` at the curve order is the zero signature for the low-S check and NULLFAIL under version 1, as on the reference (0.3.28, Calhooon/bsv-rs#14) |
+| `script_num_length_witness.rs` | 4 | default | The script-number length limit of the coin's era under a word, on the witness (a 1,048,577-byte number read by `OP_1ADD`: overflow under the block word at 750,000 and the standard word at 10,000; valid in the default mode and for a coin created after Chronicle) (0.3.28, Calhooon/bsv-rs#17) |
 | `script_residual_witnesses.rs` | 11 | default | The five consensus rules fixed in 0.3.27 on ten witness transactions of eight rules: truncated pushes, undefined opcodes, a second OP_ELSE, the post-Chronicle UTXO opcodes, FindAndDelete of a FORKID signature (Calhooon/bsv-rs#12) |
 | `script_mutators_keep_parsed_chunks.rs` | 6 | default | Every in-place `Script` mutator parses before it invalidates the byte cache (0.3.25) |
 | `resource_limits.rs` | 4 | default | A local interpreter budget is a `ScriptResourceLimit`, never a verdict; `OP_NUM2BIN` refuses before allocating (0.3.23) |

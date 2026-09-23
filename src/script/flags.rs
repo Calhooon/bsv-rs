@@ -47,6 +47,16 @@
 
 use std::fmt;
 
+/// The script-number length limit for a coin created after Genesis, on the
+/// block path (`src/consensus/consensus.h:64`, `750 * ONE_KILOBYTE`).
+pub const MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS: usize = 750_000;
+/// The script-number length limit for a coin created after Chronicle, on the
+/// block path (`src/consensus/consensus.h:66`, `32 * ONE_MEGABYTE`).
+pub const MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE: usize = 32_000_000;
+/// The node's default `-maxscriptnumlengthpolicy`, the script-number length
+/// limit on the mempool path (`src/policy/policy.h:156`, `10 * ONE_KILOBYTE`).
+pub const DEFAULT_SCRIPT_NUM_LENGTH_POLICY: usize = 10_000;
+
 /// The protocol era of the block that carries the spending transaction, as
 /// the reference derives it from a height (`src/protocol_era.cpp:21-39`:
 /// below the Genesis activation height pre-Genesis, below the Chronicle
@@ -325,6 +335,48 @@ impl ScriptFlags {
     /// include it.
     pub fn standard(era: ProtocolEra) -> Self {
         Self::mandatory(era) | Self::STANDARD_ONLY | Self::GENESIS | Self::per_input(era)
+    }
+
+    /// The four bits only the mempool word carries (`standard` sets them,
+    /// `block` never does): `NULLDUMMY`, `MINIMALDATA`,
+    /// `DISCOURAGE_UPGRADABLE_NOPS` and `CLEANSTACK`.
+    const MEMPOOL_ONLY: Self = Self(
+        Self::NULLDUMMY.0
+            | Self::MINIMALDATA.0
+            | Self::DISCOURAGE_UPGRADABLE_NOPS.0
+            | Self::CLEANSTACK.0,
+    );
+
+    /// Whether the word carries the mempool word's four bits. Where the
+    /// reference's rule depends on the path (`consensus` in
+    /// `make_eval_script_params`, `interpreter.cpp:2283-2292`), this
+    /// interpreter judges such a word on the mempool path and any other word
+    /// on the block path.
+    pub const fn is_mempool_word(self) -> bool {
+        self.contains(Self::MEMPOOL_ONLY)
+    }
+
+    /// The script-number length limit under this word for a coin of the given
+    /// era (`GetMaxScriptNumLength`, `src/configscriptpolicy.cpp:79-110`): on
+    /// the block path the consensus limit of the coin's era
+    /// ([`MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS`],
+    /// [`MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE`]); on the mempool path
+    /// `policy`, the node's `-maxscriptnumlengthpolicy`
+    /// ([`DEFAULT_SCRIPT_NUM_LENGTH_POLICY`] by default), where 0 selects the
+    /// consensus limit. A coin created before Genesis (4 bytes,
+    /// `consensus.h:62`) is outside this interpreter's words
+    /// ([`check`](Self::check)).
+    pub const fn max_script_num_length(self, utxo_after_chronicle: bool, policy: usize) -> usize {
+        let consensus = if utxo_after_chronicle {
+            MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE
+        } else {
+            MAX_SCRIPT_NUM_LENGTH_AFTER_GENESIS
+        };
+        if self.is_mempool_word() && policy != 0 {
+            policy
+        } else {
+            consensus
+        }
     }
 
     /// The word as the reference's `uint32_t`.
