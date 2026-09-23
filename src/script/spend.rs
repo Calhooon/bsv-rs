@@ -50,7 +50,7 @@
 use super::evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
-use super::flags::{Gates, ScriptFlags};
+use super::flags::{Gates, ScriptFlags, DEFAULT_SCRIPT_NUM_LENGTH_POLICY};
 use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
@@ -180,6 +180,11 @@ pub struct Spend {
     /// `598-812`). Default: the TypeScript SDK's `isAfterChronicle()`, which
     /// is `isRelaxed()`, version > 1; under a word, its `UTXO_AFTER_CHRONICLE`.
     utxo_after_chronicle: bool,
+    /// The node's `-maxscriptnumlengthpolicy`, the script-number length limit
+    /// of the mempool path (`src/policy/policy.h:156`, default 10,000; 0
+    /// selects the consensus limit); read under a word carrying the mempool
+    /// word's bits, see [`Spend::max_script_num_length`].
+    script_num_length_policy: usize,
     /// Whether an `OP_ELSE` was seen at each conditional depth (the
     /// reference's `conditional_tracker`: a second `OP_ELSE` for one `OP_IF`
     /// is unbalanced after Genesis, `interpreter.cpp:829-831`).
@@ -248,6 +253,7 @@ impl Spend {
             flags: None,
             // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags.
             utxo_after_chronicle: params.transaction_version > 1,
+            script_num_length_policy: DEFAULT_SCRIPT_NUM_LENGTH_POLICY,
             else_stack: Vec::new(),
             returning: false,
             unlocking_truncated: None,
@@ -341,6 +347,31 @@ impl Spend {
     /// the TypeScript default mode.
     pub fn flags(&self) -> Option<ScriptFlags> {
         self.flags
+    }
+
+    /// The script-number length limit in force: `None` in the TypeScript
+    /// default mode (the SDK reads a number of any length); under a word the
+    /// reference's limit ([`ScriptFlags::max_script_num_length`]) for the
+    /// coin's era, following
+    /// [`set_utxo_after_chronicle`](Self::set_utxo_after_chronicle), and on
+    /// the mempool path the policy of
+    /// [`set_script_num_length_policy`](Self::set_script_num_length_policy).
+    /// Applied before the decode at every read (`script_num.cpp:62-68`), on
+    /// every arithmetic result before it is pushed (`164`, `194`, `214`,
+    /// `301-315`), at `OP_BIN2NUM`'s result (`interpreter.cpp:1789-1790`), and
+    /// as 4 bytes on `OP_CHECKMULTISIG`'s counts (`1519-1525`, `1550-1552`).
+    pub fn max_script_num_length(&self) -> Option<usize> {
+        self.flags.map(|word| {
+            word.max_script_num_length(self.utxo_after_chronicle, self.script_num_length_policy)
+        })
+    }
+
+    /// The node's `-maxscriptnumlengthpolicy` for a word on the mempool path
+    /// (`src/policy/policy.h:156`, 10,000 bytes by default; 0 selects the
+    /// consensus limit of the coin's era). A block word and the default mode
+    /// ignore it.
+    pub fn set_script_num_length_policy(&mut self, bytes: usize) {
+        self.script_num_length_policy = bytes;
     }
 
     /// Resets the interpreter state for re-execution.
@@ -873,8 +904,7 @@ impl Spend {
                     )));
                 }
                 let n_bytes = self.pop_stack()?;
-                let bn = ScriptNum::from_bytes(&n_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let bn = self.read_number(&n_bytes)?;
 
                 let n = bn.to_i64().unwrap_or(i64::MAX);
                 if n < 0 || n >= self.stack.len() as i64 {
@@ -974,8 +1004,7 @@ impl Spend {
                 let pos_bytes = self.pop_stack()?;
                 let data = self.pop_stack()?;
 
-                let pos_bn = ScriptNum::from_bytes(&pos_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let pos_bn = self.read_number(&pos_bytes)?;
                 let pos = pos_bn.to_i64().unwrap_or(-1);
 
                 if pos < 0 || pos > data.len() as i64 {
@@ -997,8 +1026,7 @@ impl Spend {
                     );
                 }
                 let size_bytes = self.pop_stack()?;
-                let size_bn = ScriptNum::from_bytes(&size_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let size_bn = self.read_number(&size_bytes)?;
                 let size = size_bn.to_i64().unwrap_or(-1);
 
                 if size < 0 || size > MAX_SCRIPT_ELEMENT_SIZE as i64 {
@@ -1057,7 +1085,11 @@ impl Spend {
                 }
                 let buf = self.pop_stack()?;
                 let result = ScriptNum::minimally_encode(&buf);
-                if !ScriptNum::is_minimally_encoded(&result) {
+                // A result longer than the limit in force is refused as the
+                // reference refuses it (`IsMinimallyEncoded(max)`,
+                // `interpreter.cpp:1789-1790`: `SCRIPT_ERR_INVALID_NUMBER_RANGE`).
+                let over = matches!(self.max_script_num_length(), Some(max) if result.len() > max);
+                if over || !ScriptNum::is_minimally_encoded(&result) {
                     return Err(
                         self.error("OP_BIN2NUM requires that the resulting number is valid.")
                     );
@@ -1135,8 +1167,7 @@ impl Spend {
                 let n_bytes = self.pop_stack()?;
                 let buf = self.pop_stack()?;
 
-                let n_bn = ScriptNum::from_bytes(&n_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let n_bn = self.read_number(&n_bytes)?;
                 let n = n_bn.to_i64().unwrap_or(-1);
 
                 if n < 0 {
@@ -1217,8 +1248,7 @@ impl Spend {
                     )));
                 }
                 let buf = self.pop_stack()?;
-                let mut bn = ScriptNum::from_bytes(&buf, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let mut bn = self.read_number(&buf)?;
 
                 bn = match opcode {
                     OP_1ADD => bn.add(&BigNumber::one()),
@@ -1243,7 +1273,7 @@ impl Spend {
                     }
                     _ => bn,
                 };
-                self.push_stack(ScriptNum::to_bytes(&bn))?;
+                self.push_number(&bn)?;
             }
             OP_ADD
             | OP_SUB
@@ -1269,10 +1299,8 @@ impl Spend {
                 }
                 let buf2 = self.pop_stack()?;
                 let buf1 = self.pop_stack()?;
-                let bn1 = ScriptNum::from_bytes(&buf1, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
-                let bn2 = ScriptNum::from_bytes(&buf2, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let bn1 = self.read_number(&buf1)?;
+                let bn2 = self.read_number(&buf2)?;
 
                 let result = match opcode {
                     OP_ADD => bn1.add(&bn2),
@@ -1363,7 +1391,7 @@ impl Spend {
                     _ => BigNumber::zero(),
                 };
 
-                self.push_stack(ScriptNum::to_bytes(&result))?;
+                self.push_number(&result)?;
 
                 if opcode == OP_NUMEQUALVERIFY {
                     if !ScriptNum::cast_to_bool(self.stack_top()?) {
@@ -1382,12 +1410,9 @@ impl Spend {
                 let max_bytes = self.pop_stack()?;
                 let min_bytes = self.pop_stack()?;
                 let x_bytes = self.pop_stack()?;
-                let max_bn = ScriptNum::from_bytes(&max_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
-                let min_bn = ScriptNum::from_bytes(&min_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
-                let x_bn = ScriptNum::from_bytes(&x_bytes, self.require_minimal)
-                    .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                let max_bn = self.read_number(&max_bytes)?;
+                let min_bn = self.read_number(&min_bytes)?;
+                let x_bn = self.read_number(&x_bytes)?;
 
                 let in_range = x_bn >= min_bn && x_bn < max_bn;
                 self.push_stack(if in_range { vec![1] } else { vec![] })?;
@@ -1538,8 +1563,7 @@ impl Spend {
         }
 
         let n_keys_bytes = self.pop_stack()?;
-        let n_keys_bn = ScriptNum::from_bytes(&n_keys_bytes, self.require_minimal)
-            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+        let n_keys_bn = self.read_count(&n_keys_bytes)?;
         let n_keys = n_keys_bn.to_i64().unwrap_or(-1);
 
         if !(0..=MAX_MULTISIG_KEY_COUNT).contains(&n_keys) {
@@ -1575,8 +1599,7 @@ impl Spend {
         }
 
         let n_sigs_bytes = self.pop_stack()?;
-        let n_sigs_bn = ScriptNum::from_bytes(&n_sigs_bytes, self.require_minimal)
-            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+        let n_sigs_bn = self.read_count(&n_sigs_bytes)?;
         let n_sigs = n_sigs_bn.to_i64().unwrap_or(-1);
 
         if n_sigs < 0 || n_sigs as usize > n_keys {
@@ -1834,8 +1857,7 @@ impl Spend {
             )));
         }
         let num = |s: &Self, bytes: &[u8]| -> Result<BigNumber, ScriptEvaluationError> {
-            ScriptNum::from_bytes(bytes, s.require_minimal)
-                .map_err(|e| s.error(&format!("Invalid script number: {}", e)))
+            s.read_number(bytes)
         };
         match opcode {
             OP_NOP4 => {
@@ -1901,7 +1923,7 @@ impl Spend {
                 } else {
                     x.shr_bits_toward_zero(n)
                 };
-                self.push_stack(ScriptNum::to_bytes(&out))?;
+                self.push_number(&out)?;
             }
         }
         Ok(())
@@ -2062,6 +2084,62 @@ impl Spend {
                 limit: self.memory_limit,
                 attempted,
             })
+    }
+
+    // ========================================================================
+    // Script numbers under the length limit
+    // ========================================================================
+
+    /// Decodes a stack element as a script number under `limit`: the length
+    /// test precedes the decode and the minimal-encoding check, as on the
+    /// reference (`script_num.cpp:62-68`; `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`,
+    /// `interpreter.cpp:1807-1810`).
+    fn read_number_within(
+        &self,
+        bytes: &[u8],
+        limit: Option<usize>,
+    ) -> Result<BigNumber, ScriptEvaluationError> {
+        if let Some(max) = limit {
+            if bytes.len() > max {
+                return Err(self.overflow_error(bytes.len(), max));
+            }
+        }
+        ScriptNum::from_bytes(bytes, self.require_minimal)
+            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))
+    }
+
+    /// A script number read under the limit in force
+    /// ([`max_script_num_length`](Self::max_script_num_length)).
+    fn read_number(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
+        self.read_number_within(bytes, self.max_script_num_length())
+    }
+
+    /// `OP_CHECKMULTISIG`'s two counts: 4-byte numbers in every era
+    /// (`CScriptNum::MAXIMUM_ELEMENT_SIZE`, `interpreter.cpp:1519-1525`,
+    /// `1550-1552`) under a word; the default mode reads them as the
+    /// TypeScript SDK does.
+    fn read_count(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
+        self.read_number_within(bytes, self.flags.map(|_| 4))
+    }
+
+    /// Pushes a computed number, refusing one longer than the limit in force
+    /// before it reaches the stack (the reference bounds the results of `+`,
+    /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
+    /// `301-315`).
+    fn push_number(&mut self, value: &BigNumber) -> Result<(), ScriptEvaluationError> {
+        let bytes = ScriptNum::to_bytes(value);
+        if let Some(max) = self.max_script_num_length() {
+            if bytes.len() > max {
+                return Err(self.overflow_error(bytes.len(), max));
+            }
+        }
+        self.push_stack(bytes)
+    }
+
+    fn overflow_error(&self, len: usize, max: usize) -> ScriptEvaluationError {
+        self.error(&format!(
+            "Script number overflow: {len} bytes, the limit is {max} bytes."
+        ))
     }
 
     // ========================================================================
@@ -3164,6 +3242,371 @@ mod low_s_order_tests {
         assert_eq!(
             spend.validate().unwrap_err().message,
             "OP_CHECKSIG requires failing signatures to be empty."
+        );
+    }
+}
+
+#[cfg(test)]
+mod script_num_length_tests {
+    use super::*;
+    use crate::primitives::to_hex;
+    use crate::script::flags::ProtocolEra;
+
+    const PUBKEY: &str = "035935f55855afd8c999bdb5a8d08ae8e73b7618e200d4ef7687cd55d3c2e4c9d7";
+
+    /// A minimal push of `n` as a script number (always under 76 bytes here).
+    fn push_num(lock: &mut Vec<u8>, n: u64) {
+        let bytes = ScriptNum::to_bytes(&BigNumber::from_u64(n));
+        lock.push(bytes.len() as u8);
+        lock.extend_from_slice(&bytes);
+    }
+
+    /// `OP_1 <n> OP_NUM2BIN OP_1ADD OP_DROP OP_1`: OP_1ADD reads an n-byte
+    /// number (the value 1, padded).
+    fn read_n_bytes(n: u64) -> Vec<u8> {
+        let mut lock = vec![OP_1];
+        push_num(&mut lock, n);
+        lock.extend_from_slice(&[OP_NUM2BIN, OP_1ADD, OP_DROP, OP_1]);
+        lock
+    }
+
+    /// `OP_1 <n> OP_NUM2BIN <0x40> OP_CAT OP_DUP OP_MUL OP_DROP OP_1`: two
+    /// (n + 1)-byte operands whose product is about 2(n + 1) bytes long.
+    fn square_of_n_plus_one_bytes(n: u64) -> Vec<u8> {
+        let mut lock = vec![OP_1];
+        push_num(&mut lock, n);
+        lock.extend_from_slice(&[
+            OP_NUM2BIN, 0x01, 0x40, OP_CAT, OP_DUP, OP_MUL, OP_DROP, OP_1,
+        ]);
+        lock
+    }
+
+    /// `OP_1 <n> OP_NUM2BIN <0x40> OP_CAT OP_BIN2NUM OP_DROP OP_1`: OP_BIN2NUM's
+    /// result is (n + 1) bytes long and minimal.
+    fn bin2num_of_n_plus_one_bytes(n: u64) -> Vec<u8> {
+        let mut lock = vec![OP_1];
+        push_num(&mut lock, n);
+        lock.extend_from_slice(&[OP_NUM2BIN, 0x01, 0x40, OP_CAT, OP_BIN2NUM, OP_DROP, OP_1]);
+        lock
+    }
+
+    /// `OP_0 OP_0 <pubkey> <count as `len` bytes> OP_CHECKMULTISIG`: zero
+    /// signatures of one key, the key count encoded non-minimally.
+    fn checkmultisig_with_a_count_of(len: u8) -> Vec<u8> {
+        let mut lock = vec![OP_0, OP_0, 0x21];
+        lock.extend_from_slice(&crate::primitives::from_hex(PUBKEY).unwrap());
+        lock.push(len);
+        lock.push(0x01);
+        lock.extend_from_slice(&vec![0u8; len as usize - 1]);
+        lock.push(OP_CHECKMULTISIG);
+        lock
+    }
+
+    fn spend(lock: &[u8], version: i32) -> Spend {
+        Spend::new(SpendParams {
+            source_txid: [0u8; 32],
+            source_output_index: 0,
+            source_satoshis: 1000,
+            locking_script: LockingScript::from_hex(&to_hex(lock)).unwrap(),
+            transaction_version: version,
+            other_inputs: vec![],
+            outputs: vec![],
+            input_index: 0,
+            unlocking_script: UnlockingScript::from_binary(&[]).unwrap(),
+            input_sequence: 0xffff_ffff,
+            lock_time: 0,
+            memory_limit: Some(200_000_000),
+        })
+    }
+
+    fn block() -> ScriptFlags {
+        ScriptFlags::block(ProtocolEra::PostChronicle)
+    }
+
+    fn standard() -> ScriptFlags {
+        ScriptFlags::standard(ProtocolEra::PostChronicle)
+    }
+
+    /// The verdict as a string: `Ok(true)`, or the refusal's message.
+    fn run(
+        lock: &[u8],
+        version: i32,
+        word: Option<ScriptFlags>,
+        utxo_after_chronicle: Option<bool>,
+        policy: Option<usize>,
+    ) -> String {
+        let mut s = spend(lock, version);
+        if let Some(w) = word {
+            s.set_flags(w);
+        }
+        if let Some(after) = utxo_after_chronicle {
+            s.set_utxo_after_chronicle(after);
+        }
+        if let Some(bytes) = policy {
+            s.set_script_num_length_policy(bytes);
+        }
+        match s.validate() {
+            Ok(v) => format!("Ok({v})"),
+            Err(e) => e.message,
+        }
+    }
+
+    fn overflow(len: usize, max: usize) -> String {
+        format!("Script number overflow: {len} bytes, the limit is {max} bytes.")
+    }
+
+    #[test]
+    fn the_word_and_the_coins_era_decide_the_limit() {
+        assert!(!block().is_mempool_word());
+        assert!(standard().is_mempool_word());
+        assert_eq!(block().max_script_num_length(false, 10_000), 750_000);
+        assert_eq!(block().max_script_num_length(true, 10_000), 32_000_000);
+        assert_eq!(standard().max_script_num_length(false, 10_000), 10_000);
+        assert_eq!(standard().max_script_num_length(true, 10_000), 10_000);
+        assert_eq!(standard().max_script_num_length(false, 0), 750_000);
+        assert_eq!(standard().max_script_num_length(true, 0), 32_000_000);
+
+        let lock = read_n_bytes(1);
+        assert_eq!(spend(&lock, 2).max_script_num_length(), None);
+        let mut s = spend(&lock, 2);
+        s.set_flags(block());
+        assert_eq!(s.max_script_num_length(), Some(32_000_000));
+        s.set_utxo_after_chronicle(false);
+        assert_eq!(s.max_script_num_length(), Some(750_000));
+        s.set_flags(standard());
+        assert_eq!(s.max_script_num_length(), Some(10_000));
+        s.set_script_num_length_policy(0);
+        assert_eq!(s.max_script_num_length(), Some(32_000_000));
+    }
+
+    /// A coin created after Genesis, before Chronicle, on the block path:
+    /// 750,000 bytes read, 750,001 refused (`consensus.h:64`).
+    #[test]
+    fn a_coin_created_after_genesis_reads_750_000_bytes_and_refuses_750_001_under_the_block_word() {
+        assert_eq!(
+            run(&read_n_bytes(750_000), 2, Some(block()), Some(false), None),
+            "Ok(true)"
+        );
+        assert_eq!(
+            run(&read_n_bytes(750_001), 2, Some(block()), Some(false), None),
+            overflow(750_001, 750_000)
+        );
+    }
+
+    /// A coin created after Chronicle, on the block path: 32,000,000 bytes
+    /// read, 32,000,001 refused (`consensus.h:66`).
+    #[test]
+    fn a_coin_created_after_chronicle_reads_32_000_000_bytes_and_refuses_32_000_001() {
+        assert_eq!(
+            run(
+                &read_n_bytes(32_000_000),
+                2,
+                Some(block()),
+                Some(true),
+                None
+            ),
+            "Ok(true)"
+        );
+        assert_eq!(
+            run(
+                &read_n_bytes(32_000_001),
+                2,
+                Some(block()),
+                Some(true),
+                None
+            ),
+            overflow(32_000_001, 32_000_000)
+        );
+    }
+
+    /// The mempool path: the policy default of 10,000 bytes whatever the
+    /// coin's era (`policy.h:156`); a policy of 0 selects the consensus limit.
+    #[test]
+    fn the_standard_word_applies_the_policy_default_in_both_eras_and_zero_selects_the_consensus_limit(
+    ) {
+        for after in [false, true] {
+            assert_eq!(
+                run(
+                    &read_n_bytes(10_000),
+                    2,
+                    Some(standard()),
+                    Some(after),
+                    None
+                ),
+                "Ok(true)"
+            );
+            assert_eq!(
+                run(
+                    &read_n_bytes(10_001),
+                    2,
+                    Some(standard()),
+                    Some(after),
+                    None
+                ),
+                overflow(10_001, 10_000)
+            );
+        }
+        assert_eq!(
+            run(
+                &read_n_bytes(750_000),
+                2,
+                Some(standard()),
+                Some(false),
+                Some(0)
+            ),
+            "Ok(true)"
+        );
+        assert_eq!(
+            run(
+                &read_n_bytes(750_001),
+                2,
+                Some(standard()),
+                Some(false),
+                Some(0)
+            ),
+            overflow(750_001, 750_000)
+        );
+        assert_eq!(
+            run(
+                &read_n_bytes(20_000),
+                2,
+                Some(standard()),
+                Some(false),
+                Some(20_000)
+            ),
+            "Ok(true)"
+        );
+        assert_eq!(
+            run(
+                &read_n_bytes(20_001),
+                2,
+                Some(standard()),
+                Some(false),
+                Some(20_000)
+            ),
+            overflow(20_001, 20_000)
+        );
+    }
+
+    /// The length test precedes the minimal-encoding test
+    /// (`script_num.cpp:62` before `:67`): at version 1 under the standard
+    /// word a padded number of 10,000 bytes is a minimal-encoding refusal,
+    /// one of 10,001 bytes an overflow.
+    #[test]
+    fn the_length_test_precedes_the_minimal_encoding_test() {
+        assert_eq!(
+            run(
+                &read_n_bytes(10_000),
+                1,
+                Some(standard()),
+                Some(false),
+                None
+            ),
+            "Invalid script number: script execution error: Non-minimally encoded script number"
+        );
+        assert_eq!(
+            run(
+                &read_n_bytes(10_001),
+                1,
+                Some(standard()),
+                Some(false),
+                None
+            ),
+            overflow(10_001, 10_000)
+        );
+    }
+
+    /// A product longer than the limit is refused before it is pushed
+    /// (`script_num.cpp:214`); one within it is pushed.
+    #[test]
+    fn a_product_longer_than_the_limit_is_refused_before_it_is_pushed() {
+        assert_eq!(
+            run(
+                &square_of_n_plus_one_bytes(369_999),
+                2,
+                Some(block()),
+                Some(false),
+                None
+            ),
+            "Ok(true)"
+        );
+        let refused = run(
+            &square_of_n_plus_one_bytes(379_999),
+            2,
+            Some(block()),
+            Some(false),
+            None,
+        );
+        assert!(
+            refused.starts_with("Script number overflow: 7")
+                && refused.ends_with("the limit is 750000 bytes."),
+            "{refused}"
+        );
+    }
+
+    /// `OP_BIN2NUM`'s result beyond the limit is refused as the reference
+    /// refuses it (`interpreter.cpp:1789-1790`).
+    #[test]
+    fn bin2num_refuses_a_result_longer_than_the_limit() {
+        assert_eq!(
+            run(
+                &bin2num_of_n_plus_one_bytes(9_999),
+                2,
+                Some(standard()),
+                Some(false),
+                None
+            ),
+            "Ok(true)"
+        );
+        assert_eq!(
+            run(
+                &bin2num_of_n_plus_one_bytes(10_000),
+                2,
+                Some(standard()),
+                Some(false),
+                None
+            ),
+            "OP_BIN2NUM requires that the resulting number is valid."
+        );
+    }
+
+    /// `OP_CHECKMULTISIG`'s counts are 4-byte numbers under a word
+    /// (`interpreter.cpp:1519-1525`); the default mode reads them as the
+    /// TypeScript SDK does.
+    #[test]
+    fn a_five_byte_checkmultisig_count_is_an_overflow_under_a_word() {
+        assert_eq!(
+            run(
+                &checkmultisig_with_a_count_of(4),
+                2,
+                Some(block()),
+                Some(false),
+                None
+            ),
+            "Ok(true)"
+        );
+        assert_eq!(
+            run(
+                &checkmultisig_with_a_count_of(5),
+                2,
+                Some(block()),
+                Some(false),
+                None
+            ),
+            overflow(5, 4)
+        );
+        assert_eq!(
+            run(&checkmultisig_with_a_count_of(5), 2, None, None, None),
+            "Ok(true)"
+        );
+    }
+
+    /// The default mode is the TypeScript SDK's: a number of any length.
+    #[test]
+    fn the_default_mode_reads_a_number_of_any_length() {
+        assert_eq!(
+            run(&read_n_bytes(1_048_577), 2, None, None, None),
+            "Ok(true)"
         );
     }
 }
