@@ -367,6 +367,24 @@ impl BigNumber {
         }
     }
 
+    /// `self * 2^bits`: a left shift of the magnitude, the sign kept (the
+    /// reference's `bint::operator<<=`, OpenSSL `BN_lshift`).
+    pub fn shl_bits(&self, bits: u64) -> BigNumber {
+        Self {
+            inner: &self.inner << bits,
+        }
+    }
+
+    /// A right shift of the MAGNITUDE by `bits`, the sign kept: a shift toward
+    /// zero (the reference's `bint::operator>>=`, OpenSSL `BN_rshift`), not the
+    /// floor shift of a two's-complement integer: `-7 >> 1` is `-3` here.
+    pub fn shr_bits_toward_zero(&self, bits: u64) -> BigNumber {
+        let (sign, magnitude) = self.inner.clone().into_parts();
+        Self {
+            inner: BigInt::from_biguint(sign, magnitude >> bits),
+        }
+    }
+
     /// Multiplies two BigNumbers and returns a new BigNumber.
     pub fn mul(&self, other: &BigNumber) -> BigNumber {
         Self {

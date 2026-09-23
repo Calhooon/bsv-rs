@@ -21,10 +21,13 @@
 //! (push-only unlocking scripts), strict DER/pubkey encodings and
 //! SIGHASH_FORKID-required; it has no NULLFAIL, MINIMALIF or
 //! DISCOURAGE_UPGRADABLE_NOPS rule; and it runs the post-genesis BSV opcode
-//! set (OP_MUL/OP_CAT/OP_LSHIFT... enabled; only OP_2MUL/OP_2DIV/OP_VER/
-//! OP_VERIF/OP_VERNOTIF disabled; no pre-genesis size/count limits; no P2SH
-//! redeem-script evaluation; OP_CHECKLOCKTIMEVERIFY/OP_CHECKSEQUENCEVERIFY are
-//! NOPs). The node fixtures, in contrast, are parameterized by node verify
+//! set (OP_MUL/OP_CAT/OP_LSHIFT... enabled; a second OP_ELSE, an undefined
+//! opcode executed and a truncated push reached are failures; no pre-genesis
+//! size/count limits; no P2SH redeem-script evaluation;
+//! OP_CHECKLOCKTIMEVERIFY/OP_CHECKSEQUENCEVERIFY are NOPs), with the Chronicle
+//! opcodes (OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF, 0xb3-0xb7) taken
+//! from each fixture's UTXO_AFTER_CHRONICLE flag (`set_utxo_after_chronicle`,
+//! 0.3.27). The node fixtures, in contrast, are parameterized by node verify
 //! flags (P2SH, STRICTENC, UTXO_AFTER_GENESIS, ...). Since 0.3.26
 //! `Spend::set_flags(ScriptFlags::from_names(..))` can express a node word
 //! (the rules above become the word's, with NULLFAIL, MINIMALIF and
@@ -237,6 +240,13 @@ fn run_node_script(input: &Value) -> Result<bool, String> {
         lock_time: 0,
         memory_limit: None,
     });
+    // The fixture's UTXO era for the Chronicle opcodes (0.3.27): the one flag of
+    // the node word the default mode can take without the word.
+    let after_chronicle = input["flags"]
+        .as_array()
+        .map(|a| a.iter().any(|f| f.as_str() == Some("UTXO_AFTER_CHRONICLE")))
+        .unwrap_or(false);
+    spend.set_utxo_after_chronicle(after_chronicle);
     spend.validate().map_err(|e| e.message)
 }
 
@@ -294,9 +304,10 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
             "OP_RETURN" => {
                 Some("pre-genesis OP_RETURN semantics (bsv-rs implements post-genesis skip)")
             }
-            // Flag-dependent conditional structure rules (e.g. the
-            // post-genesis multiple-ELSE ban). bsv-rs implements the ts-sdk
-            // default (relaxed) ELSE/ENDIF handling.
+            // Flag-dependent conditional structure rules a post-Genesis
+            // interpreter cannot express (none in the corpus since 0.3.27,
+            // which applies the post-Genesis single-ELSE rule and keeps the
+            // conditional balance across a RETURN inside a conditional).
             "UNBALANCED_CONDITIONAL" => {
                 Some("flag-dependent ELSE/ENDIF structure rules not expressible in bsv-rs")
             }
@@ -331,10 +342,13 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
                 "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
             );
         }
-        if msg.contains("currently disabled") && has("UTXO_AFTER_CHRONICLE") {
-            // Chronicle re-enables OP_VER/OP_2MUL/OP_2DIV; bsv-rs keeps them
-            // disabled unconditionally.
-            return Some("UTXO_AFTER_CHRONICLE opcode semantics not implemented in bsv-rs");
+        if msg.contains("OP_ELSE may only be used once") && !has("UTXO_AFTER_GENESIS") {
+            // Pre-Genesis, a second OP_ELSE inverts the branch again; the node
+            // refuses it after Genesis (conditional_tracker.cpp:51-55), which is
+            // the only UTXO era bsv-rs runs (0.3.27).
+            return Some(
+                "pre-genesis multiple OP_ELSE (bsv-rs runs the post-genesis single-ELSE rule)",
+            );
         }
         if msg.contains("can only contain push operations") && !has("SIGPUSHONLY") {
             return Some("bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)");
@@ -407,6 +421,14 @@ fn is_p2sh_hex(script_pubkey_hex: &str) -> bool {
 const EVALUATION_KNOWN_FAILURES: &[(&str, &str)] = &[
     // (script-012 FIXED 2026-07-08: truncated OP_PUSHDATA1 now parses to an
     // empty-data chunk like ts-sdk — src/script/script.rs pushdata arm.)
+    // 0.3.27: TS's default accepts a second OP_ELSE for one OP_IF (its
+    // single-ELSE rule applies only under explicit flags with GENESIS); the
+    // node refuses it after Genesis (conditional_tracker.cpp:51-55) and so does
+    // bsv-rs in every mode. A stated divergence from the TS default, not a bug.
+    (
+        "script-021",
+        "TS-default multiple OP_ELSE; refused post-Genesis (0.3.27)",
+    ),
     // BUG 1 — eager OP_CHECKMULTISIG encoding validation (see above):
     (
         "node.script.bitcoin-sv.0698",
@@ -1257,16 +1279,24 @@ fn finish_evaluation(summary: Summary) {
 /// FORKID-only sighash. Any drift (corpus update, SDK behavior change) fails
 /// the assert and forces a re-audit.
 const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
-    (
-        "UTXO_AFTER_CHRONICLE opcode semantics not implemented in bsv-rs",
-        5,
-    ),
+    // 2026-09-23 repin (0.3.27, the five residual consensus rules): the class
+    // "UTXO_AFTER_CHRONICLE opcode semantics not implemented" (5) is gone, the
+    // census now sets the Chronicle gate from each fixture's flags and the five
+    // fixtures execute; "flag-dependent ELSE/ENDIF structure rules" (30) is
+    // gone, the post-Genesis fixtures expecting the single-ELSE refusal now
+    // pass and the pre-Genesis ones that assert a second OP_ELSE inverting the
+    // branch are the new class below (26); "flag-dependent opcode set"
+    // 12 -> 4 (undefined opcodes and unexecuted OP_VERIF now judged as the
+    // node does); "pre-genesis OP_RETURN semantics" 34 -> 28 and CLEANSTACK
+    // 195 -> 194 (a RETURN inside a conditional no longer clears the
+    // conditional stack, so those fixtures now match). Zero new mismatches;
+    // script-021 (the TS default's multiple OP_ELSE) is a known failure.
     // 2026-07-09 repin (225 -> 195): Spend now mirrors ts-sdk's version-based
     // relaxed mode (tx version > 1 disables CLEANSTACK/LOW_S/MINIMALDATA).
     // 30 version-2 fixtures that previously died at the always-on clean-stack
     // check now execute; 27 pass conformantly (moved to `run`) and 3 progress
     // to the CLTV/CSV gap below (5 -> 8). Zero new mismatches.
-    ("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)", 195),
+    ("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)", 194),
     ("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)", 9),
     ("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)", 181),
     ("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)", 4),
@@ -1287,12 +1317,12 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
         36,
     ),
     (
-        "flag-dependent ELSE/ENDIF structure rules not expressible in bsv-rs",
-        30,
+        "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
+        4,
     ),
     (
-        "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
-        12,
+        "pre-genesis multiple OP_ELSE (bsv-rs runs the post-genesis single-ELSE rule)",
+        26,
     ),
     // NOTE: this is HALF the sighash corpus. The fixture's `regular_hash`
     // uses the original (legacy) digest algorithm whenever the FORKID bit is
@@ -1311,7 +1341,7 @@ const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ("no isRelaxed evaluation mode in bsv-rs", 3),
     (
         "pre-genesis OP_RETURN semantics (bsv-rs implements post-genesis skip)",
-        34,
+        28,
     ),
     (
         "pre-genesis limits (bsv-rs runs post-genesis/unlimited rules)",

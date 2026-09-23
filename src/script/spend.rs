@@ -174,6 +174,25 @@ pub struct Spend {
     /// The flag word the rules above were derived from, if `set_flags` was
     /// called; `None` in the TypeScript default mode.
     flags: Option<ScriptFlags>,
+    /// The UTXO being spent is taken as created after Chronicle: `OP_2MUL`,
+    /// `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and the Chronicle
+    /// meanings of `0xb3`-`0xb7` follow it (`interpreter.cpp:360-375`,
+    /// `598-812`). Default: the TypeScript SDK's `isAfterChronicle()`, which
+    /// is `isRelaxed()`, version > 1; under a word, its `UTXO_AFTER_CHRONICLE`.
+    utxo_after_chronicle: bool,
+    /// Whether an `OP_ELSE` was seen at each conditional depth (the
+    /// reference's `conditional_tracker`: a second `OP_ELSE` for one `OP_IF`
+    /// is unbalanced after Genesis, `interpreter.cpp:829-831`).
+    else_stack: Vec<bool>,
+    /// A non-top-level `OP_RETURN` executed after Genesis: execution stops,
+    /// the walk continues for the conditional balance and the parse
+    /// (`interpreter.cpp:856-871` with `482`).
+    returning: bool,
+    /// The chunk index of a push that declares more bytes than the script
+    /// holds, per script (`Script::truncated_push`): reaching it is
+    /// `SCRIPT_ERR_BAD_OPCODE` on the reference.
+    unlocking_truncated: Option<usize>,
+    locking_truncated: Option<usize>,
 
     // Parsed-chunk caches. `Script::chunks()` deep-clones the whole chunk
     // vector; calling it from `step()` made execution O(N²) in script size,
@@ -227,9 +246,17 @@ impl Spend {
             require_compressed_pubkey: false,
             discourage_upgradable_nops: false,
             flags: None,
+            // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags.
+            utxo_after_chronicle: params.transaction_version > 1,
+            else_stack: Vec::new(),
+            returning: false,
+            unlocking_truncated: None,
+            locking_truncated: None,
         };
         spend.unlocking_chunks = spend.unlocking_script.chunks();
         spend.locking_chunks = spend.locking_script.chunks();
+        spend.unlocking_truncated = spend.unlocking_script.as_script().truncated_push();
+        spend.locking_truncated = spend.locking_script.as_script().truncated_push();
         spend.reset();
         spend
     }
@@ -284,6 +311,7 @@ impl Spend {
             minimal_if,
             discourage_upgradable_nops,
             compressed_pubkey,
+            utxo_after_chronicle,
         } = flags.gates(self.transaction_version);
         self.require_push_only = push_only;
         self.require_minimal = minimal;
@@ -294,7 +322,19 @@ impl Spend {
         self.require_minimal_if = minimal_if;
         self.discourage_upgradable_nops = discourage_upgradable_nops;
         self.require_compressed_pubkey = compressed_pubkey;
+        self.utxo_after_chronicle = utxo_after_chronicle;
         self.flags = Some(flags);
+    }
+
+    /// Overrides the UTXO's era for the re-enabled opcodes: `true` runs
+    /// `OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and the
+    /// Chronicle meanings of `0xb3`-`0xb7` (a coin created after Chronicle),
+    /// `false` keeps them disabled, `BAD_OPCODE` or NOPs as before it. Default:
+    /// version > 1 (the TypeScript SDK's `isAfterChronicle()`); under a word,
+    /// its `UTXO_AFTER_CHRONICLE` bit. Called after [`set_flags`](Self::set_flags),
+    /// it overrides the bit.
+    pub fn set_utxo_after_chronicle(&mut self, after: bool) {
+        self.utxo_after_chronicle = after;
     }
 
     /// The flag word applied by [`set_flags`](Self::set_flags), or `None` in
@@ -311,6 +351,8 @@ impl Spend {
         self.stack.clear();
         self.alt_stack.clear();
         self.if_stack.clear();
+        self.else_stack.clear();
+        self.returning = false;
         self.stack_mem = 0;
         self.alt_stack_mem = 0;
     }
@@ -405,6 +447,8 @@ impl Spend {
             self.alt_stack.clear();
             self.alt_stack_mem = 0;
             self.last_code_separator = None;
+            self.else_stack.clear();
+            self.returning = false;
             self.context = ExecutionContext::LockingScript;
             self.program_counter = 0;
         }
@@ -429,6 +473,20 @@ impl Spend {
         let operation = &op_owned;
         let current_opcode = operation.op;
 
+        // A push that declares more bytes than the script holds: the reference's
+        // GetOp fails and the script is SCRIPT_ERR_BAD_OPCODE when the walk
+        // reaches it, executed or not (script.h:190-191, interpreter.cpp:450-451).
+        let truncated = match self.context {
+            ExecutionContext::UnlockingScript => self.unlocking_truncated,
+            ExecutionContext::LockingScript => self.locking_truncated,
+        };
+        if truncated == Some(self.program_counter) {
+            return Err(self.error(&format!(
+                "A push declares more bytes than the script holds; the script cannot be parsed past it (pc={}).",
+                self.program_counter
+            )));
+        }
+
         // Check for oversized data push
         if let Some(ref data) = operation.data {
             if data.len() > MAX_SCRIPT_ELEMENT_SIZE {
@@ -440,10 +498,10 @@ impl Spend {
         }
 
         // Determine if we're currently executing (not in a false conditional branch)
-        let is_executing = !self.if_stack.contains(&false);
+        let is_executing = !self.returning && !self.if_stack.contains(&false);
 
         // Check for disabled opcodes when executing
-        if is_executing && is_opcode_disabled(current_opcode) {
+        if is_executing && is_opcode_disabled(current_opcode, self.utxo_after_chronicle) {
             return Err(self.error(&format!(
                 "This opcode is currently disabled. (Opcode: {}, PC: {})",
                 opcode_to_name(current_opcode).unwrap_or("UNKNOWN"),
@@ -480,7 +538,7 @@ impl Spend {
         opcode: u8,
         chunk: &ScriptChunk,
     ) -> Result<(), ScriptEvaluationError> {
-        let is_executing = !self.if_stack.contains(&false);
+        let is_executing = !self.returning && !self.if_stack.contains(&false);
 
         match opcode {
             // ================================================================
@@ -507,8 +565,7 @@ impl Spend {
             // CHECKSEQUENCEVERIFY, NOPs for a post-Genesis UTXO; 606-700 for
             // NOP4-NOP8 before their Chronicle meanings). ts-sdk: "is
             // discouraged by verification flags".
-            OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8
-            | OP_NOP9 | OP_NOP10 => {
+            OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP9 | OP_NOP10 => {
                 if self.discourage_upgradable_nops {
                     return Err(self.error(&format!(
                         "{} is discouraged by verification flags.",
@@ -516,8 +573,34 @@ impl Spend {
                     )));
                 }
             }
-            // Extended NOPs (0xba-0xff)
-            0xba..=0xff => {}
+            // 0xb3-0xb7: NOP4-NOP8 before Chronicle; OP_SUBSTR, OP_LEFT, OP_RIGHT,
+            // OP_LSHIFTNUM, OP_RSHIFTNUM for a UTXO created after it
+            // (interpreter.cpp:609-764; the NOP branch with the discouragement at
+            // each arm's head).
+            OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 => {
+                if !self.utxo_after_chronicle {
+                    if self.discourage_upgradable_nops {
+                        return Err(self.error(&format!(
+                            "{} is discouraged by verification flags.",
+                            opcode_to_name(opcode).unwrap_or("OP_NOP")
+                        )));
+                    }
+                } else {
+                    self.op_chronicle_splice(opcode)?;
+                }
+            }
+            // 0xba-0xff are undefined: the reference's `default:` is
+            // SCRIPT_ERR_BAD_OPCODE when one is executed (interpreter.cpp:1795),
+            // and this arm is only reached when executing: they fall to the
+            // invalid-opcode arm below.
+            // OP_VER: the transaction version as 4 little-endian bytes for a UTXO
+            // created after Chronicle (interpreter.cpp:598-608); BAD_OPCODE before.
+            OP_VER => {
+                if !self.utxo_after_chronicle {
+                    return Err(self.error("OP_VER is disabled until Chronicle."));
+                }
+                self.push_stack(self.transaction_version.to_le_bytes().to_vec())?;
+            }
 
             // ================================================================
             // Flow Control (0x63-0x6a)
@@ -542,10 +625,55 @@ impl Spend {
                     }
                 }
                 self.if_stack.push(f_value);
+                self.else_stack.push(false);
+            }
+            // OP_VERIF / OP_VERNOTIF (interpreter.cpp:773-812): for a UTXO created
+            // after Chronicle, a conditional on "the top element is exactly the
+            // transaction version as 4 little-endian bytes"; before Chronicle,
+            // skipped when not executing (post-Genesis) and BAD_OPCODE when
+            // executed. This arm runs whether or not the branch executes (the
+            // opcodes sit in the OP_IF..OP_ENDIF range).
+            OP_VERIF | OP_VERNOTIF => {
+                if !self.utxo_after_chronicle {
+                    if !is_executing {
+                        return Ok(());
+                    }
+                    return Err(self.error(&format!(
+                        "{} is disabled until Chronicle.",
+                        opcode_to_name(opcode).unwrap_or("OP_VERIF")
+                    )));
+                }
+                let mut f_value = false;
+                if is_executing {
+                    if self.stack.is_empty() {
+                        return Err(self.error(
+                            "OP_VERIF and OP_VERNOTIF require at least one item on the stack when they are used!",
+                        ));
+                    }
+                    let buf = self.pop_stack()?;
+                    if buf.len() == 4 {
+                        f_value = buf == self.transaction_version.to_le_bytes();
+                    }
+                    if opcode == OP_VERNOTIF {
+                        f_value = !f_value;
+                    }
+                }
+                self.if_stack.push(f_value);
+                self.else_stack.push(false);
             }
             OP_ELSE => {
                 if self.if_stack.is_empty() {
                     return Err(self.error("OP_ELSE requires a preceeding OP_IF."));
+                }
+                // One OP_ELSE per OP_IF after Genesis (conditional_tracker.cpp:51-55,
+                // interpreter.cpp:829-831); every UTXO here is post-Genesis.
+                if self.else_stack.last() == Some(&true) {
+                    return Err(self.error(
+                        "OP_ELSE may only be used once for each OP_IF or OP_NOTIF after Genesis.",
+                    ));
+                }
+                if let Some(seen) = self.else_stack.last_mut() {
+                    *seen = true;
                 }
                 let last = self.if_stack.len() - 1;
                 self.if_stack[last] = !self.if_stack[last];
@@ -555,6 +683,7 @@ impl Spend {
                     return Err(self.error("OP_ENDIF requires a preceeding OP_IF."));
                 }
                 self.if_stack.pop();
+                self.else_stack.pop();
             }
             OP_VERIFY => {
                 if self.stack.is_empty() {
@@ -569,16 +698,22 @@ impl Spend {
                 self.pop_stack()?;
             }
             OP_RETURN => {
-                // Jump to end of current script
-                let end = match self.context {
-                    ExecutionContext::UnlockingScript => self.unlocking_chunks.len(),
-                    ExecutionContext::LockingScript => self.locking_chunks.len(),
-                };
-                self.program_counter = end;
-                self.if_stack.clear();
-                // Counteract the final increment
-                if self.program_counter > 0 {
-                    self.program_counter -= 1;
+                // After Genesis (interpreter.cpp:856-871): at the top level the
+                // script ends successfully, whatever follows; inside a conditional,
+                // execution stops but the walk continues, so the conditionals must
+                // still balance and every later opcode must still parse (`482`).
+                if self.if_stack.is_empty() {
+                    let end = match self.context {
+                        ExecutionContext::UnlockingScript => self.unlocking_chunks.len(),
+                        ExecutionContext::LockingScript => self.locking_chunks.len(),
+                    };
+                    self.program_counter = end;
+                    // Counteract the final increment
+                    if self.program_counter > 0 {
+                        self.program_counter -= 1;
+                    }
+                } else {
+                    self.returning = true;
                 }
             }
 
@@ -1071,7 +1206,10 @@ impl Spend {
             // ================================================================
             // Arithmetic Operations
             // ================================================================
-            OP_1ADD | OP_1SUB | OP_NEGATE | OP_ABS | OP_NOT | OP_0NOTEQUAL => {
+            // OP_2MUL / OP_2DIV run only for a UTXO created after Chronicle
+            // (interpreter.cpp:1247-1254; disabled before it, `360-375`, refused
+            // above in `step`).
+            OP_1ADD | OP_1SUB | OP_2MUL | OP_2DIV | OP_NEGATE | OP_ABS | OP_NOT | OP_0NOTEQUAL => {
                 if self.stack.is_empty() {
                     return Err(self.error(&format!(
                         "{} requires at least one item to be on the stack.",
@@ -1085,6 +1223,8 @@ impl Spend {
                 bn = match opcode {
                     OP_1ADD => bn.add(&BigNumber::one()),
                     OP_1SUB => bn.sub(&BigNumber::one()),
+                    OP_2MUL => bn.add(&bn),
+                    OP_2DIV => bn.div(&BigNumber::from_i64(2)),
                     OP_NEGATE => bn.neg(),
                     OP_ABS => bn.abs(),
                     OP_NOT => {
@@ -1477,11 +1617,16 @@ impl Spend {
         }
         let mut subscript = Script::from_chunks(subscript_chunks);
 
+        // CleanupScriptCode (interpreter.cpp:255-263, applied per signature at
+        // 1573-1578): a signature's push is deleted from the scriptCode only when
+        // it does not carry SIGHASH_FORKID; FORKID is always enabled here, so
+        // only an empty signature (no hash type) is deleted, as an OP_0 push.
         for sig in &sigs {
-            let sig_script = Script::new();
-            let mut sig_script = sig_script;
-            sig_script.write_bin(sig);
-            subscript.find_and_delete(&sig_script);
+            if !has_forkid_bit(sig) {
+                let mut sig_script = Script::new();
+                sig_script.write_bin(sig);
+                subscript.find_and_delete(&sig_script);
+            }
         }
 
         // Verify signatures
@@ -1646,12 +1791,115 @@ impl Spend {
         }
         let mut subscript = Script::from_chunks(subscript_chunks);
 
-        // Remove the signature from the subscript
-        let mut sig_script = Script::new();
-        sig_script.write_bin(sig_bytes);
-        subscript.find_and_delete(&sig_script);
+        // CleanupScriptCode (interpreter.cpp:255-263, applied at 1484): the
+        // signature's push is deleted from the scriptCode only when the
+        // signature does not carry SIGHASH_FORKID (FORKID is always enabled
+        // here). A signature that does is hashed with its own push in place, so
+        // a signature whose push appears in the scriptCode cannot verify, as on
+        // the reference. An empty signature carries no hash type and is deleted
+        // as an OP_0 push, as on the reference.
+        if !has_forkid_bit(sig_bytes) {
+            let mut sig_script = Script::new();
+            sig_script.write_bin(sig_bytes);
+            subscript.find_and_delete(&sig_script);
+        }
 
         Ok(subscript)
+    }
+
+    /// `OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM`, `OP_RSHIFTNUM` at
+    /// `0xb3`-`0xb7` for a UTXO created after Chronicle (`interpreter.cpp:609-764`).
+    /// The two shifts act on script NUMBERS (not on bytes, unlike `OP_LSHIFT`);
+    /// a left shift whose result would not fit the memory budget is refused
+    /// before it is computed (a local budget; the reference's bound is its
+    /// consensus number length, `SCRIPTNUM_OVERFLOW`).
+    fn op_chronicle_splice(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
+        let name = match opcode {
+            OP_NOP4 => "OP_SUBSTR",
+            OP_NOP5 => "OP_LEFT",
+            OP_NOP6 => "OP_RIGHT",
+            OP_NOP7 => "OP_LSHIFTNUM",
+            _ => "OP_RSHIFTNUM",
+        };
+        let need = if opcode == OP_NOP4 { 3 } else { 2 };
+        if self.stack.len() < need {
+            return Err(self.error(&format!(
+                "{name} requires at least {} items to be on the stack.",
+                if need == 3 { "three" } else { "two" }
+            )));
+        }
+        let num = |s: &Self, bytes: &[u8]| -> Result<BigNumber, ScriptEvaluationError> {
+            ScriptNum::from_bytes(bytes, s.require_minimal)
+                .map_err(|e| s.error(&format!("Invalid script number: {}", e)))
+        };
+        match opcode {
+            OP_NOP4 => {
+                // (data offset len -- data[offset..offset+len])
+                let len_bytes = self.pop_stack()?;
+                let off_bytes = self.pop_stack()?;
+                let len = num(self, &len_bytes)?.to_i64().unwrap_or(-1);
+                let offset = num(self, &off_bytes)?.to_i64().unwrap_or(-1);
+                let data = self.pop_stack()?;
+                let size = data.len() as i64;
+                if offset < 0 || offset >= size || len < 0 || len > size - offset {
+                    return Err(self.error(&format!(
+                        "OP_SUBSTR offset ({offset}) must be in range [0, {size}) and length ({len}) must be in range [0, {}]",
+                        size - offset
+                    )));
+                }
+                let (o, l) = (offset as usize, len as usize);
+                self.push_stack(data[o..o + l].to_vec())?;
+            }
+            OP_NOP5 | OP_NOP6 => {
+                // (data len -- the first / last len bytes)
+                let len_bytes = self.pop_stack()?;
+                let len = num(self, &len_bytes)?.to_i64().unwrap_or(-1);
+                let data = self.pop_stack()?;
+                let size = data.len() as i64;
+                if len < 0 || len > size {
+                    return Err(self.error(&format!(
+                        "{name} length ({len}) must be in range [0, {size}]"
+                    )));
+                }
+                let l = len as usize;
+                let out = if opcode == OP_NOP5 {
+                    data[..l].to_vec()
+                } else {
+                    data[data.len() - l..].to_vec()
+                };
+                self.push_stack(out)?;
+            }
+            _ => {
+                // (x n -- x << n) / (x n -- x >> n), on script numbers
+                let n_bytes = self.pop_stack()?;
+                let n_bn = num(self, &n_bytes)?;
+                if n_bn.is_negative() {
+                    return Err(self.error(&format!("{name} bits to shift must not be negative.")));
+                }
+                let x_bytes = self.pop_stack()?;
+                let x = num(self, &x_bytes)?;
+                let n = n_bn.to_i64().map(|v| v as u64).unwrap_or(u64::MAX);
+                let out = if opcode == OP_NOP7 {
+                    // the result's size, before allocating it: a LOCAL budget
+                    let bits = (x.bit_length() as u64).saturating_add(n);
+                    let bytes = (bits / 8 + 2) as usize;
+                    if !x.is_zero() && bytes > self.memory_limit {
+                        return Err(self.resource_error(ScriptResource::ElementSize, bytes));
+                    }
+                    if x.is_zero() {
+                        x
+                    } else {
+                        x.shl_bits(n)
+                    }
+                } else if n >= x.bit_length() as u64 {
+                    BigNumber::zero()
+                } else {
+                    x.shr_bits_toward_zero(n)
+                };
+                self.push_stack(ScriptNum::to_bytes(&out))?;
+            }
+        }
+        Ok(())
     }
 
     fn verify_signature(
@@ -1835,9 +2083,18 @@ impl Spend {
 // Helper Functions
 // ============================================================================
 
-/// Checks if an opcode is disabled.
-fn is_opcode_disabled(op: u8) -> bool {
-    matches!(op, OP_2MUL | OP_2DIV | OP_VER | OP_VERIF | OP_VERNOTIF)
+/// `IsOpcodeDisabled` (interpreter.cpp:360-375): `OP_2MUL` and `OP_2DIV`
+/// unless the UTXO was created after Chronicle. `OP_VER`, `OP_VERIF` and
+/// `OP_VERNOTIF` are not "disabled" there but `BAD_OPCODE` when executed
+/// before Chronicle, handled in their arms.
+fn is_opcode_disabled(op: u8, utxo_after_chronicle: bool) -> bool {
+    !utxo_after_chronicle && matches!(op, OP_2MUL | OP_2DIV)
+}
+
+/// Whether a signature's hash type carries `SIGHASH_FORKID`; an empty
+/// signature has no hash type (`GetHashType`, interpreter.cpp:246-252).
+fn has_forkid_bit(sig: &[u8]) -> bool {
+    sig.last().is_some_and(|t| t & (SIGHASH_FORKID as u8) != 0)
 }
 
 /// Checks if a chunk uses minimal push encoding.
@@ -1947,15 +2204,18 @@ mod tests {
 
     #[test]
     fn test_is_opcode_disabled() {
-        assert!(is_opcode_disabled(OP_2MUL));
-        assert!(is_opcode_disabled(OP_2DIV));
-        assert!(is_opcode_disabled(OP_VER));
-        assert!(is_opcode_disabled(OP_VERIF));
-        assert!(is_opcode_disabled(OP_VERNOTIF));
+        assert!(is_opcode_disabled(OP_2MUL, false));
+        assert!(is_opcode_disabled(OP_2DIV, false));
+        assert!(!is_opcode_disabled(OP_2MUL, true));
+        assert!(!is_opcode_disabled(OP_2DIV, true));
+        // BAD_OPCODE in their arms, not "disabled" (interpreter.cpp:360-375)
+        assert!(!is_opcode_disabled(OP_VER, false));
+        assert!(!is_opcode_disabled(OP_VERIF, false));
+        assert!(!is_opcode_disabled(OP_VERNOTIF, false));
 
-        assert!(!is_opcode_disabled(OP_DUP));
-        assert!(!is_opcode_disabled(OP_MUL));
-        assert!(!is_opcode_disabled(OP_CAT));
+        assert!(!is_opcode_disabled(OP_DUP, false));
+        assert!(!is_opcode_disabled(OP_MUL, false));
+        assert!(!is_opcode_disabled(OP_CAT, false));
     }
 
     #[test]
@@ -2295,15 +2555,24 @@ mod flag_tests {
 
     #[test]
     fn discourage_upgradable_nops_refuses_an_executed_nop1_to_nop10_under_the_standard_word_only() {
-        for nop in [
-            "OP_NOP1", "OP_NOP2", "OP_NOP3", "OP_NOP4", "OP_NOP8", "OP_NOP9", "OP_NOP10",
+        // 0xb0-0xb2 and 0xb8-0xb9 are NOPs in every era; 0xb3-0xb7 only for a coin created
+        // before Chronicle (their Chronicle meanings live under UTXO_AFTER_CHRONICLE), so
+        // those are tested under the post-Genesis words.
+        for (nop, era) in [
+            ("OP_NOP1", ProtocolEra::PostChronicle),
+            ("OP_NOP2", ProtocolEra::PostChronicle),
+            ("OP_NOP3", ProtocolEra::PostChronicle),
+            ("OP_NOP4", ProtocolEra::PostGenesis),
+            ("OP_NOP8", ProtocolEra::PostGenesis),
+            ("OP_NOP9", ProtocolEra::PostChronicle),
+            ("OP_NOP10", ProtocolEra::PostChronicle),
         ] {
             let lock = format!("{nop} OP_1");
             assert!(
-                valid(with_flags(&lock, "", 2, block()).validate()),
+                valid(with_flags(&lock, "", 2, ScriptFlags::block(era)).validate()),
                 "{nop}: a NOP in a block"
             );
-            let msg = message(with_flags(&lock, "", 2, standard()).validate());
+            let msg = message(with_flags(&lock, "", 2, ScriptFlags::standard(era)).validate());
             assert_eq!(msg, format!("{nop} is discouraged by verification flags."));
             assert!(
                 valid(spend(&lock, "", 1).validate()),
@@ -2393,5 +2662,386 @@ mod flag_tests {
         s.set_require_minimal(true);
         assert!(s.validate().is_err());
         let _ = from_hex; // used by the witnesses' integration test; keep the import honest
+    }
+}
+
+/// The five consensus divergences left after 0.3.26 (Calhooon/bsv-rs#12), each
+/// rule on the smallest script that reaches it: the post-Chronicle opcodes and
+/// their gate, the single-ELSE rule, a RETURN inside a conditional, truncated
+/// pushes, undefined opcodes, and the scriptCode cleanup. Sites in `flags.rs`
+/// and at the arms.
+#[cfg(test)]
+mod chronicle_tests {
+    use super::*;
+    use crate::script::flags::ProtocolEra;
+
+    fn spend(lock_asm: &str, unlock_asm: &str, version: i32) -> Spend {
+        Spend::new(SpendParams {
+            source_txid: [0u8; 32],
+            source_output_index: 0,
+            source_satoshis: 1000,
+            locking_script: LockingScript::from_asm(lock_asm).unwrap(),
+            transaction_version: version,
+            other_inputs: vec![],
+            outputs: vec![],
+            input_index: 0,
+            unlocking_script: UnlockingScript::from_asm(unlock_asm).unwrap(),
+            input_sequence: 0xffff_ffff,
+            lock_time: 0,
+            memory_limit: None,
+        })
+    }
+
+    fn valid(r: Result<bool, ScriptEvaluationError>) -> bool {
+        matches!(r, Ok(true))
+    }
+
+    fn message(r: Result<bool, ScriptEvaluationError>) -> String {
+        r.expect_err("expected a refusal").message
+    }
+
+    #[test]
+    fn substr_left_and_right_take_ranges_after_chronicle_and_refuse_out_of_range_ones() {
+        // 0xb3 OP_SUBSTR (data offset len), 0xb4 OP_LEFT, 0xb5 OP_RIGHT (data len)
+        assert!(valid(
+            spend("OP_1 OP_2 OP_NOP4 bbcc OP_EQUAL", "aabbccdd", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_2 OP_NOP5 aabb OP_EQUAL", "aabbccdd", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_2 OP_NOP6 ccdd OP_EQUAL", "aabbccdd", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_0 OP_NOP5 OP_0 OP_EQUAL", "aabbccdd", 2).validate()
+        ));
+        assert_eq!(
+            message(spend("OP_5 OP_NOP5", "aabbccdd", 2).validate()),
+            "OP_LEFT length (5) must be in range [0, 4]"
+        );
+        assert_eq!(
+            message(spend("OP_4 OP_0 OP_NOP4", "aabbccdd", 2).validate()),
+            "OP_SUBSTR offset (4) must be in range [0, 4) and length (0) must be in range [0, 0]"
+        );
+        assert!(
+            message(spend("OP_1 OP_4 OP_NOP4", "aabbccdd", 2).validate())
+                .starts_with("OP_SUBSTR offset (1)")
+        );
+        assert!(
+            message(spend("OP_1NEGATE OP_NOP6", "aabbccdd", 2).validate())
+                .contains("OP_RIGHT length (-1)")
+        );
+    }
+
+    #[test]
+    fn lshiftnum_and_rshiftnum_shift_script_numbers_toward_zero() {
+        // 0xb6 OP_LSHIFTNUM, 0xb7 OP_RSHIFTNUM: (x n -- out) on numbers
+        assert!(valid(
+            spend("OP_1 OP_NOP7 OP_14 OP_EQUAL", "OP_7", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_10 OP_NOP7 0004 OP_EQUAL", "OP_1", 2).validate()
+        )); // 1 << 10 = 1024 = 0x0400 LE
+            // -7 >> 1 is -3 (toward zero; 0x87 is -7, 0x83 is -3), not -4
+        assert!(valid(spend("OP_1 OP_NOP8 83 OP_EQUAL", "87", 2).validate()));
+        assert!(valid(
+            spend("OP_1 OP_NOP8 OP_3 OP_EQUAL", "OP_7", 2).validate()
+        ));
+        // a shift past every bit is zero (the empty number)
+        assert!(valid(
+            spend("OP_16 OP_NOP8 OP_0 OP_EQUAL", "OP_7", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_16 OP_NOP8 OP_0 OP_EQUAL", "87", 2).validate()
+        ));
+        // zero shifted left stays zero
+        assert!(valid(
+            spend("OP_16 OP_NOP7 OP_0 OP_EQUAL", "OP_0", 2).validate()
+        ));
+        assert_eq!(
+            message(spend("OP_1NEGATE OP_NOP7", "OP_7", 2).validate()),
+            "OP_LSHIFTNUM bits to shift must not be negative."
+        );
+        assert_eq!(
+            message(spend("OP_1NEGATE OP_NOP8", "OP_7", 2).validate()),
+            "OP_RSHIFTNUM bits to shift must not be negative."
+        );
+    }
+
+    #[test]
+    fn lshiftnum_refuses_a_result_beyond_the_memory_budget_before_computing_it() {
+        let mut s = Spend::new(SpendParams {
+            source_txid: [0u8; 32],
+            source_output_index: 0,
+            source_satoshis: 1000,
+            locking_script: LockingScript::from_asm("2823 OP_NOP7").unwrap(), // 0x2328 = 9000 bits
+            transaction_version: 2,
+            other_inputs: vec![],
+            outputs: vec![],
+            input_index: 0,
+            unlocking_script: UnlockingScript::from_asm("OP_1").unwrap(),
+            input_sequence: 0xffff_ffff,
+            lock_time: 0,
+            memory_limit: Some(1000),
+        });
+        let err = s.validate().unwrap_err();
+        assert!(err.is_resource_limit(), "{}", err.message);
+        assert_eq!(
+            err.resource_limit.unwrap().resource,
+            ScriptResource::ElementSize
+        );
+    }
+
+    #[test]
+    fn before_chronicle_0xb3_to_0xb7_are_nops_and_discouraged_under_the_standard_word() {
+        // version 1 in the default mode: the UTXO is taken as pre-Chronicle
+        assert!(valid(
+            spend("OP_NOP4 OP_NOP5 OP_NOP6 OP_NOP7 OP_NOP8", "OP_1", 1).validate()
+        ));
+        let mut s = spend("OP_NOP7 OP_1", "", 2);
+        s.set_flags(ScriptFlags::standard(ProtocolEra::PostGenesis));
+        assert_eq!(
+            message(s.validate()),
+            "OP_NOP7 is discouraged by verification flags."
+        );
+        // the block word of a post-Chronicle coin turns them on even at version 1
+        let mut s = spend("OP_1 OP_NOP7 OP_14 OP_EQUAL", "OP_7", 1);
+        s.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle));
+        assert!(valid(s.validate()));
+        // and the setter overrides either way
+        let mut s = spend("OP_1 OP_NOP7 OP_14 OP_EQUAL", "OP_7", 1);
+        s.set_utxo_after_chronicle(true);
+        assert!(valid(s.validate()));
+    }
+
+    #[test]
+    fn op_ver_pushes_the_version_after_chronicle_and_is_refused_before() {
+        assert!(valid(spend("OP_VER 02000000 OP_EQUAL", "", 2).validate()));
+        assert_eq!(
+            message(spend("OP_VER", "", 1).validate()),
+            "OP_VER is disabled until Chronicle."
+        );
+        let mut s = spend("OP_VER 01000000 OP_EQUAL", "", 1);
+        s.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle));
+        assert!(valid(s.validate()));
+        // not executed: nothing happens, before or after Chronicle
+        assert!(valid(
+            spend("OP_0 OP_IF OP_VER OP_ENDIF OP_1", "", 1).validate()
+        ));
+    }
+
+    #[test]
+    fn op_verif_compares_the_top_with_the_version_and_is_skipped_or_refused_before_chronicle() {
+        assert!(valid(
+            spend("OP_VERIF OP_1 OP_ELSE OP_0 OP_ENDIF", "02000000", 2).validate()
+        ));
+        assert!(!valid(
+            spend("OP_VERIF OP_1 OP_ELSE OP_0 OP_ENDIF", "01000000", 2).validate()
+        ));
+        // only an exactly 4-byte element can match; OP_2 (one byte) does not
+        assert!(valid(
+            spend("OP_VERIF OP_0 OP_ELSE OP_1 OP_ENDIF", "OP_2", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_VERNOTIF OP_1 OP_ELSE OP_0 OP_ENDIF", "01000000", 2).validate()
+        ));
+        assert!(valid(
+            spend("OP_VERNOTIF OP_0 OP_ELSE OP_1 OP_ENDIF", "02000000", 2).validate()
+        ));
+        // before Chronicle: executed is refused, not executed is skipped (no conditional pushed)
+        assert_eq!(
+            message(spend("OP_VERIF OP_1 OP_ENDIF", "02000000", 1).validate()),
+            "OP_VERIF is disabled until Chronicle."
+        );
+        assert!(valid(
+            spend("OP_0 OP_IF OP_VERIF OP_ENDIF OP_1", "", 1).validate()
+        ));
+        assert!(valid(
+            spend("OP_0 OP_IF OP_VERNOTIF OP_ENDIF OP_1", "", 1).validate()
+        ));
+    }
+
+    #[test]
+    fn two_mul_and_two_div_are_disabled_before_chronicle_and_compute_after() {
+        assert!(message(spend("OP_2MUL", "OP_7", 1).validate()).contains("currently disabled"));
+        assert!(message(spend("OP_2DIV", "OP_7", 1).validate()).contains("currently disabled"));
+        assert!(valid(spend("OP_2MUL OP_14 OP_EQUAL", "OP_7", 2).validate()));
+        assert!(valid(spend("OP_2DIV OP_3 OP_EQUAL", "OP_7", 2).validate()));
+        assert!(valid(spend("OP_2DIV 83 OP_EQUAL", "87", 2).validate())); // -7 / 2 = -3
+        assert!(valid(spend("OP_2MUL 8e OP_EQUAL", "87", 2).validate())); // -7 * 2 = -14 (0x8e)
+                                                                          // not executed: no refusal before Chronicle either (interpreter.cpp:458-459, post-Genesis)
+        assert!(valid(
+            spend("OP_0 OP_IF OP_2MUL OP_ENDIF OP_1", "", 1).validate()
+        ));
+    }
+
+    #[test]
+    fn one_op_else_per_op_if_after_genesis() {
+        assert!(valid(
+            spend("OP_IF OP_1 OP_ELSE OP_0 OP_ENDIF", "OP_1", 2).validate()
+        ));
+        assert_eq!(
+            message(spend("OP_IF OP_1 OP_ELSE OP_1 OP_ELSE OP_1 OP_ENDIF", "OP_1", 2).validate()),
+            "OP_ELSE may only be used once for each OP_IF or OP_NOTIF after Genesis."
+        );
+        // one per level, nested
+        assert!(valid(
+            spend(
+                "OP_IF OP_0 OP_IF OP_ELSE OP_ENDIF OP_ELSE OP_ENDIF OP_1",
+                "OP_1",
+                2
+            )
+            .validate()
+        ));
+        // in every mode: version 1 too
+        assert!(
+            message(spend("OP_IF OP_ELSE OP_ELSE OP_ENDIF OP_1", "OP_1", 1).validate())
+                .contains("only be used once")
+        );
+    }
+
+    #[test]
+    fn a_return_inside_a_conditional_stops_execution_but_the_balance_and_the_parse_still_hold() {
+        // execution stops at the RETURN: the OP_0 after it never runs, the ENDIF still closes the IF
+        assert!(valid(
+            spend("OP_1 OP_IF OP_RETURN OP_0 OP_ENDIF", "OP_1", 2).validate()
+        ));
+        // the conditional must still balance
+        assert!(message(spend("OP_1 OP_IF OP_RETURN", "OP_1", 2).validate())
+            .contains("terminated with OP_ENDIF"));
+        // an undefined opcode after the RETURN is not executed: fine
+        let lock = LockingScript::from_binary(&[0x51, 0x63, 0x6a, 0x68, 0xba]).unwrap();
+        let mut s = spend("OP_1", "OP_1", 2);
+        s = Spend::new(SpendParams {
+            locking_script: lock,
+            ..params_of(&s)
+        });
+        assert!(valid(s.validate()));
+        // a truncated push after the RETURN is still a parse failure
+        let lock = LockingScript::from_binary(&[0x51, 0x63, 0x6a, 0x68, 0x03, 0x01]).unwrap();
+        let mut s = Spend::new(SpendParams {
+            locking_script: lock,
+            ..params_of(&spend("OP_1", "OP_1", 2))
+        });
+        assert!(message(s.validate()).starts_with("A push declares more bytes"));
+        // a top-level RETURN ends the script successfully, whatever follows
+        let lock = LockingScript::from_binary(&[0x51, 0x6a, 0xba, 0x03, 0x01]).unwrap();
+        let mut s = Spend::new(SpendParams {
+            locking_script: lock,
+            ..params_of(&spend("OP_1", "", 2))
+        });
+        assert!(valid(s.validate()));
+    }
+
+    #[test]
+    fn an_undefined_opcode_is_refused_only_when_executed() {
+        assert!(message(spend("OP_1 OP_NOP77", "", 2).validate()).starts_with("Invalid opcode 252"));
+        assert!(valid(
+            spend("OP_0 OP_IF OP_NOP77 OP_ENDIF OP_1", "", 2).validate()
+        ));
+        let lock = LockingScript::from_binary(&[0x51, 0xba]).unwrap();
+        let mut s = Spend::new(SpendParams {
+            locking_script: lock,
+            ..params_of(&spend("OP_1", "", 1))
+        });
+        assert!(message(s.validate()).starts_with("Invalid opcode 186"));
+    }
+
+    #[test]
+    fn a_truncated_push_is_refused_where_the_walk_reaches_it_even_unexecuted() {
+        // OP_0 OP_IF <push 3 with 1 byte>: the branch does not execute, the parse still fails there
+        let lock = LockingScript::from_binary(&[0x00, 0x63, 0x03, 0x01]).unwrap();
+        assert_eq!(lock.as_script().truncated_push(), Some(2));
+        let mut s = Spend::new(SpendParams {
+            locking_script: lock,
+            ..params_of(&spend("OP_1", "", 2))
+        });
+        assert!(message(s.validate()).contains("(pc=2)"));
+        // a complete script has no truncated push; bytes after a top-level RETURN are data
+        assert_eq!(
+            Script::from_binary(&[0x51, 0x03, 0x01, 0x02, 0x03])
+                .unwrap()
+                .truncated_push(),
+            None
+        );
+        assert_eq!(
+            Script::from_binary(&[0x6a, 0x03, 0x01])
+                .unwrap()
+                .truncated_push(),
+            None
+        );
+        assert_eq!(
+            Script::from_binary(&[0x4c]).unwrap().truncated_push(),
+            Some(0)
+        );
+        assert_eq!(
+            Script::from_binary(&[0x51, 0x4d, 0x01])
+                .unwrap()
+                .truncated_push(),
+            Some(1)
+        );
+        assert_eq!(
+            Script::from_binary(&[0x4e, 0x01, 0x00, 0x00, 0x00])
+                .unwrap()
+                .truncated_push(),
+            Some(0)
+        );
+        assert_eq!(
+            Script::from_binary(&[0x4e, 0x01, 0x00, 0x00, 0x00, 0xaa])
+                .unwrap()
+                .truncated_push(),
+            None
+        );
+        // an earlier failure wins: the walk never reaches the truncated push
+        let lock = LockingScript::from_binary(&[0x69, 0x03, 0x01]).unwrap(); // OP_VERIFY on an empty stack
+        let mut s = Spend::new(SpendParams {
+            locking_script: lock,
+            ..params_of(&spend("OP_1", "", 2))
+        });
+        assert!(message(s.validate()).contains("OP_VERIFY requires"));
+    }
+
+    #[test]
+    fn the_scriptcode_keeps_a_forkid_signatures_push_and_deletes_an_empty_ones_op_0() {
+        let sig = "304402204c9195e05dc41a9119b4cf65f43e450a057818d74c12265faee6a21ae2e0ab87022051c94bb55d9c54d68efaa16785c6ba6a7958757745528974a92d8cddcb993c1241";
+        let lock_asm = format!("{sig} OP_DROP OP_1");
+        let mut s = spend(&lock_asm, "", 2);
+        s.context = ExecutionContext::LockingScript;
+        let sig_bytes = crate::primitives::from_hex(sig).unwrap();
+        assert!(has_forkid_bit(&sig_bytes));
+        let sub = s.build_subscript(&sig_bytes).unwrap();
+        assert_eq!(
+            sub.to_binary(),
+            s.locking_script.to_binary(),
+            "a FORKID signature's push stays"
+        );
+        // an empty signature carries no hash type: its OP_0 push is deleted, as on the reference
+        let mut s = spend("OP_0 OP_1 OP_0", "", 2);
+        s.context = ExecutionContext::LockingScript;
+        assert!(!has_forkid_bit(&[]));
+        let sub = s.build_subscript(&[]).unwrap();
+        assert_eq!(sub.to_asm(), "OP_1");
+        // a signature without the FORKID bit would be deleted (and is refused by the encoding check)
+        assert!(!has_forkid_bit(&[
+            0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01, 0x01
+        ]));
+    }
+
+    /// `SpendParams` for a fresh interpreter with the same context as `s`.
+    fn params_of(s: &Spend) -> SpendParams {
+        SpendParams {
+            source_txid: s.source_txid,
+            source_output_index: s.source_output_index,
+            source_satoshis: s.source_satoshis,
+            locking_script: s.locking_script.clone(),
+            transaction_version: s.transaction_version,
+            other_inputs: s.other_inputs.clone(),
+            outputs: s.outputs.clone(),
+            input_index: s.input_index,
+            unlocking_script: s.unlocking_script.clone(),
+            input_sequence: s.input_sequence,
+            lock_time: s.lock_time,
+            memory_limit: Some(s.memory_limit),
+        }
     }
 }

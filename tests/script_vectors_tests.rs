@@ -95,16 +95,65 @@ fn run_spend_vector(index: usize, vector: &SpendVector) -> Result<bool, String> 
     })
 }
 
+/// Vectors this interpreter refuses ON PURPOSE, each with the rule and its site
+/// (the vectors are shared with the other SDKs and never edited; a vector the
+/// interpreter cannot express is counted here, exactly, with its reason).
+///
+/// The twenty multiple-`OP_ELSE` vectors (27-36 and their twins 258-267; the
+/// file holds two copies of one list) assert the pre-Genesis
+/// behavior of `OP_ELSE` (each one inverts the branch again). After Genesis a
+/// second `OP_ELSE` for one `OP_IF` is unbalanced on the node
+/// (`conditional_tracker.cpp:51-55`, `interpreter.cpp:829-831`), and every
+/// UTXO here is post-Genesis, so they are refused in every mode (0.3.27). The
+/// TypeScript SDK's default still accepts them: a stated divergence.
+const SPEND_VALID_KNOWN_DIVERGENCES: &[(usize, &str)] = &[
+    (27, "OP_ELSE may only be used once"),
+    (28, "OP_ELSE may only be used once"),
+    (29, "OP_ELSE may only be used once"),
+    (30, "OP_ELSE may only be used once"),
+    (31, "OP_ELSE may only be used once"),
+    (32, "OP_ELSE may only be used once"),
+    (33, "OP_ELSE may only be used once"),
+    (34, "OP_ELSE may only be used once"),
+    (35, "OP_ELSE may only be used once"),
+    (36, "OP_ELSE may only be used once"),
+    (258, "OP_ELSE may only be used once"),
+    (259, "OP_ELSE may only be used once"),
+    (260, "OP_ELSE may only be used once"),
+    (261, "OP_ELSE may only be used once"),
+    (262, "OP_ELSE may only be used once"),
+    (263, "OP_ELSE may only be used once"),
+    (264, "OP_ELSE may only be used once"),
+    (265, "OP_ELSE may only be used once"),
+    (266, "OP_ELSE may only be used once"),
+    (267, "OP_ELSE may only be used once"),
+];
+
 #[test]
 fn test_spend_valid_vectors() {
     let vectors = load_spend_vectors();
     let total = vectors.len();
     let mut passed = 0;
     let mut failed = 0;
+    let mut known = 0;
     let mut failures: Vec<String> = Vec::new();
 
     for (i, vector) in vectors.iter().enumerate() {
+        let known_divergence = SPEND_VALID_KNOWN_DIVERGENCES
+            .iter()
+            .find(|(k, _)| *k == i)
+            .map(|(_, reason)| *reason);
         match run_spend_vector(i, vector) {
+            Ok(true) if known_divergence.is_some() => {
+                failed += 1;
+                failures.push(format!(
+                    "Vector {}: listed as a known divergence but PASSED: strike it from SPEND_VALID_KNOWN_DIVERGENCES (comment: {})",
+                    i, vector.comment
+                ));
+            }
+            Err(e) if known_divergence.is_some_and(|reason| e.contains(reason)) => {
+                known += 1;
+            }
             Ok(true) => {
                 passed += 1;
             }
@@ -124,7 +173,15 @@ fn test_spend_valid_vectors() {
 
     // Print summary
     println!("\n=== Spend Valid Vectors Summary ===");
-    println!("Total: {}, Passed: {}, Failed: {}", total, passed, failed);
+    println!(
+        "Total: {}, Passed: {}, Known divergences: {}, Failed: {}",
+        total, passed, known, failed
+    );
+    assert_eq!(
+        known,
+        SPEND_VALID_KNOWN_DIVERGENCES.len(),
+        "every listed divergence must be hit with its reason"
+    );
 
     if !failures.is_empty() {
         println!("\nFirst 20 failures:");

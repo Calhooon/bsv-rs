@@ -184,6 +184,21 @@ impl Script {
     }
 
     /// Parses raw bytes into script chunks.
+    /// The chunk index of the first push that declares more bytes than the
+    /// script holds (a direct push, or a `OP_PUSHDATA1/2/4` whose length bytes
+    /// or data are cut short), or `None` when every push is complete.
+    ///
+    /// The parser is lenient (a truncated push yields a shorter chunk, as the
+    /// TypeScript SDK's does), but the reference refuses to READ such an
+    /// opcode: `GetOp` returns false (`script.h:190-191`) and the interpreter
+    /// fails the script with `SCRIPT_ERR_BAD_OPCODE` when its walk reaches it,
+    /// executed or not (`interpreter.cpp:450-451`). `Spend` applies that at
+    /// this index. Bytes after a top-level `OP_RETURN` are data on both sides
+    /// and are not examined.
+    pub fn truncated_push(&self) -> Option<usize> {
+        truncated_push_index(&self.to_binary())
+    }
+
     fn parse_chunks(bytes: &[u8]) -> Vec<ScriptChunk> {
         let mut chunks = Vec::new();
         let length = bytes.len();
@@ -749,6 +764,65 @@ impl Default for Script {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// The index of the first truncated push in `bytes`, walking exactly as
+/// `Script::parse_chunks` walks (the same top-level `OP_RETURN` rule, the same
+/// conditional tracking), so the index names the same chunk.
+fn truncated_push_index(bytes: &[u8]) -> Option<usize> {
+    let length = bytes.len();
+    let mut pos = 0;
+    let mut index = 0usize;
+    let mut in_conditional_block = 0i32;
+    while pos < length {
+        let op = bytes[pos];
+        pos += 1;
+        if op == OP_RETURN && in_conditional_block == 0 {
+            return None;
+        }
+        if op == OP_IF || op == OP_NOTIF || op == OP_VERIF || op == OP_VERNOTIF {
+            in_conditional_block += 1;
+        } else if op == OP_ENDIF {
+            in_conditional_block = (in_conditional_block - 1).max(0);
+        }
+        let declared: Option<usize> = if op > 0 && op < OP_PUSHDATA1 {
+            Some(op as usize)
+        } else if op == OP_PUSHDATA1 {
+            if pos + 1 > length {
+                return Some(index);
+            }
+            let n = bytes[pos] as usize;
+            pos += 1;
+            Some(n)
+        } else if op == OP_PUSHDATA2 {
+            if pos + 2 > length {
+                return Some(index);
+            }
+            let n = bytes[pos] as usize | ((bytes[pos + 1] as usize) << 8);
+            pos += 2;
+            Some(n)
+        } else if op == OP_PUSHDATA4 {
+            if pos + 4 > length {
+                return Some(index);
+            }
+            let n = bytes[pos] as usize
+                | ((bytes[pos + 1] as usize) << 8)
+                | ((bytes[pos + 2] as usize) << 16)
+                | ((bytes[pos + 3] as usize) << 24);
+            pos += 4;
+            Some(n)
+        } else {
+            None
+        };
+        if let Some(n) = declared {
+            if pos + n > length {
+                return Some(index);
+            }
+            pos += n;
+        }
+        index += 1;
+    }
+    None
 }
 
 impl PartialEq for Script {

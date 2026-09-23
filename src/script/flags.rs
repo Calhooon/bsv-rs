@@ -136,13 +136,16 @@ impl ProtocolEra {
 /// `520`, `563`), and this interpreter evaluates every UTXO under
 /// post-Genesis rules (`UTXO_AFTER_GENESIS` is required by `check`).
 ///
-/// **What is not implemented.** `UTXO_AFTER_CHRONICLE` re-enables
-/// `OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF` and `OP_VERNOTIF` and gives
-/// `OP_NOP4`-`OP_NOP8` their Chronicle meanings for that UTXO on the
-/// reference (`interpreter.cpp:360-375`, `598-700`, `773-812`); this
-/// interpreter keeps the five disabled and the NOPs as NOPs regardless. The
-/// bit is accepted (the reference's derivation sets it for every coin created
-/// after Chronicle) and the gap is this crate's, tracked in its changelog.
+/// **The UTXO's era.** `UTXO_AFTER_CHRONICLE` re-enables `OP_2MUL`, `OP_2DIV`,
+/// `OP_VER`, `OP_VERIF` and `OP_VERNOTIF` and gives `0xb3`-`0xb7` their
+/// Chronicle meanings (`OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM`,
+/// `OP_RSHIFTNUM`) for that UTXO, as the reference does
+/// (`interpreter.cpp:360-375`, `598-812`); without the bit the two arithmetic
+/// opcodes are disabled, the three version opcodes are `BAD_OPCODE` when
+/// executed, and `0xb3`-`0xb7` are NOPs (discouraged under
+/// `DISCOURAGE_UPGRADABLE_NOPS`). The reference's derivation sets the bit for
+/// every coin created after Chronicle; `ScriptFlags::block(era)` and
+/// `standard(era)` set it for a coin of the same era as the block.
 ///
 /// **The TypeScript SDK's default mode is not a word.** Without `set_flags`,
 /// `Spend` enforces `MINIMALDATA`, `LOW_S`, `CLEANSTACK` and `NULLDUMMY` for
@@ -472,6 +475,7 @@ impl ScriptFlags {
             minimal_if: self.contains(Self::MINIMALIF) && enforce,
             discourage_upgradable_nops: self.contains(Self::DISCOURAGE_UPGRADABLE_NOPS),
             compressed_pubkey: self.contains(Self::COMPRESSED_PUBKEYTYPE),
+            utxo_after_chronicle: self.contains(Self::UTXO_AFTER_CHRONICLE),
         }
     }
 }
@@ -489,6 +493,10 @@ pub(crate) struct Gates {
     pub minimal_if: bool,
     pub discourage_upgradable_nops: bool,
     pub compressed_pubkey: bool,
+    /// The UTXO was created after Chronicle: `OP_2MUL`, `OP_2DIV`, `OP_VER`,
+    /// `OP_VERIF`, `OP_VERNOTIF` and the Chronicle meanings of `0xb3`-`0xb7`
+    /// are live for it (`interpreter.cpp:360-375`, `598-812`).
+    pub utxo_after_chronicle: bool,
 }
 
 impl std::ops::BitOr for ScriptFlags {
@@ -661,7 +669,13 @@ mod tests {
                 minimal_if: false,
                 discourage_upgradable_nops: false,
                 compressed_pubkey: false,
+                utxo_after_chronicle: true,
             }
+        );
+        assert!(
+            !ScriptFlags::block(ProtocolEra::PostGenesis)
+                .gates(2)
+                .utxo_after_chronicle
         );
         let standard_v1 = ScriptFlags::standard(ProtocolEra::PostChronicle).gates(1);
         assert!(standard_v1.minimal && standard_v1.clean_stack && standard_v1.null_dummy);
