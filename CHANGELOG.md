@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.27] - 2026-09-23
+
+### Fixed — five consensus rules the interpreter got wrong in every mode (Calhooon/bsv-rs#12)
+
+The same differential run against bitcoin-sv v1.2.2 (`879fc8b`) that found #10
+recorded five further divergences from the block-validation rules, each with a
+witness transaction; they are `tests/script_residual_witnesses.rs` (nine
+transactions, each pinned under the block word and in the default mode; all
+nine 0.3.26 verdicts move, by design). Every citation is `src/script/interpreter.cpp`
+unless named.
+
+- **A truncated push is a parse failure, not a shorter push.** A push that
+  declares more bytes than the script holds (a direct push cut short, a
+  `OP_PUSHDATA1/2/4` whose length bytes or data are missing) is refused when
+  the interpreter's walk reaches it, executed or not: the reference's `GetOp`
+  returns false (`script.h:190-191`) and the script is
+  `SCRIPT_ERR_BAD_OPCODE` (`450-451`). `Script::from_binary` stays lenient (a
+  container, as the TypeScript SDK's is); the new `Script::truncated_push()`
+  names the chunk, and `Spend` refuses there: `A push declares more bytes than
+  the script holds; the script cannot be parsed past it (pc=N).` Bytes after a
+  top-level `OP_RETURN` are data on both sides and are not examined.
+- **An undefined opcode executed is a failure.** `0xba`-`0xff` were NOPs; the
+  reference's `default:` is `SCRIPT_ERR_BAD_OPCODE` when one is executed
+  (`1795`; the TypeScript SDK agrees). They now fall to the invalid-opcode arm
+  (`Invalid opcode N (pc=M).`); in an unexecuted branch they are still skipped.
+- **One `OP_ELSE` per `OP_IF` after Genesis.** A second `OP_ELSE` for the same
+  `OP_IF`/`OP_NOTIF` is unbalanced (`conditional_tracker.cpp:51-55`,
+  `829-831`): `OP_ELSE may only be used once for each OP_IF or OP_NOTIF after
+  Genesis.` (the TypeScript SDK's text, which applies it only under explicit
+  flags; every UTXO here is post-Genesis, so it applies in every mode).
+- **The post-Chronicle UTXO opcodes are implemented.** For a coin created after
+  Chronicle, `OP_2MUL` and `OP_2DIV` compute (`1247-1254`; `-7 OP_2DIV` is
+  `-3`, toward zero), `OP_VER` pushes the transaction version as 4
+  little-endian bytes (`598-608`), `OP_VERIF`/`OP_VERNOTIF` are conditionals on
+  "the top element is exactly those 4 bytes" (`773-812`), and `0xb3`-`0xb7`
+  are `OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM`, `OP_RSHIFTNUM`
+  (`609-764`; the two shifts act on script numbers, a right shift toward zero
+  as OpenSSL's `BN_rshift` does, a left shift refused before it is computed
+  when its result would not fit the memory budget, a local `ScriptResourceLimit`
+  where the reference's bound is its consensus number length). Before
+  Chronicle the two arithmetic opcodes stay disabled, the three version opcodes
+  are refused when executed (`OP_VER is disabled until Chronicle.`) and skipped
+  when not (post-Genesis, `773-781`), and `0xb3`-`0xb7` are NOPs (discouraged
+  under `DISCOURAGE_UPGRADABLE_NOPS`). The gate: a word's
+  `UTXO_AFTER_CHRONICLE` bit (`ScriptFlags::block(PostChronicle)` sets it);
+  without a word, the TypeScript SDK's `isAfterChronicle()`, which is its
+  relaxed branch, transaction version > 1; `Spend::set_utxo_after_chronicle`
+  overrides either. `0xb3`-`0xb7` keep their `OP_NOP4`-`OP_NOP8` names in ASM
+  (this crate's `OP_SUBSTR`/`OP_LEFT`/`OP_RIGHT` constants are the legacy
+  `0x7f`-`0x81` names, as before).
+- **A FORKID signature's push stays in the scriptCode.** `CleanupScriptCode`
+  (`255-263`, applied at `1484` and per signature at `1573-1578`) deletes a
+  signature's push from the scriptCode only when the signature does not carry
+  `SIGHASH_FORKID`; FORKID is always enabled here, so a non-empty signature is
+  never deleted and a signature whose push appears in the scriptCode cannot
+  verify (its own bytes are hashed in), as on the reference. An empty signature
+  carries no hash type and is still deleted as an `OP_0` push, as on the
+  reference. The TypeScript SDK deletes every signature (a stated divergence).
+- **A RETURN inside a conditional stops execution but not the walk.** After
+  Genesis a non-top-level `OP_RETURN` stops execution while the conditionals
+  must still balance and every later opcode must still parse (`856-871` with
+  `482`); the interpreter cleared its conditional stack and jumped to the end.
+  A top-level `OP_RETURN` still ends the script successfully whatever follows.
+
+### Added
+
+- `Script::truncated_push() -> Option<usize>`, `Spend::set_utxo_after_chronicle(bool)`,
+  `BigNumber::shl_bits` and `BigNumber::shr_bits_toward_zero`. `SpendParams`
+  and every error text of 0.3.26 are unchanged; `is_opcode_disabled` is
+  private.
+
+### Notes — cross-SDK parity
+
+- The TypeScript SDK's default mode already runs the Chronicle opcodes on its
+  relaxed branch and refuses undefined opcodes; it applies the single-ELSE rule
+  only under explicit flags, keeps a lenient parser that never refuses a
+  truncated push, and deletes every signature from the scriptCode. This crate
+  follows the reference's consensus rules in every mode and states the three
+  differences here.
+- The ts-stack census (`tests/conformance_scripts.rs`) re-pins the classes
+  these rules touch; the fixtures that expected `BAD_OPCODE` for an undefined
+  or truncated opcode, the Chronicle opcodes for a post-Chronicle UTXO, or
+  the second-ELSE refusal now pass instead of being counted unsupported.
+
 ## [0.3.26] - 2026-09-23
 
 ### Added — the node's flag words (`script::flags`)

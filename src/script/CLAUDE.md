@@ -146,6 +146,7 @@ impl Script {
 
     // Inspection
     pub fn chunks(&self) -> Vec<ScriptChunk>
+    pub fn truncated_push(&self) -> Option<usize>   // the first push cut short of its declared bytes (BAD_OPCODE when reached)
     pub fn len(&self) -> usize
     pub fn is_empty(&self) -> bool
     pub fn is_push_only(&self) -> bool
@@ -256,6 +257,7 @@ impl Spend {
     pub fn flags(&self) -> Option<ScriptFlags>
     pub fn set_require_minimal(&mut self, require: bool)    // overrides, also after set_flags
     pub fn set_require_push_only(&mut self, require: bool)  // overrides, also after set_flags
+    pub fn set_utxo_after_chronicle(&mut self, after: bool)  // the Chronicle opcodes' gate; overrides the word's bit
     pub fn reset(&mut self)
     pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError>  // refuses a word `check` refuses first
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError>  // Single instruction
@@ -365,7 +367,7 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 - **Caching**: Raw bytes and hex strings are cached and invalidated on mutation
 - **PUSHDATA**: Uses smallest encoding (direct push 0x01-0x4b, PUSHDATA1/2/4)
 - **BSV Opcodes**: All BSV re-enabled opcodes supported (CAT, SPLIT, MUL, DIV, MOD, etc.)
-- **Disabled Opcodes**: OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF (also for a post-Chronicle UTXO, where the reference re-enables them: the crate's known gap, see the changelog at 0.3.26)
+- **Disabled before Chronicle only**: OP_2MUL, OP_2DIV (disabled), OP_VER, OP_VERIF, OP_VERNOTIF (BAD_OPCODE when executed, skipped when not), 0xb3–0xb7 (NOPs); for a post-Chronicle UTXO (`UTXO_AFTER_CHRONICLE`, or version > 1 by default) all run per bitcoin-sv v1.2.2 (0.3.27). Undefined opcodes 0xba–0xff executed, a truncated push reached, a second OP_ELSE: failures in every mode.
 - **ASM Rendering**: `OP_FALSE`/`OP_0` renders as `"0"`, not `"OP_0"` in `to_asm()`
 
 ### Script Interpreter Configuration (spend.rs)
