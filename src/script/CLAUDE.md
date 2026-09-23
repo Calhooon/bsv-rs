@@ -32,6 +32,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding |
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging |
 | `spend.rs` | `Spend` interpreter for validating transaction spends |
+| `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError` |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
 | `templates/mod.rs` | Templates module declarations and re-exports |
@@ -56,7 +57,8 @@ pub use address::Address;
 pub use bip276::*;  // encode_bip276, decode_bip276, BIP276_PREFIX, NETWORK_MAINNET, NETWORK_TESTNET
 
 // Evaluation types
-pub use evaluation_error::{ExecutionContext, ScriptEvaluationError};
+pub use evaluation_error::{ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit};
+pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
 pub use spend::{Spend, SpendParams};
 
 // Template types
@@ -249,10 +251,46 @@ pub struct SpendParams {
 }
 
 impl Spend {
-    pub fn new(params: SpendParams) -> Self
+    pub fn new(params: SpendParams) -> Self          // the TypeScript SDK's default mode
+    pub fn set_flags(&mut self, flags: ScriptFlags)  // the node's word: every rule re-derived at the reference's site under its version gate
+    pub fn flags(&self) -> Option<ScriptFlags>
+    pub fn set_require_minimal(&mut self, require: bool)    // overrides, also after set_flags
+    pub fn set_require_push_only(&mut self, require: bool)  // overrides, also after set_flags
     pub fn reset(&mut self)
-    pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError>
+    pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError>  // refuses a word `check` refuses first
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError>  // Single instruction
+}
+```
+
+Two ways to run it. Without a word: strict for version ≤ 1 (MINIMALDATA, LOW_S,
+CLEANSTACK, NULLDUMMY), relaxed for version ≥ 2, push-only unlocking scripts at
+every version, no NULLFAIL (ts-sdk `isRelaxed()`). With a word: `ScriptFlags::block(era)`
+is what a mining node applies, `ScriptFlags::standard(era)` what a relaying node with
+default policy applies; NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS and
+COMPRESSED_PUBKEYTYPE exist only under a word. A consensus oracle selects the block
+word. The gates, their sites in bitcoin-sv v1.2.2 and what is not modeled are the
+table on `ScriptFlags` in `flags.rs`; the seven witness transactions are
+`tests/script_flags_witnesses.rs`.
+
+### ScriptFlags / ProtocolEra (`flags.rs`)
+
+```rust
+pub enum ProtocolEra { PostGenesis, PostChronicle }   // mainnet 620,538 / 943,816; ProtocolEra::mainnet(height)
+pub struct ScriptFlags(u32);                          // the reference's bit values (script_flags.h)
+impl ScriptFlags {
+    pub const P2SH, STRICTENC, DERSIG, LOW_S, NULLDUMMY, SIGPUSHONLY, MINIMALDATA, DISCOURAGE_UPGRADABLE_NOPS,
+              CLEANSTACK, CHECKLOCKTIMEVERIFY, CHECKSEQUENCEVERIFY, MINIMALIF, NULLFAIL, COMPRESSED_PUBKEYTYPE,
+              SIGHASH_FORKID, GENESIS, UTXO_AFTER_GENESIS, CHRONICLE, UTXO_AFTER_CHRONICLE: Self;
+    pub fn block(era: ProtocolEra) -> Self             // 0x3D462F post-Chronicle
+    pub fn standard(era: ProtocolEra) -> Self          // 0x3D47FF post-Chronicle
+    pub fn bits(self) -> u32
+    pub fn from_bits(bits: u32) -> Result<Self, ScriptFlagsError>          // unknown bits refused
+    pub fn from_names<'a>(names: impl IntoIterator<Item = &'a str>) -> Result<Self, ScriptFlagsError>
+    pub fn names(self) -> Vec<&'static str>
+    pub fn contains / union / without
+    pub fn check(self) -> Result<(), ScriptFlagsError>  // what the interpreter cannot honor, what the reference refuses
+    pub fn enforce_non_malleability(self, tx_version: i32) -> bool  // interpreter.cpp:40-44
+    pub fn requires_push_only(self, tx_version: i32) -> bool        // interpreter.cpp:2321-2334
 }
 ```
 
@@ -327,7 +365,7 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 - **Caching**: Raw bytes and hex strings are cached and invalidated on mutation
 - **PUSHDATA**: Uses smallest encoding (direct push 0x01-0x4b, PUSHDATA1/2/4)
 - **BSV Opcodes**: All BSV re-enabled opcodes supported (CAT, SPLIT, MUL, DIV, MOD, etc.)
-- **Disabled Opcodes**: OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF
+- **Disabled Opcodes**: OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF (also for a post-Chronicle UTXO, where the reference re-enables them: the crate's known gap, see the changelog at 0.3.26)
 - **ASM Rendering**: `OP_FALSE`/`OP_0` renders as `"0"`, not `"OP_0"` in `to_asm()`
 
 ### Script Interpreter Configuration (spend.rs)
@@ -336,10 +374,12 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;  // 1GB (BSV unlimited)
 const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;              // 32MB
 const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
-const REQUIRE_MINIMAL_PUSH: bool = true;
-const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;
-const REQUIRE_LOW_S_SIGNATURES: bool = true;
-const REQUIRE_CLEAN_STACK: bool = true;
+const REQUIRE_MINIMAL_PUSH: bool = true;        // the default mode, version <= 1 only
+const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;  // the default mode, every version
+const REQUIRE_LOW_S_SIGNATURES: bool = true;     // the default mode, version <= 1 only
+const REQUIRE_CLEAN_STACK: bool = true;          // the default mode, version <= 1 only
+// NULLDUMMY: the default mode, version <= 1 only. NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS,
+// COMPRESSED_PUBKEYTYPE: only under a word (`set_flags`), derived by `ScriptFlags::gates`.
 ```
 
 ## Related Documentation

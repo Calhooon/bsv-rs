@@ -20,7 +20,10 @@ fn set_chunk_opcode_on_a_from_binary_script_keeps_every_other_chunk() {
     let out = s.to_binary();
     let mut want = p2pkh();
     *want.last_mut().unwrap() = 0xad;
-    assert_eq!(out, want, "the mutated script must be the original bytes with one opcode changed");
+    assert_eq!(
+        out, want,
+        "the mutated script must be the original bytes with one opcode changed"
+    );
 }
 
 #[test]
@@ -38,7 +41,11 @@ fn write_bin_and_write_number_on_a_from_binary_script_keep_the_prefix() {
     s.write_bin(&[0xaa, 0xbb]);
     s.write_number(7);
     let out = s.to_binary();
-    assert!(out.starts_with(&p2pkh()), "the original chunks must survive a write: {}", hex(&out));
+    assert!(
+        out.starts_with(&p2pkh()),
+        "the original chunks must survive a write: {}",
+        hex(&out)
+    );
     assert!(out.len() > p2pkh().len() + 2);
 }
 
@@ -58,7 +65,12 @@ fn find_and_delete_on_a_from_binary_script_keeps_the_rest() {
     let needle = Script::from_binary(&[0x88u8]).unwrap(); // OP_EQUALVERIFY
     s.find_and_delete(&needle);
     let out = s.to_binary();
-    assert_eq!(out.len(), p2pkh().len() - 1, "exactly the deleted chunk is gone: {}", hex(&out));
+    assert_eq!(
+        out.len(),
+        p2pkh().len() - 1,
+        "exactly the deleted chunk is gone: {}",
+        hex(&out)
+    );
     assert!(out.starts_with(&p2pkh()[..23]));
     assert_eq!(*out.last().unwrap(), 0xac);
 }

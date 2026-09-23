@@ -7,6 +7,23 @@
 //! This module implements the full Bitcoin Script interpreter for BSV, enabling
 //! validation of transaction spends by executing unlocking and locking scripts.
 //!
+//! # Two ways to run it
+//!
+//! Without a flag word, [`Spend`] runs the TypeScript SDK's default evaluation
+//! mode: strict for a transaction of version 1 or lower (minimal pushes and
+//! numbers, low-S, a clean stack, an empty CHECKMULTISIG dummy), relaxed for
+//! version 2 and above, push-only unlocking scripts at every version, and no
+//! NULLFAIL rule. That mode is neither of the words a node validates under.
+//!
+//! With [`Spend::set_flags`], every rule is derived from a
+//! [`ScriptFlags`] word and the transaction version
+//! exactly as bitcoin-sv v1.2.2 derives it at each site: the block word
+//! ([`ScriptFlags::block`]) is what a mining
+//! node applies, the standard word
+//! ([`ScriptFlags::standard`]) is what a
+//! relaying node with default policy applies. A consensus oracle selects the
+//! block word. The `flags` module documents every rule, its gate and its site.
+//!
 //! # Example
 //!
 //! ```rust,ignore
@@ -33,6 +50,7 @@
 use super::evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
+use super::flags::{Gates, ScriptFlags};
 use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
@@ -148,6 +166,14 @@ pub struct Spend {
     require_minimal: bool,
     require_low_s: bool,
     require_clean_stack: bool,
+    require_null_dummy: bool,
+    require_null_fail: bool,
+    require_minimal_if: bool,
+    require_compressed_pubkey: bool,
+    discourage_upgradable_nops: bool,
+    /// The flag word the rules above were derived from, if `set_flags` was
+    /// called; `None` in the TypeScript default mode.
+    flags: Option<ScriptFlags>,
 
     // Parsed-chunk caches. `Script::chunks()` deep-clones the whole chunk
     // vector; calling it from `step()` made execution O(N²) in script size,
@@ -185,11 +211,22 @@ impl Spend {
             alt_stack_mem: 0,
             require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING,
             // ts-sdk parity: transactions with version > 1 run "relaxed"
-            // (post-Genesis semantics) — MINIMALDATA, LOW_S and CLEANSTACK are
-            // not enforced (mirrors ts-sdk Spend.isRelaxed()).
+            // (post-Genesis semantics) — MINIMALDATA, LOW_S, CLEANSTACK and
+            // NULLDUMMY are not enforced (mirrors ts-sdk Spend.isRelaxed() and
+            // its shouldEnforceNullDummy()). The reference gates the same four
+            // on the version at Chronicle (`interpreter.cpp:40-44`).
             require_minimal: REQUIRE_MINIMAL_PUSH && params.transaction_version <= 1,
             require_low_s: REQUIRE_LOW_S_SIGNATURES && params.transaction_version <= 1,
             require_clean_stack: REQUIRE_CLEAN_STACK && params.transaction_version <= 1,
+            require_null_dummy: params.transaction_version <= 1,
+            // Not in the ts-sdk default mode (its NULLFAIL, MINIMALIF and
+            // DISCOURAGE_UPGRADABLE_NOPS exist only under explicit verifyFlags);
+            // derived from a word by `set_flags`.
+            require_null_fail: false,
+            require_minimal_if: false,
+            require_compressed_pubkey: false,
+            discourage_upgradable_nops: false,
+            flags: None,
         };
         spend.unlocking_chunks = spend.unlocking_script.chunks();
         spend.locking_chunks = spend.locking_script.chunks();
@@ -200,7 +237,8 @@ impl Spend {
     /// Overrides MINIMALDATA enforcement (script-number and push minimality).
     ///
     /// Default follows ts-sdk: enforced for version <= 1 transactions, relaxed
-    /// for version > 1 (post-Genesis semantics).
+    /// for version > 1 (post-Genesis semantics). Called after [`set_flags`](Self::set_flags),
+    /// it overrides the rule the word derived.
     pub fn set_require_minimal(&mut self, require: bool) {
         self.require_minimal = require;
     }
@@ -210,9 +248,59 @@ impl Spend {
     /// The TypeScript `@bsv/sdk` Spend engine does not enforce push-only
     /// unlocking scripts; some OP_PUSH_TX-style covenant designs place
     /// executable code in the unlocking script and verify under that engine.
-    /// Default remains `true` (enforced).
+    /// Default remains `true` (enforced). Called after [`set_flags`](Self::set_flags),
+    /// it overrides the rule the word derived (the reference requires push-only
+    /// unlocking scripts post-Chronicle only for version <= 1).
     pub fn set_require_push_only(&mut self, require: bool) {
         self.require_push_only = require;
+    }
+
+    /// Applies a verification flag word: every rule this interpreter enforces
+    /// is re-derived from `flags` and the transaction version exactly as
+    /// bitcoin-sv v1.2.2 derives it at the rule's site, including its version
+    /// gate `EnforceNonMalleability` (`interpreter.cpp:40-44`; the table on
+    /// [`ScriptFlags`]). The TypeScript default mode's switches are replaced,
+    /// not merged; `set_require_minimal` and `set_require_push_only` override
+    /// a derived rule when called afterwards.
+    ///
+    /// A consensus oracle selects the block word:
+    ///
+    /// ```rust,ignore
+    /// spend.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle));
+    /// ```
+    ///
+    /// A word this interpreter cannot honor ([`ScriptFlags::check`]) is
+    /// accepted here and refused by [`validate`](Self::validate), as the
+    /// reference refuses an invalid word at `VerifyScript`
+    /// (`interpreter.cpp:2312-2313`).
+    pub fn set_flags(&mut self, flags: ScriptFlags) {
+        let Gates {
+            push_only,
+            minimal,
+            low_s,
+            clean_stack,
+            null_dummy,
+            null_fail,
+            minimal_if,
+            discourage_upgradable_nops,
+            compressed_pubkey,
+        } = flags.gates(self.transaction_version);
+        self.require_push_only = push_only;
+        self.require_minimal = minimal;
+        self.require_low_s = low_s;
+        self.require_clean_stack = clean_stack;
+        self.require_null_dummy = null_dummy;
+        self.require_null_fail = null_fail;
+        self.require_minimal_if = minimal_if;
+        self.discourage_upgradable_nops = discourage_upgradable_nops;
+        self.require_compressed_pubkey = compressed_pubkey;
+        self.flags = Some(flags);
+    }
+
+    /// The flag word applied by [`set_flags`](Self::set_flags), or `None` in
+    /// the TypeScript default mode.
+    pub fn flags(&self) -> Option<ScriptFlags> {
+        self.flags
     }
 
     /// Resets the interpreter state for re-execution.
@@ -233,6 +321,14 @@ impl Spend {
     ///
     /// `Ok(true)` if the spend is valid, or an error describing why validation failed.
     pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError> {
+        // A word this interpreter cannot honor, or one the reference refuses
+        // (`SCRIPT_ERR_INVALID_FLAGS`, interpreter.cpp:2312-2313, 2436-2437).
+        if let Some(flags) = self.flags {
+            if let Err(e) = flags.check() {
+                return Err(self.error(&format!("Invalid verification flags: {e}.")));
+            }
+        }
+
         // Check that unlocking script is push-only
         if self.require_push_only && !self.unlocking_script.is_push_only() {
             return Err(self.error(
@@ -404,8 +500,22 @@ impl Spend {
             // ================================================================
             // NOPs (do nothing)
             // ================================================================
-            OP_NOP | OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7
-            | OP_NOP8 | OP_NOP9 | OP_NOP10 => {}
+            OP_NOP => {}
+            // The upgradable NOPs 0xb0-0xb9. Under DISCOURAGE_UPGRADABLE_NOPS an
+            // executed one fails the script (interpreter.cpp:765-771 for NOP1,
+            // NOP9, NOP10; 520-523 and 563-566 for CHECKLOCKTIMEVERIFY and
+            // CHECKSEQUENCEVERIFY, NOPs for a post-Genesis UTXO; 606-700 for
+            // NOP4-NOP8 before their Chronicle meanings). ts-sdk: "is
+            // discouraged by verification flags".
+            OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8
+            | OP_NOP9 | OP_NOP10 => {
+                if self.discourage_upgradable_nops {
+                    return Err(self.error(&format!(
+                        "{} is discouraged by verification flags.",
+                        opcode_to_name(opcode).unwrap_or("OP_NOP")
+                    )));
+                }
+            }
             // Extended NOPs (0xba-0xff)
             0xba..=0xff => {}
 
@@ -421,6 +531,11 @@ impl Spend {
                         ));
                     }
                     let buf = self.pop_stack()?;
+                    // MINIMALIF (interpreter.cpp:795-803, under the version
+                    // gate): the argument must be empty or exactly 0x01.
+                    if self.require_minimal_if && !(buf.is_empty() || buf == [1]) {
+                        return Err(self.error("OP_IF and OP_NOTIF require minimal truth values."));
+                    }
                     f_value = ScriptNum::cast_to_bool(&buf);
                     if opcode == OP_NOTIF {
                         f_value = !f_value;
@@ -1218,6 +1333,15 @@ impl Spend {
                     self.verify_signature(&sig_bytes, &pubkey_bytes, &subscript)?
                 };
 
+                // NULLFAIL (interpreter.cpp:1491-1497, under the version gate):
+                // a signature that fails must be the empty vector.
+                if !success && self.require_null_fail && !sig_bytes.is_empty() {
+                    return Err(self.error(&format!(
+                        "{} requires failing signatures to be empty.",
+                        opcode_to_name(opcode).unwrap_or("OP_CHECKSIG")
+                    )));
+                }
+
                 self.push_stack(if success { vec![1] } else { vec![] })?;
 
                 if opcode == OP_CHECKSIGVERIFY {
@@ -1401,7 +1525,17 @@ impl Spend {
             }
         }
 
-        // Pop dummy element (NULLDUMMY)
+        // NULLFAIL (interpreter.cpp:1640-1646, under the version gate): when
+        // the operation fails, every signature must be the empty vector.
+        if !success && self.require_null_fail && sigs.iter().any(|s| !s.is_empty()) {
+            return Err(self.error(&format!(
+                "{} requires failing signatures to be empty.",
+                opcode_to_name(opcode).unwrap_or("OP_CHECKMULTISIG")
+            )));
+        }
+
+        // Pop the dummy element. NULLDUMMY (interpreter.cpp:1664-1670, under
+        // the version gate) requires it to be empty.
         if self.stack.is_empty() {
             return Err(self.error(&format!(
                 "{} requires an extra item (dummy) to be on the stack.",
@@ -1409,7 +1543,7 @@ impl Spend {
             )));
         }
         let dummy = self.pop_stack()?;
-        if !dummy.is_empty() {
+        if self.require_null_dummy && !dummy.is_empty() {
             return Err(self.error(&format!(
                 "{} requires the extra stack item (dummy) to be empty.",
                 opcode_to_name(opcode).unwrap_or("OP_CHECKMULTISIG")
@@ -1478,6 +1612,12 @@ impl Spend {
             }
         } else {
             return Err(self.error("The public key is in an unknown format."));
+        }
+
+        // COMPRESSED_PUBKEYTYPE (interpreter.cpp:322-327): only compressed
+        // keys are accepted under the flag.
+        if self.require_compressed_pubkey && pubkey[0] == 0x04 {
+            return Err(self.error("The public key must be compressed."));
         }
 
         // Try to parse it
@@ -1939,5 +2079,319 @@ mod tests {
 
         let result = spend.validate();
         assert!(result.is_err(), "Expected failed validation");
+    }
+}
+
+/// The flag words on the interpreter: every gate `set_flags` derives, exercised
+/// on the smallest script that reaches it, against the TypeScript default
+/// mode. The reference sites are cited in `flags.rs`.
+#[cfg(test)]
+mod flag_tests {
+    use super::*;
+    use crate::primitives::from_hex;
+    use crate::script::flags::ProtocolEra;
+
+    /// A compressed public key and a well-formed low-S signature with the
+    /// FORKID hash type that does not verify in any context below.
+    const PUBKEY: &str = "035935f55855afd8c999bdb5a8d08ae8e73b7618e200d4ef7687cd55d3c2e4c9d7";
+    const WRONG_SIG: &str = "304402204bbb723c10080132ef81641e0e9963eb77782bf50c149f0f15c6d7b8e263464e02207f18ea8fdff74fb4d4d2dc677555fb1c94cf6219fe4bb4c40162e1e270f8924941";
+
+    fn spend(lock_asm: &str, unlock_asm: &str, version: i32) -> Spend {
+        Spend::new(SpendParams {
+            source_txid: [0u8; 32],
+            source_output_index: 0,
+            source_satoshis: 1000,
+            locking_script: LockingScript::from_asm(lock_asm).unwrap(),
+            transaction_version: version,
+            other_inputs: vec![],
+            outputs: vec![],
+            input_index: 0,
+            unlocking_script: UnlockingScript::from_asm(unlock_asm).unwrap(),
+            input_sequence: 0xffff_ffff,
+            lock_time: 0,
+            memory_limit: None,
+        })
+    }
+
+    fn with_flags(lock_asm: &str, unlock_asm: &str, version: i32, flags: ScriptFlags) -> Spend {
+        let mut s = spend(lock_asm, unlock_asm, version);
+        s.set_flags(flags);
+        s
+    }
+
+    fn message(r: Result<bool, ScriptEvaluationError>) -> String {
+        r.expect_err("expected a refusal").message
+    }
+
+    fn valid(r: Result<bool, ScriptEvaluationError>) -> bool {
+        matches!(r, Ok(true))
+    }
+
+    fn block() -> ScriptFlags {
+        ScriptFlags::block(ProtocolEra::PostChronicle)
+    }
+
+    fn standard() -> ScriptFlags {
+        ScriptFlags::standard(ProtocolEra::PostChronicle)
+    }
+
+    #[test]
+    fn nullfail_refuses_a_failing_non_empty_checksig_signature_at_version_1_under_the_block_word() {
+        let lock = format!("{PUBKEY} OP_CHECKSIG OP_NOT");
+        // Version 1: NULLFAIL is mandatory and the gate is on.
+        let msg = message(with_flags(&lock, WRONG_SIG, 1, block()).validate());
+        assert_eq!(msg, "OP_CHECKSIG requires failing signatures to be empty.");
+        // Version 2 post-Chronicle: the gate is off, the negated failure is a true top.
+        assert!(valid(with_flags(&lock, WRONG_SIG, 2, block()).validate()));
+        // Before Chronicle the gate is always on.
+        assert!(with_flags(
+            &lock,
+            WRONG_SIG,
+            2,
+            ScriptFlags::block(ProtocolEra::PostGenesis)
+        )
+        .validate()
+        .is_err());
+        // An empty signature is what NULLFAIL asks for.
+        assert!(valid(with_flags(&lock, "0", 1, block()).validate()));
+        // The TypeScript default mode has no NULLFAIL rule.
+        assert!(valid(spend(&lock, WRONG_SIG, 1).validate()));
+    }
+
+    #[test]
+    fn nullfail_refuses_a_failing_checkmultisig_with_any_non_empty_signature_at_version_1() {
+        let lock = format!("OP_1 {PUBKEY} OP_1 OP_CHECKMULTISIG OP_NOT");
+        let msg = message(with_flags(&lock, &format!("0 {WRONG_SIG}"), 1, block()).validate());
+        assert_eq!(
+            msg,
+            "OP_CHECKMULTISIG requires failing signatures to be empty."
+        );
+        assert!(valid(with_flags(&lock, "0 0", 1, block()).validate()));
+        assert!(valid(
+            with_flags(&lock, &format!("0 {WRONG_SIG}"), 2, block()).validate()
+        ));
+        assert!(valid(spend(&lock, &format!("0 {WRONG_SIG}"), 1).validate()));
+    }
+
+    #[test]
+    fn nulldummy_is_a_standard_only_rule_gated_on_the_version() {
+        // 0-of-0 multisig: only the dummy is consumed; OP_1 as the dummy.
+        let lock = "OP_0 OP_0 OP_CHECKMULTISIG";
+        // The block word never carries NULLDUMMY.
+        assert!(valid(with_flags(lock, "OP_1", 1, block()).validate()));
+        // The standard word does, under the gate: version 1 refused, version 2 accepted.
+        let msg = message(with_flags(lock, "OP_1", 1, standard()).validate());
+        assert_eq!(
+            msg,
+            "OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty."
+        );
+        assert!(valid(with_flags(lock, "OP_1", 2, standard()).validate()));
+        assert!(with_flags(
+            lock,
+            "OP_1",
+            2,
+            ScriptFlags::standard(ProtocolEra::PostGenesis)
+        )
+        .validate()
+        .is_err());
+        // The TypeScript default mode: strict at version 1, relaxed at version 2.
+        assert!(spend(lock, "OP_1", 1).validate().is_err());
+        assert!(valid(spend(lock, "OP_1", 2).validate()));
+        // An empty dummy passes everywhere.
+        assert!(valid(with_flags(lock, "0", 1, standard()).validate()));
+    }
+
+    #[test]
+    fn minimaldata_low_s_and_cleanstack_follow_the_word_and_the_gate() {
+        // A non-minimal push of 1 (`01 01` instead of OP_1) leaves a true top.
+        let non_minimal = UnlockingScript::from_binary(&[0x01, 0x01]).unwrap();
+        let mut s = spend("OP_1 OP_EQUAL", "", 1);
+        s = Spend::new(SpendParams {
+            unlocking_script: non_minimal.clone(),
+            ..params_of(&s)
+        });
+        assert!(
+            s.validate().is_err(),
+            "the default mode enforces MINIMALDATA at version 1"
+        );
+        let mut s = Spend::new(SpendParams {
+            unlocking_script: non_minimal.clone(),
+            ..params_of(&spend("OP_1 OP_EQUAL", "", 1))
+        });
+        s.set_flags(block());
+        assert!(
+            valid(s.validate()),
+            "the block word never carries MINIMALDATA"
+        );
+        let mut s = Spend::new(SpendParams {
+            unlocking_script: non_minimal,
+            ..params_of(&spend("OP_1 OP_EQUAL", "", 1))
+        });
+        s.set_flags(standard());
+        assert!(
+            s.validate().is_err(),
+            "the standard word carries it, and version 1 is gated on"
+        );
+
+        // Two elements at the end: CLEANSTACK.
+        assert!(valid(with_flags("OP_1 OP_1", "", 1, block()).validate()));
+        assert!(with_flags("OP_1 OP_1", "", 1, standard())
+            .validate()
+            .is_err());
+        assert!(valid(with_flags("OP_1 OP_1", "", 2, standard()).validate()));
+    }
+
+    /// `SpendParams` for a fresh interpreter with the same context as `s`.
+    fn params_of(s: &Spend) -> SpendParams {
+        SpendParams {
+            source_txid: s.source_txid,
+            source_output_index: s.source_output_index,
+            source_satoshis: s.source_satoshis,
+            locking_script: s.locking_script.clone(),
+            transaction_version: s.transaction_version,
+            other_inputs: s.other_inputs.clone(),
+            outputs: s.outputs.clone(),
+            input_index: s.input_index,
+            unlocking_script: s.unlocking_script.clone(),
+            input_sequence: s.input_sequence,
+            lock_time: s.lock_time,
+            memory_limit: Some(s.memory_limit),
+        }
+    }
+
+    #[test]
+    fn push_only_is_derived_from_the_word_and_the_version() {
+        // A non-push opcode in the unlocking script.
+        let lock = "OP_1 OP_EQUAL";
+        let unlock = "OP_0 OP_1ADD";
+        assert!(
+            spend(lock, unlock, 2).validate().is_err(),
+            "the default mode requires push-only at every version"
+        );
+        assert!(
+            valid(with_flags(lock, unlock, 2, block()).validate()),
+            "post-Chronicle, version 2: not required"
+        );
+        assert!(
+            with_flags(lock, unlock, 1, block()).validate().is_err(),
+            "post-Chronicle, version 1: required"
+        );
+        assert!(
+            with_flags(
+                lock,
+                unlock,
+                2,
+                ScriptFlags::block(ProtocolEra::PostGenesis)
+            )
+            .validate()
+            .is_err(),
+            "pre-Chronicle: required at every version"
+        );
+        // The setter still overrides a derived rule.
+        let mut s = with_flags(lock, unlock, 1, block());
+        s.set_require_push_only(false);
+        assert!(valid(s.validate()));
+    }
+
+    #[test]
+    fn discourage_upgradable_nops_refuses_an_executed_nop1_to_nop10_under_the_standard_word_only() {
+        for nop in [
+            "OP_NOP1", "OP_NOP2", "OP_NOP3", "OP_NOP4", "OP_NOP8", "OP_NOP9", "OP_NOP10",
+        ] {
+            let lock = format!("{nop} OP_1");
+            assert!(
+                valid(with_flags(&lock, "", 2, block()).validate()),
+                "{nop}: a NOP in a block"
+            );
+            let msg = message(with_flags(&lock, "", 2, standard()).validate());
+            assert_eq!(msg, format!("{nop} is discouraged by verification flags."));
+            assert!(
+                valid(spend(&lock, "", 1).validate()),
+                "{nop}: the default mode has no such rule"
+            );
+        }
+        // Not executed: not discouraged (interpreter.cpp: the check is inside fExec).
+        assert!(valid(
+            with_flags("OP_0 OP_IF OP_NOP1 OP_ENDIF OP_1", "", 2, standard()).validate()
+        ));
+        // OP_NOP itself is never discouraged.
+        assert!(valid(
+            with_flags("OP_NOP OP_1", "", 2, standard()).validate()
+        ));
+    }
+
+    #[test]
+    fn minimalif_requires_an_empty_or_0x01_argument_under_the_flag_and_the_gate() {
+        let word = block() | ScriptFlags::MINIMALIF;
+        let lock = "OP_IF OP_1 OP_ELSE OP_0 OP_ENDIF";
+        assert!(valid(with_flags(lock, "OP_1", 1, word).validate()));
+        let msg = message(with_flags(lock, "OP_2", 1, word).validate());
+        assert_eq!(msg, "OP_IF and OP_NOTIF require minimal truth values.");
+        assert!(
+            valid(with_flags(lock, "OP_2", 2, word).validate()),
+            "version 2 post-Chronicle: gated off"
+        );
+        assert!(
+            valid(with_flags(lock, "OP_2", 1, block()).validate()),
+            "not in the block word"
+        );
+        assert!(
+            valid(spend(lock, "OP_2", 1).validate()),
+            "not in the default mode"
+        );
+    }
+
+    #[test]
+    fn compressed_pubkeytype_refuses_an_uncompressed_key_under_the_flag() {
+        // A well-formed uncompressed key (the generator point) with an empty signature:
+        // CHECKSIG fails cleanly to false, then OP_NOT makes it true.
+        let g = "0479be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
+        let lock = format!("{g} OP_CHECKSIG OP_NOT");
+        assert!(valid(with_flags(&lock, "0", 1, block()).validate()));
+        let msg = message(
+            with_flags(&lock, "0", 1, block() | ScriptFlags::COMPRESSED_PUBKEYTYPE).validate(),
+        );
+        assert_eq!(msg, "The public key must be compressed.");
+        let compressed = format!("{PUBKEY} OP_CHECKSIG OP_NOT");
+        assert!(valid(
+            with_flags(
+                &compressed,
+                "0",
+                1,
+                block() | ScriptFlags::COMPRESSED_PUBKEYTYPE
+            )
+            .validate()
+        ));
+    }
+
+    #[test]
+    fn a_word_the_interpreter_cannot_honor_is_refused_by_validate_as_invalid_flags() {
+        let word = block().without(ScriptFlags::SIGHASH_FORKID);
+        let msg = message(with_flags("OP_1", "", 1, word).validate());
+        assert!(
+            msg.starts_with("Invalid verification flags: SIGHASH_FORKID is not set"),
+            "{msg}"
+        );
+        let word = (standard() | ScriptFlags::CLEANSTACK).without(ScriptFlags::P2SH);
+        let msg = message(with_flags("OP_1", "", 1, word).validate());
+        assert!(msg.contains("CLEANSTACK without P2SH"), "{msg}");
+        let s = with_flags("OP_1", "", 1, block());
+        assert_eq!(s.flags(), Some(block()));
+        assert_eq!(spend("OP_1", "", 1).flags(), None);
+    }
+
+    #[test]
+    fn set_flags_replaces_the_default_switches_and_the_setters_override_afterwards() {
+        // The default mode at version 1 enforces MINIMALDATA; the block word does not;
+        // `set_require_minimal(true)` after `set_flags` re-enables it.
+        let non_minimal = UnlockingScript::from_binary(&[0x01, 0x01]).unwrap();
+        let mut s = Spend::new(SpendParams {
+            unlocking_script: non_minimal,
+            ..params_of(&spend("OP_1 OP_EQUAL", "", 1))
+        });
+        s.set_flags(block());
+        s.set_require_minimal(true);
+        assert!(s.validate().is_err());
+        let _ = from_hex; // used by the witnesses' integration test; keep the import honest
     }
 }

@@ -34,6 +34,9 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `overlay_mock_tests.rs` | 20 | `full` | Mock facilitator tests for LookupResolver/TopicBroadcaster |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
 | `script_vectors_tests.rs` | 13 | default | Script interpreter with 1,488 vectors (458+598+432) |
+| `script_flags_witnesses.rs` | 9 | default | The flag words (`ScriptFlags::block` / `standard`, the default mode) on seven witness transactions: policy-as-consensus at version 1 (five), the NULLDUMMY version gate, NULLFAIL (Calhooon/bsv-rs#10) |
+| `script_mutators_keep_parsed_chunks.rs` | 6 | default | Every in-place `Script` mutator parses before it invalidates the byte cache (0.3.25) |
+| `resource_limits.rs` | 4 | default | A local interpreter budget is a `ScriptResourceLimit`, never a verdict; `OP_NUM2BIN` refuses before allocating (0.3.23) |
 | `sighash_tests.rs` | 3 | default | Transaction sighash computation with 499 vectors |
 | `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
 | `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
