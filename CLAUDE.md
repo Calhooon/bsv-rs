@@ -34,7 +34,7 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 | `src/overlay/` | `LookupResolver`, `TopicBroadcaster`, facilitators, `Historian`, host reputation, admin tokens, double-spend retry |
 | `src/{messages,compat,totp,storage,registry,kvstore,identity}/` | as named |
 | `examples/` | The six README programs (`keys`, `script`, `transaction`, `brc42`, `beef_spv`, `overlay`); `[[example]]` entries carry `required-features` |
-| `tests/` | 39 integration files; `vectors/` (the shared JSON); `transaction/vectors/` (Rust constants); `conformance_*.rs` (the ts-stack census); `readme_examples.rs`; `script_flags_witnesses.rs` (the flag words on seven witness transactions), `script_residual_witnesses.rs` (the five consensus rules of 0.3.27 on nine) |
+| `tests/` | 40 integration files; `vectors/` (the shared JSON); `transaction/vectors/` (Rust constants); `conformance_*.rs` (the ts-stack census); `readme_examples.rs`; `script_flags_witnesses.rs` (the flag words on seven witness transactions), `script_residual_witnesses.rs` (the five consensus rules of 0.3.27 on ten transactions of eight rules), `script_low_s_order_witness.rs` (s at the order, 0.3.28) |
 | `benches/` | Criterion: `hash_bench`, `primitives_bench`, `script_bench`, `memory_bench` |
 | `fuzz/` | `fuzz_script_parser`, `fuzz_transaction_parser`, `fuzz_wire_protocol`, `fuzz_base58` |
 | `.github/workflows/ci.yml` | The matrix, clippy, fmt, docs |
@@ -78,7 +78,7 @@ dhat-profiling = ["dep:dhat"]
 
 ## Where the numbers come from
 
-`cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result"` summed: 0.3.27 measured 2,923 passed / 0 failed / 128 ignored (the `rust,ignore` doc illustrations; with the ts-stack corpus present). `find src -name '*.rs' | xargs wc -l` for the line count. The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
+`cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result"` summed: 0.3.28 measured 2,927 passed / 0 failed / 128 ignored (the `rust,ignore` doc illustrations; with the ts-stack corpus present). `find src -name '*.rs' | xargs wc -l` for the line count. The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
 
 ## Downstreams to keep in mind
 

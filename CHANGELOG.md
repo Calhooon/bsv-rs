@@ -7,15 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.28] - 2026-09-23
+
+### Fixed — the low-S check at the curve order (Calhooon/bsv-rs#14)
+
+- A signature whose `r` or `s` is at or above the curve order was refused as
+  high-S (`The signature must have a low S value.`) before verification. The
+  reference's `CPubKey::CheckLowS` (`src/pubkey.cpp:356-365`) parses laxly
+  (`ecdsa_signature_parse_der_lax`, `146-173`): such a value overflows into the
+  all-zero signature, which is low, so the check passes and the signature then
+  fails to verify; under version 1 with NULLFAIL the script is
+  `SCRIPT_ERR_SIG_NULLFAIL` (`src/script/interpreter.cpp:1491-1497`), otherwise
+  a false top element. `Spend::check_signature_encoding` now treats an `r` or
+  `s` at or above the order as the zero signature for the low-S check; the
+  high-S refusal applies to `n/2 < s < n` only. Both verdicts were invalid; the
+  rule and the message differed, found by the same differential run against
+  bitcoin-sv v1.2.2 (`879fc8b`). Pinned by `tests/script_low_s_order_witness.rs`
+  (the witness, a version-1 P2PK spend with `s` = the order, under the block
+  word, the standard word and the default mode; RED on 0.3.27) and by the
+  boundary tests in `spend.rs` (`s = n/2` low, `s = n/2 + 1` and `s = n - 1`
+  high, `s = n`, `s = n + 1` and `r = n` the zero signature).
+
+### Corrected
+
+- The 0.3.27 entry and the header of `tests/script_residual_witnesses.rs`
+  said "nine witness transactions"; the file holds ten, of eight rules (two
+  each for the truncated push and the undefined opcode, one each for the
+  second `OP_ELSE`, `OP_VER`, `OP_2DIV`, `OP_2MUL`, `0xb7` as `OP_RSHIFTNUM`
+  and the FORKID scriptCode). One count at every site now.
+
 ## [0.3.27] - 2026-09-23
 
 ### Fixed — five consensus rules the interpreter got wrong in every mode (Calhooon/bsv-rs#12)
 
 The same differential run against bitcoin-sv v1.2.2 (`879fc8b`) that found #10
 recorded five further divergences from the block-validation rules, each with a
-witness transaction; they are `tests/script_residual_witnesses.rs` (nine
-transactions, each pinned under the block word and in the default mode; all
-nine 0.3.26 verdicts move, by design). Every citation is `src/script/interpreter.cpp`
+witness transaction; they are `tests/script_residual_witnesses.rs` (ten
+transactions of eight rules, each pinned under the block word and in the
+default mode; all ten 0.3.26 verdicts move, by design; this sentence said nine
+until 0.3.28 corrected it). Every citation is `src/script/interpreter.cpp`
 unless named.
 
 - **A truncated push is a parse failure, not a shorter push.** A push that
