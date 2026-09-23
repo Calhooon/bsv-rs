@@ -1603,9 +1603,17 @@ mod transaction_tests {
                 );
                 // Signature chunk
                 let sig_data = chunks[0].data.as_ref().expect("sig should have data");
+                // A DER signature with its sighash byte: 9 to 73 bytes
+                // (`IsValidSignatureEncoding`, interpreter.cpp:177-194); a
+                // fixed lower bound of 70 is not a property of a valid
+                // signature (#16).
+                let parsed =
+                    bsv_rs::primitives::bsv::TransactionSignature::from_checksig_format(sig_data)
+                        .expect("a DER signature with a sighash byte");
+                assert_eq!(parsed.to_checksig_format(), *sig_data);
                 assert!(
-                    sig_data.len() >= 70 && sig_data.len() <= 73,
-                    "DER signature should be 70-73 bytes, got {}",
+                    (9..=73).contains(&sig_data.len()),
+                    "a signature with its sighash byte is 9 to 73 bytes, got {}",
                     sig_data.len()
                 );
                 // Last byte is sighash type (SIGHASH_ALL | SIGHASH_FORKID = 0x41)

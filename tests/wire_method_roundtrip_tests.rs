@@ -467,10 +467,14 @@ mod signature_tests {
             .await
             .unwrap();
 
-        // DER signature should be 70-72 bytes typically
+        // A DER signature: it parses, re-encodes to the same bytes and is 8 to
+        // 72 bytes long (`r` and `s` are 1 to 33 bytes each); a fixed lower
+        // bound fails on a key whose `r` or `s` has leading zero bytes (#16).
         assert!(!sig_result.signature.is_empty());
-        assert!(sig_result.signature.len() >= 68);
-        assert!(sig_result.signature.len() <= 73);
+        let parsed = bsv_rs::primitives::Signature::from_der(&sig_result.signature)
+            .expect("a DER signature");
+        assert_eq!(parsed.to_der(), sig_result.signature);
+        assert!((8..=72).contains(&sig_result.signature.len()));
 
         let verify_result = transceiver
             .verify_signature(
