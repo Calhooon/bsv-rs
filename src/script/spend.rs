@@ -55,7 +55,8 @@ use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
 use crate::primitives::bsv::sighash::{
-    compute_sighash_for_signing, SighashParams, TxInput, TxOutput, SIGHASH_FORKID,
+    compute_sighash_dispatched_for_signing, SighashParams, TxInput, TxOutput, SIGHASH_CHRONICLE,
+    SIGHASH_FORKID,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::primitives::ec::PublicKey;
@@ -1759,6 +1760,21 @@ impl Spend {
             return Err(self.error("The signature must have a low S value."));
         }
 
+        // STRICTENC (interpreter.cpp:296-303): the CHRONICLE bit is legal only
+        // when the word carries SCRIPT_CHRONICLE (the block is in the
+        // Chronicle era); `SCRIPT_ERR_ILLEGAL_CHRONICLE` otherwise. The default
+        // mode has no word and admits the bit (Calhooon/bsv-rs#22).
+        if let Some(word) = self.flags {
+            if word.contains(ScriptFlags::STRICTENC)
+                && !word.contains(ScriptFlags::CHRONICLE)
+                && (tx_sig.scope() & SIGHASH_CHRONICLE) != 0
+            {
+                return Err(
+                    self.error("The signature must not use SIGHASH_CHRONICLE before Chronicle.")
+                );
+            }
+        }
+
         if (tx_sig.scope() & SIGHASH_FORKID) == 0 {
             return Err(self.error("The signature must use SIGHASH_FORKID."));
         }
@@ -2020,8 +2036,11 @@ impl Spend {
         // Build inputs array for sighash
         let inputs = self.build_inputs_array();
 
-        // Compute sighash
-        let sighash = compute_sighash_for_signing(&SighashParams {
+        // The digest, dispatched as the reference's `SignatureHash` does
+        // (`interpreter.cpp:2112-2124`; FORKID is always enabled here): BIP143
+        // for a FORKID type without the CHRONICLE bit, the original digest
+        // otherwise (Calhooon/bsv-rs#22).
+        let sighash = compute_sighash_dispatched_for_signing(&SighashParams {
             version: self.transaction_version,
             inputs: &inputs,
             outputs: &self.outputs,

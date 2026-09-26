@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the signature hash dispatched on the CHRONICLE bit (Calhooon/bsv-rs#22)
+
+- The interpreter computed the BIP143 digest for every hash type. The
+  reference's `SignatureHash` (`src/script/interpreter.cpp:2112-2124`) does
+  so only when `SCRIPT_ENABLE_SIGHASH_FORKID` is in the flags and the type
+  carries the FORKID bit and not the CHRONICLE bit (`SIGHASH_CHRONICLE = 0x20`,
+  `src/script/sighashtype.h:14`); every other type is hashed by the original
+  serializer (`SignatureHashOriginal`, `2086-2110`;
+  `CTransactionSignatureSerializer`, `1841-1958`: the version; the inputs, only
+  the signed one under ANYONECANPAY, the others with an empty script and, under
+  SINGLE or NONE, a zero sequence; the scriptCode as `SerializeScriptCode`
+  writes it, `1864-1892`, a length prefix of the scriptCode's size minus its
+  `OP_CODESEPARATOR`s and the bytes the parser reads with the separators
+  removed, stopping where `GetOp` fails, `script.h:164-195`; the outputs, none
+  under NONE, the null output at every index but the signed one under SINGLE;
+  the lock time; the 4-byte type), and the constant `one` when SINGLE names an
+  output the transaction does not have (`2094-2102`). So a signature made over
+  the original digest with the CHRONICLE bit, valid on the reference under a
+  post-Chronicle word, was a false top here, and one made over BIP143 with that
+  bit verified here where the reference refuses it. `Spend::verify_signature`
+  now dispatches as `SignatureHash` does (FORKID is always enabled in this
+  interpreter: the CHRONICLE bit selects the original digest, its absence
+  BIP143), in every mode, as the TypeScript SDK does; under a word carrying
+  STRICTENC and not CHRONICLE the bit is refused before verification, as the
+  reference's `CheckSignatureEncoding` does (`291-303`,
+  `SCRIPT_ERR_ILLEGAL_CHRONICLE`; the message
+  `The signature must not use SIGHASH_CHRONICLE before Chronicle.`). New in
+  `primitives::bsv::sighash`: `SIGHASH_CHRONICLE`,
+  `compute_sighash_dispatched_for_signing`,
+  `compute_sighash_original_for_signing` and
+  `build_sighash_preimage_original`; `compute_sighash`,
+  `compute_sighash_for_signing` and `build_sighash_preimage` keep computing
+  BIP143. Found by the same differential run against bitcoin-sv v1.2.2
+  (`879fc8b`), 21 transactions. Pinned by
+  `tests/script_sighash_dispatch_witness.rs`: the witness (a P2PK spend whose
+  locking script ends in `OP_RETURN 0x4c`, signed `0x61` over the original
+  digest) valid under the block word, the standard word and the default mode,
+  refused under a block word of the era before Chronicle; and the whole class
+  as one table under both words (the six defined types with the bit, each
+  with and without ANYONECANPAY; three-input spends under ALL, NONE, SINGLE
+  with and without its output, ANYONECANPAY, one and two `OP_CODESEPARATOR`s;
+  five more truncated pushes after a top-level `OP_RETURN`; the bit on a coin
+  created before Chronicle; a CHRONICLE-bit signature made over BIP143, which
+  the reference refuses). RED on 0.3.28: 21 of 21 rows.
+
 ### Fixed — the two bounds of the numeric shifts (Calhooon/bsv-rs#21)
 
 - `OP_LSHIFTNUM` and `OP_RSHIFTNUM` shifted by a count of any size, so
