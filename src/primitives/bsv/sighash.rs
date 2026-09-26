@@ -14,6 +14,8 @@
 //! - `SINGLE` (0x03): Signs all inputs, only the output at the same index
 //! - `ANYONECANPAY` (0x80): Flag to sign only this input (can combine with others)
 //! - `FORKID` (0x40): BSV-specific flag (required for BIP-143 style)
+//! - `CHRONICLE` (0x20): sends the signature to the original (pre-fork) digest
+//!   on the reference (`SignatureHash`, `interpreter.cpp:2112-2124`)
 //!
 //! # Example
 //!
@@ -99,6 +101,12 @@ pub const SIGHASH_FORKID: u32 = 0x00000040;
 
 /// Only sign this one input (allows others to add inputs).
 pub const SIGHASH_ANYONECANPAY: u32 = 0x00000080;
+
+/// `SIGHASH_CHRONICLE` (0x20): the hash type bit that sends the signature to
+/// the ORIGINAL (pre-fork) digest on the reference (`src/script/sighashtype.h:14`;
+/// `SignatureHash`, `src/script/interpreter.cpp:2112-2124`), legal under
+/// STRICTENC only when the block is in the Chronicle era (`291-303`).
+pub const SIGHASH_CHRONICLE: u32 = 0x00000020;
 
 /// Mask for the base sighash type (ALL, NONE, SINGLE).
 const SIGHASH_BASE_MASK: u32 = 0x1F;
@@ -682,6 +690,201 @@ pub fn compute_sighash(params: &SighashParams) -> [u8; 32] {
 pub fn compute_sighash_for_signing(params: &SighashParams) -> [u8; 32] {
     let preimage = build_sighash_preimage(params);
     sha256d(&preimage)
+}
+
+/// The constant the original digest returns instead of a hash when the input
+/// index is out of range or `SIGHASH_SINGLE` names an output the transaction
+/// does not have (`SignatureHashOriginal`, `interpreter.cpp:2089-2102`:
+/// `uint256S("0…01")`, the byte `0x01` first in the internal order a verifier
+/// consumes). A signature over it verifies, as it does on the reference.
+const SIGHASH_ONE: [u8; 32] = {
+    let mut one = [0u8; 32];
+    one[0] = 1;
+    one
+};
+
+/// The digest a signature over `params` must verify against, dispatched as
+/// the reference's `SignatureHash` does with `SCRIPT_ENABLE_SIGHASH_FORKID`
+/// set (`interpreter.cpp:2118-2123`): the BIP143 digest when the scope
+/// carries the FORKID bit and not the CHRONICLE bit, the original digest
+/// otherwise. Internal byte order, as [`compute_sighash_for_signing`].
+pub fn compute_sighash_dispatched_for_signing(params: &SighashParams) -> [u8; 32] {
+    if (params.scope & SIGHASH_FORKID) != 0 && (params.scope & SIGHASH_CHRONICLE) == 0 {
+        compute_sighash_for_signing(params)
+    } else {
+        compute_sighash_original_for_signing(params)
+    }
+}
+
+/// The original (pre-fork) digest, `SignatureHashOriginal`
+/// (`interpreter.cpp:2086-2110`): the constant `one` when the input index is out
+/// of range or the base type is `SIGHASH_SINGLE` and no output has that
+/// index, else the double SHA-256 of [`build_sighash_preimage_original()`].
+/// Internal byte order.
+pub fn compute_sighash_original_for_signing(params: &SighashParams) -> [u8; 32] {
+    let base = params.scope & SIGHASH_BASE_MASK;
+    if params.input_index >= params.inputs.len() {
+        return SIGHASH_ONE;
+    }
+    if base == SIGHASH_SINGLE && params.input_index >= params.outputs.len() {
+        return SIGHASH_ONE;
+    }
+    sha256d(&build_sighash_preimage_original(params))
+}
+
+/// The original serializer, `CTransactionSignatureSerializer::Serialize`
+/// (`interpreter.cpp:1841-1958`): the version; the inputs (only the signed one
+/// under ANYONECANPAY, `1897-1900`; the others with an empty script and, under
+/// SINGLE or NONE, a zero sequence, `1905-1915`; the signed one with the
+/// scriptCode as `SerializeScriptCode` writes it); the outputs (none
+/// under NONE; `input_index + 1` under SINGLE with the null output, value −1
+/// and an empty script, at every index but the signed one, `1923-1932`; all
+/// otherwise); the lock time; the 4-byte hash type. The caller handles the
+/// two `one` cases ([`compute_sighash_original_for_signing`]); here an input
+/// index or a SINGLE output index out of range is a bug and panics.
+pub fn build_sighash_preimage_original(params: &SighashParams) -> Vec<u8> {
+    let scope = params.scope;
+    let base = scope & SIGHASH_BASE_MASK;
+    let anyone_can_pay = (scope & SIGHASH_ANYONECANPAY) != 0;
+    let n_in = params.input_index;
+    assert!(
+        n_in < params.inputs.len(),
+        "input index {n_in} out of range"
+    );
+    let mut w = Writer::new();
+    w.write_i32_le(params.version);
+    let n_inputs = if anyone_can_pay {
+        1
+    } else {
+        params.inputs.len()
+    };
+    w.write_var_int(n_inputs as u64);
+    for i in 0..n_inputs {
+        let idx = if anyone_can_pay { n_in } else { i };
+        let input = &params.inputs[idx];
+        w.write_bytes(&input.txid);
+        w.write_u32_le(input.output_index);
+        if idx == n_in {
+            write_script_code_original(&mut w, params.subscript);
+        } else {
+            w.write_var_int(0);
+        }
+        if idx != n_in && (base == SIGHASH_SINGLE || base == SIGHASH_NONE) {
+            w.write_u32_le(0);
+        } else {
+            w.write_u32_le(input.sequence);
+        }
+    }
+    let n_outputs = if base == SIGHASH_NONE {
+        0
+    } else if base == SIGHASH_SINGLE {
+        n_in + 1
+    } else {
+        params.outputs.len()
+    };
+    w.write_var_int(n_outputs as u64);
+    for o in 0..n_outputs {
+        if base == SIGHASH_SINGLE && o != n_in {
+            // `CTxOut()`: nValue −1, an empty script
+            w.write_u64_le(u64::MAX);
+            w.write_var_int(0);
+        } else {
+            let output = &params.outputs[o];
+            w.write_u64_le(output.satoshis);
+            w.write_var_int(output.script.len() as u64);
+            w.write_bytes(&output.script);
+        }
+    }
+    w.write_u32_le(params.locktime);
+    w.write_u32_le(scope);
+    w.into_bytes()
+}
+
+/// `SerializeScriptCode` (`interpreter.cpp:1864-1892`): a length prefix of
+/// the scriptCode's size minus the `OP_CODESEPARATOR`s the parser reads, then
+/// the bytes of the opcodes the parser reads with the separators removed,
+/// stopping where `GetOp` fails (`script.h:164-195`: a push whose length
+/// bytes or payload are short leaves the iterator past the opcode and any
+/// whole length prefix it read, and the bytes written stop there while the
+/// prefix still counts the whole scriptCode).
+fn write_script_code_original(w: &mut Writer, script_code: &[u8]) {
+    const OP_CODESEPARATOR: u8 = 0xab;
+    let mut separators = 0usize;
+    let mut pc = 0usize;
+    while let (Some(op), next) = get_op(script_code, pc) {
+        if op == OP_CODESEPARATOR {
+            separators += 1;
+        }
+        pc = next;
+    }
+    w.write_var_int((script_code.len() - separators) as u64);
+    let mut begin = 0usize;
+    let mut pc = 0usize;
+    loop {
+        let (op, next) = get_op(script_code, pc);
+        match op {
+            Some(OP_CODESEPARATOR) => {
+                w.write_bytes(&script_code[begin..next - 1]);
+                begin = next;
+                pc = next;
+            }
+            Some(_) => pc = next,
+            None => {
+                pc = next;
+                break;
+            }
+        }
+    }
+    if begin != script_code.len() {
+        w.write_bytes(&script_code[begin..pc]);
+    }
+}
+
+/// `CScript::GetOp2` (`script.h:164-195`): the opcode at `pc` and the
+/// position after it and its push data, or `None` with the position the
+/// reference's iterator is left at when the read fails (past the opcode, and
+/// past a length prefix that was whole).
+fn get_op(bytes: &[u8], mut pc: usize) -> (Option<u8>, usize) {
+    const OP_PUSHDATA1: u8 = 0x4c;
+    const OP_PUSHDATA2: u8 = 0x4d;
+    const OP_PUSHDATA4: u8 = 0x4e;
+    if pc >= bytes.len() {
+        return (None, pc);
+    }
+    let opcode = bytes[pc];
+    pc += 1;
+    if opcode <= OP_PUSHDATA4 {
+        let size: usize = if opcode < OP_PUSHDATA1 {
+            opcode as usize
+        } else if opcode == OP_PUSHDATA1 {
+            if bytes.len() - pc < 1 {
+                return (None, pc);
+            }
+            let n = bytes[pc] as usize;
+            pc += 1;
+            n
+        } else if opcode == OP_PUSHDATA2 {
+            if bytes.len() - pc < 2 {
+                return (None, pc);
+            }
+            let n = u16::from_le_bytes([bytes[pc], bytes[pc + 1]]) as usize;
+            pc += 2;
+            n
+        } else {
+            if bytes.len() - pc < 4 {
+                return (None, pc);
+            }
+            let n = u32::from_le_bytes([bytes[pc], bytes[pc + 1], bytes[pc + 2], bytes[pc + 3]])
+                as usize;
+            pc += 4;
+            n
+        };
+        if bytes.len() - pc < size {
+            return (None, pc);
+        }
+        pc += size;
+    }
+    (Some(opcode), pc)
 }
 
 // ============================================================================
