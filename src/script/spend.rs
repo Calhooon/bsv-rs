@@ -1837,10 +1837,12 @@ impl Spend {
 
     /// `OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM`, `OP_RSHIFTNUM` at
     /// `0xb3`-`0xb7` for a UTXO created after Chronicle (`interpreter.cpp:609-764`).
-    /// The two shifts act on script NUMBERS (not on bytes, unlike `OP_LSHIFT`);
-    /// a left shift whose result would not fit the memory budget is refused
-    /// before it is computed (a local budget; the reference's bound is its
-    /// consensus number length, `SCRIPTNUM_OVERFLOW`).
+    /// The splice operands are read by [`read_splice_operand`](Self::read_splice_operand)
+    /// (the reference's `int64` path under a word). The two shifts act on
+    /// script NUMBERS (not on bytes, unlike `OP_LSHIFT`); a left shift whose
+    /// result would not fit the memory budget is refused before it is computed
+    /// (a local budget; the reference's bound is its consensus number length,
+    /// `SCRIPTNUM_OVERFLOW`).
     fn op_chronicle_splice(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         let name = match opcode {
             OP_NOP4 => "OP_SUBSTR",
@@ -1864,8 +1866,8 @@ impl Spend {
                 // (data offset len -- data[offset..offset+len])
                 let len_bytes = self.pop_stack()?;
                 let off_bytes = self.pop_stack()?;
-                let len = num(self, &len_bytes)?.to_i64().unwrap_or(-1);
-                let offset = num(self, &off_bytes)?.to_i64().unwrap_or(-1);
+                let len = self.read_splice_operand(&len_bytes)?;
+                let offset = self.read_splice_operand(&off_bytes)?;
                 let data = self.pop_stack()?;
                 let size = data.len() as i64;
                 if offset < 0 || offset >= size || len < 0 || len > size - offset {
@@ -1880,7 +1882,7 @@ impl Spend {
             OP_NOP5 | OP_NOP6 => {
                 // (data len -- the first / last len bytes)
                 let len_bytes = self.pop_stack()?;
-                let len = num(self, &len_bytes)?.to_i64().unwrap_or(-1);
+                let len = self.read_splice_operand(&len_bytes)?;
                 let data = self.pop_stack()?;
                 let size = data.len() as i64;
                 if len < 0 || len > size {
@@ -1927,6 +1929,38 @@ impl Spend {
             }
         }
         Ok(())
+    }
+
+    /// The `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` length and offset operands.
+    /// Under a word, the reference's `int64` path: the opcodes build the operand
+    /// as a `CScriptNum` with the constructor's default `big_int = false`
+    /// (`interpreter.cpp:622-625`, `651-653`, `676-678`; `script_num.h:60-63`),
+    /// so after the length test and the minimal-encoding rule of every read
+    /// (`script_num.cpp:62-68`) the value is `bsv::deserialize<int64_t>`
+    /// (`int_serialization.h:64-95`): the ordinary sign-magnitude reading of an
+    /// element of 1 to 8 bytes, and for a longer element the two's-complement
+    /// `int64` of its first 8 bytes, the rest never read (`:78-79`; the
+    /// reference's shifts on a ninth and later byte are undefined in C++,
+    /// `:75-76`, and this reading is their one determinate case, zero tail
+    /// bytes). `getint` then saturates to the `int` range
+    /// (`script_num.cpp:394-420`). The default mode reads a script number of
+    /// any length, as the TypeScript SDK does (Calhooon/bsv-rs#20).
+    fn read_splice_operand(&self, bytes: &[u8]) -> Result<i64, ScriptEvaluationError> {
+        if self.flags.is_none() {
+            return Ok(self.read_number(bytes)?.to_i64().unwrap_or(-1));
+        }
+        // the length test and the minimal-encoding rule, with their messages
+        let as_number = self.read_number(bytes)?;
+        let value = if bytes.len() <= 8 {
+            // an element of up to 8 bytes: the sign-magnitude reading, which
+            // always fits an i64 (63 bits of magnitude and a sign)
+            as_number.to_i64().unwrap_or(-1)
+        } else {
+            let mut first = [0u8; 8];
+            first.copy_from_slice(&bytes[..8]);
+            i64::from_le_bytes(first)
+        };
+        Ok(value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)))
     }
 
     fn verify_signature(

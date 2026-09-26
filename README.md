@@ -438,7 +438,7 @@ Parity with the reference SDKs is a discipline, not a claim:
 | | |
 |---|---|
 | Source | 91,172 lines of Rust under `src/`, 13 feature-gated modules, one `Error` enum |
-| Tests | 2,940 passed, 0 failed (1,512 unit, 1,259 integration across 41 files, 169 doc tests); 128 doc examples are `ignore`d illustrations |
+| Tests | 2,948 passed, 0 failed (1,512 unit, 1,267 integration across 42 files, 169 doc tests; the 5 `memory_profiling` tests pass alone with `--test-threads=1` and are not counted); 128 doc examples are `ignore`d illustrations |
 | Vectors | 2,031 shared JSON vectors + the `ts-stack` corpus (5,116 script-domain vectors pinned) |
 | Fuzzing | 4 libFuzzer targets: the script parser, the transaction parser, the wire protocol, base58 |
 | Benchmarks | 4 Criterion suites: hashes, primitives, script, memory (with RSS tracking) |
