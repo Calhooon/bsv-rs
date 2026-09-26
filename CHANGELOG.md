@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.29] - 2026-09-26
+
 ### Fixed — an undefined base hash type refused under STRICTENC (Calhooon/bsv-rs#23)
 
 - `Spend::check_signature_encoding` tested the DER form, the low-S rule and
