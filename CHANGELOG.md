@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the two bounds of the numeric shifts (Calhooon/bsv-rs#21)
+
+- `OP_LSHIFTNUM` and `OP_RSHIFTNUM` shifted by a count of any size, so
+  `1 OP_RSHIFTNUM 2147483648` was 0 and a valid spend, and a left shift's size
+  was tested only against the interpreter's local memory budget (a resource
+  limit, not a verdict). The reference reads the count and the value as big
+  integers (`src/script/interpreter.cpp:708-711`, `744-747`) and applies
+  `CScriptNum::operator<<=` / `operator>>=`: a left shift first refuses a
+  result whose size, the value's serialized size plus `count / 8` bytes,
+  would exceed the era's maximum number length (`src/script/script_num.cpp:305-308`,
+  `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`, `interpreter.cpp:1807-1810`), before any
+  shift; then on both shifts a count above `INT_MAX` throws `big_int_error`
+  (`src/big_int.cpp:359-369`, `383-393`), caught as `SCRIPT_ERR_BIG_INT`
+  (`interpreter.cpp:1819-1821`); a right shift has no size test
+  (`script_num.cpp:363-367`). Under a word the interpreter now applies both,
+  in that order, before its memory budget; the message of the second is
+  `<opcode> count (N) does not fit an int.`. The negative-count refusal, the
+  shifts, the result's length test and the default mode (the TypeScript SDK
+  shifts by any count) are unchanged. Found by the same differential run
+  against bitcoin-sv v1.2.2 (`879fc8b`). Pinned by
+  `tests/script_shift_count_witness.rs` (the witness under the block word and
+  the standard word: the big-integer error; the default mode: valid; RED on
+  0.3.28) and its boundary cases (a right shift by `INT_MAX` is 0 and valid;
+  left shifts of 1 by `INT_MAX` and `INT_MAX + 1` overflow the number length
+  before any allocation, at the block path's 32,000,000 bytes and the mempool
+  path's 10,000; a zero value follows the same tests; an ordinary shift and a
+  coin created before Chronicle are unchanged).
+
 ### Fixed — the `int64` reading of the `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` operands (Calhooon/bsv-rs#20)
 
 - The three Chronicle splice opcodes read their length and offset operands as

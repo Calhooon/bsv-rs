@@ -1839,10 +1839,15 @@ impl Spend {
     /// `0xb3`-`0xb7` for a UTXO created after Chronicle (`interpreter.cpp:609-764`).
     /// The splice operands are read by [`read_splice_operand`](Self::read_splice_operand)
     /// (the reference's `int64` path under a word). The two shifts act on
-    /// script NUMBERS (not on bytes, unlike `OP_LSHIFT`); a left shift whose
-    /// result would not fit the memory budget is refused before it is computed
-    /// (a local budget; the reference's bound is its consensus number length,
-    /// `SCRIPTNUM_OVERFLOW`).
+    /// script NUMBERS (not on bytes, unlike `OP_LSHIFT`). Under a word the
+    /// reference's two bounds come first (Calhooon/bsv-rs#21): a left shift's
+    /// result size against the era's maximum number length before the shift
+    /// (`script_num.cpp:305-308`, `SCRIPTNUM_OVERFLOW`), then on both shifts a
+    /// count above `INT_MAX` as the big-integer error (`big_int.cpp:359-369`,
+    /// `383-393`; `SCRIPT_ERR_BIG_INT`, `interpreter.cpp:1819-1821`). After
+    /// them, a left shift whose result would not fit the memory budget is
+    /// refused before it is computed (a local budget: a resource limit, not a
+    /// verdict). The default mode shifts by any count, as the TypeScript SDK does.
     fn op_chronicle_splice(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         let name = match opcode {
             OP_NOP4 => "OP_SUBSTR",
@@ -1907,6 +1912,38 @@ impl Spend {
                 }
                 let x_bytes = self.pop_stack()?;
                 let x = num(self, &x_bytes)?;
+                if let Some(max) = self.max_script_num_length() {
+                    // Under a word, the reference's bounds (Calhooon/bsv-rs#21).
+                    // A left shift first tests the result's size, the value's
+                    // serialized size plus count / 8 bytes, against the era's
+                    // maximum number length, before any shift or allocation
+                    // (`CScriptNum::operator<<=`, `script_num.cpp:305-308`); a
+                    // right shift has no size test (`363-367`).
+                    if opcode == OP_NOP7 {
+                        let current = ScriptNum::to_bytes(&x).len() as u64;
+                        match n_bn.to_u64().and_then(|n| current.checked_add(n / 8)) {
+                            Some(size) if size <= max as u64 => {}
+                            Some(size) => return Err(self.overflow_error(size as usize, max)),
+                            None => {
+                                return Err(self.error(&format!(
+                                    "Script number overflow: a shift by {} bits, the limit is {max} bytes.",
+                                    n_bn.to_dec_string()
+                                )))
+                            }
+                        }
+                    }
+                    // Then, on both shifts, a count above INT_MAX is the
+                    // reference's `big_int_error` (`bint::operator<<=` and
+                    // `operator>>=` on a `bint` count, `big_int.cpp:359-369`,
+                    // `383-393`), caught as `SCRIPT_ERR_BIG_INT`
+                    // (`interpreter.cpp:1819-1821`).
+                    if n_bn.to_i64().is_none_or(|n| n > i64::from(i32::MAX)) {
+                        return Err(self.error(&format!(
+                            "{name} count ({}) does not fit an int.",
+                            n_bn.to_dec_string()
+                        )));
+                    }
+                }
                 let n = n_bn.to_i64().map(|v| v as u64).unwrap_or(u64::MAX);
                 let out = if opcode == OP_NOP7 {
                     // the result's size, before allocating it: a LOCAL budget
