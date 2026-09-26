@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — the `int64` reading of the `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` operands (Calhooon/bsv-rs#20)
+
+- The three Chronicle splice opcodes read their length and offset operands as
+  script numbers of any length under the era's limit. The reference builds
+  them as a `CScriptNum` on its `int64` path (`src/script/interpreter.cpp:622-625`,
+  `651-653`, `676-678`; the constructor's default `big_int = false`,
+  `src/script/script_num.h:60-63`), where `bsv::deserialize<int64_t>`
+  (`src/script/int_serialization.h:64-95`) returns the two's-complement
+  `int64` of the first 8 bytes of an element longer than 8 bytes and never
+  reads the rest (`:78-79`), then `getint` saturates the value to the `int`
+  range (`src/script/script_num.cpp:394-420`). So a 9-byte operand
+  `04 00 00 00 00 00 00 00 80` is 4 to the reference and was −4 here, a range
+  refusal. Under a word `Spend::read_splice_operand` now reads the operands
+  that way (the length test and the minimal-encoding rule first, as at every
+  read); an element of 1 to 8 bytes decodes exactly as before. The default
+  mode is unchanged: the TypeScript SDK reads a script number of any length.
+  Found by the same differential run against bitcoin-sv v1.2.2 (`879fc8b`).
+  Pinned by `tests/script_int64_operand_witness.rs` (the witness under the
+  block word and the standard word: valid; the default mode: the range
+  refusal; RED on 0.3.28) and its boundary cases (an 8-byte operand with its
+  sign bit set is −4 on both sides, a 9-byte operand with a zero ninth byte
+  and a 10-byte operand with zero tail bytes are 4, `OP_LEFT` and `OP_RIGHT`
+  read their length the same way, an 8-byte `INT64_MAX` offset is out of
+  range on both sides).
+
 ## [0.3.28] - 2026-09-23
 
 ### Fixed — the low-S check at the curve order (Calhooon/bsv-rs#14)
