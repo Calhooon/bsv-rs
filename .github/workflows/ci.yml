@@ -53,6 +53,11 @@ jobs:
       - name: Run EC tests
         run: cargo test --test ec_tests --all-features --verbose
 
+      # the consensus witness files: every rule the differential against bitcoin-sv found, pinned on its
+      # witness transaction; never run in CI before this step (0.3.25 to 0.3.28 relied on local runs)
+      - name: Run the consensus witness tests
+        run: cargo test --test script_flags_witnesses --test script_residual_witnesses --test script_low_s_order_witness --test script_num_length_witness --test script_int64_operand_witness --test script_shift_count_witness --test script_sighash_dispatch_witness --test script_undefined_hashtype_witness --all-features --verbose
+
       - name: Run doc tests
         run: cargo test --doc --all-features
 
