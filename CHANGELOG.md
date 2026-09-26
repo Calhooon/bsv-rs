@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — an undefined base hash type refused under STRICTENC (Calhooon/bsv-rs#23)
+
+- `Spend::check_signature_encoding` tested the DER form, the low-S rule and
+  the FORKID bit and never the base type, so a signature made over the BIP143
+  digest of a hash type such as `0x44` (base 4 | FORKID) verified. Under
+  `SCRIPT_VERIFY_STRICTENC` the reference refuses a signature whose hash type
+  is not defined (`src/script/interpreter.cpp:291-294`,
+  `SCRIPT_ERR_SIG_HASHTYPE`): `SigHashType::isDefined`
+  (`src/script/sighashtype.h:82-90`) clears the CHRONICLE, FORKID and
+  ANYONECANPAY bits and requires what is left to be ALL (1), NONE (2) or
+  SINGLE (3); both node words carry STRICTENC (`src/script/standard.h:57`,
+  `:64`). The interpreter now applies the test under a word carrying STRICTENC
+  and in the default mode (the TypeScript SDK refuses such a type too), after
+  the DER and low-S rules and before the CHRONICLE and FORKID rules, as the
+  reference orders them; the message is
+  `The signature's hash type (0xNN) has no defined base type.`. Found by the
+  same differential run against bitcoin-sv v1.2.2 (`879fc8b`), three
+  transactions (bases 0, 4 and 31). Pinned by
+  `tests/script_undefined_hashtype_witness.rs`: the witness (`0x44`) refused
+  under the block word, the standard word and the default mode, its two
+  siblings (`0x40`, `0x5f`) refused, the witness valid under the block word
+  without STRICTENC (the reference does not test the base without the flag);
+  the boundary cases re-type the witness's signature: every defined base with
+  any of the other bits passes the test and then fails to verify (a false
+  top), every undefined base is refused. RED on 0.3.28: 5 of 7 rows.
+
 ### Fixed — the signature hash dispatched on the CHRONICLE bit (Calhooon/bsv-rs#22)
 
 - The interpreter computed the BIP143 digest for every hash type. The

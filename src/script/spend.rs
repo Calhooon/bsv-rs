@@ -55,8 +55,8 @@ use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
 use crate::primitives::bsv::sighash::{
-    compute_sighash_dispatched_for_signing, SighashParams, TxInput, TxOutput, SIGHASH_CHRONICLE,
-    SIGHASH_FORKID,
+    compute_sighash_dispatched_for_signing, SighashParams, TxInput, TxOutput, SIGHASH_ALL,
+    SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE, SIGHASH_FORKID, SIGHASH_SINGLE,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::primitives::ec::PublicKey;
@@ -1758,6 +1758,26 @@ impl Spend {
         // false top). Only n/2 < s < n is a high-S refusal.
         if self.require_low_s && !tx_sig.has_low_s() && !signature_overflows_the_order(&tx_sig) {
             return Err(self.error("The signature must have a low S value."));
+        }
+
+        // STRICTENC (interpreter.cpp:291-294): the hash type must have a defined
+        // base once the CHRONICLE, FORKID and ANYONECANPAY bits are cleared
+        // (`SigHashType::isDefined`, sighashtype.h:82-90): ALL, NONE or SINGLE;
+        // `SCRIPT_ERR_SIG_HASHTYPE` otherwise. Both node words carry STRICTENC;
+        // the default mode tests it too, as the TypeScript SDK refuses an
+        // undefined type (Calhooon/bsv-rs#23).
+        if self
+            .flags
+            .is_none_or(|word| word.contains(ScriptFlags::STRICTENC))
+        {
+            let base =
+                tx_sig.scope() & !(SIGHASH_CHRONICLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY);
+            if !(SIGHASH_ALL..=SIGHASH_SINGLE).contains(&base) {
+                return Err(self.error(&format!(
+                    "The signature's hash type (0x{:02x}) has no defined base type.",
+                    tx_sig.scope()
+                )));
+            }
         }
 
         // STRICTENC (interpreter.cpp:296-303): the CHRONICLE bit is legal only
