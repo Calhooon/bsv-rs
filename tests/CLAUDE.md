@@ -5,7 +5,7 @@
 
 This directory contains integration tests that verify the BSV Rust SDK works correctly across modules and produces results identical to the TypeScript and Go SDK implementations. Tests use shared JSON test vectors to ensure byte-for-byte compatibility across all three SDK implementations.
 
-**Total: 1,215 test functions across 31 test files + ~2,044 JSON test vectors + Rust constant vectors**
+**Total: 1,289 integration tests across 45 test files (`cargo test --features "full,http,websocket"` at `4f48957`, 2026-09-27: 2,970 passed with the 1,512 unit and 169 doc tests; the 5 `memory_profiling` tests run behind `dhat-profiling`, alone, outside the count) + 2,049 JSON test vectors across the twelve files below (README's 2,031 counts the JSON arrays' lengths: `overlay_types.json` is an object of six categories) + 54 wallet-wire message files + Rust constant vectors**
 
 ## Files
 
@@ -18,9 +18,11 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `chaintracker_http_tests.rs` | 10 | `transaction`+`http` | WhatsOnChain chain tracker with wiremock |
 | `compat_bip39_tests.rs` | 29 | `compat` | BIP-39 mnemonics with official TREZOR vectors |
 | `compat_integration_tests.rs` | 31 | `compat` | BIP-32/39, BSM, ECIES, Base58 workflows |
+| `conformance_beef.rs` | 3 | `transaction` | The ts-stack conformance corpus's BUMP, serialization, BEEF and transaction-regression suites, every mismatch classified against pinned counts; reads `$BSV_CONFORMANCE_DIR` (default `../ts-stack/conformance`) and skips loudly without it |
+| `conformance_scripts.rs` | 2 | `transaction` | The corpus's script domain (5,116 evaluation vectors pinned, the sighash and script regressions) through `Spend`, the sighash builder and the `Script` API, every mismatch classified against pinned counts; the same corpus and skip |
 | `cross_sdk_tests.rs` | 17 | default | BRC-42, symmetric encryption, WIF/address vectors |
 | `drbg_tests.rs` | 6 | default | HMAC-DRBG with NIST SP 800-90A vectors |
-| `ec_tests.rs` | 37 | default | Elliptic curve ops, BRC-42 derivation, ECDH, pubkey validation |
+| `ec_tests.rs` | 39 | default | Elliptic curve ops, BRC-42 derivation, ECDH, pubkey validation |
 | `identity_tests.rs` | 69 | `identity` | Certificates, contacts, queries, broadcast results |
 | `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
@@ -28,10 +30,12 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `live_policy_http_tests.rs` | 20 | `transaction`+`http` | LivePolicy dynamic fee model with wiremock |
 | `memory_profiling.rs` | 5 | `dhat-profiling` | Heap allocation profiling for crypto operations |
 | `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
+| `overlay_admin_token_ts_parity_tests.rs` | 2 | `overlay` | Byte-exact parity of `create_signed_overlay_admin_token` with `@bsv/sdk 1.10.1`'s `pushdrop.lock` output (`overlay_admin_token_ts_parity.json`, 5 cases) |
 | `overlay_cross_sdk_tests.rs` | 13 | `overlay` | Admin token and overlay type cross-SDK vectors |
 | `overlay_http_tests.rs` | 49 | `overlay`+`http` | SHIP broadcast and SLAP lookup facilitators with wiremock |
 | `overlay_integration_tests.rs` | 62 | `overlay` | Protocols, topics, reputation, historian, admin tokens, lookup resolver |
 | `overlay_mock_tests.rs` | 20 | `full` | Mock facilitator tests for LookupResolver/TopicBroadcaster |
+| `readme_examples.rs` | 1 | default | Every ```rust block of `README.md` that names an `examples/<name>.rs` file equals that file byte for byte, and every example appears in the README |
 | `registry_integration_tests.rs` | 50 | `registry` | Definitions, queries, PushDrop roundtrips, cross-SDK |
 | `script_vectors_tests.rs` | 13 | default | Script interpreter with 1,488 vectors (458+598+432) |
 | `script_flags_witnesses.rs` | 9 | default | The flag words (`ScriptFlags::block` / `standard`, the default mode) on seven witness transactions: policy-as-consensus at version 1 (five), the NULLDUMMY version gate, NULLFAIL (Calhooon/bsv-rs#10) |
@@ -44,11 +48,11 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `script_residual_witnesses.rs` | 11 | default | The five consensus rules fixed in 0.3.27 on ten witness transactions of eight rules: truncated pushes, undefined opcodes, a second OP_ELSE, the post-Chronicle UTXO opcodes, FindAndDelete of a FORKID signature (Calhooon/bsv-rs#12) |
 | `script_mutators_keep_parsed_chunks.rs` | 6 | default | Every in-place `Script` mutator parses before it invalidates the byte cache (0.3.25) |
 | `resource_limits.rs` | 4 | default | A local interpreter budget is a `ScriptResourceLimit`, never a verdict; `OP_NUM2BIN` refuses before allocating (0.3.23) |
-| `sighash_tests.rs` | 3 | default | Transaction sighash computation with 499 vectors |
+| `sighash_tests.rs` | 4 | default | Transaction sighash computation with 499 vectors |
 | `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
 | `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
 | `template_tests.rs` | 22 | default | P2PKH, P2PK, Multisig, RPuzzle script templates |
-| `transaction_tests.rs` | 103 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry, SPV verify |
+| `transaction_tests.rs` | 104 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry, SPV verify |
 | `wallet_tests.rs` | 56 | `wallet` | KeyDeriver, CachedKeyDeriver, ProtoWallet, wire protocol |
 | `wallet_wire_cross_sdk_tests.rs` | 42 | `wallet` | Cross-SDK wire protocol vectors from Go SDK (54 vectors) |
 | `wire_method_roundtrip_tests.rs` | 90 | `wallet` | Wire protocol roundtrips for all 28 WalletInterface methods |
@@ -65,6 +69,7 @@ Test vectors in `tests/vectors/` are shared with the TypeScript and Go SDKs:
 | `brc42_public.json` | BRC-42 public key derivation vectors (5 vectors) |
 | `symmetric_key.json` | Symmetric encryption test vectors (5 vectors) |
 | `overlay_admin_token.json` | Overlay SHIP/SLAP admin token vectors (4 vectors) |
+| `overlay_admin_token_ts_parity.json` | Overlay admin token parity cases against `@bsv/sdk 1.10.1` (5 cases) |
 | `overlay_types.json` | Overlay type serialization vectors (18 entries across 6 categories) |
 | `drbg.json` | HMAC-DRBG vectors (15 vectors from NIST SP 800-90A) |
 | `sighash.json` | Transaction sighash vectors (500 entries, 499 used) |
@@ -105,7 +110,11 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`template_tests.rs`** — P2PKH (lock/unlock/address/validation), P2PK (compressed detection, length estimate), Multisig (2-of-3, 1-of-1, 3-of-3, 16-of-16, validation errors), RPuzzle (hash types, K value, R computation)
 
 ### Transaction (`transaction` feature)
-- **`transaction_tests.rs`** — Parsing/roundtrip (103 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), SPV verification (`Transaction::verify()`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
+- **`transaction_tests.rs`** — Parsing/roundtrip (104 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), SPV verification (`Transaction::verify()`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
+
+### Conformance corpus (`transaction` feature; `$BSV_CONFORMANCE_DIR`, skipped loudly when absent)
+- **`conformance_scripts.rs`** — The ts-stack corpus's script domain: 5,116 evaluation vectors (node script fixtures from bitcoin-sv and Teranode, the SDK's), the sighash and script regressions; every mismatch classified into an enumerated `unsupported` class or a pinned known failure, the per-class counts pinned (`EVALUATION_UNSUPPORTED_PINS`, `EVALUATION_KNOWN_FAILURES`), so corpus or interpreter drift is a red test. CI never sees the corpus (Calhooon/bsv-rs#31): run it before a release
+- **`conformance_beef.rs`** — The corpus's BUMP (MerklePath), serialization, BEEF and transaction-regression suites, the same classification and pins
 
 ### Transaction HTTP (`transaction`+`http` features, wiremock)
 - **`broadcaster_http_tests.rs`** — ARC (9 tests: success, API key, errors, batch), WoC (9 tests: mainnet/testnet/STN, errors), Teranode (8 tests: EF format, timeout, batch)
@@ -132,6 +141,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 ### Overlay (`overlay` feature)
 - **`overlay_cross_sdk_tests.rs`** — Admin token creation/decoding/protocol detection, network presets, LookupQuestion/Answer types, AdmittanceInstructions, TaggedBEEF
 - **`overlay_integration_tests.rs`** — Protocols, LookupQuestion/Answer, TaggedBEEF, AdmittanceInstructions, TopicBroadcaster validation, RequireAck, LookupResolverConfig, HostReputationTracker (ranking, reset, JSON export/import, global singleton), SyncHistorian (chain traversal, filtering, cycle prevention), admin tokens, HostResponse/ServiceMetadata, LookupResolver.find_competent_hosts() public API
+- **`overlay_admin_token_ts_parity_tests.rs`** — `create_signed_overlay_admin_token` byte-exact against `@bsv/sdk 1.10.1`'s `pushdrop.lock` output on five recorded cases
 - **`overlay_mock_tests.rs`** — MockLookupFacilitator and MockBroadcastFacilitator with pre-configured responses. Tests LookupResolver with mock SLAP facilitators (query routing, empty results, error handling, call counting), TopicBroadcaster with mock SHIP facilitators (broadcast routing, multi-host fan-out, partial failures, RequireAck handling). No network access required.
 
 ### Overlay HTTP (`overlay`+`http` features, wiremock)
@@ -152,6 +162,9 @@ Transaction test vectors in `tests/transaction/vectors/`:
 
 ### Registry (`registry` feature)
 - **`registry_integration_tests.rs`** — DefinitionType (string conversion, lookup services, topics, baskets, field counts), BasketDefinitionData (builder, PushDrop encode/decode), ProtocolDefinitionData (security levels), CertificateDefinitionData (field descriptors), DefinitionData enum, TokenData, RegistryRecord, query builders, result types, RegistryClientConfig, cross-SDK PushDrop field order, constants
+
+### Documentation (default features)
+- **`readme_examples.rs`** — The README's ```rust blocks that name an `examples/<name>.rs` file are those files byte for byte, and every example file appears in the README
 
 ### Profiling (`dhat-profiling` feature)
 - **`memory_profiling.rs`** — Heap allocation profiling: AES-GCM (64-16384 bytes), BRC-42/ECDH derivation, Shamir 3-of-5 and 5-of-10, ECDSA sign/verify, SHA-256/Hash160 hashing
@@ -200,12 +213,13 @@ Tests are organized by feature area:
 | **primitives** | `cross_sdk_tests`, `drbg_tests`, `ec_tests`, `integration_tests` |
 | **script** | `script_vectors_tests`, `template_tests` |
 | **transaction** | `sighash_tests`, `transaction_tests` |
+| **conformance corpus** | `conformance_scripts`, `conformance_beef` |
 | **transaction HTTP** | `broadcaster_http_tests`, `chaintracker_http_tests`, `live_policy_http_tests` |
 | **wallet** | `wallet_tests`, `wire_method_roundtrip_tests`, `wallet_wire_cross_sdk_tests` |
 | **messages** | `messages_tests` |
 | **compat** | `compat_bip39_tests`, `compat_integration_tests` |
 | **auth** | `auth_cross_sdk_tests`, `auth_integration_tests`, `auth_peer_e2e_tests` |
-| **overlay** | `overlay_cross_sdk_tests`, `overlay_integration_tests`, `overlay_mock_tests` |
+| **overlay** | `overlay_cross_sdk_tests`, `overlay_integration_tests`, `overlay_mock_tests`, `overlay_admin_token_ts_parity_tests` |
 | **overlay HTTP** | `overlay_http_tests` |
 | **storage** | `storage_tests` |
 | **storage HTTP** | `storage_http_tests` |
@@ -213,6 +227,7 @@ Tests are organized by feature area:
 | **kvstore** | `kvstore_integration_tests`, `kvstore_global_tests` |
 | **registry** | `registry_integration_tests` |
 | **profiling** | `memory_profiling` |
+| **documentation** | `readme_examples` |
 
 Notable multi-module test files use nested submodules:
 - `transaction_tests.rs`: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`

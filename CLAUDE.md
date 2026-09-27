@@ -78,7 +78,7 @@ dhat-profiling = ["dep:dhat"]
 
 ## Where the numbers come from
 
-`cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result"` summed: 0.3.28 measured 2,927 passed / 0 failed / 128 ignored (the `rust,ignore` doc illustrations; with the ts-stack corpus present). `find src -name '*.rs' | xargs wc -l` for the line count. The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
+`cargo test --features "full,http,websocket" --no-fail-fast 2>&1 | grep "^test result"` summed: measured 2026-09-27 at `4f48957` (0.3.29 on `main`): 2,970 passed / 0 failed / 128 ignored (1,512 unit, 1,289 integration across the 45 files, 169 doc tests; the ignored are the `rust,ignore` doc illustrations; the 5 `memory_profiling` tests sit behind `dhat-profiling`, run alone, and are outside the count). The two conformance files count the same with or without the ts-stack corpus: they skip loudly without it, and with it the evaluation gate's pins must hold (run them with `BSV_CONFORMANCE_DIR` set before a release; CI does not, Calhooon/bsv-rs#31). `find src -name '*.rs' | xargs wc -l` for the line count (91,528 at `4f48957`). The vector counts are the JSON arrays' lengths under `tests/vectors/`; the corpus total is the pinned constant in `tests/conformance_scripts.rs`. Re-measure before you write a number down.
 
 ## Downstreams to keep in mind
 
