@@ -35,12 +35,15 @@ impl fmt::Display for ExecutionContext {
 /// a caller (an overlay door, a wallet) must be able to tell the two apart.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptResource {
-    /// The main stack's memory budget (`memory_limit`).
+    /// The main stack's memory budget (`memory_limit`); under a flag word the
+    /// one budget of both stacks on the node's count (`Spend::memory_limit`),
+    /// every refusal of it labelled here, before any allocation.
     Stack,
-    /// The alt stack's memory budget (`memory_limit`).
+    /// The alt stack's memory budget (`memory_limit`), in the default mode.
     AltStack,
     /// A single element the script asked to allocate (`OP_NUM2BIN`'s size
-    /// operand), refused BEFORE the allocation.
+    /// operand, the numeric left shift's result), refused BEFORE the
+    /// allocation, in the default mode.
     ElementSize,
 }
 

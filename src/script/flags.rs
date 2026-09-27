@@ -56,6 +56,16 @@ pub const MAX_SCRIPT_NUM_LENGTH_AFTER_CHRONICLE: usize = 32_000_000;
 /// The node's default `-maxscriptnumlengthpolicy`, the script-number length
 /// limit on the mempool path (`src/policy/policy.h:156`, `10 * ONE_KILOBYTE`).
 pub const DEFAULT_SCRIPT_NUM_LENGTH_POLICY: usize = 10_000;
+/// The node's default `-maxstackmemoryusagepolicy`, the stack memory budget
+/// of the mempool path for a coin created after Genesis
+/// (`src/policy/policy.h:153`, `100 * ONE_MEGABYTE`; `src/init.cpp:2485`).
+/// The block path's figure is `INT64_MAX` (`src/consensus/consensus.h:82`):
+/// no bound but the budget of the evaluating machine.
+pub const DEFAULT_STACK_MEMORY_USAGE_POLICY: usize = 100_000_000;
+/// What one stack element costs beyond its bytes in the node's stack memory
+/// count (`LimitedVector::ELEMENT_OVERHEAD`, `src/script/limitedstack.h:43`:
+/// "a consensus rule", so that millions of empty elements are not free).
+pub const STACK_ELEMENT_OVERHEAD: usize = 32;
 
 /// The protocol era of the block that carries the spending transaction, as
 /// the reference derives it from a height (`src/protocol_era.cpp:21-39`:
@@ -376,6 +386,26 @@ impl ScriptFlags {
             policy
         } else {
             consensus
+        }
+    }
+
+    /// The stack memory budget whose excess is a VERDICT under this word
+    /// (`GetMaxStackMemoryUsage`, `src/configscriptpolicy.cpp:139-154`): on
+    /// the mempool path `policy`, the node's `-maxstackmemoryusagepolicy`
+    /// ([`DEFAULT_STACK_MEMORY_USAGE_POLICY`] by default), where 0 selects
+    /// none (`SetMaxStackMemoryUsage`, `:289-292`, sets the policy to the
+    /// consensus default `INT64_MAX`); on the block path none, the consensus
+    /// figure being `INT64_MAX` (`src/consensus/consensus.h:82`). The node
+    /// counts one budget over the main and the alt stack, each element at its
+    /// size plus [`STACK_ELEMENT_OVERHEAD`], and refuses a growth that would
+    /// exceed it before the growth happens (`LimitedStack`,
+    /// `src/script/limitedstack.cpp:194-209`), `SCRIPT_ERR_STACK_SIZE`
+    /// (`interpreter.cpp:1815-1817`).
+    pub const fn max_stack_memory_usage(self, policy: usize) -> Option<usize> {
+        if self.is_mempool_word() && policy != 0 {
+            Some(policy)
+        } else {
+            None
         }
     }
 

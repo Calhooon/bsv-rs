@@ -7,6 +7,102 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.30] - 2026-09-27
+
+### Fixed — the stack memory budget under a word (Calhooon/bsv-rs#30)
+
+- The interpreter held one local budget in every mode, 32,000,000 bytes for
+  each stack apart, counting the bytes alone, and stopped a script that
+  exceeded it with a resource limit (`ScriptEvaluationError::resource_limit`,
+  no verdict). After Genesis the reference bounds a script's memory by the
+  stack memory budget of the path and by nothing else
+  (`src/consensus/consensus.h:81-82`): `INT64_MAX` on the block path
+  (`consensus.h:82`) and the node's `-maxstackmemoryusagepolicy` on the
+  mempool path, 100,000,000 bytes by default (`src/policy/policy.h:153`;
+  `GetMaxStackMemoryUsage`, `src/configscriptpolicy.cpp:139-154`). It counts
+  the main and the alt stack as one budget (the alt stack is a child stack,
+  `src/script/interpreter.cpp:1993`, whose growth the parent counts,
+  `src/script/limitedstack.cpp:196-199`), each element at its size plus 32
+  bytes (`LimitedVector::ELEMENT_OVERHEAD`, `src/script/limitedstack.h:43`),
+  and refuses a growth that would exceed the budget before it happens
+  (`limitedstack.cpp:194-209`; `OP_NUM2BIN`'s pad is charged before the
+  resize, `:66` then `:68`), `SCRIPT_ERR_STACK_SIZE`
+  (`interpreter.cpp:1815-1817`). Under a word the interpreter now counts as
+  the node counts. `SpendParams::memory_limit: None` selects a local budget of
+  100,000,000 bytes on the node's count on both paths (`Spend::memory_limit`):
+  the block path's own figure is unbounded, which a library embedded in a
+  wallet cannot honor, so above the local budget the evaluator still declines
+  with a resource limit, at the higher figure and on the node's count. On the
+  mempool path the policy's excess is a verdict with a fixed message,
+  `Stack size limit exceeded: N bytes, the stack memory policy is M bytes.`
+  (`resource_limit: None`; `Spend::stack_memory_policy`;
+  `Spend::set_stack_memory_policy` for a node configured otherwise, 0
+  selecting no policy verdict as the node's 0 does,
+  `configscriptpolicy.cpp:289-292`; `ScriptFlags::max_stack_memory_usage`;
+  `flags::DEFAULT_STACK_MEMORY_USAGE_POLICY`, `flags::STACK_ELEMENT_OVERHEAD`).
+  An explicit `memory_limit` wins in every mode and stays a resource limit;
+  the policy's verdict fires at its own figure whatever the local budget. An
+  alt stack the unlocking script leaves non-empty stays charged while the
+  locking script runs, as on the node, whose alt stack is created per script
+  and dropped without releasing its elements' charge (`LimitedStack` declares
+  no destructor, `limitedstack.h:78-151`). Every refusal of the budget under a
+  word comes before the allocation it would need: `OP_NUM2BIN`'s pad on the
+  node's count after the minimal-encoding test, as the reference orders the
+  two, and the numeric left shift's result on its exact length (the
+  magnitude's bits plus the count, one byte for each 8 bits and one for the
+  sign's room) after the size tests of Calhooon/bsv-rs#21; that exact length
+  also decides the reference's size test after the shift
+  (`src/script/script_num.cpp:315-316`, `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`)
+  before the shift is computed. The default mode is unchanged: 32,000,000
+  bytes for each stack apart, the bytes alone, the `element-size` refusals
+  before allocation (`tests/resource_limits.rs`). Found by the same
+  differential run against bitcoin-sv v1.2.2 (`879fc8b`): four transactions
+  the reference decides stopped here at the local budget, two under both
+  words (a 32,000,001-byte number built by `OP_NUM2BIN` and read by `OP_1ADD`
+  on a coin created after Chronicle, `SCRIPT_ERR_SCRIPTNUM_OVERFLOW` on both
+  paths; a 40,000,000-byte element built and dropped, valid on both paths)
+  and two under the block word (the number 1 shifted left to exactly
+  32,000,000 bytes, valid, and to 32,000,001 bytes past the size test before
+  the shift, `SCRIPT_ERR_SCRIPTNUM_OVERFLOW` at the test after it; on the
+  mempool path both overflow the policy's number length first). Pinned by
+  `tests/script_stack_memory_witness.rs`: the four witnesses and a fifth of
+  the same family (the size test before the shift) under the block word, the
+  standard word and the default mode, and the budget's edges at the node's
+  figures (exactly 100,000,000 bytes on the node's count admitted on both
+  paths and one byte more refused, the policy's verdict on the mempool path
+  and the resource limit on the block path; the same total split across the
+  two stacks; the unlocking script's alt stack left charged; a policy of 0;
+  an explicit budget of 1,000 bytes and one of 200,000,000 bytes) and at
+  small figures (the 32 bytes of each element, the shared budget, the pad
+  charged before the resize, the shift's exact length and charge). RED on 0.3.29: 18 of the file's 22 rows that
+  use no 0.3.30 API (the other six set or read the new knobs), run on the
+  published crate; the four that pass are the default mode's row of the
+  32,000,001-byte read, the shifts refused before the shift on the mempool
+  path and on both, and the shift's exact length at a number length of 16.
+
+### Fixed — `OP_NUM2BIN`'s size bound under a word (Calhooon/bsv-rs#30)
+
+- Under a word a size below 0 or above `INT32_MAX` is refused before anything
+  is allocated, `SCRIPT_ERR_PUSH_SIZE` on every path, as the reference
+  refuses it (`src/script/interpreter.cpp:1747-1749`), with the message
+  `OP_NUM2BIN requires a size from 0 to 2147483647, found N.`. The
+  interpreter's 1 GiB element bound, which is not the reference's after
+  Genesis, applies in the default mode only (to `OP_NUM2BIN`'s size and to
+  `OP_CAT`'s result, with the message it had); under a word a size between
+  1 GiB and `INT32_MAX` is decided by the budget, its growth charged before
+  the resize (on the mempool path the policy's verdict, on the block path the
+  local budget's resource limit, nothing allocated). The verdict on a size
+  above `INT32_MAX` is unchanged (`SCRIPT_ERR_PUSH_SIZE`); its message under a
+  word is new. Pinned by the same file: a size of 2^31, of `INT32_MAX` and of
+  -1 under both words and in the default mode.
+
+### Tests
+
+- The CI step of the consensus witness files also runs
+  `tests/script_stack_memory_witness.rs` (about 100 MB at its peak: its large
+  rows run one at a time) and `tests/resource_limits.rs`, which pins the
+  default mode's budget and had never run in CI.
+
 ## [0.3.29] - 2026-09-27
 
 ### Fixed — an undefined base hash type refused under STRICTENC (Calhooon/bsv-rs#23)

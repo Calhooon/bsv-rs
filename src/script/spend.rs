@@ -24,6 +24,23 @@
 //! relaying node with default policy applies. A consensus oracle selects the
 //! block word. The `flags` module documents every rule, its gate and its site.
 //!
+//! # The memory budget
+//!
+//! `SpendParams::memory_limit` is a LOCAL budget: exhausting it stops the
+//! evaluation with a resource limit
+//! ([`ScriptEvaluationError::resource_limit`]), never a verdict, and `Some(n)`
+//! wins in every mode. With `None`, the default mode keeps the TypeScript
+//! SDK's 32,000,000 bytes for each stack apart, counting the bytes alone.
+//! Under a word the count is the node's (one budget over the main and the alt
+//! stack, 32 bytes of overhead per element, every growth charged before it
+//! happens, `src/script/limitedstack.cpp`) and `None` selects 100,000,000
+//! bytes, the node's policy default (`src/policy/policy.h:153`), on both
+//! paths. On the mempool path the node's stack memory policy is a verdict
+//! besides: a growth above it is `SCRIPT_ERR_STACK_SIZE` on the reference
+//! ([`Spend::stack_memory_policy`], [`Spend::set_stack_memory_policy`]). On the
+//! block path the node's figure is `INT64_MAX`: the local budget declines, it
+//! never decides.
+//!
 //! # Example
 //!
 //! ```rust,ignore
@@ -50,7 +67,10 @@
 use super::evaluation_error::{
     ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit,
 };
-use super::flags::{Gates, ScriptFlags, DEFAULT_SCRIPT_NUM_LENGTH_POLICY};
+use super::flags::{
+    Gates, ScriptFlags, DEFAULT_SCRIPT_NUM_LENGTH_POLICY, DEFAULT_STACK_MEMORY_USAGE_POLICY,
+    STACK_ELEMENT_OVERHEAD,
+};
 use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
@@ -69,8 +89,16 @@ use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, to_hex, BigNu
 /// Maximum size of a single script element (1GB for BSV unlimited)
 const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;
 
-/// Default memory limit for stack usage (32MB)
+/// The local memory budget of the default mode when `memory_limit` is `None`
+/// (32,000,000 bytes, each stack apart, the bytes alone).
 const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;
+
+/// The local memory budget under a word when `memory_limit` is `None`: the
+/// node's policy default ([`DEFAULT_STACK_MEMORY_USAGE_POLICY`],
+/// `src/policy/policy.h:153`) on the block path as on the mempool path, since
+/// the block path's own figure is `INT64_MAX` (`src/consensus/consensus.h:82`)
+/// and a library embedded in a wallet cannot honor an unbounded budget.
+const WORD_MEMORY_LIMIT: usize = DEFAULT_STACK_MEMORY_USAGE_POLICY;
 
 /// Maximum number of keys in a multisig (i32::MAX for BSV)
 const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
@@ -129,7 +157,11 @@ pub struct SpendParams {
     pub input_sequence: u32,
     /// The lock time of the spending transaction.
     pub lock_time: u32,
-    /// Optional memory limit in bytes (default: 32MB).
+    /// The LOCAL memory budget in bytes: exhausting it is a resource limit
+    /// ([`ScriptEvaluationError::resource_limit`]), never a verdict, and
+    /// `Some(n)` wins in every mode. `None` selects the mode's figure: 32,000,000
+    /// bytes in the default mode, 100,000,000 on the node's count under a word
+    /// ([`Spend::memory_limit`]).
     pub memory_limit: Option<usize>,
 }
 
@@ -160,9 +192,22 @@ pub struct Spend {
     stack: Vec<Vec<u8>>,
     alt_stack: Vec<Vec<u8>>,
     if_stack: Vec<bool>,
-    memory_limit: usize,
+    /// `SpendParams::memory_limit`; `None` selects the mode's figure
+    /// ([`Spend::memory_limit`]).
+    memory_limit: Option<usize>,
     stack_mem: usize,
     alt_stack_mem: usize,
+    /// Under a word, the node's stack memory count: ONE budget over the main
+    /// and the alt stack (the alt stack is a child of the main stack,
+    /// `interpreter.cpp:1993`, whose growth the parent counts,
+    /// `limitedstack.cpp:196-199`), every element at its size plus
+    /// `STACK_ELEMENT_OVERHEAD` (`limitedstack.h:43`, charged at `163`,
+    /// `171`), every growth charged before it happens (`194-209`). The node's
+    /// alt stack is created per script and nothing releases its elements'
+    /// charge when it is dropped (`LimitedStack` declares no destructor,
+    /// `limitedstack.h:78-151`), so an alt stack the unlocking script leaves
+    /// non-empty stays charged while the locking script runs.
+    node_mem: u64,
     require_push_only: bool,
     require_minimal: bool,
     require_low_s: bool,
@@ -186,6 +231,11 @@ pub struct Spend {
     /// selects the consensus limit); read under a word carrying the mempool
     /// word's bits, see [`Spend::max_script_num_length`].
     script_num_length_policy: usize,
+    /// The node's `-maxstackmemoryusagepolicy`, the stack memory budget of the
+    /// mempool path (`src/policy/policy.h:153`, default 100,000,000; 0 selects
+    /// none); read under a word carrying the mempool word's bits, see
+    /// [`Spend::stack_memory_policy`].
+    stack_memory_policy: usize,
     /// Whether an `OP_ELSE` was seen at each conditional depth (the
     /// reference's `conditional_tracker`: a second `OP_ELSE` for one `OP_IF`
     /// is unbalanced after Genesis, `interpreter.cpp:829-831`).
@@ -231,9 +281,10 @@ impl Spend {
             stack: Vec::new(),
             alt_stack: Vec::new(),
             if_stack: Vec::new(),
-            memory_limit: params.memory_limit.unwrap_or(DEFAULT_MEMORY_LIMIT),
+            memory_limit: params.memory_limit,
             stack_mem: 0,
             alt_stack_mem: 0,
+            node_mem: 0,
             require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING,
             // ts-sdk parity: transactions with version > 1 run "relaxed"
             // (post-Genesis semantics) — MINIMALDATA, LOW_S, CLEANSTACK and
@@ -255,6 +306,7 @@ impl Spend {
             // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags.
             utxo_after_chronicle: params.transaction_version > 1,
             script_num_length_policy: DEFAULT_SCRIPT_NUM_LENGTH_POLICY,
+            stack_memory_policy: DEFAULT_STACK_MEMORY_USAGE_POLICY,
             else_stack: Vec::new(),
             returning: false,
             unlocking_truncated: None,
@@ -296,6 +348,10 @@ impl Spend {
     /// [`ScriptFlags`]). The TypeScript default mode's switches are replaced,
     /// not merged; `set_require_minimal` and `set_require_push_only` override
     /// a derived rule when called afterwards.
+    ///
+    /// The memory budget follows the word too: the node's stack memory count
+    /// and, on the mempool path, its policy verdict ([`memory_limit`](Self::memory_limit),
+    /// [`stack_memory_policy`](Self::stack_memory_policy)).
     ///
     /// A consensus oracle selects the block word:
     ///
@@ -375,6 +431,50 @@ impl Spend {
         self.script_num_length_policy = bytes;
     }
 
+    /// The LOCAL memory budget in force: `SpendParams::memory_limit` when it
+    /// is `Some`, in every mode. Otherwise, in the TypeScript default mode,
+    /// 32,000,000 bytes for each stack apart, counting the bytes alone, as
+    /// that SDK counts; under a word, 100,000,000 bytes on the node's count,
+    /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`] bytes per
+    /// element (the node's policy default, `src/policy/policy.h:153`, on the
+    /// block path as on the mempool path: the block path's own figure is
+    /// `INT64_MAX`, `src/consensus/consensus.h:82`, which a library embedded
+    /// in a wallet cannot honor). Exhausting it stops the evaluation with a
+    /// resource limit ([`ScriptEvaluationError::resource_limit`]): the
+    /// evaluator declines to go on, it does not decide.
+    pub fn memory_limit(&self) -> usize {
+        self.memory_limit.unwrap_or(if self.flags.is_some() {
+            WORD_MEMORY_LIMIT
+        } else {
+            DEFAULT_MEMORY_LIMIT
+        })
+    }
+
+    /// The stack memory budget whose excess is a VERDICT, in force: `None` in
+    /// the default mode and on the block path (the node's consensus figure is
+    /// `INT64_MAX`); on the mempool path the policy of
+    /// [`set_stack_memory_policy`](Self::set_stack_memory_policy)
+    /// ([`ScriptFlags::max_stack_memory_usage`]). A growth that would take the
+    /// node's count above it is refused before it happens, as the reference
+    /// refuses it (`limitedstack.cpp:202-205`, `SCRIPT_ERR_STACK_SIZE`,
+    /// `interpreter.cpp:1815-1817`): `Stack size limit exceeded: N bytes, the
+    /// stack memory policy is M bytes.`
+    pub fn stack_memory_policy(&self) -> Option<usize> {
+        self.flags
+            .and_then(|word| word.max_stack_memory_usage(self.stack_memory_policy))
+    }
+
+    /// The node's `-maxstackmemoryusagepolicy` for a word on the mempool path
+    /// (`src/policy/policy.h:153`, 100,000,000 bytes by default; 0 selects no
+    /// policy verdict, the node's consensus figure `INT64_MAX`,
+    /// `src/configscriptpolicy.cpp:289-292`). A block word and the default
+    /// mode ignore it. The local budget is `SpendParams::memory_limit`, a
+    /// separate knob: the policy's verdict fires at its figure whatever the
+    /// local budget, and the local budget stops the evaluation below it.
+    pub fn set_stack_memory_policy(&mut self, bytes: usize) {
+        self.stack_memory_policy = bytes;
+    }
+
     /// Resets the interpreter state for re-execution.
     pub fn reset(&mut self) {
         self.context = ExecutionContext::UnlockingScript;
@@ -387,6 +487,7 @@ impl Spend {
         self.returning = false;
         self.stack_mem = 0;
         self.alt_stack_mem = 0;
+        self.node_mem = 0;
     }
 
     /// Validates the spend by executing both scripts.
@@ -457,17 +558,25 @@ impl Spend {
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError> {
         // Check memory limits — a LOCAL budget, reported as a resource limit
         // (the reference's `ScriptResourceLimitError`), never as a verdict on
-        // the script.
-        if self.stack_mem > self.memory_limit {
-            return Err(self.resource_error(ScriptResource::Stack, self.stack_mem));
-        }
-        if self.alt_stack_mem > self.memory_limit {
-            return Err(self.resource_error(ScriptResource::AltStack, self.alt_stack_mem));
+        // the script. The default mode's, each stack apart; under a word every
+        // growth is charged to the node's count before it happens instead
+        // (`charge`).
+        if self.flags.is_none() {
+            let limit = self.memory_limit();
+            if self.stack_mem > limit {
+                return Err(self.resource_error(ScriptResource::Stack, self.stack_mem));
+            }
+            if self.alt_stack_mem > limit {
+                return Err(self.resource_error(ScriptResource::AltStack, self.alt_stack_mem));
+            }
         }
 
         // Switch from unlocking to locking script when unlocking is complete.
         // ts-sdk parity: conditionals must be terminated, the alt stack is
         // cleared, and the last code separator does not carry across scripts.
+        // Under a word the node's count keeps the cleared alt stack's charge
+        // (`node_mem`): the reference drops the unlocking script's alt stack
+        // without releasing it.
         if self.context == ExecutionContext::UnlockingScript
             && self.program_counter >= self.unlocking_chunks.len()
         {
@@ -922,6 +1031,7 @@ impl Spend {
                     let remove_idx = self.stack.len() - 1 - n_idx;
                     let removed = self.stack.remove(remove_idx);
                     self.stack_mem -= removed.len();
+                    self.release(removed.len());
                     self.push_stack(item)?;
                 } else {
                     // OP_PICK
@@ -959,7 +1069,7 @@ impl Spend {
                     );
                 }
                 let top = self.stack_top()?.to_vec();
-                self.ensure_stack_mem(top.len())?;
+                self.reserve_stack(top.len())?;
                 let insert_idx = self.stack.len() - 2;
                 self.stack.insert(insert_idx, top.clone());
                 self.stack_mem += top.len();
@@ -988,7 +1098,10 @@ impl Spend {
                 let buf1 = self.pop_stack()?;
                 let mut result = buf1;
                 result.extend(buf2);
-                if result.len() > MAX_SCRIPT_ELEMENT_SIZE {
+                // The default mode's 1 GiB element bound; under a word an element
+                // after Genesis is bounded by the stack memory budget alone
+                // (`src/consensus/consensus.h:81-82`), which the push charges.
+                if self.flags.is_none() && result.len() > MAX_SCRIPT_ELEMENT_SIZE {
                     return Err(self.error(&format!(
                         "It's not currently possible to push data larger than {} bytes.",
                         MAX_SCRIPT_ELEMENT_SIZE
@@ -1030,22 +1143,39 @@ impl Spend {
                 let size_bn = self.read_number(&size_bytes)?;
                 let size = size_bn.to_i64().unwrap_or(-1);
 
-                if size < 0 || size > MAX_SCRIPT_ELEMENT_SIZE as i64 {
-                    return Err(self.error(&format!(
-                        "It's not currently possible to push data larger than {} bytes or negative size.",
-                        MAX_SCRIPT_ELEMENT_SIZE
-                    )));
-                }
-                let size = size as usize;
-                // Reference parity (0.3.23): the element the script asks for is
-                // refused BEFORE it is allocated when it alone exceeds the
-                // local memory budget — the TypeScript SDK's `element-size`
-                // resource check. Without this a 9-byte script could make the
-                // evaluator allocate up to MAX_SCRIPT_ELEMENT_SIZE (1 GB) and
-                // only then trip the stack budget on the push.
-                if size > self.memory_limit {
-                    return Err(self.resource_error(ScriptResource::ElementSize, size));
-                }
+                let size = if self.flags.is_some() {
+                    // Under a word the reference's bound: a size below 0 or above
+                    // INT32_MAX is SCRIPT_ERR_PUSH_SIZE before anything is
+                    // allocated, on every path (`interpreter.cpp:1747-1749`); an
+                    // element after Genesis is otherwise bounded by the stack
+                    // memory budget alone (`src/consensus/consensus.h:81-82`),
+                    // charged below.
+                    if size < 0 || size > i64::from(i32::MAX) {
+                        return Err(self.error(&format!(
+                            "OP_NUM2BIN requires a size from 0 to 2147483647, found {}.",
+                            size_bn.to_dec_string()
+                        )));
+                    }
+                    size as usize
+                } else {
+                    if size < 0 || size > MAX_SCRIPT_ELEMENT_SIZE as i64 {
+                        return Err(self.error(&format!(
+                            "It's not currently possible to push data larger than {} bytes or negative size.",
+                            MAX_SCRIPT_ELEMENT_SIZE
+                        )));
+                    }
+                    let size = size as usize;
+                    // Reference parity (0.3.23): the element the script asks for is
+                    // refused BEFORE it is allocated when it alone exceeds the
+                    // local memory budget — the TypeScript SDK's `element-size`
+                    // resource check. Without this a 9-byte script could make the
+                    // evaluator allocate up to MAX_SCRIPT_ELEMENT_SIZE (1 GB) and
+                    // only then trip the stack budget on the push.
+                    if size > self.memory_limit() {
+                        return Err(self.resource_error(ScriptResource::ElementSize, size));
+                    }
+                    size
+                };
 
                 let rawnum = self.pop_stack()?;
                 let minimal = ScriptNum::minimally_encode(&rawnum);
@@ -1054,6 +1184,18 @@ impl Spend {
                     return Err(self.error(
                         "OP_NUM2BIN requires that the size expressed in the top stack item is large enough to hold the value expressed in the second-from-top stack item.",
                     ));
+                }
+
+                // Under a word the growth is charged before the element is
+                // resized (`LimitedVector::padRight`, `limitedstack.cpp:60-71`:
+                // the charge at `:66`, the resize at `:68`), so a size the budget
+                // refuses is refused before it is allocated. The node's count
+                // after the pad equals the count of the padded element pushed
+                // here (the value's minimal encoding is never longer than it).
+                if self.flags.is_some() && minimal.len() < size {
+                    self.check_node_budget(
+                        self.node_mem + size as u64 + STACK_ELEMENT_OVERHEAD as u64,
+                    )?;
                 }
 
                 if minimal.len() == size {
@@ -1881,9 +2023,12 @@ impl Spend {
     /// (`script_num.cpp:305-308`, `SCRIPTNUM_OVERFLOW`), then on both shifts a
     /// count above `INT_MAX` as the big-integer error (`big_int.cpp:359-369`,
     /// `383-393`; `SCRIPT_ERR_BIG_INT`, `interpreter.cpp:1819-1821`). After
-    /// them, a left shift whose result would not fit the memory budget is
-    /// refused before it is computed (a local budget: a resource limit, not a
-    /// verdict). The default mode shifts by any count, as the TypeScript SDK does.
+    /// them, a left shift's result is sized exactly before it is computed: over
+    /// the era's number length it is the reference's size test after the shift
+    /// (`script_num.cpp:315-316`), and its charge to the node's stack memory
+    /// count is tested as the push will charge it. The default mode shifts by
+    /// any count, as the TypeScript SDK does, and refuses a result that alone
+    /// would exceed the local budget before computing it (a resource limit).
     fn op_chronicle_splice(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         let name = match opcode {
             OP_NOP4 => "OP_SUBSTR",
@@ -1982,15 +2127,34 @@ impl Spend {
                 }
                 let n = n_bn.to_i64().map(|v| v as u64).unwrap_or(u64::MAX);
                 let out = if opcode == OP_NOP7 {
-                    // the result's size, before allocating it: a LOCAL budget
-                    let bits = (x.bit_length() as u64).saturating_add(n);
-                    let bytes = (bits / 8 + 2) as usize;
-                    if !x.is_zero() && bytes > self.memory_limit {
-                        return Err(self.resource_error(ScriptResource::ElementSize, bytes));
-                    }
                     if x.is_zero() {
                         x
+                    } else if let Some(max) = self.max_script_num_length() {
+                        // Under a word the size test above bounds the result, and
+                        // its exact length is known before the shift: the
+                        // magnitude's bits plus the count, one byte for each 8
+                        // bits and one for the sign's room. The reference's size
+                        // test after the shift (`script_num.cpp:315-316`,
+                        // SCRIPTNUM_OVERFLOW) and the node's charge of the pushed
+                        // result (`limitedstack.h:171`) are decided on it before
+                        // anything is allocated.
+                        let bits = (x.bit_length() as u64).saturating_add(n);
+                        let len = bits / 8 + 1;
+                        if len > max as u64 {
+                            return Err(self.overflow_error(len as usize, max));
+                        }
+                        self.check_node_budget(
+                            self.node_mem + len + STACK_ELEMENT_OVERHEAD as u64,
+                        )?;
+                        x.shl_bits(n)
                     } else {
+                        // the default mode: the result's size, before allocating
+                        // it, against the LOCAL budget
+                        let bits = (x.bit_length() as u64).saturating_add(n);
+                        let bytes = (bits / 8 + 2) as usize;
+                        if bytes > self.memory_limit() {
+                            return Err(self.resource_error(ScriptResource::ElementSize, bytes));
+                        }
                         x.shl_bits(n)
                     }
                 } else if n >= x.bit_length() as u64 {
@@ -2110,7 +2274,7 @@ impl Spend {
     // ========================================================================
 
     fn push_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {
-        self.ensure_stack_mem(item.len())?;
+        self.reserve_stack(item.len())?;
         self.stack_mem += item.len();
         self.stack.push(item);
         Ok(())
@@ -2126,6 +2290,7 @@ impl Spend {
         }
         let item = self.stack.pop().unwrap();
         self.stack_mem -= item.len();
+        self.release(item.len());
         Ok(item)
     }
 
@@ -2148,7 +2313,7 @@ impl Spend {
     }
 
     fn push_alt_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {
-        self.ensure_alt_stack_mem(item.len())?;
+        self.reserve_alt_stack(item.len())?;
         self.alt_stack_mem += item.len();
         self.alt_stack.push(item);
         Ok(())
@@ -2160,18 +2325,89 @@ impl Spend {
         }
         let item = self.alt_stack.pop().unwrap();
         self.alt_stack_mem -= item.len();
+        self.release(item.len());
         Ok(item)
     }
 
+    /// Before an element of `len` bytes joins the main stack: the default
+    /// mode's budget for that stack, or under a word the node's charge.
+    fn reserve_stack(&mut self, len: usize) -> Result<(), ScriptEvaluationError> {
+        if self.flags.is_some() {
+            self.charge(len)
+        } else {
+            self.ensure_stack_mem(len)
+        }
+    }
+
+    /// Before an element of `len` bytes joins the alt stack: the default
+    /// mode's budget for that stack, or under a word the node's charge (the
+    /// node moves an element between the two stacks without a charge,
+    /// `limitedstack.cpp:290-305`; here it leaves one and joins the other,
+    /// released then charged again, the same count at every step).
+    fn reserve_alt_stack(&mut self, len: usize) -> Result<(), ScriptEvaluationError> {
+        if self.flags.is_some() {
+            self.charge(len)
+        } else {
+            self.ensure_alt_stack_mem(len)
+        }
+    }
+
+    /// Under a word, charges an element of `len` bytes to the node's count
+    /// (`LimitedStack::push_back`, `limitedstack.h:163`, `171`: its size plus
+    /// `STACK_ELEMENT_OVERHEAD`), tested before the element is held.
+    fn charge(&mut self, len: usize) -> Result<(), ScriptEvaluationError> {
+        let attempted = self
+            .node_mem
+            .saturating_add(len as u64 + STACK_ELEMENT_OVERHEAD as u64);
+        self.check_node_budget(attempted)?;
+        self.node_mem = attempted;
+        Ok(())
+    }
+
+    /// Under a word, releases an element of `len` bytes that left either stack
+    /// (`LimitedStack::pop_back`, `erase`, `limitedstack.cpp:211-219`,
+    /// `245-268`).
+    fn release(&mut self, len: usize) {
+        if self.flags.is_some() {
+            self.node_mem = self
+                .node_mem
+                .saturating_sub(len as u64 + STACK_ELEMENT_OVERHEAD as u64);
+        }
+    }
+
+    /// Whether the node's count may reach `attempted` bytes. Above the stack
+    /// memory policy in force ([`stack_memory_policy`](Self::stack_memory_policy))
+    /// it is the reference's verdict: `LimitedStack::increaseCombinedStackSize`
+    /// throws before the growth (`limitedstack.cpp:202-205`), caught as
+    /// `SCRIPT_ERR_STACK_SIZE` (`interpreter.cpp:1815-1817`). Above the local
+    /// budget ([`memory_limit`](Self::memory_limit)) it is a resource limit.
+    /// The policy is tested first: its verdict needs nothing allocated.
+    fn check_node_budget(&self, attempted: u64) -> Result<(), ScriptEvaluationError> {
+        if let Some(policy) = self.stack_memory_policy() {
+            if attempted > policy as u64 {
+                return Err(self.error(&format!(
+                    "Stack size limit exceeded: {attempted} bytes, the stack memory policy is {policy} bytes."
+                )));
+            }
+        }
+        if attempted > self.memory_limit() as u64 {
+            return Err(self.resource_error(
+                ScriptResource::Stack,
+                usize::try_from(attempted).unwrap_or(usize::MAX),
+            ));
+        }
+        Ok(())
+    }
+
     fn ensure_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
-        if self.stack_mem + additional > self.memory_limit {
+        if self.stack_mem + additional > self.memory_limit() {
             return Err(self.resource_error(ScriptResource::Stack, self.stack_mem + additional));
         }
         Ok(())
     }
 
     fn ensure_alt_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
-        if self.alt_stack_mem + additional > self.memory_limit {
+        if self.alt_stack_mem + additional > self.memory_limit() {
             return Err(
                 self.resource_error(ScriptResource::AltStack, self.alt_stack_mem + additional)
             );
@@ -2188,10 +2424,11 @@ impl Spend {
             ScriptResource::AltStack => "Alt stack memory usage",
             ScriptResource::ElementSize => "Script element allocation",
         };
-        self.error(&format!("{label} has exceeded {} bytes", self.memory_limit))
+        let limit = self.memory_limit();
+        self.error(&format!("{label} has exceeded {limit} bytes"))
             .with_resource_limit(ScriptResourceLimit {
                 resource,
-                limit: self.memory_limit,
+                limit,
                 attempted,
             })
     }
@@ -2717,7 +2954,7 @@ mod flag_tests {
             unlocking_script: s.unlocking_script.clone(),
             input_sequence: s.input_sequence,
             lock_time: s.lock_time,
-            memory_limit: Some(s.memory_limit),
+            memory_limit: s.memory_limit,
         }
     }
 
@@ -3243,7 +3480,7 @@ mod chronicle_tests {
             unlocking_script: s.unlocking_script.clone(),
             input_sequence: s.input_sequence,
             lock_time: s.lock_time,
-            memory_limit: Some(s.memory_limit),
+            memory_limit: s.memory_limit,
         }
     }
 }
@@ -3718,5 +3955,40 @@ mod script_num_length_tests {
             run(&read_n_bytes(1_048_577), 2, None, None, None),
             "Ok(true)"
         );
+    }
+
+    /// Under a word the numeric left shift's result is sized before it is
+    /// computed: the magnitude's bits plus the count, one byte for each 8 bits
+    /// and one for the sign's room, which is the serialized length of the
+    /// shifted number, whatever its sign (Calhooon/bsv-rs#30).
+    #[test]
+    fn a_left_shifts_exact_length_is_its_serialized_length() {
+        for x in [
+            1i64,
+            2,
+            127,
+            128,
+            255,
+            256,
+            32_767,
+            32_768,
+            -1,
+            -127,
+            -128,
+            -255,
+            i64::MAX,
+            i64::MIN + 1,
+        ] {
+            let x = BigNumber::from_i64(x);
+            for n in 0..40u64 {
+                let bits = x.bit_length() as u64 + n;
+                assert_eq!(
+                    (bits / 8 + 1) as usize,
+                    ScriptNum::to_bytes(&x.shl_bits(n)).len(),
+                    "{} << {n}",
+                    x.to_dec_string()
+                );
+            }
+        }
     }
 }

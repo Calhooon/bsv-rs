@@ -248,7 +248,7 @@ pub struct SpendParams {
     pub unlocking_script: UnlockingScript,
     pub input_sequence: u32,
     pub lock_time: u32,
-    pub memory_limit: Option<usize>,  // Default: 32MB
+    pub memory_limit: Option<usize>,  // the LOCAL budget: None = 32 MB (default mode) or 100 MB on the node's count (under a word)
 }
 
 impl Spend {
@@ -258,6 +258,9 @@ impl Spend {
     pub fn set_require_minimal(&mut self, require: bool)    // overrides, also after set_flags
     pub fn set_require_push_only(&mut self, require: bool)  // overrides, also after set_flags
     pub fn set_utxo_after_chronicle(&mut self, after: bool)  // the Chronicle opcodes' gate; overrides the word's bit
+    pub fn memory_limit(&self) -> usize                      // the local budget in force (0.3.30)
+    pub fn stack_memory_policy(&self) -> Option<usize>       // the mempool path's verdict figure in force (0.3.30)
+    pub fn set_stack_memory_policy(&mut self, bytes: usize)  // the node's -maxstackmemoryusagepolicy, 0 = none (0.3.30)
     pub fn reset(&mut self)
     pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError>  // refuses a word `check` refuses first
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError>  // Single instruction
@@ -273,6 +276,17 @@ COMPRESSED_PUBKEYTYPE exist only under a word. A consensus oracle selects the bl
 word. The gates, their sites in bitcoin-sv v1.2.2 and what is not modeled are the
 table on `ScriptFlags` in `flags.rs`; the seven witness transactions are
 `tests/script_flags_witnesses.rs`.
+
+The memory budget (0.3.30, bsv-rs#30). `memory_limit` is LOCAL: exhausting it is a
+`ScriptResourceLimit`, never a verdict, and `Some(n)` wins in every mode. The default
+mode keeps 32 MB for each stack apart, the bytes alone. Under a word the count is the
+node's (`LimitedStack`: one budget over both stacks, `STACK_ELEMENT_OVERHEAD` = 32
+bytes per element, every growth charged before it happens, an unlocking script's alt
+stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's policy
+default); on the mempool path the node's stack memory policy is a verdict besides
+(`Stack size limit exceeded: …`, `SCRIPT_ERR_STACK_SIZE`), and `OP_NUM2BIN`'s size is
+bounded by `INT32_MAX` (`SCRIPT_ERR_PUSH_SIZE`). The witnesses are
+`tests/script_stack_memory_witness.rs`.
 
 ### ScriptFlags / ProtocolEra (`flags.rs`)
 
@@ -374,7 +388,8 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 
 ```rust
 const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;  // 1GB (BSV unlimited)
-const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;              // 32MB
+const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;              // 32MB, the default mode's local budget
+const WORD_MEMORY_LIMIT: usize = DEFAULT_STACK_MEMORY_USAGE_POLICY;  // 100MB, under a word
 const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
 const REQUIRE_MINIMAL_PUSH: bool = true;        // the default mode, version <= 1 only
 const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;  // the default mode, every version

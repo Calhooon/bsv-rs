@@ -5,7 +5,7 @@
 
 This directory contains integration tests that verify the BSV Rust SDK works correctly across modules and produces results identical to the TypeScript and Go SDK implementations. Tests use shared JSON test vectors to ensure byte-for-byte compatibility across all three SDK implementations.
 
-**Total: 1,289 integration tests across 45 test files (`cargo test --features "full,http,websocket"` at `4f48957`, 2026-09-27: 2,970 passed with the 1,512 unit and 169 doc tests; the 5 `memory_profiling` tests run behind `dhat-profiling`, alone, outside the count) + 2,049 JSON test vectors across the twelve files below (README's 2,031 counts the JSON arrays' lengths: `overlay_types.json` is an object of six categories) + 54 wallet-wire message files + Rust constant vectors**
+**Total: 1,317 integration tests across 46 test files (`cargo test --features "full,http,websocket"` at `d6a8a26`, 2026-09-27: 2,999 passed with the 1,513 unit and 169 doc tests; the 5 `memory_profiling` tests run behind `dhat-profiling`, alone, outside the count) + 2,049 JSON test vectors across the twelve files below (README's 2,031 counts the JSON arrays' lengths: `overlay_types.json` is an object of six categories) + 54 wallet-wire message files + Rust constant vectors**
 
 ## Files
 
@@ -47,7 +47,8 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `script_num_length_witness.rs` | 4 | default | The script-number length limit of the coin's era under a word, on the witness (a 1,048,577-byte number read by `OP_1ADD`: overflow under the block word at 750,000 and the standard word at 10,000; valid in the default mode and for a coin created after Chronicle) (0.3.28, Calhooon/bsv-rs#17) |
 | `script_residual_witnesses.rs` | 11 | default | The five consensus rules fixed in 0.3.27 on ten witness transactions of eight rules: truncated pushes, undefined opcodes, a second OP_ELSE, the post-Chronicle UTXO opcodes, FindAndDelete of a FORKID signature (Calhooon/bsv-rs#12) |
 | `script_mutators_keep_parsed_chunks.rs` | 6 | default | Every in-place `Script` mutator parses before it invalidates the byte cache (0.3.25) |
-| `resource_limits.rs` | 4 | default | A local interpreter budget is a `ScriptResourceLimit`, never a verdict; `OP_NUM2BIN` refuses before allocating (0.3.23) |
+| `resource_limits.rs` | 4 | default | A local interpreter budget is a `ScriptResourceLimit`, never a verdict; `OP_NUM2BIN` refuses before allocating (0.3.23); the default mode's budget, in CI since 0.3.30 |
+| `script_stack_memory_witness.rs` | 28 | default | The node's stack memory budget under a word (bsv-rs#30): the differential's witnesses (a 32,000,001-byte number read, the left shifts at the number length's edge, a 40,000,000-byte element) under both words and the default mode; the budget's edges at the node's figures (100,000,000 bytes on the node's count, the two stacks shared, the unlocking script's alt stack left charged, the policy of 0, explicit budgets) and at small figures; `OP_NUM2BIN`'s `INT32_MAX` bound; its large rows run one at a time (about 100 MB at its peak) |
 | `sighash_tests.rs` | 4 | default | Transaction sighash computation with 499 vectors |
 | `storage_http_tests.rs` | 35 | `storage`+`http` | Uploader/downloader HTTP flows with wiremock |
 | `storage_tests.rs` | 70 | `storage` | UHRP URLs, downloader/uploader config, cross-SDK |
