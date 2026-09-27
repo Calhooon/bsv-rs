@@ -364,6 +364,15 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
         if msg.contains("SIGHASH_FORKID") && !has("SIGHASH_FORKID") {
             return Some("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)");
         }
+        // Since 0.3.29 the hash type's base is tested before the FORKID bit,
+        // as the reference orders the two (interpreter.cpp:291-294, then
+        // 305-306), so a legacy signature whose base is undefined (the node's
+        // "undefined hashtype but no STRICTENC" fixtures) is refused at the
+        // base test first. The fixture is the same legacy-signature class:
+        // bsv-rs always requires FORKID and cannot run it either way.
+        if msg.starts_with("The signature's hash type (") && !has("SIGHASH_FORKID") {
+            return Some("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)");
+        }
         if msg.contains("low S") && !has("LOW_S") {
             return Some("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)");
         }
