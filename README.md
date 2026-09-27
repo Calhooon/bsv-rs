@@ -433,12 +433,12 @@ Parity with the reference SDKs is a discipline, not a claim:
 - **Cross-SDK wire protocol**: the BRC-100 wallet wire (`WalletWireTransceiver` / `WalletWireProcessor`) round-trips all 28 methods against vectors captured from the Go SDK's serializer.
 - **Known divergences are written down**, in `CHANGELOG.md` and in `CLAUDE.md`: the Go SDK's default counterparty (`Anyone` vs `Self`), Go's missing TOTP, overlay caching, historian, reputation and RPuzzle; the TypeScript TOTP default of 2 digits (this crate uses 6, per the RFC); the SDKs' disagreement on the nonce HMAC inputs (`verify_nonce` is only ever called on a peer's own nonces); the Go admin-token signing key; and RFC 6979 nonces for a digest at or above the curve order, where k256 follows the RFC and libsecp256k1 does not (signatures differ in that regime only, and both verify).
 
-## Numbers (measured 2026-09-27 at `4f48957`, 0.3.29)
+## Numbers (measured 2026-09-27 at `d6a8a26`, 0.3.30)
 
 | | |
 |---|---|
-| Source | 91,528 lines of Rust under `src/`, 13 feature-gated modules, one `Error` enum |
-| Tests | 2,970 passed, 0 failed (1,512 unit, 1,289 integration across 45 files, 169 doc tests; the 5 `memory_profiling` tests pass alone with `--test-threads=1` and are not counted); 128 doc examples are `ignore`d illustrations |
+| Source | 91,833 lines of Rust under `src/`, 13 feature-gated modules, one `Error` enum |
+| Tests | 2,999 passed, 0 failed (1,513 unit, 1,317 integration across 46 files, 169 doc tests; the 5 `memory_profiling` tests pass alone with `--test-threads=1` and are not counted); 128 doc examples are `ignore`d illustrations |
 | Vectors | 2,031 shared JSON vectors + the `ts-stack` corpus (5,116 script-domain vectors pinned) |
 | Fuzzing | 4 libFuzzer targets: the script parser, the transaction parser, the wire protocol, base58 |
 | Benchmarks | 4 Criterion suites: hashes, primitives, script, memory (with RSS tracking) |
