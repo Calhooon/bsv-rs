@@ -13,9 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Spend::stack_memory_policy`, `Spend::set_stack_memory_policy`),
   `SpendParams::memory_limit`, `ScriptFlags::max_stack_memory_usage`,
   `flags::DEFAULT_STACK_MEMORY_USAGE_POLICY`,
-  `ScriptEvaluationError::resource_limit` and `is_resource_limit`, the README
-  and the crate guides now state the block path's budget as the reference sets
-  it: a node's is its operator's mandatory `-maxstackmemoryusageconsensus`
+  `ScriptEvaluationError::resource_limit` and `is_resource_limit`, the README,
+  the crate guides and the witnesses' module doc
+  (`tests/script_stack_memory_witness.rs`) now state the block path's budget
+  as the reference sets it: a node's is its operator's mandatory
+  `-maxstackmemoryusageconsensus`
   (bitcoin-sv v1.2.2 does not start without it, `src/bitcoind.cpp:140-157`),
   in which 0 means `INT64_MAX` (`src/configscriptpolicy.cpp:280-283`), not a
   constant. They give the recipe for a caller modelling a node run with 0,
@@ -30,6 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The 0.3.30 entry gave the block path's figure as "`INT64_MAX` on the block
   path (`consensus.h:82`)" and "the block path's own figure is unbounded": both
   now read as the operator's mandatory setting, 0 meaning `INT64_MAX`.
+- The witnesses' module doc (`tests/script_stack_memory_witness.rs`, 0.3.30)
+  gave the block path's budget as "`INT64_MAX` on the block path
+  (`consensus.h:82`)" and the node's own figure as "unbounded", and the doc of
+  its `INT32_MAX` row named "the reference's consensus instance" as the one
+  that allocates 2 GiB: they now read as the operator's mandatory setting and
+  as a node run with `-maxstackmemoryusageconsensus=0`.
 
 ## [0.3.30] - 2026-09-27
 

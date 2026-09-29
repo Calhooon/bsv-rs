@@ -8,10 +8,13 @@
 //! `src/script/limitedstack.h:43`), and refuses a growth that would exceed the
 //! budget before it happens (`limitedstack.cpp:194-209`; a pad is charged
 //! before the resize, `:66` then `:68`), `SCRIPT_ERR_STACK_SIZE`
-//! (`interpreter.cpp:1815-1817`). The budget is `INT64_MAX` on the block path
-//! (`consensus.h:82`) and the node's `-maxstackmemoryusagepolicy`, 100,000,000
-//! bytes by default, on the mempool path (`src/policy/policy.h:153`;
-//! `GetMaxStackMemoryUsage`, `src/configscriptpolicy.cpp:139-154`).
+//! (`interpreter.cpp:1815-1817`). On the block path the budget is no constant
+//! but the operator's mandatory `-maxstackmemoryusageconsensus` (the node does
+//! not start without it, `src/bitcoind.cpp:140-157`; 0 means `INT64_MAX`,
+//! `src/configscriptpolicy.cpp:280-283`, `consensus.h:82`); on the mempool
+//! path it is the node's `-maxstackmemoryusagepolicy`, 100,000,000 bytes by
+//! default (`src/policy/policy.h:153`; `GetMaxStackMemoryUsage`,
+//! `src/configscriptpolicy.cpp:139-154`).
 //! `OP_NUM2BIN` refuses a size below 0 or above `INT32_MAX` with
 //! `SCRIPT_ERR_PUSH_SIZE` before anything is allocated
 //! (`interpreter.cpp:1747-1749`).
@@ -21,8 +24,9 @@
 //! resource limit (no verdict) where the reference decides. Under a word
 //! 0.3.30 counts as the node counts, with a local budget of 100,000,000 bytes
 //! on both paths (on the block path a resource limit, the node's own figure
-//! being unbounded) and the policy's verdict on the mempool path; the default
-//! mode keeps 0.3.29's budget and count. The two `OP_LSHIFTNUM` witnesses of
+//! being its operator's setting, which this crate cannot know) and the
+//! policy's verdict on the mempool path; the default mode keeps 0.3.29's
+//! budget and count. The two `OP_LSHIFTNUM` witnesses of
 //! the same family, by `INT_MAX` and `INT_MAX + 1`, are pinned since 0.3.29 in
 //! `tests/script_shift_count_witness.rs`.
 //!
@@ -383,8 +387,9 @@ fn a_negative_num2bin_size_is_a_push_size_refusal() {
 
 /// A size of `INT32_MAX` passes the size bound; its growth is charged before
 /// the resize, so it is refused with nothing allocated: the policy's verdict
-/// on the mempool path, the local budget on the block path (the reference's
-/// consensus instance allocates 2 GiB and goes on; this crate declines).
+/// on the mempool path, the local budget on the block path (a node run with
+/// `-maxstackmemoryusageconsensus=0` allocates 2 GiB and goes on; this crate
+/// declines).
 #[test]
 fn a_num2bin_to_int32_max_is_refused_before_it_is_allocated() {
     assert_eq!(

@@ -395,8 +395,9 @@ impl ScriptFlags {
     /// (`GetMaxStackMemoryUsage`, `src/configscriptpolicy.cpp:139-154`): on
     /// the mempool path `policy`, the node's `-maxstackmemoryusagepolicy`
     /// ([`DEFAULT_STACK_MEMORY_USAGE_POLICY`] by default), where 0 selects
-    /// none (`SetMaxStackMemoryUsage`, `:289-292`, sets the policy to the
-    /// consensus default `INT64_MAX`); on the block path none: a node's
+    /// none (`SetMaxStackMemoryUsage`, `:289-292`, sets the policy to
+    /// `INT64_MAX`, the constant `DEFAULT_STACK_MEMORY_USAGE_CONSENSUS_AFTER_GENESIS`
+    /// of `src/consensus/consensus.h:82`); on the block path none: a node's
     /// budget there is its operator's mandatory `-maxstackmemoryusageconsensus`
     /// (`src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
     /// `src/configscriptpolicy.cpp:280-283`), which this interpreter cannot
