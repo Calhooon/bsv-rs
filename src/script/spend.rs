@@ -37,9 +37,23 @@
 //! bytes, the node's policy default (`src/policy/policy.h:153`), on both
 //! paths. On the mempool path the node's stack memory policy is a verdict
 //! besides: a growth above it is `SCRIPT_ERR_STACK_SIZE` on the reference
-//! ([`Spend::stack_memory_policy`], [`Spend::set_stack_memory_policy`]). On the
-//! block path the node's figure is `INT64_MAX`: the local budget declines, it
-//! never decides.
+//! ([`Spend::stack_memory_policy`], [`Spend::set_stack_memory_policy`]).
+//!
+//! On the block path a node's budget is its operator's
+//! `-maxstackmemoryusageconsensus`, a mandatory setting (bitcoin-sv v1.2.2 does
+//! not start without it, `src/bitcoind.cpp:140-157`) in which 0 means
+//! `INT64_MAX` (`src/configscriptpolicy.cpp:280-283`): no constant a library can
+//! adopt, so above its local budget the evaluator declines, it never decides.
+//! A caller modelling a node run with 0 passes `memory_limit: Some(usize::MAX)`:
+//! the evaluation then allocates what the script asks (`OP_NUM2BIN` alone asks
+//! up to `INT32_MAX` bytes, and an error's report copies the stack) and decides
+//! as that node does.
+//!
+//! A decline is an `Err` whose
+//! [`resource_limit`](ScriptEvaluationError::resource_limit) is `Some`
+//! ([`ScriptEvaluationError::is_resource_limit`]): the evaluator stopped and the
+//! script was not judged. A caller that judges validity branches on it first
+//! and never reads a decline as invalid.
 //!
 //! # Example
 //!
@@ -95,9 +109,12 @@ const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;
 
 /// The local memory budget under a word when `memory_limit` is `None`: the
 /// node's policy default ([`DEFAULT_STACK_MEMORY_USAGE_POLICY`],
-/// `src/policy/policy.h:153`) on the block path as on the mempool path, since
-/// the block path's own figure is `INT64_MAX` (`src/consensus/consensus.h:82`)
-/// and a library embedded in a wallet cannot honor an unbounded budget.
+/// `src/policy/policy.h:153`) on the block path as on the mempool path. The
+/// block path has no protocol figure to take instead: a node's is its
+/// operator's mandatory `-maxstackmemoryusageconsensus`
+/// (`src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
+/// `src/configscriptpolicy.cpp:280-283`), and a library embedded in a wallet
+/// cannot honor an unbounded budget by default.
 const WORD_MEMORY_LIMIT: usize = DEFAULT_STACK_MEMORY_USAGE_POLICY;
 
 /// Maximum number of keys in a multisig (i32::MAX for BSV)
@@ -161,7 +178,8 @@ pub struct SpendParams {
     /// ([`ScriptEvaluationError::resource_limit`]), never a verdict, and
     /// `Some(n)` wins in every mode. `None` selects the mode's figure: 32,000,000
     /// bytes in the default mode, 100,000,000 on the node's count under a word
-    /// ([`Spend::memory_limit`]).
+    /// ([`Spend::memory_limit`]). `Some(usize::MAX)` under the block word models
+    /// a node run with `-maxstackmemoryusageconsensus=0`.
     pub memory_limit: Option<usize>,
 }
 
@@ -437,11 +455,15 @@ impl Spend {
     /// that SDK counts; under a word, 100,000,000 bytes on the node's count,
     /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`] bytes per
     /// element (the node's policy default, `src/policy/policy.h:153`, on the
-    /// block path as on the mempool path: the block path's own figure is
-    /// `INT64_MAX`, `src/consensus/consensus.h:82`, which a library embedded
-    /// in a wallet cannot honor). Exhausting it stops the evaluation with a
-    /// resource limit ([`ScriptEvaluationError::resource_limit`]): the
-    /// evaluator declines to go on, it does not decide.
+    /// block path as on the mempool path: a node's block-path budget is its
+    /// operator's mandatory `-maxstackmemoryusageconsensus`,
+    /// `src/bitcoind.cpp:140-157`, 0 meaning `INT64_MAX`,
+    /// `src/configscriptpolicy.cpp:280-283`, so there is no protocol figure to
+    /// adopt; `Some(usize::MAX)` models a node run with 0). Exhausting it stops
+    /// the evaluation with a resource limit
+    /// ([`ScriptEvaluationError::resource_limit`]): the evaluator declines to go
+    /// on, it does not decide, and a caller that judges validity must not read
+    /// that `Err` as invalid.
     pub fn memory_limit(&self) -> usize {
         self.memory_limit.unwrap_or(if self.flags.is_some() {
             WORD_MEMORY_LIMIT
@@ -451,8 +473,10 @@ impl Spend {
     }
 
     /// The stack memory budget whose excess is a VERDICT, in force: `None` in
-    /// the default mode and on the block path (the node's consensus figure is
-    /// `INT64_MAX`); on the mempool path the policy of
+    /// the default mode and on the block path (a node's block-path budget is
+    /// its operator's mandatory `-maxstackmemoryusageconsensus`, which this
+    /// interpreter cannot know: the local budget declines instead,
+    /// [`memory_limit`](Self::memory_limit)); on the mempool path the policy of
     /// [`set_stack_memory_policy`](Self::set_stack_memory_policy)
     /// ([`ScriptFlags::max_stack_memory_usage`]). A growth that would take the
     /// node's count above it is refused before it happens, as the reference
@@ -466,7 +490,7 @@ impl Spend {
 
     /// The node's `-maxstackmemoryusagepolicy` for a word on the mempool path
     /// (`src/policy/policy.h:153`, 100,000,000 bytes by default; 0 selects no
-    /// policy verdict, the node's consensus figure `INT64_MAX`,
+    /// policy verdict, as the node sets a policy of 0 to `INT64_MAX`,
     /// `src/configscriptpolicy.cpp:289-292`). A block word and the default
     /// mode ignore it. The local budget is `SpendParams::memory_limit`, a
     /// separate knob: the policy's verdict fires at its figure whatever the

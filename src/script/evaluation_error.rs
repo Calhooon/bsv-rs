@@ -91,7 +91,10 @@ pub struct ScriptEvaluationError {
     /// `Some` when the evaluation stopped because a LOCAL resource budget was
     /// exhausted (the TypeScript SDK throws a distinct
     /// `ScriptResourceLimitError` for these); `None` for every verdict about
-    /// the script itself. Added in 0.3.23 (reference parity).
+    /// the script itself. Added in 0.3.23 (reference parity). An error with
+    /// `Some` here is a decline: the script was not judged, so a caller that
+    /// judges validity branches on this field first and never reads such an
+    /// error as invalid.
     pub resource_limit: Option<ScriptResourceLimit>,
 }
 
@@ -134,7 +137,8 @@ impl ScriptEvaluationError {
     }
 
     /// Whether the evaluation stopped on a LOCAL resource budget (see
-    /// [`ScriptEvaluationError::resource_limit`]) rather than on the script.
+    /// [`ScriptEvaluationError::resource_limit`]) rather than on the script:
+    /// test it before reading an error as a verdict that the script is invalid.
     pub fn is_resource_limit(&self) -> bool {
         self.resource_limit.is_some()
     }

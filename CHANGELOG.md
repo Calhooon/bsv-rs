@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documented — the block path's stack budget (the guard of Calhooon/bsv-rs#30)
+
+- The docs of `Spend` (the module's memory budget section, `Spend::memory_limit`,
+  `Spend::stack_memory_policy`, `Spend::set_stack_memory_policy`),
+  `SpendParams::memory_limit`, `ScriptFlags::max_stack_memory_usage`,
+  `flags::DEFAULT_STACK_MEMORY_USAGE_POLICY`,
+  `ScriptEvaluationError::resource_limit` and `is_resource_limit`, the README
+  and the crate guides now state the block path's budget as the reference sets
+  it: a node's is its operator's mandatory `-maxstackmemoryusageconsensus`
+  (bitcoin-sv v1.2.2 does not start without it, `src/bitcoind.cpp:140-157`),
+  in which 0 means `INT64_MAX` (`src/configscriptpolicy.cpp:280-283`), not a
+  constant. They give the recipe for a caller modelling a node run with 0,
+  `memory_limit: Some(usize::MAX)` (the evaluation then allocates what the
+  script asks, `OP_NUM2BIN` alone up to `INT32_MAX` bytes, and decides as that
+  node does), and they say that a decline is an `Err` whose `resource_limit`
+  is `Some`, which a caller that judges validity must not read as invalid. No
+  behaviour changes.
+
+### Corrected
+
+- The 0.3.30 entry gave the block path's figure as "`INT64_MAX` on the block
+  path (`consensus.h:82`)" and "the block path's own figure is unbounded": both
+  now read as the operator's mandatory setting, 0 meaning `INT64_MAX`.
+
 ## [0.3.30] - 2026-09-27
 
 ### Fixed — the stack memory budget under a word (Calhooon/bsv-rs#30)
@@ -16,8 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exceeded it with a resource limit (`ScriptEvaluationError::resource_limit`,
   no verdict). After Genesis the reference bounds a script's memory by the
   stack memory budget of the path and by nothing else
-  (`src/consensus/consensus.h:81-82`): `INT64_MAX` on the block path
-  (`consensus.h:82`) and the node's `-maxstackmemoryusagepolicy` on the
+  (`src/consensus/consensus.h:81-82`): on the block path the operator's
+  mandatory `-maxstackmemoryusageconsensus` (`src/bitcoind.cpp:140-157`; 0
+  means `INT64_MAX`, `consensus.h:82`) and the node's
+  `-maxstackmemoryusagepolicy` on the
   mempool path, 100,000,000 bytes by default (`src/policy/policy.h:153`;
   `GetMaxStackMemoryUsage`, `src/configscriptpolicy.cpp:139-154`). It counts
   the main and the alt stack as one budget (the alt stack is a child stack,
@@ -30,8 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`interpreter.cpp:1815-1817`). Under a word the interpreter now counts as
   the node counts. `SpendParams::memory_limit: None` selects a local budget of
   100,000,000 bytes on the node's count on both paths (`Spend::memory_limit`):
-  the block path's own figure is unbounded, which a library embedded in a
-  wallet cannot honor, so above the local budget the evaluator still declines
+  the block path's own figure is the operator's setting, which a library
+  cannot know and, at 0, embedded in a wallet cannot honor, so above the local
+  budget the evaluator still declines
   with a resource limit, at the higher figure and on the node's count. On the
   mempool path the policy's excess is a verdict with a fixed message,
   `Stack size limit exceeded: N bytes, the stack memory policy is M bytes.`
