@@ -285,7 +285,12 @@ bytes per element, every growth charged before it happens, an unlocking script's
 stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's policy
 default); on the mempool path the node's stack memory policy is a verdict besides
 (`Stack size limit exceeded: …`, `SCRIPT_ERR_STACK_SIZE`), and `OP_NUM2BIN`'s size is
-bounded by `INT32_MAX` (`SCRIPT_ERR_PUSH_SIZE`). The witnesses are
+bounded by `INT32_MAX` (`SCRIPT_ERR_PUSH_SIZE`). On the block path a node's budget
+is its operator's mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.2 does not
+start without it, `src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
+`src/configscriptpolicy.cpp:280-283`), no constant, so the local budget declines above
+100 MB; `memory_limit: Some(usize::MAX)` models a node run with 0. A decline is an `Err`
+whose `resource_limit` is `Some`: never read it as invalid. The witnesses are
 `tests/script_stack_memory_witness.rs`.
 
 ### ScriptFlags / ProtocolEra (`flags.rs`)

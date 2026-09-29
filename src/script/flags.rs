@@ -59,8 +59,10 @@ pub const DEFAULT_SCRIPT_NUM_LENGTH_POLICY: usize = 10_000;
 /// The node's default `-maxstackmemoryusagepolicy`, the stack memory budget
 /// of the mempool path for a coin created after Genesis
 /// (`src/policy/policy.h:153`, `100 * ONE_MEGABYTE`; `src/init.cpp:2485`).
-/// The block path's figure is `INT64_MAX` (`src/consensus/consensus.h:82`):
-/// no bound but the budget of the evaluating machine.
+/// The block path's budget on a node is not a constant: it is the operator's
+/// mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.2 does not start
+/// without it, `src/bitcoind.cpp:140-157`), where 0 means `INT64_MAX`
+/// (`src/configscriptpolicy.cpp:280-283`, `src/consensus/consensus.h:82`).
 pub const DEFAULT_STACK_MEMORY_USAGE_POLICY: usize = 100_000_000;
 /// What one stack element costs beyond its bytes in the node's stack memory
 /// count (`LimitedVector::ELEMENT_OVERHEAD`, `src/script/limitedstack.h:43`:
@@ -394,8 +396,12 @@ impl ScriptFlags {
     /// the mempool path `policy`, the node's `-maxstackmemoryusagepolicy`
     /// ([`DEFAULT_STACK_MEMORY_USAGE_POLICY`] by default), where 0 selects
     /// none (`SetMaxStackMemoryUsage`, `:289-292`, sets the policy to the
-    /// consensus default `INT64_MAX`); on the block path none, the consensus
-    /// figure being `INT64_MAX` (`src/consensus/consensus.h:82`). The node
+    /// consensus default `INT64_MAX`); on the block path none: a node's
+    /// budget there is its operator's mandatory `-maxstackmemoryusageconsensus`
+    /// (`src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
+    /// `src/configscriptpolicy.cpp:280-283`), which this interpreter cannot
+    /// know, so its local budget declines instead
+    /// ([`Spend::memory_limit`](super::Spend::memory_limit)). The node
     /// counts one budget over the main and the alt stack, each element at its
     /// size plus [`STACK_ELEMENT_OVERHEAD`], and refuses a growth that would
     /// exceed it before the growth happens (`LimitedStack`,
