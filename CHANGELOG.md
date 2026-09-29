@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.31] - 2026-09-29
+
 ### Documented — the block path's stack budget (the guard of Calhooon/bsv-rs#30)
 
 - The docs of `Spend` (the module's memory budget section, `Spend::memory_limit`,
