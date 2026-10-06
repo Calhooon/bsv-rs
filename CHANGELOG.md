@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.32] - 2026-10-05
+
+### Fixed — the `int64` operand reader above 8 bytes follows the node's measured reading
+
+- Under a word, the offset and length operands of `OP_SUBSTR`, `OP_LEFT` and
+  `OP_RIGHT` (the reference's `int64` path, `CScriptNum` with `big_int`
+  false, `src/script/interpreter.cpp:622-625`, `651-653`, `676-678`;
+  `bsv::deserialize<int64_t>`, `src/script/int_serialization.h:64-95`) are now
+  read, at 9 bytes and more, as the node's build reads them. Before: the
+  two's-complement `int64` of the element's first 8 bytes, the rest never
+  read. After: every byte but the last OR-ed into a 64-bit pattern at bit
+  position `8 * (i mod 8)` (byte 8 lands on byte 0's position, byte 9 on byte
+  1's, with period 8), the last byte dropped, no sign bit read, the pattern a
+  two's-complement `int64`. The two readings are the same at 9 bytes and
+  whenever the bytes from the ninth to the last but one are zero; they differ
+  from 10 bytes: `00 00 00 00 00 00 00 00 04 01` was 0 and is 4, as the node
+  reads it on the block path and the mempool path. Elements of 0 to 8 bytes
+  (the reference's code as written, the sign-magnitude reading), the length
+  test and the minimal-encoding rule before the read, `getint`'s saturation
+  to the `int` range after it, the routing (the three opcodes, under the block
+  and the standard word) and the default mode (a script number of any length,
+  as the TypeScript SDK reads it) are unchanged. No operand is refused that
+  was not refused before: the node refuses none on this path.
+- Why it was wrong: the reference's loop shifts an `int64_t` by 64 bits and
+  more from the tenth byte (`int_serialization.h:75`), undefined in C++, and
+  0.3.29 took the one determinate case (zero tail bytes) as the rule. The
+  specification's owner ruled on 2026-10-05 (bsv-script-lean,
+  `docs/records/20261005-221333-owner-rulings-32.md`, R1) that where the
+  pinned reference leaves this reader undefined the node's measured reading
+  is consensus; the measurements and the rule are public in bsv-script-lean,
+  `docs/records/20261006-010651-r1-reading-public.md` (section 3 the cases,
+  section 4 the rule).
+- What is measured and what is not: on the node (bitcoin-sv v1.2.2,
+  `879fc8b`) lengths 1, 9 and 10; at 16 and 17 bytes builds of the same
+  source carry the fold and the node's own runs are owed (at 17 bytes one
+  vectorized arm64 build of that source reads 0 where this crate, with the
+  scalar builds, reads 4); 11 through 15 bytes and 18 and above are
+  unmeasured, the rule extended by its mechanism. The rule is the measured
+  builds', not a reading of the C++, and claims nothing for another binary of
+  the same source (the specification's D178). `fold_int64_operand`
+  (`src/script/spend.rs`) says so at the site.
+- Pinned by `tests/script_int64_fold_witness.rs` (15 tests): one for each
+  case of the record's section 3, named by its id (`f1_offset_10_bytes`,
+  `f1_control_offset_op4`, `f1_control_offset_9_bytes`, `gen_00796`,
+  `f1_offset_16_bytes`, `f1_offset_17_bytes`,
+  `f1_control_offset_17_bytes_byte0`), each asserting the value read under
+  both words; the boundary lengths 8, 9, 10, 11 (the smallest unmeasured), 17
+  (the largest measured) and 18; the same reader on `OP_LEFT` and `OP_RIGHT`;
+  the default mode unchanged. Eight of the fifteen were RED on 0.3.31 (the
+  10-byte, 16-byte and 17-byte cases, the 10, 11, 17 and 18 boundaries,
+  `OP_LEFT`/`OP_RIGHT`). `tests/script_int64_operand_witness.rs` (0.3.29) stays
+  green, its assertions unchanged.
+
+### Notes — cross-SDK parity
+
+- The TypeScript SDK reads these operands as script numbers of any length;
+  this crate's default mode keeps that. Under a word this crate follows the
+  node's measured build where the reference source is undefined: a stated
+  finding, scoped as above.
+
 ## [0.3.31] - 2026-09-29
 
 ### Documented — the block path's stack budget (the guard of Calhooon/bsv-rs#30)

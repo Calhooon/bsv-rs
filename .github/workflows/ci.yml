@@ -58,7 +58,7 @@ jobs:
       # script_stack_memory_witness holds about 100 MB at its peak (its large rows run one at a time);
       # resource_limits pins the default mode's local budget, unchanged since 0.3.23
       - name: Run the consensus witness tests
-        run: cargo test --test script_flags_witnesses --test script_residual_witnesses --test script_low_s_order_witness --test script_num_length_witness --test script_int64_operand_witness --test script_shift_count_witness --test script_sighash_dispatch_witness --test script_undefined_hashtype_witness --test script_stack_memory_witness --test resource_limits --all-features --verbose
+        run: cargo test --test script_flags_witnesses --test script_residual_witnesses --test script_low_s_order_witness --test script_num_length_witness --test script_int64_operand_witness --test script_int64_fold_witness --test script_shift_count_witness --test script_sighash_dispatch_witness --test script_undefined_hashtype_witness --test script_stack_memory_witness --test resource_limits --all-features --verbose
 
       - name: Run doc tests
         run: cargo test --doc --all-features
