@@ -5,10 +5,11 @@
 //! operand `04 00 00 00 00 00 00 00 80`, then `OP_4 OP_SUBSTR <04050607>
 //! OP_EQUAL`. The reference builds the operand as a `CScriptNum` on its
 //! `int64` path (`interpreter.cpp:622-625`, `script_num.h:60-63`) and
-//! `bsv::deserialize<int64_t>` (`int_serialization.h:64-95`) returns the
-//! two's-complement `int64` of the first 8 bytes of an element longer than 8
-//! bytes, never reading the rest: the operand is 4, the spend valid on the
-//! block path and the mempool path. 0.3.28 read it as a script number, −4, and
+//! `bsv::deserialize<int64_t>` (`int_serialization.h:64-95`) returns, for an
+//! element of 9 bytes, the two's-complement `int64` of its first 8 bytes, the
+//! ninth dropped (from 10 bytes the later bytes fold onto the low positions,
+//! 0.3.32, `script_int64_fold_witness.rs`): the operand is 4, the spend valid
+//! on the block path and the mempool path. 0.3.28 read it as a script number, −4, and
 //! refused the range under every word; the default mode (the TypeScript SDK's
 //! reading) keeps that verdict.
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
@@ -28,8 +29,8 @@ const LOCK_9_SIGN: &str = "10000102030405060708090a0b0c0d0e0f0904000000000000008
 const LOCK_8_SIGN: &str = "10000102030405060708090a0b0c0d0e0f08040000000000008054b3040405060787";
 /// The same with a 9-byte operand whose ninth byte is zero: 4 on both sides.
 const LOCK_9_PAD: &str = "10000102030405060708090a0b0c0d0e0f0904000000000000000054b3040405060787";
-/// The same with a 10-byte operand whose two tail bytes are zero: 4 (the one
-/// case of ten bytes the reference's arithmetic determines).
+/// The same with a 10-byte operand whose two tail bytes are zero: 4 (zero
+/// bytes fold nothing in).
 const LOCK_10_PAD: &str =
     "10000102030405060708090a0b0c0d0e0f0a0400000000000000000054b3040405060787";
 /// `<00..0f> <04 00 00 00 00 00 00 00 80> OP_LEFT <00010203> OP_EQUAL`: the same reading on the length operand of `OP_LEFT`.

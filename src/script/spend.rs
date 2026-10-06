@@ -2199,13 +2199,12 @@ impl Spend {
     /// so after the length test and the minimal-encoding rule of every read
     /// (`script_num.cpp:62-68`) the value is `bsv::deserialize<int64_t>`
     /// (`int_serialization.h:64-95`): the ordinary sign-magnitude reading of an
-    /// element of 1 to 8 bytes, and for a longer element the two's-complement
-    /// `int64` of its first 8 bytes, the rest never read (`:78-79`; the
-    /// reference's shifts on a ninth and later byte are undefined in C++,
-    /// `:75-76`, and this reading is their one determinate case, zero tail
-    /// bytes). `getint` then saturates to the `int` range
-    /// (`script_num.cpp:394-420`). The default mode reads a script number of
-    /// any length, as the TypeScript SDK does (Calhooon/bsv-rs#20).
+    /// element of 1 to 8 bytes (the reference's code as written), and for an
+    /// element of 9 bytes and more the node's measured reading
+    /// ([`fold_int64_operand`]; the reference's shifts on a tenth and later
+    /// byte are undefined in C++, `:75`). `getint` then saturates to the `int`
+    /// range (`script_num.cpp:394-420`). The default mode reads a script
+    /// number of any length, as the TypeScript SDK does (Calhooon/bsv-rs#20).
     fn read_splice_operand(&self, bytes: &[u8]) -> Result<i64, ScriptEvaluationError> {
         if self.flags.is_none() {
             return Ok(self.read_number(bytes)?.to_i64().unwrap_or(-1));
@@ -2217,9 +2216,7 @@ impl Spend {
             // always fits an i64 (63 bits of magnitude and a sign)
             as_number.to_i64().unwrap_or(-1)
         } else {
-            let mut first = [0u8; 8];
-            first.copy_from_slice(&bytes[..8]);
-            i64::from_le_bytes(first)
+            fold_int64_operand(bytes)
         };
         Ok(value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)))
     }
@@ -2552,6 +2549,34 @@ fn is_opcode_disabled(op: u8, utxo_after_chronicle: bool) -> bool {
 fn signature_overflows_the_order(sig: &TransactionSignature) -> bool {
     let n = BigNumber::secp256k1_order();
     BigNumber::from_bytes_be(sig.r()) >= n || BigNumber::from_bytes_be(sig.s()) >= n
+}
+
+/// The reference's `int64` operand reader on an element of 9 bytes and more,
+/// as the node's build reads it (`bsv::deserialize<int64_t>`,
+/// `int_serialization.h:70-82`): every byte but the last is OR-ed into a
+/// 64-bit pattern at bit position `8 * (i mod 8)`, so byte 8 lands on byte 0's
+/// position, byte 9 on byte 1's, with period 8; the last byte is dropped and
+/// no sign bit is read (`:80-81`); the pattern is a two's-complement `int64`.
+/// At 9 bytes that is the first 8 bytes alone. From the tenth byte the
+/// reference's shift is by 64 bits and more, undefined in C++ (`:75`), and the
+/// rule is the measured builds' (the scalar loop, the shift count taken mod
+/// 64), consensus by the specification's ruling R1: bsv-script-lean,
+/// `docs/records/20261006-010651-r1-reading-public.md`, section 4.
+///
+/// Measured on the node (bitcoin-sv v1.2.2, `879fc8b`): 9 and 10 bytes. At 16
+/// and 17 bytes the fold is measured on builds of the same source, the node's
+/// own runs owed. UNMEASURED: 11 through 15 bytes, and 18 and above, where the
+/// rule extends by its mechanism and no run carries it (the specification's
+/// D178 scope: the pinned build's measured reading is the rule of record, the
+/// undefined behaviour a hazard, another binary of the same source not
+/// covered).
+fn fold_int64_operand(bytes: &[u8]) -> i64 {
+    let body = &bytes[..bytes.len().saturating_sub(1)];
+    let pattern = body
+        .iter()
+        .enumerate()
+        .fold(0u64, |v, (i, &b)| v | u64::from(b) << (8 * (i % 8)));
+    pattern as i64
 }
 
 /// Whether a signature's hash type carries `SIGHASH_FORKID`; an empty
