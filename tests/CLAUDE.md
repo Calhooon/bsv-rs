@@ -5,7 +5,7 @@
 
 This directory contains integration tests that verify the BSV Rust SDK works correctly across modules and produces results identical to the TypeScript and Go SDK implementations. Tests use shared JSON test vectors to ensure byte-for-byte compatibility across all three SDK implementations.
 
-**Total: 1,317 integration tests across 46 test files (`cargo test --features "full,http,websocket"` at `d6a8a26`, 2026-09-27: 2,999 passed with the 1,513 unit and 169 doc tests; the 5 `memory_profiling` tests run behind `dhat-profiling`, alone, outside the count) + 2,049 JSON test vectors across the twelve files below (README's 2,031 counts the JSON arrays' lengths: `overlay_types.json` is an object of six categories) + 54 wallet-wire message files + Rust constant vectors**
+**Total: 1,332 integration tests across 47 test files (`cargo test --features "full,http,websocket"` at `1eff2d0`, 2026-10-05: 3,014 passed with the 1,513 unit and 169 doc tests; the 5 `memory_profiling` tests run behind `dhat-profiling`, alone, outside the count) + 2,049 JSON test vectors across the twelve files below (README's 2,031 counts the JSON arrays' lengths: `overlay_types.json` is an object of six categories) + 54 wallet-wire message files + Rust constant vectors**
 
 ## Files
 
