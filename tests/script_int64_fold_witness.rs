@@ -1,21 +1,8 @@
-//! The `int64` operand reader above 8 bytes, as the node reads it: the cases
-//! of the public reading record of the specification's ruling R1
-//! (bsv-script-lean, `docs/records/20261006-010651-r1-reading-public.md`,
-//! section 3 the cases, section 4 the rule). Each case is the record's lock,
-//! `<00..0f> <offset> OP_4 OP_SUBSTR <04050607> OP_EQUAL`, in a version-2 spend
-//! of a coin created after Chronicle; only the offset operand varies. For an
-//! operand of 9 bytes and more the measured builds of bitcoin-sv v1.2.2
-//! (`879fc8b`) OR every byte but the last into a 64-bit pattern at bit
-//! position `8 * (i mod 8)`, drop the last byte, read no sign bit, and take
-//! the pattern as a two's-complement `int64` (`int_serialization.h:70-82`; the
-//! shift at `:75` is undefined in C++ from the tenth byte, so the rule is the
-//! measured builds'). 0.3.31 read the first 8 bytes alone: 0 where the node
-//! reads 4 on the record's 10-byte, 16-byte and 17-byte operands.
-//!
-//! Lengths 1, 9 and 10 are measured on the node; 16 and 17 on builds of the
-//! same source, the node's own runs owed; 11 through 15 and 18 and above are
-//! UNMEASURED, the rule extended by its mechanism (the specification's D178
-//! scope). The default mode keeps the TypeScript SDK's script-number reading.
+//! Splice operand boundary cases for bitcoin-sv v1.2.3 at
+//! `6504a3aff65ba97c0f6c80962b033e35ecbfed4b` (Calhooon/bsv-rs#41).
+//! The witness ids and bytes are retained from the specification's public
+//! corpus. Expectations follow `int_serialization.h:61-118`,
+//! `script_num.cpp:80-91`, and `interpreter.cpp:1807-1809`.
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::{from_hex, to_hex};
 use bsv_rs::script::{
@@ -118,149 +105,102 @@ fn assert_out_of_range(operand: &[u8], value: i64) {
     }
 }
 
-// ---- the record's section 3, one test for each case ----
-
-/// `f1-offset-10-bytes`, `00 x8 04 01`: the ninth byte folds onto byte 0's
-/// position and the tenth is dropped, so 4 and VALID on the block and the
-/// mempool path (measured on the node). 0.3.31 read 0.
-#[test]
-fn f1_offset_10_bytes_reads_4() {
-    assert_reads(Some(&[0, 0, 0, 0, 0, 0, 0, 0, 4, 1]), 4);
+fn assert_fixed_width_refusal(operand: &[u8]) {
+    for mode in [Mode::Block, Mode::Standard] {
+        assert_eq!(
+            run(&substr_lock(Some(operand), "04050607"), mode),
+            Err("Script number overflow: operand does not fit int64.".to_string())
+        );
+    }
 }
 
-/// `f1-control-offset-op4`, `04` pushed by `OP_4`: 4, the defined region.
+#[test]
+fn f1_offset_10_bytes_is_refused() {
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 4, 1]);
+}
+
 #[test]
 fn f1_control_offset_op4_reads_4() {
     assert_reads(None, 4);
 }
 
-/// `f1-control-offset-9-bytes`, `00 x8 04`: the ninth byte is the last and is
-/// dropped, so 0, the substring `00010203`, unequal (the node's
-/// `SCRIPT_ERR_EVAL_FALSE`).
 #[test]
-fn f1_control_offset_9_bytes_reads_0() {
-    let operand = [0, 0, 0, 0, 0, 0, 0, 0, 4];
-    assert_reads(Some(&operand), 0);
-    assert!(!run(&substr_lock(Some(&operand), "04050607"), Mode::Block).unwrap_or(false));
+fn f1_control_offset_9_bytes_with_magnitude_in_the_sign_byte_is_refused() {
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 4]);
 }
 
-/// gen-00796, `04 00 x9`: byte 0 at bits 0 to 7 and zeros after it, so 4 and
-/// VALID under both words (measured on the node; it cannot tell the fold from
-/// the first-8-bytes reading).
 #[test]
-fn gen_00796_reads_4() {
-    assert_reads(Some(&[4, 0, 0, 0, 0, 0, 0, 0, 0, 0]), 4);
+fn gen_00796_is_refused() {
+    assert_fixed_width_refusal(&[4, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 }
 
-/// `f1-offset-16-bytes`, `00 x8 04 00 x6 01`: 4 (measured on builds of the
-/// reference source, the node's own run owed). 0.3.31 read 0.
 #[test]
-fn f1_offset_16_bytes_reads_4() {
-    assert_reads(Some(&[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 1]), 4);
+fn f1_offset_16_bytes_is_refused() {
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 1]);
 }
 
-/// `f1-offset-17-bytes`, `00 x8 04 00 x7 01`: 4, the scalar reading of the
-/// record's rule (two of the three measured builds; the vectorized arm64
-/// archive reads 0, and the node's own run is owed). 0.3.31 read 0.
 #[test]
-fn f1_offset_17_bytes_reads_4() {
-    assert_reads(
-        Some(&[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 1]),
-        4,
-    );
+fn f1_offset_17_bytes_is_refused() {
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 1]);
 }
 
-/// `f1-control-offset-17-bytes-byte0`, `04 00 x15 01`: 4 on every measured build.
 #[test]
-fn f1_control_offset_17_bytes_byte0_reads_4() {
-    assert_reads(
-        Some(&[4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]),
-        4,
-    );
+fn f1_control_offset_17_bytes_byte0_is_refused() {
+    assert_fixed_width_refusal(&[4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]);
 }
 
-// ---- the boundary lengths ----
-
-/// 8 bytes, the end of the defined region: the sign-magnitude reading, the
-/// last byte's bit 7 the sign. Unchanged.
 #[test]
-fn length_8_is_the_defined_sign_magnitude_reading() {
+fn length_8_uses_sign_magnitude() {
     assert_reads(Some(&[4, 0, 0, 0, 0, 0, 0, 0]), 4);
     assert_out_of_range(&[4, 0, 0, 0, 0, 0, 0, 0x80], -4);
 }
 
-/// 9 bytes: the first 8 as a two's-complement `int64`, the ninth dropped
-/// whatever it is, no sign bit read.
 #[test]
-fn length_9_drops_its_ninth_byte() {
-    assert_reads(Some(&[4, 0, 0, 0, 0, 0, 0, 0, 0x80]), 4);
-    assert_reads(Some(&[4, 0, 0, 0, 0, 0, 0, 0, 0x7f]), 4);
-    // ff x8 is -1 in two's complement, saturated by nothing, out of range
-    assert_out_of_range(&[0xff; 9], -1);
+fn length_9_checks_and_respects_its_sign_byte() {
+    assert_reads(Some(&[4, 0, 0, 0, 0, 0, 0, 0, 0]), 4);
+    assert_out_of_range(&[4, 0, 0, 0, 0, 0, 0, 0, 0x80], -4);
+    assert_fixed_width_refusal(&[4, 0, 0, 0, 0, 0, 0, 0, 0x7f]);
+    assert_fixed_width_refusal(&[0xff; 9]);
 }
 
-/// 10 bytes: the ninth byte is OR-ed onto byte 0's position (not added, not
-/// replacing it) and the tenth is dropped.
 #[test]
-fn length_10_ors_its_ninth_byte_onto_byte_0() {
-    assert_reads(Some(&[1, 0, 0, 0, 0, 0, 0, 0, 4, 1]), 5);
-    assert_reads(Some(&[4, 0, 0, 0, 0, 0, 0, 0, 4, 1]), 4);
-    assert_reads(Some(&[2, 0, 0, 0, 0, 0, 0, 0, 0, 0x84]), 2);
+fn length_10_is_refused() {
+    assert_fixed_width_refusal(&[1, 0, 0, 0, 0, 0, 0, 0, 4, 1]);
+    assert_fixed_width_refusal(&[4, 0, 0, 0, 0, 0, 0, 0, 4, 1]);
+    assert_fixed_width_refusal(&[2, 0, 0, 0, 0, 0, 0, 0, 0, 0x84]);
 }
 
-/// 11 bytes, the smallest length no record measures on any build
-/// (UNMEASURED): by the rule's mechanism byte 9 lands on byte 1's position,
-/// so `00 x9 01 01` is 256, out of range, and byte 8 still lands on byte 0's.
 #[test]
-fn length_11_unmeasured_folds_with_period_8() {
-    assert_out_of_range(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1], 256);
-    assert_reads(Some(&[0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1]), 3);
+fn length_11_is_refused() {
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]);
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 1]);
 }
 
-/// 17 bytes, the largest measured length: byte 16 is the last and dropped,
-/// bytes 8 to 15 fold onto positions 0 to 7.
 #[test]
-fn length_17_the_largest_measured_drops_byte_16() {
-    assert_reads(
-        Some(&[2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0x81]),
-        6,
-    );
-    // byte 15 on position 7: the pattern's top bit, a negative int64
-    // saturated to INT_MIN by the reference's getint
-    assert_out_of_range(
-        &[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80, 1],
-        i64::from(i32::MIN),
-    );
+fn length_17_is_refused() {
+    assert_fixed_width_refusal(&[2, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 0x81]);
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80, 1]);
 }
 
-/// 18 bytes, the smallest length above every measurement (UNMEASURED): by the
-/// rule's mechanism byte 16 starts the third period on byte 0's position.
 #[test]
-fn length_18_unmeasured_folds_its_third_period() {
-    assert_reads(
-        Some(&[1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 1]),
-        7,
-    );
-    assert_reads(
-        Some(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1]),
-        4,
-    );
+fn length_18_is_refused() {
+    assert_fixed_width_refusal(&[1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 4, 1]);
+    assert_fixed_width_refusal(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 1]);
 }
 
-/// The same reader on the length operand of `OP_LEFT` and `OP_RIGHT`
-/// (`interpreter.cpp:651-653`, `676-678`; the record measured `OP_SUBSTR`'s
-/// offset, these two sites share its `CScriptNum` constructor by the source).
 #[test]
-fn op_left_and_op_right_read_the_folded_length() {
+fn op_left_and_op_right_use_the_checked_length() {
     let operand = [0, 0, 0, 0, 0, 0, 0, 0, 4, 1];
     for mode in [Mode::Block, Mode::Standard] {
-        assert_eq!(run(&lock(Some(&operand), "b4040001020387"), mode), Ok(true));
-        assert_eq!(run(&lock(Some(&operand), "b5040c0d0e0f87"), mode), Ok(true));
+        for tail in ["b4040001020387", "b5040c0d0e0f87"] {
+            assert_eq!(
+                run(&lock(Some(&operand), tail), mode),
+                Err("Script number overflow: operand does not fit int64.".to_string())
+            );
+        }
     }
 }
 
-/// The default mode is unchanged: the record's 10-byte operand is a script
-/// number too large for the range, as the TypeScript SDK reads it.
 #[test]
 fn the_default_mode_keeps_the_script_number_reading() {
     let operand = [0, 0, 0, 0, 0, 0, 0, 0, 4, 1];
