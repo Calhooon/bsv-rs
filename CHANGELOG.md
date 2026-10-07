@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.33] - 2026-10-06
+
+### Changed
+
+- follows bitcoin-sv v1.2.3's fixed-width operand decoding and OP_SPLIT position bound (int_serialization.h:61-118, interpreter.cpp:1708-1721 at 6504a3a).
+- Under a flag word, `OP_SUBSTR`'s offset and length and `OP_LEFT`'s and
+  `OP_RIGHT`'s count use checked signed 64-bit decoding. The era-width and
+  minimal-encoding checks precede conversion; `getint` saturation follows it.
+  Decode failures use the node's script-number error mapping
+  (`script_num.cpp:80-91`, `interpreter.cpp:1807-1809` at
+  `6504a3aff65ba97c0f6c80962b033e35ecbfed4b`). `OP_SPLIT` positions under a
+  flag word are bounded by `INT32_MAX` and the data length.
+- Tests cover nine-byte sign encodings, ten-byte encodings, the signed
+  minimum and signed-range boundary, all four splice operands, check order,
+  and `OP_SPLIT` at `INT32_MAX` and `INT32_MAX + 1`. The split boundary is
+  tested with a synthetic data length, without a multi-gigabyte allocation.
+  The existing splice witness cases carry v1.2.3 expectations.
+
+### Notes — cross-SDK parity
+
+- The default mode retains the TypeScript SDK's unrestricted number reader.
+  Under a flag word the splice operands follow the pinned node's fixed-width
+  construction sites (`interpreter.cpp:622-625`, `655-656`, `680-681`).
+
 ## [0.3.32] - 2026-10-05
 
 ### Fixed — the `int64` operand reader above 8 bytes follows the node's measured reading

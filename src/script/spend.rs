@@ -1143,15 +1143,7 @@ impl Spend {
                 let data = self.pop_stack()?;
 
                 let pos_bn = self.read_number(&pos_bytes)?;
-                let pos = pos_bn.to_i64().unwrap_or(-1);
-
-                if pos < 0 || pos > data.len() as i64 {
-                    return Err(self.error(
-                        "OP_SPLIT requires the first stack item to be a non-negative number less than or equal to the size of the second-from-top stack item.",
-                    ));
-                }
-
-                let split_idx = pos as usize;
+                let split_idx = self.split_position(&pos_bn, data.len())?;
                 let left = data[..split_idx].to_vec();
                 let right = data[split_idx..].to_vec();
                 self.push_stack(left)?;
@@ -2192,32 +2184,49 @@ impl Spend {
         Ok(())
     }
 
+    /// The OP_SPLIT position check, separate from slicing so its boundary can
+    /// be tested without allocating the data: bitcoin-sv v1.2.3,
+    /// `interpreter.cpp:1708-1721` at `6504a3aff65ba97c0f6c80962b033e35ecbfed4b`.
+    fn split_position(
+        &self,
+        position: &BigNumber,
+        data_len: usize,
+    ) -> Result<usize, ScriptEvaluationError> {
+        let pos = position.to_i64().unwrap_or(-1);
+        if pos < 0
+            || (self.flags.is_some() && pos > i64::from(i32::MAX))
+            || pos as u64 > data_len as u64
+        {
+            return Err(self.error(
+                "OP_SPLIT requires the first stack item to be a non-negative number less than or equal to the size of the second-from-top stack item.",
+            ));
+        }
+        Ok(pos as usize)
+    }
+
     /// The `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` length and offset operands.
-    /// Under a word, the reference's `int64` path: the opcodes build the operand
-    /// as a `CScriptNum` with the constructor's default `big_int = false`
-    /// (`interpreter.cpp:622-625`, `651-653`, `676-678`; `script_num.h:60-63`),
-    /// so after the length test and the minimal-encoding rule of every read
-    /// (`script_num.cpp:62-68`) the value is `bsv::deserialize<int64_t>`
-    /// (`int_serialization.h:64-95`): the ordinary sign-magnitude reading of an
-    /// element of 1 to 8 bytes (the reference's code as written), and for an
-    /// element of 9 bytes and more the node's measured reading
-    /// ([`fold_int64_operand`]; the reference's shifts on a tenth and later
-    /// byte are undefined in C++, `:75`). `getint` then saturates to the `int`
-    /// range (`script_num.cpp:394-420`). The default mode reads a script
-    /// number of any length, as the TypeScript SDK does (Calhooon/bsv-rs#20).
+    /// Under a word, follows bitcoin-sv v1.2.3's fixed-width construction sites
+    /// (`interpreter.cpp:622-625`, `655-656`, `680-681`) and checked decoder
+    /// (`int_serialization.h:61-118`), at
+    /// `6504a3aff65ba97c0f6c80962b033e35ecbfed4b`. The era width and minimality
+    /// checks precede conversion (`script_num.cpp:62-87`). A failed conversion
+    /// is SCRIPT_ERR_SCRIPTNUM_OVERFLOW (`script_num.cpp:80-91`,
+    /// `interpreter.cpp:1807-1809`). `getint` then saturates to the `int` range
+    /// (`script_num.cpp:396-422`).
+    /// The default mode uses the TypeScript SDK's unrestricted number reader.
     fn read_splice_operand(&self, bytes: &[u8]) -> Result<i64, ScriptEvaluationError> {
         if self.flags.is_none() {
             return Ok(self.read_number(bytes)?.to_i64().unwrap_or(-1));
         }
-        // the length test and the minimal-encoding rule, with their messages
+        // Preserve the era-width/minimality ordering and their messages.
         let as_number = self.read_number(bytes)?;
-        let value = if bytes.len() <= 8 {
-            // an element of up to 8 bytes: the sign-magnitude reading, which
-            // always fits an i64 (63 bits of magnitude and a sign)
-            as_number.to_i64().unwrap_or(-1)
-        } else {
-            fold_int64_operand(bytes)
-        };
+        let decode_error = || self.error("Script number overflow: operand does not fit int64.");
+        if bytes.len() > 9 || (bytes.len() == 9 && bytes[8] & 0x7f != 0) {
+            return Err(decode_error());
+        }
+        // The sign-magnitude value must fit i64, including i64::MIN, whose
+        // magnitude is 2^63 and whose ninth byte must be 0x80.
+        let value = as_number.to_i64().ok_or_else(decode_error)?;
         Ok(value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)))
     }
 
@@ -2549,34 +2558,6 @@ fn is_opcode_disabled(op: u8, utxo_after_chronicle: bool) -> bool {
 fn signature_overflows_the_order(sig: &TransactionSignature) -> bool {
     let n = BigNumber::secp256k1_order();
     BigNumber::from_bytes_be(sig.r()) >= n || BigNumber::from_bytes_be(sig.s()) >= n
-}
-
-/// The reference's `int64` operand reader on an element of 9 bytes and more,
-/// as the node's build reads it (`bsv::deserialize<int64_t>`,
-/// `int_serialization.h:70-82`): every byte but the last is OR-ed into a
-/// 64-bit pattern at bit position `8 * (i mod 8)`, so byte 8 lands on byte 0's
-/// position, byte 9 on byte 1's, with period 8; the last byte is dropped and
-/// no sign bit is read (`:80-81`); the pattern is a two's-complement `int64`.
-/// At 9 bytes that is the first 8 bytes alone. From the tenth byte the
-/// reference's shift is by 64 bits and more, undefined in C++ (`:75`), and the
-/// rule is the measured builds' (the scalar loop, the shift count taken mod
-/// 64), consensus by the specification's ruling R1: bsv-script-lean,
-/// `docs/records/20261006-010651-r1-reading-public.md`, section 4.
-///
-/// Measured on the node (bitcoin-sv v1.2.2, `879fc8b`): 9 and 10 bytes. At 16
-/// and 17 bytes the fold is measured on builds of the same source, the node's
-/// own runs owed. UNMEASURED: 11 through 15 bytes, and 18 and above, where the
-/// rule extends by its mechanism and no run carries it (the specification's
-/// D178 scope: the pinned build's measured reading is the rule of record, the
-/// undefined behaviour a hazard, another binary of the same source not
-/// covered).
-fn fold_int64_operand(bytes: &[u8]) -> i64 {
-    let body = &bytes[..bytes.len().saturating_sub(1)];
-    let pattern = body
-        .iter()
-        .enumerate()
-        .fold(0u64, |v, (i, &b)| v | u64::from(b) << (8 * (i % 8)));
-    pattern as i64
 }
 
 /// Whether a signature's hash type carries `SIGHASH_FORKID`; an empty
@@ -4038,6 +4019,239 @@ mod script_num_length_tests {
                     x.to_dec_string()
                 );
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod fixed_width_operand_tests {
+    use super::*;
+    use crate::script::ProtocolEra;
+
+    fn spend(standard: bool) -> Spend {
+        spend_with_lock(standard, LockingScript::new())
+    }
+
+    fn spend_with_lock(standard: bool, locking_script: LockingScript) -> Spend {
+        let mut s = Spend::new(SpendParams {
+            source_txid: [0; 32],
+            source_output_index: 0,
+            source_satoshis: 1,
+            locking_script,
+            transaction_version: 2,
+            other_inputs: vec![],
+            outputs: vec![],
+            input_index: 0,
+            unlocking_script: UnlockingScript::new(),
+            input_sequence: u32::MAX,
+            lock_time: 0,
+            memory_limit: None,
+        });
+        s.set_flags(if standard {
+            ScriptFlags::standard(ProtocolEra::PostChronicle)
+        } else {
+            ScriptFlags::block(ProtocolEra::PostChronicle)
+        });
+        s
+    }
+
+    fn assert_number_error(s: &Spend, bytes: &[u8]) {
+        let error = s.read_splice_operand(bytes).unwrap_err();
+        assert!(
+            error.message.starts_with("Script number overflow"),
+            "{error}"
+        );
+        assert!(!error.is_resource_limit());
+    }
+
+    #[test]
+    fn fixed_width_nine_byte_operands_respect_the_sign_byte() {
+        for standard in [false, true] {
+            let s = spend(standard);
+            assert_eq!(
+                s.read_splice_operand(&[4, 0, 0, 0, 0, 0, 0, 0, 0]).unwrap(),
+                4
+            );
+            assert_eq!(
+                s.read_splice_operand(&[4, 0, 0, 0, 0, 0, 0, 0, 0x80])
+                    .unwrap(),
+                -4
+            );
+            assert_eq!(s.read_splice_operand(&[0; 9]).unwrap(), 0);
+            assert_eq!(
+                s.read_splice_operand(&[0, 0, 0, 0, 0, 0, 0, 0, 0x80])
+                    .unwrap(),
+                0
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_width_ninth_byte_must_be_a_pure_sign() {
+        for standard in [false, true] {
+            let s = spend(standard);
+            for sign in [1, 0x7f, 0x81, 0xff] {
+                assert_number_error(&s, &[4, 0, 0, 0, 0, 0, 0, 0, sign]);
+            }
+        }
+    }
+
+    #[test]
+    fn fixed_width_ten_byte_operands_are_refused() {
+        for standard in [false, true] {
+            let s = spend(standard);
+            assert_number_error(&s, &[4, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+            assert_number_error(&s, &[0; 10]);
+        }
+    }
+
+    #[test]
+    fn fixed_width_signed_minimum_is_decoded_then_saturated_by_getint() {
+        for standard in [false, true] {
+            let s = spend(standard);
+            let bytes = ScriptNum::to_bytes(&BigNumber::from_i64(i64::MIN));
+            assert_eq!(bytes, [0, 0, 0, 0, 0, 0, 0, 0x80, 0x80]);
+            assert_eq!(s.read_splice_operand(&bytes).unwrap(), i64::from(i32::MIN));
+            assert_eq!(
+                s.read_splice_operand(&ScriptNum::to_bytes(&BigNumber::from_i64(i64::MAX)))
+                    .unwrap(),
+                i64::from(i32::MAX)
+            );
+        }
+    }
+
+    #[test]
+    fn fixed_width_nine_byte_magnitudes_must_fit_the_signed_range() {
+        for standard in [false, true] {
+            let s = spend(standard);
+            assert_number_error(&s, &[0, 0, 0, 0, 0, 0, 0, 0x80, 0]);
+            for sign in [0, 0x80] {
+                assert_number_error(&s, &[1, 0, 0, 0, 0, 0, 0, 0x80, sign]);
+                assert_number_error(&s, &[0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, sign]);
+            }
+        }
+    }
+
+    #[test]
+    fn fixed_width_checks_follow_era_width_and_minimal_encoding_checks() {
+        let mut s = spend(true);
+        s.set_require_minimal(true);
+        s.set_script_num_length_policy(8);
+        let bytes = [0; 10];
+        assert_eq!(
+            s.read_splice_operand(&bytes).unwrap_err().message,
+            "Script number overflow: 10 bytes, the limit is 8 bytes."
+        );
+        s.set_script_num_length_policy(0);
+        assert!(s
+            .read_splice_operand(&bytes)
+            .unwrap_err()
+            .message
+            .starts_with("Invalid script number"));
+        s.set_require_minimal(false);
+        assert_number_error(&s, &bytes);
+    }
+
+    #[test]
+    fn fixed_width_rule_leaves_arithmetic_numbers_unrestricted() {
+        let s = spend(false);
+        let bytes = [4, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        assert_eq!(s.read_number(&bytes).unwrap().to_i64(), Some(4));
+    }
+
+    #[test]
+    fn every_splice_operand_uses_the_fixed_width_decoder() {
+        let data: Vec<u8> = (0..16).collect();
+        let cases: &[(&[u8], Option<&str>)] = &[
+            (&[4, 0, 0, 0, 0, 0, 0, 0, 0], None),
+            (&[4, 0, 0, 0, 0, 0, 0, 0, 0x80], Some("must be in range")),
+            (&[4, 0, 0, 0, 0, 0, 0, 0, 1], Some("Script number overflow")),
+            (
+                &[4, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                Some("Script number overflow"),
+            ),
+            (&[0, 0, 0, 0, 0, 0, 0, 0x80, 0x80], Some("must be in range")),
+            (
+                &[0, 0, 0, 0, 0, 0, 0, 0x80, 0],
+                Some("Script number overflow"),
+            ),
+        ];
+        for standard in [false, true] {
+            for (opcode, offset_operand) in [
+                (OP_NOP4, true),
+                (OP_NOP4, false),
+                (OP_NOP5, false),
+                (OP_NOP6, false),
+            ] {
+                for &(bytes, refusal) in cases {
+                    let mut lock = Script::new();
+                    lock.write_bin(&data);
+                    if opcode == OP_NOP4 && !offset_operand {
+                        lock.write_number(4);
+                    }
+                    lock.write_bin(bytes);
+                    if offset_operand {
+                        lock.write_number(4);
+                    }
+                    lock.write_opcode(opcode);
+                    let expected = match opcode {
+                        OP_NOP4 => &data[4..8],
+                        OP_NOP5 => &data[..4],
+                        _ => &data[12..],
+                    };
+                    lock.write_bin(expected).write_opcode(OP_EQUAL);
+                    let mut s = spend_with_lock(standard, LockingScript::from_script(lock));
+                    if let Some(message) = refusal {
+                        let error = s.validate().unwrap_err();
+                        assert!(error.message.contains(message), "{error}");
+                        assert!(!error.is_resource_limit());
+                    } else {
+                        assert!(s.validate().unwrap());
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn substr_checks_length_before_offset() {
+        let mut lock = Script::new();
+        lock.write_bin(&[1, 2, 3, 4])
+            .write_bin(&[1; 10])
+            .write_bin(&[0, 0])
+            .write_opcode(OP_NOP4);
+        let mut s = spend_with_lock(true, LockingScript::from_script(lock));
+        s.set_require_minimal(true);
+        assert!(s
+            .validate()
+            .unwrap_err()
+            .message
+            .starts_with("Invalid script number"));
+    }
+
+    #[test]
+    fn split_position_accepts_int32_max_and_refuses_int32_max_plus_one() {
+        // Exercise the OP_SPLIT range check with a synthetic data length:
+        // no multi-gigabyte stack element is needed to test the position bound.
+        let max = i32::MAX as usize;
+        for standard in [false, true] {
+            let s = spend(standard);
+            assert_eq!(
+                s.split_position(&BigNumber::from_i64(max as i64), max)
+                    .unwrap(),
+                max
+            );
+            let error = s
+                .split_position(&BigNumber::from_i64(max as i64 + 1), max + 1)
+                .unwrap_err();
+            assert!(error
+                .message
+                .starts_with("OP_SPLIT requires the first stack item"));
+            assert!(!error.is_resource_limit());
+            assert!(s
+                .split_position(&BigNumber::from_i64(max as i64), max - 1)
+                .is_err());
+            assert!(s.split_position(&BigNumber::from_i64(-1), max).is_err());
         }
     }
 }

@@ -1,17 +1,8 @@
-//! The `int64` reading of the `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` operands
-//! on a witness from the differential run against bitcoin-sv v1.2.2
-//! (`879fc8b`), Calhooon/bsv-rs#20: a version-2 spend of a coin created after
-//! Chronicle whose locking script pushes the 16 bytes `00..0f`, the 9-byte
-//! operand `04 00 00 00 00 00 00 00 80`, then `OP_4 OP_SUBSTR <04050607>
-//! OP_EQUAL`. The reference builds the operand as a `CScriptNum` on its
-//! `int64` path (`interpreter.cpp:622-625`, `script_num.h:60-63`) and
-//! `bsv::deserialize<int64_t>` (`int_serialization.h:64-95`) returns, for an
-//! element of 9 bytes, the two's-complement `int64` of its first 8 bytes, the
-//! ninth dropped (from 10 bytes the later bytes fold onto the low positions,
-//! 0.3.32, `script_int64_fold_witness.rs`): the operand is 4, the spend valid
-//! on the block path and the mempool path. 0.3.28 read it as a script number, −4, and
-//! refused the range under every word; the default mode (the TypeScript SDK's
-//! reading) keeps that verdict.
+//! Fixed-width splice witnesses under bitcoin-sv v1.2.3 at
+//! `6504a3aff65ba97c0f6c80962b033e35ecbfed4b` (Calhooon/bsv-rs#41).
+//! `int_serialization.h:61-118` defines the checked sign-magnitude decoding;
+//! `script_num.cpp:80-91` and `interpreter.cpp:1807-1809` define its error.
+//! Both node words and the TypeScript SDK default mode are exercised.
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
 use bsv_rs::script::{
@@ -29,8 +20,7 @@ const LOCK_9_SIGN: &str = "10000102030405060708090a0b0c0d0e0f0904000000000000008
 const LOCK_8_SIGN: &str = "10000102030405060708090a0b0c0d0e0f08040000000000008054b3040405060787";
 /// The same with a 9-byte operand whose ninth byte is zero: 4 on both sides.
 const LOCK_9_PAD: &str = "10000102030405060708090a0b0c0d0e0f0904000000000000000054b3040405060787";
-/// The same with a 10-byte operand whose two tail bytes are zero: 4 (zero
-/// bytes fold nothing in).
+/// The same with a 10-byte operand: outside the fixed-width encoding limit.
 const LOCK_10_PAD: &str =
     "10000102030405060708090a0b0c0d0e0f0a0400000000000000000054b3040405060787";
 /// `<00..0f> <04 00 00 00 00 00 00 00 80> OP_LEFT <00010203> OP_EQUAL`: the same reading on the length operand of `OP_LEFT`.
@@ -41,7 +31,7 @@ const LOCK_RIGHT_9_SIGN: &str =
     "10000102030405060708090a0b0c0d0e0f09040000000000000080b5040c0d0e0f87";
 /// `<00..0f> <ff ff ff ff ff ff ff 7f> OP_4 OP_SUBSTR <04050607> OP_EQUAL`: an
 /// 8-byte offset of `INT64_MAX`, saturated to `INT_MAX` by the reference's
-/// `getint` (`script_num.cpp:394-420`) and out of range on both sides.
+/// `getint` (`script_num.cpp:396-422`) and out of range on both sides.
 const LOCK_8_MAX: &str = "10000102030405060708090a0b0c0d0e0f08ffffffffffffff7f54b3040405060787";
 
 #[derive(Clone, Copy)]
@@ -90,21 +80,27 @@ fn run(lock_hex: &str, mode: Mode) -> Result<bool, String> {
 const RANGE_REFUSAL_MINUS_4: &str =
     "OP_SUBSTR offset (-4) must be in range [0, 16) and length (4) must be in range [0, 20]";
 
-/// The witness under the block word: the operand is 4, the spend valid.
+/// The witness under the block word: the operand is -4, outside the range.
 #[test]
-fn the_witness_is_valid_under_the_block_word() {
-    assert_eq!(run(LOCK_9_SIGN, Mode::Block), Ok(true));
+fn the_witness_is_a_range_refusal_under_the_block_word() {
+    assert_eq!(
+        run(LOCK_9_SIGN, Mode::Block),
+        Err(RANGE_REFUSAL_MINUS_4.to_string())
+    );
 }
 
 /// And on the mempool path: the operand is not required minimal at version 2
 /// (the non-malleability gate, `interpreter.cpp:40-44`), so the same reading.
 #[test]
-fn the_witness_is_valid_under_the_standard_word() {
-    assert_eq!(run(LOCK_9_SIGN, Mode::Standard), Ok(true));
+fn the_witness_is_a_range_refusal_under_the_standard_word() {
+    assert_eq!(
+        run(LOCK_9_SIGN, Mode::Standard),
+        Err(RANGE_REFUSAL_MINUS_4.to_string())
+    );
 }
 
 /// The default mode keeps the TypeScript SDK's reading: −4, a range refusal
-/// (0.3.28's verdict under every word).
+/// under the TypeScript SDK number reader.
 #[test]
 fn the_witness_is_a_range_refusal_in_the_default_mode() {
     assert_eq!(
@@ -135,19 +131,32 @@ fn a_9_byte_operand_with_a_zero_ninth_byte_is_4() {
     assert_eq!(run(LOCK_9_PAD, Mode::Default), Ok(true));
 }
 
-/// Ten bytes whose two tail bytes are zero is 4.
+/// The fixed-width path refuses ten bytes; the default mode reads 4.
 #[test]
-fn a_10_byte_operand_with_zero_tail_bytes_is_4() {
-    assert_eq!(run(LOCK_10_PAD, Mode::Block), Ok(true));
+fn a_10_byte_operand_is_refused_under_a_word() {
+    for mode in [Mode::Block, Mode::Standard] {
+        assert_eq!(
+            run(LOCK_10_PAD, mode),
+            Err("Script number overflow: operand does not fit int64.".to_string())
+        );
+    }
     assert_eq!(run(LOCK_10_PAD, Mode::Default), Ok(true));
 }
 
 /// The same reading on the length operand of `OP_LEFT` and `OP_RIGHT`
-/// (`interpreter.cpp:651-653`, `676-678`).
+/// (`interpreter.cpp:655-656`, `680-681`).
 #[test]
 fn op_left_and_op_right_read_their_length_the_same_way() {
-    assert_eq!(run(LOCK_LEFT_9_SIGN, Mode::Block), Ok(true));
-    assert_eq!(run(LOCK_RIGHT_9_SIGN, Mode::Block), Ok(true));
+    for mode in [Mode::Block, Mode::Standard] {
+        assert_eq!(
+            run(LOCK_LEFT_9_SIGN, mode),
+            Err("OP_LEFT length (-4) must be in range [0, 16]".to_string())
+        );
+        assert_eq!(
+            run(LOCK_RIGHT_9_SIGN, mode),
+            Err("OP_RIGHT length (-4) must be in range [0, 16]".to_string())
+        );
+    }
     assert_eq!(
         run(LOCK_LEFT_9_SIGN, Mode::Default),
         Err("OP_LEFT length (-4) must be in range [0, 16]".to_string())
