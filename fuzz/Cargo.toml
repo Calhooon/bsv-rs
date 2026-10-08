@@ -37,3 +37,9 @@ name = "fuzz_base58"
 path = "fuzz_targets/fuzz_base58.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_beef_parser"
+path = "fuzz_targets/fuzz_beef_parser.rs"
+test = false
+doc = false
