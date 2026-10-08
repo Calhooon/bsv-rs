@@ -14,7 +14,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `auth_cross_sdk_tests.rs` | 13 | `auth` | Certificate serialization cross-SDK vectors |
 | `auth_integration_tests.rs` | 70 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads, nonce handling |
 | `auth_peer_e2e_tests.rs` | 21 | `auth` | BRC-31 peer mutual authentication end-to-end via loopback |
-| `broadcaster_http_tests.rs` | 26 | `transaction`+`http` | ARC, WoC, Teranode broadcasters with wiremock |
+| `broadcaster_http_tests.rs` | 27 | `transaction`+`http` | ARC, WoC, Teranode broadcasters with wiremock; the ARC 2xx verdict vector served through wiremock (bsv-stack-lean #35, P0-2) |
 | `chaintracker_http_tests.rs` | 10 | `transaction`+`http` | WhatsOnChain chain tracker with wiremock |
 | `compat_bip39_tests.rs` | 29 | `compat` | BIP-39 mnemonics with official TREZOR vectors |
 | `compat_integration_tests.rs` | 31 | `compat` | BIP-32/39, BSM, ECIES, Base58 workflows |
@@ -72,6 +72,7 @@ Test vectors in `tests/vectors/` are shared with the TypeScript and Go SDKs:
 | `symmetric_key.json` | Symmetric encryption test vectors (5 vectors) |
 | `overlay_admin_token.json` | Overlay SHIP/SLAP admin token vectors (4 vectors) |
 | `overlay_admin_token_ts_parity.json` | Overlay admin token parity cases against `@bsv/sdk 1.10.1` (5 cases) |
+| `arc_tx_status_verdicts.json` | ARC `POST /v1/tx` 2xx bodies and the verdict each must produce (17 cases; the reference's rule at `ts-stack@edf6e03 ARC.ts:110-180`; served through wiremock in `broadcaster_http_tests.rs` and replayed through the verdict in `src/transaction/broadcasters/arc.rs`) |
 | `overlay_types.json` | Overlay type serialization vectors (18 entries across 6 categories) |
 | `drbg.json` | HMAC-DRBG vectors (15 vectors from NIST SP 800-90A) |
 | `sighash.json` | Transaction sighash vectors (500 entries, 499 used) |

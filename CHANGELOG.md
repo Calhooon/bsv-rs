@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — an ARC answer is judged by its `txStatus`, never by the HTTP code
+
+- `ArcBroadcaster::broadcast` read the HTTP code and nothing else: every 2xx
+  was a `BroadcastResponse` with the body's `txStatus` as its message, so a
+  wallet recorded as accepted a transaction the node refused (REJECTED,
+  DOUBLE_SPEND_ATTEMPTED, MINED_IN_STALE_BLOCK, the ORPHAN statuses), and a
+  2xx with no `txStatus` at all was a success. ARC answers 2xx whenever it
+  processed the request and puts the verdict in the body
+  (`arc@e7efc5b internal/api/handler/default.go:489-500`).
+- Now the body's `txStatus` decides, by the reference's rule
+  (`ts-stack@edf6e03 packages/sdk/src/transaction/broadcasters/ARC.ts:110-180`):
+  `DOUBLE_SPEND_ATTEMPTED`, `REJECTED`, `INVALID`, `MALFORMED`,
+  `MINED_IN_STALE_BLOCK` and any status or `extraInfo` containing `ORPHAN` are
+  a `BroadcastFailure` whose `code` is the status word, whose `description` is
+  the status word and the `extraInfo`, and whose `more` carries `extraInfo`
+  and `competingTxs` when sent; a missing `txStatus`, a status word outside
+  the reference's accepted set, or a malformed `competingTxs` list is
+  `ERR_INVALID_RESPONSE`; a failure naming another transaction's id is
+  `ERR_TXID_MISMATCH`. An accepted status is a success whose `message` is the
+  status word and whose `competing_txs` are ARC's, lower-cased. The non-2xx
+  path is unchanged.
+- Pinned by `tests/vectors/arc_tx_status_verdicts.json` (17 recorded 2xx
+  bodies and their verdicts; shared with the other ports), served through
+  wiremock in `tests/broadcaster_http_tests.rs`
+  (`an_arc_2xx_answer_is_judged_by_its_tx_status_not_by_the_http_code`, 14 of
+  17 wrong before the fix) and replayed through the verdict alone in
+  `src/transaction/broadcasters/arc.rs`. bsv-stack-lean #35, P0-2.
+- Migration: none in the API. Callers that matched `Ok(_)` on every 2xx now
+  receive `Err(BroadcastFailure)` with the real verdict; a caller that treated
+  `response.message == "REJECTED"` as a failure by hand can drop that check.
+
+### Notes — cross-SDK parity
+
+- The success `message` stays the status word alone; the reference appends
+  the `extraInfo` (`ARC.ts:176`). The success path keeps ARC's echoed `txid`
+  without the reference's mismatch check (`ARC.ts:161-171`); the failure path
+  has it (`ARC.ts:136-146`). A `BroadcastFailure` always carries the
+  submitted `txid`; the reference sets it only when ARC echoed a valid one
+  (`ARC.ts:152`).
+- An explicit `"competingTxs": null`, which ARC sends on an ordinary 2xx
+  (`arc@e7efc5b pkg/api/arc.go:429`, no `omitempty`; `doc/api.md:1512`), is
+  read as absent. Read as written, the reference refuses it as
+  `ERR_INVALID_RESPONSE` (`ARC.ts:129-132`); not run here.
+- The accepted set is the reference's nine words. The Go port adds `QUEUED`,
+  `REQUESTED_BY_NETWORK` and `CONFIRMED` (`go-sdk@511b58c
+  transaction/broadcaster/arc.go:198-216`); ARC's own enum has `QUEUED` and
+  `REQUESTED_BY_NETWORK` (`metamorph_api.proto:13-28`). Here, as in the
+  reference, those two words on a 2xx are `ERR_INVALID_RESPONSE`.
+
 ## [0.3.33] - 2026-10-06
 
 ### Changed
