@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — QUEUED, REQUESTED_BY_NETWORK and CONFIRMED are accepted on a 2xx
+
+- The reference's spec (`specs/broadcast/arc.yaml`) and go-sdk accept these three
+  non-error states; the reference's TypeScript code reports them as an invalid
+  response. bsv-rs follows the spec: the word is carried as the success message,
+  a hint about the transaction and never evidence. An unknown word is still an
+  invalid response. (bsv-stack-lean #35, the owner's ruling of 2026-10-08.)
+
 ### Fixed — an ARC answer is judged by its `txStatus`, never by the HTTP code
 
 - `ArcBroadcaster::broadcast` read the HTTP code and nothing else: every 2xx
