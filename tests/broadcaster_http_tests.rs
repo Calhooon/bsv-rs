@@ -767,7 +767,10 @@ fn arc_verdict_mismatch(
                 return Some(format!("status {:?}, not Success", response.status));
             }
             if response.txid != txid {
-                return Some(format!("txid {}, not the submitted {}", response.txid, txid));
+                return Some(format!(
+                    "txid {}, not the submitted {}",
+                    response.txid, txid
+                ));
             }
             if expect.message.as_deref() != Some(response.message.as_str()) {
                 return Some(format!(
@@ -788,7 +791,10 @@ fn arc_verdict_mismatch(
                 return Some(format!("status {:?}, not Error", failure.status));
             }
             if expect.code.as_deref() != Some(failure.code.as_str()) {
-                return Some(format!("code {:?}, expected {:?}", failure.code, expect.code));
+                return Some(format!(
+                    "code {:?}, expected {:?}",
+                    failure.code, expect.code
+                ));
             }
             if expect.description.as_deref() != Some(failure.description.as_str()) {
                 return Some(format!(
@@ -797,10 +803,16 @@ fn arc_verdict_mismatch(
                 ));
             }
             if failure.txid.as_deref() != Some(txid) {
-                return Some(format!("txid {:?}, not the submitted {}", failure.txid, txid));
+                return Some(format!(
+                    "txid {:?}, not the submitted {}",
+                    failure.txid, txid
+                ));
             }
             if expect.more != failure.more {
-                return Some(format!("more {:?}, expected {:?}", failure.more, expect.more));
+                return Some(format!(
+                    "more {:?}, expected {:?}",
+                    failure.more, expect.more
+                ));
             }
             None
         }
@@ -835,9 +847,7 @@ async fn an_arc_2xx_answer_is_judged_by_its_tx_status_not_by_the_http_code() {
         let mock_server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/v1/tx"))
-            .respond_with(
-                ResponseTemplate::new(case.http_status).set_body_json(case.body.clone()),
-            )
+            .respond_with(ResponseTemplate::new(case.http_status).set_body_json(case.body.clone()))
             .expect(1)
             .mount(&mock_server)
             .await;
