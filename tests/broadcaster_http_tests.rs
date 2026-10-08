@@ -712,3 +712,148 @@ async fn test_teranode_broadcast_many() {
         assert!(result.is_ok(), "Expected all broadcasts to succeed");
     }
 }
+
+// =============================================================================
+// ARC: the body's txStatus decides, never the HTTP code
+// (bsv-stack-lean #35, P0-2; the reference's rule at ts-stack@edf6e03
+// packages/sdk/src/transaction/broadcasters/ARC.ts:110-180)
+// =============================================================================
+
+/// The recorded ARC bodies and the verdict each must produce, shared with the
+/// other ports: `tests/vectors/arc_tx_status_verdicts.json`.
+#[derive(serde::Deserialize)]
+struct ArcVerdictVectors {
+    txid: String,
+    cases: Vec<ArcVerdictCase>,
+}
+
+#[derive(serde::Deserialize)]
+struct ArcVerdictCase {
+    name: String,
+    http_status: u16,
+    body: serde_json::Value,
+    expect: ArcVerdictExpect,
+}
+
+#[derive(serde::Deserialize)]
+struct ArcVerdictExpect {
+    result: String,
+    #[serde(default)]
+    code: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
+    #[serde(default)]
+    more: Option<serde_json::Value>,
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default)]
+    competing_txs: Option<Vec<String>>,
+}
+
+fn arc_verdict_vectors() -> ArcVerdictVectors {
+    serde_json::from_str(include_str!("vectors/arc_tx_status_verdicts.json"))
+        .expect("tests/vectors/arc_tx_status_verdicts.json parses")
+}
+
+/// `None` when the broadcaster's answer is the vector's; otherwise what differs.
+fn arc_verdict_mismatch(
+    txid: &str,
+    expect: &ArcVerdictExpect,
+    result: &bsv_rs::transaction::BroadcastResult,
+) -> Option<String> {
+    match (expect.result.as_str(), result) {
+        ("success", Ok(response)) => {
+            if response.status != BroadcastStatus::Success {
+                return Some(format!("status {:?}, not Success", response.status));
+            }
+            if response.txid != txid {
+                return Some(format!("txid {}, not the submitted {}", response.txid, txid));
+            }
+            if expect.message.as_deref() != Some(response.message.as_str()) {
+                return Some(format!(
+                    "message {:?}, expected {:?}",
+                    response.message, expect.message
+                ));
+            }
+            if expect.competing_txs != response.competing_txs {
+                return Some(format!(
+                    "competing_txs {:?}, expected {:?}",
+                    response.competing_txs, expect.competing_txs
+                ));
+            }
+            None
+        }
+        ("failure", Err(failure)) => {
+            if failure.status != BroadcastStatus::Error {
+                return Some(format!("status {:?}, not Error", failure.status));
+            }
+            if expect.code.as_deref() != Some(failure.code.as_str()) {
+                return Some(format!("code {:?}, expected {:?}", failure.code, expect.code));
+            }
+            if expect.description.as_deref() != Some(failure.description.as_str()) {
+                return Some(format!(
+                    "description {:?}, expected {:?}",
+                    failure.description, expect.description
+                ));
+            }
+            if failure.txid.as_deref() != Some(txid) {
+                return Some(format!("txid {:?}, not the submitted {}", failure.txid, txid));
+            }
+            if expect.more != failure.more {
+                return Some(format!("more {:?}, expected {:?}", failure.more, expect.more));
+            }
+            None
+        }
+        ("success", Err(failure)) => Some(format!(
+            "expected success {:?}, got failure {} ({})",
+            expect.message, failure.code, failure.description
+        )),
+        ("failure", Ok(response)) => Some(format!(
+            "expected failure {:?}, got success with message {:?}",
+            expect.code, response.message
+        )),
+        (other, _) => Some(format!("the vector's expect.result {:?} is unknown", other)),
+    }
+}
+
+/// Every recorded 2xx body of the vector, served by a local mock ARC, produces the
+/// vector's verdict: REJECTED, DOUBLE_SPEND_ATTEMPTED, MINED_IN_STALE_BLOCK, the
+/// ORPHAN statuses, an unknown status and a missing `txStatus` fail on HTTP 200;
+/// SEEN_ON_NETWORK and MINED succeed, with the competing transactions carried.
+#[tokio::test]
+async fn an_arc_2xx_answer_is_judged_by_its_tx_status_not_by_the_http_code() {
+    let vectors = arc_verdict_vectors();
+    let tx = test_transaction();
+    assert_eq!(
+        tx.id(),
+        vectors.txid,
+        "the vector's txid is the test transaction's"
+    );
+
+    let mut mismatches = Vec::new();
+    for case in &vectors.cases {
+        let mock_server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/tx"))
+            .respond_with(
+                ResponseTemplate::new(case.http_status).set_body_json(case.body.clone()),
+            )
+            .expect(1)
+            .mount(&mock_server)
+            .await;
+
+        let broadcaster = ArcBroadcaster::new(&mock_server.uri(), None);
+        let result = broadcaster.broadcast(&tx).await;
+        if let Some(why) = arc_verdict_mismatch(&vectors.txid, &case.expect, &result) {
+            mismatches.push(format!("  {}: {}", case.name, why));
+        }
+    }
+
+    assert!(
+        mismatches.is_empty(),
+        "{} of {} recorded ARC bodies get the wrong verdict:\n{}",
+        mismatches.len(),
+        vectors.cases.len(),
+        mismatches.join("\n")
+    );
+}
