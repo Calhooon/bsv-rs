@@ -62,7 +62,12 @@ fn ef_source_placeholder_len(source_output_index: u32) -> Option<usize> {
 /// tx.fee(None, ChangeDistribution::Equal).await?;
 /// tx.sign().await?;
 /// ```
-#[derive(Debug, Clone)]
+///
+/// `Clone` and `Drop` walk the linked `source_transaction` ancestry with an
+/// explicit stack, not by recursion (0.3.35, bsv-stack-lean #57): a chain of
+/// unproven links a stranger's BEEF can carry is as deep as the BEEF is long,
+/// and the derived glue spent several stack frames per link.
+#[derive(Debug)]
 pub struct Transaction {
     /// Transaction version number.
     ///
@@ -669,13 +674,23 @@ impl Transaction {
         beef.to_binary_atomic(&txid)
     }
 
-    /// Recursively collects ancestor transactions and their merkle proofs.
+    /// Collects ancestor transactions and their merkle proofs.
     ///
     /// This implements the same algorithm as the TypeScript and Go SDKs:
-    /// - If this transaction has a merkle_path (is proven), add it and stop recursion
-    /// - Otherwise, recursively collect ancestors from each input's source_transaction
+    /// - If this transaction has a merkle_path (is proven), add it and stop descending
+    /// - Otherwise, collect ancestors from each input's source_transaction first
     /// - Ancestors are returned in dependency order (oldest first)
     /// - Merkle proofs are deduplicated by block height and computed root
+    ///
+    /// The walk is depth first with an explicit stack, not recursive (0.3.35,
+    /// bsv-stack-lean #57), in the recursive walk's order: inputs from the
+    /// last to the first, a txid already collected skipped on entry, a
+    /// transaction collected after its sources. Each collected transaction is
+    /// a copy WITHOUT its ancestry (the BEEF needs its bytes, not its sources;
+    /// an input with no `source_txid` gets its source's id), where the
+    /// recursive walk cloned every ancestor's whole ancestry again, which made
+    /// `to_beef` quadratic in a chain's depth. The reference walks with an
+    /// explicit stack too (`@bsv/sdk` `Transaction.toBEEF`).
     ///
     /// # Arguments
     ///
@@ -692,55 +707,71 @@ impl Transaction {
         bumps: &mut Vec<MerklePath>,
         bump_index_by_root: &mut HashMap<String, usize>,
     ) -> Result<()> {
-        let txid = self.id();
-
-        // Check for cycles - if we've already seen this transaction, skip it
-        if seen_txids.contains(&txid) {
-            return Ok(());
+        /// An unproven transaction whose sources are being collected, and how
+        /// many of its inputs (counted from the last) are left to visit.
+        struct Frame<'a> {
+            tx: &'a Transaction,
+            txid: String,
+            inputs_left: usize,
         }
 
-        // If this transaction has a merkle proof, it's proven (mined)
-        // Add the proof and transaction, then stop recursion
-        if let Some(ref merkle_path) = self.merkle_path {
-            // Deduplicate merkle proofs by block height and computed root
-            let root = merkle_path.compute_root(Some(&txid)).unwrap_or_default();
-            let key = format!("{}:{}", merkle_path.block_height, root);
+        let mut stack: Vec<Frame> = Vec::new();
+        let mut entering: Option<&Transaction> = Some(self);
+        loop {
+            if let Some(tx) = entering.take() {
+                let txid = tx.id();
+                if seen_txids.contains(&txid) {
+                    // Already collected: skip it.
+                } else if let Some(ref merkle_path) = tx.merkle_path {
+                    // Proven (mined): add the proof and the transaction, and
+                    // do not descend. Deduplicate merkle proofs by block
+                    // height and computed root.
+                    let root = merkle_path.compute_root(Some(&txid)).unwrap_or_default();
+                    let key = format!("{}:{}", merkle_path.block_height, root);
 
-            if let Some(&existing_idx) = bump_index_by_root.get(&key) {
-                // Combine with existing bump at same height/root
-                if bumps[existing_idx].combine(merkle_path).is_err() {
-                    // If combine fails, just add as new
-                    let new_idx = bumps.len();
-                    bumps.push(merkle_path.clone());
-                    bump_index_by_root.insert(key, new_idx);
+                    if let Some(&existing_idx) = bump_index_by_root.get(&key) {
+                        // Combine with existing bump at same height/root
+                        if bumps[existing_idx].combine(merkle_path).is_err() {
+                            // If combine fails, just add as new
+                            let new_idx = bumps.len();
+                            bumps.push(merkle_path.clone());
+                            bump_index_by_root.insert(key, new_idx);
+                        }
+                    } else {
+                        // Add as new bump
+                        let new_idx = bumps.len();
+                        bumps.push(merkle_path.clone());
+                        bump_index_by_root.insert(key, new_idx);
+                    }
+
+                    seen_txids.insert(txid);
+                    ancestors.push(tx.clone_for_beef());
+                } else {
+                    // Not proven: collect its sources first, last input first
+                    // (like the TypeScript SDK) for the dependency order.
+                    stack.push(Frame {
+                        tx,
+                        txid,
+                        inputs_left: tx.inputs.len(),
+                    });
                 }
-            } else {
-                // Add as new bump
-                let new_idx = bumps.len();
-                bumps.push(merkle_path.clone());
-                bump_index_by_root.insert(key, new_idx);
             }
 
-            // Mark as seen and add to ancestors
-            seen_txids.insert(txid);
-            ancestors.push(self.clone());
-            return Ok(());
-        }
-
-        // Transaction is not proven - recursively collect ancestors from inputs
-        // Process inputs in reverse order (like TypeScript SDK) for correct dependency order
-        for i in (0..self.inputs.len()).rev() {
-            let input = &self.inputs[i];
-
-            if let Some(ref source_tx) = input.source_transaction {
-                // Recursively collect ancestors from this source transaction
-                source_tx.collect_ancestors(
-                    allow_partial,
-                    seen_txids,
-                    ancestors,
-                    bumps,
-                    bump_index_by_root,
-                )?;
+            let Some(top) = stack.last_mut() else {
+                return Ok(());
+            };
+            if top.inputs_left == 0 {
+                // After processing all ancestors, add this transaction
+                let frame = stack.pop().expect("the stack is not empty");
+                seen_txids.insert(frame.txid);
+                ancestors.push(frame.tx.clone_for_beef());
+                continue;
+            }
+            top.inputs_left -= 1;
+            let i = top.inputs_left;
+            let input = &top.tx.inputs[i];
+            if let Some(source_tx) = input.source_transaction.as_deref() {
+                entering = Some(source_tx);
             } else if !allow_partial {
                 // Missing source transaction and not allowing partial
                 let source_txid = input.source_txid.as_deref().unwrap_or("unknown");
@@ -752,12 +783,22 @@ impl Transaction {
             }
             // If allow_partial and source_transaction is None, just skip this input
         }
+    }
 
-        // After processing all ancestors, add this transaction
-        seen_txids.insert(txid);
-        ancestors.push(self.clone());
-
-        Ok(())
+    /// The copy of this transaction a BEEF stores: every field but the
+    /// ancestry, with each input's `source_txid` filled from its source when
+    /// it had none, so its bytes, its txid and its input txids are this
+    /// transaction's.
+    fn clone_for_beef(&self) -> Transaction {
+        let mut copy = self.clone_without_sources();
+        for (copy_input, input) in copy.inputs.iter_mut().zip(&self.inputs) {
+            if copy_input.source_txid.is_none() {
+                if let Some(source) = input.source_transaction.as_deref() {
+                    copy_input.source_txid = Some(source.id());
+                }
+            }
+        }
+        copy
     }
 
     /// Invalidates all serialization caches.
@@ -1240,8 +1281,44 @@ impl Transaction {
         Ok(to_hex(&self.to_ef()?))
     }
 
+    /// Hashes, deepest first, every linked source whose id this transaction's
+    /// serialization reads THROUGH the source (an input with no
+    /// `source_txid`, the shape `add_input_from_tx` builds), so reading an id
+    /// never recurses more than one level: a chain built that way used to
+    /// recurse once per link through `id()` (0.3.35, bsv-stack-lean #57). The
+    /// reference does the same before it serializes (`@bsv/sdk`
+    /// `Transaction.materializeSourceTXIDs`).
+    fn hash_sources_without_txids(&self) {
+        fn unhashed(input: &TransactionInput) -> Option<&Transaction> {
+            if input.source_txid.is_some() {
+                return None;
+            }
+            input
+                .source_transaction
+                .as_deref()
+                .filter(|source| source.cached_hash.borrow().is_none())
+        }
+        if self.inputs.iter().all(|input| unhashed(input).is_none()) {
+            return;
+        }
+        // Every reachable source to hash, each after the one that links it,
+        // so the reversed list hashes a source before anything that reads it.
+        let mut order: Vec<&Transaction> = Vec::new();
+        let mut stack: Vec<&Transaction> = vec![self];
+        while let Some(tx) = stack.pop() {
+            for source in tx.inputs.iter().filter_map(unhashed) {
+                order.push(source);
+                stack.push(source);
+            }
+        }
+        for source in order.into_iter().rev() {
+            source.hash();
+        }
+    }
+
     /// Builds the serialized bytes for this transaction.
     fn build_serialized_bytes(&self) -> Vec<u8> {
+        self.hash_sources_without_txids();
         let mut writer = Writer::new();
 
         writer.write_u32_le(self.version);
@@ -1904,6 +1981,97 @@ impl Transaction {
         }
 
         Ok(true)
+    }
+}
+
+impl Transaction {
+    /// A copy of this transaction with every input's `source_transaction`
+    /// left `None`: the one level [`Clone`] copies per step of its walk.
+    fn clone_without_sources(&self) -> Self {
+        Self {
+            version: self.version,
+            inputs: self
+                .inputs
+                .iter()
+                .map(TransactionInput::clone_without_source)
+                .collect(),
+            outputs: self.outputs.clone(),
+            lock_time: self.lock_time,
+            metadata: self.metadata.clone(),
+            merkle_path: self.merkle_path.clone(),
+            cached_hash: self.cached_hash.clone(),
+            raw_bytes_cache: self.raw_bytes_cache.clone(),
+            hex_cache: self.hex_cache.clone(),
+        }
+    }
+}
+
+impl Clone for Transaction {
+    /// A deep copy, ancestry included, as the derived `Clone` made: every
+    /// linked `source_transaction` is copied, and every input's
+    /// `unlocking_script_template` is left `None` (templates hold closures).
+    /// The ancestry is copied depth first with an explicit stack, so a deep
+    /// chain costs heap, not stack.
+    fn clone(&self) -> Self {
+        /// One transaction being copied, and the next input to look at.
+        struct Frame<'a> {
+            original: &'a Transaction,
+            copy: Transaction,
+            next_input: usize,
+        }
+
+        let mut stack = vec![Frame {
+            original: self,
+            copy: self.clone_without_sources(),
+            next_input: 0,
+        }];
+        loop {
+            let top = stack.last_mut().expect("the stack is not empty");
+            let original = top.original;
+            let next_source = original
+                .inputs
+                .iter()
+                .enumerate()
+                .skip(top.next_input)
+                .find_map(|(i, input)| input.source_transaction.as_deref().map(|src| (i, src)));
+            if let Some((i, source)) = next_source {
+                top.next_input = i + 1;
+                stack.push(Frame {
+                    original: source,
+                    copy: source.clone_without_sources(),
+                    next_input: 0,
+                });
+                continue;
+            }
+            let done = stack.pop().expect("the stack is not empty").copy;
+            match stack.last_mut() {
+                Some(parent) => {
+                    parent.copy.inputs[parent.next_input - 1].source_transaction =
+                        Some(Box::new(done));
+                }
+                None => return done,
+            }
+        }
+    }
+}
+
+impl Drop for Transaction {
+    /// Drops the linked ancestry one transaction at a time: every
+    /// `source_transaction` is taken out before its owner is dropped, so no
+    /// drop reaches below the one in hand.
+    fn drop(&mut self) {
+        let mut ancestry: Vec<Box<Transaction>> = self
+            .inputs
+            .iter_mut()
+            .filter_map(|input| input.source_transaction.take())
+            .collect();
+        while let Some(mut tx) = ancestry.pop() {
+            ancestry.extend(
+                tx.inputs
+                    .iter_mut()
+                    .filter_map(|input| input.source_transaction.take()),
+            );
+        }
     }
 }
 

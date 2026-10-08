@@ -228,16 +228,30 @@ impl TransactionInput {
     }
 }
 
-impl Clone for TransactionInput {
-    fn clone(&self) -> Self {
+impl TransactionInput {
+    /// A copy of this input with `source_transaction` left `None`.
+    pub(crate) fn clone_without_source(&self) -> Self {
         Self {
-            source_transaction: self.source_transaction.clone(),
+            source_transaction: None,
             source_txid: self.source_txid.clone(),
             source_output_index: self.source_output_index,
             unlocking_script: self.unlocking_script.clone(),
             // Templates are not cloned - they contain closures
             unlocking_script_template: None,
             sequence: self.sequence,
+        }
+    }
+}
+
+impl Clone for TransactionInput {
+    fn clone(&self) -> Self {
+        Self {
+            // `Transaction::clone` copies the whole ancestry without recursion.
+            source_transaction: self
+                .source_transaction
+                .as_deref()
+                .map(|source| Box::new(source.clone())),
+            ..self.clone_without_source()
         }
     }
 }

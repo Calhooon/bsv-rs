@@ -63,6 +63,19 @@ pub struct BeefValidationResult {
     pub roots: HashMap<u32, String>,
 }
 
+/// Count bounds for [`Beef::from_binary_with_limits`]: a door that reads a
+/// stranger's BEEF names the most it will take of each, and a BEEF over any
+/// of them is refused before it is read further.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BeefLimits {
+    /// The most transactions (full or txid-only) the BEEF may carry.
+    pub max_txs: usize,
+    /// The most BUMPs (merkle paths) the BEEF may carry.
+    pub max_bumps: usize,
+    /// The most bytes the serialized BEEF may be, Atomic prefix included.
+    pub max_bytes: usize,
+}
+
 /// BEEF (Background Evaluation Extended Format) for SPV proofs.
 ///
 /// A BEEF contains:
@@ -186,11 +199,100 @@ impl Beef {
     /// one cheap stub per repeat), and [`Transaction::verify`] no longer cares
     /// which copy it reaches: it gathers the reachable transactions by txid and
     /// looks every input's source up in that map.
+    ///
+    /// The walk is ITERATIVE (0.3.35, bsv-stack-lean #57): an explicit stack of
+    /// frames replaces the call that recursed once per unproven link, so a
+    /// stranger's chain of unproven transactions costs heap, not stack (a
+    /// 1 MiB stack, the order of a WASM stack in a Worker, overflowed at a few
+    /// hundred links and the abort took every request in flight with it). The
+    /// frames are visited in the recursion's order (depth first, inputs in
+    /// order), so which input gets the full link and which a stub, and the
+    /// resulting `source_transaction` shape, are exactly the recursive walk's.
+    /// The reference walks iteratively too (`@bsv/sdk` `Beef.#addInputProof`).
+    /// Bumps are looked up through an index built once, so the walk is linear
+    /// in the BEEF rather than in transactions times bumps.
     fn add_input_proof(&self, tx: &mut Transaction) {
+        /// One transaction being linked, and the next input to link.
+        struct Frame {
+            tx: Transaction,
+            next_input: usize,
+        }
+
+        // `find_bump`'s answer for every hash at level 0: the FIRST bump whose
+        // leaf level carries it, as `find_bump`'s scan returns.
+        let mut bump_by_txid: HashMap<&str, &MerklePath> = HashMap::new();
+        for bump in &self.bumps {
+            for leaf in bump.path.first().into_iter().flatten() {
+                if let Some(hash) = leaf.hash.as_deref() {
+                    bump_by_txid.entry(hash).or_insert(bump);
+                }
+            }
+        }
+        let find_bump = |txid: &str| bump_by_txid.get(txid).copied();
+
+        // Attach a transaction's own proof; a proven transaction is not
+        // descended (its frame starts with no input left to link).
+        let enter = |mut tx: Transaction| -> Frame {
+            if tx.merkle_path.is_none() {
+                if let Some(mp) = find_bump(&tx.id()) {
+                    tx.merkle_path = Some(mp.clone());
+                }
+            }
+            let next_input = if tx.merkle_path.is_some() {
+                tx.inputs.len()
+            } else {
+                0
+            };
+            Frame { tx, next_input }
+        };
+
         // Keyed by txid, the value being the stub handed to later inputs.
         // Presence also means "this txid has been linked in full once".
         let mut stubs: HashMap<String, Transaction> = HashMap::new();
-        self.attach_proof_memoized(tx, &mut stubs);
+        let mut stack: Vec<Frame> = vec![enter(std::mem::take(tx))];
+
+        while let Some(top) = stack.last_mut() {
+            if top.next_input == top.tx.inputs.len() {
+                // Every input of this transaction is linked: hand it to the
+                // input of its parent that it sources, or back to the caller.
+                let done = stack.pop().expect("the stack is not empty").tx;
+                match stack.last_mut() {
+                    Some(parent) => {
+                        parent.tx.inputs[parent.next_input - 1].source_transaction =
+                            Some(Box::new(done));
+                    }
+                    None => *tx = done,
+                }
+                continue;
+            }
+            let input = &mut top.tx.inputs[top.next_input];
+            top.next_input += 1;
+            let Some(src_txid) = input.source_txid.clone() else {
+                continue;
+            };
+            if let Some(stub) = stubs.get(&src_txid) {
+                // Already linked in full once: this input gets the stub, which
+                // carries the output being spent (and the proof when there is
+                // one) without repeating the ancestry underneath it.
+                input.source_transaction = Some(Box::new(stub.clone()));
+                continue;
+            }
+            // Take the caller's own source when it carries one, else this BEEF's.
+            let mut src = match input.source_transaction.take() {
+                Some(own) => *own,
+                None => match self.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
+                    Some(found) => found,
+                    None => continue, // not in this BEEF: left unlinked, as before
+                },
+            };
+            // Memoize the stub BEFORE descending: a BEEF whose source links
+            // form a cycle then terminates instead of walking forever, and for
+            // the honest DAG case the order makes no difference (a transaction
+            // is never reachable from inside its own ancestry).
+            let stub = Self::bare_stub(&mut src, find_bump(&src_txid));
+            stubs.insert(src_txid, stub);
+            stack.push(enter(src));
+        }
     }
 
     /// A bare copy of `tx`: the transaction with its BUMP when the BEEF proves
@@ -213,50 +315,6 @@ impl Beef {
             }
         }
         stub
-    }
-
-    fn attach_proof_memoized(
-        &self,
-        tx: &mut Transaction,
-        stubs: &mut HashMap<String, Transaction>,
-    ) {
-        let txid = tx.id();
-        if tx.merkle_path.is_none() {
-            if let Some(mp) = self.find_bump(&txid) {
-                tx.merkle_path = Some(mp.clone());
-            }
-        }
-        if tx.merkle_path.is_some() {
-            return; // proven: no ancestry needed
-        }
-        for input in tx.inputs.iter_mut() {
-            let Some(src_txid) = input.source_txid.clone() else {
-                continue;
-            };
-            if let Some(stub) = stubs.get(&src_txid) {
-                // Already linked in full once: this input gets the stub, which
-                // carries the output being spent (and the proof when there is
-                // one) without repeating the ancestry underneath it.
-                input.source_transaction = Some(Box::new(stub.clone()));
-                continue;
-            }
-            // Take the caller's own source when it carries one, else this BEEF's.
-            let mut src = match input.source_transaction.take() {
-                Some(own) => *own,
-                None => match self.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
-                    Some(found) => found,
-                    None => continue, // not in this BEEF: left unlinked, as before
-                },
-            };
-            // Memoize the stub BEFORE descending: a BEEF whose source links
-            // form a cycle then terminates instead of recursing forever, and
-            // for the honest DAG case the order makes no difference (a
-            // transaction is never reachable from inside its own ancestry).
-            let stub = Self::bare_stub(&mut src, self.find_bump(&src_txid));
-            stubs.insert(src_txid, stub);
-            self.attach_proof_memoized(&mut src, stubs);
-            input.source_transaction = Some(Box::new(src));
-        }
     }
 
     /// Merges a MerklePath into this BEEF.
@@ -678,14 +736,23 @@ impl Beef {
     }
 
     /// Sorts transactions by dependency order.
+    ///
+    /// The order is the one a repeated scan of the pending transactions
+    /// produces (each scan accepts, in BEEF order, every transaction whose
+    /// inputs are valid by then), but it is computed in one pass with a
+    /// work list keyed by (scan, position) instead of rescanning: a chain
+    /// written newest first made the rescan quadratic, 767.8 s for 128,000
+    /// links (0.3.35, bsv-stack-lean #57). The reference sorts the same way
+    /// (`@bsv/sdk` `Beef.#topoSort`, "preserve the legacy repeated-scan
+    /// ordering without repeating scans").
     pub fn sort_txs(&mut self) -> SortResult {
+        use std::cmp::Reverse;
+        use std::collections::{BinaryHeap, HashSet};
+
         let mut result = SortResult::default();
         let mut valid_txids: HashMap<String, bool> = HashMap::new();
-        let mut txid_to_idx: HashMap<String, usize> = HashMap::new();
-
-        for (i, tx) in self.txs.iter().enumerate() {
-            txid_to_idx.insert(tx.txid(), i);
-        }
+        let txids: Vec<String> = self.txs.iter().map(|tx| tx.txid()).collect();
+        let known: HashSet<&str> = txids.iter().map(String::as_str).collect();
 
         // Separate transactions by type
         let mut with_proof: Vec<usize> = Vec::new();
@@ -695,12 +762,12 @@ impl Beef {
         for (i, tx) in self.txs.iter_mut().enumerate() {
             tx.is_valid = Some(tx.has_proof());
             if tx.has_proof() {
-                valid_txids.insert(tx.txid(), true);
+                valid_txids.insert(txids[i].clone(), true);
                 with_proof.push(i);
             } else if tx.is_txid_only() && tx.input_txids.is_empty() {
-                valid_txids.insert(tx.txid(), true);
+                valid_txids.insert(txids[i].clone(), true);
                 txid_only.push(i);
-                result.txid_only.push(tx.txid());
+                result.txid_only.push(txids[i].clone());
             } else {
                 queue.push(i);
             }
@@ -713,79 +780,88 @@ impl Beef {
         for &i in &queue {
             let mut has_missing = false;
             for input_txid in &self.txs[i].input_txids {
-                if !txid_to_idx.contains_key(input_txid) {
+                if !known.contains(input_txid.as_str()) {
                     result.missing_inputs.push(input_txid.clone());
                     has_missing = true;
                 }
             }
             if has_missing {
                 with_missing.push(i);
-                result.with_missing_inputs.push(self.txs[i].txid());
+                result.with_missing_inputs.push(txids[i].clone());
             } else {
                 pending.push(i);
             }
         }
 
-        // Process pending transactions
-        let mut sorted_pending: Vec<usize> = Vec::new();
-        while !pending.is_empty() {
-            let old_len = pending.len();
-            pending.retain(|&i| {
-                let all_inputs_valid = self.txs[i]
-                    .input_txids
-                    .iter()
-                    .all(|txid| valid_txids.contains_key(txid));
-                if all_inputs_valid {
-                    valid_txids.insert(self.txs[i].txid(), true);
-                    sorted_pending.push(i);
-                    false
-                } else {
-                    true
+        // Each pending transaction waits on its inputs that are not valid
+        // yet; `dependents` lists the waiters of each such txid.
+        let n = self.txs.len();
+        let mut waiting_on = vec![0usize; n];
+        let mut dependents: HashMap<&str, Vec<usize>> = HashMap::new();
+        for &i in &pending {
+            for input_txid in &self.txs[i].input_txids {
+                if !valid_txids.contains_key(input_txid) {
+                    waiting_on[i] += 1;
+                    dependents.entry(input_txid.as_str()).or_default().push(i);
                 }
-            });
-            if pending.len() == old_len {
-                break;
+            }
+        }
+
+        // Accept in (scan, position) order. A transaction's scan is the first
+        // in which every input it waits on was valid before its position: an
+        // input made valid at (scan s, position p) counts from scan s for a
+        // waiter after p, and from scan s + 1 for a waiter before p. A txid is
+        // valid from its first accepted entry.
+        let mut scan = vec![0usize; n];
+        let mut accepted = vec![false; n];
+        let mut ready: BinaryHeap<Reverse<(usize, usize)>> = pending
+            .iter()
+            .filter(|&&i| waiting_on[i] == 0)
+            .map(|&i| Reverse((0, i)))
+            .collect();
+        let mut sorted_pending: Vec<usize> = Vec::new();
+        while let Some(Reverse((s, i))) = ready.pop() {
+            accepted[i] = true;
+            sorted_pending.push(i);
+            if valid_txids.insert(txids[i].clone(), true).is_some() {
+                continue; // a repeated txid: its waiters were released already
+            }
+            for j in dependents.remove(txids[i].as_str()).unwrap_or_default() {
+                let from = if i < j { s } else { s + 1 };
+                scan[j] = scan[j].max(from);
+                waiting_on[j] -= 1;
+                if waiting_on[j] == 0 {
+                    ready.push(Reverse((scan[j], j)));
+                }
             }
         }
 
         // Remaining are not valid
-        for &i in &pending {
-            result.not_valid.push(self.txs[i].txid());
+        let not_valid: Vec<usize> = pending.into_iter().filter(|&i| !accepted[i]).collect();
+        for &i in &not_valid {
+            result.not_valid.push(txids[i].clone());
         }
 
         // Collect valid txids
         result.valid = valid_txids.keys().cloned().collect();
 
         // Reorder transactions - build new order indices
-        let mut new_order: Vec<usize> = Vec::new();
+        let mut new_order: Vec<usize> = Vec::with_capacity(n);
         new_order.extend(&with_missing);
-        new_order.extend(&pending);
+        new_order.extend(&not_valid);
         new_order.extend(&txid_only);
         new_order.extend(&with_proof);
         new_order.extend(&sorted_pending);
 
-        // Rebuild txs in new order
-        let old_txs = std::mem::take(&mut self.txs);
-        let old_len = old_txs.len();
-
-        // Convert to a vector we can index into
-        let old_vec: Vec<BeefTx> = old_txs;
-
-        // Build new txs in order
-        for &i in &new_order {
-            if i < old_len {
-                self.txs.push(old_vec[i].clone());
-            }
-        }
-
-        // If we didn't add all txs (due to dedup in order), add remaining
-        if self.txs.len() < old_len {
-            for (i, tx) in old_vec.into_iter().enumerate() {
-                if !new_order.contains(&i) {
-                    self.txs.push(tx);
-                }
-            }
-        }
+        // Move the transactions into the new order (every index is in exactly
+        // one of the five lists; anything left over keeps its relative order
+        // at the end, as before).
+        let mut old: Vec<Option<BeefTx>> = std::mem::take(&mut self.txs)
+            .into_iter()
+            .map(Some)
+            .collect();
+        self.txs = new_order.iter().filter_map(|&i| old[i].take()).collect();
+        self.txs.extend(old.into_iter().flatten());
 
         self.needs_sort = false;
         self.rebuild_index();
@@ -794,9 +870,35 @@ impl Beef {
     }
 
     /// Parses a BEEF from binary data.
+    ///
+    /// No count is bounded beyond what the bytes hold; a door that reads a
+    /// stranger's BEEF can bound it with [`Beef::from_binary_with_limits`].
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
         let mut reader = Reader::new(bin);
         Self::from_reader(&mut reader)
+    }
+
+    /// Parses a BEEF from binary data, refusing it when it is longer than
+    /// `limits.max_bytes` or when its count prefix claims more than
+    /// `limits.max_bumps` BUMPs or `limits.max_txs` transactions. Each count
+    /// is checked on its prefix, before one entry of that kind is read or
+    /// stored, and the refusal is a [`crate::Error::BeefError`] naming the
+    /// limit and the count. An Atomic BEEF is bounded on its inner counts
+    /// and on its whole length.
+    ///
+    /// The walks over a parsed BEEF's transactions (the link, the sort,
+    /// `verify_valid`, the serializers) keep their work on the heap, so the
+    /// limits bound memory and time, not stack depth.
+    pub fn from_binary_with_limits(bin: &[u8], limits: &BeefLimits) -> Result<Self> {
+        if bin.len() > limits.max_bytes {
+            return Err(crate::Error::BeefError(format!(
+                "BEEF of {} bytes is over max_bytes {}",
+                bin.len(),
+                limits.max_bytes
+            )));
+        }
+        let mut reader = Reader::new(bin);
+        Self::read(&mut reader, Some(limits))
     }
 
     /// Parses a BEEF from a hex string.
@@ -807,6 +909,11 @@ impl Beef {
 
     /// Parses a BEEF from a Reader.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
+        Self::read(reader, None)
+    }
+
+    /// The parse, with the count bounds when a door gave them.
+    fn read(reader: &mut Reader, limits: Option<&BeefLimits>) -> Result<Self> {
         let mut version = reader.read_u32_le()?;
         let mut atomic_txid = None;
 
@@ -831,6 +938,14 @@ impl Beef {
 
         // Read bumps
         let bump_count = reader.read_var_int_num()?;
+        if let Some(limits) = limits {
+            if bump_count > limits.max_bumps {
+                return Err(crate::Error::BeefError(format!(
+                    "BEEF claims {} BUMPs, over max_bumps {}",
+                    bump_count, limits.max_bumps
+                )));
+            }
+        }
         for _ in 0..bump_count {
             let bump = MerklePath::from_reader(reader)?;
             beef.bumps.push(bump);
@@ -838,6 +953,14 @@ impl Beef {
 
         // Read transactions
         let tx_count = reader.read_var_int_num()?;
+        if let Some(limits) = limits {
+            if tx_count > limits.max_txs {
+                return Err(crate::Error::BeefError(format!(
+                    "BEEF claims {} transactions, over max_txs {}",
+                    tx_count, limits.max_txs
+                )));
+            }
+        }
         for _ in 0..tx_count {
             let tx = BeefTx::from_reader(reader, version)?;
             let txid = tx.txid();
@@ -2386,5 +2509,454 @@ mod merkle_path_reattach_tests {
             "the fixture BEEF holds the funding plus every level, each once"
         );
         (beef.to_binary(), subject_txid)
+    }
+}
+
+/// The walks made iterative in 0.3.35 (bsv-stack-lean #57) against their
+/// 0.3.34 recursive and rescanning forms, kept here verbatim as the
+/// reference, on seeded random BEEFs: a DAG of spends with proven roots,
+/// inputs missing from the BEEF, txid-only entries, repeated entries and a
+/// shuffled wire order. Same link shape, same sort, same bytes.
+#[cfg(test)]
+mod iterative_equivalence_tests {
+    use super::*;
+    use crate::script::{LockingScript, UnlockingScript};
+    use crate::transaction::{TransactionInput, TransactionOutput};
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::{Rng, SeedableRng};
+    use std::collections::HashSet;
+
+    // ---- the 0.3.34 forms, verbatim but for being free functions ----
+
+    fn legacy_attach_proof_memoized(
+        beef: &Beef,
+        tx: &mut Transaction,
+        stubs: &mut HashMap<String, Transaction>,
+    ) {
+        let txid = tx.id();
+        if tx.merkle_path.is_none() {
+            if let Some(mp) = beef.find_bump(&txid) {
+                tx.merkle_path = Some(mp.clone());
+            }
+        }
+        if tx.merkle_path.is_some() {
+            return; // proven: no ancestry needed
+        }
+        for input in tx.inputs.iter_mut() {
+            let Some(src_txid) = input.source_txid.clone() else {
+                continue;
+            };
+            if let Some(stub) = stubs.get(&src_txid) {
+                input.source_transaction = Some(Box::new(stub.clone()));
+                continue;
+            }
+            let mut src = match input.source_transaction.take() {
+                Some(own) => *own,
+                None => match beef.find_txid(&src_txid).and_then(|b| b.tx().cloned()) {
+                    Some(found) => found,
+                    None => continue,
+                },
+            };
+            let stub = Beef::bare_stub(&mut src, beef.find_bump(&src_txid));
+            stubs.insert(src_txid, stub);
+            legacy_attach_proof_memoized(beef, &mut src, stubs);
+            input.source_transaction = Some(Box::new(src));
+        }
+    }
+
+    fn legacy_find_atomic_transaction(beef: &Beef, txid: &str) -> Option<Transaction> {
+        let mut tx = beef.find_txid(txid)?.tx().cloned()?;
+        let mut stubs: HashMap<String, Transaction> = HashMap::new();
+        legacy_attach_proof_memoized(beef, &mut tx, &mut stubs);
+        Some(tx)
+    }
+
+    fn legacy_sort_txs(beef: &mut Beef) -> SortResult {
+        let mut result = SortResult::default();
+        let mut valid_txids: HashMap<String, bool> = HashMap::new();
+        let mut txid_to_idx: HashMap<String, usize> = HashMap::new();
+
+        for (i, tx) in beef.txs.iter().enumerate() {
+            txid_to_idx.insert(tx.txid(), i);
+        }
+
+        let mut with_proof: Vec<usize> = Vec::new();
+        let mut txid_only: Vec<usize> = Vec::new();
+        let mut queue: Vec<usize> = Vec::new();
+
+        for (i, tx) in beef.txs.iter_mut().enumerate() {
+            tx.is_valid = Some(tx.has_proof());
+            if tx.has_proof() {
+                valid_txids.insert(tx.txid(), true);
+                with_proof.push(i);
+            } else if tx.is_txid_only() && tx.input_txids.is_empty() {
+                valid_txids.insert(tx.txid(), true);
+                txid_only.push(i);
+                result.txid_only.push(tx.txid());
+            } else {
+                queue.push(i);
+            }
+        }
+
+        let mut with_missing: Vec<usize> = Vec::new();
+        let mut pending: Vec<usize> = Vec::new();
+
+        for &i in &queue {
+            let mut has_missing = false;
+            for input_txid in &beef.txs[i].input_txids {
+                if !txid_to_idx.contains_key(input_txid) {
+                    result.missing_inputs.push(input_txid.clone());
+                    has_missing = true;
+                }
+            }
+            if has_missing {
+                with_missing.push(i);
+                result.with_missing_inputs.push(beef.txs[i].txid());
+            } else {
+                pending.push(i);
+            }
+        }
+
+        let mut sorted_pending: Vec<usize> = Vec::new();
+        while !pending.is_empty() {
+            let old_len = pending.len();
+            pending.retain(|&i| {
+                let all_inputs_valid = beef.txs[i]
+                    .input_txids
+                    .iter()
+                    .all(|txid| valid_txids.contains_key(txid));
+                if all_inputs_valid {
+                    valid_txids.insert(beef.txs[i].txid(), true);
+                    sorted_pending.push(i);
+                    false
+                } else {
+                    true
+                }
+            });
+            if pending.len() == old_len {
+                break;
+            }
+        }
+
+        for &i in &pending {
+            result.not_valid.push(beef.txs[i].txid());
+        }
+
+        result.valid = valid_txids.keys().cloned().collect();
+
+        let mut new_order: Vec<usize> = Vec::new();
+        new_order.extend(&with_missing);
+        new_order.extend(&pending);
+        new_order.extend(&txid_only);
+        new_order.extend(&with_proof);
+        new_order.extend(&sorted_pending);
+
+        let old_txs = std::mem::take(&mut beef.txs);
+        let old_len = old_txs.len();
+        let old_vec: Vec<BeefTx> = old_txs;
+        for &i in &new_order {
+            if i < old_len {
+                beef.txs.push(old_vec[i].clone());
+            }
+        }
+        if beef.txs.len() < old_len {
+            for (i, tx) in old_vec.into_iter().enumerate() {
+                if !new_order.contains(&i) {
+                    beef.txs.push(tx);
+                }
+            }
+        }
+
+        beef.needs_sort = false;
+        beef.rebuild_index();
+
+        result
+    }
+
+    fn legacy_collect_ancestors(
+        tx: &Transaction,
+        allow_partial: bool,
+        seen_txids: &mut HashSet<String>,
+        ancestors: &mut Vec<Transaction>,
+        bumps: &mut Vec<MerklePath>,
+        bump_index_by_root: &mut HashMap<String, usize>,
+    ) -> Result<()> {
+        let txid = tx.id();
+        if seen_txids.contains(&txid) {
+            return Ok(());
+        }
+        if let Some(ref merkle_path) = tx.merkle_path {
+            let root = merkle_path.compute_root(Some(&txid)).unwrap_or_default();
+            let key = format!("{}:{}", merkle_path.block_height, root);
+            if let Some(&existing_idx) = bump_index_by_root.get(&key) {
+                if bumps[existing_idx].combine(merkle_path).is_err() {
+                    let new_idx = bumps.len();
+                    bumps.push(merkle_path.clone());
+                    bump_index_by_root.insert(key, new_idx);
+                }
+            } else {
+                let new_idx = bumps.len();
+                bumps.push(merkle_path.clone());
+                bump_index_by_root.insert(key, new_idx);
+            }
+            seen_txids.insert(txid);
+            ancestors.push(tx.clone());
+            return Ok(());
+        }
+        for i in (0..tx.inputs.len()).rev() {
+            let input = &tx.inputs[i];
+            if let Some(ref source_tx) = input.source_transaction {
+                legacy_collect_ancestors(
+                    source_tx,
+                    allow_partial,
+                    seen_txids,
+                    ancestors,
+                    bumps,
+                    bump_index_by_root,
+                )?;
+            } else if !allow_partial {
+                let source_txid = input.source_txid.as_deref().unwrap_or("unknown");
+                return Err(crate::Error::TransactionError(format!(
+                    "Missing source transaction for input {} (txid: {}). \
+                     Set allow_partial=true to skip missing source transactions.",
+                    i, source_txid
+                )));
+            }
+        }
+        seen_txids.insert(txid);
+        ancestors.push(tx.clone());
+        Ok(())
+    }
+
+    /// 0.3.34's `to_beef` (V2) and `to_atomic_beef`, over the recursive walk.
+    fn legacy_to_beef(tx: &Transaction, allow_partial: bool, atomic: bool) -> Result<Vec<u8>> {
+        let mut beef = Beef::with_version(BEEF_V2);
+        let mut seen_txids: HashSet<String> = HashSet::new();
+        let mut ancestors: Vec<Transaction> = Vec::new();
+        let mut bumps: Vec<MerklePath> = Vec::new();
+        let mut bump_index_by_root: HashMap<String, usize> = HashMap::new();
+        legacy_collect_ancestors(
+            tx,
+            allow_partial,
+            &mut seen_txids,
+            &mut ancestors,
+            &mut bumps,
+            &mut bump_index_by_root,
+        )?;
+        for bump in bumps {
+            beef.merge_bump(bump);
+        }
+        for ancestor in ancestors {
+            beef.merge_transaction(ancestor);
+        }
+        if atomic {
+            beef.to_binary_atomic(&tx.id())
+        } else {
+            Ok(beef.to_binary())
+        }
+    }
+
+    // ---- the random BEEFs ----
+
+    fn random_txid(rng: &mut StdRng) -> String {
+        let bytes: [u8; 32] = rng.gen();
+        to_hex(&bytes)
+    }
+
+    /// A random BEEF of `n` transactions: each spends one to three outputs
+    /// of earlier ones (or, one time in ten, a txid not in the BEEF); one in
+    /// five is proven; one in twenty is a txid-only entry; then a few entries
+    /// are repeated and the wire order is shuffled.
+    fn random_beef(rng: &mut StdRng, n: usize) -> Beef {
+        let lock = LockingScript::from_binary(&[0x51]).unwrap();
+        let mut beef = Beef::new();
+        let mut made: Vec<(String, u32)> = Vec::new();
+        for _ in 0..n {
+            let mut tx = Transaction::new();
+            let inputs = rng.gen_range(1..=3);
+            for _ in 0..inputs {
+                let (txid, vout) = if made.is_empty() || rng.gen_bool(0.1) {
+                    (random_txid(rng), 0)
+                } else {
+                    let (txid, outputs) = &made[rng.gen_range(0..made.len())];
+                    (txid.clone(), rng.gen_range(0..*outputs))
+                };
+                let mut input = TransactionInput::new(txid, vout);
+                input.unlocking_script = Some(UnlockingScript::new());
+                tx.inputs.push(input);
+            }
+            let outputs = rng.gen_range(1..=3);
+            for _ in 0..outputs {
+                tx.outputs.push(TransactionOutput::new(
+                    rng.gen_range(1..10_000),
+                    lock.clone(),
+                ));
+            }
+            let txid = tx.id();
+            if rng.gen_bool(0.05) {
+                beef.merge_txid_only(txid.clone());
+            } else if rng.gen_bool(0.2) {
+                let height = rng.gen_range(800_000..800_003);
+                let bump = beef.merge_bump(MerklePath::from_coinbase_txid(&txid, height));
+                beef.merge_raw_tx(tx.to_binary(), Some(bump));
+            } else {
+                beef.merge_raw_tx(tx.to_binary(), None);
+            }
+            made.push((txid, outputs as u32));
+        }
+        for _ in 0..rng.gen_range(0..3) {
+            let repeat = beef.txs[rng.gen_range(0..beef.txs.len())].clone();
+            beef.txs.push(repeat);
+        }
+        beef.txs.shuffle(rng);
+        beef.rebuild_index();
+        beef
+    }
+
+    /// The linked shape, node by node in preorder: txid, proven or not, and
+    /// for each input whether it carries a source.
+    fn shape(tx: &Transaction) -> Vec<(String, bool, Vec<bool>)> {
+        let mut out = Vec::new();
+        let mut stack = vec![tx];
+        while let Some(t) = stack.pop() {
+            out.push((
+                t.id(),
+                t.merkle_path.is_some(),
+                t.inputs
+                    .iter()
+                    .map(|i| i.source_transaction.is_some())
+                    .collect(),
+            ));
+            for input in t.inputs.iter().rev() {
+                if let Some(src) = input.source_transaction.as_deref() {
+                    stack.push(src);
+                }
+            }
+        }
+        out
+    }
+
+    fn txids(beef: &Beef) -> Vec<String> {
+        beef.txs.iter().map(|t| t.txid()).collect()
+    }
+
+    fn sorted(mut v: Vec<String>) -> Vec<String> {
+        v.sort();
+        v
+    }
+
+    /// Strips every `source_txid` that has a linked source: the shape
+    /// `add_input_from_tx` builds.
+    fn strip_source_txids(tx: &mut Transaction) {
+        tx.invalidate_caches();
+        for input in tx.inputs.iter_mut() {
+            if let Some(src) = input.source_transaction.as_deref_mut() {
+                strip_source_txids(src);
+                input.source_txid = None;
+            }
+        }
+    }
+
+    #[test]
+    fn the_iterative_sort_orders_exactly_as_the_rescan_did() {
+        let mut rng = StdRng::seed_from_u64(57);
+        for round in 0..300 {
+            let n = rng.gen_range(1..40);
+            let beef = random_beef(&mut rng, n);
+            let mut new = beef.clone();
+            let mut old = beef.clone();
+            let a = new.sort_txs();
+            let b = legacy_sort_txs(&mut old);
+            assert_eq!(txids(&new), txids(&old), "round {round}: the order");
+            assert_eq!(a.missing_inputs, b.missing_inputs, "round {round}");
+            assert_eq!(a.not_valid, b.not_valid, "round {round}");
+            assert_eq!(
+                a.with_missing_inputs, b.with_missing_inputs,
+                "round {round}"
+            );
+            assert_eq!(a.txid_only, b.txid_only, "round {round}");
+            assert_eq!(sorted(a.valid), sorted(b.valid), "round {round}");
+            assert_eq!(new.to_binary(), old.to_binary(), "round {round}: the bytes");
+        }
+    }
+
+    #[test]
+    fn the_iterative_link_has_exactly_the_recursive_shape() {
+        let mut rng = StdRng::seed_from_u64(35);
+        let mut linked = 0;
+        for round in 0..300 {
+            let n = rng.gen_range(1..40);
+            let mut beef = random_beef(&mut rng, n);
+            if rng.gen_bool(0.5) {
+                beef.sort_txs();
+            }
+            for txid in txids(&beef) {
+                let new = beef.find_atomic_transaction(&txid);
+                let old = legacy_find_atomic_transaction(&beef, &txid);
+                assert_eq!(
+                    new.as_ref().map(shape),
+                    old.as_ref().map(shape),
+                    "round {round}, subject {txid}"
+                );
+                linked += usize::from(new.is_some());
+            }
+        }
+        assert!(linked > 1_000, "the rounds exercised {linked} subjects");
+    }
+
+    #[test]
+    fn the_iterative_serializers_write_exactly_the_recursive_bytes() {
+        let mut rng = StdRng::seed_from_u64(2026);
+        let mut compared = 0;
+        for round in 0..200 {
+            let n = rng.gen_range(1..30);
+            let beef = random_beef(&mut rng, n);
+            for txid in txids(&beef) {
+                let Some(mut tx) = beef.find_atomic_transaction(&txid) else {
+                    continue;
+                };
+                if rng.gen_bool(0.3) {
+                    strip_source_txids(&mut tx);
+                }
+                for allow_partial in [false, true] {
+                    for atomic in [false, true] {
+                        let new = if atomic {
+                            tx.to_atomic_beef(allow_partial)
+                        } else {
+                            tx.to_beef(allow_partial)
+                        };
+                        let old = legacy_to_beef(&tx, allow_partial, atomic);
+                        assert_eq!(
+                            new.map_err(|e| e.to_string()),
+                            old.map_err(|e| e.to_string()),
+                            "round {round}, subject {txid}, partial {allow_partial}, atomic {atomic}"
+                        );
+                        compared += 1;
+                    }
+                }
+            }
+        }
+        assert!(
+            compared > 1_000,
+            "the rounds compared {compared} serializations"
+        );
+    }
+
+    #[test]
+    fn the_iterative_clone_copies_exactly_what_the_derived_clone_did() {
+        let mut rng = StdRng::seed_from_u64(5);
+        for _ in 0..100 {
+            let n = rng.gen_range(1..30);
+            let beef = random_beef(&mut rng, n);
+            for txid in txids(&beef) {
+                let Some(tx) = beef.find_atomic_transaction(&txid) else {
+                    continue;
+                };
+                let copy = tx.clone();
+                assert_eq!(shape(&copy), shape(&tx));
+                assert_eq!(copy.to_beef(true).ok(), tx.to_beef(true).ok());
+            }
+        }
     }
 }

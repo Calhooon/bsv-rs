@@ -100,7 +100,7 @@ pub mod transaction;
 pub mod tx_json;
 
 // Re-exports for convenience
-pub use beef::{Beef, BeefValidationResult, SortResult};
+pub use beef::{Beef, BeefLimits, BeefValidationResult, SortResult};
 pub use beef_tx::{BeefTx, TxDataFormat, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 pub use broadcaster::{
     is_broadcast_failure, is_broadcast_success, BroadcastFailure, BroadcastResponse,

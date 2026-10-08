@@ -44,7 +44,7 @@ pub struct HistorianConfig<T, C> {
 /// Traverses transaction ancestry to build history.
 ///
 /// Uses an interpreter function to extract values from transaction outputs,
-/// then follows input sources recursively to build a chronological history.
+/// then follows input sources depth first to build a chronological history.
 ///
 /// # Type Parameters
 ///
@@ -98,7 +98,7 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
 
     /// Build history starting from a transaction.
     ///
-    /// Recursively traverses input sources, collecting interpreter results.
+    /// Traverses input sources depth first, collecting interpreter results.
     /// Returns values in chronological order (oldest first).
     ///
     /// # Arguments
@@ -147,19 +147,21 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
         Ok(results)
     }
 
-    /// Recursive traversal helper.
-    fn traverse<'a>(
-        &'a self,
-        tx: &'a Transaction,
-        context: Option<&'a C>,
-        visited: &'a mut HashSet<String>,
-        results: &'a mut Vec<T>,
-    ) -> Pin<Box<dyn Future<Output = Result<()>> + 'a>>
-    where
-        T: 'a,
-        C: 'a,
-    {
-        Box::pin(async move {
+    /// The traversal: depth first, a transaction's outputs interpreted on
+    /// entry, then each input's linked source in input order, a txid visited
+    /// once. The order is the recursive walk's, kept on an explicit stack
+    /// (0.3.35, bsv-stack-lean #57): `from_beef` hands this a lookup answer's
+    /// ancestry, a stranger's chain as deep as its BEEF is long, and the
+    /// recursive future nested one poll per link on the stack.
+    async fn traverse(
+        &self,
+        start: &Transaction,
+        context: Option<&C>,
+        visited: &mut HashSet<String>,
+        results: &mut Vec<T>,
+    ) -> Result<()> {
+        let mut stack: Vec<&Transaction> = vec![start];
+        while let Some(tx) = stack.pop() {
             let txid = tx.id();
 
             // Prevent cycles
@@ -167,7 +169,7 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
                 if self.debug {
                     eprintln!("[Historian] Skipping visited: {}", txid);
                 }
-                return Ok(());
+                continue;
             }
             visited.insert(txid.clone());
 
@@ -185,17 +187,18 @@ impl<T: Clone + Send + Sync + 'static, C: Send + Sync + 'static> Historian<T, C>
                 }
             }
 
-            // Traverse input sources
-            for input in &tx.inputs {
+            // Traverse input sources: pushed last to first, so the first
+            // input's ancestry is walked first.
+            for input in tx.inputs.iter().rev() {
                 if let Some(ref source_tx) = input.source_transaction {
-                    self.traverse(source_tx, context, visited, results).await?;
+                    stack.push(source_tx);
                 } else if self.debug {
                     eprintln!("[Historian] Input missing source transaction");
                 }
             }
+        }
 
-            Ok(())
-        })
+        Ok(())
     }
 
     /// Generate cache key for a transaction and context.
@@ -262,37 +265,42 @@ impl<T: Clone + Send + Sync, C: Send + Sync> SyncHistorian<T, C> {
         results
     }
 
-    /// Recursive traversal helper.
+    /// The traversal, in the order of [`Historian`]'s: depth first, outputs
+    /// on entry, sources in input order, a txid visited once, on an explicit
+    /// stack.
     fn traverse(
         &self,
-        tx: &Transaction,
+        start: &Transaction,
         context: Option<&C>,
         visited: &mut HashSet<String>,
         results: &mut Vec<T>,
     ) {
-        let txid = tx.id();
+        let mut stack: Vec<&Transaction> = vec![start];
+        while let Some(tx) = stack.pop() {
+            let txid = tx.id();
 
-        // Prevent cycles
-        if visited.contains(&txid) {
-            return;
-        }
-        visited.insert(txid.clone());
-
-        if self.debug {
-            eprintln!("[SyncHistorian] Processing: {}", txid);
-        }
-
-        // Interpret each output
-        for (idx, _output) in tx.outputs.iter().enumerate() {
-            if let Some(value) = (self.interpreter)(tx, idx as u32, context) {
-                results.push(value);
+            // Prevent cycles
+            if visited.contains(&txid) {
+                continue;
             }
-        }
+            visited.insert(txid.clone());
 
-        // Traverse input sources
-        for input in &tx.inputs {
-            if let Some(ref source_tx) = input.source_transaction {
-                self.traverse(source_tx, context, visited, results);
+            if self.debug {
+                eprintln!("[SyncHistorian] Processing: {}", txid);
+            }
+
+            // Interpret each output
+            for (idx, _output) in tx.outputs.iter().enumerate() {
+                if let Some(value) = (self.interpreter)(tx, idx as u32, context) {
+                    results.push(value);
+                }
+            }
+
+            // Traverse input sources, the first input's ancestry first
+            for input in tx.inputs.iter().rev() {
+                if let Some(ref source_tx) = input.source_transaction {
+                    stack.push(source_tx);
+                }
             }
         }
     }
@@ -424,5 +432,84 @@ mod tests {
         let history2 = historian.build_history(&tx, None).await.unwrap();
 
         assert_eq!(history1, history2);
+    }
+
+    /// The 0.3.34 recursive traversal, verbatim but for being a free
+    /// function: the reference order for the iterative walk (0.3.35).
+    fn legacy_traverse(tx: &Transaction, visited: &mut HashSet<String>, results: &mut Vec<String>) {
+        let txid = tx.id();
+        if visited.contains(&txid) {
+            return;
+        }
+        visited.insert(txid.clone());
+        for idx in 0..tx.outputs.len() {
+            results.push(format!("{txid}:{idx}"));
+        }
+        for input in &tx.inputs {
+            if let Some(ref source_tx) = input.source_transaction {
+                legacy_traverse(source_tx, visited, results);
+            }
+        }
+    }
+
+    /// A random linked ancestry: each transaction spends one to three of the
+    /// earlier ones (copies, so a txid recurs along several paths) and pays
+    /// one to three outputs.
+    fn random_ancestry(rng: &mut rand::rngs::StdRng, n: usize) -> Transaction {
+        use rand::Rng;
+        let mut made: Vec<Transaction> = Vec::new();
+        for k in 0..n {
+            let mut tx = Transaction::new();
+            for _ in 0..rng.gen_range(1..=3usize) {
+                if made.is_empty() {
+                    tx.inputs
+                        .push(TransactionInput::new(format!("{k:064x}"), 0));
+                } else {
+                    let source = made[rng.gen_range(0..made.len())].clone();
+                    let mut input = TransactionInput::new(source.id(), 0);
+                    input.source_transaction = Some(Box::new(source));
+                    tx.inputs.push(input);
+                }
+            }
+            for _ in 0..rng.gen_range(1..=3usize) {
+                tx.outputs.push(TransactionOutput::new(
+                    rng.gen_range(1..1_000u64),
+                    LockingScript::from_asm("OP_TRUE").unwrap(),
+                ));
+            }
+            made.push(tx);
+        }
+        made.pop().unwrap()
+    }
+
+    #[tokio::test]
+    async fn the_iterative_historians_visit_in_the_recursive_order() {
+        use rand::SeedableRng;
+        let mut rng = rand::rngs::StdRng::seed_from_u64(57);
+        for round in 0..100 {
+            let tx = random_ancestry(&mut rng, 12);
+            let mut expected = Vec::new();
+            legacy_traverse(&tx, &mut HashSet::new(), &mut expected);
+            expected.reverse();
+
+            let sync =
+                SyncHistorian::<String, ()>::new(|tx, vout, _| Some(format!("{}:{vout}", tx.id())));
+            assert_eq!(
+                sync.build_history(&tx, None),
+                expected,
+                "round {round}: sync"
+            );
+
+            let interpreter: InterpreterFn<String, ()> = Box::new(|tx, vout, _| {
+                let value = format!("{}:{vout}", tx.id());
+                Box::pin(async move { Some(value) })
+            });
+            let historian = Historian::new(interpreter, HistorianConfig::default());
+            assert_eq!(
+                historian.build_history(&tx, None).await.unwrap(),
+                expected,
+                "round {round}: async"
+            );
+        }
     }
 }
