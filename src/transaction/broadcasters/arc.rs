@@ -79,17 +79,25 @@ mod verdict {
         "MINED_IN_STALE_BLOCK",
     ];
 
-    /// The `txStatus` words the reference accepts (`ARC.ts:28-38`); any other word
-    /// on a 2xx is an invalid response, as there (`ARC.ts:157-159`).
-    const ARC_ACCEPTED_STATUSES: [&str; 9] = [
+    /// The `txStatus` words accepted on a 2xx: the reference's set (`ARC.ts:28-38`)
+    /// plus the three non-error states the reference's own spec and go-sdk accept
+    /// and the reference's code does not (`specs/broadcast/arc.yaml:407-415` lists
+    /// REQUESTED_BY_NETWORK as a success status; `go-sdk transaction/broadcaster/arc.go:18-31`
+    /// accepts QUEUED, REQUESTED_BY_NETWORK and CONFIRMED). Every accepted word is a
+    /// hint about the transaction, never evidence (bsv-stack-lean, the tracker);
+    /// any other word on a 2xx is an invalid response (`ARC.ts:157-159`).
+    const ARC_ACCEPTED_STATUSES: [&str; 12] = [
         "SUCCESS",
         "RECEIVED",
-        "SENT_TO_NETWORK",
+        "QUEUED",
+        "STORED",
         "ANNOUNCED_TO_NETWORK",
+        "REQUESTED_BY_NETWORK",
+        "SENT_TO_NETWORK",
         "ACCEPTED_BY_NETWORK",
         "SEEN_ON_NETWORK",
-        "STORED",
         "MINED",
+        "CONFIRMED",
         "IMMUTABLE",
     ];
 
