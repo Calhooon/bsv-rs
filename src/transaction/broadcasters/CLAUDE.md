@@ -31,6 +31,19 @@ bsv-rs = { version = "0.3", features = ["transaction", "http"] }
 
 Without the `http` feature, calling `broadcast()` returns an error with code `NO_HTTP`.
 
+## The ARC verdict on a 2xx
+
+ARC answers `POST /v1/tx` with an HTTP 2xx whenever it processed the request and puts the transaction's fate in the body's `txStatus` (`arc@e7efc5b internal/api/handler/default.go:489-500`). `ArcBroadcaster` reads `txStatus` and applies the reference's rule (`ts-stack@edf6e03 packages/sdk/src/transaction/broadcasters/ARC.ts:110-180`), in `arc_success_verdict`:
+
+| the body says | the verdict |
+|---|---|
+| `DOUBLE_SPEND_ATTEMPTED`, `REJECTED`, `INVALID`, `MALFORMED`, `MINED_IN_STALE_BLOCK`, or `ORPHAN` anywhere in the status or `extraInfo` | `Err(BroadcastFailure)`: `code` the status word, `description` the word and the `extraInfo`, `more` = `{extraInfo, competingTxs}` when sent |
+| the failure names another transaction's `txid` | `Err`, `ERR_TXID_MISMATCH` |
+| no `txStatus`, or one outside the reference's accepted set, or a `competingTxs` that is not a list of distinct txids | `Err`, `ERR_INVALID_RESPONSE` |
+| `SUCCESS`, `RECEIVED`, `SENT_TO_NETWORK`, `ANNOUNCED_TO_NETWORK`, `ACCEPTED_BY_NETWORK`, `SEEN_ON_NETWORK`, `STORED`, `MINED`, `IMMUTABLE` | `Ok(BroadcastResponse)`: `message` the status word, `competing_txs` ARC's, lower-cased |
+
+The HTTP code never decides a 2xx. The vector is `tests/vectors/arc_tx_status_verdicts.json`; the parity notes are in `CHANGELOG.md` (0.3.34). Before 0.3.34 every 2xx was a success (bsv-stack-lean #35, P0-2).
+
 ## Key Exports
 
 ### ArcConfig
