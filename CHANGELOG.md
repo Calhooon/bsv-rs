@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.34] - 2026-10-08
+
 ### Changed — QUEUED, REQUESTED_BY_NETWORK and CONFIRMED are accepted on a 2xx
 
 - The reference's spec (`specs/broadcast/arc.yaml`) and go-sdk accept these three
