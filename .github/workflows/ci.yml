@@ -2,9 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
   pull_request:
-    branches: [main, master]
+    branches: [main]
+  # release.yml runs these same jobs on a version tag before it publishes
+  workflow_call:
+
+permissions:
+  contents: read
+
+# a newer push to the same branch or PR cancels the run it supersedes; a tag's run is never cancelled
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -101,6 +111,47 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --all -- --check
+
+  # the conformance vectors as one named check (a required status on main): the shared JSON under
+  # tests/vectors/ and the ts-stack corpus. The conformance files skip when the corpus is absent
+  # (Calhooon/bsv-rs#31), so the corpus is checked out at the commit the pinned totals were audited
+  # against (5,116 evaluation vectors) and its presence is asserted before the tests run
+  vectors:
+    name: vectors
+    runs-on: ubuntu-latest
+    env:
+      BSV_CONFORMANCE_DIR: ${{ github.workspace }}/ts-stack/conformance
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check out the ts-stack conformance corpus
+        uses: actions/checkout@v4
+        with:
+          repository: bsv-blockchain/ts-stack
+          ref: edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9
+          path: ts-stack
+          sparse-checkout: conformance
+          persist-credentials: false
+
+      - name: Assert the corpus is present
+        run: test -f "$BSV_CONFORMANCE_DIR/META.json"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-vectors-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ubuntu-vectors-
+
+      - name: Run the vector-backed tests
+        run: cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --verbose -- --nocapture
 
   docs:
     name: Documentation
