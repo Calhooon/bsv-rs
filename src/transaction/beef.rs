@@ -681,7 +681,10 @@ impl Beef {
     ///   0; at any other offset it is [`Kind::MissingSibling`] (NL-8 W2). Two
     ///   BUMPs at one height with different roots: [`Kind::RootNotCarried`]
     ///   (the headers carry one root per height).
-    /// - A raw transaction with no input: [`Kind::NoInputs`] (0.4.1).
+    /// - A raw transaction with no input: [`Kind::NoInputs`] (0.4.1); one with
+    ///   an input and no output: [`Kind::NoOutputs`] (0.4.3). The first such
+    ///   transaction in the order held when this is called, as the reader
+    ///   meets the first on the wire.
     /// - A txid-only entry no BUMP of this BEEF proves: [`Kind::StubNotProven`]
     ///   (NL-8 W5).
     /// - A BUMP index that names no BUMP, or a BUMP that does not carry the
@@ -707,6 +710,17 @@ impl Beef {
             Some(subject) => self.atomic_rule(&subject),
             None => Ok(()),
         };
+        // The first transaction that is no transaction, in the order held
+        // (the reader's), before the sort moves it.
+        let no_transaction = self.txs.iter().find_map(|tx| {
+            if tx.has_no_inputs() {
+                Some(Kind::NoInputs)
+            } else if tx.has_no_outputs() {
+                Some(Kind::NoOutputs)
+            } else {
+                None
+            }
+        });
         let sr = self.sort_txs();
 
         // Each BUMP's root, by the streaming reader's walk: once per BUMP,
@@ -741,8 +755,8 @@ impl Beef {
             .collect();
         let proven: HashSet<&str> = carried.iter().map(|(_, h)| *h).collect();
 
-        if self.txs.iter().any(BeefTx::has_no_inputs) {
-            return Err(Kind::NoInputs);
+        if let Some(kind) = no_transaction {
+            return Err(kind);
         }
 
         let mut valid_txids: HashSet<String> = HashSet::new();

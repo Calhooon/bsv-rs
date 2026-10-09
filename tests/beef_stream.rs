@@ -296,10 +296,10 @@ fn chain(n: usize, atomic: bool) -> Chain {
 }
 
 #[test]
-fn the_nineteen_kinds_are_nineteen_and_distinct() {
+fn the_twenty_kinds_are_twenty_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 19);
-    assert_eq!(all.len(), 19);
+    assert_eq!(Kind::ALL.len(), 20);
+    assert_eq!(all.len(), 20);
 }
 
 #[test]
@@ -1038,7 +1038,7 @@ fn a_block_of_one_transaction_has_a_one_leaf_bump_whose_root_is_the_txid() {
 }
 
 // ---------------------------------------------------------------------------
-// The spends: the interpreter's verdict, never one of the nineteen kinds
+// The spends: the interpreter's verdict, never one of the twenty kinds
 // ---------------------------------------------------------------------------
 
 const OP_TRUE: &[u8] = &[0x51];
