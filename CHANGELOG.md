@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-09
+
+A raw transaction with no input is invalid bytes (bsv-stack-lean #58, found by
+the middleware's door, bsv-middleware-rs 0.4.0). The rule is the node's and is
+cited, not restated: bsv-script-lean at `87f0461`,
+`lean/BsvScript/TxRules.lean:85` (`checkTransactionCommon`, the verdict
+`vinEmpty`; the theorem `checkTransactionCommon_vinEmpty`, `:216-219`), its
+page `docs/BLOCK-CONSENSUS.md:31-32`, the S6 issue #61 under the charter #58.
+The posture of 0.4.0 stands: nothing is refused for a size or a count.
+
+### Fixed: a transaction with no input was read as valid
+
+- The streaming reader held an unproven transaction by its inputs alone, so
+  one with no input passed with nothing proven beneath it, and a payment
+  spending it was `Valid` whenever the BEEF also carried any BUMP the headers
+  knew (a proven stranger beside it was enough). `Beef::verify_valid` read the
+  same bytes as valid for the same reason. Under a BUMP index the bytes were
+  taken on the BUMP's word, though no block holds such a transaction.
+- `verify_stream`, `verify_stream_structure`, `verify_stream_two_pass`,
+  `verify_stream_async` and `BeefStream` itself now refuse it as
+  `Invalid { offset, kind: Kind::NoInputs, reason: Reason::NoInputs }`, the
+  offset the transaction's leading byte, with or without a BUMP index, in V1
+  and V2. The decoder refuses the element when its last byte is read
+  (`BeefDecoder`), and `BeefIndex::fold` holds an element built by hand to the
+  same rule.
+- `Beef::verify_valid` and `Beef::is_valid` answer not valid for a BEEF that
+  carries one (`BeefTx::has_no_inputs`, new).
+- The witnesses, red at 0.4.0 (`Valid` in every one) and green here, in
+  `tests/beef_stream.rs`:
+  `a_transaction_with_no_input_is_invalid_bytes_at_its_offset` (the
+  middleware's BEEF: a proven stranger, the transaction with no input, a
+  payment spending it), `a_transaction_with_no_input_is_invalid_under_a_bump_too`
+  and `the_asynchronous_reader_refuses_a_transaction_with_no_input`.
+- The specification moved with it: `BeefOfAnySize` of bsv-stack-lean gains
+  `Reason.noInputs` and its theorem (NL-1c). The rows this crate replays gave
+  their proven anchor one input; `tests/beef_stream_deep.rs` holds the Lean's
+  new counts (6,000,112 bytes and 6,700,132 units of work at 100,000 links).
+
+### Changed
+
+- `Kind` and `Reason` gain the variant `NoInputs`, and `Kind::ALL` is
+  `[Kind; 19]`. Neither enum is `#[non_exhaustive]`: an exhaustive `match` on
+  `Kind` or `Reason` needs the one new arm, and a binding typed `[Kind; 18]`
+  needs `19`.
+- A BEEF built for a test around a synthetic root (a `Transaction::new()` with
+  outputs and no input) is no longer valid to `verify_valid` or the streaming
+  reader. Give the root an input and a merkle path, as `examples/beef_spv.rs`
+  now does (the README's block follows it).
+- `Transaction::verify` is unchanged: it still walks a linked object graph and
+  still exempts a transaction with no inputs from the value rule.
+
+### Notes: cross-SDK parity
+
+- The reference's `Beef.verifyValid` has no such check
+  (`ts-stack@edf6e03 packages/sdk/src/transaction/Beef.ts:1054-1075`, and the
+  sort at `:1456-1470` queues an unproven transaction with no input with
+  nothing to wait on), so it reads these bytes as valid. This crate follows
+  the node. Read at the pin, not run against the reference.
+
 ## [0.4.0] - 2026-10-09
 
 The posture (bsv-stack-lean, the charter "a BEEF of any size", the owner's
