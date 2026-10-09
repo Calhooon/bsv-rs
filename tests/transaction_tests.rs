@@ -1494,10 +1494,10 @@ mod transaction_tests {
     mod p2pkh_e2e_tests {
         use bsv_rs::primitives::ec::PrivateKey;
         use bsv_rs::script::templates::P2PKH;
-        use bsv_rs::script::{ScriptTemplate, SignOutputs};
+        use bsv_rs::script::{ScriptTemplate, SignOutputs, UnlockingScript};
         use bsv_rs::transaction::{
             AlwaysValidChainTracker, ChangeDistribution, SatoshisPerKilobyte, Transaction,
-            TransactionOutput,
+            TransactionInput, TransactionOutput,
         };
 
         /// Build a P2PKH source transaction with a single output of the given amount,
@@ -1507,7 +1507,14 @@ mod transaction_tests {
             let p2pkh = P2PKH::new();
             let locking_script = p2pkh.lock(&pubkey_hash).expect("P2PKH lock should work");
 
+            // One input, spending a coin this test does not carry: a
+            // transaction with no input is no transaction, and `verify`
+            // refuses one (0.4.3, bsv-stack-lean #59). A test that verifies
+            // a spend of it proves it with a merkle path.
             let mut source_tx = Transaction::new();
+            let mut coin = TransactionInput::new("11".repeat(32), 0);
+            coin.unlocking_script = Some(UnlockingScript::new());
+            source_tx.add_input(coin).expect("add_input should work");
             source_tx
                 .add_output(TransactionOutput::new(satoshis, locking_script))
                 .expect("add_output should work");
@@ -1652,8 +1659,13 @@ mod transaction_tests {
             let pubkey_hash = private_key.public_key().hash160();
             let p2pkh = P2PKH::new();
 
-            // Create source transaction
-            let source_tx = build_source_tx(&private_key, 50_000);
+            // Create source transaction, mined (the one transaction of its block)
+            let mut source_tx = build_source_tx(&private_key, 50_000);
+            let source_txid = source_tx.id();
+            source_tx.merkle_path = Some(bsv_rs::transaction::MerklePath::from_coinbase_txid(
+                &source_txid,
+                800_000,
+            ));
 
             // Create spending transaction
             let mut spend_tx = Transaction::new();

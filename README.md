@@ -184,22 +184,32 @@ fn main() {
 // examples/transaction.rs
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::script::templates::P2PKH;
-use bsv_rs::script::SignOutputs;
-use bsv_rs::transaction::{MockChainTracker, Transaction, TransactionInput, TransactionOutput};
+use bsv_rs::script::{SignOutputs, UnlockingScript};
+use bsv_rs::transaction::{
+    MerklePath, MockChainTracker, Transaction, TransactionInput, TransactionOutput,
+};
 
 fn main() {
     let key = PrivateKey::random();
     let address = key.public_key().to_address();
 
-    // A funding transaction that pays our address (synthetic: no inputs, so it
-    // is a root the verifier never has to judge).
+    // A funding transaction that pays our address. It spends a coin this
+    // program does not carry, which its merkle path vouches for (here it is
+    // the one transaction of its block, so the block's root is its txid). A
+    // transaction with no input, or with no output, is no transaction, and
+    // `verify` refuses one.
     let mut funding = Transaction::new();
+    let mut mined = TransactionInput::new("11".repeat(32), 0);
+    mined.unlocking_script = Some(UnlockingScript::new());
+    funding.add_input(mined).unwrap();
     funding
         .add_output(TransactionOutput::new(
             10_000,
             P2PKH::lock_from_address(&address).unwrap(),
         ))
         .unwrap();
+    let funding_txid = funding.id();
+    funding.merkle_path = Some(MerklePath::from_coinbase_txid(&funding_txid, 800_000));
 
     // The spend: one input sourcing the funding output (the whole source
     // transaction rides along, which is what SPV-style verification needs),
@@ -218,9 +228,11 @@ fn main() {
     // `verify` walks the ancestry by txid: a proven transaction is checked
     // against the chain tracker; an unproven one has every input's script
     // EXECUTED against its source output, and its outputs weighed against its
-    // inputs. This chain is unproven end to end, so the tracker is never
-    // asked and the interpreter is the whole verdict.
-    let tracker = MockChainTracker::new(0);
+    // inputs. The spend is unproven, so the interpreter judges it; the
+    // funding transaction is proven, so the tracker is asked for its root
+    // and its own ancestry is not needed.
+    let mut tracker = MockChainTracker::new(800_000);
+    tracker.add_root(800_000, funding_txid);
     let ok = futures::executor::block_on(spend.verify(&tracker, None)).unwrap();
     assert!(ok);
     println!("verified {ok}");
@@ -425,7 +437,7 @@ More: BRC-103 over HTTP or Socket.IO (`auth`, `socketio`), the wallet wire proto
 
 **The interpreter runs in the TypeScript SDK's default mode, or under a node's flag word.** Without a word, `Spend` is the TypeScript SDK's default evaluation mode: a transaction of version 1 or lower runs strict (minimal pushes and minimally encoded numbers, low-S, an empty CHECKMULTISIG dummy, push-only unlocking scripts, a clean stack, strict DER and public-key encodings, `SIGHASH_FORKID` required); version 2 and above runs the post-Genesis relaxed mode (MINIMALDATA, LOW_S, CLEANSTACK and NULLDUMMY not enforced), as `Spend.isRelaxed()` does upstream; `set_require_minimal` and `set_require_push_only` override either way. That mode is neither of the two words a node validates under. With `set_flags(ScriptFlags::block(era))` the interpreter applies the block-validation word bitcoin-sv v1.2.2 derives for a block of that era, and with `ScriptFlags::standard(era)` the mempool word (the block word plus exactly NULLDUMMY, MINIMALDATA, DISCOURAGE_UPGRADABLE_NOPS and CLEANSTACK); every rule, including NULLFAIL, MINIMALIF and the discouraged NOPs, is enforced at the reference's site under the reference's version gate (at Chronicle a transaction of version 2 or above is malleable and every malleability restriction is off for it). A caller judging a spend on the network's behalf selects the block word; `ScriptFlags` carries the reference's bit values and names, so a word can be compared with a node's own. The opcode set is post-Genesis BSV (OP_MUL, OP_CAT, OP_LSHIFT and the rest enabled; no pre-Genesis size or count limits, but under a word the script-number length limit of the coin's era (750,000 bytes for a coin created after Genesis and 32,000,000 after Chronicle on the block path; the node's policy default of 10,000 on the mempool path, `set_script_num_length_policy` for a node configured otherwise), applied before the decode at every read and on every arithmetic result, while the default mode reads a number of any length as the TypeScript SDK does; no P2SH evaluation; CLTV and CSV are NOPs; an undefined opcode executed and a push cut short of its declared bytes are failures, as on the node; one OP_ELSE per OP_IF), and for a coin created after Chronicle (a word's `UTXO_AFTER_CHRONICLE`; without a word, the relaxed branch, version 2 and above) OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF and the Chronicle meanings of 0xb3–0xb7 (OP_SUBSTR, OP_LEFT, OP_RIGHT, OP_LSHIFTNUM, OP_RSHIFTNUM) run as the node runs them. A CHECKSIG's signed subscript continues across the unlock/lock boundary after an OP_CODESEPARATOR, so OP_PUSH_TX covenants verify. In the default mode a script element may be up to 1 GiB and the working memory budget is 32 MB for each stack (`memory_limit`); under a word the budget is counted as the node counts it (one budget over both stacks, 32 bytes of overhead per element, every growth charged before it happens), 100 MB by default, the node's policy default, and on the mempool path the node's stack memory policy is a verdict besides (`set_stack_memory_policy` for a node configured otherwise), with `OP_NUM2BIN`'s size bounded by `INT32_MAX` as on the node. Exhausting the local budget is a `ScriptResourceLimit` (`Stack`, `AltStack`, `ElementSize`) that `is_resource_limit()` tells apart from a refusal, and every refusal of it comes before the allocation it would need. On the block path a node's budget is not a constant but its operator's mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.2 does not start without it; 0 means unlimited): a caller modelling a node run with 0 passes `memory_limit: Some(usize::MAX)`, and a caller that judges validity reads an error whose `resource_limit` is `Some` as a decline, never as invalid.
 
-**BEEF linking is linear and `verify` walks by txid.** `Transaction::from_beef` links each distinct unproven parent once and gives every later input sourcing the same txid a stub, so a diamond chain (each level spending both outputs of the last) links in time and memory linear in the BEEF; `verify` gathers the reachable transactions into a map by txid, checks a proven one against the `ChainTracker` and does not descend it, executes every input script of an unproven one against its source looked up by txid, and refuses an unproven transaction whose outputs exceed its inputs (a transaction with no inputs is a synthetic root and exempt). A BEEF whose links form a cycle terminates.
+**BEEF linking is linear and `verify` walks by txid.** `Transaction::from_beef` links each distinct unproven parent once and gives every later input sourcing the same txid a stub, so a diamond chain (each level spending both outputs of the last) links in time and memory linear in the BEEF; `verify` gathers the reachable transactions into a map by txid, checks a proven one against the `ChainTracker` and does not descend it, executes every input script of an unproven one against its source looked up by txid, and refuses an unproven transaction whose outputs exceed its inputs. A transaction it reaches with no input, or with no output, is refused, proven or not (`NoInputs`, `NoOutputs`, the streaming reader's kinds; 0.4.3): a root carries an input and a merkle path. A BEEF whose links form a cycle terminates.
 
 **Sighash computation lives in the script templates, not in `Transaction`,** as in the reference SDKs. `SighashCache` computes the three BIP-143 midstates once per transaction and reuses them across inputs (the free functions recompute per call, quadratic in the input count).
 
