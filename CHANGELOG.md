@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.35] - 2026-10-08
+
 ### Fixed — no walk over a BEEF's ancestry recurses (bsv-stack-lean #57, P0-5)
 
 - A stranger's BEEF that is one chain of unproven transactions took the stack
