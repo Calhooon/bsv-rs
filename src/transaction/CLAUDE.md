@@ -13,6 +13,7 @@ This module provides complete Bitcoin transaction functionality:
 - BEEF format (BRC-62/95/96) for SPV proofs with iterative ancestry collection (no walk over `source_transaction` recurses: link, sort, serializers, `verify`, `Clone`, `Drop`; 0.3.35, bsv-stack-lean #57)
 - The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (nineteen kinds, none a size or a count) or `SpendRefused`; `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
 - A raw transaction with no input is invalid bytes (0.4.1, bsv-stack-lean #58): `Kind::NoInputs` at the transaction's offset from the streaming reader, not valid from `Beef::verify_valid`, with or without a BUMP index. The rule is the node's (bsv-script-lean `lean/BsvScript/TxRules.lean`, `checkTransactionCommon_vinEmpty`); a test BEEF's root needs an input and a merkle path
+- The whole path on the reader's walk and rules (0.4.2, bsv-stack-lean #61): `Beef::verify_valid` computes each BUMP's root by `beef_stream`'s `bump_root` (linear; 0.4.1 walked once per leaf), and `Beef::verify_structure` answers the roots or the reader's `Kind`. A lone leaf at an offset other than 0 is `MissingSibling`; `from_binary` refuses a byte after the frame (`TrailingBytes`, in the reader's words); an atomic BEEF is held to the reader's subject rule (`SubjectMissing`, `UnrelatedTransaction`); a txid-only entry is valid when a BUMP of the BEEF proves it (`StubNotProven` otherwise) and `allow_txid_only` decides nothing
 - `BeefLimits { max_txs, max_bumps }` are memory hints since 0.4.0; `Beef::from_binary_with_limits` is deprecated and refuses nothing by size or count
 - JSON serialization matching Go SDK format for cross-SDK compatibility
 - Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
@@ -319,7 +320,7 @@ pub struct Beef {
 impl Beef {
     // Construction: new() [V2], with_version(), from_hex(), from_binary()
     // Serialization: to_hex(), to_binary() [auto-sorts], to_binary_atomic(txid)
-    // Validation: is_valid(allow_txid_only), verify_valid() -> BeefValidationResult, sort_txs() -> SortResult
+    // Validation: is_valid(allow_txid_only), verify_valid() -> BeefValidationResult, verify_structure() -> Result<roots, Kind> (0.4.2), sort_txs() -> SortResult
     // Lookup: find_txid(), find_txid_mut(), find_bump(), find_transaction_for_signing(), find_atomic_transaction(), is_atomic()
     // Merging: merge_bump() [combines same height/root], merge_transaction(), merge_raw_tx(), merge_txid_only(), make_txid_only(), merge_beef()
     // Utility: clone_shallow(), to_log_string()
