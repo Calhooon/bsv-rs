@@ -1376,3 +1376,134 @@ async fn the_asynchronous_reader_gives_the_verdict_of_the_synchronous_one() {
         expected
     );
 }
+
+// ---------------------------------------------------------------------------
+// A transaction with no input: invalid bytes (bsv-stack-lean #58)
+// ---------------------------------------------------------------------------
+
+/// The BEEF the middleware's door met (bsv-middleware-rs 0.4.0,
+/// `a_transaction_with_no_input_and_no_proof_anchors_nothing`): a proven
+/// stranger with its BUMP, an unproven transaction with no input, and a
+/// payment spending it. Every root it carries is the header's.
+fn beside_a_proven_stranger(version: u32) -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>, Hash32) {
+    let (stranger, bump, headers) = funded(&[(7, &[0x53])]);
+    let parent = tx_with(&[], &[(100, OP_TRUE)]);
+    let payment = tx_with(&[(txid(&parent), 0, &[])], &[(100, OP_TRUE)]);
+    let subject = txid(&payment);
+    let (bytes, offsets) = wire(
+        version,
+        None,
+        &[bump],
+        &[
+            Entry::Raw(stranger, Some(0)),
+            Entry::Raw(parent, None),
+            Entry::Raw(payment, None),
+        ],
+    );
+    (bytes, offsets, headers, subject)
+}
+
+/// The offset of a refusal whose kind is `NoInputs`.
+fn no_inputs_at(verdict: Verdict) -> u64 {
+    let (offset, reason) = refusal(verdict);
+    assert_eq!(format!("{:?}", reason.kind()), "NoInputs");
+    offset
+}
+
+#[test]
+fn a_transaction_with_no_input_is_invalid_bytes_at_its_offset() {
+    for version in [V1, V2] {
+        let (bytes, offsets, headers, subject) = beside_a_proven_stranger(version);
+        let at = offsets[1];
+
+        // With the scripts run, for the structure alone, and under a named
+        // subject: the transaction with no input, at its leading byte.
+        assert_eq!(no_inputs_at(scripts(&bytes, &headers)), at);
+        assert_eq!(no_inputs_at(structure(&bytes, &headers)), at);
+        assert_eq!(
+            no_inputs_at(verify_stream(bytes.as_slice(), &headers, Some(subject)).unwrap()),
+            at
+        );
+        assert_eq!(
+            no_inputs_at(
+                verify_stream_two_pass(std::io::Cursor::new(&bytes), &headers, None).unwrap()
+            ),
+            at
+        );
+
+        // The stream refuses the element itself: no index, no header.
+        let (offset, reason) = elements(&bytes).expect_err("the element is refused");
+        assert_eq!(offset, at);
+        assert_eq!(format!("{:?}", reason.kind()), "NoInputs");
+
+        // The whole-BEEF path refuses the same bytes.
+        let mut beef = Beef::from_binary(&bytes).unwrap();
+        assert!(!beef.verify_valid(false).valid);
+        assert!(!beef.is_valid(true));
+    }
+}
+
+#[test]
+fn a_transaction_with_no_input_is_invalid_under_a_bump_too() {
+    // A BUMP that carries the txid does not make it a transaction: the node
+    // would not have mined it, so no block holds it and no proof of it is a
+    // proof. The refusal is the same one, at the transaction, with the BUMP
+    // read and its root carried.
+    let nothing_in = raw_tx(&[], 2);
+    let bump = bump_bytes(
+        800_000,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&nothing_in), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_000, root_of(&bump));
+    for version in [V1, V2] {
+        let (bytes, offsets) = wire(
+            version,
+            None,
+            std::slice::from_ref(&bump),
+            &[Entry::Raw(nothing_in.clone(), Some(0))],
+        );
+        assert_eq!(no_inputs_at(scripts(&bytes, &headers)), offsets[0]);
+        assert_eq!(no_inputs_at(structure(&bytes, &headers)), offsets[0]);
+        let mut beef = Beef::from_binary(&bytes).unwrap();
+        assert!(!beef.verify_valid(false).valid);
+    }
+
+    // The control: the same frame around a transaction with one input, which
+    // its proof vouches for.
+    let one_in = raw_tx(&[([0x11; 32], 0)], 2);
+    let bump = bump_bytes(
+        800_000,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&one_in), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_000, root_of(&bump));
+    let (bytes, _) = wire(V1, None, &[bump], &[Entry::Raw(one_in, Some(0))]);
+    assert!(scripts(&bytes, &headers).is_valid());
+    assert!(Beef::from_binary(&bytes).unwrap().verify_valid(false).valid);
+}
+
+#[tokio::test]
+async fn the_asynchronous_reader_refuses_a_transaction_with_no_input() {
+    let (bytes, offsets, headers, _) = beside_a_proven_stranger(V1);
+    let (_, bump, _) = funded(&[(7, &[0x53])]);
+    let mut tracker = MockChainTracker::new(900_000);
+    tracker.add_root(800_000, display_hex(&root_of(&bump)));
+    let expected = verify_stream(bytes.as_slice(), &headers, None).unwrap();
+    let mut source = Chunks {
+        bytes: bytes.clone(),
+        at: 0,
+        size: 7,
+    };
+    let got = verify_stream_async(&mut source, &tracker, None)
+        .await
+        .unwrap();
+    assert_eq!(got, expected);
+    assert_eq!(no_inputs_at(got), offsets[1]);
+}
