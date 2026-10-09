@@ -235,8 +235,10 @@ struct Chain {
     anchor_root: Hash32,
 }
 
+/// The anchor (the Lean's `anchorTx`): one input naming a transaction the
+/// BEEF does not carry, which its proof vouches for, and two outputs.
 fn anchor_tx() -> Vec<u8> {
-    raw_tx(&[], 2)
+    raw_tx(&[([0x2A; 32], 0)], 2)
 }
 
 /// The anchor's BUMP: height 1, the anchor at offset 0, the duplicate marker
@@ -293,10 +295,10 @@ fn chain(n: usize, atomic: bool) -> Chain {
 }
 
 #[test]
-fn the_eighteen_kinds_are_eighteen_and_distinct() {
+fn the_nineteen_kinds_are_nineteen_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 18);
-    assert_eq!(all.len(), 18);
+    assert_eq!(Kind::ALL.len(), 19);
+    assert_eq!(all.len(), 19);
 }
 
 #[test]
@@ -1008,7 +1010,9 @@ fn a_block_of_one_transaction_has_a_one_leaf_bump_whose_root_is_the_txid() {
     // (the reference: ts-stack@edf6e03 MerklePath.ts:345,390-391). The root
     // is the txid. The Lean's climb answers `missingSibling 0 1` for these
     // bytes; this reader follows the reference.
-    let coinbase = anchor_tx();
+    // The one transaction of such a block is its coinbase: one input, the
+    // null outpoint (the Lean's `loneTx`).
+    let coinbase = raw_tx(&[([0u8; 32], 0xFFFF_FFFF)], 1);
     let id = txid(&coinbase);
     let path = MerklePath::from_coinbase_txid(&display_hex(&id), 800_010);
     assert_eq!(path.compute_root(None).unwrap(), display_hex(&id));
@@ -1033,7 +1037,7 @@ fn a_block_of_one_transaction_has_a_one_leaf_bump_whose_root_is_the_txid() {
 }
 
 // ---------------------------------------------------------------------------
-// The spends: the interpreter's verdict, never one of the eighteen kinds
+// The spends: the interpreter's verdict, never one of the nineteen kinds
 // ---------------------------------------------------------------------------
 
 const OP_TRUE: &[u8] = &[0x51];
@@ -1406,7 +1410,8 @@ fn beside_a_proven_stranger(version: u32) -> (Vec<u8>, Vec<u64>, HashMap<u64, Ha
 /// The offset of a refusal whose kind is `NoInputs`.
 fn no_inputs_at(verdict: Verdict) -> u64 {
     let (offset, reason) = refusal(verdict);
-    assert_eq!(format!("{:?}", reason.kind()), "NoInputs");
+    assert_eq!(reason, Reason::NoInputs);
+    assert_eq!(reason.kind(), Kind::NoInputs);
     offset
 }
 
@@ -1432,9 +1437,7 @@ fn a_transaction_with_no_input_is_invalid_bytes_at_its_offset() {
         );
 
         // The stream refuses the element itself: no index, no header.
-        let (offset, reason) = elements(&bytes).expect_err("the element is refused");
-        assert_eq!(offset, at);
-        assert_eq!(format!("{:?}", reason.kind()), "NoInputs");
+        assert_eq!(elements(&bytes).unwrap_err(), (at, Reason::NoInputs));
 
         // The whole-BEEF path refuses the same bytes.
         let mut beef = Beef::from_binary(&bytes).unwrap();

@@ -193,6 +193,28 @@ impl BeefTx {
         None
     }
 
+    /// True for a raw transaction whose input count is 0. A txid-only entry
+    /// has no bytes to read and is never this.
+    ///
+    /// Such bytes are no transaction: the node refuses one before any script
+    /// runs, so no block holds it and nothing spends it. Since 0.4.1
+    /// [`Beef::verify_valid`](super::beef::Beef::verify_valid) refuses a BEEF
+    /// that carries one, with or without a BUMP index, as the streaming
+    /// reader does (`Kind::NoInputs`).
+    pub fn has_no_inputs(&self) -> bool {
+        if let Some(ref tx) = self.tx {
+            return tx.inputs.is_empty();
+        }
+        match self.raw_tx {
+            // The input count is the varint after the four bytes of version.
+            Some(ref raw_tx) => {
+                let mut reader = Reader::new(raw_tx);
+                reader.read_bytes(4).is_ok() && matches!(reader.read_var_int_num(), Ok(0))
+            }
+            None => false,
+        }
+    }
+
     /// Updates the input_txids list based on transaction data.
     fn update_input_txids(&mut self) {
         if self.has_proof() {

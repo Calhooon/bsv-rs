@@ -76,6 +76,7 @@ dhat-profiling = ["dep:dhat"]
 - TS's explicit `verifyFlags` applies a flag as given (NULLDUMMY, MINIMALDATA, LOW_S, CLEANSTACK at every version; no `CHRONICLE` flag); this crate's `set_flags` applies the node's version gate at the node's sites (0.3.26). The default mode keeps TS's no-NULLFAIL; the block word carries it.
 - TS's default keeps a lenient parser (a truncated push is a shorter push), allows a second OP_ELSE outside explicit flags, and deletes every signature from the scriptCode; this crate follows the node in every mode (0.3.27, bsv-rs#12). TS's `OP_SUBSTR`/`OP_LEFT`/`OP_RIGHT` names sit at `0xb3`-`0xb5`; this crate's constants of those names are the legacy `0x7f`-`0x81`, and `0xb3`-`0xb7` render as `OP_NOP4`-`OP_NOP8`.
 - Under a word, the splice operands and `OP_SPLIT` position follow bitcoin-sv v1.2.3 (`6504a3a`, `int_serialization.h:61-118`, `interpreter.cpp:1708-1721`); the default mode retains the TypeScript SDK's unrestricted number reader (0.3.33, bsv-rs#41).
+- TS's `Beef.verifyValid` reads a BEEF carrying a raw transaction with no input as valid (`ts-stack@edf6e03` `Beef.ts:1054-1075`); this crate's `verify_valid` and streaming reader refuse it, following the node (0.4.1, bsv-stack-lean #58).
 
 ## Where the numbers come from
 

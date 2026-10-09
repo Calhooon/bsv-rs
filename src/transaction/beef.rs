@@ -650,8 +650,22 @@ impl Beef {
     }
 
     /// Validates the BEEF structure and returns roots to verify.
+    ///
+    /// Since 0.4.1 a BEEF that carries a raw transaction with no input is not
+    /// valid, with or without a BUMP index: the node refuses such a
+    /// transaction before any script runs, so no block holds it and a BUMP
+    /// that claims it proves nothing; unproven, it has no input to hold it
+    /// by and would stand with nothing proven beneath it. The streaming
+    /// reader names it (`Kind::NoInputs`, the transaction's offset).
     pub fn verify_valid(&mut self, allow_txid_only: bool) -> BeefValidationResult {
         let sr = self.sort_txs();
+
+        if self.txs.iter().any(BeefTx::has_no_inputs) {
+            return BeefValidationResult {
+                valid: false,
+                roots: HashMap::new(),
+            };
+        }
 
         if !sr.missing_inputs.is_empty()
             || !sr.not_valid.is_empty()
