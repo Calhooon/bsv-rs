@@ -528,7 +528,7 @@ struct PathNode {
 ///
 /// The maps are keyed by offsets a stranger chose, so they keep the standard
 /// library's keyed hasher.
-fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Refusal> {
+pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Refusal> {
     let Some(level0) = levels.first() else {
         return Err(Refusal::new(offset, Reason::TreeHeightZero));
     };
@@ -654,6 +654,45 @@ fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Refusal> {
             },
         )),
     }
+}
+
+/// The root of an in-memory BUMP by the same walk ([`bump_root`]): the one
+/// walker under the stream and under [`Beef::verify_valid`](super::beef::Beef::verify_valid)
+/// (0.4.2; at 0.4.1 the whole path walked the BUMP once per leaf, NL-8 W1).
+/// The levels keep their in-memory order; a hash that is not 32 bytes of hex
+/// (only a BUMP built by hand holds one) is a node the BUMP does not carry.
+/// A refusal names the kind; its offset is 0, there being no stream.
+pub(crate) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
+    let levels: Vec<Vec<Leaf>> = path
+        .path
+        .iter()
+        .map(|level| {
+            level
+                .iter()
+                .filter_map(|l| {
+                    let node = if l.duplicate {
+                        Node::Duplicate
+                    } else {
+                        Node::Hash(wire_hash(l.hash.as_deref()?)?)
+                    };
+                    Some(Leaf {
+                        at: 0,
+                        offset: l.offset,
+                        node,
+                        client: l.txid,
+                    })
+                })
+                .collect()
+        })
+        .collect();
+    bump_root(0, &levels)
+}
+
+/// A display-hex hash in wire order, if it is 32 bytes of hex.
+pub(crate) fn wire_hash(display: &str) -> Option<Hash32> {
+    let mut h: Hash32 = crate::primitives::from_hex(display).ok()?.try_into().ok()?;
+    h.reverse();
+    Some(h)
 }
 
 // ---------------------------------------------------------------------------

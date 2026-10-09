@@ -30,12 +30,13 @@
 //! let hex = beef.to_hex();
 //! ```
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::primitives::encoding::bounded_capacity;
 use crate::primitives::{from_hex, to_hex, Reader, Writer};
 use crate::Result;
 
+use super::beef_stream::{display_hex, merkle_path_root};
 use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
@@ -694,33 +695,56 @@ impl Beef {
             }
         }
 
-        // Validate bumps and collect roots
+        // Each BUMP's root, by the streaming reader's walk: once per BUMP,
+        // linear in its leaves (0.4.2). At 0.4.1 each flagged leaf computed
+        // the root afresh, rebuilding every node it needed from level 0: a
+        // BUMP of 8,192 leaves gave no answer in 120 s (bsv-stack-lean NL-8
+        // W1, #61).
         for bump in &self.bumps {
+            let root = match merkle_path_root(bump) {
+                Ok(root) => display_hex(&root),
+                Err(_) => {
+                    return BeefValidationResult {
+                        valid: false,
+                        roots: HashMap::new(),
+                    }
+                }
+            };
+            match roots.get(&bump.block_height) {
+                Some(existing) if *existing != root => {
+                    return BeefValidationResult {
+                        valid: false,
+                        roots: HashMap::new(),
+                    }
+                }
+                Some(_) => {}
+                None => {
+                    roots.insert(bump.block_height, root);
+                }
+            }
             for leaf in &bump.path[0] {
                 if leaf.txid {
                     if let Some(ref hash) = leaf.hash {
                         valid_txids.insert(hash.clone(), true);
-
-                        // Compute and verify root
-                        if let Ok(root) = bump.compute_root(Some(hash)) {
-                            let height = bump.block_height;
-                            if let Some(existing) = roots.get(&height) {
-                                if existing != &root {
-                                    return BeefValidationResult {
-                                        valid: false,
-                                        roots: HashMap::new(),
-                                    };
-                                }
-                            } else {
-                                roots.insert(height, root);
-                            }
-                        }
                     }
                 }
             }
         }
 
-        // Verify all txs with bump_index have matching leaf
+        // Verify all txs with bump_index have matching leaf: each BUMP's
+        // level 0 indexed once, not scanned once per transaction.
+        let carried: HashSet<(usize, &str)> = self
+            .bumps
+            .iter()
+            .enumerate()
+            .flat_map(|(i, bump)| {
+                bump.path
+                    .first()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(move |l| l.hash.as_deref().map(|h| (i, h)))
+            })
+            .collect();
         for tx in &self.txs {
             if let Some(bump_idx) = tx.bump_index() {
                 if bump_idx >= self.bumps.len() {
@@ -729,7 +753,7 @@ impl Beef {
                         roots: HashMap::new(),
                     };
                 }
-                if !self.bumps[bump_idx].contains(&tx.txid()) {
+                if !carried.contains(&(bump_idx, tx.txid().as_str())) {
                     return BeefValidationResult {
                         valid: false,
                         roots: HashMap::new(),
