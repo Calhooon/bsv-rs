@@ -2,7 +2,7 @@
 //!
 //! A valid BEEF is never refused for its size or its counts. A refusal is for
 //! invalid bytes only, and names them: the offset of the byte and one of
-//! nineteen kinds, none of which is a size or a count.
+//! twenty kinds, none of which is a size or a count.
 //!
 //! The specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean
 //! (`lean/BeefOfAnySize.lean`, its report `docs/p0/nl-1.md`), which states six
@@ -42,13 +42,13 @@
 //!
 //! # What is and is not the Lean's
 //!
-//! The nineteen [`Kind`]s, the offsets and the order of the checks inside one
+//! The twenty [`Kind`]s, the offsets and the order of the checks inside one
 //! element are the Lean's. Two things are outside it and say so in the type:
 //!
 //! - Script execution and the value rule are the interpreter's verdict on a
 //!   spend, not a rule about the BEEF's bytes (the Lean leaves them to the
 //!   node). A spend that fails is [`Verdict::SpendRefused`], never one of the
-//!   nineteen kinds. [`StreamVerifier::structure_only`] turns the spend
+//!   twenty kinds. [`StreamVerifier::structure_only`] turns the spend
 //!   checks off and leaves exactly the Lean's validity.
 //! - A block with only one transaction has a one-leaf BUMP whose root is the
 //!   txid itself. The reference and [`MerklePath`] accept it; the Lean's
@@ -104,7 +104,7 @@ pub fn display_hex(hash: &Hash32) -> String {
 // The refusal: invalid bytes, named
 // ---------------------------------------------------------------------------
 
-/// The nineteen kinds of refusal, the Lean's `Kind`. None is a size or a
+/// The twenty kinds of refusal, the Lean's `Kind`. None is a size or a
 /// count: no byte is wrong by being one of many.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
@@ -146,11 +146,13 @@ pub enum Kind {
     UnrelatedTransaction,
     /// A raw transaction with no input (since 0.4.1).
     NoInputs,
+    /// A raw transaction with an input and no output (since 0.4.3).
+    NoOutputs,
 }
 
 impl Kind {
-    /// The nineteen kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 19] = [
+    /// The twenty kinds, each once, in the Lean's order (`Kind.all`).
+    pub const ALL: [Kind; 20] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -170,6 +172,7 @@ impl Kind {
         Kind::SubjectMissing,
         Kind::UnrelatedTransaction,
         Kind::NoInputs,
+        Kind::NoOutputs,
     ];
 }
 
@@ -272,6 +275,12 @@ pub enum Reason {
     /// no block holds it, a BUMP that claims it proves nothing, and an
     /// unproven one has no input for the reader to hold it by.
     NoInputs,
+    /// A raw transaction with at least one input and an output count of 0,
+    /// named at the transaction's leading byte. The node refuses it beside
+    /// one with no input, after it (bsv-script-lean@87f0461
+    /// `lean/BsvScript/TxRules.lean:86`, `checkTransactionCommon_voutEmpty`),
+    /// so a transaction with neither is [`Reason::NoInputs`].
+    NoOutputs,
 }
 
 impl Reason {
@@ -297,6 +306,7 @@ impl Reason {
             Reason::SubjectMissing { .. } => Kind::SubjectMissing,
             Reason::UnrelatedTransaction { .. } => Kind::UnrelatedTransaction,
             Reason::NoInputs => Kind::NoInputs,
+            Reason::NoOutputs => Kind::NoOutputs,
         }
     }
 }
@@ -328,6 +338,22 @@ impl fmt::Display for Refusal {
 }
 
 impl std::error::Error for Refusal {}
+
+/// The two counts that make a transaction's bytes no transaction, in the
+/// node's order: no input ([`Reason::NoInputs`]), then no output
+/// ([`Reason::NoOutputs`]). The rule is the sibling's, cited not restated:
+/// bsv-script-lean@87f0461 `lean/BsvScript/TxRules.lean:85-86`
+/// (`checkTransactionCommon_vinEmpty`, `checkTransactionCommon_voutEmpty`).
+/// Every path of this crate that judges a transaction asks this.
+pub(crate) fn no_transaction(inputs: usize, outputs: usize) -> Option<Reason> {
+    if inputs == 0 {
+        Some(Reason::NoInputs)
+    } else if outputs == 0 {
+        Some(Reason::NoOutputs)
+    } else {
+        None
+    }
+}
 
 // ---------------------------------------------------------------------------
 // The elements
@@ -1425,13 +1451,13 @@ impl BeefDecoder {
         })))
     }
 
-    /// A transaction and its frame bytes are complete. One with no input is
-    /// refused here, at its leading byte, with or without a BUMP index (the
-    /// Lean's `parseElement`).
+    /// A transaction and its frame bytes are complete. One with no input or
+    /// no output is refused here, at its leading byte, with or without a
+    /// BUMP index (the Lean's `parseElement`).
     fn tx_done(&mut self) -> Result<Element, Refusal> {
         let tx = self.tx.take().expect("a transaction is in hand");
-        if tx.inputs.is_empty() {
-            return Err(Refusal::new(tx.offset, Reason::NoInputs));
+        if let Some(reason) = no_transaction(tx.inputs.len(), tx.outputs.len()) {
+            return Err(Refusal::new(tx.offset, reason));
         }
         self.frame.txs_left -= 1;
         Ok(Element::Tx {
@@ -1651,7 +1677,7 @@ struct TxEntry {
 
 /// Why a spend was refused. This is the interpreter's verdict on a
 /// transaction, not a rule about the BEEF's bytes, and it is not one of the
-/// nineteen [`Kind`]s.
+/// twenty [`Kind`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpendRefusal {
     /// The parent is a txid-only entry: its output is not in the BEEF.
@@ -1907,11 +1933,12 @@ impl BeefIndex {
                 bump_index,
                 body,
             } => {
-                // A transaction with no input is no transaction, with or
-                // without a BUMP index. The stream refuses it as it is read;
-                // this holds an element built by hand to the same rule.
-                if body.inputs.is_empty() {
-                    return Err(Refusal::new(*offset, Reason::NoInputs).into());
+                // A transaction with no input or no output is no
+                // transaction, with or without a BUMP index. The stream
+                // refuses it as it is read; this holds an element built by
+                // hand to the same rule.
+                if let Some(reason) = no_transaction(body.inputs.len(), body.outputs.len()) {
+                    return Err(Refusal::new(*offset, reason).into());
                 }
                 // The Lean's `checkTx`: with a BUMP index, the BUMP carries
                 // the txid and its proof vouches for the inputs; without one,
@@ -2193,7 +2220,7 @@ pub enum Verdict {
         /// order).
         roots: Vec<(u64, Hash32)>,
     },
-    /// The bytes are invalid: the offset of the byte and one of the nineteen
+    /// The bytes are invalid: the offset of the byte and one of the twenty
     /// kinds.
     Invalid {
         /// The stream offset of the byte the refusal names.
@@ -2204,7 +2231,7 @@ pub enum Verdict {
         reason: Reason,
     },
     /// The BEEF's bytes are well formed up to here and the interpreter
-    /// refused a spend. Not one of the nineteen kinds: the verdict is the
+    /// refused a spend. Not one of the twenty kinds: the verdict is the
     /// script's, on a transaction.
     SpendRefused {
         /// The offset of the input (or of the transaction, for the value

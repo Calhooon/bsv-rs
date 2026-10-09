@@ -215,6 +215,32 @@ impl BeefTx {
         }
     }
 
+    /// True for a raw transaction with at least one input and an output
+    /// count of 0. A txid-only entry has no bytes to read and is never this;
+    /// raw bytes that do not parse are not this either (the parse refuses
+    /// them first).
+    ///
+    /// The node refuses such bytes beside a transaction with no input, after
+    /// it (bsv-script-lean@87f0461 `lean/BsvScript/TxRules.lean:86`,
+    /// `checkTransactionCommon_voutEmpty`). Since 0.4.3
+    /// [`Beef::verify_valid`](super::beef::Beef::verify_valid) refuses a BEEF
+    /// that carries one, with or without a BUMP index, as the streaming
+    /// reader does (`Kind::NoOutputs`).
+    pub fn has_no_outputs(&self) -> bool {
+        if self.has_no_inputs() {
+            return false;
+        }
+        if let Some(ref tx) = self.tx {
+            return tx.outputs.is_empty();
+        }
+        match self.raw_tx {
+            Some(ref raw_tx) => {
+                matches!(Transaction::from_binary(raw_tx), Ok(tx) if tx.outputs.is_empty())
+            }
+            None => false,
+        }
+    }
+
     /// Updates the input_txids list based on transaction data.
     fn update_input_txids(&mut self) {
         if self.has_proof() {
