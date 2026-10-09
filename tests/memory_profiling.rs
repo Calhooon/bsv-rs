@@ -7,8 +7,8 @@
 //! - Peak heap usage
 //! - Allocation hotspot identification
 //!
-//! Note: Only one dhat profiler can be active at a time, so tests must run
-//! sequentially (--test-threads=1) when using dhat features.
+//! Note: Only one dhat profiler can be active at a time (a second one panics), so every test
+//! here holds `PROFILER` for its whole body: the target is serial under any `--test-threads`.
 
 #![cfg(feature = "dhat-profiling")]
 
@@ -19,6 +19,15 @@ use bsv_rs::primitives::symmetric::SymmetricKey;
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
+
+/// The one dhat profiler of this process: a test takes it before it creates a profiler.
+static PROFILER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// Waits for the profiler. A test that failed while holding it poisons the lock; the next
+/// test still runs alone, so its own result stands.
+fn serial() -> std::sync::MutexGuard<'static, ()> {
+    PROFILER.lock().unwrap_or_else(|e| e.into_inner())
+}
 
 /// Helper to run profiled operations and report stats
 #[allow(dead_code)]
@@ -45,6 +54,7 @@ where
 
 #[test]
 fn test_encryption_allocations() {
+    let _serial = serial();
     let key = SymmetricKey::random();
 
     // Test different payload sizes
@@ -74,6 +84,7 @@ fn test_encryption_allocations() {
 
 #[test]
 fn test_key_derivation_allocations() {
+    let _serial = serial();
     let alice = PrivateKey::random();
     let bob = PrivateKey::random();
     let bob_pub = bob.public_key();
@@ -114,6 +125,7 @@ fn test_key_derivation_allocations() {
 
 #[test]
 fn test_shamir_allocations() {
+    let _serial = serial();
     let key = PrivateKey::random();
 
     // 3-of-5 split
@@ -173,6 +185,7 @@ fn test_shamir_allocations() {
 
 #[test]
 fn test_signing_allocations() {
+    let _serial = serial();
     let key = PrivateKey::random();
     let pubkey = key.public_key();
     let msg_hash = hash::sha256(b"benchmark message for signing");
@@ -230,6 +243,7 @@ fn test_signing_allocations() {
 
 #[test]
 fn test_hashing_allocations() {
+    let _serial = serial();
     let data_1kb = vec![0u8; 1024];
     let data_16kb = vec![0u8; 16384];
 

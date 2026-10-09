@@ -70,6 +70,11 @@ jobs:
       - name: Run the consensus witness tests
         run: cargo test --test script_flags_witnesses --test script_residual_witnesses --test script_low_s_order_witness --test script_num_length_witness --test script_int64_operand_witness --test script_int64_fold_witness --test script_shift_count_witness --test script_sighash_dispatch_witness --test script_undefined_hashtype_witness --test script_stack_memory_witness --test resource_limits --all-features --verbose
 
+      # the dhat heap measurements: one profiler per process, so each test holds the file's lock and
+      # the target is serial under the default thread count (it failed 4 of 5 in parallel before)
+      - name: Run the memory profiling tests
+        run: cargo test --test memory_profiling --all-features --verbose
+
       - name: Run doc tests
         run: cargo test --doc --all-features
 
