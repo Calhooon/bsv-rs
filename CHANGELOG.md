@@ -7,6 +7,110 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-10
+
+The whole-BEEF path (`Beef::from_binary` then `Beef::verify_valid`) walks a
+BUMP once, in time linear in its leaves, and refuses the bytes the streaming
+reader refuses, with the reader's kinds (bsv-stack-lean #61, found by the
+replay NL-8, `docs/p0/nl-8.md` W1 to W5). The posture of 0.4.0 stands: a
+refusal is for invalid bytes only, never for a size or a count; every refusal
+added here is of bytes the reader and the Lean definition `BeefOfAnySize`
+already refuse.
+
+### Fixed: the whole path walked a BUMP once per leaf (W1)
+
+- `verify_valid` computed each flagged level-0 leaf's root by
+  `MerklePath::compute_root`, and each call built a fresh walker that
+  recomputed every node it needed from level 0: quadratic in the leaves. A
+  BEEF of one BUMP of 4,096 leaves (146,976 bytes) took 29.8 s in release;
+  8,192 leaves (294,433 bytes) gave no answer in 120 s, where the streaming
+  reader answers in 0.012 s.
+- Each BUMP's root is now the streaming reader's walk (`bump_root`, the one
+  walker under both paths), once per BUMP; a transaction's BUMP index is held
+  to an index of each BUMP's level 0 built once. The same probe at this
+  release: 0.031 s at 4,096 leaves, 0.066 s at 8,192 (release, parse and
+  verdict together).
+- Witness, red at 0.4.1 and green here: `tests/beef_stream.rs`
+  `the_whole_path_walks_a_wide_bump_in_linear_time` (4,096 and 8,192 leaves,
+  each under `WHOLE_PATH_BOUND`, 10 s, generous for a debug build).
+- `MerklePath::compute_root` and the parse's own root check are unchanged:
+  one call is linear, and the parse's check shares its nodes since 0.3.35.
+
+### Fixed: the whole path accepted bytes the reader refuses (W2 to W5)
+
+Each of these is invalid bytes, refused by the streaming reader at its offset
+with the kind named, and accepted by 0.4.1's whole path:
+
+- **A lone leaf at an offset other than 0** (`MissingSibling`). The block of
+  one transaction is the one leaf at offset 0, and its root is that txid; the
+  same leaf at any other offset has no sibling. `MerklePath` alone keeps the
+  reference's reading (below).
+- **A byte after the frame** (`TrailingBytes`). `Beef::from_binary`,
+  `Beef::from_hex`, the deprecated `from_binary_with_limits`, and
+  `Transaction::from_beef` and `from_atomic_beef` through them, refuse it with
+  the reader's words: `invalid BEEF at byte N: TrailingBytes`.
+  `Beef::from_reader` still reads one BEEF out of a longer stream and leaves
+  what follows to its caller.
+- **An atomic BEEF whose subject is not the last raw transaction**
+  (`SubjectMissing`), **or that carries a transaction or txid-only entry no
+  later raw transaction spends** (`UnrelatedTransaction`). "Last" and "later"
+  are the order the transactions hold when `verify_valid` is called, before
+  its sort: the wire's for a BEEF just read.
+- **A txid-only entry no BUMP of the BEEF proves** (`StubNotProven`), with
+  `allow_txid_only` true. A txid-only entry is now read on its own: valid when
+  a BUMP of this BEEF carries its txid at level 0, refused otherwise.
+- Witnesses, each red at 0.4.1 and green here, each holding the whole path's
+  kind to the reader's on the same bytes (`tests/beef_stream.rs`):
+  `the_whole_path_refuses_a_lone_leaf_at_an_offset_other_than_0`,
+  `the_whole_path_refuses_a_byte_after_the_frame`,
+  `the_whole_path_holds_an_atomic_beef_to_its_subject`,
+  `the_whole_path_reads_each_txid_only_entry_as_the_reader_does`.
+
+### Added
+
+- `Beef::verify_structure() -> Result<HashMap<u32, String>, Kind>`: the
+  roots, or the reader's `Kind` for what is wrong (the in-memory BEEF has no
+  offsets to name). `verify_valid` and `is_valid` are it without the kind.
+
+### Changed
+
+- **`allow_txid_only` decides nothing.** Through 0.4.1, `true` accepted every
+  txid-only entry and `false` refused every one; now a proven entry is valid
+  and an unproven one is not, under either value. The parameter stays for the
+  signature. A caller that passed `true` for txids it holds elsewhere (a
+  wallet's known txids) must carry their BUMPs in the BEEF or check those
+  txids itself; a caller that passed `false` now accepts a txid-only entry
+  this BEEF's own BUMP proves. `tests/transaction_tests.rs`
+  `test_beef_txid_only_validation` pinned the old flag and now pins the
+  refusal.
+- `verify_valid`'s `roots` holds every BUMP's height, flagged leaf or not, and
+  a BUMP whose walk fails is not valid (0.4.1 skipped a root it could not
+  compute). Two BUMPs at one height with different roots stay not valid.
+- No signature changed and no type gained a field or a variant.
+
+### Notes: cross-SDK parity
+
+Read at the pin, not run against the reference:
+
+- The lone leaf: the reference accepts one at any offset and returns the txid
+  as the root (`ts-stack@edf6e03 packages/sdk/src/transaction/MerklePath.ts:345`,
+  `:390-391`); so do this crate's `MerklePath::from_binary` and
+  `compute_root`, unchanged. The whole-BEEF verdict follows the reader and the
+  chain: the only transaction of a block is its coinbase, at index 0
+  (bsv-stack-lean `docs/readings/one-transaction-block-lone-leaf.md`).
+- The trailing byte: the reference's `Beef.fromBinary` is the prefix parser
+  and `fromBinaryStrict` the framed one, which throws "Serialized BEEF
+  contains trailing data" (`Beef.ts:1286-1309`); its `fromString` is strict
+  (`:1319`). This crate's `from_binary` is now the framed one; `from_reader`
+  is the prefix parser.
+- The atomic rule: the reference refuses an atomic BEEF unless every
+  transaction is in the subject's ancestry (`Beef.ts:482-491`, `:420`, checked
+  by `verifyValid` at `:1064`), which refuses the same rows by another rule.
+- The txid-only flag: the reference's `verifyValid` refuses every txid-only
+  entry unless `allowTxidOnly` is true and then accepts every one
+  (`Beef.ts:1070`, `:1101-1104`). This crate reads each entry, as its reader
+  does.
+
 ## [0.4.1] - 2026-10-09
 
 A raw transaction with no input is invalid bytes (bsv-stack-lean #58, found by
