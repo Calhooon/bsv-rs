@@ -1492,6 +1492,64 @@ fn a_transaction_with_no_input_is_invalid_under_a_bump_too() {
     assert!(Beef::from_binary(&bytes).unwrap().verify_valid(false).valid);
 }
 
+#[test]
+fn the_leans_no_input_rows_have_the_leans_offsets() {
+    // `Scenarios.lean`, "The transaction with no input": the same frames from
+    // the same encoders (empty scripts, so the structure alone).
+    let stranger = raw_tx(&[([0x2A; 32], 0)], 1);
+    let bump = bump_bytes(
+        800_004,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&stranger), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_004, root_of(&bump));
+    let nothing_in = raw_tx(&[], 1);
+    let payment = raw_tx(&[(txid(&nothing_in), 0)], 1);
+    let entries = [
+        Entry::Raw(stranger.clone(), Some(0)),
+        Entry::Raw(nothing_in, None),
+        Entry::Raw(payment.clone(), None),
+    ];
+    // `no_input_refused`: the transaction with no input at 111.
+    let (bytes, offsets) = wire(V1, None, std::slice::from_ref(&bump), &entries);
+    assert_eq!(offsets, [49, 111, 131]);
+    assert_eq!(no_inputs_at(structure(&bytes, &headers)), 111);
+    // `no_input_atomic_refused`: at 147 behind the prefix and the subject.
+    let (bytes, _) = wire(
+        V1,
+        Some(txid(&payment)),
+        std::slice::from_ref(&bump),
+        &entries,
+    );
+    assert_eq!(no_inputs_at(structure(&bytes, &headers)), 147);
+    // `stranger_payment_accepted`: the control, three steps.
+    let paid = raw_tx(&[(txid(&stranger), 0)], 1);
+    let (bytes, _) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(stranger, Some(0)), Entry::Raw(paid, None)],
+    );
+    assert!(structure(&bytes, &headers).is_valid());
+
+    // `no_input_under_a_bump_refused`: at 49, the BUMP read and carried.
+    let nothing_in = raw_tx(&[], 2);
+    let bump = bump_bytes(
+        800_006,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&nothing_in), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_006, root_of(&bump));
+    let (bytes, _) = wire(V1, None, &[bump], &[Entry::Raw(nothing_in, Some(0))]);
+    assert_eq!(no_inputs_at(structure(&bytes, &headers)), 49);
+}
+
 #[tokio::test]
 async fn the_asynchronous_reader_refuses_a_transaction_with_no_input() {
     let (bytes, offsets, headers, _) = beside_a_proven_stranger(V1);

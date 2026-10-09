@@ -39,7 +39,9 @@ The posture of 0.4.0 stands: nothing is refused for a size or a count.
   `a_transaction_with_no_input_is_invalid_bytes_at_its_offset` (the
   middleware's BEEF: a proven stranger, the transaction with no input, a
   payment spending it), `a_transaction_with_no_input_is_invalid_under_a_bump_too`
-  and `the_asynchronous_reader_refuses_a_transaction_with_no_input`.
+  and `the_asynchronous_reader_refuses_a_transaction_with_no_input`;
+  `the_leans_no_input_rows_have_the_leans_offsets` holds the Lean rows'
+  offsets (111, 147 behind an Atomic prefix, 49 under a BUMP).
 - The specification moved with it: `BeefOfAnySize` of bsv-stack-lean gains
   `Reason.noInputs` and its theorem (NL-1c). The rows this crate replays gave
   their proven anchor one input; `tests/beef_stream_deep.rs` holds the Lean's
