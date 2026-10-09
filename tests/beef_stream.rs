@@ -13,13 +13,14 @@
 use std::collections::HashMap;
 
 use bsv_rs::primitives::{from_hex, sha256, sha256d};
+use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::beef_stream::{
     display_hex, AsyncByteSource, BeefDecoder, Hash32, HeadersFn, Progress, SpendRefusal, Step,
 };
 use bsv_rs::transaction::{
     referenced_outpoints, resume, verify_stream, verify_stream_async, verify_stream_structure,
     verify_stream_two_pass, Beef, BeefStream, Cursor, Element, Kind, MerklePath, MockChainTracker,
-    Reason, StreamVerifier, Verdict,
+    Reason, StreamVerifier, Transaction, TransactionInput, TransactionOutput, Verdict,
 };
 
 // ---------------------------------------------------------------------------
@@ -1792,4 +1793,309 @@ fn the_whole_path_reads_each_txid_only_entry_as_the_reader_does() {
         reader_kind(&bytes, &[(800_000, anchor_root)]).as_deref(),
         Some("StubNotProven")
     );
+}
+
+// ---------------------------------------------------------------------------
+// A transaction with no output: invalid bytes, as one with no input
+// (bsv-stack-lean #59)
+// ---------------------------------------------------------------------------
+//
+// The node refuses a transaction with no output beside one with no input, in
+// that order (the sibling's rule, bsv-script-lean@87f0461
+// `lean/BsvScript/TxRules.lean:86`, `checkTransactionCommon_voutEmpty`). The
+// kind is named by its `Debug` text here, so the base (0.4.2, which has no
+// such kind) compiles and answers.
+
+/// The offset and the kind's name of a refusal.
+fn refused_as(verdict: Verdict) -> (u64, String) {
+    let (offset, reason) = refusal(verdict);
+    assert_eq!(format!("{reason:?}"), format!("{:?}", reason.kind()));
+    (offset, format!("{:?}", reason.kind()))
+}
+
+/// The Lean's `noOutputWire` (`Scenarios.lean`, "The transaction with no
+/// output"): the proven stranger with its BUMP, then a transaction spending
+/// it that pays nothing to anyone.
+fn no_output_beside_a_proven_stranger(
+    version: u32,
+) -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>, Hash32) {
+    let (stranger, bump, headers) = funded(&[(7, OP_TRUE)]);
+    let nothing_out = tx_with(&[(txid(&stranger), 0, &[])], &[]);
+    let subject = txid(&nothing_out);
+    let (bytes, offsets) = wire(
+        version,
+        None,
+        &[bump],
+        &[Entry::Raw(stranger, Some(0)), Entry::Raw(nothing_out, None)],
+    );
+    (bytes, offsets, headers, subject)
+}
+
+#[test]
+fn a_transaction_with_no_output_is_invalid_bytes_at_its_offset() {
+    for version in [V1, V2] {
+        let (bytes, offsets, headers, subject) = no_output_beside_a_proven_stranger(version);
+        let at = (offsets[1], "NoOutputs".to_string());
+
+        // With the scripts run (the stranger's OP_TRUE spent), for the
+        // structure alone, under a named subject, in two passes.
+        assert_eq!(refused_as(scripts(&bytes, &headers)), at);
+        assert_eq!(refused_as(structure(&bytes, &headers)), at);
+        assert_eq!(
+            refused_as(verify_stream(bytes.as_slice(), &headers, Some(subject)).unwrap()),
+            at
+        );
+        assert_eq!(
+            refused_as(
+                verify_stream_two_pass(std::io::Cursor::new(&bytes), &headers, None).unwrap()
+            ),
+            at
+        );
+
+        // `BeefStream` refuses the element itself: no index, no header.
+        let (offset, reason) = elements(&bytes).unwrap_err();
+        assert_eq!((offset, format!("{reason:?}")), at);
+
+        // The whole path: not valid, with the reader's kind.
+        assert_eq!(whole(&bytes), Err("NoOutputs".to_string()));
+        assert!(!Beef::from_binary(&bytes).unwrap().verify_valid(false).valid);
+    }
+}
+
+#[test]
+fn a_transaction_with_no_output_is_invalid_under_a_bump_too() {
+    // The BUMP carries its txid and the headers its root: no block holds it
+    // all the same, and the refusal is at the transaction, the BUMP read.
+    let nothing_out = raw_tx(&[([0x2B; 32], 1)], 0);
+    let bump = bump_bytes(
+        800_007,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&nothing_out), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_007, root_of(&bump));
+    for version in [V1, V2] {
+        let (bytes, offsets) = wire(
+            version,
+            None,
+            std::slice::from_ref(&bump),
+            &[Entry::Raw(nothing_out.clone(), Some(0))],
+        );
+        let at = (offsets[0], "NoOutputs".to_string());
+        assert_eq!(refused_as(scripts(&bytes, &headers)), at);
+        assert_eq!(refused_as(structure(&bytes, &headers)), at);
+        assert_eq!(whole(&bytes), Err("NoOutputs".to_string()));
+    }
+}
+
+#[test]
+fn a_transaction_with_neither_is_refused_for_its_inputs_first() {
+    // The sibling checks the inputs before the outputs (`TxRules.lean:85-86`):
+    // a transaction with neither is `NoInputs`, on every path.
+    let (stranger, bump, headers) = funded(&[(7, OP_TRUE)]);
+    let neither = tx_with(&[], &[]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(stranger, Some(0)), Entry::Raw(neither, None)],
+    );
+    let at = (offsets[1], "NoInputs".to_string());
+    assert_eq!(refused_as(structure(&bytes, &headers)), at);
+    assert_eq!(refused_as(scripts(&bytes, &headers)), at);
+    assert_eq!(whole(&bytes), Err("NoInputs".to_string()));
+}
+
+#[test]
+fn the_leans_no_output_rows_have_the_leans_offsets() {
+    // `Scenarios.lean`, "The transaction with no output": the same frames from
+    // the same encoders (empty scripts, so the structure alone).
+    let stranger = raw_tx(&[([0x2A; 32], 0)], 1);
+    let bump = bump_bytes(
+        800_004,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&stranger), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_004, root_of(&bump));
+    let nothing_out = raw_tx(&[(txid(&stranger), 0)], 0);
+    assert_eq!(nothing_out.len(), 51);
+    let entries = [
+        Entry::Raw(stranger.clone(), Some(0)),
+        Entry::Raw(nothing_out.clone(), None),
+    ];
+    // `no_output_refused`: the transaction with no output at 111.
+    let (bytes, offsets) = wire(V1, None, std::slice::from_ref(&bump), &entries);
+    assert_eq!(offsets, [49, 111]);
+    assert_eq!(
+        refused_as(structure(&bytes, &headers)),
+        (111, "NoOutputs".into())
+    );
+    // `no_output_atomic_refused`: at 147, the subject the transaction itself.
+    let (bytes, _) = wire(
+        V1,
+        Some(txid(&nothing_out)),
+        std::slice::from_ref(&bump),
+        &entries,
+    );
+    assert_eq!(
+        refused_as(structure(&bytes, &headers)),
+        (147, "NoOutputs".into())
+    );
+    // `no_input_no_output_refused`: neither, at 111, for its inputs.
+    let (bytes, _) = wire(
+        V1,
+        None,
+        std::slice::from_ref(&bump),
+        &[
+            Entry::Raw(stranger, Some(0)),
+            Entry::Raw(raw_tx(&[], 0), None),
+        ],
+    );
+    assert_eq!(
+        refused_as(structure(&bytes, &headers)),
+        (111, "NoInputs".into())
+    );
+
+    // `no_output_under_a_bump_refused`: at 49, the BUMP read and carried.
+    let nothing_out = raw_tx(&[([0x2B; 32], 1)], 0);
+    let bump = bump_bytes(
+        800_007,
+        1,
+        &[vec![
+            LeafSpec::Hash(0, txid(&nothing_out), true),
+            LeafSpec::Dup(1),
+        ]],
+    );
+    let headers = one_header(800_007, root_of(&bump));
+    let (bytes, _) = wire(V1, None, &[bump], &[Entry::Raw(nothing_out, Some(0))]);
+    assert_eq!(
+        refused_as(structure(&bytes, &headers)),
+        (49, "NoOutputs".into())
+    );
+}
+
+#[tokio::test]
+async fn the_asynchronous_reader_refuses_a_transaction_with_no_output() {
+    let (bytes, offsets, headers, _) = no_output_beside_a_proven_stranger(V1);
+    let (_, bump, _) = funded(&[(7, OP_TRUE)]);
+    let mut tracker = MockChainTracker::new(900_000);
+    tracker.add_root(800_000, display_hex(&root_of(&bump)));
+    let expected = verify_stream(bytes.as_slice(), &headers, None).unwrap();
+    let mut source = Chunks {
+        bytes: bytes.clone(),
+        at: 0,
+        size: 7,
+    };
+    let got = verify_stream_async(&mut source, &tracker, None)
+        .await
+        .unwrap();
+    assert_eq!(got, expected);
+    assert_eq!(refused_as(got), (offsets[1], "NoOutputs".into()));
+}
+
+// ---------------------------------------------------------------------------
+// The whole-transaction path (`Transaction::verify`, the linked walk): the
+// same two refusals with the same kinds (bsv-stack-lean #59)
+// ---------------------------------------------------------------------------
+
+/// A transaction of `inputs` (each spending `(source, vout)` with an empty
+/// unlocking script) and `outputs` locked by OP_TRUE.
+fn linked(inputs: &[(&Transaction, u32)], outputs: &[u64]) -> Transaction {
+    let mut tx = Transaction::new();
+    for (source, vout) in inputs {
+        let mut input = TransactionInput::with_source_transaction((*source).clone(), *vout);
+        input.unlocking_script = Some(UnlockingScript::new());
+        tx.add_input(input).unwrap();
+    }
+    for satoshis in outputs {
+        tx.add_output(TransactionOutput::new(
+            *satoshis,
+            LockingScript::from_binary(OP_TRUE).unwrap(),
+        ))
+        .unwrap();
+    }
+    tx
+}
+
+/// A transaction proven as the one transaction of its block at 800,000,
+/// spending a coin nobody here carries.
+fn mined(n_inputs: usize, outputs: &[u64]) -> (Transaction, MockChainTracker) {
+    let mut tx = linked(&[], outputs);
+    for i in 0..n_inputs {
+        let mut input = TransactionInput::new("11".repeat(32), i as u32);
+        input.unlocking_script = Some(UnlockingScript::new());
+        tx.add_input(input).unwrap();
+    }
+    let id = tx.id();
+    tx.merkle_path = Some(MerklePath::from_coinbase_txid(&id, 800_000));
+    let mut tracker = MockChainTracker::new(800_000);
+    tracker.add_root(800_000, id);
+    (tx, tracker)
+}
+
+/// `verify`'s answer: `Ok(valid)`, or the error's text.
+fn walk(tx: &Transaction, tracker: &MockChainTracker) -> Result<bool, String> {
+    futures::executor::block_on(tx.verify(tracker, None)).map_err(|e| e.to_string())
+}
+
+/// The refusal names the kind and the transaction.
+fn refused_for(answer: Result<bool, String>, kind: &str, tx: &Transaction) {
+    match answer {
+        Err(text) => {
+            assert!(text.contains(kind), "{kind} expected in {text:?}");
+            assert!(text.contains(&tx.id()), "the txid expected in {text:?}");
+        }
+        Ok(v) => panic!("a refusal {kind} expected, got Ok({v})"),
+    }
+}
+
+#[test]
+fn verify_refuses_a_root_with_no_input() {
+    // The synthetic root the walk exempted until 0.4.3: unproven, no input.
+    let root = linked(&[], &[10_000]);
+    let spend = linked(&[(&root, 0)], &[9_900]);
+    refused_for(walk(&spend, &MockChainTracker::new(0)), "NoInputs", &root);
+
+    // Proven by a merkle path all the same: no block holds it.
+    let (root, tracker) = mined(0, &[10_000]);
+    let spend = linked(&[(&root, 0)], &[9_900]);
+    refused_for(walk(&spend, &tracker), "NoInputs", &root);
+
+    // The transaction verified itself.
+    let alone = linked(&[], &[1]);
+    refused_for(walk(&alone, &MockChainTracker::new(0)), "NoInputs", &alone);
+}
+
+#[test]
+fn verify_refuses_a_transaction_with_no_output() {
+    let (funding, tracker) = mined(1, &[10_000]);
+    // The subject pays nothing to anyone.
+    let nothing_out = linked(&[(&funding, 0)], &[]);
+    refused_for(walk(&nothing_out, &tracker), "NoOutputs", &nothing_out);
+    // An ancestor with no output, proven.
+    let (root, tracker) = mined(1, &[]);
+    let spend = linked(&[(&root, 0)], &[1]);
+    refused_for(walk(&spend, &tracker), "NoOutputs", &root);
+    // Neither: the inputs first, as the node.
+    let neither = linked(&[], &[]);
+    refused_for(
+        walk(&neither, &MockChainTracker::new(0)),
+        "NoInputs",
+        &neither,
+    );
+
+    // The control: a proven funding with its input, a spend with its output.
+    let spend = linked(&[(&funding, 0)], &[9_900]);
+    assert_eq!(walk(&spend, &tracker_for(&funding)), Ok(true));
+}
+
+fn tracker_for(tx: &Transaction) -> MockChainTracker {
+    let mut tracker = MockChainTracker::new(800_000);
+    tracker.add_root(800_000, tx.id());
+    tracker
 }
