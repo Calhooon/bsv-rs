@@ -1616,3 +1616,180 @@ fn the_whole_path_walks_a_wide_bump_in_linear_time() {
         assert_eq!(r.roots.get(&800_001), Some(&display_hex(&root)));
     }
 }
+
+/// The whole path's answer: `Ok(roots)`, or the reader's kind its refusal
+/// names (`verify_structure`), or a parse refusal's message. `verify_valid`
+/// says the same under both values of the txid-only flag.
+fn whole(bytes: &[u8]) -> Result<HashMap<u32, String>, String> {
+    let mut beef = Beef::from_binary(bytes).map_err(|e| e.to_string())?;
+    let answer = beef.verify_structure().map_err(|k| format!("{k:?}"));
+    for allow in [false, true] {
+        let r = Beef::from_binary(bytes).unwrap().verify_valid(allow);
+        assert_eq!(
+            r.valid,
+            answer.is_ok(),
+            "allow_txid_only {allow}: {answer:?}"
+        );
+        if let Ok(roots) = &answer {
+            assert_eq!(&r.roots, roots);
+        }
+    }
+    answer
+}
+
+/// The reader's kind for the same bytes, on headers that carry `roots`.
+fn reader_kind(bytes: &[u8], roots: &[(u64, Hash32)]) -> Option<String> {
+    let headers: HashMap<u64, Hash32> = roots.iter().copied().collect();
+    match structure(bytes, &headers) {
+        Verdict::Invalid { kind, .. } => Some(format!("{kind:?}")),
+        v => {
+            assert!(v.is_valid(), "{v:?}");
+            None
+        }
+    }
+}
+
+#[test]
+fn the_whole_path_refuses_a_lone_leaf_at_an_offset_other_than_0() {
+    // NL-8 W2 (`lone_at_one`): the one-transaction block is the leaf at 0
+    // (bsv-stack-lean docs/readings/one-transaction-block-lone-leaf.md); at 1
+    // the reader refuses at 12, `MissingSibling`, and 0.4.1's whole path
+    // accepted (its walker answered the txid at any offset).
+    let coinbase = raw_tx(&[([0u8; 32], 0xFFFF_FFFF)], 1);
+    let id = txid(&coinbase);
+    let at_one = bump_bytes(800_005, 1, &[vec![LeafSpec::Hash(1, id, true)]]);
+    let (bytes, _) = wire(V1, None, &[at_one], &[]);
+    assert_eq!(bytes.len(), 47);
+    assert_eq!(refusal(structure(&bytes, &one_header(800_005, id))).0, 12);
+    assert_eq!(whole(&bytes), Err("MissingSibling".to_string()));
+    assert_eq!(
+        reader_kind(&bytes, &[(800_005, id)]).as_deref(),
+        Some("MissingSibling")
+    );
+
+    // `lone`: the leaf at 0, its root the txid, on both paths.
+    let at_zero = bump_bytes(800_005, 1, &[vec![LeafSpec::Hash(0, id, true)]]);
+    let (bytes, _) = wire(V1, None, &[at_zero], &[Entry::Raw(coinbase, Some(0))]);
+    assert!(structure(&bytes, &one_header(800_005, id)).is_valid());
+    assert_eq!(
+        whole(&bytes).unwrap().get(&800_005),
+        Some(&display_hex(&id))
+    );
+}
+
+#[test]
+fn the_whole_path_refuses_a_byte_after_the_frame() {
+    // NL-8 W3 (`example_trailing`): the BRC-62 example and one byte. The
+    // reader refuses at 677, `TrailingBytes`; 0.4.1's parse ended after the
+    // last transaction and never looked.
+    let mut bytes = example();
+    let Element::Bump(bump) = &elements(&bytes).unwrap()[0] else {
+        panic!("a BUMP leads")
+    };
+    let headers = one_header(bump.block_height, bump.root);
+    assert!(whole(&bytes).is_ok());
+    bytes.push(0);
+    assert_eq!(bytes.len(), 678);
+    assert_eq!(
+        refusal(structure(&bytes, &headers)),
+        (677, Reason::TrailingBytes)
+    );
+    let refused = whole(&bytes).unwrap_err();
+    assert!(
+        refused.ends_with("invalid BEEF at byte 677: TrailingBytes"),
+        "{refused}"
+    );
+    // The hex reader and the transaction readers take the same parse.
+    assert!(Beef::from_hex(&bsv_rs::primitives::to_hex(&bytes)).is_err());
+    assert!(bsv_rs::transaction::Transaction::from_beef(&bytes, None).is_err());
+}
+
+#[test]
+fn the_whole_path_holds_an_atomic_beef_to_its_subject() {
+    // NL-8 W4. `wrong_subject`: the second link named as the subject of the
+    // three-link chain (the reader: 4, `SubjectMissing`).
+    let entries = chain_entries(3);
+    let second = match &entries[2] {
+        Entry::Raw(raw, _) => txid(raw),
+        Entry::TxidOnly(_) => unreachable!(),
+    };
+    let c = chain_of(&entries, Some(second));
+    assert_eq!(c.bytes.len(), 339);
+    assert_eq!(whole(&c.bytes), Err("SubjectMissing".to_string()));
+    assert_eq!(
+        reader_kind(&c.bytes, &[(800_000, c.anchor_root)]).as_deref(),
+        Some("SubjectMissing")
+    );
+
+    // `unrelated`: a side transaction nothing spends (the reader: its offset,
+    // `UnrelatedTransaction`).
+    let (entries, _, last) = with_side();
+    let c = chain_of(&entries, Some(last));
+    assert_eq!(c.bytes.len(), 400);
+    assert_eq!(whole(&c.bytes), Err("UnrelatedTransaction".to_string()));
+    assert_eq!(
+        reader_kind(&c.bytes, &[(800_000, c.anchor_root)]).as_deref(),
+        Some("UnrelatedTransaction")
+    );
+    // `side_without_subject`: the atomic rule's concern alone.
+    let c = chain_of(&entries, None);
+    assert!(whole(&c.bytes).is_ok());
+
+    // `example_atomic_parent`: the BRC-62 example behind a prefix naming its
+    // parent, which is not the last transaction (the reader: 4,
+    // `SubjectMissing`).
+    let els = elements(&example()).unwrap();
+    let (Element::Bump(bump), Element::Tx { txid: parent, .. }, Element::Tx { txid: payment, .. }) =
+        (&els[0], &els[1], &els[2])
+    else {
+        panic!("a BUMP and two transactions")
+    };
+    let atomic = |subject: &Hash32| {
+        let mut v = ATOMIC.to_le_bytes().to_vec();
+        v.extend_from_slice(subject);
+        v.extend(example());
+        v
+    };
+    let bytes = atomic(parent);
+    assert_eq!(bytes.len(), 713);
+    assert_eq!(whole(&bytes), Err("SubjectMissing".to_string()));
+    assert_eq!(
+        reader_kind(&bytes, &[(bump.block_height, bump.root)]).as_deref(),
+        Some("SubjectMissing")
+    );
+    // `example_atomic_payment`: the payment is the subject.
+    assert!(whole(&atomic(payment)).is_ok());
+    // The chain with its last link as the subject, and the same BEEF as this
+    // crate writes it (sorted, the subject last).
+    let c = chain(3, true);
+    assert!(whole(&c.bytes).is_ok());
+    let mut beef = Beef::from_binary(&c.bytes).unwrap();
+    let subject = beef.atomic_txid.clone().unwrap();
+    let written = beef.to_binary_atomic(&subject).unwrap();
+    assert!(whole(&written).is_ok());
+}
+
+#[test]
+fn the_whole_path_reads_each_txid_only_entry_as_the_reader_does() {
+    // NL-8 W5: a txid-only entry stands when a BUMP of this BEEF proves it,
+    // whatever the flag says (`stub_proven`), and is refused when none does
+    // (`stub_not_proven`, the reader: 50, `StubNotProven`). At 0.4.1 the flag
+    // accepted or refused both alike.
+    let anchor = txid(&anchor_tx());
+    let anchor_root = root_of(&anchor_bump());
+    let (bytes, _) = wire(V2, None, &[anchor_bump()], &[Entry::TxidOnly(anchor)]);
+    assert_eq!(bytes.len(), 82);
+    assert_eq!(
+        whole(&bytes),
+        Ok(HashMap::from([(800_000u32, display_hex(&anchor_root))]))
+    );
+    assert_eq!(reader_kind(&bytes, &[(800_000, anchor_root)]), None);
+
+    let stranger = tag(&[42]);
+    let (bytes, _) = wire(V2, None, &[anchor_bump()], &[Entry::TxidOnly(stranger)]);
+    assert_eq!(whole(&bytes), Err("StubNotProven".to_string()));
+    assert_eq!(
+        reader_kind(&bytes, &[(800_000, anchor_root)]).as_deref(),
+        Some("StubNotProven")
+    );
+}
