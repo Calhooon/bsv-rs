@@ -32,6 +32,7 @@
 
 use std::collections::HashMap;
 
+use crate::primitives::encoding::bounded_capacity;
 use crate::primitives::{from_hex, to_hex, Reader, Writer};
 use crate::Result;
 
@@ -63,17 +64,21 @@ pub struct BeefValidationResult {
     pub roots: HashMap<u32, String>,
 }
 
-/// Count bounds for [`Beef::from_binary_with_limits`]: a door that reads a
-/// stranger's BEEF names the most it will take of each, and a BEEF over any
-/// of them is refused before it is read further.
+/// Memory hints for [`Beef::from_binary_with_limits`]: how many entries of
+/// each kind the in-memory parse may reserve room for ahead of reading them.
+///
+/// These are not limits on what is accepted. Since 0.4.0 a valid BEEF is
+/// never refused for its size or its counts: a BEEF with more transactions
+/// or BUMPs than the hints is read all the same, and the vectors grow as the
+/// entries arrive. A door that reads a stranger's BEEF reads it with
+/// [`verify_stream`](super::beef_stream::verify_stream), which holds one
+/// element at a time and ignores these hints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BeefLimits {
-    /// The most transactions (full or txid-only) the BEEF may carry.
+    /// The most transactions (full or txid-only) to reserve room for.
     pub max_txs: usize,
-    /// The most BUMPs (merkle paths) the BEEF may carry.
+    /// The most BUMPs (merkle paths) to reserve room for.
     pub max_bumps: usize,
-    /// The most bytes the serialized BEEF may be, Atomic prefix included.
-    pub max_bytes: usize,
 }
 
 /// BEEF (Background Evaluation Extended Format) for SPV proofs.
@@ -871,32 +876,32 @@ impl Beef {
 
     /// Parses a BEEF from binary data.
     ///
-    /// No count is bounded beyond what the bytes hold; a door that reads a
-    /// stranger's BEEF can bound it with [`Beef::from_binary_with_limits`].
+    /// No count is bounded beyond what the bytes hold. The whole BEEF is
+    /// held in memory: this is the reader for small bodies and for building.
+    /// A door that reads a stranger's BEEF reads it with
+    /// [`verify_stream`](super::beef_stream::verify_stream), one element at a
+    /// time.
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
         let mut reader = Reader::new(bin);
         Self::from_reader(&mut reader)
     }
 
-    /// Parses a BEEF from binary data, refusing it when it is longer than
-    /// `limits.max_bytes` or when its count prefix claims more than
-    /// `limits.max_bumps` BUMPs or `limits.max_txs` transactions. Each count
-    /// is checked on its prefix, before one entry of that kind is read or
-    /// stored, and the refusal is a [`crate::Error::BeefError`] naming the
-    /// limit and the count. An Atomic BEEF is bounded on its inner counts
-    /// and on its whole length.
+    /// Parses a BEEF from binary data, reserving room for at most
+    /// `limits.max_bumps` BUMPs and `limits.max_txs` transactions ahead of
+    /// reading them.
     ///
-    /// The walks over a parsed BEEF's transactions (the link, the sort,
-    /// `verify_valid`, the serializers) keep their work on the heap, so the
-    /// limits bound memory and time, not stack depth.
+    /// Deprecated in 0.4.0. Through 0.3 this refused a BEEF over a byte
+    /// length, a BUMP count or a transaction count; it refuses none of them
+    /// now and reads exactly what [`Beef::from_binary`] reads. A valid BEEF
+    /// is never refused for its size or its counts, and a count the bytes
+    /// cannot honor is refused where the bytes run out. The streaming reader
+    /// is [`verify_stream`](super::beef_stream::verify_stream).
+    #[deprecated(
+        since = "0.4.0",
+        note = "the limits no longer refuse anything; use `Beef::from_binary` for a small body \
+                and `beef_stream::verify_stream` for a stranger's"
+    )]
     pub fn from_binary_with_limits(bin: &[u8], limits: &BeefLimits) -> Result<Self> {
-        if bin.len() > limits.max_bytes {
-            return Err(crate::Error::BeefError(format!(
-                "BEEF of {} bytes is over max_bytes {}",
-                bin.len(),
-                limits.max_bytes
-            )));
-        }
         let mut reader = Reader::new(bin);
         Self::read(&mut reader, Some(limits))
     }
@@ -912,8 +917,10 @@ impl Beef {
         Self::read(reader, None)
     }
 
-    /// The parse, with the count bounds when a door gave them.
-    fn read(reader: &mut Reader, limits: Option<&BeefLimits>) -> Result<Self> {
+    /// The parse, with the memory hints when a caller gave them. A hint
+    /// reserves room, never more than the bytes left could fill (a BUMP is at
+    /// least 3 bytes, a transaction entry at least 10); it refuses nothing.
+    fn read(reader: &mut Reader, hints: Option<&BeefLimits>) -> Result<Self> {
         let mut version = reader.read_u32_le()?;
         let mut atomic_txid = None;
 
@@ -938,13 +945,12 @@ impl Beef {
 
         // Read bumps
         let bump_count = reader.read_var_int_num()?;
-        if let Some(limits) = limits {
-            if bump_count > limits.max_bumps {
-                return Err(crate::Error::BeefError(format!(
-                    "BEEF claims {} BUMPs, over max_bumps {}",
-                    bump_count, limits.max_bumps
-                )));
-            }
+        if let Some(hints) = hints {
+            beef.bumps.reserve(bounded_capacity(
+                bump_count.min(hints.max_bumps),
+                reader.remaining(),
+                3,
+            ));
         }
         for _ in 0..bump_count {
             let bump = MerklePath::from_reader(reader)?;
@@ -953,13 +959,12 @@ impl Beef {
 
         // Read transactions
         let tx_count = reader.read_var_int_num()?;
-        if let Some(limits) = limits {
-            if tx_count > limits.max_txs {
-                return Err(crate::Error::BeefError(format!(
-                    "BEEF claims {} transactions, over max_txs {}",
-                    tx_count, limits.max_txs
-                )));
-            }
+        if let Some(hints) = hints {
+            beef.txs.reserve(bounded_capacity(
+                tx_count.min(hints.max_txs),
+                reader.remaining(),
+                10,
+            ));
         }
         for _ in 0..tx_count {
             let tx = BeefTx::from_reader(reader, version)?;
