@@ -30,13 +30,13 @@ It is a reference-parity port of the TypeScript [`@bsv/sdk`](https://github.com/
 
 ```toml
 [dependencies]
-bsv-rs = "0.3"                                                            # primitives + script
-bsv-rs = { version = "0.3", features = ["transaction"] }                  # + transactions, BEEF, SPV
-bsv-rs = { version = "0.3", features = ["wallet"] }                       # + BRC-42 keys, ProtoWallet
-bsv-rs = { version = "0.3", features = ["auth", "http"] }                 # + BRC-103 over HTTP
-bsv-rs = { version = "0.3", features = ["overlay", "http"] }              # + SHIP/SLAP
-bsv-rs = { version = "0.3", features = ["full", "http"] }                 # everything, native
-bsv-rs = { version = "0.3", default-features = false,
+bsv-rs = "0.4"                                                            # primitives + script
+bsv-rs = { version = "0.4", features = ["transaction"] }                  # + transactions, BEEF, SPV
+bsv-rs = { version = "0.4", features = ["wallet"] }                       # + BRC-42 keys, ProtoWallet
+bsv-rs = { version = "0.4", features = ["auth", "http"] }                 # + BRC-103 over HTTP
+bsv-rs = { version = "0.4", features = ["overlay", "http"] }              # + SHIP/SLAP
+bsv-rs = { version = "0.4", features = ["full", "http"] }                 # everything, native
+bsv-rs = { version = "0.4", default-features = false,
            features = ["auth", "wallet", "transaction", "overlay", "socketio", "wasm"] }  # a Worker
 ```
 
