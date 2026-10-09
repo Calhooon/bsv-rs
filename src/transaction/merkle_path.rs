@@ -210,7 +210,7 @@ impl MerklePath {
                 first_offset.entry(hash.as_str()).or_insert(leaf.offset);
             }
         }
-        let mut walker = RootWalker::new(&merkle_path.path);
+        let mut walker = RootWalker::shared(&merkle_path.path);
         let mut root: Option<String> = None;
         for leaf in &merkle_path.path[0] {
             if let Some(ref hash) = leaf.hash {
@@ -557,6 +557,10 @@ impl MerklePath {
     }
 }
 
+/// A level of at most this many leaves is scanned, not indexed: a single
+/// `compute_root` over a typical BUMP stays as fast as the 0.3.34 scan.
+const SCAN_MAX: usize = 16;
+
 /// A node found at its offset or computed from the level below.
 #[derive(Clone)]
 struct Node {
@@ -572,14 +576,17 @@ struct Node {
 /// through stops there: the rest of its walk is the earlier one's.
 struct RootWalker<'a> {
     path: &'a [Vec<MerklePathLeaf>],
-    /// Each level's offsets, to the first leaf at that offset.
-    index: Vec<HashMap<u64, usize>>,
+    /// Each level's offsets, to the first leaf at that offset; `None` for a
+    /// level short enough to scan (a scan finds the same first leaf).
+    index: Vec<Option<HashMap<u64, usize>>>,
     /// Every sibling found or computed, keyed by (height, offset).
     nodes: HashMap<(usize, u64), std::result::Result<Node, String>>,
     /// The working hash a finished walk carried through (height, offset).
     walked: HashMap<(usize, u64), String>,
     /// The root of the first finished walk.
     root: Option<String>,
+    /// Whether walks meet: false for a single `compute_root`.
+    shared: bool,
 }
 
 impl<'a> RootWalker<'a> {
@@ -587,11 +594,14 @@ impl<'a> RootWalker<'a> {
         let index = path
             .iter()
             .map(|level| {
+                if level.len() <= SCAN_MAX {
+                    return None;
+                }
                 let mut at = HashMap::with_capacity(level.len());
                 for (i, leaf) in level.iter().enumerate() {
                     at.entry(leaf.offset).or_insert(i);
                 }
-                at
+                Some(at)
             })
             .collect();
         Self {
@@ -600,6 +610,16 @@ impl<'a> RootWalker<'a> {
             nodes: HashMap::new(),
             walked: HashMap::new(),
             root: None,
+            shared: false,
+        }
+    }
+
+    /// A walker whose walks stop where they meet an earlier one (the root
+    /// check of every level-0 leaf).
+    fn shared(path: &'a [Vec<MerklePathLeaf>]) -> Self {
+        Self {
+            shared: true,
+            ..Self::new(path)
         }
     }
 
@@ -614,19 +634,27 @@ impl<'a> RootWalker<'a> {
             return Ok(working_hash);
         }
 
-        let mut passed = Vec::with_capacity(self.path.len());
+        let mut passed = Vec::new();
         for height in 0..self.path.len() {
             let node = (height, offset_at_height(index, height));
-            if let (Some(seen), Some(root)) = (self.walked.get(&node), self.root.clone()) {
+            let seen = if self.shared {
+                self.walked.get(&node)
+            } else {
+                None
+            };
+            if let (Some(seen), Some(root)) = (seen, self.root.as_ref()) {
                 if *seen != working_hash {
                     return Err(crate::Error::MerklePathError(
                         "Mismatched roots".to_string(),
                     ));
                 }
+                let root = root.clone();
                 self.walked.extend(passed);
                 return Ok(root);
             }
-            passed.push((node, working_hash.clone()));
+            if self.shared {
+                passed.push((node, working_hash.clone()));
+            }
 
             let offset = node.1 ^ 1;
             let leaf = self
@@ -657,6 +685,18 @@ impl<'a> RootWalker<'a> {
     /// Finds the node at `height` and `offset`, or computes it from the level
     /// below, once.
     fn find_or_compute(&mut self, height: usize, offset: u64) -> std::result::Result<Node, String> {
+        // Try to find existing leaf
+        let stored = match &self.index[height] {
+            Some(at) => at.get(&offset).copied(),
+            None => self.path[height].iter().position(|l| l.offset == offset),
+        };
+        if let Some(i) = stored {
+            let leaf = &self.path[height][i];
+            return Ok(Node {
+                hash: leaf.hash.clone(),
+                duplicate: leaf.duplicate,
+            });
+        }
         if let Some(found) = self.nodes.get(&(height, offset)) {
             return found.clone();
         }
@@ -670,16 +710,7 @@ impl<'a> RootWalker<'a> {
         height: usize,
         offset: u64,
     ) -> std::result::Result<Node, String> {
-        // Try to find existing leaf
-        if let Some(&i) = self.index[height].get(&offset) {
-            let leaf = &self.path[height][i];
-            return Ok(Node {
-                hash: leaf.hash.clone(),
-                duplicate: leaf.duplicate,
-            });
-        }
-
-        // Can't compute at level 0
+        // Not stored (`find_or_compute` looked); can't compute at level 0
         if height == 0 {
             return Err(format!("Missing hash at height 0, offset {}", offset));
         }
