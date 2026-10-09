@@ -1802,10 +1802,17 @@ impl Transaction {
     /// Matches the Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`,
     /// whose inputs share one source object per txid by reference.
     ///
-    /// The value rule is skipped for a transaction with no inputs at all:
-    /// there is no ancestry to weigh its outputs against, and such a
-    /// transaction is a synthetic root (a test fixture or a caller-built
-    /// source), never something this walk can judge.
+    /// A transaction the walk reaches with no input, or with an input and no
+    /// output, is refused, proven or not: the error names it and the
+    /// streaming reader's kind (`NoInputs`, `NoOutputs`), the node's two
+    /// checks in their order (bsv-script-lean@87f0461
+    /// `lean/BsvScript/TxRules.lean:85-86`). Until 0.4.3 a transaction with no
+    /// inputs was a synthetic root, exempt from the value rule; the node
+    /// mines no such transaction, so a root carries an input and, to be
+    /// judged without its ancestry, a merkle path (bsv-stack-lean #59). The
+    /// TS SDK refuses the same two for an unmined transaction, in the same
+    /// order (`ts-stack@edf6e03` `Transaction.ts:1336-1342`); this walk asks
+    /// it of a proven one too, as the streaming reader does.
     ///
     /// # Arguments
     ///
@@ -1832,6 +1839,7 @@ impl Transaction {
             let Some(tx) = by_txid.get(&txid).copied() else {
                 continue; // only txids found in the map are ever queued
             };
+            refuse_no_transaction(tx, &txid)?;
 
             // If the transaction has a merkle path, verify it
             if let Some(ref merkle_path) = tx.merkle_path {
@@ -1869,6 +1877,9 @@ impl Transaction {
                 };
                 let source_txid = input.get_source_txid().map_err(|_| missing())?;
                 let source = by_txid.get(&source_txid).copied().ok_or_else(missing)?;
+                // A source with no output is refused as itself, before the
+                // index into its outputs could only say "out of bounds".
+                refuse_no_transaction(source, &source_txid)?;
                 let source_output = source
                     .outputs
                     .get(input.source_output_index as usize)
@@ -1975,12 +1986,27 @@ impl Transaction {
 
             // The reference's value rule: an unmined transaction may not
             // create satoshis (TS `Transaction.verify`, `outputTotal > inputTotal`).
-            if !tx.inputs.is_empty() && output_total > input_total {
+            // Every transaction here has an input (`refuse_no_transaction`).
+            if output_total > input_total {
                 return Ok(false);
             }
         }
 
         Ok(true)
+    }
+}
+
+/// A transaction with no input, or with an input and no output, is no
+/// transaction: the streaming reader's refusal (`beef_stream::no_transaction`)
+/// for the whole-transaction path, naming the txid and the kind.
+fn refuse_no_transaction(tx: &Transaction, txid: &str) -> Result<()> {
+    match super::beef_stream::no_transaction(tx.inputs.len(), tx.outputs.len()) {
+        Some(reason) => Err(crate::Error::TransactionError(format!(
+            "invalid transaction {}: {:?}",
+            txid,
+            reason.kind()
+        ))),
+        None => Ok(()),
     }
 }
 
