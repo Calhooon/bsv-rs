@@ -85,6 +85,7 @@
 //! ```
 
 pub mod beef;
+pub mod beef_stream;
 pub mod beef_tx;
 pub mod broadcaster;
 pub mod broadcasters;
@@ -101,6 +102,11 @@ pub mod tx_json;
 
 // Re-exports for convenience
 pub use beef::{Beef, BeefLimits, BeefValidationResult, SortResult};
+pub use beef_stream::{
+    referenced_outpoints, resume, verify_stream, verify_stream_async, verify_stream_structure,
+    verify_stream_two_pass, AsyncByteSource, AsyncStreamVerifier, BeefDecoder, BeefIndex,
+    BeefStream, Cursor, Element, Headers, Kind, Progress, Reason, Refusal, StreamVerifier, Verdict,
+};
 pub use beef_tx::{BeefTx, TxDataFormat, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 pub use broadcaster::{
     is_broadcast_failure, is_broadcast_success, BroadcastFailure, BroadcastResponse,
