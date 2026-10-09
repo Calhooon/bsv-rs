@@ -1568,3 +1568,51 @@ async fn the_asynchronous_reader_refuses_a_transaction_with_no_input() {
     assert_eq!(got, expected);
     assert_eq!(no_inputs_at(got), offsets[1]);
 }
+
+// ---------------------------------------------------------------------------
+// The whole path (`Beef::from_binary` then `verify_valid`) on the reader's
+// walk and rules (bsv-stack-lean NL-8 W1 to W5, #61; 0.4.2)
+// ---------------------------------------------------------------------------
+
+/// The whole path's bound on one wide BUMP: the reader answers 8,192 leaves
+/// in 0.012 s (release, NL-8); 0.4.1's whole path gave no answer in 120 s.
+/// Generous for a debug build and a loaded machine.
+const WHOLE_PATH_BOUND: std::time::Duration = std::time::Duration::from_secs(10);
+
+/// Runs `f` on its own thread and waits at most `bound` for its answer: a
+/// walk that gives none is a failure named so, not a hang.
+fn within<T: Send + 'static>(
+    bound: std::time::Duration,
+    f: impl FnOnce() -> T + Send + 'static,
+) -> Option<(T, std::time::Duration)> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    let start = std::time::Instant::now();
+    std::thread::spawn(move || {
+        let _ = tx.send(f());
+    });
+    rx.recv_timeout(bound).ok().map(|t| (t, start.elapsed()))
+}
+
+#[test]
+fn the_whole_path_walks_a_wide_bump_in_linear_time() {
+    // NL-8 W1: the wide BUMP (`wide_14`'s shape) at 4,096 and 8,192 leaves,
+    // every level above 0 empty, so every node of the tree is computed. At
+    // 0.4.1 `verify_valid` walked the BUMP once per leaf (29.8 s at 4,096
+    // leaves in release; no answer in 120 s at 8,192).
+    for k in [12u8, 13] {
+        let bump = wide_bump(k);
+        let root = root_of(&bump);
+        let (bytes, _) = wire(V1, None, &[bump], &[]);
+        assert!(structure(&bytes, &one_header(800_001, root)).is_valid());
+        let answer = within(WHOLE_PATH_BOUND, move || {
+            let mut beef = Beef::from_binary(&bytes).expect("the wide BUMP reads");
+            beef.verify_valid(false)
+        });
+        let Some((r, took)) = answer else {
+            panic!("2^{k} leaves: no answer from the whole path within {WHOLE_PATH_BOUND:?}")
+        };
+        println!("whole path, 2^{k} leaves: {took:?}");
+        assert!(r.valid, "2^{k} leaves");
+        assert_eq!(r.roots.get(&800_001), Some(&display_hex(&root)));
+    }
+}
