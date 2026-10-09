@@ -115,7 +115,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 ### Transaction (`transaction` feature)
 - **`transaction_tests.rs`** — Parsing/roundtrip (104 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), SPV verification (`Transaction::verify()`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
 
-- **`beef_stream.rs`**: The streaming BEEF reader against the rows of the Lean definition `BeefOfAnySize` (bsv-stack-lean): each refusal with its offset and kind, the BRC-62 example cut and accepted with its script executed, the resumption at every `k`, chunks of every size, the spend refusals, the asynchronous reader
+- **`beef_stream.rs`**: The streaming BEEF reader against the rows of the Lean definition `BeefOfAnySize` (bsv-stack-lean): each refusal with its offset and kind, the BRC-62 example cut and accepted with its script executed, the resumption at every `k`, chunks of every size, the spend refusals, the asynchronous reader; a raw transaction with no input refused as `NoInputs` at its offset, unproven beside a proven stranger and under a BUMP (0.4.1, bsv-stack-lean #58)
 - **`beef_stream_deep.rs`**: The P0-5 chain at 1,000, 10,000 and 100,000 links read from a source that writes itself (`support/beef_chain.rs`) on a 1 MiB stack, the resumption at three points, the P0-5c wide BUMP at 8,192 and 16,384 leaves, the Lean's counts at those sizes
 - **`beef_limits.rs`**: `BeefLimits` as memory hints: a BEEF over every one is read, a claimed count is refused for the bytes
 

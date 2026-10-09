@@ -193,20 +193,17 @@ fn the_deep_chain_resumes_at_three_points() {
 // The Lean's rows at their sizes
 // ---------------------------------------------------------------------------
 
-/// The Lean's `chain n`: an anchor with no input and two outputs, proven by a
-/// BUMP of height 1 (the anchor at offset 0, the duplicate marker at 1), and
-/// `n` links with empty scripts and outputs of one satoshi. V1.
+/// The Lean's `chain n`: an anchor with one input its proof vouches for and
+/// two outputs, proven by a BUMP of height 1 (the anchor at offset 0, the
+/// duplicate marker at 1), and `n` links with empty scripts and outputs of
+/// one satoshi. V1. (Until 0.4.1 the anchor had no input; such a transaction
+/// is `NoInputs` now, under a BUMP or not.)
 fn lean_chain(n: usize, atomic: bool) -> (Vec<u8>, HashMap<u64, Hash32>) {
-    let raw = |prev: Option<&Hash32>, n_out: usize| {
+    let raw = |prev: &Hash32, n_out: usize| {
         let mut v = 1u32.to_le_bytes().to_vec();
-        match prev {
-            Some(prev) => {
-                v.push(1);
-                v.extend_from_slice(prev);
-                v.extend_from_slice(&[0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]);
-            }
-            None => v.push(0),
-        }
+        v.push(1);
+        v.extend_from_slice(prev);
+        v.extend_from_slice(&[0, 0, 0, 0, 0, 0xFF, 0xFF, 0xFF, 0xFF]);
         v.push(n_out as u8);
         for _ in 0..n_out {
             v.extend_from_slice(&1u64.to_le_bytes());
@@ -215,12 +212,12 @@ fn lean_chain(n: usize, atomic: bool) -> (Vec<u8>, HashMap<u64, Hash32>) {
         v.extend_from_slice(&0u32.to_le_bytes());
         v
     };
-    let anchor = raw(None, 2);
+    let anchor = raw(&[0x2A; 32], 2);
     let anchor_txid = sha256d(&anchor);
     let mut links = Vec::new();
     let mut prev = anchor_txid;
     for _ in 0..n {
-        let link = raw(Some(&prev), 1);
+        let link = raw(&prev, 1);
         prev = sha256d(&link);
         links.push(link);
     }
@@ -278,13 +275,13 @@ fn the_leans_deep_rows_have_the_leans_counts() {
     let (bytes, headers) = lean_chain(100_000, false);
     assert_eq!(
         summary(&bytes, &headers),
-        (100_002, 6_000_071, 100_002, 6_700_089, 100_004, true)
+        (100_002, 6_000_112, 100_002, 6_700_132, 100_004, true)
     );
     // The same at 10,000 links, atomic on the last link.
     let (bytes, headers) = lean_chain(10_000, true);
     assert_eq!(
         summary(&bytes, &headers),
-        (10_002, 600_071, 10_002, 680_090, 10_004, true)
+        (10_002, 600_112, 10_002, 680_133, 10_004, true)
     );
 }
 

@@ -11,7 +11,8 @@ This module provides complete Bitcoin transaction functionality:
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs with iterative ancestry collection (no walk over `source_transaction` recurses: link, sort, serializers, `verify`, `Clone`, `Drop`; 0.3.35, bsv-stack-lean #57)
-- The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (eighteen kinds, none a size or a count) or `SpendRefused`; `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
+- The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (nineteen kinds, none a size or a count) or `SpendRefused`; `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
+- A raw transaction with no input is invalid bytes (0.4.1, bsv-stack-lean #58): `Kind::NoInputs` at the transaction's offset from the streaming reader, not valid from `Beef::verify_valid`, with or without a BUMP index. The rule is the node's (bsv-script-lean `lean/BsvScript/TxRules.lean`, `checkTransactionCommon_vinEmpty`); a test BEEF's root needs an input and a merkle path
 - `BeefLimits { max_txs, max_bumps }` are memory hints since 0.4.0; `Beef::from_binary_with_limits` is deprecated and refuses nothing by size or count
 - JSON serialization matching Go SDK format for cross-SDK compatibility
 - Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
