@@ -691,7 +691,7 @@ fn a_claimed_count_is_read_and_the_refusal_is_for_the_bytes() {
     );
 
     // The same for nTransactions, and for a count of 2^64 - 1: a truncated
-    // version field at 15, where the transaction was due.
+    // version field at 14, where the transaction was due.
     let mut bytes = V1.to_le_bytes().to_vec();
     bytes.push(0);
     bytes.push(0xFF);
