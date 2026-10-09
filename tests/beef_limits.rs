@@ -1,7 +1,11 @@
-//! The count bound for doors that want one: `Beef::from_binary_with_limits`
-//! (bsv-stack-lean #57, P0-5). Each limit admits a BEEF at its count and
-//! refuses one over it with a `BeefError` naming the limit and the count,
-//! checked on the count prefix before anything of that kind is read.
+//! `BeefLimits` without a verdict (bsv-stack-lean, the no-limits program
+//! NL-3; bsv-rs 0.4.0). Through 0.3 `Beef::from_binary_with_limits` refused a
+//! BEEF over a byte length, a BUMP count or a transaction count (P0-5, #57).
+//! A valid BEEF is never refused for its size or its counts: the limits are
+//! memory hints now, a BEEF over every one of them is read, and a count the
+//! bytes cannot honor is refused where the bytes run out, never for the
+//! count.
+#![allow(deprecated)]
 #![cfg(feature = "transaction")]
 
 use bsv_rs::script::{LockingScript, UnlockingScript};
@@ -40,89 +44,70 @@ fn chain_bytes(n: usize) -> (Vec<u8>, String) {
     (beef.to_binary(), subject)
 }
 
-fn limits(max_txs: usize, max_bumps: usize, max_bytes: usize) -> BeefLimits {
-    BeefLimits {
-        max_txs,
-        max_bumps,
-        max_bytes,
-    }
-}
-
-fn refusal(bytes: &[u8], limits: &BeefLimits) -> String {
-    match Beef::from_binary_with_limits(bytes, limits) {
-        Err(bsv_rs::Error::BeefError(message)) => message,
-        Err(other) => panic!("expected a BeefError, got {other:?}"),
-        Ok(beef) => panic!("expected a refusal, parsed {} txs", beef.txs.len()),
-    }
+fn hints(max_txs: usize, max_bumps: usize) -> BeefLimits {
+    BeefLimits { max_txs, max_bumps }
 }
 
 #[test]
-fn the_limits_admit_a_beef_at_every_count() {
+fn a_beef_at_its_hints_is_read() {
     let (bytes, _) = chain_bytes(10);
-    let beef = Beef::from_binary_with_limits(&bytes, &limits(10, 1, bytes.len()))
-        .expect("10 txs, 1 bump and the exact byte count are within the limits");
+    let beef = Beef::from_binary_with_limits(&bytes, &hints(10, 1)).expect("reads");
     assert_eq!(beef.txs.len(), 10);
     assert_eq!(beef.bumps.len(), 1);
 }
 
+/// What 0.3.35 refused as `over max_txs 9` and `over max_bumps 0`.
 #[test]
-fn the_limits_refuse_one_transaction_too_many() {
+fn a_beef_over_every_hint_is_read_all_the_same() {
     let (bytes, _) = chain_bytes(10);
-    let message = refusal(&bytes, &limits(9, 1, usize::MAX));
-    assert!(message.contains("max_txs 9"), "{message}");
-    assert!(message.contains("10"), "names the count: {message}");
+    for limits in [hints(9, 1), hints(usize::MAX, 0), hints(0, 0)] {
+        let mut beef = Beef::from_binary_with_limits(&bytes, &limits)
+            .expect("a valid BEEF is not refused for its counts");
+        assert_eq!(beef.txs.len(), 10);
+        assert_eq!(beef.bumps.len(), 1);
+        assert_eq!(beef.to_binary(), bytes);
+    }
 }
 
+/// A count prefix that claims 4,294,967,295 transactions over no bytes: the
+/// count is read, nothing is reserved for it, and the refusal is for the
+/// bytes that are not there. 0.3.35 answered `over max_txs 1000`.
 #[test]
-fn the_limits_refuse_one_bump_too_many() {
-    let (bytes, _) = chain_bytes(10);
-    let message = refusal(&bytes, &limits(usize::MAX, 0, usize::MAX));
-    assert!(message.contains("max_bumps 0"), "{message}");
-    assert!(message.contains("1"), "names the count: {message}");
-}
-
-#[test]
-fn the_limits_refuse_one_byte_too_many() {
-    let (bytes, _) = chain_bytes(10);
-    let message = refusal(&bytes, &limits(usize::MAX, usize::MAX, bytes.len() - 1));
-    assert!(
-        message.contains(&format!("max_bytes {}", bytes.len() - 1)),
-        "{message}"
-    );
-    assert!(
-        message.contains(&bytes.len().to_string()),
-        "names the count: {message}"
-    );
-}
-
-/// A count prefix that claims more transactions than the limit is refused on
-/// the prefix, before one transaction is read or one slot reserved.
-#[test]
-fn the_limits_refuse_a_claimed_count_before_reading_it() {
+fn a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing() {
     let (bytes, _) = chain_bytes(2);
     let mut beef = Beef::from_binary(&bytes).expect("parses");
     beef.txs.clear();
     let mut writer = bsv_rs::primitives::Writer::new();
     beef.to_writer(&mut writer);
-    let mut hostile = writer.into_bytes();
+    let mut claimed = writer.into_bytes();
     // The last byte is the tx count (0); claim 0xFFFFFFFF transactions instead.
-    hostile.pop();
-    hostile.extend_from_slice(&[0xfe, 0xff, 0xff, 0xff, 0xff]);
-    let message = refusal(&hostile, &limits(1_000, 10, usize::MAX));
-    assert!(message.contains("max_txs 1000"), "{message}");
-    assert!(
-        message.contains("4294967295"),
-        "names the claimed count: {message}"
-    );
+    claimed.pop();
+    claimed.extend_from_slice(&[0xfe, 0xff, 0xff, 0xff, 0xff]);
+    for limits in [hints(1_000, 10), hints(usize::MAX, usize::MAX)] {
+        let error = Beef::from_binary_with_limits(&claimed, &limits).expect_err("no bytes");
+        assert!(
+            matches!(error, bsv_rs::Error::ReaderUnderflow { .. }),
+            "the refusal is the bytes running out: {error:?}"
+        );
+        let message = error.to_string();
+        assert!(!message.contains("max_"), "no limit is named: {message}");
+    }
+    let plain = Beef::from_binary(&claimed).expect_err("no bytes");
+    assert!(matches!(plain, bsv_rs::Error::ReaderUnderflow { .. }));
 }
 
-/// The limits are checked on an Atomic BEEF's inner counts too, and
-/// `from_binary` stays unbounded.
+/// An Atomic BEEF over its hints is read too, and with or without hints the
+/// parse is the same parse.
 #[test]
-fn the_limits_apply_to_atomic_beef_and_from_binary_stays_unbounded() {
+fn the_hints_change_nothing_that_is_read() {
     let (mut beef, subject) = chain_beef(5);
     let atomic = beef.to_binary_atomic(&subject).expect("atomic");
-    let message = refusal(&atomic, &limits(4, 1, usize::MAX));
-    assert!(message.contains("max_txs 4"), "{message}");
-    assert_eq!(Beef::from_binary(&atomic).expect("unbounded").txs.len(), 5);
+    let hinted = Beef::from_binary_with_limits(&atomic, &hints(4, 0)).expect("reads");
+    let plain = Beef::from_binary(&atomic).expect("reads");
+    assert_eq!(hinted.txs.len(), 5);
+    assert_eq!(hinted.atomic_txid, plain.atomic_txid);
+    assert_eq!(
+        hinted.txs.iter().map(|t| t.txid()).collect::<Vec<_>>(),
+        plain.txs.iter().map(|t| t.txid()).collect::<Vec<_>>()
+    );
 }
