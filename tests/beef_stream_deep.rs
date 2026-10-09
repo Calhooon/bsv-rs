@@ -453,6 +453,42 @@ fn the_wide_bump_is_accepted_at_8_192_and_16_384_leaves_when_its_root_checks() {
     }
 }
 
+/// The honest shapes at every small size: the stream's root is the tree's
+/// root and the root the in-memory reader computes for every txid.
+#[test]
+fn the_stream_and_the_in_memory_reader_compute_the_same_roots() {
+    let mut read = 0;
+    for k in 1..=10u32 {
+        let mut shapes = vec![flat_probe(k)];
+        for count in [1usize, 2, 3, 1 << (k - 1), (1 << k) - 1, 1 << k] {
+            if count >= 1 && count <= 1 << k {
+                shapes.push(compound_bump(k, count));
+            }
+        }
+        for (bytes, root) in shapes {
+            let Some(Ok(Element::Bump(bump))) = BeefStream::new(bytes.as_slice()).next() else {
+                panic!("k={k}: the BUMP did not read")
+            };
+            assert_eq!(bump.root, root, "k={k}");
+            let beef = Beef::from_binary(&bytes).unwrap();
+            // A walk per txid is the in-memory reader's cost, not the
+            // stream's: a few of them say the same thing.
+            for txid in beef.bumps[0].txids().into_iter().take(4) {
+                assert_eq!(
+                    beef.bumps[0].compute_root(Some(&txid)).unwrap(),
+                    display(&root)
+                );
+            }
+            assert_eq!(
+                bump.to_merkle_path().unwrap().to_binary(),
+                beef.bumps[0].to_binary()
+            );
+            read += 1;
+        }
+    }
+    assert!(read >= 60, "{read} shapes read");
+}
+
 #[test]
 fn the_leans_wide_row_has_the_leans_counts() {
     // `#eval summary (run stub (wideHeaders 14) (wide 14))`: 16,384 leaves,
