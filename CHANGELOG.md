@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-09
+
+The posture (bsv-stack-lean, the charter "a BEEF of any size", the owner's
+ruling of 2026-10-09): a valid BEEF is never refused for its size or its
+counts. A refusal is for invalid bytes only, and names them. 0.3.35 gave doors
+a verdict by size (`BeefLimits`); 0.4.0 takes that verdict away and gives them
+a reader whose memory does not grow with the body.
+
+### Added: the streaming BEEF reader (`transaction::beef_stream`)
+
+- `verify_stream(source, headers, subject) -> io::Result<Verdict>` reads a BEEF
+  from any `std::io::Read` in one pass, one step per element. Each BUMP's root
+  is computed by a linear walk and checked against the `Headers` as it streams
+  (no header at a height is fail closed); each unproven transaction's inputs
+  are resolved against the index and their scripts executed against the parent
+  output the index kept; a subject is held to the Atomic rule (it is the last
+  transaction, and every other transaction is spent by a later one).
+- The verdict is `Valid { subject, roots }`, `Invalid { offset, kind, reason }`
+  or `SpendRefused { offset, txid, input, why }`. An `Invalid` carries the
+  offset of the byte it names and one of eighteen `Kind`s (`Kind::ALL`), none
+  of which is a size or a count. A spend the interpreter refuses is not one of
+  the eighteen: it is the script's verdict on a transaction, and
+  `verify_stream_structure` leaves it out.
+- `BeefStream` yields the elements one at a time (`Element::Bump` with its
+  root, `Element::Tx` with its txid hashed while the bytes passed,
+  `Element::TxidOnly`) and holds one chunk of the source and the one element
+  in hand. `BeefDecoder` is the same reader fed slices, for a source that is
+  not a `Read`; `AsyncByteSource` and `verify_stream_async` read a request
+  body or an object store's body stream against a `ChainTracker`.
+- `BeefIndex` is what the reader keeps: one entry per element and one per txid
+  a BUMP carries at level 0; with scripts, each unspent output until a later
+  input spends it. Never a sibling hash, never a transaction's bytes after its
+  step.
+- `verify_stream_two_pass` reads a source that can be read again (an object
+  at rest) twice: `referenced_outpoints` learns which outputs are spent, and
+  the verifying pass keeps those alone. One pass cannot know which outputs
+  will be spent and keeps every unspent one, which for transactions carrying
+  large outputs nothing spends is their bytes.
+- `Cursor` is the state after `k` elements, with `to_binary` / `from_binary`;
+  `StreamVerifier::resume(cursor, source, headers)` over the rest of the stream
+  yields the verdict of the whole, refusal for refusal.
+- The specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean
+  (six theorems: `accept_iff_valid`, `accept_independent_of_size`,
+  `memory_bounded_per_element`, `refusal_names_invalid_bytes`, `work_linear`,
+  `resume_sound`). `tests/beef_stream.rs` replays its rows with their offsets
+  and kinds, the BRC-62 example among them; `tests/beef_stream_deep.rs` reads
+  the P0-5 chain at 1,000, 10,000 and 100,000 links on a 1 MiB stack and the
+  P0-5c wide BUMP at 8,192 and 16,384 leaves, and holds the Lean's own counts
+  at those sizes; `tests/memory_profiling.rs` measures the peak heap: 16,988
+  bytes for the stream alone at every depth, about 128 bytes per element for
+  the verdict at 100,000 links.
+- One shape is accepted that the Lean definition refuses: the one-leaf BUMP of
+  a block with only one transaction, whose root is the txid, as the reference
+  and `MerklePath` read it (`MerklePath::from_coinbase_txid`).
+
+### Changed (breaking): `BeefLimits` has no verdict
+
+- `BeefLimits::max_bytes` is removed. `max_txs` and `max_bumps` are memory
+  hints: how many entries the in-memory parse may reserve room for, never more
+  than the bytes left could fill.
+- `Beef::from_binary_with_limits` is deprecated and refuses nothing it did not
+  refuse without limits. The three `BeefError` refusals of 0.3.35 (`BEEF of N
+  bytes is over max_bytes`, `BEEF claims N BUMPs, over max_bumps`, `BEEF claims
+  N transactions, over max_txs`) are gone. A count the bytes cannot honor is
+  refused where the bytes run out (`ReaderUnderflow`), never for the count.
+- Migration: delete `max_bytes` from a `BeefLimits { .. }` literal. A door
+  that called `from_binary_with_limits` to bound a stranger's BEEF calls
+  `verify_stream` on the body's reader instead and drops its 413. Code that
+  matched on the three messages has nothing left to match. `Beef::from_binary`
+  is unchanged and stays the reader for small bodies and for building.
+
 ## [0.3.35] - 2026-10-08
 
 ### Fixed — no walk over a BEEF's ancestry recurses (bsv-stack-lean #57, P0-5)

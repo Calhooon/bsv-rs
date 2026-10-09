@@ -28,7 +28,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
 | `kvstore_integration_tests.rs` | 93 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
 | `live_policy_http_tests.rs` | 20 | `transaction`+`http` | LivePolicy dynamic fee model with wiremock |
-| `memory_profiling.rs` | 5 | `dhat-profiling` | Heap allocation profiling for crypto operations |
+| `memory_profiling.rs` | 6 | `dhat-profiling` | Heap allocation profiling for crypto operations; the streaming BEEF reader's peak heap at 1,000, 10,000 and 100,000 links |
 | `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
 | `overlay_admin_token_ts_parity_tests.rs` | 2 | `overlay` | Byte-exact parity of `create_signed_overlay_admin_token` with `@bsv/sdk 1.10.1`'s `pushdrop.lock` output (`overlay_admin_token_ts_parity.json`, 5 cases) |
 | `overlay_cross_sdk_tests.rs` | 13 | `overlay` | Admin token and overlay type cross-SDK vectors |
@@ -114,6 +114,10 @@ Transaction test vectors in `tests/transaction/vectors/`:
 
 ### Transaction (`transaction` feature)
 - **`transaction_tests.rs`** — Parsing/roundtrip (104 tests), fee models (Fixed, SatoshisPerKilobyte), MockChainTracker, broadcast, MerklePath/BUMP, BEEF format, ancestry collection (`to_beef`, `to_atomic_beef`), SPV verification (`Transaction::verify()`), cross-SDK BEEF/MerklePath vectors. Organized into submodules: `beef_extended_tests`, `beef_ancestry_tests`, `cross_sdk_tests`, `merkle_path_advanced_tests`
+
+- **`beef_stream.rs`** — The streaming BEEF reader against the rows of the Lean definition `BeefOfAnySize` (bsv-stack-lean): each refusal with its offset and kind, the BRC-62 example cut and accepted with its script executed, the resumption at every `k`, chunks of every size, the spend refusals, the asynchronous reader
+- **`beef_stream_deep.rs`** — The P0-5 chain at 1,000, 10,000 and 100,000 links read from a source that writes itself (`support/beef_chain.rs`) on a 1 MiB stack, the resumption at three points, the P0-5c wide BUMP at 8,192 and 16,384 leaves, the Lean's counts at those sizes
+- **`beef_limits.rs`** — `BeefLimits` as memory hints: a BEEF over every one is read, a claimed count is refused for the bytes
 
 ### Conformance corpus (`transaction` feature; `$BSV_CONFORMANCE_DIR`, skipped loudly when absent)
 - **`conformance_scripts.rs`** — The ts-stack corpus's script domain: 5,116 evaluation vectors (node script fixtures from bitcoin-sv and Teranode, the SDK's), the sighash and script regressions; every mismatch classified into an enumerated `unsupported` class or a pinned known failure, the per-class counts pinned (`EVALUATION_UNSUPPORTED_PINS`, `EVALUATION_KNOWN_FAILURES`), so corpus or interpreter drift is a red test. CI never sees the corpus (Calhooon/bsv-rs#31): run it before a release

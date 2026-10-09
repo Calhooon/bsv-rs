@@ -11,7 +11,8 @@ This module provides complete Bitcoin transaction functionality:
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
 - BEEF format (BRC-62/95/96) for SPV proofs with iterative ancestry collection (no walk over `source_transaction` recurses: link, sort, serializers, `verify`, `Clone`, `Drop`; 0.3.35, bsv-stack-lean #57)
-- `Beef::from_binary_with_limits` with `BeefLimits { max_txs, max_bumps, max_bytes }` for a door that bounds a stranger's BEEF
+- The streaming BEEF reader (`beef_stream`, 0.4.0): `verify_stream` over any `Read`, one element held at a time, the verdict `Valid`, `Invalid { offset, kind }` (eighteen kinds, none a size or a count) or `SpendRefused`; `Cursor` and `resume`. A valid BEEF is never refused for its size or its counts
+- `BeefLimits { max_txs, max_bumps }` are memory hints since 0.4.0; `Beef::from_binary_with_limits` is deprecated and refuses nothing by size or count
 - JSON serialization matching Go SDK format for cross-SDK compatibility
 - Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
@@ -30,6 +31,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
 | `beef.rs` | `Beef` (BRC-62/95/96) with validation, sorting, merging, and logging |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants |
+| `beef_stream.rs` | The streaming reader: `BeefDecoder`, `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`; the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
 | `broadcaster.rs` | `Broadcaster` trait, response/failure types, helper functions |
