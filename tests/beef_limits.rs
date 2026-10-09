@@ -101,7 +101,7 @@ fn the_limits_refuse_one_byte_too_many() {
 fn the_limits_refuse_a_claimed_count_before_reading_it() {
     let (bytes, _) = chain_bytes(2);
     let mut beef = Beef::from_binary(&bytes).expect("parses");
-    beef.txs.truncate(0);
+    beef.txs.clear();
     let mut writer = bsv_rs::primitives::Writer::new();
     beef.to_writer(&mut writer);
     let mut hostile = writer.into_bytes();
