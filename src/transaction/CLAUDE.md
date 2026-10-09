@@ -10,7 +10,8 @@ This module provides complete Bitcoin transaction functionality:
 - Signing with script templates
 - Fee calculation with pluggable fee models
 - MerklePath (BRC-74 BUMP) for merkle proofs
-- BEEF format (BRC-62/95/96) for SPV proofs with recursive ancestry collection
+- BEEF format (BRC-62/95/96) for SPV proofs with iterative ancestry collection (no walk over `source_transaction` recurses: link, sort, serializers, `verify`, `Clone`, `Drop`; 0.3.35, bsv-stack-lean #57)
+- `Beef::from_binary_with_limits` with `BeefLimits { max_txs, max_bumps, max_bytes }` for a door that bounds a stranger's BEEF
 - JSON serialization matching Go SDK format for cross-SDK compatibility
 - Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
@@ -291,7 +292,7 @@ impl MerklePath {
     pub fn from_hex/from_binary/from_reader(...)                // Parsing
     pub fn from_coinbase_txid(txid: &str, height: u32) -> Self  // Single-tx block
     pub fn to_hex/to_binary/to_writer(...)                      // Serialization
-    pub fn compute_root(&self, txid: Option<&str>) -> Result<String>
+    pub fn compute_root(&self, txid: Option<&str>) -> Result<String>  // One cached walk (RootWalker)
     pub fn contains(&self, txid: &str) -> bool
     pub fn txids(&self) -> Vec<String>
     pub fn combine(&mut self, other: &MerklePath) -> Result<()>  // Same height/root required
@@ -365,14 +366,14 @@ let result = ArcBroadcaster::default().broadcast(&tx).await;             // BEEF
 let result = WhatsOnChainBroadcaster::mainnet().broadcast(&tx).await;    // Raw hex
 let result = TeranodeBroadcaster::new(url, None).broadcast(&tx).await;   // EF binary
 
-// Serializing to BEEF (recursively collects ancestors)
+// Serializing to BEEF (collects ancestors with an explicit stack)
 let beef_v1 = tx.to_beef_v1(false)?;  // For ARC
 let beef_v2 = tx.to_beef(false)?;     // V2 format
 let atomic = tx.to_atomic_beef(false)?;
 
-// SPV Verification (Transaction-level, recursive)
+// SPV Verification (Transaction-level, by txid over the whole ancestry)
 let tracker = WhatsOnChainTracker::mainnet();
-let is_valid = tx.verify(&tracker, None).await?;              // Recursive SPV verify
+let is_valid = tx.verify(&tracker, None).await?;              // SPV verify of the ancestry
 let is_valid = tx.verify(&tracker, Some(&fee_model)).await?;  // With fee validation
 
 // SPV Verification (BEEF-level, manual root checking)
@@ -393,16 +394,18 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **Convenience inputs**: `add_input_from_tx` sets template; `add_input_from` builds a minimal source tx; `add_inputs_from_utxos` does NOT set templates (caller must set them separately)
 - **Change**: Created via `new_change()` or `add_p2pkh_output(_, None)`; computed in `fee()` using Benford's law for Random distribution
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
+- **Debug**: `Transaction` and `TransactionInput` implement `Debug` by hand; a linked `source_transaction` prints as `Some("<txid>")`, never its ancestry (0.3.35, bsv-stack-lean #57 P0-5c)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
 - **HTTP feature**: `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
-- **BEEF ancestry**: `to_beef()` and `to_beef_v1()` recursively walk `source_transaction` chain via `collect_ancestors()`, stops at txs with `merkle_path`
+- **BEEF ancestry**: `to_beef()` and `to_beef_v1()` walk the `source_transaction` chain depth first with an explicit stack via `collect_ancestors()`, stop at txs with `merkle_path`, and store each ancestor without its own ancestry
 - **BEEF V1 vs V2**: Use `to_beef_v1()` for ARC compatibility (BRC-62), `to_beef()` for V2 with TXID-only support (BRC-96)
 - **BEEF indexing**: Beef maintains an internal `txid_index` HashMap for O(1) transaction lookup by txid
+- **MerklePath root check**: the parse checks every level-0 leaf's root with one `RootWalker` that indexes each level by offset and computes each node once, shared across the walks (the reference's `computeRootCached`; linear in the leaves since 0.3.35, bsv-stack-lean #57 P0-5c). A tree height over 64 is refused before any shift
 - **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by `"height:root"` key; combines proofs at same height/root
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
 - **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker` implement `Default`
-- **SPV verify**: `verify()` performs queue-based recursive verification: checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input, enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
+- **SPV verify**: `verify()` performs queue-based verification over the whole ancestry (no recursion): checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input, enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
 - **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
 
 ## BEEF Ancestry Collection Algorithm
@@ -410,8 +413,8 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 The `collect_ancestors()` method implements the same algorithm as TypeScript/Go SDKs:
 
 1. **Cycle detection**: Skip transactions already seen (by txid)
-2. **Proven transactions**: If tx has `merkle_path`, add proof (deduplicated by height:root) and stop recursion
-3. **Unproven transactions**: Recursively process each input's `source_transaction` in reverse order
+2. **Proven transactions**: If tx has `merkle_path`, add proof (deduplicated by height:root) and do not descend
+3. **Unproven transactions**: Process each input's `source_transaction` first, in reverse order, depth first on an explicit stack (the recursive walk's order)
 4. **Dependency order**: After processing all ancestors, add current transaction
 5. **Partial support**: `allow_partial=true` skips inputs with missing source transactions
 
@@ -422,7 +425,7 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 | `TransactionError` | Missing source, satoshis, uncomputed change, EF marker issues, BEEF parsing, JSON serialization, SPV verification failures (invalid merkle path, fee too low, script validation) |
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
-| `MerklePathError` | Empty path, duplicate offset, invalid offset at height, mismatched roots |
+| `MerklePathError` | Empty path, tree height over 64, duplicate offset, invalid offset at height, mismatched roots |
 | `ChainTrackerError` | `NetworkError`, `InvalidResponse`, `BlockNotFound(height)`, `Other` |
 
 ## Related Documentation

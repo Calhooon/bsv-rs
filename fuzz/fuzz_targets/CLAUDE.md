@@ -12,6 +12,7 @@ This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte 
 | `fuzz_base58.rs` | Fuzzes Base58, Base58Check, hex, and Base64 decoding plus encode/decode roundtrips |
 | `fuzz_script_parser.rs` | Fuzzes `Script::from_binary` and `Script::from_hex`, exercises type detection and serialization |
 | `fuzz_transaction_parser.rs` | Fuzzes `Transaction::from_binary`, sighash `parse_transaction`, and `MerklePath::from_binary` |
+| `fuzz_beef_parser.rs` | Fuzzes `Beef::from_binary` against `from_binary_with_limits`, links every subject (`find_atomic_transaction`), serializes, clones and drops it, then `verify_valid`, the round trip, `Transaction::from_beef` and `from_atomic_beef` |
 | `fuzz_wire_protocol.rs` | Fuzzes `WireReader` deserialization of varint, string, counterparty, protocol ID, and raw bytes |
 
 ## Target Details

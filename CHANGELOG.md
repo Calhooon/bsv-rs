@@ -7,6 +7,87 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.35] - 2026-10-08
+
+### Fixed — no walk over a BEEF's ancestry recurses (bsv-stack-lean #57, P0-5)
+
+- A stranger's BEEF that is one chain of unproven transactions took the stack
+  one frame (or several) per link: on a 1 MiB thread, the order of a WASM
+  stack in a Worker, release builds aborted by 1,000 links in the link of
+  `Transaction::from_beef` / `from_atomic_beef` (`Beef::find_atomic_transaction`),
+  by 2,000 in `to_beef` / `to_atomic_beef` (and `to_beef_v1`, the same walk),
+  in `Clone` of the linked result and in `id()` of a chain built with
+  `add_input_from_tx`, by 4,000 in the overlay's `Historian` / `SyncHistorian`, and by 16,000 in the
+  `Drop` of the linked result. A stack overflow is an abort, not a panic: in a
+  Worker it takes every request in flight on the instance.
+- Every one of those walks now keeps its work on the heap, in the recursive
+  walk's order: the link (one full link per txid, a bare stub per repeat,
+  cycle-safe, the same `source_transaction` shape), the serializers' ancestor
+  collection, the historians, and `Transaction`'s `Clone` and `Drop`. `id()`
+  hashes a chain's txid-less sources deepest first before it reads them. The
+  witness, `tests/beef_deep_chain.rs`, runs each walk alone on a 1 MiB thread
+  at 100,000 links; `iterative_equivalence_tests` in `beef.rs` holds each new
+  walk to the 0.3.34 form on seeded random BEEFs.
+- `Beef::sort_txs` rescanned the pending list once per resolved link, so a
+  chain written newest first sorted in quadratic time (767.8 s for 128,000
+  links in a release build). It now computes the same order in one pass, as
+  the reference does (`@bsv/sdk` `Beef.#topoSort`).
+- `to_beef` cloned each ancestor's whole ancestry into the BEEF it was
+  building (quadratic in a chain's depth); it stores each ancestor without its
+  sources, and writes the same bytes.
+
+### Added — `Beef::from_binary_with_limits` and `BeefLimits`
+
+- `BeefLimits { max_txs, max_bumps, max_bytes }` and
+  `Beef::from_binary_with_limits(bin, &limits)`: a door that reads a stranger's
+  BEEF refuses one over its byte length, BUMP count or transaction count with a
+  `BeefError` naming the limit and the count, each count checked on its prefix
+  before an entry of that kind is read. `Beef::from_binary` is unchanged (no
+  bound beyond the bytes). `tests/beef_limits.rs`.
+
+### Changed — `Transaction` implements `Drop`
+
+- The ancestry is dropped one transaction at a time. A type with `Drop`
+  cannot have a field moved out of an owned value, so code such as
+  `if let Some(mp) = tx.merkle_path { .. }` or `let inputs = tx.inputs;` on an
+  owned `Transaction` no longer compiles (E0509). Migration, one line:
+  `tx.merkle_path.take()` / `std::mem::take(&mut tx.inputs)`, or borrow
+  (`tx.merkle_path.as_ref()`). Compiled against this tree:
+  bsv-wallet-toolbox-rs, bsv-wallet-cli, bsv-middleware-rs, rust-message-box,
+  bsv-middleware-cloudflare, bsv-storage-cloudflare, rust-wallet-infra build
+  unchanged; the overlay engine's `GET /tx/bump` route
+  (`crates/overlay-cloudflare/src/routes.rs`) needs the one-line migration.
+
+### Fixed — the BUMP parse is linear in its leaves (bsv-stack-lean #57, P0-5c)
+
+- `MerklePath::from_reader` (under `from_binary`, `from_hex` and every BEEF
+  parse) checks that every level-0 leaf computes the same root, and each check
+  walked the tree again: a linear scan of each level for the sibling, a missing
+  sibling recomputed from level 0. One BUMP of 8,192 flagged leaves with empty
+  upper levels (294,433 bytes) took 225.7 s to parse in a release build, about
+  five times per doubling, inside any `BeefLimits`. The check now shares every
+  node it finds or computes across the walks, each level indexed by offset
+  once, as the reference does (`@bsv/sdk` `MerklePath.computeRootCached`):
+  0.051 s for the same bytes. `compute_root` uses the same walk. The answers
+  and the errors are the 0.3.34 ones (`linear_root_equivalence_tests` holds
+  the new walk to the old one on seeded random paths); the witness is
+  `tests/merkle_path_cost.rs`.
+- A tree-height byte over 64 shifted an offset by 64 or more: `attempt to
+  shift right with overflow` in a debug build (or any build with
+  `overflow-checks`), a wrong error in a release one. It is refused at the
+  parse, before any shift, with `MerklePathError("Invalid tree height: 65,
+  over the maximum height 64")`; `MerklePath::new` and `new_unchecked` refuse a
+  path of more than 64 levels the same way, and no shift by a height can panic.
+
+### Changed — `{:?}` of a `Transaction` prints a linked source as its txid
+
+- `Transaction` and `TransactionInput` implement `Debug` by hand: an input's
+  `source_transaction` prints as `Some("<txid>")`, never as the source's whole
+  ancestry. The derived `Debug` printed every linked ancestor, one recursion
+  per link, so `format!("{:?}", tx)` of a 1,000-link chain overflowed a 1 MiB
+  stack and aborted. Every other field prints as the derive printed it. Code
+  that parses `{:?}` output of a linked transaction sees the change.
+
 ## [0.3.34] - 2026-10-08
 
 ### Changed — QUEUED, REQUESTED_BY_NETWORK and CONFIRMED are accepted on a 2xx

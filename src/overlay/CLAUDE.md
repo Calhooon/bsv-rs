@@ -240,7 +240,7 @@ pub struct RankChangeEvent {
 
 ## Historian
 
-Traverses transaction ancestry to build chronological history. Follows `input.source_transaction` references recursively.
+Traverses transaction ancestry to build chronological history. Follows `input.source_transaction` references depth first on an explicit stack (0.3.35: the recursive walk overflowed a 1 MiB stack at a few thousand links).
 
 - **`Historian<T, C>`** - Async version with `InterpreterFn<T, C>` callback, optional caching via `tokio::sync::RwLock`, and `interpreter_version` for cache invalidation. Cache key format: `"{version}|{txid}|{ctx_key}"`
 - **`SyncHistorian<T, C>`** - Synchronous version with builder methods `with_debug()` and `with_version()`

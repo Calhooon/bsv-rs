@@ -32,10 +32,30 @@
 //! let is_valid = merkle_path.verify("txid...", &chain_tracker).await?;
 //! ```
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
 use crate::Result;
+
+/// The most levels a path may have. Offsets are `u64`, so a path of 64 levels
+/// shifts an offset by at most 63; a tree-height byte over this is refused
+/// before any shift (bsv-stack-lean #57, P0-5c).
+const MAX_TREE_HEIGHT: usize = 64;
+
+fn tree_height_error(height: usize) -> crate::Error {
+    crate::Error::MerklePathError(format!(
+        "Invalid tree height: {}, over the maximum height {}",
+        height, MAX_TREE_HEIGHT
+    ))
+}
+
+/// `offset >> height`, 0 when the shift is out of range, so no build panics.
+fn offset_at_height(offset: u64, height: usize) -> u64 {
+    u32::try_from(height)
+        .ok()
+        .and_then(|h| offset.checked_shr(h))
+        .unwrap_or(0)
+}
 
 /// A leaf node in the Merkle path tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,6 +154,10 @@ impl MerklePath {
             ));
         }
 
+        if path.len() > MAX_TREE_HEIGHT {
+            return Err(tree_height_error(path.len()));
+        }
+
         if path[0].is_empty() {
             return Err(crate::Error::MerklePathError(
                 "Empty level at height: 0".to_string(),
@@ -160,7 +184,7 @@ impl MerklePath {
                 if height == 0 && !leaf.duplicate {
                     #[allow(clippy::needless_range_loop)]
                     for h in 1..path.len() {
-                        legal_offsets[h].insert((leaf.offset >> h) ^ 1);
+                        legal_offsets[h].insert(offset_at_height(leaf.offset, h) ^ 1);
                     }
                 } else if height > 0
                     && legal_offsets_only
@@ -176,11 +200,21 @@ impl MerklePath {
 
         let merkle_path = Self { block_height, path };
 
-        // Verify all txids compute to the same root
+        // Verify all txids compute to the same root. The walks share every
+        // node found or computed, as the reference's `computeRootCached` does
+        // (`@bsv/sdk` `MerklePath` constructor), so the check is linear in the
+        // leaves: at 0.3.34 each walk recomputed the tree (P0-5c).
+        let mut first_offset: HashMap<&str, u64> = HashMap::new();
+        for leaf in &merkle_path.path[0] {
+            if let Some(ref hash) = leaf.hash {
+                first_offset.entry(hash.as_str()).or_insert(leaf.offset);
+            }
+        }
+        let mut walker = RootWalker::shared(&merkle_path.path);
         let mut root: Option<String> = None;
         for leaf in &merkle_path.path[0] {
             if let Some(ref hash) = leaf.hash {
-                let computed = merkle_path.compute_root(Some(hash))?;
+                let computed = walker.root_from(hash, first_offset[hash.as_str()])?;
                 if let Some(ref expected) = root {
                     if &computed != expected {
                         return Err(crate::Error::MerklePathError(
@@ -228,6 +262,9 @@ impl MerklePath {
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
         let block_height = reader.read_var_int_num()? as u32;
         let tree_height = reader.read_u8()? as usize;
+        if tree_height > MAX_TREE_HEIGHT {
+            return Err(tree_height_error(tree_height));
+        }
 
         let mut path: Vec<Vec<MerklePathLeaf>> = vec![Vec::new(); tree_height];
 
@@ -371,71 +408,7 @@ impl MerklePath {
         };
 
         let index = self.index_of(&txid)?;
-        let mut working_hash = txid;
-
-        // Special case for blocks with only one transaction
-        if self.path.len() == 1 && self.path[0].len() == 1 {
-            return Ok(working_hash);
-        }
-
-        for height in 0..self.path.len() {
-            let offset = (index >> height) ^ 1;
-            let leaf = self.find_or_compute_leaf(height, offset)?;
-
-            working_hash = if leaf.duplicate {
-                hash_pair(&working_hash, &working_hash)
-            } else if offset % 2 != 0 {
-                // Odd offset means sibling is on the RIGHT, working_hash is on the LEFT
-                hash_pair(&working_hash, leaf.hash.as_deref().unwrap_or(""))
-            } else {
-                // Even offset means sibling is on the LEFT, working_hash is on the RIGHT
-                hash_pair(leaf.hash.as_deref().unwrap_or(""), &working_hash)
-            };
-        }
-
-        Ok(working_hash)
-    }
-
-    /// Finds a leaf at the given height and offset, or computes it from lower levels.
-    fn find_or_compute_leaf(&self, height: usize, offset: u64) -> Result<MerklePathLeaf> {
-        // Try to find existing leaf
-        if let Some(leaf) = self.path[height].iter().find(|l| l.offset == offset) {
-            return Ok(leaf.clone());
-        }
-
-        // Can't compute at level 0
-        if height == 0 {
-            return Err(crate::Error::MerklePathError(format!(
-                "Missing hash at height 0, offset {}",
-                offset
-            )));
-        }
-
-        // Compute from level below
-        let h = height - 1;
-        let l = offset << 1;
-
-        let leaf0 = self.find_or_compute_leaf(h, l)?;
-        if leaf0.hash.is_none() && !leaf0.duplicate {
-            return Err(crate::Error::MerklePathError(format!(
-                "Missing hash at height {}, offset {}",
-                h, l
-            )));
-        }
-
-        let leaf1 = self.find_or_compute_leaf(h, l + 1)?;
-
-        let working_hash = if leaf1.duplicate {
-            let h0 = leaf0.hash.as_deref().unwrap_or("");
-            hash_pair(h0, h0)
-        } else {
-            // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
-            let h0 = leaf0.hash.as_deref().unwrap_or("");
-            let h1 = leaf1.hash.as_deref().unwrap_or("");
-            hash_pair(h0, h1)
-        };
-
-        Ok(MerklePathLeaf::new(offset, working_hash))
+        RootWalker::new(&self.path).root_from(&txid, index)
     }
 
     /// Combines this MerklePath with another to create a compound proof.
@@ -581,6 +554,192 @@ impl MerklePath {
             .filter(|l| l.txid)
             .filter_map(|l| l.hash.clone())
             .collect()
+    }
+}
+
+/// A level of at most this many leaves is scanned, not indexed: a single
+/// `compute_root` over a typical BUMP stays as fast as the 0.3.34 scan.
+const SCAN_MAX: usize = 16;
+
+/// A node found at its offset or computed from the level below.
+#[derive(Clone)]
+struct Node {
+    hash: Option<String>,
+    duplicate: bool,
+}
+
+/// The walk from a level-0 leaf to the root, sharing every node it finds or
+/// computes with the walks after it (the reference's `computeRootCached`,
+/// `cachedFindLeaf` and `cachedMerkleRoot`). Each level is indexed by offset
+/// once, each node is found or computed once (an error included: it depends
+/// only on the node), and a walk that reaches a node an earlier walk passed
+/// through stops there: the rest of its walk is the earlier one's.
+struct RootWalker<'a> {
+    path: &'a [Vec<MerklePathLeaf>],
+    /// Each level's offsets, to the first leaf at that offset; `None` for a
+    /// level short enough to scan (a scan finds the same first leaf).
+    index: Vec<Option<HashMap<u64, usize>>>,
+    /// Every sibling found or computed, keyed by (height, offset).
+    nodes: HashMap<(usize, u64), std::result::Result<Node, String>>,
+    /// The working hash a finished walk carried through (height, offset).
+    walked: HashMap<(usize, u64), String>,
+    /// The root of the first finished walk.
+    root: Option<String>,
+    /// Whether walks meet: false for a single `compute_root`.
+    shared: bool,
+}
+
+impl<'a> RootWalker<'a> {
+    fn new(path: &'a [Vec<MerklePathLeaf>]) -> Self {
+        let index = path
+            .iter()
+            .map(|level| {
+                if level.len() <= SCAN_MAX {
+                    return None;
+                }
+                let mut at = HashMap::with_capacity(level.len());
+                for (i, leaf) in level.iter().enumerate() {
+                    at.entry(leaf.offset).or_insert(i);
+                }
+                Some(at)
+            })
+            .collect();
+        Self {
+            path,
+            index,
+            nodes: HashMap::new(),
+            walked: HashMap::new(),
+            root: None,
+            shared: false,
+        }
+    }
+
+    /// A walker whose walks stop where they meet an earlier one (the root
+    /// check of every level-0 leaf).
+    fn shared(path: &'a [Vec<MerklePathLeaf>]) -> Self {
+        Self {
+            shared: true,
+            ..Self::new(path)
+        }
+    }
+
+    /// The root computed from `txid` at level-0 offset `index`. Every walk on
+    /// one walker must finish with the same root: a walk that differs from an
+    /// earlier one where they meet is refused as `Mismatched roots`.
+    fn root_from(&mut self, txid: &str, index: u64) -> Result<String> {
+        let mut working_hash = txid.to_string();
+
+        // Special case for blocks with only one transaction
+        if self.path.len() == 1 && self.path[0].len() == 1 {
+            return Ok(working_hash);
+        }
+
+        let mut passed = Vec::new();
+        for height in 0..self.path.len() {
+            let node = (height, offset_at_height(index, height));
+            let seen = if self.shared {
+                self.walked.get(&node)
+            } else {
+                None
+            };
+            if let (Some(seen), Some(root)) = (seen, self.root.as_ref()) {
+                if *seen != working_hash {
+                    return Err(crate::Error::MerklePathError(
+                        "Mismatched roots".to_string(),
+                    ));
+                }
+                let root = root.clone();
+                self.walked.extend(passed);
+                return Ok(root);
+            }
+            if self.shared {
+                passed.push((node, working_hash.clone()));
+            }
+
+            let offset = node.1 ^ 1;
+            let leaf = self
+                .find_or_compute(height, offset)
+                .map_err(crate::Error::MerklePathError)?;
+
+            working_hash = if leaf.duplicate {
+                hash_pair(&working_hash, &working_hash)
+            } else if offset % 2 != 0 {
+                // Odd offset means sibling is on the RIGHT, working_hash is on the LEFT
+                hash_pair(&working_hash, leaf.hash.as_deref().unwrap_or(""))
+            } else {
+                // Even offset means sibling is on the LEFT, working_hash is on the RIGHT
+                hash_pair(leaf.hash.as_deref().unwrap_or(""), &working_hash)
+            };
+        }
+
+        // Only a finished walk that agrees with the first marks its nodes.
+        match &self.root {
+            None => self.root = Some(working_hash.clone()),
+            Some(root) if *root != working_hash => return Ok(working_hash),
+            Some(_) => {}
+        }
+        self.walked.extend(passed);
+        Ok(working_hash)
+    }
+
+    /// Finds the node at `height` and `offset`, or computes it from the level
+    /// below, once.
+    fn find_or_compute(&mut self, height: usize, offset: u64) -> std::result::Result<Node, String> {
+        // Try to find existing leaf
+        let stored = match &self.index[height] {
+            Some(at) => at.get(&offset).copied(),
+            None => self.path[height].iter().position(|l| l.offset == offset),
+        };
+        if let Some(i) = stored {
+            let leaf = &self.path[height][i];
+            return Ok(Node {
+                hash: leaf.hash.clone(),
+                duplicate: leaf.duplicate,
+            });
+        }
+        if let Some(found) = self.nodes.get(&(height, offset)) {
+            return found.clone();
+        }
+        let found = self.find_or_compute_once(height, offset);
+        self.nodes.insert((height, offset), found.clone());
+        found
+    }
+
+    fn find_or_compute_once(
+        &mut self,
+        height: usize,
+        offset: u64,
+    ) -> std::result::Result<Node, String> {
+        // Not stored (`find_or_compute` looked); can't compute at level 0
+        if height == 0 {
+            return Err(format!("Missing hash at height 0, offset {}", offset));
+        }
+
+        // Compute from level below
+        let h = height - 1;
+        let l = offset << 1;
+
+        let leaf0 = self.find_or_compute(h, l)?;
+        if leaf0.hash.is_none() && !leaf0.duplicate {
+            return Err(format!("Missing hash at height {}, offset {}", h, l));
+        }
+
+        let leaf1 = self.find_or_compute(h, l + 1)?;
+
+        let working_hash = if leaf1.duplicate {
+            let h0 = leaf0.hash.as_deref().unwrap_or("");
+            hash_pair(h0, h0)
+        } else {
+            // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
+            let h0 = leaf0.hash.as_deref().unwrap_or("");
+            let h1 = leaf1.hash.as_deref().unwrap_or("");
+            hash_pair(h0, h1)
+        };
+
+        Ok(Node {
+            hash: Some(working_hash),
+            duplicate: false,
+        })
     }
 }
 
@@ -749,5 +908,511 @@ mod tests {
         let mut path1 = MerklePath::from_hex(BUMP_HEX_1).unwrap();
         let path2 = MerklePath::from_hex(BUMP_HEX_1).unwrap();
         assert!(path1.combine(&path2).is_ok());
+    }
+}
+
+/// The parse's root check and `compute_root` made linear in 0.3.35
+/// (bsv-stack-lean #57, P0-5c) against their 0.3.34 forms, kept here verbatim
+/// as the reference, on seeded random paths: single paths, compound paths from
+/// a block, flat level-0 sets, duplicate flags, txid flags, a hash at two
+/// offsets, missing siblings, bad roots, heights 1 to 64 and offsets up to
+/// 2^40. Same answers, same errors.
+#[cfg(test)]
+mod linear_root_equivalence_tests {
+    use super::*;
+    use rand::rngs::StdRng;
+    use rand::seq::SliceRandom;
+    use rand::{Rng, SeedableRng};
+
+    // ---- the 0.3.34 forms, verbatim but for being free functions ----
+
+    fn legacy_new_internal(
+        block_height: u32,
+        path: Vec<Vec<MerklePathLeaf>>,
+        legal_offsets_only: bool,
+    ) -> Result<MerklePath> {
+        if path.is_empty() {
+            return Err(crate::Error::MerklePathError(
+                "Path cannot be empty".to_string(),
+            ));
+        }
+
+        if path[0].is_empty() {
+            return Err(crate::Error::MerklePathError(
+                "Empty level at height: 0".to_string(),
+            ));
+        }
+
+        // Compute legal offsets based on level 0 txid positions
+        let mut legal_offsets: Vec<HashSet<u64>> = vec![HashSet::new(); path.len()];
+
+        for (height, leaves) in path.iter().enumerate() {
+            let mut offsets_at_height = HashSet::new();
+
+            for leaf in leaves {
+                // Check for duplicate offsets
+                if offsets_at_height.contains(&leaf.offset) {
+                    return Err(crate::Error::MerklePathError(format!(
+                        "Duplicate offset: {}, at height: {}",
+                        leaf.offset, height
+                    )));
+                }
+                offsets_at_height.insert(leaf.offset);
+
+                // For level 0 non-duplicate leaves, compute legal offsets for higher levels
+                if height == 0 && !leaf.duplicate {
+                    #[allow(clippy::needless_range_loop)]
+                    for h in 1..path.len() {
+                        legal_offsets[h].insert((leaf.offset >> h) ^ 1);
+                    }
+                } else if height > 0
+                    && legal_offsets_only
+                    && !legal_offsets[height].contains(&leaf.offset)
+                {
+                    return Err(crate::Error::MerklePathError(format!(
+                        "Invalid offset: {}, at height: {}",
+                        leaf.offset, height
+                    )));
+                }
+            }
+        }
+
+        let merkle_path = MerklePath { block_height, path };
+
+        // Verify all txids compute to the same root
+        let mut root: Option<String> = None;
+        for leaf in &merkle_path.path[0] {
+            if let Some(ref hash) = leaf.hash {
+                let computed = legacy_compute_root(&merkle_path, Some(hash))?;
+                if let Some(ref expected) = root {
+                    if &computed != expected {
+                        return Err(crate::Error::MerklePathError(
+                            "Mismatched roots".to_string(),
+                        ));
+                    }
+                } else {
+                    root = Some(computed);
+                }
+            }
+        }
+
+        Ok(merkle_path)
+    }
+
+    fn legacy_compute_root(mp: &MerklePath, txid: Option<&str>) -> Result<String> {
+        // Get the txid to work with
+        let txid = match txid {
+            Some(t) => t.to_string(),
+            None => {
+                // Find the first valid hash
+                mp.path[0]
+                    .iter()
+                    .find_map(|l| l.hash.clone())
+                    .ok_or_else(|| {
+                        crate::Error::MerklePathError(
+                            "No valid leaf found in the Merkle Path".to_string(),
+                        )
+                    })?
+            }
+        };
+
+        let index = mp.index_of(&txid)?;
+        let mut working_hash = txid;
+
+        // Special case for blocks with only one transaction
+        if mp.path.len() == 1 && mp.path[0].len() == 1 {
+            return Ok(working_hash);
+        }
+
+        for height in 0..mp.path.len() {
+            let offset = (index >> height) ^ 1;
+            let leaf = legacy_find_or_compute_leaf(mp, height, offset)?;
+
+            working_hash = if leaf.duplicate {
+                hash_pair(&working_hash, &working_hash)
+            } else if offset % 2 != 0 {
+                // Odd offset means sibling is on the RIGHT, working_hash is on the LEFT
+                hash_pair(&working_hash, leaf.hash.as_deref().unwrap_or(""))
+            } else {
+                // Even offset means sibling is on the LEFT, working_hash is on the RIGHT
+                hash_pair(leaf.hash.as_deref().unwrap_or(""), &working_hash)
+            };
+        }
+
+        Ok(working_hash)
+    }
+
+    fn legacy_find_or_compute_leaf(
+        mp: &MerklePath,
+        height: usize,
+        offset: u64,
+    ) -> Result<MerklePathLeaf> {
+        // Try to find existing leaf
+        if let Some(leaf) = mp.path[height].iter().find(|l| l.offset == offset) {
+            return Ok(leaf.clone());
+        }
+
+        // Can't compute at level 0
+        if height == 0 {
+            return Err(crate::Error::MerklePathError(format!(
+                "Missing hash at height 0, offset {}",
+                offset
+            )));
+        }
+
+        // Compute from level below
+        let h = height - 1;
+        let l = offset << 1;
+
+        let leaf0 = legacy_find_or_compute_leaf(mp, h, l)?;
+        if leaf0.hash.is_none() && !leaf0.duplicate {
+            return Err(crate::Error::MerklePathError(format!(
+                "Missing hash at height {}, offset {}",
+                h, l
+            )));
+        }
+
+        let leaf1 = legacy_find_or_compute_leaf(mp, h, l + 1)?;
+
+        let working_hash = if leaf1.duplicate {
+            let h0 = leaf0.hash.as_deref().unwrap_or("");
+            hash_pair(h0, h0)
+        } else {
+            // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
+            let h0 = leaf0.hash.as_deref().unwrap_or("");
+            let h1 = leaf1.hash.as_deref().unwrap_or("");
+            hash_pair(h0, h1)
+        };
+
+        Ok(MerklePathLeaf::new(offset, working_hash))
+    }
+
+    // ---- the generators ----
+
+    fn random_hash(rng: &mut StdRng) -> String {
+        let bytes: [u8; 32] = rng.gen();
+        to_hex(&bytes)
+    }
+
+    /// One txid at `index` under a tree of `height` levels, a sibling (a hash
+    /// or a duplicate flag) at every level.
+    fn single_path(rng: &mut StdRng, height: usize, index: u64) -> Vec<Vec<MerklePathLeaf>> {
+        let mut path = vec![Vec::new(); height];
+        path[0].push(MerklePathLeaf::new_txid(index, random_hash(rng)));
+        for (h, level) in path.iter_mut().enumerate() {
+            let offset = (index >> h) ^ 1;
+            if offset % 2 == 1 && rng.gen_ratio(1, 6) {
+                level.push(MerklePathLeaf::new_duplicate(offset));
+            } else {
+                level.push(MerklePathLeaf::new(offset, random_hash(rng)));
+            }
+        }
+        path
+    }
+
+    /// The compound path of `count` leaves out of a block of `n` leaves
+    /// (the last odd node at each level paired with a duplicate flag), its
+    /// leaves placed at `base + i` under a tree of `height` levels, the levels
+    /// above the block a random sibling each. `extra` stores computable nodes
+    /// too; `flat` leaves every level above 0 empty.
+    fn compound_path(
+        rng: &mut StdRng,
+        n: usize,
+        count: usize,
+        height: usize,
+        base: u64,
+        extra: bool,
+        flat: bool,
+    ) -> Vec<Vec<MerklePathLeaf>> {
+        // The block's tree, display hex, each level padded by a duplicate.
+        let mut levels: Vec<Vec<Option<String>>> =
+            vec![(0..n).map(|_| Some(random_hash(rng))).collect()];
+        while levels.last().unwrap().len() > 1 {
+            let below = levels.last().unwrap();
+            let above = below
+                .chunks(2)
+                .map(|pair| {
+                    let left = pair[0].as_deref().unwrap();
+                    match pair.get(1) {
+                        Some(Some(right)) => Some(hash_pair(left, right)),
+                        _ => Some(hash_pair(left, left)),
+                    }
+                })
+                .collect();
+            levels.push(above);
+        }
+        let block_height = levels.len() - 1;
+        let mut chosen: Vec<u64> = (0..n as u64).collect();
+        chosen.shuffle(rng);
+        chosen.truncate(count.min(n).max(1));
+        chosen.sort();
+
+        let mut path = vec![Vec::new(); height];
+        if flat {
+            for (i, hash) in levels[0].iter().enumerate() {
+                let mut leaf = MerklePathLeaf::new(base + i as u64, hash.clone().unwrap());
+                leaf.txid = rng.gen_bool(0.7);
+                path[0].push(leaf);
+            }
+            return path;
+        }
+        let mut nodes: HashSet<u64> = chosen.iter().copied().collect();
+        for (h, level) in path.iter_mut().enumerate() {
+            let at = |o: u64| base.checked_shr(h as u32).unwrap_or(0) + o;
+            if h < block_height {
+                let width = levels[h].len() as u64;
+                let mut offsets: Vec<u64> = nodes.iter().flat_map(|o| [*o, o ^ 1]).collect();
+                offsets.sort();
+                offsets.dedup();
+                for o in offsets {
+                    let is_node = nodes.contains(&o);
+                    if h == 0 && is_node {
+                        let mut leaf =
+                            MerklePathLeaf::new(at(o), levels[0][o as usize].clone().unwrap());
+                        leaf.txid = rng.gen_bool(0.8);
+                        level.push(leaf);
+                    } else if !is_node || (extra && rng.gen_ratio(1, 4)) {
+                        if o >= width {
+                            level.push(MerklePathLeaf::new_duplicate(at(o)));
+                        } else {
+                            level.push(MerklePathLeaf::new(
+                                at(o),
+                                levels[h][o as usize].clone().unwrap(),
+                            ));
+                        }
+                    }
+                }
+                nodes = nodes.iter().map(|o| o >> 1).collect();
+            } else {
+                // Above the block: the block's root climbs a single path.
+                let node = base >> h;
+                level.push(MerklePathLeaf::new(node ^ 1, random_hash(rng)));
+            }
+        }
+        path
+    }
+
+    /// Damages a path: a lost leaf, a changed hash, a stray leaf, a duplicate
+    /// offset, a level-0 hash repeated at another offset, a flipped flag.
+    fn damage(rng: &mut StdRng, path: &mut [Vec<MerklePathLeaf>]) {
+        let h = rng.gen_range(0..path.len());
+        if path[h].is_empty() {
+            path[h].push(MerklePathLeaf::new(rng.gen_range(0..64), random_hash(rng)));
+            return;
+        }
+        let i = rng.gen_range(0..path[h].len());
+        match rng.gen_range(0..7) {
+            0 => {
+                path[h].remove(i);
+            }
+            1 => path[h][i].hash = Some(random_hash(rng)),
+            2 => {
+                let offset = path[h][i].offset ^ 2;
+                path[h].push(MerklePathLeaf::new(offset, random_hash(rng)));
+            }
+            3 => {
+                let copy = path[h][i].clone();
+                path[h].push(copy);
+            }
+            4 if !path[0].is_empty() => {
+                let hash = path[0][rng.gen_range(0..path[0].len())].hash.clone();
+                let offset = path[0].iter().map(|l| l.offset).max().unwrap() + 1;
+                path[0].push(MerklePathLeaf {
+                    offset,
+                    hash,
+                    txid: true,
+                    duplicate: false,
+                });
+            }
+            5 => {
+                path[h][i].duplicate = !path[h][i].duplicate;
+                if path[h][i].duplicate {
+                    path[h][i].hash = None;
+                } else if path[h][i].hash.is_none() && rng.gen_bool(0.5) {
+                    path[h][i].hash = Some(random_hash(rng));
+                }
+            }
+            _ => path[h][i].txid = !path[h][i].txid,
+        }
+    }
+
+    /// A random path of one of the shapes, damaged or not.
+    fn random_path(rng: &mut StdRng) -> Vec<Vec<MerklePathLeaf>> {
+        let mut path = match rng.gen_range(0..5) {
+            0 => {
+                let height = rng.gen_range(1..=64);
+                let span = height.min(40) as u32;
+                let index = rng.gen_range(0..1u64 << span);
+                single_path(rng, height, index)
+            }
+            1 | 2 => {
+                let n: usize = rng.gen_range(1..=80);
+                let count = rng.gen_range(1..=n);
+                let block = usize::BITS - (n - 1).leading_zeros();
+                let height = (block as usize).max(1);
+                let extra = rng.gen_bool(0.3);
+                compound_path(rng, n, count, height, 0, extra, false)
+            }
+            3 => {
+                // A block's subtree placed high: offsets up to 2^40, up to 64 levels.
+                let n: usize = rng.gen_range(1..=64);
+                let count = rng.gen_range(1..=n);
+                let block = (usize::BITS - (n - 1).leading_zeros()) as usize;
+                let height = rng.gen_range(block.max(1) + 1..=64);
+                let span = (height.min(40) - block) as u32;
+                let base = rng.gen_range(0..1u64 << span) << block;
+                let extra = rng.gen_bool(0.3);
+                compound_path(rng, n, count, height, base, extra, false)
+            }
+            _ => {
+                let k = rng.gen_range(0..8);
+                let n = rng.gen_range(1..=1usize << k);
+                let height = rng.gen_range(1..=k + 2);
+                compound_path(rng, n, n, height, 0, false, true)
+            }
+        };
+        if rng.gen_bool(0.4) {
+            for _ in 0..rng.gen_range(1..=3) {
+                damage(rng, &mut path);
+            }
+        }
+        if rng.gen_bool(0.5) {
+            for level in path.iter_mut() {
+                level.shuffle(rng);
+            }
+        }
+        path
+    }
+
+    fn outcome(result: &Result<MerklePath>) -> std::result::Result<(), String> {
+        result.as_ref().map(|_| ()).map_err(|e| format!("{:?}", e))
+    }
+
+    fn roots(
+        mp: &MerklePath,
+        root: impl Fn(&MerklePath, Option<&str>) -> Result<String>,
+    ) -> Vec<String> {
+        let mut asked: Vec<Option<String>> = vec![None, Some("00".repeat(32))];
+        asked.extend(
+            mp.path[0]
+                .iter()
+                .map(|l| l.hash.clone())
+                .filter(Option::is_some),
+        );
+        asked
+            .iter()
+            .map(|txid| format!("{:?}", root(mp, txid.as_deref())))
+            .collect()
+    }
+
+    // ---- the differentials ----
+
+    #[test]
+    fn the_root_check_accepts_and_refuses_exactly_as_the_rescan_did() {
+        let mut rng = StdRng::seed_from_u64(0x5c);
+        let (mut accepted, mut refused) = (0, 0);
+        for round in 0..1500 {
+            let path = random_path(&mut rng);
+            for legal_offsets_only in [false, true] {
+                let new = MerklePath::new_internal(800_000, path.clone(), legal_offsets_only);
+                let old = legacy_new_internal(800_000, path.clone(), legal_offsets_only);
+                assert_eq!(
+                    outcome(&new),
+                    outcome(&old),
+                    "round {round}, legal_offsets_only {legal_offsets_only}: {path:?}"
+                );
+                if new.is_ok() {
+                    accepted += 1;
+                } else {
+                    refused += 1;
+                }
+            }
+        }
+        println!("accepted {accepted}, refused {refused}");
+        assert!(accepted > 500 && refused > 500, "both sides are exercised");
+    }
+
+    #[test]
+    fn compute_root_answers_exactly_as_the_rescan_did() {
+        let mut rng = StdRng::seed_from_u64(0x5c5c);
+        let (mut answered, mut erred) = (0, 0);
+        for round in 0..1000 {
+            let mut path = random_path(&mut rng);
+            // The struct as a caller may build it, unchecked; an empty level 0
+            // is out of scope (both index it).
+            if path[0].is_empty() {
+                path[0].push(MerklePathLeaf::new_txid(0, random_hash(&mut rng)));
+            }
+            let mp = MerklePath {
+                block_height: 800_000,
+                path,
+            };
+            let new = roots(&mp, |mp, txid| mp.compute_root(txid));
+            let old = roots(&mp, legacy_compute_root);
+            assert_eq!(new, old, "round {round}: {:?}", mp.path);
+            for answer in &new {
+                if answer.starts_with("Ok") {
+                    answered += 1;
+                } else {
+                    erred += 1;
+                }
+            }
+        }
+        println!("answered {answered}, erred {erred}");
+        assert!(answered > 1000 && erred > 500, "both sides are exercised");
+    }
+
+    #[test]
+    fn the_parse_of_the_wire_bytes_matches_the_rescan() {
+        let mut rng = StdRng::seed_from_u64(0x0335);
+        let mut parsed = 0;
+        for round in 0..1000 {
+            let path = random_path(&mut rng);
+            let bytes = MerklePath {
+                block_height: 800_000,
+                path,
+            }
+            .to_binary();
+            let new = MerklePath::from_binary(&bytes);
+            // The 0.3.34 parse: read, sort each level, the unchecked check.
+            let legacy_read = || -> Result<Vec<Vec<MerklePathLeaf>>> {
+                let mut reader = Reader::new(&bytes);
+                let _ = reader.read_var_int_num()?;
+                let height = reader.read_u8()? as usize;
+                let mut path = vec![Vec::new(); height];
+                for level in path.iter_mut() {
+                    for _ in 0..reader.read_var_int_num()? {
+                        let offset = reader.read_var_int_num()? as u64;
+                        let flags = reader.read_u8()?;
+                        if flags & 1 != 0 {
+                            level.push(MerklePathLeaf::new_duplicate(offset));
+                        } else {
+                            let mut hash = reader.read_bytes(32)?.to_vec();
+                            hash.reverse();
+                            level.push(MerklePathLeaf {
+                                offset,
+                                hash: Some(to_hex(&hash)),
+                                txid: flags & 2 != 0,
+                                duplicate: false,
+                            });
+                        }
+                    }
+                    level.sort_by_key(|l| l.offset);
+                }
+                Ok(path)
+            };
+            let old = legacy_read().and_then(|path| legacy_new_internal(800_000, path, false));
+            assert_eq!(outcome(&new), outcome(&old), "round {round}");
+            if let (Ok(new), Ok(old)) = (&new, &old) {
+                assert_eq!(
+                    roots(new, |mp, t| mp.compute_root(t)),
+                    roots(old, legacy_compute_root)
+                );
+                assert_eq!(new.to_binary(), old.to_binary());
+                parsed += 1;
+            }
+        }
+        println!("parsed {parsed}");
+        assert!(parsed > 250);
     }
 }
