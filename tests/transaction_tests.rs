@@ -701,16 +701,19 @@ mod transaction_tests {
             let txid = "a".repeat(64);
             beef.merge_txid_only(txid.clone());
 
-            // Should fail without allowing txid_only
+            // No BUMP proves the txid: not valid, whatever the flag says
+            // (0.4.2; through 0.4.1 `true` accepted it, bsv-stack-lean NL-8 W5).
             assert!(
                 !beef.is_valid(false),
-                "BEEF with txid-only should fail strict validation"
+                "BEEF with an unproven txid-only entry should fail validation"
             );
-
-            // Should pass with txid_only allowed
             assert!(
-                beef.is_valid(true),
-                "BEEF with txid-only should pass lenient validation"
+                !beef.is_valid(true),
+                "the flag no longer accepts an unproven txid-only entry"
+            );
+            assert_eq!(
+                beef.verify_structure(),
+                Err(bsv_rs::transaction::Kind::StubNotProven)
             );
         }
 

@@ -36,7 +36,7 @@ use crate::primitives::encoding::bounded_capacity;
 use crate::primitives::{from_hex, to_hex, Reader, Writer};
 use crate::Result;
 
-use super::beef_stream::{display_hex, merkle_path_root};
+use super::beef_stream::{display_hex, merkle_path_root, Kind, Reason, Refusal};
 use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
@@ -639,100 +639,94 @@ impl Beef {
         self.mark_mutated();
     }
 
-    /// Checks if this BEEF is structurally valid.
+    /// Checks if this BEEF is structurally valid: [`verify_valid`](Self::verify_valid)`.valid`.
     ///
     /// Does NOT verify merkle roots against a chain tracker.
     ///
     /// # Arguments
     ///
-    /// * `allow_txid_only` - If true, txid-only transactions are considered valid
+    /// * `allow_txid_only` - Decides nothing since 0.4.2: a txid-only entry
+    ///   is valid when a BUMP of this BEEF proves its txid, and not otherwise
+    ///   (see [`verify_structure`](Self::verify_structure)).
     pub fn is_valid(&mut self, allow_txid_only: bool) -> bool {
         self.verify_valid(allow_txid_only).valid
     }
 
-    /// Validates the BEEF structure and returns roots to verify.
+    /// Validates the BEEF structure and returns roots to verify:
+    /// [`verify_structure`](Self::verify_structure) without the kind.
     ///
-    /// Since 0.4.1 a BEEF that carries a raw transaction with no input is not
-    /// valid, with or without a BUMP index: the node refuses such a
-    /// transaction before any script runs, so no block holds it and a BUMP
-    /// that claims it proves nothing; unproven, it has no input to hold it
-    /// by and would stand with nothing proven beneath it. The streaming
-    /// reader names it (`Kind::NoInputs`, the transaction's offset).
+    /// `allow_txid_only` decides nothing since 0.4.2. Through 0.4.1 it
+    /// accepted every txid-only entry when true and refused every one when
+    /// false; the streaming reader, and this, read each entry: valid when a
+    /// BUMP of this BEEF proves its txid, [`Kind::StubNotProven`] otherwise
+    /// (bsv-stack-lean NL-8 W5).
     pub fn verify_valid(&mut self, allow_txid_only: bool) -> BeefValidationResult {
+        let _ = allow_txid_only;
+        match self.verify_structure() {
+            Ok(roots) => BeefValidationResult { valid: true, roots },
+            Err(_) => BeefValidationResult {
+                valid: false,
+                roots: HashMap::new(),
+            },
+        }
+    }
+
+    /// The whole BEEF's structure on the streaming reader's rules: the roots
+    /// to check against the headers by height, or the reader's [`Kind`] for
+    /// what is wrong (the in-memory BEEF has no offsets to name).
+    ///
+    /// - Each BUMP's root is the reader's walk (`beef_stream`'s `bump_root`), once per BUMP
+    ///   and linear in its leaves (0.4.2; at 0.4.1 the walk ran once per leaf,
+    ///   NL-8 W1). A lone leaf is the block of one transaction only at offset
+    ///   0; at any other offset it is [`Kind::MissingSibling`] (NL-8 W2). Two
+    ///   BUMPs at one height with different roots: [`Kind::RootNotCarried`]
+    ///   (the headers carry one root per height).
+    /// - A raw transaction with no input: [`Kind::NoInputs`] (0.4.1).
+    /// - A txid-only entry no BUMP of this BEEF proves: [`Kind::StubNotProven`]
+    ///   (NL-8 W5).
+    /// - A BUMP index that names no BUMP, or a BUMP that does not carry the
+    ///   txid: [`Kind::BumpIndexNamesNoBump`], [`Kind::TxidNotInBump`].
+    /// - An input of an unproven transaction that names no transaction of
+    ///   this BEEF, or one that never becomes valid: [`Kind::InputNamesNoElement`].
+    ///   The transactions are sorted first ([`sort_txs`](Self::sort_txs)), as
+    ///   the reference sorts them; the stream reads its order as written.
+    /// - Atomic (NL-8 W4): the subject is the last raw transaction, else
+    ///   [`Kind::SubjectMissing`]; every other transaction or txid-only entry
+    ///   is spent by a later raw transaction, else
+    ///   [`Kind::UnrelatedTransaction`]. "Last" and "later" are the order the
+    ///   transactions hold when this is called, before its sort: the wire's
+    ///   for a BEEF just read, the writer's for one built here.
+    ///
+    /// A byte after the frame (NL-8 W3) is refused by [`from_binary`](Self::from_binary)
+    /// before this runs.
+    pub fn verify_structure(&mut self) -> std::result::Result<HashMap<u32, String>, Kind> {
+        // The atomic rule reads the order as held, so it is judged before
+        // the sort and answered after the rest, where the reader's `finish`
+        // answers it.
+        let atomic = match self.atomic_txid.clone() {
+            Some(subject) => self.atomic_rule(&subject),
+            None => Ok(()),
+        };
         let sr = self.sort_txs();
-
-        if self.txs.iter().any(BeefTx::has_no_inputs) {
-            return BeefValidationResult {
-                valid: false,
-                roots: HashMap::new(),
-            };
-        }
-
-        if !sr.missing_inputs.is_empty()
-            || !sr.not_valid.is_empty()
-            || (!sr.txid_only.is_empty() && !allow_txid_only)
-            || !sr.with_missing_inputs.is_empty()
-        {
-            return BeefValidationResult {
-                valid: false,
-                roots: HashMap::new(),
-            };
-        }
-
-        let mut roots: HashMap<u32, String> = HashMap::new();
-        let mut valid_txids: HashMap<String, bool> = HashMap::new();
-
-        // Mark txid-only as valid if allowed
-        for tx in &self.txs {
-            if tx.is_txid_only() {
-                if !allow_txid_only {
-                    return BeefValidationResult {
-                        valid: false,
-                        roots: HashMap::new(),
-                    };
-                }
-                valid_txids.insert(tx.txid(), true);
-            }
-        }
 
         // Each BUMP's root, by the streaming reader's walk: once per BUMP,
         // linear in its leaves (0.4.2). At 0.4.1 each flagged leaf computed
         // the root afresh, rebuilding every node it needed from level 0: a
         // BUMP of 8,192 leaves gave no answer in 120 s (bsv-stack-lean NL-8
         // W1, #61).
+        let mut roots: HashMap<u32, String> = HashMap::new();
         for bump in &self.bumps {
-            let root = match merkle_path_root(bump) {
-                Ok(root) => display_hex(&root),
-                Err(_) => {
-                    return BeefValidationResult {
-                        valid: false,
-                        roots: HashMap::new(),
-                    }
-                }
-            };
+            let root = display_hex(&merkle_path_root(bump).map_err(|r| r.kind())?);
             match roots.get(&bump.block_height) {
-                Some(existing) if *existing != root => {
-                    return BeefValidationResult {
-                        valid: false,
-                        roots: HashMap::new(),
-                    }
-                }
+                Some(existing) if *existing != root => return Err(Kind::RootNotCarried),
                 Some(_) => {}
                 None => {
                     roots.insert(bump.block_height, root);
                 }
             }
-            for leaf in &bump.path[0] {
-                if leaf.txid {
-                    if let Some(ref hash) = leaf.hash {
-                        valid_txids.insert(hash.clone(), true);
-                    }
-                }
-            }
         }
-
-        // Verify all txs with bump_index have matching leaf: each BUMP's
-        // level 0 indexed once, not scanned once per transaction.
+        // Every hash of each BUMP's level 0 is a txid that BUMP proves,
+        // indexed once.
         let carried: HashSet<(usize, &str)> = self
             .bumps
             .iter()
@@ -745,37 +739,83 @@ impl Beef {
                     .filter_map(move |l| l.hash.as_deref().map(|h| (i, h)))
             })
             .collect();
+        let proven: HashSet<&str> = carried.iter().map(|(_, h)| *h).collect();
+
+        if self.txs.iter().any(BeefTx::has_no_inputs) {
+            return Err(Kind::NoInputs);
+        }
+
+        let mut valid_txids: HashSet<String> = HashSet::new();
+        for tx in &self.txs {
+            if tx.is_txid_only() {
+                let txid = tx.txid();
+                if !proven.contains(txid.as_str()) {
+                    return Err(Kind::StubNotProven);
+                }
+                valid_txids.insert(txid);
+            }
+        }
+
         for tx in &self.txs {
             if let Some(bump_idx) = tx.bump_index() {
                 if bump_idx >= self.bumps.len() {
-                    return BeefValidationResult {
-                        valid: false,
-                        roots: HashMap::new(),
-                    };
+                    return Err(Kind::BumpIndexNamesNoBump);
                 }
-                if !carried.contains(&(bump_idx, tx.txid().as_str())) {
-                    return BeefValidationResult {
-                        valid: false,
-                        roots: HashMap::new(),
-                    };
+                let txid = tx.txid();
+                if !carried.contains(&(bump_idx, txid.as_str())) {
+                    return Err(Kind::TxidNotInBump);
                 }
+                valid_txids.insert(txid);
             }
+        }
+
+        if !sr.missing_inputs.is_empty()
+            || !sr.not_valid.is_empty()
+            || !sr.with_missing_inputs.is_empty()
+        {
+            return Err(Kind::InputNamesNoElement);
         }
 
         // Verify dependency order
         for tx in &self.txs {
             for input_txid in &tx.input_txids {
-                if !valid_txids.contains_key(input_txid) {
-                    return BeefValidationResult {
-                        valid: false,
-                        roots: HashMap::new(),
-                    };
+                if !valid_txids.contains(input_txid) {
+                    return Err(Kind::InputNamesNoElement);
                 }
             }
-            valid_txids.insert(tx.txid(), true);
+            valid_txids.insert(tx.txid());
         }
 
-        BeefValidationResult { valid: true, roots }
+        atomic?;
+        Ok(roots)
+    }
+
+    /// The atomic rule on the transactions in the order they hold (the
+    /// streaming reader's `BeefIndex::finish`): `subject` is the last raw
+    /// transaction, and every other entry is spent by a later raw
+    /// transaction.
+    fn atomic_rule(&self, subject: &str) -> std::result::Result<(), Kind> {
+        let mut last_raw: Option<String> = None;
+        let mut referenced: HashMap<String, bool> = HashMap::new();
+        for tx in &self.txs {
+            let txid = tx.txid();
+            if !tx.is_txid_only() {
+                for prev in spent_txids(tx) {
+                    if let Some(r) = referenced.get_mut(&prev) {
+                        *r = true;
+                    }
+                }
+                last_raw = Some(txid.clone());
+            }
+            referenced.entry(txid).or_insert(false);
+        }
+        if last_raw.as_deref() != Some(subject) {
+            return Err(Kind::SubjectMissing);
+        }
+        if referenced.iter().any(|(txid, r)| !r && txid != subject) {
+            return Err(Kind::UnrelatedTransaction);
+        }
+        Ok(())
     }
 
     /// Sorts transactions by dependency order.
@@ -919,9 +959,16 @@ impl Beef {
     /// A door that reads a stranger's BEEF reads it with
     /// [`verify_stream`](super::beef_stream::verify_stream), one element at a
     /// time.
+    ///
+    /// Since 0.4.2 a byte after the frame is refused, as the streaming reader
+    /// refuses it: the error names its offset and `TrailingBytes`
+    /// (bsv-stack-lean NL-8 W3). [`from_reader`](Self::from_reader) reads a
+    /// BEEF out of a longer stream and leaves what follows to its caller.
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
         let mut reader = Reader::new(bin);
-        Self::from_reader(&mut reader)
+        let beef = Self::from_reader(&mut reader)?;
+        no_trailing_bytes(&reader)?;
+        Ok(beef)
     }
 
     /// Parses a BEEF from binary data, reserving room for at most
@@ -941,7 +988,9 @@ impl Beef {
     )]
     pub fn from_binary_with_limits(bin: &[u8], limits: &BeefLimits) -> Result<Self> {
         let mut reader = Reader::new(bin);
-        Self::read(&mut reader, Some(limits))
+        let beef = Self::read(&mut reader, Some(limits))?;
+        no_trailing_bytes(&reader)?;
+        Ok(beef)
     }
 
     /// Parses a BEEF from a hex string.
@@ -1143,6 +1192,37 @@ impl Default for Beef {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// A byte after the frame's end: the streaming reader's refusal, in its words.
+fn no_trailing_bytes(reader: &Reader) -> Result<()> {
+    if reader.remaining() == 0 {
+        return Ok(());
+    }
+    let refusal = Refusal {
+        offset: reader.position() as u64,
+        reason: Reason::TrailingBytes,
+    };
+    Err(crate::Error::BeefError(refusal.to_string()))
+}
+
+/// The txids a raw transaction's inputs spend (display hex), proven or not.
+fn spent_txids(tx: &BeefTx) -> Vec<String> {
+    let parsed;
+    let t = match tx.tx() {
+        Some(t) => t,
+        None => match tx.raw_tx().map(Transaction::from_binary) {
+            Some(Ok(t)) => {
+                parsed = t;
+                &parsed
+            }
+            _ => return Vec::new(),
+        },
+    };
+    t.inputs
+        .iter()
+        .filter_map(|i| i.get_source_txid().ok())
+        .collect()
 }
 
 #[cfg(test)]
