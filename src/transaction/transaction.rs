@@ -66,8 +66,8 @@ fn ef_source_placeholder_len(source_output_index: u32) -> Option<usize> {
 /// `Clone` and `Drop` walk the linked `source_transaction` ancestry with an
 /// explicit stack, not by recursion (0.3.35, bsv-stack-lean #57): a chain of
 /// unproven links a stranger's BEEF can carry is as deep as the BEEF is long,
-/// and the derived glue spent several stack frames per link.
-#[derive(Debug)]
+/// and the derived glue spent several stack frames per link. `Debug` prints
+/// each input's linked source as its txid, not its ancestry (0.3.35, P0-5c).
 pub struct Transaction {
     /// Transaction version number.
     ///
@@ -2003,6 +2003,25 @@ impl Transaction {
             raw_bytes_cache: self.raw_bytes_cache.clone(),
             hex_cache: self.hex_cache.clone(),
         }
+    }
+}
+
+/// The derive's output, field for field; each input prints its linked source
+/// as its txid (`TransactionInput`'s `Debug`), so the output is the
+/// transaction, not its history.
+impl std::fmt::Debug for Transaction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Transaction")
+            .field("version", &self.version)
+            .field("inputs", &self.inputs)
+            .field("outputs", &self.outputs)
+            .field("lock_time", &self.lock_time)
+            .field("metadata", &self.metadata)
+            .field("merkle_path", &self.merkle_path)
+            .field("cached_hash", &self.cached_hash)
+            .field("raw_bytes_cache", &self.raw_bytes_cache)
+            .field("hex_cache", &self.hex_cache)
+            .finish()
     }
 }
 

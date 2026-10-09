@@ -56,7 +56,11 @@ pub struct Utxo {
 ///     0,
 /// );
 /// ```
-#[derive(Debug)]
+///
+/// `Debug` prints a linked `source_transaction` as its txid
+/// (`Some("<txid>")`), never its ancestry: a linked chain is as deep as the
+/// BEEF it came from, and printing it whole recursed once per link (0.3.35,
+/// bsv-stack-lean #57).
 pub struct TransactionInput {
     /// Optional reference to the full source transaction.
     ///
@@ -253,6 +257,22 @@ impl Clone for TransactionInput {
                 .map(|source| Box::new(source.clone())),
             ..self.clone_without_source()
         }
+    }
+}
+
+impl std::fmt::Debug for TransactionInput {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TransactionInput")
+            .field(
+                "source_transaction",
+                &self.source_transaction.as_deref().map(|source| source.id()),
+            )
+            .field("source_txid", &self.source_txid)
+            .field("source_output_index", &self.source_output_index)
+            .field("unlocking_script", &self.unlocking_script)
+            .field("unlocking_script_template", &self.unlocking_script_template)
+            .field("sequence", &self.sequence)
+            .finish()
     }
 }
 

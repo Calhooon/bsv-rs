@@ -56,6 +56,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged; the overlay engine's `GET /tx/bump` route
   (`crates/overlay-cloudflare/src/routes.rs`) needs the one-line migration.
 
+### Fixed — the BUMP parse is linear in its leaves (bsv-stack-lean #57, P0-5c)
+
+- `MerklePath::from_reader` (under `from_binary`, `from_hex` and every BEEF
+  parse) checks that every level-0 leaf computes the same root, and each check
+  walked the tree again: a linear scan of each level for the sibling, a missing
+  sibling recomputed from level 0. One BUMP of 8,192 flagged leaves with empty
+  upper levels (294,433 bytes) took 225.7 s to parse in a release build, about
+  five times per doubling, inside any `BeefLimits`. The check now shares every
+  node it finds or computes across the walks, each level indexed by offset
+  once, as the reference does (`@bsv/sdk` `MerklePath.computeRootCached`):
+  0.051 s for the same bytes. `compute_root` uses the same walk. The answers
+  and the errors are the 0.3.34 ones (`linear_root_equivalence_tests` holds
+  the new walk to the old one on seeded random paths); the witness is
+  `tests/merkle_path_cost.rs`.
+- A tree-height byte over 64 shifted an offset by 64 or more: `attempt to
+  shift right with overflow` in a debug build (or any build with
+  `overflow-checks`), a wrong error in a release one. It is refused at the
+  parse, before any shift, with `MerklePathError("Invalid tree height: 65,
+  over the maximum height 64")`; `MerklePath::new` and `new_unchecked` refuse a
+  path of more than 64 levels the same way, and no shift by a height can panic.
+
+### Changed — `{:?}` of a `Transaction` prints a linked source as its txid
+
+- `Transaction` and `TransactionInput` implement `Debug` by hand: an input's
+  `source_transaction` prints as `Some("<txid>")`, never as the source's whole
+  ancestry. The derived `Debug` printed every linked ancestor, one recursion
+  per link, so `format!("{:?}", tx)` of a 1,000-link chain overflowed a 1 MiB
+  stack and aborted. Every other field prints as the derive printed it. Code
+  that parses `{:?}` output of a linked transaction sees the change.
+
 ## [0.3.34] - 2026-10-08
 
 ### Changed — QUEUED, REQUESTED_BY_NETWORK and CONFIRMED are accepted on a 2xx
