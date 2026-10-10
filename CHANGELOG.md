@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-10-10
+
+The spend of an unproven transaction is linear in its inputs, and the reader
+can pause between two inputs and resume from the input reached (bsv-low
+#591: LOW's R400-H1 and R403-H1, found on the relay's payment door over
+0.4.3). LOW's shape: a proven parent with n `OP_TRUE` outputs, a subject
+spending all n with empty unlocks. On the relay's door over 0.4.3 they
+measured 4,000 inputs in 0.10 s, 16,000 in 1.8 s, 64,000 (3.3 MB) in 18.5 to
+24.9 s and 128,000 (6.5 MB) in 186 s.
+
+### Fixed: the spend of a wide transaction grew with its inputs squared
+
+- At 0.4.3 `BeefIndex::check_spends_of` cloned the other inputs and the
+  outputs for every input; every `OP_CHECKSIG` rebuilt the input list and
+  recomputed hashPrevouts, hashSequence and hashOutputs over it; and spending
+  an output walked its parent's whole output table. Now the reader and
+  `Transaction::verify` build one input list and one output list per
+  transaction, shared by every input's spend with its sighash midstates
+  (each computed at most once per transaction and scope class), and an
+  output table keeps its unspent count.
+- The witness (`tests/beef_stream_linear_spend.rs`, release, `--ignored`),
+  `verify_stream` of LOW's shape on the studio (aarch64-apple-darwin):
+
+  | n | 0.4.3 | 0.4.4 |
+  |---|---|---|
+  | 4,000 | 0.072 s | 0.002 s |
+  | 16,000 | 0.804 s | 0.006 s |
+  | 64,000 | 11.994 s | 0.022 s |
+
+  Quadruple the inputs: 14.92 times the time at 0.4.3, 3.81 here.
+- The digests do not move: 1,000 P2PKH spends signed over 0.4.3's free
+  function under six scopes verify, and a signature over another digest is
+  refused at its input; `TxSighashCache` equals
+  `compute_sighash_dispatched_for_signing` for every scope byte and input.
+- The original (pre-fork) digest, for a scope without FORKID or with the
+  CHRONICLE bit, still serializes every input per signature, as the
+  reference's `SignatureHashOriginal` does: a transaction of n such
+  signatures is still n squared bytes hashed. The clock between inputs is
+  what bounds a request's share of it.
+
+### Added: a clock between inputs
+
+- `StreamVerifier::step_until(spent)` asks the caller's budget between two
+  inputs of an unproven transaction and answers `Timed::Paused` when it is
+  spent, at least one input of the step having run; the next call continues
+  in place. `step` is `step_until` with a budget never spent.
+- The cursor of a paused reading is the state before the transaction
+  (`Cursor::offset` its element's first byte, the index unchanged) and names
+  the input reached (`Cursor::input_reached`). `StreamVerifier::resume` and
+  `AsyncStreamVerifier::resume` re-read that one transaction and run its
+  scripts from that input on; the inputs before it never run again. A
+  resumed slice re-reads the transaction's bytes and re-resolves its inputs
+  (linear in it), never its scripts.
+- Cursor bytes: a cursor between two elements has 0.4.3's bytes exactly; a
+  paused one appends a presence byte, the offset, the txid and the input.
+  0.4.3 refuses a paused cursor's bytes ("bytes after its end").
+- The witness (`tests/beef_stream_pause.rs`): a 64,000-input subject read in
+  slices of 10,000 inputs pauses at inputs 10,000, 20,000, ..., 60,000 (a
+  restart would pause at 10,000 each time), each cursor through its bytes and
+  a fresh reader, to the verdict of the whole; a refusal at input 60,000 is
+  the same paused or not; the asynchronous reader resumes a paused cursor; a
+  reading with no slice never pauses.
+
+### Changed
+
+- **`Spend`** holds the transaction as an `Arc<TxSighashCache>`.
+  `Spend::new(SpendParams)` keeps its shape and its verdicts and builds the
+  list once per spend. New: `Spend::with_transaction(TxSpendParams)` (the
+  shared transaction, the input index, the source satoshis, the two scripts,
+  the memory limit), which copies nothing per input, the constructor for a
+  caller that checks every input of a transaction (the CLI, the toolbox, the
+  relay); `Err` when the index names no input.
+- **New public items**, nothing removed: `primitives::bsv::sighash::TxSighashCache`,
+  `script::TxSpendParams`, `Spend::with_transaction`,
+  `transaction::Timed`, `StreamVerifier::step_until`, `Cursor::input_reached`.
+  `Progress` is unchanged, so no caller's `match` breaks.
+
 ## [0.4.3] - 2026-10-10
 
 A raw transaction with no output is invalid bytes, as one with no input has

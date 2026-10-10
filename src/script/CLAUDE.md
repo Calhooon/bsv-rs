@@ -59,7 +59,7 @@ pub use bip276::*;  // encode_bip276, decode_bip276, BIP276_PREFIX, NETWORK_MAIN
 // Evaluation types
 pub use evaluation_error::{ExecutionContext, ScriptEvaluationError, ScriptResource, ScriptResourceLimit};
 pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
-pub use spend::{Spend, SpendParams};
+pub use spend::{Spend, SpendParams, TxSpendParams};
 
 // Template types
 pub use template::{ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
@@ -251,8 +251,19 @@ pub struct SpendParams {
     pub memory_limit: Option<usize>,  // the LOCAL budget: None = 32 MB (default mode) or 100 MB on the node's count (under a word)
 }
 
+// 0.4.4: one transaction shared by the spends of all its inputs (bsv-low #591)
+pub struct TxSpendParams {
+    pub transaction: Arc<TxSighashCache>,  // inputs, outputs, version, lock time, the BIP-143 midstates once per transaction
+    pub input_index: usize,
+    pub source_satoshis: u64,
+    pub locking_script: LockingScript,
+    pub unlocking_script: UnlockingScript,
+    pub memory_limit: Option<usize>,
+}
+
 impl Spend {
     pub fn new(params: SpendParams) -> Self          // the TypeScript SDK's default mode
+    pub fn with_transaction(params: TxSpendParams) -> Result<Self>  // nothing copied per input; Err if the index names no input
     pub fn set_flags(&mut self, flags: ScriptFlags)  // the node's word: every rule re-derived at the reference's site under its version gate
     pub fn flags(&self) -> Option<ScriptFlags>
     pub fn set_require_minimal(&mut self, require: bool)    // overrides, also after set_flags
