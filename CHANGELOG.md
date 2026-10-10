@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-10-10
+
+A raw transaction with no output is invalid bytes, as one with no input has
+been since 0.4.1, and `Transaction::verify` refuses both (bsv-stack-lean #59,
+found by the NL-3b lane while closing #58). The rule is the node's, cited not
+restated: bsv-script-lean@87f0461 `lean/BsvScript/TxRules.lean:85-86`
+(`checkTransactionCommon`: `vinEmpty`, then `voutEmpty`; the theorems
+`checkTransactionCommon_vinEmpty` and `checkTransactionCommon_voutEmpty`). The
+posture of 0.4.0 stands: a refusal is for invalid bytes only, never for a
+size or a count; `NoOutputs` refuses the one count, zero, that makes the bytes
+no transaction, and bounds nothing from above.
+
+### Fixed: a transaction with no output was read as valid
+
+- The streaming reader, `BeefStream`, `verify_stream` (with or without
+  scripts, under a subject, in two passes) and `verify_stream_async` refuse a
+  raw transaction with at least one input and no output as
+  `Invalid { offset, kind: Kind::NoOutputs, reason: Reason::NoOutputs }`, the
+  offset its leading byte, with or without a BUMP index. One with neither is
+  `NoInputs`, the node's order. The index's fold holds an `Element` built by
+  hand to the same rule.
+- `Beef::verify_valid`, `is_valid` and `verify_structure` refuse a BEEF that
+  carries one (`Kind::NoOutputs`; `BeefTx::has_no_outputs`, new). The kind is
+  the first such transaction's in the order held when it is called, the
+  reader's order, before the sort.
+- One helper answers both counts in the node's order for every path
+  (`beef_stream::no_transaction`, crate-private).
+- Witnesses, red at 0.4.2 and green here (`tests/beef_stream.rs`):
+  `a_transaction_with_no_output_is_invalid_bytes_at_its_offset` (V1 and V2,
+  every reader and the whole path), `a_transaction_with_no_output_is_invalid_under_a_bump_too`,
+  `the_leans_no_output_rows_have_the_leans_offsets` (the Lean's rows of
+  `BeefOfAnySize`: 111, 147 behind the Atomic prefix, 49 under a BUMP, and
+  neither at 111 as `NoInputs`), `the_asynchronous_reader_refuses_a_transaction_with_no_output`;
+  `a_transaction_with_neither_is_refused_for_its_inputs_first` holds the order.
+
+### Fixed: `Transaction::verify` exempted a root with no input
+
+- Through 0.4.2 the linked walk treated a transaction with no inputs as a
+  synthetic root and skipped the value rule for it, and judged a transaction
+  with no output like any other. Every transaction the walk reaches (the one
+  verified, each popped ancestor, each source it resolves), proven by a
+  merkle path or not, is now refused with either:
+  `transaction error: invalid transaction <txid>: NoInputs` (or `NoOutputs`),
+  the reader's kinds. The value rule's exemption is gone; nothing reaches it.
+- Witnesses, red at 0.4.2 (`Ok(true)`) and green here (`tests/beef_stream.rs`):
+  `verify_refuses_a_root_with_no_input` (unproven, proven, the transaction
+  itself), `verify_refuses_a_transaction_with_no_output` (the subject, a
+  proven ancestor, neither; the control `Ok(true)`).
+
+### Changed
+
+- **`Kind` and `Reason` gain the variant `NoOutputs`**, last; `Kind::ALL` is
+  `[Kind; 20]`. Neither is `#[non_exhaustive]`, so an exhaustive `match` needs
+  the new arm and a binding typed `[Kind; 19]` needs `20`, as at 0.4.1.
+- **A root needs an input.** A test or a caller that built a funding
+  transaction with outputs and no inputs and verified a spend of it gets the
+  refusal. Give the root one input and, so the walk need not descend it, a
+  merkle path (for a block of one transaction,
+  `MerklePath::from_coinbase_txid`) and a tracker that carries its root.
+  `examples/transaction.rs` (and the README block that is its body) and
+  `tests/transaction_tests.rs`'s `build_source_tx` moved so.
+- Nothing stored changes: a BEEF stored by an earlier version is held to
+  these rules on its next read.
+
+### Notes: cross-SDK parity
+
+Read at the pin, not run against the reference:
+
+- The reference's `Beef.verifyValid` has no such check
+  (`ts-stack@edf6e03 packages/sdk/src/transaction/Beef.ts:1054-1075`).
+- The reference's `Transaction.verify` refuses an unmined transaction with no
+  inputs, then one with no outputs (`Transaction.ts:1336-1342`, called for an
+  unmined transaction at `:1654`), and does not ask it of a proven one. This
+  crate's walk asks it of every transaction it reaches, as its reader does;
+  through 0.4.2 its walk exempted what the reference refuses.
+
 ## [0.4.2] - 2026-10-10
 
 The whole-BEEF path (`Beef::from_binary` then `Beef::verify_valid`) walks a
