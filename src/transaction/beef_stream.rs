@@ -1922,6 +1922,19 @@ impl BeefIndex {
 
     /// A transaction or a txid-only entry.
     fn fold_checked(&mut self, element: &Element) -> Result<(), Stop> {
+        self.fold_checked_from(element, 0, &mut || false)
+            .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))
+    }
+
+    /// [`fold_checked`](Self::fold_checked) with the scripts run from input
+    /// `from` and `spent` asked between inputs. `Ok(Some(i))` is a pause
+    /// before input `i`: the index is unchanged.
+    fn fold_checked_from(
+        &mut self,
+        element: &Element,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+    ) -> Result<Option<u32>, Stop> {
         match element {
             Element::Bump(_) => unreachable!("a BUMP is folded with its header answer"),
             Element::TxidOnly { offset, txid } => {
@@ -1937,7 +1950,7 @@ impl BeefIndex {
                 });
                 self.steps += 1;
                 self.work += 32 + 3;
-                Ok(())
+                Ok(None)
             }
             Element::Tx {
                 offset,
@@ -1993,7 +2006,11 @@ impl BeefIndex {
                 let seen = self.txs.get(txid).is_some_and(|e| e.raw);
                 if self.check_spends && !seen {
                     if bump_index.is_none() {
-                        self.check_spends_of(*offset, txid, body)?;
+                        if let Some(next) =
+                            self.check_spends_of(*offset, txid, body, from, spent)?
+                        {
+                            return Ok(Some(next));
+                        }
                     }
                     for input in &body.inputs {
                         self.spend_output(&input.prev, input.vout);
@@ -2046,7 +2063,7 @@ impl BeefIndex {
                 self.last_raw = Some((*txid, *offset));
                 self.steps += 1;
                 self.work += body.raw.len() as u64 + 5 + 2 * body.inputs.len() as u64;
-                Ok(())
+                Ok(None)
             }
         }
     }
@@ -2076,7 +2093,19 @@ impl BeefIndex {
     /// The spends of an unproven transaction: each input's script executed
     /// against the parent output the index kept, and the value rule
     /// (`Transaction::verify`'s checks, in its order). Nothing is changed.
-    fn check_spends_of(&self, offset: u64, txid: &Hash32, body: &TxBody) -> Result<(), Stop> {
+    ///
+    /// The scripts run from input `from` on (the inputs before it were run by
+    /// an earlier slice of the same reading, against the same index), and
+    /// `spent` is asked between two inputs: `Ok(Some(i))` is a pause before
+    /// input `i`, at least one input after `from` having run.
+    fn check_spends_of(
+        &self,
+        offset: u64,
+        txid: &Hash32,
+        body: &TxBody,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+    ) -> Result<Option<u32>, Stop> {
         let refuse = |at: u64, input: Option<u32>, why: SpendRefusal| Stop::Spend {
             offset: at,
             txid: *txid,
@@ -2152,7 +2181,18 @@ impl BeefIndex {
             outputs,
             body.lock_time,
         ));
-        for (vin, (input, source)) in body.inputs.iter().zip(sources).enumerate() {
+        for (vin, (input, source)) in body
+            .inputs
+            .iter()
+            .zip(sources)
+            .enumerate()
+            .skip(from as usize)
+        {
+            // The clock between inputs (bsv-low #591): one transaction of
+            // many inputs is no longer one uninterruptible step.
+            if vin > from as usize && spent() {
+                return Ok(Some(vin as u32));
+            }
             let script_error =
                 |message: String| refuse(input.at, Some(vin as u32), SpendRefusal::Script(message));
             let locking_script = LockingScript::from_binary(&source.script)
@@ -2180,7 +2220,7 @@ impl BeefIndex {
         if output_total > input_total {
             return Err(refuse(offset, None, SpendRefusal::CreatesValue));
         }
-        Ok(())
+        Ok(None)
     }
 
     /// The atomic check at the end (the Lean's `finish`): the subject is the
@@ -2313,6 +2353,20 @@ pub struct Cursor {
     index: BeefIndex,
     /// The subject the caller named.
     subject: Option<Hash32>,
+    /// A reading paused inside a transaction: the frame and the index are
+    /// the state before it, and this names it and the input reached.
+    pending: Option<Pending>,
+}
+
+/// The transaction a paused reading stands in and the input it reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Pending {
+    /// The transaction's stream offset (its raw bytes' leading byte; the
+    /// frame stands at the element's first byte, at or before it).
+    offset: u64,
+    txid: Hash32,
+    /// The first input whose script has not run.
+    input: u32,
 }
 
 const CURSOR_MAGIC: &[u8; 4] = b"BSC1";
@@ -2334,7 +2388,17 @@ impl Cursor {
         &self.index
     }
 
-    /// The cursor's bytes. Equal states give equal bytes.
+    /// The input a reading paused inside a transaction reached: the
+    /// transaction starts at [`offset`](Self::offset), the scripts of the
+    /// inputs before this one have run, and a resume runs them from this one
+    /// on. `None` between two elements.
+    pub fn input_reached(&self) -> Option<u32> {
+        self.pending.map(|p| p.input)
+    }
+
+    /// The cursor's bytes. Equal states give equal bytes; a cursor between
+    /// two elements has 0.4.3's bytes, and a paused one appends the
+    /// transaction and the input reached.
     pub fn to_binary(&self) -> Vec<u8> {
         fn put_hash(w: &mut Writer, h: &Option<Hash32>) {
             match h {
@@ -2437,6 +2501,12 @@ impl Cursor {
                     w.write_u32_le(*vout);
                 }
             }
+        }
+        if let Some(pending) = &self.pending {
+            w.write_u8(1);
+            w.write_u64_le(pending.offset);
+            w.write_bytes(&pending.txid);
+            w.write_u32_le(pending.input);
         }
         w.into_bytes()
     }
@@ -2563,6 +2633,24 @@ impl Cursor {
             }
             _ => return Err(bad("a presence byte")),
         };
+        let pending = if r.is_empty() {
+            None
+        } else {
+            if r.read_u8()? != 1 {
+                return Err(bad("a presence byte"));
+            }
+            let offset = r.read_u64_le()?;
+            let txid = hash(&mut r)?;
+            let input = r.read_u32_le()?;
+            if offset < frame.pos {
+                return Err(bad("a pause before its frame"));
+            }
+            Some(Pending {
+                offset,
+                txid,
+                input,
+            })
+        };
         if !r.is_empty() {
             return Err(bad("bytes after its end"));
         }
@@ -2570,6 +2658,7 @@ impl Cursor {
             frame,
             index,
             subject,
+            pending,
         })
     }
 }
@@ -2586,6 +2675,8 @@ struct Judge {
     subject: Option<Hash32>,
     /// The caller's subject was held against the prefix's.
     subject_checked: bool,
+    /// A resumed reading's transaction paused inside, until it is read.
+    resume_at: Option<Pending>,
 }
 
 impl Judge {
@@ -2594,7 +2685,14 @@ impl Judge {
             index,
             subject,
             subject_checked: false,
+            resume_at: None,
         }
+    }
+
+    fn resumed(cursor: Cursor) -> (Frame, Self) {
+        let mut judge = Self::new(cursor.subject, cursor.index);
+        judge.resume_at = cursor.pending;
+        (cursor.frame, judge)
     }
 
     fn cursor(&self, decoder: &BeefDecoder) -> Cursor {
@@ -2602,6 +2700,21 @@ impl Judge {
             frame: decoder.frame.clone(),
             index: self.index.clone(),
             subject: self.subject,
+            pending: self.resume_at,
+        }
+    }
+
+    /// The input the scripts of `element` run from: the input a paused
+    /// reading reached, when `element` is the transaction it paused in, else
+    /// the first.
+    fn start_of(&mut self, element: &Element) -> u32 {
+        match (self.resume_at.take(), element) {
+            (Some(p), Element::Tx { offset, txid, .. })
+                if p.offset == *offset && p.txid == *txid =>
+            {
+                p.input
+            }
+            _ => 0,
         }
     }
 
@@ -2653,13 +2766,28 @@ pub enum Progress {
     Verdict(Verdict),
 }
 
+/// What one call to [`StreamVerifier::step_until`] came to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Timed {
+    /// As [`StreamVerifier::step`].
+    Progress(Progress),
+    /// The budget was spent between two inputs of an unproven transaction:
+    /// [`StreamVerifier::cursor`] stands before the transaction and names
+    /// the input reached ([`Cursor::input_reached`]).
+    Paused,
+}
+
 /// The reader over a [`Read`]: one step per element, a cursor between any
-/// two.
+/// two, and, under a budget, between two inputs of a transaction.
 pub struct StreamVerifier<R, H> {
     source: BeefStream<R>,
     judge: Judge,
     headers: H,
     verdict: Option<Verdict>,
+    /// The frame before the element in hand: after the last element folded.
+    boundary: Frame,
+    /// The transaction a pause left in hand and the input it reached.
+    held: Option<(Element, u32)>,
 }
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
@@ -2706,27 +2834,42 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
 
     /// A reader resumed from a cursor. `source` is positioned at
     /// [`Cursor::offset`]; the verdict is the verdict of the whole.
+    ///
+    /// A cursor paused inside a transaction is positioned at that
+    /// transaction: it is read again and its scripts run from the input
+    /// reached, the inputs before it never again.
     pub fn resume(cursor: Cursor, source: R, headers: H) -> Self {
-        Self::from_parts(
-            BeefDecoder::at(cursor.frame),
-            Judge::new(cursor.subject, cursor.index),
-            source,
-            headers,
-        )
+        let (frame, judge) = Judge::resumed(cursor);
+        Self::from_parts(BeefDecoder::at(frame), judge, source, headers)
     }
 
     fn from_parts(decoder: BeefDecoder, judge: Judge, source: R, headers: H) -> Self {
         Self {
+            boundary: decoder.frame.clone(),
             source: BeefStream::with_decoder(source, decoder),
             judge,
             headers,
             verdict: None,
+            held: None,
         }
     }
 
-    /// The state after the elements read so far.
+    /// The state after the elements read so far, or, paused inside a
+    /// transaction, the state before it and the input reached.
     pub fn cursor(&self) -> Cursor {
-        self.judge.cursor(&self.source.decoder)
+        match &self.held {
+            Some((Element::Tx { offset, txid, .. }, input)) => Cursor {
+                frame: self.boundary.clone(),
+                index: self.judge.index.clone(),
+                subject: self.judge.subject,
+                pending: Some(Pending {
+                    offset: *offset,
+                    txid: *txid,
+                    input: *input,
+                }),
+            },
+            _ => self.judge.cursor(&self.source.decoder),
+        }
     }
 
     /// The index.
@@ -2736,32 +2879,65 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
 
     /// Reads and folds one element, or ends the reading.
     pub fn step(&mut self) -> std::io::Result<Progress> {
+        match self.step_until(&mut || false)? {
+            Timed::Progress(progress) => Ok(progress),
+            Timed::Paused => unreachable!("a budget never spent never pauses"),
+        }
+    }
+
+    /// [`step`](Self::step) under a budget: `spent` is asked between two
+    /// inputs of an unproven transaction, and when it answers `true` the
+    /// reading pauses there ([`Timed::Paused`]) with at least one input of
+    /// the step run. The next call continues the same transaction from the
+    /// input reached; so does a reader resumed from [`cursor`](Self::cursor).
+    /// Between two elements the caller asks its own clock.
+    pub fn step_until(&mut self, spent: &mut dyn FnMut() -> bool) -> std::io::Result<Timed> {
         if let Some(verdict) = &self.verdict {
-            return Ok(Progress::Verdict(verdict.clone()));
+            return Ok(Timed::Progress(Progress::Verdict(verdict.clone())));
         }
-        let verdict = match self.source.next_element() {
-            Err(StreamError::Io(e)) => return Err(e),
-            Err(StreamError::Refused(r)) => Some(r.into()),
-            Ok(element) => match self.judge.check_named_subject(&self.source.decoder) {
-                Err(r) => Some(r.into()),
-                Ok(()) => match element {
-                    None => Some(self.judge.conclude(&self.source.decoder)),
-                    Some(element) => self
-                        .judge
-                        .index
-                        .fold(&element, &self.headers)
-                        .err()
-                        .map(Verdict::from),
-                },
-            },
-        };
-        match verdict {
-            None => Ok(Progress::Stepped),
-            Some(verdict) => {
-                self.verdict = Some(verdict.clone());
-                Ok(Progress::Verdict(verdict))
+        let (element, from) = match self.held.take() {
+            Some(held) => held,
+            None => {
+                let element = match self.source.next_element() {
+                    Err(StreamError::Io(e)) => return Err(e),
+                    Err(StreamError::Refused(r)) => return Ok(self.latch(r.into())),
+                    Ok(element) => element,
+                };
+                if let Err(r) = self.judge.check_named_subject(&self.source.decoder) {
+                    return Ok(self.latch(r.into()));
+                }
+                let Some(element) = element else {
+                    let verdict = self.judge.conclude(&self.source.decoder);
+                    return Ok(self.latch(verdict));
+                };
+                let from = self.judge.start_of(&element);
+                (element, from)
             }
+        };
+        let folded = match &element {
+            Element::Bump(_) => self
+                .judge
+                .index
+                .fold(&element, &self.headers)
+                .map(|()| None),
+            other => self.judge.index.fold_checked_from(other, from, spent),
+        };
+        match folded {
+            Ok(None) => {
+                self.boundary = self.source.decoder.frame.clone();
+                Ok(Timed::Progress(Progress::Stepped))
+            }
+            Ok(Some(next)) => {
+                self.held = Some((element, next));
+                Ok(Timed::Paused)
+            }
+            Err(stop) => Ok(self.latch(stop.into())),
         }
+    }
+
+    fn latch(&mut self, verdict: Verdict) -> Timed {
+        self.verdict = Some(verdict.clone());
+        Timed::Progress(Progress::Verdict(verdict))
     }
 
     /// Reads to the end.
@@ -2909,9 +3085,10 @@ impl AsyncStreamVerifier {
     /// A reader resumed from a cursor; the source continues at
     /// [`Cursor::offset`].
     pub fn resume(cursor: Cursor) -> Self {
+        let (frame, judge) = Judge::resumed(cursor);
         Self {
-            decoder: BeefDecoder::at(cursor.frame),
-            judge: Judge::new(cursor.subject, cursor.index),
+            decoder: BeefDecoder::at(frame),
+            judge,
         }
     }
 
@@ -2960,7 +3137,13 @@ impl AsyncStreamVerifier {
                         };
                         self.judge.index.fold_bump(&bump, carried)
                     }
-                    Step::Element(other) => self.judge.index.fold_checked(&other),
+                    Step::Element(other) => {
+                        let from = self.judge.start_of(&other);
+                        self.judge
+                            .index
+                            .fold_checked_from(&other, from, &mut || false)
+                            .map(|_| ())
+                    }
                 };
                 if let Err(stop) = folded {
                     return Ok(stop.into());

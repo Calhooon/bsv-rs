@@ -74,7 +74,7 @@ jobs:
       # deep chain at 100,000 links on a 1 MiB stack, the wide BUMP at 16,384 leaves, the limits
       # without a verdict
       - name: Run the streaming BEEF witnesses
-        run: cargo test --test beef_stream --test beef_stream_deep --test beef_stream_linear_spend --test beef_limits --all-features --verbose
+        run: cargo test --test beef_stream --test beef_stream_deep --test beef_stream_linear_spend --test beef_stream_pause --test beef_limits --all-features --verbose
 
       # the dhat heap measurements: one profiler per process, so each test holds the file's lock and
       # the target is serial under the default thread count (it failed 4 of 5 in parallel before)
