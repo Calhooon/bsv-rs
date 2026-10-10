@@ -89,12 +89,13 @@ use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, Script, ScriptChunk, UnlockingScript};
 use crate::primitives::bsv::sighash::{
-    compute_sighash_dispatched_for_signing, SighashParams, TxInput, TxOutput, SIGHASH_ALL,
-    SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE, SIGHASH_FORKID, SIGHASH_SINGLE,
+    TxInput, TxOutput, TxSighashCache, SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE,
+    SIGHASH_FORKID, SIGHASH_SINGLE,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::primitives::ec::PublicKey;
 use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, to_hex, BigNumber};
+use std::sync::Arc;
 
 // ============================================================================
 // Configuration Constants
@@ -183,6 +184,26 @@ pub struct SpendParams {
     pub memory_limit: Option<usize>,
 }
 
+/// Parameters for a spend of one input of a transaction whose input and
+/// output lists, and sighash midstates, are shared by the spends of all its
+/// inputs ([`Spend::with_transaction`]). The outpoint and the sequence are
+/// the transaction's input at `input_index`.
+pub struct TxSpendParams {
+    /// The spending transaction: its version, inputs, outputs and lock time,
+    /// with the midstates every input's signature checks share.
+    pub transaction: Arc<TxSighashCache>,
+    /// The index of this input in the spending transaction.
+    pub input_index: usize,
+    /// The satoshi value of the source UTXO.
+    pub source_satoshis: u64,
+    /// The locking script of the source UTXO.
+    pub locking_script: LockingScript,
+    /// The unlocking script for this spend.
+    pub unlocking_script: UnlockingScript,
+    /// As [`SpendParams::memory_limit`].
+    pub memory_limit: Option<usize>,
+}
+
 // ============================================================================
 // Spend Struct
 // ============================================================================
@@ -196,12 +217,11 @@ pub struct Spend {
     source_satoshis: u64,
     locking_script: LockingScript,
     transaction_version: i32,
-    other_inputs: Vec<TxInput>,
-    outputs: Vec<TxOutput>,
+    /// The spending transaction and its sighash midstates, shared by the
+    /// spends of its inputs (one input list per transaction, not per input).
+    transaction: Arc<TxSighashCache>,
     input_index: usize,
     unlocking_script: UnlockingScript,
-    input_sequence: u32,
-    lock_time: u32,
 
     // Execution state
     context: ExecutionContext,
@@ -277,20 +297,87 @@ pub struct Spend {
 }
 
 impl Spend {
-    /// Creates a new Spend validator from the given parameters.
+    /// Creates a new Spend validator from the given parameters. The input
+    /// list is `other_inputs` with this input inserted at `input_index` (at
+    /// the end when the index is past them), built once here.
     pub fn new(params: SpendParams) -> Self {
+        let ours = TxInput {
+            txid: params.source_txid,
+            output_index: params.source_output_index,
+            script: params.unlocking_script.to_binary(),
+            sequence: params.input_sequence,
+        };
+        let mut inputs = params.other_inputs;
+        inputs.insert(params.input_index.min(inputs.len()), ours);
+        let transaction = Arc::new(TxSighashCache::new(
+            params.transaction_version,
+            inputs,
+            params.outputs,
+            params.lock_time,
+        ));
+        Self::from_parts(
+            transaction,
+            params.input_index,
+            (params.source_txid, params.source_output_index),
+            params.source_satoshis,
+            params.locking_script,
+            params.unlocking_script,
+            params.memory_limit,
+        )
+    }
+
+    /// A spend of input `input_index` of a transaction shared among the
+    /// spends of its inputs: nothing is copied per input, and the BIP-143
+    /// midstates are computed at most once per transaction
+    /// ([`TxSighashCache`]). The outpoint and sequence are the transaction's
+    /// input's. The verdict is [`Spend::new`]'s for the same transaction.
+    ///
+    /// # Errors
+    ///
+    /// `input_index` names no input of the transaction.
+    pub fn with_transaction(params: TxSpendParams) -> crate::Result<Self> {
+        let input = params
+            .transaction
+            .inputs()
+            .get(params.input_index)
+            .ok_or_else(|| {
+                crate::Error::TransactionError(format!(
+                    "input index {} out of range (transaction has {} inputs)",
+                    params.input_index,
+                    params.transaction.inputs().len()
+                ))
+            })?;
+        let outpoint = (input.txid, input.output_index);
+        Ok(Self::from_parts(
+            params.transaction,
+            params.input_index,
+            outpoint,
+            params.source_satoshis,
+            params.locking_script,
+            params.unlocking_script,
+            params.memory_limit,
+        ))
+    }
+
+    fn from_parts(
+        transaction: Arc<TxSighashCache>,
+        input_index: usize,
+        (source_txid, source_output_index): ([u8; 32], u32),
+        source_satoshis: u64,
+        locking_script: LockingScript,
+        unlocking_script: UnlockingScript,
+        memory_limit: Option<usize>,
+    ) -> Self {
+        let transaction_version = transaction.version();
         let mut spend = Self {
-            source_txid: params.source_txid,
-            source_output_index: params.source_output_index,
-            source_satoshis: params.source_satoshis,
-            locking_script: params.locking_script,
-            transaction_version: params.transaction_version,
-            other_inputs: params.other_inputs,
-            outputs: params.outputs,
-            input_index: params.input_index,
-            unlocking_script: params.unlocking_script,
-            input_sequence: params.input_sequence,
-            lock_time: params.lock_time,
+            source_txid,
+            source_output_index,
+            source_satoshis,
+            locking_script,
+            transaction_version,
+            transaction,
+            input_index,
+            unlocking_script,
             context: ExecutionContext::UnlockingScript,
             program_counter: 0,
             unlocking_chunks: Vec::new(),
@@ -299,7 +386,7 @@ impl Spend {
             stack: Vec::new(),
             alt_stack: Vec::new(),
             if_stack: Vec::new(),
-            memory_limit: params.memory_limit,
+            memory_limit,
             stack_mem: 0,
             alt_stack_mem: 0,
             node_mem: 0,
@@ -309,10 +396,10 @@ impl Spend {
             // NULLDUMMY are not enforced (mirrors ts-sdk Spend.isRelaxed() and
             // its shouldEnforceNullDummy()). The reference gates the same four
             // on the version at Chronicle (`interpreter.cpp:40-44`).
-            require_minimal: REQUIRE_MINIMAL_PUSH && params.transaction_version <= 1,
-            require_low_s: REQUIRE_LOW_S_SIGNATURES && params.transaction_version <= 1,
-            require_clean_stack: REQUIRE_CLEAN_STACK && params.transaction_version <= 1,
-            require_null_dummy: params.transaction_version <= 1,
+            require_minimal: REQUIRE_MINIMAL_PUSH && transaction_version <= 1,
+            require_low_s: REQUIRE_LOW_S_SIGNATURES && transaction_version <= 1,
+            require_clean_stack: REQUIRE_CLEAN_STACK && transaction_version <= 1,
+            require_null_dummy: transaction_version <= 1,
             // Not in the ts-sdk default mode (its NULLFAIL, MINIMALIF and
             // DISCOURAGE_UPGRADABLE_NOPS exist only under explicit verifyFlags);
             // derived from a word by `set_flags`.
@@ -322,7 +409,7 @@ impl Spend {
             discourage_upgradable_nops: false,
             flags: None,
             // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags.
-            utxo_after_chronicle: params.transaction_version > 1,
+            utxo_after_chronicle: transaction_version > 1,
             script_num_length_policy: DEFAULT_SCRIPT_NUM_LENGTH_POLICY,
             stack_memory_policy: DEFAULT_STACK_MEMORY_USAGE_POLICY,
             else_stack: Vec::new(),
@@ -2247,56 +2334,20 @@ impl Spend {
             Err(_) => return Ok(false),
         };
 
-        // Build inputs array for sighash
-        let inputs = self.build_inputs_array();
-
         // The digest, dispatched as the reference's `SignatureHash` does
         // (`interpreter.cpp:2112-2124`; FORKID is always enabled here): BIP143
         // for a FORKID type without the CHRONICLE bit, the original digest
-        // otherwise (Calhooon/bsv-rs#22).
-        let sighash = compute_sighash_dispatched_for_signing(&SighashParams {
-            version: self.transaction_version,
-            inputs: &inputs,
-            outputs: &self.outputs,
-            locktime: self.lock_time,
-            input_index: self.input_index,
-            subscript: &subscript.to_binary(),
-            satoshis: self.source_satoshis,
-            scope: tx_sig.scope(),
-        });
+        // otherwise (Calhooon/bsv-rs#22). The BIP143 midstates are the
+        // transaction's, shared by every input's spend (bsv-low #591).
+        let sighash = self.transaction.sighash_dispatched_for_signing(
+            self.input_index,
+            &subscript.to_binary(),
+            self.source_satoshis,
+            tx_sig.scope(),
+        );
 
         // Verify
         Ok(pubkey.verify(&sighash, tx_sig.signature()))
-    }
-
-    fn build_inputs_array(&self) -> Vec<TxInput> {
-        let mut inputs = Vec::with_capacity(self.other_inputs.len() + 1);
-
-        // Add other inputs
-        for (i, other) in self.other_inputs.iter().enumerate() {
-            if i == self.input_index {
-                // Insert our input at the correct position
-                inputs.push(TxInput {
-                    txid: self.source_txid,
-                    output_index: self.source_output_index,
-                    script: self.unlocking_script.to_binary(),
-                    sequence: self.input_sequence,
-                });
-            }
-            inputs.push(other.clone());
-        }
-
-        // Handle case where our input is at the end or other_inputs is empty
-        if self.input_index >= self.other_inputs.len() {
-            inputs.push(TxInput {
-                txid: self.source_txid,
-                output_index: self.source_output_index,
-                script: self.unlocking_script.to_binary(),
-                sequence: self.input_sequence,
-            });
-        }
-
-        inputs
     }
 
     // ========================================================================
@@ -2972,18 +3023,25 @@ mod flag_tests {
 
     /// `SpendParams` for a fresh interpreter with the same context as `s`.
     fn params_of(s: &Spend) -> SpendParams {
+        let inputs = s.transaction.inputs();
+        let ours = &inputs[s.input_index];
         SpendParams {
             source_txid: s.source_txid,
             source_output_index: s.source_output_index,
             source_satoshis: s.source_satoshis,
             locking_script: s.locking_script.clone(),
             transaction_version: s.transaction_version,
-            other_inputs: s.other_inputs.clone(),
-            outputs: s.outputs.clone(),
+            other_inputs: inputs
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != s.input_index)
+                .map(|(_, other)| other.clone())
+                .collect(),
+            outputs: s.transaction.outputs().to_vec(),
             input_index: s.input_index,
             unlocking_script: s.unlocking_script.clone(),
-            input_sequence: s.input_sequence,
-            lock_time: s.lock_time,
+            input_sequence: ours.sequence,
+            lock_time: s.transaction.locktime(),
             memory_limit: s.memory_limit,
         }
     }
@@ -3498,18 +3556,25 @@ mod chronicle_tests {
 
     /// `SpendParams` for a fresh interpreter with the same context as `s`.
     fn params_of(s: &Spend) -> SpendParams {
+        let inputs = s.transaction.inputs();
+        let ours = &inputs[s.input_index];
         SpendParams {
             source_txid: s.source_txid,
             source_output_index: s.source_output_index,
             source_satoshis: s.source_satoshis,
             locking_script: s.locking_script.clone(),
             transaction_version: s.transaction_version,
-            other_inputs: s.other_inputs.clone(),
-            outputs: s.outputs.clone(),
+            other_inputs: inputs
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| *i != s.input_index)
+                .map(|(_, other)| other.clone())
+                .collect(),
+            outputs: s.transaction.outputs().to_vec(),
             input_index: s.input_index,
             unlocking_script: s.unlocking_script.clone(),
-            input_sequence: s.input_sequence,
-            lock_time: s.lock_time,
+            input_sequence: ours.sequence,
+            lock_time: s.transaction.locktime(),
             memory_limit: s.memory_limit,
         }
     }

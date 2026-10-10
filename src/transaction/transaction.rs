@@ -1823,8 +1823,8 @@ impl Transaction {
         chain_tracker: &dyn super::ChainTracker,
         fee_model: Option<&dyn super::FeeModel>,
     ) -> Result<bool> {
-        use crate::primitives::bsv::sighash::{TxInput, TxOutput};
-        use crate::script::{Spend, SpendParams};
+        use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
+        use crate::script::{Spend, TxSpendParams};
 
         let by_txid = self.reachable_by_txid();
         let overflow = || crate::Error::TransactionError("Input satoshis overflow".to_string());
@@ -1910,6 +1910,10 @@ impl Transaction {
                 }
             }
 
+            // One input list and one output list per transaction, shared by
+            // every input's spend with the sighash midstates (bsv-low #591).
+            // Every input names a source txid: the resolution above refused
+            // the transaction otherwise.
             let outputs: Vec<TxOutput> = tx
                 .outputs
                 .iter()
@@ -1918,6 +1922,28 @@ impl Transaction {
                     script: o.locking_script.to_binary(),
                 })
                 .collect();
+            let inputs: Vec<TxInput> = tx
+                .inputs
+                .iter()
+                .map(|inp| {
+                    Ok(TxInput {
+                        txid: inp.get_source_txid_bytes()?,
+                        output_index: inp.source_output_index,
+                        script: inp
+                            .unlocking_script
+                            .as_ref()
+                            .map(|s| s.to_binary())
+                            .unwrap_or_default(),
+                        sequence: inp.sequence,
+                    })
+                })
+                .collect::<Result<_>>()?;
+            let shared = std::sync::Arc::new(TxSighashCache::new(
+                tx.version as i32,
+                inputs,
+                outputs,
+                tx.lock_time,
+            ));
 
             // Verify each input's script
             for ((vin, input), (source_txid, source_output)) in
@@ -1932,44 +1958,18 @@ impl Transaction {
                     ))
                 })?;
 
-                // Build other_inputs for sighash context
-                let other_inputs: Vec<TxInput> = tx
-                    .inputs
-                    .iter()
-                    .enumerate()
-                    .filter(|(i, _)| *i != vin)
-                    .map(|(_, inp)| TxInput {
-                        txid: inp.get_source_txid_bytes().unwrap_or([0u8; 32]),
-                        output_index: inp.source_output_index,
-                        script: inp
-                            .unlocking_script
-                            .as_ref()
-                            .map(|s| s.to_binary())
-                            .unwrap_or_default(),
-                        sequence: inp.sequence,
-                    })
-                    .collect();
-
-                let source_txid_bytes = input.get_source_txid_bytes()?;
-
-                let mut spend = Spend::new(SpendParams {
-                    source_txid: source_txid_bytes,
-                    source_output_index: input.source_output_index,
+                let mut spend = Spend::with_transaction(TxSpendParams {
+                    transaction: shared.clone(),
+                    input_index: vin,
                     source_satoshis,
                     locking_script: LockingScript::from_script(crate::script::Script::from_binary(
                         &locking_script.to_binary(),
                     )?),
-                    transaction_version: tx.version as i32,
-                    other_inputs,
-                    outputs: outputs.clone(),
-                    input_index: vin,
                     unlocking_script: UnlockingScript::from_script(
                         crate::script::Script::from_binary(&unlocking_script.to_binary())?,
                     ),
-                    input_sequence: input.sequence,
-                    lock_time: tx.lock_time,
                     memory_limit: None,
-                });
+                })?;
 
                 spend.validate().map_err(|e| {
                     crate::Error::TransactionError(format!(

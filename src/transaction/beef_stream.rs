@@ -78,12 +78,13 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::future::Future;
 use std::io::{Read, Seek, SeekFrom};
+use std::sync::Arc;
 
 use sha2::{Digest, Sha256};
 
-use crate::primitives::bsv::sighash::{TxInput, TxOutput};
+use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::primitives::{sha256d, to_hex, Reader, Writer};
-use crate::script::{LockingScript, Spend, SpendParams, UnlockingScript};
+use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError, MockChainTracker};
@@ -1673,6 +1674,16 @@ struct TxEntry {
     /// Its unspent outputs by index, when spends are checked. A spent output
     /// is `None`; the whole table goes when the last one is spent.
     outputs: Option<Box<[Option<Retained>]>>,
+    /// The outputs of the table still unspent: the table goes at zero, with
+    /// no walk over it per spend (bsv-low #591). Derived; never stored.
+    live: usize,
+}
+
+/// The unspent outputs of a table.
+fn live_of(outputs: &Option<Box<[Option<Retained>]>>) -> usize {
+    outputs
+        .as_ref()
+        .map_or(0, |o| o.iter().filter(|slot| slot.is_some()).count())
 }
 
 /// Why a spend was refused. This is the interpreter's verdict on a
@@ -1922,6 +1933,7 @@ impl BeefIndex {
                     referenced: false,
                     raw: false,
                     outputs: None,
+                    live: 0,
                 });
                 self.steps += 1;
                 self.work += 32 + 3;
@@ -2014,6 +2026,7 @@ impl BeefIndex {
                     Some(entry) => {
                         if !entry.raw {
                             entry.raw = true;
+                            entry.live = live_of(&outputs);
                             entry.outputs = outputs;
                         }
                     }
@@ -2024,6 +2037,7 @@ impl BeefIndex {
                                 at: *offset,
                                 referenced: false,
                                 raw: true,
+                                live: live_of(&outputs),
                                 outputs,
                             },
                         );
@@ -2050,9 +2064,11 @@ impl BeefIndex {
             return;
         };
         if let Some(slot) = outputs.get_mut(vout as usize) {
-            *slot = None;
+            if slot.take().is_some() {
+                parent.live -= 1;
+            }
         }
-        if outputs.iter().all(Option::is_none) {
+        if parent.live == 0 {
             parent.outputs = None;
         }
     }
@@ -2107,6 +2123,11 @@ impl BeefIndex {
                 .ok_or_else(|| refuse(offset, None, SpendRefusal::CreatesValue))?;
         }
 
+        // One input list and one output list for the transaction, shared by
+        // every input's spend with the sighash midstates: hashPrevouts,
+        // hashSequence and hashOutputs are computed at most once per scope
+        // class here, never once per input (bsv-low #591). The digest reads
+        // no input's script, so the shared inputs carry none.
         let outputs: Vec<TxOutput> = body
             .outputs
             .iter()
@@ -2121,37 +2142,32 @@ impl BeefIndex {
             .map(|i| TxInput {
                 txid: i.prev,
                 output_index: i.vout,
-                script: body.raw[i.script.clone()].to_vec(),
+                script: Vec::new(),
                 sequence: i.sequence,
             })
             .collect();
+        let shared = Arc::new(TxSighashCache::new(
+            body.version as i32,
+            inputs,
+            outputs,
+            body.lock_time,
+        ));
         for (vin, (input, source)) in body.inputs.iter().zip(sources).enumerate() {
             let script_error =
                 |message: String| refuse(input.at, Some(vin as u32), SpendRefusal::Script(message));
-            let other_inputs: Vec<TxInput> = inputs
-                .iter()
-                .enumerate()
-                .filter(|(i, _)| *i != vin)
-                .map(|(_, other)| other.clone())
-                .collect();
             let locking_script = LockingScript::from_binary(&source.script)
                 .map_err(|e| script_error(e.to_string()))?;
             let unlocking_script = UnlockingScript::from_binary(&body.raw[input.script.clone()])
                 .map_err(|e| script_error(e.to_string()))?;
-            let mut spend = Spend::new(SpendParams {
-                source_txid: input.prev,
-                source_output_index: input.vout,
+            let mut spend = Spend::with_transaction(TxSpendParams {
+                transaction: shared.clone(),
+                input_index: vin,
                 source_satoshis: source.satoshis,
                 locking_script,
-                transaction_version: body.version as i32,
-                other_inputs,
-                outputs: outputs.clone(),
-                input_index: vin,
                 unlocking_script,
-                input_sequence: input.sequence,
-                lock_time: body.lock_time,
                 memory_limit: None,
-            });
+            })
+            .map_err(|e| script_error(e.to_string()))?;
             match spend.validate() {
                 Ok(true) => {}
                 Ok(false) => return Err(script_error("the script did not succeed".to_string())),
@@ -2530,6 +2546,7 @@ impl Cursor {
                     at,
                     referenced: flags & 1 == 1,
                     raw: flags & 2 == 2,
+                    live: live_of(&outputs),
                     outputs,
                 },
             );

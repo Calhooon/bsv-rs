@@ -82,6 +82,7 @@ use crate::error::{Error, Result};
 use crate::primitives::encoding::{bounded_capacity, Reader, Writer};
 use crate::primitives::hash::sha256d;
 use std::collections::HashMap;
+use std::sync::OnceLock;
 
 // ============================================================================
 // SIGHASH Constants
@@ -548,56 +549,15 @@ impl<'t> SighashCache<'t> {
         let hash_prevouts = self.hash_prevouts(scope);
         let hash_sequence = self.hash_sequence(scope);
         let hash_outputs = self.hash_outputs(input_index, scope);
-
-        let mut writer = Writer::with_capacity(
-            4 + // version
-            32 + // hashPrevouts
-            32 + // hashSequence
-            32 + // txid
-            4 + // output index
-            9 + subscript.len() + // scriptCode (varint + data)
-            8 + // value
-            4 + // sequence
-            32 + // hashOutputs
-            4 + // locktime
-            4, // sighash type
-        );
-
-        // 1. nVersion (4 bytes, signed LE)
-        writer.write_i32_le(self.version);
-
-        // 2. hashPrevouts (32 bytes)
-        writer.write_bytes(&hash_prevouts);
-
-        // 3. hashSequence (32 bytes)
-        writer.write_bytes(&hash_sequence);
-
-        // 4. outpoint (32 bytes txid + 4 bytes index)
-        // The txid is written in the same byte order as stored in the
-        // transaction (internal order)
-        writer.write_bytes(&input.txid);
-        writer.write_u32_le(input.output_index);
-
-        // 5. scriptCode (varint length + bytes)
-        writer.write_var_int(subscript.len() as u64);
-        writer.write_bytes(subscript);
-
-        // 6. value (8 bytes LE)
-        writer.write_u64_le(satoshis);
-
-        // 7. nSequence (4 bytes LE)
-        writer.write_u32_le(input.sequence);
-
-        // 8. hashOutputs (32 bytes)
-        writer.write_bytes(&hash_outputs);
-
-        // 9. nLocktime (4 bytes LE)
-        writer.write_u32_le(self.locktime);
-
-        // 10. sighash type (4 bytes LE, unsigned)
-        writer.write_u32_le(scope);
-
-        Ok(writer.into_bytes())
+        Ok(bip143_preimage(
+            self.version,
+            input,
+            self.locktime,
+            [hash_prevouts, hash_sequence, hash_outputs],
+            subscript,
+            satoshis,
+            scope,
+        ))
     }
 
     /// Computes the sighash digest in display order (reversed, as typically
@@ -635,6 +595,213 @@ impl<'t> SighashCache<'t> {
     ) -> Result<[u8; 32]> {
         let preimage = self.preimage(input_index, subscript, satoshis, scope)?;
         Ok(sha256d(&preimage))
+    }
+}
+
+/// The BIP-143 preimage of one input from its three midstates
+/// (`[hashPrevouts, hashSequence, hashOutputs]`), the one writer of it in
+/// the crate: [`SighashCache::preimage`] and [`TxSighashCache`] call it.
+fn bip143_preimage(
+    version: i32,
+    input: &TxInput,
+    locktime: u32,
+    [hash_prevouts, hash_sequence, hash_outputs]: [[u8; 32]; 3],
+    subscript: &[u8],
+    satoshis: u64,
+    scope: u32,
+) -> Vec<u8> {
+    let mut writer = Writer::with_capacity(
+        4 + // version
+        32 + // hashPrevouts
+        32 + // hashSequence
+        32 + // txid
+        4 + // output index
+        9 + subscript.len() + // scriptCode (varint + data)
+        8 + // value
+        4 + // sequence
+        32 + // hashOutputs
+        4 + // locktime
+        4, // sighash type
+    );
+
+    // 1. nVersion (4 bytes, signed LE)
+    writer.write_i32_le(version);
+
+    // 2. hashPrevouts (32 bytes)
+    writer.write_bytes(&hash_prevouts);
+
+    // 3. hashSequence (32 bytes)
+    writer.write_bytes(&hash_sequence);
+
+    // 4. outpoint (32 bytes txid + 4 bytes index)
+    // The txid is written in the same byte order as stored in the
+    // transaction (internal order)
+    writer.write_bytes(&input.txid);
+    writer.write_u32_le(input.output_index);
+
+    // 5. scriptCode (varint length + bytes)
+    writer.write_var_int(subscript.len() as u64);
+    writer.write_bytes(subscript);
+
+    // 6. value (8 bytes LE)
+    writer.write_u64_le(satoshis);
+
+    // 7. nSequence (4 bytes LE)
+    writer.write_u32_le(input.sequence);
+
+    // 8. hashOutputs (32 bytes)
+    writer.write_bytes(&hash_outputs);
+
+    // 9. nLocktime (4 bytes LE)
+    writer.write_u32_le(locktime);
+
+    // 10. sighash type (4 bytes LE, unsigned)
+    writer.write_u32_le(scope);
+
+    writer.into_bytes()
+}
+
+/// [`SighashCache`]'s midstates over a transaction it owns, for sharing by
+/// reference or `Arc` among the spends of every input of that transaction
+/// (`Spend::with_transaction` in the script module): `hashPrevouts`,
+/// `hashSequence` and the ALL class's `hashOutputs` are each computed at
+/// most once per transaction, on first use, in the scope classes
+/// [`SighashCache`] caches them in. An in-range SINGLE's `hashOutputs` is the
+/// one output's and is not kept. `Sync`: the midstates are `OnceLock`s.
+///
+/// The digest reads no input's script, so the inputs may carry empty ones.
+#[derive(Debug, Clone)]
+pub struct TxSighashCache {
+    version: i32,
+    inputs: Vec<TxInput>,
+    outputs: Vec<TxOutput>,
+    locktime: u32,
+    hash_prevouts: OnceLock<[u8; 32]>,
+    hash_sequence: OnceLock<[u8; 32]>,
+    hash_outputs_all: OnceLock<[u8; 32]>,
+}
+
+impl TxSighashCache {
+    /// The cache over a transaction's parts; no midstate is computed yet.
+    pub fn new(version: i32, inputs: Vec<TxInput>, outputs: Vec<TxOutput>, locktime: u32) -> Self {
+        Self {
+            version,
+            inputs,
+            outputs,
+            locktime,
+            hash_prevouts: OnceLock::new(),
+            hash_sequence: OnceLock::new(),
+            hash_outputs_all: OnceLock::new(),
+        }
+    }
+
+    /// The transaction's version.
+    pub fn version(&self) -> i32 {
+        self.version
+    }
+
+    /// The transaction's inputs.
+    pub fn inputs(&self) -> &[TxInput] {
+        &self.inputs
+    }
+
+    /// The transaction's outputs.
+    pub fn outputs(&self) -> &[TxOutput] {
+        &self.outputs
+    }
+
+    /// The transaction's lock time.
+    pub fn locktime(&self) -> u32 {
+        self.locktime
+    }
+
+    /// `hashPrevouts` for `scope`, as [`SighashCache::hash_prevouts`].
+    pub fn hash_prevouts(&self, scope: u32) -> [u8; 32] {
+        if (scope & SIGHASH_ANYONECANPAY) != 0 {
+            return [0u8; 32];
+        }
+        *self
+            .hash_prevouts
+            .get_or_init(|| compute_hash_prevouts(&self.inputs, scope))
+    }
+
+    /// `hashSequence` for `scope`, as [`SighashCache::hash_sequence`].
+    pub fn hash_sequence(&self, scope: u32) -> [u8; 32] {
+        let base_type = scope & SIGHASH_BASE_MASK;
+        if (scope & SIGHASH_ANYONECANPAY) != 0
+            || base_type == SIGHASH_SINGLE
+            || base_type == SIGHASH_NONE
+        {
+            return [0u8; 32];
+        }
+        *self
+            .hash_sequence
+            .get_or_init(|| compute_hash_sequence(&self.inputs, scope))
+    }
+
+    /// `hashOutputs` for `(input_index, scope)`, as
+    /// [`SighashCache::hash_outputs`].
+    pub fn hash_outputs(&self, input_index: usize, scope: u32) -> [u8; 32] {
+        let base_type = scope & SIGHASH_BASE_MASK;
+        if base_type != SIGHASH_SINGLE && base_type != SIGHASH_NONE {
+            *self
+                .hash_outputs_all
+                .get_or_init(|| compute_hash_outputs(&self.outputs, input_index, scope))
+        } else {
+            compute_hash_outputs(&self.outputs, input_index, scope)
+        }
+    }
+
+    /// The digest a signature over input `input_index` must verify against,
+    /// equal to [`compute_sighash_dispatched_for_signing`] over this
+    /// transaction: the BIP-143 digest from the shared midstates for a FORKID
+    /// scope without the CHRONICLE bit, the original digest otherwise (whose
+    /// serialization covers every input, as the reference's does).
+    ///
+    /// # Panics
+    ///
+    /// Under the BIP-143 digest, if `input_index` is out of range (the
+    /// contract of [`build_sighash_preimage`]).
+    pub fn sighash_dispatched_for_signing(
+        &self,
+        input_index: usize,
+        subscript: &[u8],
+        satoshis: u64,
+        scope: u32,
+    ) -> [u8; 32] {
+        if (scope & SIGHASH_FORKID) == 0 || (scope & SIGHASH_CHRONICLE) != 0 {
+            return compute_sighash_original_for_signing(&SighashParams {
+                version: self.version,
+                inputs: &self.inputs,
+                outputs: &self.outputs,
+                locktime: self.locktime,
+                input_index,
+                subscript,
+                satoshis,
+                scope,
+            });
+        }
+        let Some(input) = self.inputs.get(input_index) else {
+            panic!(
+                "input index {} out of range (transaction has {} inputs)",
+                input_index,
+                self.inputs.len()
+            )
+        };
+        let midstates = [
+            self.hash_prevouts(scope),
+            self.hash_sequence(scope),
+            self.hash_outputs(input_index, scope),
+        ];
+        sha256d(&bip143_preimage(
+            self.version,
+            input,
+            self.locktime,
+            midstates,
+            subscript,
+            satoshis,
+            scope,
+        ))
     }
 }
 
@@ -1132,6 +1299,49 @@ mod tests {
     const CACHE_TEST_LOCK: [u8; 25] = [
         0x76, 0xa9, 0x14, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0x88, 0xac,
     ];
+
+    /// The owned, shared cache of the spend path (bsv-low #591): for every
+    /// scope byte and every input of one transaction, interleaved on one
+    /// cache, the digest equals 0.4.3's dispatched free function over the
+    /// whole input list, the original digest's `one` cases included (an
+    /// in-range SINGLE past the outputs).
+    #[test]
+    fn tx_sighash_cache_equals_the_dispatched_free_function_every_scope_byte() {
+        let tx = cache_test_tx(7, 3);
+        let shared = TxSighashCache::new(
+            tx.version,
+            tx.inputs.clone(),
+            tx.outputs.clone(),
+            tx.locktime,
+        );
+        for i in 0..tx.inputs.len() {
+            for scope in 0u32..=0xff {
+                let expected = compute_sighash_dispatched_for_signing(&SighashParams {
+                    version: tx.version,
+                    inputs: &tx.inputs,
+                    outputs: &tx.outputs,
+                    locktime: tx.locktime,
+                    input_index: i,
+                    subscript: &CACHE_TEST_LOCK,
+                    satoshis: 500 + i as u64,
+                    scope,
+                });
+                let got = shared.sighash_dispatched_for_signing(
+                    i,
+                    &CACHE_TEST_LOCK,
+                    500 + i as u64,
+                    scope,
+                );
+                assert_eq!(got, expected, "input {i}, scope {scope:#04x}");
+            }
+        }
+        // The original digest past the inputs is `one`, as the free
+        // function's.
+        assert_eq!(
+            shared.sighash_dispatched_for_signing(7, &CACHE_TEST_LOCK, 1, SIGHASH_ALL),
+            SIGHASH_ONE
+        );
+    }
 
     /// Every scope class (ALL/NONE/SINGLE × ANYONECANPAY, FORKID set, plus
     /// non-standard base values that behave as ALL) — one shared cache across

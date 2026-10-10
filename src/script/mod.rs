@@ -83,7 +83,7 @@ pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
 pub use locking_script::LockingScript;
 pub use script::Script;
 pub use script_num::ScriptNum;
-pub use spend::{Spend, SpendParams};
+pub use spend::{Spend, SpendParams, TxSpendParams};
 pub use template::{ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
 pub use transaction::{
     SimpleUtxo, SpendValidation, TransactionContext, TransactionInputContext,
