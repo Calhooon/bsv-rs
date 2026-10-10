@@ -341,7 +341,7 @@ impl Spend {
             .inputs()
             .get(params.input_index)
             .ok_or_else(|| {
-                crate::Error::TransactionError(format!(
+                crate::Error::ScriptExecutionError(format!(
                     "input index {} out of range (transaction has {} inputs)",
                     params.input_index,
                     params.transaction.inputs().len()
