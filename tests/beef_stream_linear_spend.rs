@@ -271,3 +271,33 @@ fn a_signature_over_another_digest_is_refused_at_its_input() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn a_shared_spend_of_an_input_the_transaction_has_not_is_an_error() {
+    use bsv_rs::primitives::bsv::sighash::TxSighashCache;
+    use bsv_rs::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
+    use std::sync::Arc;
+    let input = TxInput {
+        txid: [0xCC; 32],
+        output_index: 0,
+        script: vec![],
+        sequence: 0xFFFF_FFFF,
+    };
+    let output = TxOutput {
+        satoshis: 1,
+        script: vec![OP_TRUE],
+    };
+    let shared = Arc::new(TxSighashCache::new(1, vec![input], vec![output], 0));
+    let spend = |input_index| {
+        Spend::with_transaction(TxSpendParams {
+            transaction: shared.clone(),
+            input_index,
+            source_satoshis: 1,
+            locking_script: LockingScript::from_binary(&[OP_TRUE]).unwrap(),
+            unlocking_script: UnlockingScript::from_binary(&[]).unwrap(),
+            memory_limit: None,
+        })
+    };
+    assert!(spend(0).unwrap().validate().unwrap());
+    assert!(spend(1).is_err());
+}
