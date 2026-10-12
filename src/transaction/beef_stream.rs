@@ -1684,14 +1684,39 @@ impl<R: Read> Iterator for BeefStream<R> {
 
 /// The headers a verifier holds: per height the active chain's merkle root,
 /// or nothing. No header at a height is fail closed.
+/// Header context for checking mining in the next block (since 0.5.0).
+/// The activation heights belong to the caller's network. After CSV activation,
+/// finality uses median time past; before it the candidate block's time is needed.
+/// [SRC] bsv-script-lean@87f0461 docs/BLOCK-CONSENSUS.md:83-88.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChainTip {
+    /// Active chain tip's height.
+    pub height: u32,
+    /// Tip's median time past, in seconds.
+    pub median_time_past: u32,
+    /// This network's Genesis activation height.
+    pub genesis_height: u32,
+    /// This network's CSV activation height.
+    pub csv_height: u32,
+    /// Candidate block time, required only for time locks before CSV.
+    pub next_block_time: Option<u32>,
+}
+
 pub trait Headers {
     /// The header at `height` carries `root` (wire order).
     fn carries(&self, height: u64, root: &Hash32) -> bool;
+    /// The caller's active tip and network; none means no contextual evidence.
+    fn mining_tip(&self) -> Option<ChainTip> {
+        None
+    }
 }
 
 impl<H: Headers + ?Sized> Headers for &H {
     fn carries(&self, height: u64, root: &Hash32) -> bool {
         (**self).carries(height, root)
+    }
+    fn mining_tip(&self) -> Option<ChainTip> {
+        (**self).mining_tip()
     }
 }
 
@@ -1955,7 +1980,7 @@ impl BeefIndex {
                 let carried = headers.carries(bump.block_height, &bump.root);
                 self.fold_bump(bump, carried)
             }
-            other => self.fold_checked(other),
+            other => self.fold_checked(other, headers.mining_tip()),
         }
     }
 
@@ -1995,8 +2020,8 @@ impl BeefIndex {
     }
 
     /// A transaction or a txid-only entry.
-    fn fold_checked(&mut self, element: &Element) -> Result<(), Stop> {
-        self.fold_checked_from(element, 0, &mut || false, None)
+    fn fold_checked(&mut self, element: &Element, tip: Option<ChainTip>) -> Result<(), Stop> {
+        self.fold_checked_from(element, 0, &mut || false, None, tip)
             .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))
     }
 
@@ -2009,6 +2034,7 @@ impl BeefIndex {
         from: u32,
         spent: &mut dyn FnMut() -> bool,
         work_limit: Option<u64>,
+        _tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
         match element {
             Element::Bump(_) => unreachable!("a BUMP is folded with its header answer"),
@@ -3009,10 +3035,13 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
                 .index
                 .fold(&element, &self.headers)
                 .map(|()| None),
-            other => self
-                .judge
-                .index
-                .fold_checked_from(other, from, spent, self.work_limit),
+            other => self.judge.index.fold_checked_from(
+                other,
+                from,
+                spent,
+                self.work_limit,
+                self.headers.mining_tip(),
+            ),
         };
         match folded {
             Ok(None) => {
@@ -3243,9 +3272,24 @@ impl AsyncStreamVerifier {
                     }
                     Step::Element(other) => {
                         let from = self.judge.start_of(&other);
+                        let tip = if self.judge.index.check_spends
+                            && matches!(
+                                &other,
+                                Element::Tx {
+                                    bump_index: None,
+                                    ..
+                                }
+                            ) {
+                            tracker
+                                .mining_tip()
+                                .await
+                                .map_err(AsyncVerifyError::Headers)?
+                        } else {
+                            None
+                        };
                         self.judge
                             .index
-                            .fold_checked_from(&other, from, &mut || false, self.work_limit)
+                            .fold_checked_from(&other, from, &mut || false, self.work_limit, tip)
                             .map(|_| ())
                     }
                 };
