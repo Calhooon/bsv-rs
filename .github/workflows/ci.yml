@@ -70,6 +70,10 @@ jobs:
       - name: Run the consensus witness tests
         run: cargo test --test script_flags_witnesses --test script_residual_witnesses --test script_low_s_order_witness --test script_num_length_witness --test script_int64_operand_witness --test script_int64_fold_witness --test script_shift_count_witness --test script_sighash_dispatch_witness --test script_undefined_hashtype_witness --test script_stack_memory_witness --test resource_limits --all-features --verbose
 
+      # R404-H1: a LOCAL work bound within one input, never a script verdict.
+      - name: Run the local work budget witness
+        run: cargo test --test script_work_budget --all-features --verbose
+
       # the streaming BEEF reader: the rows of the Lean definition with their offsets and kinds, the
       # deep chain at 100,000 links on a 1 MiB stack, the wide BUMP at 16,384 leaves, the limits
       # without a verdict
@@ -77,9 +81,9 @@ jobs:
         run: cargo test --test beef_stream --test beef_stream_deep --test beef_stream_linear_spend --test beef_stream_pause --test beef_limits --all-features --verbose
 
       # the dhat heap measurements: one profiler per process, so each test holds the file's lock and
-      # the target is serial under the default thread count (it failed 4 of 5 in parallel before)
+      # one harness thread also keeps slow-test diagnostics out of the active global profile
       - name: Run the memory profiling tests
-        run: cargo test --test memory_profiling --all-features --verbose
+        run: cargo test --test memory_profiling --all-features --verbose -- --test-threads=1
 
       - name: Run doc tests
         run: cargo test --doc --all-features
