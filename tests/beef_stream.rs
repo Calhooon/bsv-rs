@@ -298,8 +298,8 @@ fn chain(n: usize, atomic: bool) -> Chain {
 #[test]
 fn the_twenty_kinds_are_twenty_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 21);
-    assert_eq!(all.len(), 21);
+    assert_eq!(Kind::ALL.len(), 22);
+    assert_eq!(all.len(), 22);
 }
 
 #[test]
@@ -2189,4 +2189,24 @@ fn mining_row4_unproven_coinbase() {
             mining_invalid(&bytes, &HashMap::new(), offsets[0], "UnprovenCoinbase");
         }
     }
+}
+
+#[test]
+fn mining_row5b_null_outpoint() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[]), ([0; 32], u32::MAX, &[])],
+        &[(1, OP_TRUE)],
+        true,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 46, "NullOutpoint");
+}
+
+#[test]
+fn mining_row5a_null_outpoint() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[]), ([0; 32], u32::MAX, &[])],
+        &[(1, OP_TRUE)],
+        false,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 46, "NullOutpoint");
 }

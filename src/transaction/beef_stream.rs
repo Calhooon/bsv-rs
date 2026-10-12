@@ -151,11 +151,13 @@ pub enum Kind {
     NoOutputs,
     /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
     UnprovenCoinbase,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    NullOutpoint,
 }
 
 impl Kind {
     /// The twenty kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 21] = [
+    pub const ALL: [Kind; 22] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -177,6 +179,7 @@ impl Kind {
         Kind::NoInputs,
         Kind::NoOutputs,
         Kind::UnprovenCoinbase,
+        Kind::NullOutpoint,
     ];
 }
 
@@ -287,6 +290,8 @@ pub enum Reason {
     NoOutputs,
     /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
     UnprovenCoinbase,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    NullOutpoint,
 }
 
 impl Reason {
@@ -313,6 +318,7 @@ impl Reason {
             Reason::UnrelatedTransaction { .. } => Kind::UnrelatedTransaction,
             Reason::NoInputs => Kind::NoInputs,
             Reason::NoOutputs => Kind::NoOutputs,
+            Reason::NullOutpoint => Kind::NullOutpoint,
             Reason::UnprovenCoinbase => Kind::UnprovenCoinbase,
         }
     }
@@ -378,6 +384,13 @@ fn check_transaction(
     }
     if let Some(reason) = no_transaction(inputs.len(), outputs.len()) {
         return Err(Refusal::new(offset, reason));
+    }
+    if !is_coinbase(inputs) {
+        for input in inputs {
+            if input.prev == [0; 32] && input.vout == u32::MAX {
+                return Err(Refusal::new(input.at, Reason::NullOutpoint));
+            }
+        }
     }
     Ok(())
 }
