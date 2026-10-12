@@ -12,7 +12,7 @@ trait MissingBudget { fn set_work_limit(&mut self, limit: Option<u64>); }
 impl MissingBudget for Spend { fn set_work_limit(&mut self, _: Option<u64>) {} }
 
 fn witness(n: usize, scope: u32) -> (Spend, usize, usize) {
-    let key = PrivateKey::from_hex("2a").unwrap();
+    let key = PrivateKey::from_hex(&format!("{:064x}", 42)).unwrap();
     let mut lock = Script::new();
     for _ in 0..n {
         lock.write_opcode(0x76).write_bin(&key.public_key().to_compressed()).write_opcode(0xad);
