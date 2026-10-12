@@ -2314,3 +2314,30 @@ fn mining_order_output_before_duplicate() {
     );
     mining_invalid(&bytes, &headers, offsets[1] + 88, "ValueOutOfRange");
 }
+
+#[test]
+fn mining_row7f_input_range() {
+    let p = tx_with(&[([0xAA; 32], 0, &[])], &[(2_100_000_000_000_000, OP_TRUE)]);
+    let q = tx_with(&[([0xBB; 32], 0, &[])], &[(2_100_000_000_000_000, OP_TRUE)]);
+    let c = tx_with(&[(txid(&p), 0, &[]), (txid(&q), 0, &[])], &[(1, OP_TRUE)]);
+    let bumps = [
+        bump_bytes(800_000, 1, &[vec![LeafSpec::Hash(0, txid(&p), true)]]),
+        bump_bytes(800_001, 1, &[vec![LeafSpec::Hash(0, txid(&q), true)]]),
+    ];
+    let headers = HashMap::from([(800_000, txid(&p)), (800_001, txid(&q))]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &bumps,
+        &[
+            Entry::Raw(p, Some(0)),
+            Entry::Raw(q, Some(1)),
+            Entry::Raw(c, None),
+        ],
+    );
+    mining_spend(
+        scripts(&bytes, &headers),
+        offsets[2] + 46,
+        "InputValueOutOfRange",
+    );
+}
