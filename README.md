@@ -1,6 +1,6 @@
 # bsv-rs
 
-**0.4.5**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
+**0.5.0**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
 BEEF and SPV, wallets, authentication and overlay clients. Optional features
 support native applications and wasm hosts. Compatibility is tested against
 shared vectors; the crate also has explicit local evaluator contracts and
@@ -10,7 +10,7 @@ documented differences from other SDKs.
 
 ```toml
 [dependencies]
-bsv-rs = { version = "=0.4.5", features = ["transaction", "wallet"] }
+bsv-rs = { version = "=0.5.0", features = ["transaction", "wallet"] }
 ```
 
 Defaults enable primitives and script. [Cargo.toml](Cargo.toml) lists module
@@ -44,6 +44,21 @@ script. The implementation is [src/transaction/beef_stream.rs](src/transaction/b
 Script defaults follow SDK evaluation mode; callers modelling node validation
 select explicit `ScriptFlags` and interpret resource limits separately from
 validity. The flag and resource witnesses live in [tests](tests).
+
+## The node's mining checks
+
+From 0.5.0 the streaming reader refuses an unproven transaction that
+bitcoin-sv refuses when mining it: an unproven coinbase, a null outpoint, a
+repeated input, an output value or running total outside the money range, an
+input total outside it, a P2SH-shaped output after Genesis, an immature
+coinbase spend, and a time-locked transaction that is not final for the next
+block. Each byte refusal names its offset and kind. A finality verdict needs a
+tip: `Headers::mining_tip` and the async `ChainTracker::mining_tip` supply a
+`ChainTip`, and without one the reader declines the transaction as
+unverifiable instead of guessing. The new kinds and refusals extend public
+exhaustive enums; [CHANGELOG.md](CHANGELOG.md) carries the 0.5.0 migration
+notes. The node's rules are read through the sibling specification's pins, so
+the node implementation decides what the reader refuses.
 
 ## Build, gate and records
 
