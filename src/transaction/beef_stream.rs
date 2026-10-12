@@ -1775,6 +1775,8 @@ pub enum SpendRefusal {
     Resource(crate::script::ScriptResourceLimit),
     /// The transaction's outputs are worth more than its inputs.
     CreatesValue,
+    /// An input value or running input total outside the sibling's MoneyRange.
+    InputValueOutOfRange,
 }
 
 /// What stops a step: invalid bytes, or a spend the interpreter refused.
@@ -2207,13 +2209,10 @@ impl BeefIndex {
                     ))
                 }
             };
-            input_total = input_total.checked_add(source.satoshis).ok_or_else(|| {
-                refuse(
-                    input.at,
-                    vin,
-                    SpendRefusal::Script("input satoshis overflow".to_string()),
-                )
-            })?;
+            if source.satoshis > MAX_MONEY || source.satoshis > MAX_MONEY - input_total {
+                return Err(refuse(input.at, vin, SpendRefusal::InputValueOutOfRange));
+            }
+            input_total += source.satoshis;
             sources.push(source);
         }
         let mut output_total: u64 = 0;
