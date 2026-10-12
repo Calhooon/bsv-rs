@@ -298,8 +298,8 @@ fn chain(n: usize, atomic: bool) -> Chain {
 #[test]
 fn the_twenty_kinds_are_twenty_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 23);
-    assert_eq!(all.len(), 23);
+    assert_eq!(Kind::ALL.len(), 24);
+    assert_eq!(all.len(), 24);
 }
 
 #[test]
@@ -2239,4 +2239,67 @@ fn mining_row6a_duplicate_input() {
     let (bytes, offsets, headers) =
         mining_child(&[(f, 0, &[]), (f, 0, &[])], &[(1, OP_TRUE)], false);
     mining_invalid(&bytes, &headers, offsets[1] + 46, "DuplicateInput");
+}
+
+#[test]
+fn mining_row7g_max_money_boundary() {
+    let (bytes, _, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[])],
+        &[(2_100_000_000_000_000, OP_TRUE)],
+        false,
+    );
+    assert!(scripts(&bytes, &headers).is_valid());
+}
+
+#[test]
+fn mining_row7e_output_range() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[])],
+        &[(2_100_000_000_000_001, OP_TRUE)],
+        true,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 47, "ValueOutOfRange");
+}
+
+#[test]
+fn mining_row7d_output_range() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[])],
+        &[(u64::MAX, OP_TRUE), (1, OP_TRUE)],
+        false,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 47, "ValueOutOfRange");
+}
+
+#[test]
+fn mining_row7c_output_range() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[])],
+        &[(1 << 63, OP_TRUE)],
+        false,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 47, "ValueOutOfRange");
+}
+
+#[test]
+fn mining_row7b_output_range() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[])],
+        &[
+            (2_100_000_000_000_000, OP_TRUE),
+            (2_100_000_000_000_000, OP_TRUE),
+        ],
+        false,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 57, "ValueOutOfRange");
+}
+
+#[test]
+fn mining_row7a_output_range() {
+    let (bytes, offsets, headers) = mining_child(
+        &[(mining_parent_id(), 0, &[])],
+        &[(2_100_000_000_000_001, OP_TRUE)],
+        false,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 47, "ValueOutOfRange");
 }
