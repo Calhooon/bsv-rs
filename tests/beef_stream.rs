@@ -2428,8 +2428,16 @@ fn mining_row3d_p2sh_before_genesis() {
     let mut p2sh = vec![0xa9, 0x14];
     p2sh.extend([0; 20]);
     p2sh.push(0x87);
-    let (bytes, offsets, roots) =
-        mining_child(&[(mining_parent_id(), 0, &[])], &[(1, &p2sh)], false);
+    let (parent, _, _) = funded(&[(2_100_000_000_000_000, OP_TRUE)]);
+    let bump = bump_bytes(9_000, 1, &[vec![LeafSpec::Hash(0, txid(&parent), true)]]);
+    let roots = one_header(9_000, txid(&parent));
+    let child = tx_with(&[(txid(&parent), 0, &[])], &[(1, &p2sh)]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(parent, Some(0)), Entry::Raw(child, None)],
+    );
     let mut headers = mining_headers(roots, 9_998, 1_700_000_000);
     assert!(verify_stream(bytes.as_slice(), &headers, None)
         .unwrap()
@@ -2457,7 +2465,7 @@ fn mining_finality(lock_time: u32, sequence: u32, with_tip: bool) -> (Verdict, u
     let answer = if with_tip {
         verify_stream(
             bytes.as_slice(),
-            &mining_headers(roots, 800_000, 1_700_000_000),
+            mining_headers(roots, 800_000, 1_700_000_000),
             None,
         )
         .unwrap()
@@ -2706,4 +2714,31 @@ async fn mining_async_and_two_pass_enforce_coinbase_maturity() {
             ..
         }
     ));
+}
+#[test]
+fn mining_lean_rows_have_the_same_wire_offsets() {
+    let mut previous = [0; 32];
+    previous[0] = 42;
+    let cases = [
+        (raw_tx(&[([0; 32], u32::MAX)], 1), 6, "UnprovenCoinbase"),
+        (
+            raw_tx(&[(previous, 0), ([0; 32], u32::MAX)], 1),
+            52,
+            "NullOutpoint",
+        ),
+        (
+            raw_tx(&[(previous, 0), (previous, 0)], 1),
+            52,
+            "DuplicateInput",
+        ),
+        (
+            tx_with(&[(previous, 0, &[])], &[(2_100_000_000_000_001, &[])]),
+            53,
+            "ValueOutOfRange",
+        ),
+    ];
+    for (raw, at, name) in cases {
+        let (bytes, _) = wire(V1, None, &[], &[Entry::Raw(raw, None)]);
+        mining_invalid(&bytes, &HashMap::new(), at, name);
+    }
 }
