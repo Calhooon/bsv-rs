@@ -296,7 +296,7 @@ fn chain(n: usize, atomic: bool) -> Chain {
 }
 
 #[test]
-fn the_twenty_kinds_are_twenty_and_distinct() {
+fn the_twenty_four_kinds_are_twenty_four_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
     assert_eq!(Kind::ALL.len(), 24);
     assert_eq!(all.len(), 24);
@@ -2585,4 +2585,125 @@ fn mining_maturity_resume_retains_the_verified_height() {
         resume(decoded, rest, &headers).unwrap(),
         verify_stream(bytes.as_slice(), &headers, None).unwrap()
     );
+}
+#[test]
+fn mining_row4b_coinbase_precedes_no_outputs() {
+    let raw = raw_tx(&[([0; 32], u32::MAX)], 0);
+    let (bytes, offsets) = wire(V1, None, &[], &[Entry::Raw(raw, None)]);
+    mining_invalid(&bytes, &HashMap::new(), offsets[0], "UnprovenCoinbase");
+}
+#[test]
+fn mining_handmade_elements_obey_the_decoder_checks() {
+    let (p, bump, roots) = funded(&[(1000, OP_TRUE)]);
+    let c = tx_with(&[(txid(&p), 0, &[])], &[(1, OP_TRUE)]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(p, Some(0)), Entry::Raw(c, None)],
+    );
+    let parsed = elements(&bytes).unwrap();
+    for (name, delta) in [
+        ("UnprovenCoinbase", 0),
+        ("NullOutpoint", 46),
+        ("DuplicateInput", 46),
+        ("ValueOutOfRange", 47),
+    ] {
+        let mut child = parsed[2].clone();
+        if let Element::Tx { body, .. } = &mut child {
+            match name {
+                "UnprovenCoinbase" => {
+                    body.inputs[0].prev = [0; 32];
+                    body.inputs[0].vout = u32::MAX;
+                    body.outputs.clear();
+                }
+                "NullOutpoint" => {
+                    let mut second = body.inputs[0].clone();
+                    second.prev = [0; 32];
+                    second.vout = u32::MAX;
+                    second.at += 41;
+                    body.inputs.push(second);
+                }
+                "DuplicateInput" => {
+                    let mut second = body.inputs[0].clone();
+                    second.at += 41;
+                    body.inputs.push(second);
+                }
+                _ => body.outputs[0].satoshis = 2_100_000_000_000_001,
+            }
+        }
+        let mut index = bsv_rs::transaction::beef_stream::BeefIndex::new();
+        index.fold(&parsed[0], &roots).unwrap();
+        index.fold(&parsed[1], &roots).unwrap();
+        match index.fold(&child, &roots) {
+            Err(bsv_rs::transaction::beef_stream::Stop::Invalid(r)) => assert_eq!(
+                (r.offset, format!("{:?}", r.kind())),
+                (offsets[1] + delta, name.into())
+            ),
+            other => panic!("expected {name}, got {other:?}"),
+        }
+    }
+}
+#[async_trait::async_trait]
+impl bsv_rs::transaction::ChainTracker for MiningHeaders {
+    async fn is_valid_root_for_height(
+        &self,
+        root: &str,
+        height: u32,
+    ) -> Result<bool, bsv_rs::transaction::ChainTrackerError> {
+        Ok(self
+            .roots
+            .get(&u64::from(height))
+            .is_some_and(|h| display_hex(h) == root))
+    }
+    async fn current_height(&self) -> Result<u32, bsv_rs::transaction::ChainTrackerError> {
+        Ok(self.tip.height)
+    }
+    async fn mining_tip(
+        &self,
+    ) -> Result<
+        Option<bsv_rs::transaction::beef_stream::ChainTip>,
+        bsv_rs::transaction::ChainTrackerError,
+    > {
+        Ok(Some(self.tip))
+    }
+}
+#[tokio::test]
+async fn mining_async_and_two_pass_enforce_coinbase_maturity() {
+    let (bytes, _, roots) = mining_coinbase_spend();
+    let headers = mining_headers(roots, 800_098, 1_700_000_000);
+    let expected = verify_stream(bytes.as_slice(), &headers, None).unwrap();
+    let mut chunks = Chunks {
+        bytes: bytes.clone(),
+        at: 0,
+        size: 7,
+    };
+    assert_eq!(
+        verify_stream_async(&mut chunks, &headers, None)
+            .await
+            .unwrap(),
+        expected
+    );
+    assert_eq!(
+        verify_stream_two_pass(std::io::Cursor::new(&bytes), &headers, None).unwrap(),
+        expected
+    );
+    let mut tracker = MockChainTracker::new(800_099);
+    for (height, root) in &headers.roots {
+        tracker.add_root(*height as u32, display_hex(root));
+    }
+    let mut chunks = Chunks {
+        bytes,
+        at: 0,
+        size: 1,
+    };
+    assert!(matches!(
+        verify_stream_async(&mut chunks, &tracker, None)
+            .await
+            .unwrap(),
+        Verdict::Unverifiable {
+            check: bsv_rs::transaction::beef_stream::MiningCheck::CoinbaseMaturity,
+            ..
+        }
+    ));
 }
