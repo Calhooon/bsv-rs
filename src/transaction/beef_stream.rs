@@ -155,11 +155,13 @@ pub enum Kind {
     NullOutpoint,
     /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
     DuplicateInput,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    ValueOutOfRange,
 }
 
 impl Kind {
     /// The twenty kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 23] = [
+    pub const ALL: [Kind; 24] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -183,6 +185,7 @@ impl Kind {
         Kind::UnprovenCoinbase,
         Kind::NullOutpoint,
         Kind::DuplicateInput,
+        Kind::ValueOutOfRange,
     ];
 }
 
@@ -297,6 +300,8 @@ pub enum Reason {
     NullOutpoint,
     /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
     DuplicateInput,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    ValueOutOfRange,
 }
 
 impl Reason {
@@ -323,6 +328,7 @@ impl Reason {
             Reason::UnrelatedTransaction { .. } => Kind::UnrelatedTransaction,
             Reason::NoInputs => Kind::NoInputs,
             Reason::NoOutputs => Kind::NoOutputs,
+            Reason::ValueOutOfRange => Kind::ValueOutOfRange,
             Reason::DuplicateInput => Kind::DuplicateInput,
             Reason::NullOutpoint => Kind::NullOutpoint,
             Reason::UnprovenCoinbase => Kind::UnprovenCoinbase,
@@ -374,6 +380,9 @@ pub(crate) fn no_transaction(inputs: usize, outputs: usize) -> Option<Reason> {
     }
 }
 
+// [SRC] sibling@87f0461 TxRules.lean:25.
+const MAX_MONEY: u64 = 2_100_000_000_000_000;
+
 // [SRC] sibling@87f0461 TxRules.lean:31-38,101-110; reading #68.
 fn is_coinbase(inputs: &[InputRef]) -> bool {
     matches!(inputs, [i] if i.prev == [0; 32] && i.vout == u32::MAX)
@@ -390,6 +399,14 @@ fn check_transaction(
     }
     if let Some(reason) = no_transaction(inputs.len(), outputs.len()) {
         return Err(Refusal::new(offset, reason));
+    }
+    // [SRC] sibling@87f0461 TxRules.lean:25,88-93. Output checks precede inputs.
+    let mut total = 0;
+    for output in outputs {
+        if output.satoshis > MAX_MONEY || output.satoshis > MAX_MONEY - total {
+            return Err(Refusal::new(output.at, Reason::ValueOutOfRange));
+        }
+        total += output.satoshis;
     }
     if !is_coinbase(inputs) {
         let mut seen = HashSet::with_capacity(inputs.len());
@@ -508,6 +525,8 @@ pub struct InputRef {
 /// One output of a streamed transaction.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OutputRef {
+    /// The absolute stream offset of the output value field (since 0.5.0).
+    pub at: u64,
     /// The value in satoshis.
     pub satoshis: u64,
     /// The locking script's place in the raw bytes.
@@ -924,6 +943,7 @@ struct TxBuilder {
     in_vout: u32,
     script_start: usize,
     out_satoshis: u64,
+    out_at: u64,
     txid: Hash32,
     lock_time: u32,
 }
@@ -1180,6 +1200,7 @@ impl BeefDecoder {
             in_vout: 0,
             script_start: 0,
             out_satoshis: 0,
+            out_at: 0,
             txid: [0u8; 32],
             lock_time: 0,
         });
@@ -1327,6 +1348,7 @@ impl BeefDecoder {
                 };
             }
             St::OutValue => {
+                self.tx.as_mut().expect("a transaction is in hand").out_at = self.field_at;
                 let mut le = [0u8; 8];
                 le.copy_from_slice(&self.scratch[..8]);
                 self.tx
@@ -1455,6 +1477,7 @@ impl BeefDecoder {
             self.st = St::InSequence;
         } else {
             tx.outputs.push(OutputRef {
+                at: tx.out_at,
                 satoshis: tx.out_satoshis,
                 script: tx.script_start..tx.raw.len(),
             });
@@ -2195,9 +2218,9 @@ impl BeefIndex {
         }
         let mut output_total: u64 = 0;
         for output in &body.outputs {
-            output_total = output_total
-                .checked_add(output.satoshis)
-                .ok_or_else(|| refuse(offset, None, SpendRefusal::CreatesValue))?;
+            // check_transaction bounded every prefix by MAX_MONEY.
+            output_total += output.satoshis;
+            debug_assert!(output_total <= MAX_MONEY);
         }
 
         // One input list and one output list for the transaction, shared by
