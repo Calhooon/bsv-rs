@@ -2,7 +2,7 @@
 //!
 //! A valid BEEF is never refused for its size or its counts. A refusal is for
 //! invalid bytes only, and names them: the offset of the byte and one of
-//! twenty kinds, none of which is a size or a count.
+//! twenty-four kinds, none of which is a size or a count.
 //!
 //! The specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean
 //! (`lean/BeefOfAnySize.lean`, its report `docs/p0/nl-1.md`), which states six
@@ -42,24 +42,17 @@
 //!
 //! # What is and is not the Lean's
 //!
-//! The twenty [`Kind`]s, the offsets and the order of the checks inside one
+//! The twenty-four [`Kind`]s, the offsets and the order of the checks inside one
 //! element are the Lean's. Two things are outside it and say so in the type:
 //!
 //! - Script execution and the value rule are the interpreter's verdict on a
 //!   spend, not a rule about the BEEF's bytes (the Lean leaves them to the
 //!   node). A spend that fails is [`Verdict::SpendRefused`], never one of the
-//!   twenty kinds. [`StreamVerifier::structure_only`] turns the spend
+//!   twenty-four kinds. [`StreamVerifier::structure_only`] turns the spend
 //!   checks off and leaves exactly the Lean's validity.
-//! - A block with only one transaction has a one-leaf BUMP whose root is the
-//!   txid itself. The reference and [`MerklePath`] accept it; the Lean's
-//!   climb refuses it for the sibling it does not have. This reader accepts
-//!   it, at offset 0 only, and that is the one shape it accepts that the Lean
-//!   definition does not.
-//! - The Lean's `readBytes` cuts the whole frame and then steps, so a stream
-//!   with two faults is refused there for the frame's. This reader
-//!   interleaves the frame with the steps and stops at the soonest fault in
-//!   stream order (`0062.md:191`). On a stream with one fault, and on every
-//!   valid stream, the two agree.
+//! - Next-block mining context: P2SH's Genesis era, finality and coinbase
+//!   maturity are spend checks. Missing finality or maturity context yields
+//!   [`Verdict::Unverifiable`], a decline outside the Lean's byte validity.
 //!
 //! # Example
 //!
@@ -106,7 +99,7 @@ pub fn display_hex(hash: &Hash32) -> String {
 // The refusal: invalid bytes, named
 // ---------------------------------------------------------------------------
 
-/// The twenty kinds of refusal, the Lean's `Kind`. None is a size or a
+/// The twenty-four kinds of refusal, the Lean's `Kind`. None is a size or a
 /// count: no byte is wrong by being one of many.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Kind {
@@ -150,18 +143,22 @@ pub enum Kind {
     NoInputs,
     /// A raw transaction with an input and no output (since 0.4.3).
     NoOutputs,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// An unproven single null-outpoint input, at the transaction's leading byte.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:35-38,102 (#68).
     UnprovenCoinbase,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// A null outpoint in a regular transaction, at the input's previous txid.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:31-32,107 (#68).
     NullOutpoint,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// A repeated outpoint, at the repeating input's previous txid.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:108 (#68).
     DuplicateInput,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// An output value or running total outside MoneyRange, at the value field.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:25,88-93 (#68).
     ValueOutOfRange,
 }
 
 impl Kind {
-    /// The twenty kinds, each once, in the Lean's order (`Kind.all`).
+    /// The twenty-four kinds, each once, in the Lean's order (`Kind.all`).
     pub const ALL: [Kind; 24] = [
         Kind::BadVersion,
         Kind::BadVarint,
@@ -293,15 +290,20 @@ pub enum Reason {
     /// named at the transaction's leading byte. The node refuses it beside
     /// one with no input, after it (bsv-script-lean@87f0461
     /// `lean/BsvScript/TxRules.lean:86`, `checkTransactionCommon_voutEmpty`),
-    /// so a transaction with neither is [`Reason::NoInputs`].
+    /// so a transaction with neither is [`Reason::NoInputs`]. An unproven
+    /// coinbase is [`Reason::UnprovenCoinbase`] ahead of this check.
     NoOutputs,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// An unproven single null-outpoint input, at the transaction's leading byte.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:35-38,102 (#68).
     UnprovenCoinbase,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// A null outpoint in a regular transaction, at the input's previous txid.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:31-32,107 (#68).
     NullOutpoint,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// A repeated outpoint, at the repeating input's previous txid.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:108 (#68).
     DuplicateInput,
-    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    /// An output value or running total outside MoneyRange, at the value field.
+    /// \[SRC\] sibling@87f0461 TxRules.lean:25,88-93 (#68).
     ValueOutOfRange,
 }
 
@@ -643,12 +645,11 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
         return Err(Refusal::new(offset, Reason::NoTxidAtLevelZero));
     };
 
-    // The one place this reader accepts what the Lean definition refuses: a
-    // block with only one transaction. Its merkle root is that txid, so its
+    // The Lean's Bump.lone?: a block with only one transaction. Its merkle root is that txid, so its
     // BUMP is one level holding the one leaf at offset 0 and nothing to pair
     // it with (the reference, `ts-stack@edf6e03 MerklePath.ts:345,390-391`;
-    // `MerklePath::from_coinbase_txid` writes this shape). The Lean's climb
-    // asks for a sibling at offset 1 and answers `missingSibling 0 1`.
+    // `MerklePath::from_coinbase_txid` writes this shape). Other lone-leaf
+    // shapes still require their sibling.
     if let [only] = levels {
         if let [Leaf {
             offset: 0,
@@ -1525,9 +1526,9 @@ impl BeefDecoder {
         })))
     }
 
-    /// A transaction and its frame bytes are complete. One with no input or
-    /// no output is refused here, at its leading byte, with or without a
-    /// BUMP index (the Lean's `parseElement`).
+    /// A transaction and its frame bytes are complete. The mining byte
+    /// checks run in the Lean's parseElement order, naming the transaction,
+    /// output value field or input's previous txid.
     fn tx_done(&mut self) -> Result<Element, Refusal> {
         let tx = self.tx.take().expect("a transaction is in hand");
         check_transaction(tx.offset, &tx.inputs, &tx.outputs, tx.bump_index)?;
@@ -1683,12 +1684,10 @@ impl<R: Read> Iterator for BeefStream<R> {
 // The headers
 // ---------------------------------------------------------------------------
 
-/// The headers a verifier holds: per height the active chain's merkle root,
-/// or nothing. No header at a height is fail closed.
 /// Header context for checking mining in the next block (since 0.5.0).
 /// The activation heights belong to the caller's network. After CSV activation,
 /// finality uses median time past; before it the candidate block's time is needed.
-/// [SRC] bsv-script-lean@87f0461 docs/BLOCK-CONSENSUS.md:83-88.
+/// \[SRC\] bsv-script-lean@87f0461 docs/BLOCK-CONSENSUS.md:83-88.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChainTip {
     /// Active chain tip's height.
@@ -1703,6 +1702,8 @@ pub struct ChainTip {
     pub next_block_time: Option<u32>,
 }
 
+/// Active-chain roots and optional mining context. Missing roots fail closed;
+/// missing tip context declines checks that need it.
 pub trait Headers {
     /// The header at `height` carries `root` (wire order).
     fn carries(&self, height: u64, root: &Hash32) -> bool;
@@ -1786,7 +1787,7 @@ fn live_of(outputs: &Option<Box<[Option<Retained>]>>) -> usize {
 
 /// Why a spend was refused. This is the interpreter's verdict on a
 /// transaction, not a rule about the BEEF's bytes, and it is not one of the
-/// twenty [`Kind`]s.
+/// twenty-four [`Kind`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpendRefusal {
     /// The parent is a txid-only entry: its output is not in the BEEF.
@@ -2098,10 +2099,8 @@ impl BeefIndex {
                 bump_index,
                 body,
             } => {
-                // A transaction with no input or no output is no
-                // transaction, with or without a BUMP index. The stream
-                // refuses it as it is read; this holds an element built by
-                // hand to the same rule.
+                // Hand-built elements obey the decoder's mining byte checks
+                // in the same order, even when the index has seen this txid.
                 check_transaction(*offset, &body.inputs, &body.outputs, *bump_index)?;
                 // The Lean's `checkTx`: with a BUMP index, the BUMP carries
                 // the txid and its proof vouches for the inputs; without one,
@@ -2509,7 +2508,7 @@ pub enum Verdict {
         /// order).
         roots: Vec<(u64, Hash32)>,
     },
-    /// The bytes are invalid: the offset of the byte and one of the twenty
+    /// The bytes are invalid: the offset of the byte and one of the twenty-four
     /// kinds.
     Invalid {
         /// The stream offset of the byte the refusal names.
@@ -2520,7 +2519,7 @@ pub enum Verdict {
         reason: Reason,
     },
     /// The BEEF's bytes are well formed up to here and the interpreter
-    /// refused a spend. Not one of the twenty kinds: the verdict is the
+    /// refused a spend. Not one of the twenty-four kinds: the verdict is the
     /// script's, on a transaction. `SpendRefusal::Resource` is a LOCAL
     /// evaluator decline: this spend was not judged invalid.
     SpendRefused {

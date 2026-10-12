@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-12
+
+### Mining checks in the streaming BEEF reader (bsv-stack-lean #68)
+
+The reading is `docs/readings/mining-checks-against-the-reader.md` in
+bsv-stack-lean, sections 1-3. Node rules are cited through
+bsv-script-lean@87f0461 `lean/BsvScript/TxRules.lean:25,31-38,85-110`
+and `docs/BLOCK-CONSENSUS.md:68,83-88`; the latter cites
+bitcoin-sv@879fc8b42 `IsFinalTx` and `COINBASE_MATURITY`.
+
+- Four new exhaustive `Kind` and `Reason` variants, in the decoder and
+  hand-built fold, also under `structure_only`: `UnprovenCoinbase` at the
+  transaction's leading byte (ahead of `NoOutputs`); `NullOutpoint` at
+  the input's previous txid; `DuplicateInput` at the repeating input's
+  previous txid; `ValueOutOfRange` at the output value field that leaves
+  MoneyRange, individually or in running total. The checks use the
+  sibling's order: coinbase, no inputs, no outputs, output values, then
+  null and duplicate outpoints in input order. Proven coinbases remain
+  allowed; the other byte checks apply with a BUMP index too.
+- `Kind::ALL` has 24 entries. `OutputRef` gains public `at: u64`, the
+  absolute value-field offset. Update exhaustive matches and hand-built
+  output literals. These public changes require the minor release 0.5.0.
+- New `SpendRefusal::InputValueOutOfRange` at the input leaving MoneyRange,
+  replacing the overflow `Script` string. The unreachable output overflow
+  branch of `CreatesValue` is removed; a debug assertion records the bound.
+- `Headers::mining_tip() -> Option<ChainTip>` defaults to `None`, and the
+  object-safe async `ChainTracker::mining_tip()` defaults to `Ok(None)`.
+  Existing implementors compile. `ChainTip` carries `height: u32`,
+  `median_time_past: u32`, network `genesis_height: u32` and
+  `csv_height: u32`, and `next_block_time: Option<u32>` for a candidate
+  block before CSV. References forward the synchronous method.
+- `SpendRefusal::P2shOutput { vout }` names the output value field of an
+  exact 23-byte P2SH template in an unproven transaction when the next
+  block is after Genesis. With no tip, the Genesis era defaults to after
+  Genesis. Proven transactions and near-shapes are unchanged.
+- `SpendRefusal::NonFinal { lock_time }` names an unproven transaction's
+  leading byte when the supplied next-block context fails the node's
+  `IsFinalTx`. After CSV time locks use tip median time past; before CSV
+  they need the candidate block time. Zero lock time or all-final
+  sequences need no tip. A caller that never supplies a tip now receives
+  `Verdict::Unverifiable { check: MiningCheck::Finality, .. }` for any
+  nonzero lock time with a non-final sequence. This is a fail-closed
+  decline, never `Invalid` or `NonFinal`; no tip is guessed. The fold
+  returns `Stop::Unverifiable` with the same offset and check.
+- `SpendRefusal::PrematureCoinbase { height }` names the spending input
+  when a verified coinbase is fewer than 100 blocks old at the next
+  block. With no tip the reader declines with
+  `Unverifiable { check: MiningCheck::CoinbaseMaturity, .. }`.
+  Verified coinbase heights survive retention and cursor round trips.
+  Cursors now use `BSC2`; `BSC1` lacks maturity evidence and is rejected.
+  Restart old cursors from the beginning of their BEEF.
+- Contextual spend checks run only in full mode on unproven transactions.
+  `ParentIsTxidOnly`, `OutputNotAvailable`, `Script` and `CreatesValue`
+  are unchanged otherwise. Cross-transaction respend stays
+  `OutputNotAvailable`; a repeat within one transaction is now invalid
+  bytes. Script evaluation keeps the TypeScript default mode; spend-era
+  flags and confiscation rules remain the sibling's separate work.
+
+### Notes - cross-SDK parity
+
+Intentional differences from ts-stack@edf6e03: the node's output checks
+precede duplicate inputs; the reader also checks P2SH, mining finality and
+coinbase maturity. Against go-sdk@v1.7.2, a missing tip is an explicit
+unverifiable decline, including a GullibleHeadersClient-style absence,
+not a guessed height or an invalid transaction. With a tip the SV node's
+block path decides finality, including the pre-CSV candidate block time.
+The boundary and refusal-offset witnesses are `tests/beef_stream.rs`;
+`tests/mining_tip_api.rs` checks default and reference compatibility.
+
 ## [0.4.5] - 2026-10-12
 
 Two rules of bsv-stack-lean L2: the lone leaf at offset 0 only (the owner's `offset 0`; PR #51) and a LOCAL work bound inside one input's script (LOW's R404-H1, bsv-stack-lean #75 B; PR #52). No verdict moves under the defaults.
