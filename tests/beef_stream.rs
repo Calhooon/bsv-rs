@@ -298,8 +298,8 @@ fn chain(n: usize, atomic: bool) -> Chain {
 #[test]
 fn the_twenty_kinds_are_twenty_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 22);
-    assert_eq!(all.len(), 22);
+    assert_eq!(Kind::ALL.len(), 23);
+    assert_eq!(all.len(), 23);
 }
 
 #[test]
@@ -2209,4 +2209,34 @@ fn mining_row5a_null_outpoint() {
         false,
     );
     mining_invalid(&bytes, &headers, offsets[1] + 46, "NullOutpoint");
+}
+
+#[test]
+fn mining_row6b_duplicate_structure_only() {
+    let f = mining_parent_id();
+    let (bytes, offsets, headers) =
+        mining_child(&[(f, 0, &[]), (f, 0, &[])], &[(1, OP_TRUE)], false);
+    match structure(&bytes, &headers) {
+        Verdict::Invalid { offset, kind, .. } => assert_eq!(
+            (offset, format!("{kind:?}")),
+            (offsets[1] + 46, "DuplicateInput".into())
+        ),
+        other => panic!("expected DuplicateInput, got {other:?}"),
+    }
+}
+
+#[test]
+fn mining_row6c_duplicate_input() {
+    let f = mining_parent_id();
+    let (bytes, offsets, headers) =
+        mining_child(&[(f, 0, &[]), (f, 0, &[])], &[(1, OP_TRUE)], true);
+    mining_invalid(&bytes, &headers, offsets[1] + 46, "DuplicateInput");
+}
+
+#[test]
+fn mining_row6a_duplicate_input() {
+    let f = mining_parent_id();
+    let (bytes, offsets, headers) =
+        mining_child(&[(f, 0, &[]), (f, 0, &[])], &[(1, OP_TRUE)], false);
+    mining_invalid(&bytes, &headers, offsets[1] + 46, "DuplicateInput");
 }
