@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-10-12
+
+Two rules of bsv-stack-lean L2: the lone leaf at offset 0 only (the owner's `offset 0`; PR #51) and a LOCAL work bound inside one input's script (LOW's R404-H1, bsv-stack-lean #75 B; PR #52). No verdict moves under the defaults.
+
 ### Fixed
 
 - `MerklePath` refuses a one-level proof holding one hashed leaf at a
