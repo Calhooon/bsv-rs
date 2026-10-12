@@ -109,6 +109,12 @@ pub trait ChainTracker: Send + Sync {
     ///
     /// The current block height.
     async fn current_height(&self) -> Result<u32, ChainTrackerError>;
+
+    /// Active tip, median time past and network activation heights for the streaming reader.
+    /// Existing trackers default to no contextual evidence; current_height alone is insufficient.
+    async fn mining_tip(&self) -> Result<Option<super::beef_stream::ChainTip>, ChainTrackerError> {
+        Ok(None)
+    }
 }
 
 /// A mock chain tracker for testing purposes.
