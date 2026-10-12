@@ -117,6 +117,7 @@ fn main() {
         input_sequence: 0xffff_ffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
     assert!(spend.validate().unwrap());
 
@@ -137,6 +138,7 @@ fn main() {
         input_sequence: 0xffff_ffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
     let err = refused.validate().unwrap_err();
     assert!(!err.is_resource_limit());
@@ -164,6 +166,7 @@ fn main() {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         })
     };
     assert!(untidy().validate().is_err());

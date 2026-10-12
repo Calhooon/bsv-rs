@@ -28,6 +28,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   holding a nonzero lone-leaf proof must obtain a valid proof; its offset
   must not be rewritten on trust. No public type changes.
 
+### Added: a LOCAL work bound inside one input's script
+
+LOW's R404-H1 on the relay's 0.4.4 (bsv-stack-lean #75 B): the clock of
+0.4.4 pauses between inputs, but one input with many original-digest
+signature checks hashes its wide transaction repeatedly before that clock
+is asked again. `SpendParams` and `TxSpendParams` now take
+`work_limit: Option<u64>`. The default `None` preserves every verdict and
+runs without calculating hash costs. Under `Some(n)`, each reached opcode
+costs one unit plus the bytes hashed: the signature's serialized preimage,
+the 32-byte intermediate of a double hash, and BIP-143 midstates only when
+the shared cache does not cover them (SINGLE outputs are not cached).
+Every charge precedes its work; an exhausted budget is
+`ScriptResource::Work`, a LOCAL evaluator decline, never an invalid script.
+`ScriptResourceLimit` carries `work_spent: Some(n)` for Work, the budget and
+the attempted charge as `u64` on native and wasm32. Memory resources keep
+their byte counts, now `u64`, and have `work_spent: None`.
+
+`StreamVerifier::set_work_limit` and `AsyncStreamVerifier::set_work_limit`
+set that bound per input. The reader returns
+`SpendRefusal::Resource(ScriptResourceLimit)` at the named input, preserving
+memory declines too. The cursor's bytes and `step_until`'s between-input
+pause are unchanged: reapply the local budget after `resume`. A declined
+Spend stays declined until `reset`; no within-script resume is introduced.
+This is a work bound, not a wall clock: parsing, allocation, arithmetic and
+curve verification are not measured in hash bytes.
+
+The witness is `tests/script_work_budget.rs`: one 1 MB subject input with
+10,000 valid original-digest checks, declined within its script under the
+budget; the identical body under an ample budget keeps its verdict. It
+also pins hash charging, exact boundaries, CHECKMULTISIG propagation, a
+wrong digest's unchanged refusal, and the reader's named decline. The
+explicit native release control measures 1,000 and 10,000 checks. No
+version bump here; the release joins this lane and L2-offset0.
+
+Migration: add `work_limit: None` to spend parameter literals and
+`work_spent: None` to memory resource literals; resource byte fields are
+`u64`. Match the new `ScriptResource::Work` and `SpendRefusal::Resource`
+variants as local declines before interpreting validity.
+
+### Notes: cross-SDK parity
+
+The opt-in work budget is this crate's local evaluator contract, extending
+the TS SDK's memory resource distinction (`ts-stack@edf6e03`,
+`ScriptResourceLimitError.ts`). It changes no wire format, digest or node
+rule. The default evaluation keeps the existing reference verdicts.
+
 ## [0.4.4] - 2026-10-10
 
 The spend of an unproven transaction is linear in its inputs, and the reader

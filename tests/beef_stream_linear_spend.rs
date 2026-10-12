@@ -296,6 +296,7 @@ fn a_shared_spend_of_an_input_the_transaction_has_not_is_an_error() {
             locking_script: LockingScript::from_binary(&[OP_TRUE]).unwrap(),
             unlocking_script: UnlockingScript::from_binary(&[]).unwrap(),
             memory_limit: None,
+            work_limit: None,
         })
     };
     assert!(spend(0).unwrap().validate().unwrap());

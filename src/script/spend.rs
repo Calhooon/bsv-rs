@@ -55,6 +55,17 @@
 //! script was not judged. A caller that judges validity branches on it first
 //! and never reads a decline as invalid.
 //!
+//! # The work budget
+//!
+//! `work_limit: Some(n)` bounds one input's evaluation: one unit per opcode
+//! reached (including skipped branches), plus each byte fed to a hash. Double
+//! SHA-256 and HASH160 include the 32-byte intermediate; sighashes include the
+//! serialized preimage and uncached BIP-143 midstates. Every charge precedes
+//! its work. Overflow declines, and charged work never exceeds the budget.
+//! `None` preserves the unbounded evaluation. This is a local resource bound,
+//! not a clock or a node rule: parsing, allocation, arithmetic and EC costs
+//! are not byte-hash measurements. A declined spend must be reset to run again.
+//!
 //! # Example
 //!
 //! ```rust,ignore
@@ -73,6 +84,7 @@
 //!     input_sequence: 0xffffffff,
 //!     lock_time: 0,
 //!     memory_limit: None,
+//!     work_limit: None,
 //! });
 //!
 //! let valid = spend.validate()?;
@@ -182,6 +194,10 @@ pub struct SpendParams {
     /// ([`Spend::memory_limit`]). `Some(usize::MAX)` under the block word models
     /// a node run with `-maxstackmemoryusageconsensus=0`.
     pub memory_limit: Option<usize>,
+    /// LOCAL work budget: one unit per opcode plus bytes hashed (both rounds
+    /// of double hashes and uncached sighash midstates). `None` is unbounded.
+    /// Exhaustion is `ScriptResource::Work`, never a validity verdict.
+    pub work_limit: Option<u64>,
 }
 
 /// Parameters for a spend of one input of a transaction whose input and
@@ -202,6 +218,10 @@ pub struct TxSpendParams {
     pub unlocking_script: UnlockingScript,
     /// As [`SpendParams::memory_limit`].
     pub memory_limit: Option<usize>,
+    /// LOCAL work budget: one unit per opcode plus bytes hashed (both rounds
+    /// of double hashes and uncached sighash midstates). `None` is unbounded.
+    /// Exhaustion is `ScriptResource::Work`, never a validity verdict.
+    pub work_limit: Option<u64>,
 }
 
 // ============================================================================
@@ -233,6 +253,9 @@ pub struct Spend {
     /// `SpendParams::memory_limit`; `None` selects the mode's figure
     /// ([`Spend::memory_limit`]).
     memory_limit: Option<usize>,
+    work_limit: Option<u64>,
+    work_spent: u64,
+    work_declined: Option<u64>,
     stack_mem: usize,
     alt_stack_mem: usize,
     /// Under a word, the node's stack memory count: ONE budget over the main
@@ -323,6 +346,7 @@ impl Spend {
             params.locking_script,
             params.unlocking_script,
             params.memory_limit,
+            params.work_limit,
         )
     }
 
@@ -356,9 +380,11 @@ impl Spend {
             params.locking_script,
             params.unlocking_script,
             params.memory_limit,
+            params.work_limit,
         ))
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn from_parts(
         transaction: Arc<TxSighashCache>,
         input_index: usize,
@@ -367,6 +393,7 @@ impl Spend {
         locking_script: LockingScript,
         unlocking_script: UnlockingScript,
         memory_limit: Option<usize>,
+        work_limit: Option<u64>,
     ) -> Self {
         let transaction_version = transaction.version();
         let mut spend = Self {
@@ -387,6 +414,9 @@ impl Spend {
             alt_stack: Vec::new(),
             if_stack: Vec::new(),
             memory_limit,
+            work_limit,
+            work_spent: 0,
+            work_declined: None,
             stack_mem: 0,
             alt_stack_mem: 0,
             node_mem: 0,
@@ -599,6 +629,8 @@ impl Spend {
         self.stack_mem = 0;
         self.alt_stack_mem = 0;
         self.node_mem = 0;
+        self.work_spent = 0;
+        self.work_declined = None;
     }
 
     /// Validates the spend by executing both scripts.
@@ -667,6 +699,9 @@ impl Spend {
     ///
     /// `Ok(true)` if execution should continue, `Ok(false)` if the script is complete.
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError> {
+        if let Some(attempted) = self.work_declined {
+            return Err(self.work_error(attempted));
+        }
         // Check memory limits — a LOCAL budget, reported as a resource limit
         // (the reference's `ScriptResourceLimitError`), never as a verdict on
         // the script. The default mode's, each stack apart; under a word every
@@ -716,6 +751,7 @@ impl Spend {
             return Ok(false);
         }
 
+        self.charge_work(1)?;
         let op_owned = match self.context {
             ExecutionContext::UnlockingScript => {
                 self.unlocking_chunks[self.program_counter].clone()
@@ -1674,6 +1710,7 @@ impl Spend {
                     );
                 }
                 let buf = self.pop_stack()?;
+                self.charge_work(buf.len() as u64)?;
                 let hash = ripemd160(&buf);
                 self.push_stack(hash.to_vec())?;
             }
@@ -1684,6 +1721,7 @@ impl Spend {
                     );
                 }
                 let buf = self.pop_stack()?;
+                self.charge_work(buf.len() as u64)?;
                 let hash = sha1(&buf);
                 self.push_stack(hash.to_vec())?;
             }
@@ -1694,6 +1732,7 @@ impl Spend {
                     );
                 }
                 let buf = self.pop_stack()?;
+                self.charge_work(buf.len() as u64)?;
                 let hash = sha256(&buf);
                 self.push_stack(hash.to_vec())?;
             }
@@ -1704,6 +1743,7 @@ impl Spend {
                     );
                 }
                 let buf = self.pop_stack()?;
+                self.charge_work(buf.len() as u64 + 32)?;
                 let hash = hash160(&buf);
                 self.push_stack(hash.to_vec())?;
             }
@@ -1714,6 +1754,7 @@ impl Spend {
                     );
                 }
                 let buf = self.pop_stack()?;
+                self.charge_work(buf.len() as u64 + 32)?;
                 let hash = sha256d(&buf);
                 self.push_stack(hash.to_vec())?;
             }
@@ -1925,8 +1966,7 @@ impl Spend {
             let sig_valid = if sig_bytes.is_empty() {
                 false
             } else {
-                self.verify_signature(sig_bytes, pubkey_bytes, &subscript)
-                    .unwrap_or(false)
+                self.verify_signature(sig_bytes, pubkey_bytes, &subscript)?
             };
 
             if sig_valid {
@@ -2318,7 +2358,7 @@ impl Spend {
     }
 
     fn verify_signature(
-        &self,
+        &mut self,
         sig_bytes: &[u8],
         pubkey_bytes: &[u8],
         subscript: &Script,
@@ -2339,9 +2379,16 @@ impl Spend {
         // for a FORKID type without the CHRONICLE bit, the original digest
         // otherwise (Calhooon/bsv-rs#22). The BIP143 midstates are the
         // transaction's, shared by every input's spend (bsv-low #591).
+        let script_bytes = subscript.to_binary();
+        if self.work_limit.is_some() {
+            let cost =
+                self.transaction
+                    .hashing_work(self.input_index, &script_bytes, tx_sig.scope());
+            self.charge_work(cost)?;
+        }
         let sighash = self.transaction.sighash_dispatched_for_signing(
             self.input_index,
-            &subscript.to_binary(),
+            &script_bytes,
             self.source_satoshis,
             tx_sig.scope(),
         );
@@ -2504,13 +2551,15 @@ impl Spend {
             ScriptResource::Stack => "Stack memory usage",
             ScriptResource::AltStack => "Alt stack memory usage",
             ScriptResource::ElementSize => "Script element allocation",
+            ScriptResource::Work => "Work",
         };
         let limit = self.memory_limit();
         self.error(&format!("{label} has exceeded {limit} bytes"))
             .with_resource_limit(ScriptResourceLimit {
                 resource,
-                limit,
-                attempted,
+                limit: limit as u64,
+                attempted: attempted as u64,
+                work_spent: None,
             })
     }
 
@@ -2568,6 +2617,43 @@ impl Spend {
         self.error(&format!(
             "Script number overflow: {len} bytes, the limit is {max} bytes."
         ))
+    }
+
+    /// Work charged in this evaluation when a work budget is configured.
+    /// Unbounded evaluations do not calculate hash costs.
+    pub fn work_spent(&self) -> u64 {
+        self.work_spent
+    }
+
+    fn charge_work(&mut self, cost: u64) -> Result<(), ScriptEvaluationError> {
+        let Some(limit) = self.work_limit else {
+            return Ok(());
+        };
+        match self.work_spent.checked_add(cost) {
+            Some(next) if next <= limit => {
+                self.work_spent = next;
+                Ok(())
+            }
+            attempted => {
+                let attempted = attempted.unwrap_or(u64::MAX);
+                self.work_declined = Some(attempted);
+                Err(self.work_error(attempted))
+            }
+        }
+    }
+
+    fn work_error(&self, attempted: u64) -> ScriptEvaluationError {
+        let limit = self.work_limit.unwrap_or(u64::MAX);
+        self.error(&format!(
+            "Work budget exhausted: spent {} units, budget {limit}",
+            self.work_spent
+        ))
+        .with_resource_limit(ScriptResourceLimit {
+            resource: ScriptResource::Work,
+            limit,
+            attempted,
+            work_spent: Some(self.work_spent),
+        })
     }
 
     // ========================================================================
@@ -2777,6 +2863,7 @@ mod tests {
             input_sequence: 0xffffffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
 
         let result = spend.validate();
@@ -2803,6 +2890,7 @@ mod tests {
             input_sequence: 0xffffffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
 
         let result = spend.validate();
@@ -2830,6 +2918,7 @@ mod tests {
             input_sequence: 0xffffffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
 
         let result = spend.validate();
@@ -2855,6 +2944,7 @@ mod tests {
             input_sequence: 0xffffffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
 
         let result = spend.validate();
@@ -2890,6 +2980,7 @@ mod flag_tests {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         })
     }
 
@@ -3043,6 +3134,7 @@ mod flag_tests {
             input_sequence: ours.sequence,
             lock_time: s.transaction.locktime(),
             memory_limit: s.memory_limit,
+            work_limit: None,
         }
     }
 
@@ -3216,6 +3308,7 @@ mod chronicle_tests {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         })
     }
 
@@ -3310,6 +3403,7 @@ mod chronicle_tests {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: Some(1000),
+            work_limit: None,
         });
         let err = s.validate().unwrap_err();
         assert!(err.is_resource_limit(), "{}", err.message);
@@ -3576,6 +3670,7 @@ mod chronicle_tests {
             input_sequence: ours.sequence,
             lock_time: s.transaction.locktime(),
             memory_limit: s.memory_limit,
+            work_limit: None,
         }
     }
 }
@@ -3625,6 +3720,7 @@ mod low_s_order_tests {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         })
     }
 
@@ -3677,6 +3773,7 @@ mod low_s_order_tests {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
         spend.set_flags(ScriptFlags::block(
             crate::script::flags::ProtocolEra::PostChronicle,
@@ -3758,6 +3855,7 @@ mod script_num_length_tests {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: Some(200_000_000),
+            work_limit: None,
         })
     }
 
@@ -4111,6 +4209,7 @@ mod fixed_width_operand_tests {
             input_sequence: u32::MAX,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
         s.set_flags(if standard {
             ScriptFlags::standard(ProtocolEra::PostChronicle)

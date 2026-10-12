@@ -81,6 +81,7 @@ fn spend(
         input_sequence: input.sequence,
         lock_time: tx.locktime,
         memory_limit: None,
+        work_limit: None,
     });
     match mode {
         Mode::Block => s.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle)),

@@ -79,6 +79,7 @@ fn run(w: &Witness, mode: Mode) -> Result<bool, String> {
         input_sequence: input.sequence,
         lock_time: tx.locktime,
         memory_limit: None,
+        work_limit: None,
     });
     if mode == Mode::Block {
         spend.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle));
