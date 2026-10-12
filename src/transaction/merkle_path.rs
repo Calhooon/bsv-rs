@@ -1316,17 +1316,42 @@ mod linear_root_equivalence_tests {
             .collect()
     }
 
+    // The legacy routines above remain verbatim. The owner's L2-offset0
+    // ruling intentionally changes their successful nonzero lone-leaf answer;
+    // every other answer, including a missing requested txid, stays identical.
+    fn expected_after_lone_leaf_ruling<T>(
+        path: &[Vec<MerklePathLeaf>],
+        legacy: Result<T>,
+    ) -> Result<T> {
+        legacy.and_then(|value| {
+            if let [level] = path {
+                if let [leaf] = level.as_slice() {
+                    if leaf.hash.is_some() && leaf.offset != 0 {
+                        return Err(crate::Error::MerklePathError(format!(
+                            "MissingSibling {{ level: 0, offset: {} }}",
+                            leaf.offset ^ 1
+                        )));
+                    }
+                }
+            }
+            Ok(value)
+        })
+    }
+
     // ---- the differentials ----
 
     #[test]
-    fn the_root_check_accepts_and_refuses_exactly_as_the_rescan_did() {
+    fn the_root_check_matches_the_rescan_except_the_ruled_lone_leaf() {
         let mut rng = StdRng::seed_from_u64(0x5c);
         let (mut accepted, mut refused) = (0, 0);
         for round in 0..1500 {
             let path = random_path(&mut rng);
             for legal_offsets_only in [false, true] {
                 let new = MerklePath::new_internal(800_000, path.clone(), legal_offsets_only);
-                let old = legacy_new_internal(800_000, path.clone(), legal_offsets_only);
+                let old = expected_after_lone_leaf_ruling(
+                    &path,
+                    legacy_new_internal(800_000, path.clone(), legal_offsets_only),
+                );
                 assert_eq!(
                     outcome(&new),
                     outcome(&old),
@@ -1344,7 +1369,7 @@ mod linear_root_equivalence_tests {
     }
 
     #[test]
-    fn compute_root_answers_exactly_as_the_rescan_did() {
+    fn compute_root_matches_the_rescan_except_the_ruled_lone_leaf() {
         let mut rng = StdRng::seed_from_u64(0x5c5c);
         let (mut answered, mut erred) = (0, 0);
         for round in 0..1000 {
@@ -1359,7 +1384,9 @@ mod linear_root_equivalence_tests {
                 path,
             };
             let new = roots(&mp, |mp, txid| mp.compute_root(txid));
-            let old = roots(&mp, legacy_compute_root);
+            let old = roots(&mp, |mp, txid| {
+                expected_after_lone_leaf_ruling(&mp.path, legacy_compute_root(mp, txid))
+            });
             assert_eq!(new, old, "round {round}: {:?}", mp.path);
             for answer in &new {
                 if answer.starts_with("Ok") {
@@ -1374,7 +1401,7 @@ mod linear_root_equivalence_tests {
     }
 
     #[test]
-    fn the_parse_of_the_wire_bytes_matches_the_rescan() {
+    fn the_parse_matches_the_rescan_except_the_ruled_lone_leaf() {
         let mut rng = StdRng::seed_from_u64(0x0335);
         let mut parsed = 0;
         for round in 0..1000 {
@@ -1412,7 +1439,10 @@ mod linear_root_equivalence_tests {
                 }
                 Ok(path)
             };
-            let old = legacy_read().and_then(|path| legacy_new_internal(800_000, path, false));
+            let old = legacy_read().and_then(|path| {
+                let legacy = legacy_new_internal(800_000, path.clone(), false);
+                expected_after_lone_leaf_ruling(&path, legacy)
+            });
             assert_eq!(outcome(&new), outcome(&old), "round {round}");
             if let (Ok(new), Ok(old)) = (&new, &old) {
                 assert_eq!(
