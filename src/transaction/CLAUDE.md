@@ -305,7 +305,7 @@ impl MerklePath {
 }
 ```
 
-Validation in `new()`: level 0 non-empty, no duplicate offsets, legal higher-level offsets, all txids compute same root.
+Validation in `new()`: level 0 non-empty, no duplicate offsets, legal higher-level offsets, all txids compute same root. A one-level lone hashed leaf is valid only at offset 0; parsing and `compute_root` share this rule in `RootWalker`, refusing other offsets with `MissingSibling` and the missing sibling's level and offset. TS returns the txid at any offset (`ts-stack@edf6e03 MerklePath.ts:345,390-391`); this divergence follows the BEEF reader and the owner's offset-0 ruling.
 
 ## BEEF Format (BRC-62/95/96)
 

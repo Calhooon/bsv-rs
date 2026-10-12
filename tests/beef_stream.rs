@@ -1622,7 +1622,15 @@ fn the_whole_path_walks_a_wide_bump_in_linear_time() {
 /// names (`verify_structure`), or a parse refusal's message. `verify_valid`
 /// says the same under both values of the txid-only flag.
 fn whole(bytes: &[u8]) -> Result<HashMap<u32, String>, String> {
-    let mut beef = Beef::from_binary(bytes).map_err(|e| e.to_string())?;
+    let mut beef = Beef::from_binary(bytes).map_err(|e| match e {
+        // MerklePath now refuses this shape during parse, before verify_structure.
+        bsv_rs::Error::MerklePathError(ref message)
+            if message == "MissingSibling { level: 0, offset: 0 }" =>
+        {
+            format!("{:?}", Kind::MissingSibling)
+        }
+        _ => e.to_string(),
+    })?;
     let answer = beef.verify_structure().map_err(|k| format!("{k:?}"));
     for allow in [false, true] {
         let r = Beef::from_binary(bytes).unwrap().verify_valid(allow);
