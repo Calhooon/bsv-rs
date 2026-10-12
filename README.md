@@ -43,7 +43,7 @@ script. The implementation is [src/transaction/beef_stream.rs](src/transaction/b
 
 Script defaults follow SDK evaluation mode; callers modelling node validation
 select explicit `ScriptFlags` and interpret resource limits separately from
-validity. The flag and resource witnesses live in [tests](tests).
+validity. The flag and resource witnesses live in [tests](./tests).
 
 ## The node's mining checks
 
@@ -77,7 +77,7 @@ from tags. [CHANGELOG.md](CHANGELOG.md) holds release and API migration notes.
 
 ## Examples
 
-The blocks below are the files in [examples](examples), checked byte for byte
+The blocks below are the files in [examples](./examples), checked byte for byte
 by [tests/readme_examples.rs](tests/readme_examples.rs). Building them does not
 run their network or signing operations. Network examples require a host's
 own configuration and authorization.
@@ -471,4 +471,4 @@ More: BRC-103 over HTTP or Socket.IO (`auth`, `socketio`), the wallet wire proto
 
 ## License
 
-Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
+Licensed under [MIT](./LICENSE-MIT) or [Apache-2.0](./LICENSE-APACHE).
