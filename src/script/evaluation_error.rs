@@ -45,6 +45,8 @@ pub enum ScriptResource {
     /// operand, the numeric left shift's result), refused BEFORE the
     /// allocation, in the default mode.
     ElementSize,
+    /// A LOCAL bound on opcode steps and bytes hashed, never a script verdict.
+    Work,
 }
 
 impl fmt::Display for ScriptResource {
@@ -53,6 +55,7 @@ impl fmt::Display for ScriptResource {
             ScriptResource::Stack => write!(f, "stack"),
             ScriptResource::AltStack => write!(f, "alt-stack"),
             ScriptResource::ElementSize => write!(f, "element-size"),
+            ScriptResource::Work => write!(f, "work"),
         }
     }
 }
@@ -62,8 +65,12 @@ impl fmt::Display for ScriptResource {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScriptResourceLimit {
     pub resource: ScriptResource,
-    pub limit: usize,
-    pub attempted: usize,
+    /// Budget in bytes for memory resources, units for work.
+    pub limit: u64,
+    /// Usage the refused operation would require (saturated on overflow).
+    pub attempted: u64,
+    /// Work already charged, only for `Work`; always at or below `limit`.
+    pub work_spent: Option<u64>,
 }
 
 #[derive(Debug, Clone)]

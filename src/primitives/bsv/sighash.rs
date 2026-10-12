@@ -237,6 +237,19 @@ pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction> {
     })
 }
 
+fn varint_size(n: u64) -> u64 {
+    match n {
+        0..=0xfc => 1,
+        0xfd..=0xffff => 3,
+        0x10000..=0xffffffff => 5,
+        _ => 9,
+    }
+}
+
+fn output_size(output: &TxOutput) -> u64 {
+    8 + varint_size(output.script.len() as u64) + output.script.len() as u64
+}
+
 // ============================================================================
 // Sighash Computation
 // ============================================================================
@@ -679,16 +692,19 @@ pub struct TxSighashCache {
     hash_prevouts: OnceLock<[u8; 32]>,
     hash_sequence: OnceLock<[u8; 32]>,
     hash_outputs_all: OnceLock<[u8; 32]>,
+    output_bytes: u64,
 }
 
 impl TxSighashCache {
     /// The cache over a transaction's parts; no midstate is computed yet.
     pub fn new(version: i32, inputs: Vec<TxInput>, outputs: Vec<TxOutput>, locktime: u32) -> Self {
+        let output_bytes = outputs.iter().map(output_size).sum();
         Self {
             version,
             inputs,
             outputs,
             locktime,
+            output_bytes,
             hash_prevouts: OnceLock::new(),
             hash_sequence: OnceLock::new(),
             hash_outputs_all: OnceLock::new(),
@@ -750,6 +766,74 @@ impl TxSighashCache {
         } else {
             compute_hash_outputs(&self.outputs, input_index, scope)
         }
+    }
+
+    /// Bytes the dispatched digest will hash, counted BEFORE hashing. Each
+    /// double hash includes its 32-byte second SHA-256 input. Shared BIP-143
+    /// cache hits cost zero; SINGLE outputs are not cached by this cache.
+    /// A concurrent cache fill may make this reservation conservative.
+    pub(crate) fn hashing_work(&self, input_index: usize, subscript: &[u8], scope: u32) -> u64 {
+        let base = scope & SIGHASH_BASE_MASK;
+        let anyone = scope & SIGHASH_ANYONECANPAY != 0;
+        if scope & SIGHASH_FORKID == 0 || scope & SIGHASH_CHRONICLE != 0 {
+            if input_index >= self.inputs.len()
+                || (base == SIGHASH_SINGLE && input_index >= self.outputs.len())
+            {
+                return 0; // The constant one, no hash.
+            }
+            let n_inputs = if anyone { 1 } else { self.inputs.len() as u64 };
+            let n_outputs = match base {
+                SIGHASH_NONE => 0,
+                SIGHASH_SINGLE => input_index as u64 + 1,
+                _ => self.outputs.len() as u64,
+            };
+            // Exactly the bytes write_script_code_original writes, including
+            // its declared length prefix on a truncated push.
+            let mut separators = 0;
+            let mut pc = 0;
+            loop {
+                let (op, next) = get_op(subscript, pc);
+                pc = next;
+                match op {
+                    Some(0xab) => separators += 1,
+                    Some(_) => {}
+                    None => break,
+                }
+            }
+            let script_bytes =
+                varint_size((subscript.len() - separators) as u64) + (pc - separators) as u64;
+            let outputs = match base {
+                SIGHASH_NONE => 0,
+                SIGHASH_SINGLE => input_index as u64 * 9 + output_size(&self.outputs[input_index]),
+                _ => self.output_bytes,
+            };
+            return 12 + varint_size(n_inputs) + n_inputs * 41 - 1
+                + script_bytes
+                + varint_size(n_outputs)
+                + outputs
+                + 32;
+        }
+        let mut bytes = 156 + varint_size(subscript.len() as u64) + subscript.len() as u64 + 32;
+        if !anyone && self.hash_prevouts.get().is_none() {
+            bytes += self.inputs.len() as u64 * 36 + 32;
+        }
+        if !anyone
+            && base != SIGHASH_SINGLE
+            && base != SIGHASH_NONE
+            && self.hash_sequence.get().is_none()
+        {
+            bytes += self.inputs.len() as u64 * 4 + 32;
+        }
+        if base != SIGHASH_SINGLE && base != SIGHASH_NONE {
+            if self.hash_outputs_all.get().is_none() {
+                bytes += self.output_bytes + 32;
+            }
+        } else if base == SIGHASH_SINGLE {
+            if let Some(output) = self.outputs.get(input_index) {
+                bytes += output_size(output) + 32;
+            }
+        }
+        bytes
     }
 
     /// The digest a signature over input `input_index` must verify against,
@@ -1341,6 +1425,80 @@ mod tests {
             shared.sighash_dispatched_for_signing(7, &CACHE_TEST_LOCK, 1, SIGHASH_ALL),
             SIGHASH_ONE
         );
+    }
+
+    #[test]
+    fn work_reservation_matches_serialized_hash_inputs_every_scope() {
+        let tx = cache_test_tx(3, 2);
+        // Separators in opcode position, in pushes, and truncated pushes.
+        for code in [
+            vec![0xab, 1, 0xab, 0x51],
+            vec![0x4c],
+            vec![0x4d, 2, 0, 7],
+            vec![],
+        ] {
+            for scope in 0..=255 {
+                for index in 0..tx.inputs.len() {
+                    let cache = TxSighashCache::new(
+                        tx.version,
+                        tx.inputs.clone(),
+                        tx.outputs.clone(),
+                        tx.locktime,
+                    );
+                    let params = SighashParams {
+                        version: tx.version,
+                        inputs: &tx.inputs,
+                        outputs: &tx.outputs,
+                        locktime: tx.locktime,
+                        input_index: index,
+                        subscript: &code,
+                        satoshis: 1,
+                        scope,
+                    };
+                    let original = scope & SIGHASH_FORKID == 0 || scope & SIGHASH_CHRONICLE != 0;
+                    let base = scope & SIGHASH_BASE_MASK;
+                    let preimage = if original {
+                        if base == SIGHASH_SINGLE && index >= tx.outputs.len() {
+                            0
+                        } else {
+                            build_sighash_preimage_original(&params).len() as u64 + 32
+                        }
+                    } else {
+                        build_sighash_preimage(&params).len() as u64 + 32
+                    };
+                    let mut expected = preimage;
+                    if !original {
+                        if scope & SIGHASH_ANYONECANPAY == 0 {
+                            expected += tx.inputs.len() as u64 * 36 + 32;
+                            if base != SIGHASH_NONE && base != SIGHASH_SINGLE {
+                                expected += tx.inputs.len() as u64 * 4 + 32;
+                            }
+                        }
+                        if base != SIGHASH_NONE && base != SIGHASH_SINGLE {
+                            expected += tx.outputs.iter().map(output_size).sum::<u64>() + 32;
+                        } else if base == SIGHASH_SINGLE && index < tx.outputs.len() {
+                            expected += output_size(&tx.outputs[index]) + 32;
+                        }
+                    }
+                    assert_eq!(
+                        cache.hashing_work(index, &code, scope),
+                        expected,
+                        "cold {scope:#x} {index}"
+                    );
+                    cache.sighash_dispatched_for_signing(index, &code, 1, scope);
+                    let warm = if !original && base == SIGHASH_SINGLE && index < tx.outputs.len() {
+                        preimage + output_size(&tx.outputs[index]) + 32
+                    } else {
+                        preimage
+                    };
+                    assert_eq!(
+                        cache.hashing_work(index, &code, scope),
+                        warm,
+                        "warm {scope:#x} {index}"
+                    );
+                }
+            }
+        }
     }
 
     /// Every scope class (ALL/NONE/SINGLE × ANYONECANPAY, FORKID set, plus

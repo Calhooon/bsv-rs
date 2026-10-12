@@ -1969,6 +1969,7 @@ impl Transaction {
                         crate::script::Script::from_binary(&unlocking_script.to_binary())?,
                     ),
                     memory_limit: None,
+                    work_limit: None,
                 })?;
 
                 spend.validate().map_err(|e| {

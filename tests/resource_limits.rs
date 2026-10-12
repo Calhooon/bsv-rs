@@ -22,6 +22,7 @@ fn spend(lock: Script, unlock: Script, memory_limit: usize) -> Spend {
         input_sequence: 0xffff_ffff,
         lock_time: 0,
         memory_limit: Some(memory_limit),
+        work_limit: None,
     })
 }
 

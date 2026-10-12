@@ -1701,6 +1701,8 @@ pub enum SpendRefusal {
     },
     /// The script interpreter refused the spend.
     Script(String),
+    /// The evaluator declined on a LOCAL resource, never an invalid script.
+    Resource(crate::script::ScriptResourceLimit),
     /// The transaction's outputs are worth more than its inputs.
     CreatesValue,
 }
@@ -1922,7 +1924,7 @@ impl BeefIndex {
 
     /// A transaction or a txid-only entry.
     fn fold_checked(&mut self, element: &Element) -> Result<(), Stop> {
-        self.fold_checked_from(element, 0, &mut || false)
+        self.fold_checked_from(element, 0, &mut || false, None)
             .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))
     }
 
@@ -1934,6 +1936,7 @@ impl BeefIndex {
         element: &Element,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
     ) -> Result<Option<u32>, Stop> {
         match element {
             Element::Bump(_) => unreachable!("a BUMP is folded with its header answer"),
@@ -2007,7 +2010,7 @@ impl BeefIndex {
                 if self.check_spends && !seen {
                     if bump_index.is_none() {
                         if let Some(next) =
-                            self.check_spends_of(*offset, txid, body, from, spent)?
+                            self.check_spends_of(*offset, txid, body, from, spent, work_limit)?
                         {
                             return Ok(Some(next));
                         }
@@ -2105,6 +2108,7 @@ impl BeefIndex {
         body: &TxBody,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
     ) -> Result<Option<u32>, Stop> {
         let refuse = |at: u64, input: Option<u32>, why: SpendRefusal| Stop::Spend {
             offset: at,
@@ -2206,12 +2210,20 @@ impl BeefIndex {
                 locking_script,
                 unlocking_script,
                 memory_limit: None,
+                work_limit,
             })
             .map_err(|e| script_error(e.to_string()))?;
             match spend.validate() {
                 Ok(true) => {}
                 Ok(false) => return Err(script_error("the script did not succeed".to_string())),
-                Err(e) => return Err(script_error(e.message)),
+                Err(e) => {
+                    return Err(match e.resource_limit {
+                        Some(limit) => {
+                            refuse(input.at, Some(vin as u32), SpendRefusal::Resource(limit))
+                        }
+                        None => script_error(e.message),
+                    })
+                }
             }
         }
         // The reference's value rule: an unmined transaction may not create
@@ -2288,7 +2300,8 @@ pub enum Verdict {
     },
     /// The BEEF's bytes are well formed up to here and the interpreter
     /// refused a spend. Not one of the twenty kinds: the verdict is the
-    /// script's, on a transaction.
+    /// script's, on a transaction. `SpendRefusal::Resource` is a LOCAL
+    /// evaluator decline: this spend was not judged invalid.
     SpendRefused {
         /// The offset of the input (or of the transaction, for the value
         /// rule).
@@ -2788,6 +2801,7 @@ pub struct StreamVerifier<R, H> {
     boundary: Frame,
     /// The transaction a pause left in hand and the input it reached.
     held: Option<(Element, u32)>,
+    work_limit: Option<u64>,
 }
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
@@ -2802,6 +2816,14 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             source,
             headers,
         )
+    }
+
+    /// Sets the LOCAL work bound per input, before its scripts run. A
+    /// resource decline is `SpendRefusal::Resource`, naming the input, work
+    /// spent and budget. `None` is the default. This configuration is not
+    /// cursor state: reapply it after `resume`, including a decoded cursor.
+    pub fn set_work_limit(&mut self, limit: Option<u64>) {
+        self.work_limit = limit;
     }
 
     /// The same reader for the BEEF's structure alone: no script is run and
@@ -2851,6 +2873,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             headers,
             verdict: None,
             held: None,
+            work_limit: None,
         }
     }
 
@@ -2920,7 +2943,10 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
                 .index
                 .fold(&element, &self.headers)
                 .map(|()| None),
-            other => self.judge.index.fold_checked_from(other, from, spent),
+            other => self
+                .judge
+                .index
+                .fold_checked_from(other, from, spent, self.work_limit),
         };
         match folded {
             Ok(None) => {
@@ -3063,6 +3089,7 @@ impl std::error::Error for AsyncVerifyError {}
 pub struct AsyncStreamVerifier {
     decoder: BeefDecoder,
     judge: Judge,
+    work_limit: Option<u64>,
 }
 
 impl AsyncStreamVerifier {
@@ -3071,7 +3098,16 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::new()),
+            work_limit: None,
         }
+    }
+
+    /// Sets the LOCAL work bound per input, before its scripts run. A
+    /// resource decline is `SpendRefusal::Resource`, naming the input, work
+    /// spent and budget. `None` is the default. This configuration is not
+    /// cursor state: reapply it after `resume`, including a decoded cursor.
+    pub fn set_work_limit(&mut self, limit: Option<u64>) {
+        self.work_limit = limit;
     }
 
     /// The same for the BEEF's structure alone.
@@ -3079,6 +3115,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::structure_only()),
+            work_limit: None,
         }
     }
 
@@ -3089,6 +3126,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::at(frame),
             judge,
+            work_limit: None,
         }
     }
 
@@ -3141,7 +3179,7 @@ impl AsyncStreamVerifier {
                         let from = self.judge.start_of(&other);
                         self.judge
                             .index
-                            .fold_checked_from(&other, from, &mut || false)
+                            .fold_checked_from(&other, from, &mut || false, self.work_limit)
                             .map(|_| ())
                     }
                 };

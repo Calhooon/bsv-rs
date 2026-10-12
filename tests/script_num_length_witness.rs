@@ -41,6 +41,7 @@ fn run(word: Option<ScriptFlags>, utxo_after_chronicle: Option<bool>) -> Result<
         input_sequence: input.sequence,
         lock_time: tx.locktime,
         memory_limit: None,
+        work_limit: None,
     });
     if let Some(w) = word {
         spend.set_flags(w);

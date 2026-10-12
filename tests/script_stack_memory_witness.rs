@@ -167,6 +167,7 @@ fn outcome(
         input_sequence: input.sequence,
         lock_time: tx.locktime,
         memory_limit,
+        work_limit: None,
     });
     match mode {
         Mode::Block => s.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle)),
@@ -183,8 +184,8 @@ fn outcome(
         Err(e) => match e.resource_limit {
             Some(limit) => Resource {
                 resource: limit.resource,
-                limit: limit.limit,
-                attempted: limit.attempted,
+                limit: limit.limit as usize,
+                attempted: limit.attempted as usize,
             },
             None => Verdict(e.message),
         },
@@ -839,6 +840,7 @@ fn the_budgets_in_force() {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit,
+            work_limit: None,
         });
         match mode {
             Mode::Block => s.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle)),

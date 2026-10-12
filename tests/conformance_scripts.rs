@@ -239,6 +239,7 @@ fn run_node_script(input: &Value) -> Result<bool, String> {
         input_sequence: 0xffff_ffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
     // The fixture's UTXO era for the Chronicle opcodes (0.3.27): the one flag of
     // the node word the default mode can take without the word.
@@ -913,6 +914,7 @@ fn validate_tx_input(tx: &Transaction, vin: usize, prevout: &Value) -> Result<()
         input_sequence: txin.sequence,
         lock_time: tx.lock_time,
         memory_limit: None,
+        work_limit: None,
     });
     match spend.validate() {
         Ok(_) => Ok(()),
@@ -1014,6 +1016,7 @@ fn run_misc_vector(input: &Value, expected: &Value) -> MiscOutcome {
             input_sequence: 0xffff_ffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
         let got = spend.validate().unwrap_or(false);
         let want = b(expected, "valid");
@@ -1426,6 +1429,7 @@ fn shift_via_interpreter(value: &[u8], shift_bits: i64, shift_op: u8, want: &[u8
         input_sequence: 0xffff_ffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
     spend.validate().unwrap_or(false)
 }

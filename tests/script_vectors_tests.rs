@@ -84,6 +84,7 @@ fn run_spend_vector(index: usize, vector: &SpendVector) -> Result<bool, String> 
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     // Validate the spend
@@ -365,6 +366,7 @@ fn test_script_valid_vectors_execution() {
             input_sequence: 0xffffffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
 
         match spend.validate() {
@@ -482,6 +484,7 @@ fn test_script_invalid_vectors() {
             input_sequence: 0xffffffff,
             lock_time: 0,
             memory_limit: None,
+            work_limit: None,
         });
 
         match spend.validate() {
@@ -547,6 +550,7 @@ fn test_arithmetic_script() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap(), "1 + 2 should equal 3");
@@ -573,6 +577,7 @@ fn test_op_depth() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -599,6 +604,7 @@ fn test_conditional() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -624,6 +630,7 @@ fn test_op_cat() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -651,6 +658,7 @@ fn test_op_split() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -676,6 +684,7 @@ fn test_op_mul() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -701,6 +710,7 @@ fn test_op_div() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -739,6 +749,7 @@ fn test_hash_operations() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     assert!(spend.validate().unwrap());
@@ -786,6 +797,7 @@ fn test_first_spend_vector_detailed() {
         input_sequence: 0xffffffff,
         lock_time: 0,
         memory_limit: None,
+        work_limit: None,
     });
 
     let result = spend.validate();
