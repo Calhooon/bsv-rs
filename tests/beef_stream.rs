@@ -2126,6 +2126,10 @@ fn mining_spend(answer: Verdict, at: u64, name: &str) {
             assert_eq!(offset, at);
             assert_eq!(format!("{why:?}"), name);
         }
+        Verdict::Unverifiable { offset, check, .. } => {
+            assert_eq!(offset, at);
+            assert_eq!(format!("Unverifiable {{ check: {check:?} }}"), name);
+        }
         other => panic!("expected {name} at {at}, got {other:?}"),
     }
 }
@@ -2374,6 +2378,27 @@ fn mining_row3a_p2sh_output() {
     );
     assert!(structure(&bytes, &headers).is_valid());
 }
+
+#[test]
+fn mining_row8f_no_tip_declines() {
+    let (p, bump, headers) = funded(&[(1000, OP_TRUE)]);
+    let mut c = tx_with(&[(txid(&p), 0, &[])], &[(1, OP_TRUE)]);
+    c[42..46].copy_from_slice(&0u32.to_le_bytes());
+    let end = c.len();
+    c[end - 4..].copy_from_slice(&800_001u32.to_le_bytes());
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(p, Some(0)), Entry::Raw(c, None)],
+    );
+    mining_spend(
+        scripts(&bytes, &headers),
+        offsets[1],
+        "Unverifiable { check: Finality }",
+    );
+    assert!(structure(&bytes, &headers).is_valid());
+}
 struct MiningHeaders {
     roots: HashMap<u64, Hash32>,
     tip: bsv_rs::transaction::beef_stream::ChainTip,
@@ -2414,5 +2439,81 @@ fn mining_row3d_p2sh_before_genesis() {
         verify_stream(bytes.as_slice(), &headers, None).unwrap(),
         offsets[1] + 47,
         "P2shOutput { vout: 0 }",
+    );
+}
+
+fn mining_finality(lock_time: u32, sequence: u32, with_tip: bool) -> (Verdict, u64) {
+    let (parent, bump, roots) = funded(&[(1000, OP_TRUE)]);
+    let mut child = tx_with(&[(txid(&parent), 0, &[])], &[(1, OP_TRUE)]);
+    child[42..46].copy_from_slice(&sequence.to_le_bytes());
+    let end = child.len();
+    child[end - 4..].copy_from_slice(&lock_time.to_le_bytes());
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(parent, Some(0)), Entry::Raw(child, None)],
+    );
+    let answer = if with_tip {
+        verify_stream(
+            bytes.as_slice(),
+            &mining_headers(roots, 800_000, 1_700_000_000),
+            None,
+        )
+        .unwrap()
+    } else {
+        scripts(&bytes, &roots)
+    };
+    (answer, offsets[1])
+}
+#[test]
+fn mining_row8a_height_below_next_block() {
+    assert!(mining_finality(800_000, 0, true).0.is_valid());
+}
+#[test]
+fn mining_row8b_height_at_next_block() {
+    let (v, at) = mining_finality(800_001, 0, true);
+    mining_spend(v, at, "NonFinal { lock_time: 800001 }");
+}
+#[test]
+fn mining_row8c_all_sequences_final() {
+    assert!(mining_finality(800_001, u32::MAX, true).0.is_valid());
+    assert!(mining_finality(800_001, u32::MAX, false).0.is_valid());
+}
+#[test]
+fn mining_row8d_time_below_mtp() {
+    assert!(mining_finality(1_699_999_999, 0, true).0.is_valid());
+}
+#[test]
+fn mining_row8e_time_at_mtp() {
+    let (v, at) = mining_finality(1_700_000_000, 0, true);
+    mining_spend(v, at, "NonFinal { lock_time: 1700000000 }");
+}
+#[test]
+fn mining_row8g_zero_lock_time() {
+    assert!(mining_finality(0, 0, false).0.is_valid());
+}
+#[test]
+fn mining_row8_pre_csv_uses_candidate_time_and_declines_without_it() {
+    let (p, bump, roots) = funded(&[(1000, OP_TRUE)]);
+    let mut c = tx_with(&[(txid(&p), 0, &[])], &[(1, OP_TRUE)]);
+    c[42..46].copy_from_slice(&0u32.to_le_bytes());
+    let end = c.len();
+    c[end - 4..].copy_from_slice(&1_700_000_000u32.to_le_bytes());
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(p, Some(0)), Entry::Raw(c, None)],
+    );
+    let mut headers = mining_headers(roots, 800_000, 1_600_000_000);
+    headers.tip.csv_height = 800_002;
+    headers.tip.next_block_time = Some(1_700_000_001);
+    assert!(verify_stream(bytes.as_slice(), &headers, None)
+        .unwrap()
+        .is_valid());
+    headers.tip.next_block_time = None;
+    assert!(
+        matches!(verify_stream(bytes.as_slice(),&headers,None).unwrap(),Verdict::Unverifiable { offset, check: bsv_rs::transaction::beef_stream::MiningCheck::Finality, .. } if offset == offsets[1])
     );
 }
