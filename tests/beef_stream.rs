@@ -2303,3 +2303,14 @@ fn mining_row7a_output_range() {
     );
     mining_invalid(&bytes, &headers, offsets[1] + 47, "ValueOutOfRange");
 }
+
+#[test]
+fn mining_order_output_before_duplicate() {
+    let f = mining_parent_id();
+    let (bytes, offsets, headers) = mining_child(
+        &[(f, 0, &[]), (f, 0, &[])],
+        &[(2_100_000_000_000_001, OP_TRUE)],
+        false,
+    );
+    mining_invalid(&bytes, &headers, offsets[1] + 88, "ValueOutOfRange");
+}
