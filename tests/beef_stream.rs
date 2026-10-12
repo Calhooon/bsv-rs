@@ -2517,3 +2517,72 @@ fn mining_row8_pre_csv_uses_candidate_time_and_declines_without_it() {
         matches!(verify_stream(bytes.as_slice(),&headers,None).unwrap(),Verdict::Unverifiable { offset, check: bsv_rs::transaction::beef_stream::MiningCheck::Finality, .. } if offset == offsets[1])
     );
 }
+#[test]
+fn mining_maturity_no_tip_declines() {
+    let p = tx_with(&[([0; 32], u32::MAX, &[])], &[(1000, OP_TRUE)]);
+    let bump = bump_bytes(800_000, 1, &[vec![LeafSpec::Hash(0, txid(&p), true)]]);
+    let headers = one_header(800_000, txid(&p));
+    let c = tx_with(&[(txid(&p), 0, &[])], &[(1, OP_TRUE)]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(p, Some(0)), Entry::Raw(c, None)],
+    );
+    mining_spend(
+        scripts(&bytes, &headers),
+        offsets[1] + 5,
+        "Unverifiable { check: CoinbaseMaturity }",
+    );
+}
+fn mining_coinbase_spend() -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>) {
+    let parent = tx_with(&[([0; 32], u32::MAX, &[])], &[(1000, OP_TRUE)]);
+    let bump = bump_bytes(800_000, 1, &[vec![LeafSpec::Hash(0, txid(&parent), true)]]);
+    let roots = one_header(800_000, txid(&parent));
+    let child = tx_with(&[(txid(&parent), 0, &[])], &[(1, OP_TRUE)]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(parent, Some(0)), Entry::Raw(child, None)],
+    );
+    (bytes, offsets, roots)
+}
+#[test]
+fn mining_maturity_at_99_blocks_is_premature() {
+    let (bytes, offsets, roots) = mining_coinbase_spend();
+    let headers = mining_headers(roots, 800_098, 1_700_000_000);
+    mining_spend(
+        verify_stream(bytes.as_slice(), &headers, None).unwrap(),
+        offsets[1] + 5,
+        "PrematureCoinbase { height: 800000 }",
+    );
+    assert!(verify_stream_structure(bytes.as_slice(), &headers, None)
+        .unwrap()
+        .is_valid());
+}
+#[test]
+fn mining_maturity_at_100_blocks_is_valid() {
+    let (bytes, _, roots) = mining_coinbase_spend();
+    let headers = mining_headers(roots, 800_099, 1_700_000_000);
+    assert!(verify_stream(bytes.as_slice(), &headers, None)
+        .unwrap()
+        .is_valid());
+}
+#[test]
+fn mining_maturity_resume_retains_the_verified_height() {
+    let (bytes, _, roots) = mining_coinbase_spend();
+    let cursor = cursor_at(&bytes, &roots, 2, true).unwrap();
+    let encoded = cursor.to_binary();
+    let decoded = Cursor::from_binary(&encoded).unwrap();
+    assert_eq!(decoded, cursor);
+    let mut old = encoded;
+    old[..4].copy_from_slice(b"BSC1");
+    assert!(Cursor::from_binary(&old).is_err());
+    let headers = mining_headers(roots, 800_098, 1_700_000_000);
+    let rest = &bytes[decoded.offset() as usize..];
+    assert_eq!(
+        resume(decoded, rest, &headers).unwrap(),
+        verify_stream(bytes.as_slice(), &headers, None).unwrap()
+    );
+}

@@ -1767,6 +1767,8 @@ struct TxEntry {
     referenced: bool,
     /// Its raw bytes were read (a txid-only entry leaves this false).
     raw: bool,
+    /// Verified height of a proven coinbase; no other transaction has one.
+    coinbase_height: Option<u64>,
     /// Its unspent outputs by index, when spends are checked. A spent output
     /// is `None`; the whole table goes when the last one is spent.
     outputs: Option<Box<[Option<Retained>]>>,
@@ -1812,6 +1814,11 @@ pub enum SpendRefusal {
     NonFinal {
         /// Transaction lock time, named at its leading byte.
         lock_time: u32,
+    },
+    /// A proven coinbase output has not matured for the next block.
+    PrematureCoinbase {
+        /// The coinbase's verified block height; named at the spending input.
+        height: u64,
     },
 }
 
@@ -2077,6 +2084,7 @@ impl BeefIndex {
                     at: *offset,
                     referenced: false,
                     raw: false,
+                    coinbase_height: None,
                     outputs: None,
                     live: 0,
                 });
@@ -2187,7 +2195,7 @@ impl BeefIndex {
                             }
                         }
                         if let Some(next) =
-                            self.check_spends_of(*offset, txid, body, from, spent, work_limit)?
+                            self.check_spends_of(*offset, txid, body, from, spent, work_limit, tip)?
                         {
                             return Ok(Some(next));
                         }
@@ -2219,10 +2227,16 @@ impl BeefIndex {
                             .collect::<Box<[_]>>()
                     })
                     .filter(|outputs| outputs.iter().any(Option::is_some));
+                let coinbase_height = if is_coinbase(&body.inputs) {
+                    bump_index.map(|index| self.bumps[index as usize].0)
+                } else {
+                    None
+                };
                 match self.txs.get_mut(txid) {
                     Some(entry) => {
                         if !entry.raw {
                             entry.raw = true;
+                            entry.coinbase_height = coinbase_height;
                             entry.live = live_of(&outputs);
                             entry.outputs = outputs;
                         }
@@ -2234,6 +2248,7 @@ impl BeefIndex {
                                 at: *offset,
                                 referenced: false,
                                 raw: true,
+                                coinbase_height,
                                 live: live_of(&outputs),
                                 outputs,
                             },
@@ -2278,6 +2293,7 @@ impl BeefIndex {
     /// an earlier slice of the same reading, against the same index), and
     /// `spent` is asked between two inputs: `Ok(Some(i))` is a pause before
     /// input `i`, at least one input after `from` having run.
+    #[allow(clippy::too_many_arguments)] // One resumed spend and its caller's mining context.
     fn check_spends_of(
         &self,
         offset: u64,
@@ -2286,6 +2302,7 @@ impl BeefIndex {
         from: u32,
         spent: &mut dyn FnMut() -> bool,
         work_limit: Option<u64>,
+        tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
         let refuse = |at: u64, input: Option<u32>, why: SpendRefusal| Stop::Spend {
             offset: at,
@@ -2316,6 +2333,26 @@ impl BeefIndex {
                     ))
                 }
             };
+            // [SRC] sibling@87f0461 BLOCK-CONSENSUS.md:68,
+            // node@879fc8b42 consensus/consensus.h:75 as cited there.
+            if let Some(height) = parent.coinbase_height {
+                let context = tip.ok_or(Stop::Unverifiable {
+                    offset: input.at,
+                    txid: *txid,
+                    input: vin,
+                    check: MiningCheck::CoinbaseMaturity,
+                })?;
+                if (u64::from(context.height) + 1)
+                    .checked_sub(height)
+                    .is_none_or(|depth| depth < 100)
+                {
+                    return Err(refuse(
+                        input.at,
+                        vin,
+                        SpendRefusal::PrematureCoinbase { height },
+                    ));
+                }
+            }
             if source.satoshis > MAX_MONEY || source.satoshis > MAX_MONEY - input_total {
                 return Err(refuse(input.at, vin, SpendRefusal::InputValueOutOfRange));
             }
@@ -2577,7 +2614,7 @@ struct Pending {
     input: u32,
 }
 
-const CURSOR_MAGIC: &[u8; 4] = b"BSC1";
+const CURSOR_MAGIC: &[u8; 4] = b"BSC2";
 
 impl Cursor {
     /// The elements read.
@@ -2605,8 +2642,9 @@ impl Cursor {
     }
 
     /// The cursor's bytes. Equal states give equal bytes; a cursor between
-    /// two elements has 0.4.3's bytes, and a paused one appends the
-    /// transaction and the input reached.
+    /// two elements encodes the verified coinbase heights as well. BSC2
+    /// rejects older cursors without this metadata: restart their reading.
+    /// A paused cursor appends the transaction and the input reached.
     pub fn to_binary(&self) -> Vec<u8> {
         fn put_hash(w: &mut Writer, h: &Option<Hash32>) {
             match h {
@@ -2674,6 +2712,15 @@ impl Cursor {
             w.write_bytes(txid);
             w.write_u64_le(entry.at);
             w.write_u8(entry.referenced as u8 | (entry.raw as u8) << 1);
+            match entry.coinbase_height {
+                Some(height) => {
+                    w.write_u8(1);
+                    w.write_u64_le(height);
+                }
+                None => {
+                    w.write_u8(0);
+                }
+            }
             match &entry.outputs {
                 None => {
                     w.write_var_int(0);
@@ -2798,6 +2845,11 @@ impl Cursor {
             if flags > 3 {
                 return Err(bad("a transaction's flags"));
             }
+            let coinbase_height = match r.read_u8()? {
+                0 => None,
+                1 => Some(r.read_u64_le()?),
+                _ => return Err(bad("a coinbase height presence byte")),
+            };
             let n = r.read_var_int()?;
             let outputs = if n == 0 {
                 None
@@ -2824,6 +2876,7 @@ impl Cursor {
                     at,
                     referenced: flags & 1 == 1,
                     raw: flags & 2 == 2,
+                    coinbase_height,
                     live: live_of(&outputs),
                     outputs,
                 },
