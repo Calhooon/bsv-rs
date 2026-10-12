@@ -2341,3 +2341,78 @@ fn mining_row7f_input_range() {
         "InputValueOutOfRange",
     );
 }
+
+#[test]
+fn mining_row3c_near_p2sh_output() {
+    let mut p2sh = vec![0xa9, 0x14];
+    p2sh.extend([0; 20]);
+    p2sh.extend([0x87, 0x75]);
+    let (bytes, _, headers) = mining_child(&[(mining_parent_id(), 0, &[])], &[(1, &p2sh)], false);
+    assert!(scripts(&bytes, &headers).is_valid());
+}
+
+#[test]
+fn mining_row3b_proven_p2sh_output() {
+    let mut p2sh = vec![0xa9, 0x14];
+    p2sh.extend([0; 20]);
+    p2sh.push(0x87);
+    let (bytes, _, headers) = mining_child(&[(mining_parent_id(), 0, &[])], &[(1, &p2sh)], true);
+    assert!(scripts(&bytes, &headers).is_valid());
+}
+
+#[test]
+fn mining_row3a_p2sh_output() {
+    let mut p2sh = vec![0xa9, 0x14];
+    p2sh.extend([0; 20]);
+    p2sh.push(0x87);
+    let (bytes, offsets, headers) =
+        mining_child(&[(mining_parent_id(), 0, &[])], &[(1, &p2sh)], false);
+    mining_spend(
+        scripts(&bytes, &headers),
+        offsets[1] + 47,
+        "P2shOutput { vout: 0 }",
+    );
+    assert!(structure(&bytes, &headers).is_valid());
+}
+struct MiningHeaders {
+    roots: HashMap<u64, Hash32>,
+    tip: bsv_rs::transaction::beef_stream::ChainTip,
+}
+impl bsv_rs::transaction::beef_stream::Headers for MiningHeaders {
+    fn carries(&self, height: u64, root: &Hash32) -> bool {
+        self.roots.get(&height) == Some(root)
+    }
+    fn mining_tip(&self) -> Option<bsv_rs::transaction::beef_stream::ChainTip> {
+        Some(self.tip)
+    }
+}
+fn mining_headers(roots: HashMap<u64, Hash32>, height: u32, mtp: u32) -> MiningHeaders {
+    MiningHeaders {
+        roots,
+        tip: bsv_rs::transaction::beef_stream::ChainTip {
+            height,
+            median_time_past: mtp,
+            genesis_height: 10_000,
+            csv_height: 0,
+            next_block_time: None,
+        },
+    }
+}
+#[test]
+fn mining_row3d_p2sh_before_genesis() {
+    let mut p2sh = vec![0xa9, 0x14];
+    p2sh.extend([0; 20]);
+    p2sh.push(0x87);
+    let (bytes, offsets, roots) =
+        mining_child(&[(mining_parent_id(), 0, &[])], &[(1, &p2sh)], false);
+    let mut headers = mining_headers(roots, 9_998, 1_700_000_000);
+    assert!(verify_stream(bytes.as_slice(), &headers, None)
+        .unwrap()
+        .is_valid());
+    headers.tip.height = 9_999;
+    mining_spend(
+        verify_stream(bytes.as_slice(), &headers, None).unwrap(),
+        offsets[1] + 47,
+        "P2shOutput { vout: 0 }",
+    );
+}
