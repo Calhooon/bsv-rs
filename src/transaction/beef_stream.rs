@@ -153,11 +153,13 @@ pub enum Kind {
     UnprovenCoinbase,
     /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
     NullOutpoint,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    DuplicateInput,
 }
 
 impl Kind {
     /// The twenty kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 22] = [
+    pub const ALL: [Kind; 23] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -180,6 +182,7 @@ impl Kind {
         Kind::NoOutputs,
         Kind::UnprovenCoinbase,
         Kind::NullOutpoint,
+        Kind::DuplicateInput,
     ];
 }
 
@@ -292,6 +295,8 @@ pub enum Reason {
     UnprovenCoinbase,
     /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
     NullOutpoint,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    DuplicateInput,
 }
 
 impl Reason {
@@ -318,6 +323,7 @@ impl Reason {
             Reason::UnrelatedTransaction { .. } => Kind::UnrelatedTransaction,
             Reason::NoInputs => Kind::NoInputs,
             Reason::NoOutputs => Kind::NoOutputs,
+            Reason::DuplicateInput => Kind::DuplicateInput,
             Reason::NullOutpoint => Kind::NullOutpoint,
             Reason::UnprovenCoinbase => Kind::UnprovenCoinbase,
         }
@@ -386,9 +392,13 @@ fn check_transaction(
         return Err(Refusal::new(offset, reason));
     }
     if !is_coinbase(inputs) {
+        let mut seen = HashSet::with_capacity(inputs.len());
         for input in inputs {
             if input.prev == [0; 32] && input.vout == u32::MAX {
                 return Err(Refusal::new(input.at, Reason::NullOutpoint));
+            }
+            if !seen.insert((input.prev, input.vout)) {
+                return Err(Refusal::new(input.at, Reason::DuplicateInput));
             }
         }
     }
@@ -2152,7 +2162,6 @@ impl BeefIndex {
             why,
         };
         let mut sources: Vec<&Retained> = Vec::with_capacity(body.inputs.len());
-        let mut spent_here: HashSet<(&Hash32, u32)> = HashSet::new();
         let mut input_total: u64 = 0;
         for (vin, input) in body.inputs.iter().enumerate() {
             let vin = Some(vin as u32);
@@ -2166,7 +2175,7 @@ impl BeefIndex {
             }
             let slot = parent.outputs.as_ref().and_then(|o| o.get(vout as usize));
             let source = match slot {
-                Some(Some(source)) if spent_here.insert((&input.prev, vout)) => source,
+                Some(Some(source)) => source,
                 _ => {
                     return Err(refuse(
                         input.at,
