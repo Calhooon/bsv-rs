@@ -70,7 +70,8 @@
 //! match verdict {
 //!     Verdict::Valid { subject, roots } => { /* every root was carried */ }
 //!     Verdict::Invalid { offset, kind, .. } => { /* the byte and the kind */ }
-//!     Verdict::SpendRefused { offset, why, .. } => { /* a script said no */ }
+//!     Verdict::SpendRefused { offset, why, .. } => { /* a spend said no */ }
+//!     Verdict::Unverifiable { check, .. } => { /* supply the mining context */ }
 //! }
 //! ```
 
@@ -1807,11 +1808,36 @@ pub enum SpendRefusal {
         /// Output index, named at the output value field.
         vout: u32,
     },
+    /// Not final for mining in the next block under the supplied headers.
+    NonFinal {
+        /// Transaction lock time, named at its leading byte.
+        lock_time: u32,
+    },
+}
+
+/// A mining check that cannot be judged without header context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MiningCheck {
+    /// Next-block transaction finality.
+    Finality,
+    /// Coinbase maturity at the next block's height.
+    CoinbaseMaturity,
 }
 
 /// What stops a step: invalid bytes, or a spend the interpreter refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stop {
+    /// The reader declined: missing context is never invalid bytes or an invalid spend.
+    Unverifiable {
+        /// Transaction or input offset.
+        offset: u64,
+        /// Spending transaction.
+        txid: Hash32,
+        /// Input, when named.
+        input: Option<u32>,
+        /// Check whose context is absent.
+        check: MiningCheck,
+    },
     /// The bytes are invalid.
     Invalid(Refusal),
     /// A spend was refused.
@@ -2130,6 +2156,36 @@ impl BeefIndex {
                                 }
                             }
                         }
+                        // [SRC] sibling@87f0461 BLOCK-CONSENSUS.md:83-88,
+                        // node@879fc8b42 validation.cpp:228-248 as cited there.
+                        if body.lock_time != 0 && body.inputs.iter().any(|i| i.sequence != u32::MAX)
+                        {
+                            let unavailable = || Stop::Unverifiable {
+                                offset: *offset,
+                                txid: *txid,
+                                input: None,
+                                check: MiningCheck::Finality,
+                            };
+                            let context = tip.ok_or_else(unavailable)?;
+                            let next_height = u64::from(context.height) + 1;
+                            let limit = if body.lock_time < 500_000_000 {
+                                next_height
+                            } else if next_height >= u64::from(context.csv_height) {
+                                u64::from(context.median_time_past)
+                            } else {
+                                u64::from(context.next_block_time.ok_or_else(unavailable)?)
+                            };
+                            if u64::from(body.lock_time) >= limit {
+                                return Err(Stop::Spend {
+                                    offset: *offset,
+                                    txid: *txid,
+                                    input: None,
+                                    why: SpendRefusal::NonFinal {
+                                        lock_time: body.lock_time,
+                                    },
+                                });
+                            }
+                        }
                         if let Some(next) =
                             self.check_spends_of(*offset, txid, body, from, spent, work_limit)?
                         {
@@ -2397,6 +2453,17 @@ impl Default for BeefIndex {
 /// The verdict of a reading.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Verdict {
+    /// A decline for missing mining context, never a transaction verdict.
+    Unverifiable {
+        /// Transaction or input offset.
+        offset: u64,
+        /// Spending transaction.
+        txid: Hash32,
+        /// Input, when named.
+        input: Option<u32>,
+        /// Check whose context is absent.
+        check: MiningCheck,
+    },
     /// Every element checked, every root carried.
     Valid {
         /// The subject the atomic rule was held to, if there was one.
@@ -2452,6 +2519,17 @@ impl From<Refusal> for Verdict {
 impl From<Stop> for Verdict {
     fn from(stop: Stop) -> Self {
         match stop {
+            Stop::Unverifiable {
+                offset,
+                txid,
+                input,
+                check,
+            } => Verdict::Unverifiable {
+                offset,
+                txid,
+                input,
+                check,
+            },
             Stop::Invalid(r) => r.into(),
             Stop::Spend {
                 offset,
