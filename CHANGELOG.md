@@ -78,7 +78,7 @@ The boundary and refusal-offset witnesses are `tests/beef_stream.rs`;
 
 ## [0.4.5] - 2026-10-12
 
-Two rules of bsv-stack-lean L2: the lone leaf at offset 0 only (the owner's `offset 0`; PR #51) and a LOCAL work bound inside one input's script (LOW's R404-H1, bsv-stack-lean #75 B; PR #52). No verdict moves under the defaults.
+Two rules of bsv-stack-lean L2: the lone leaf at offset 0 only (PR #51) and a LOCAL work bound inside one input's script (LOW's R404-H1, bsv-stack-lean #75 B; PR #52). No verdict moves under the defaults.
 
 ### Fixed
 
@@ -96,10 +96,21 @@ Two rules of bsv-stack-lean L2: the lone leaf at offset 0 only (the owner's `off
 - Intentional divergence: TS returns the txid for a lone leaf at any
   offset (`ts-stack@edf6e03`, `MerklePath.ts:345,390-391`), as does Go
   (`go-sdk@v1.7.1`, `transaction/merklepath.go:354-363`). This crate accepts
-  only offset 0, the owner's ruling recorded in bsv-stack-lean's
-  `docs/readings/one-transaction-block-lone-leaf.md`, section 4. Callers
-  holding a nonzero lone-leaf proof must obtain a valid proof; its offset
-  must not be rewritten on trust. No public type changes.
+  only offset 0: the node requires the leading transaction to be the
+  coinbase, so a block of one transaction holds it at index 0 (bitcoin-sv
+  v1.2.3, `src/validation.cpp:5823-5824`, `CheckBlock`, calling
+  `CheckCoinbase` at `:577-579`, `bad-cb-missing`). BRC-62 reads the level-0
+  offset as the transaction's index in the block (`BRCs@ed1b015`,
+  `transactions/0062.md:179-180`); BRC-74 defines it as the position from
+  the left (`transactions/0074.md:66`), and its illustrative routine
+  refuses a lone leaf at a nonzero offset (`:326-335`). Every builder
+  writes 0: `MerklePath.fromCoinbaseTxidAndHeight` (`ts-stack@edf6e03`,
+  `MerklePath.ts:181-183`), `NewMerklePathFromCoinbaseTxid`
+  (`go-sdk@v1.7.1`, `transaction/merklepath.go:156-178`), and go-sdk#348's
+  testnet vector (`transaction/merklepath_test.go:325-341`). The same
+  refusal is proposed to the TypeScript and Go SDKs. Callers holding a
+  nonzero lone-leaf proof must obtain a valid proof; its offset must not
+  be rewritten on trust. No public type changes.
 
 ### Added: a LOCAL work bound inside one input's script
 
