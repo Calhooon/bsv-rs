@@ -1,52 +1,74 @@
 # bsv-rs
 
-A Rust SDK for BSV: cryptographic primitives, the Bitcoin Script interpreter, transactions with BEEF and SPV, BRC-42 wallets, BRC-103 mutual authentication, and the overlay network (SHIP, SLAP, STEAK), with storage, registry, key-value and identity clients on top.
+**0.4.5**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
+BEEF and SPV, wallets, authentication and overlay clients. Optional features
+support native applications and wasm hosts. Compatibility is tested against
+shared vectors; the crate also has explicit local evaluator contracts and
+documented differences from other SDKs.
 
-It is a reference-parity port of the TypeScript [`@bsv/sdk`](https://github.com/bitcoin-sv/ts-sdk), cross-checked against the [Go SDK](https://github.com/bitcoin-sv/go-sdk): the same bytes on the wire, the same verdicts from the interpreter, pinned by shared test vectors and by the `ts-stack` conformance corpus. It builds for `wasm32-unknown-unknown` and runs in production inside Cloudflare Workers.
-
-[![Crates.io](https://img.shields.io/crates/v/bsv-rs.svg)](https://crates.io/crates/bsv-rs)
-[![Documentation](https://docs.rs/bsv-rs/badge.svg)](https://docs.rs/bsv-rs)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE-MIT)
-
-## What you get
-
-| Module | Feature | What it is |
-|---|---|---|
-| `primitives` | default | SHA-256/512, RIPEMD-160, HMAC, PBKDF2, HMAC-DRBG (RFC 6979), secp256k1 and P-256 ECDSA, ECDH, Shamir, AES-256-GCM, `BigNumber`, hex/base58/base64, a binary `Reader`/`Writer` with varints |
-| `script` | default | `Script` parsing (hex, ASM, chunks), every BSV opcode, the `Spend` interpreter, templates: P2PKH, P2PK, Multisig, RPuzzle, PushDrop |
-| `transaction` | | `Transaction` building, signing, fee models (static and ARC live policy), `MerklePath` (BRC-74 BUMP), `Beef` (BRC-62/95/96), `verify` (scripts and merkle roots against a `ChainTracker`), ARC and WhatsOnChain clients |
-| `wallet` | | BRC-42/43 `KeyDeriver`, `ProtoWallet` (sign, verify, encrypt, decrypt, HMAC), `WalletClient` over HTTP, the BRC-100 binary wire protocol (28 methods, Go-compatible) |
-| `messages` | | BRC-77 signed and BRC-78 encrypted messages |
-| `compat` | | BIP-32 HD keys, BIP-39 mnemonics (eight wordlists), Bitcoin Signed Messages, Electrum and Bitcore ECIES |
-| `totp` | | RFC 6238 one-time passwords |
-| `auth` | | BRC-103 mutual authentication (`Peer`, sessions, BRC-52/53 certificates) over BRC-104 HTTP; `socketio` adds a Socket.IO 5 transport, `websocket` a tokio-tungstenite one |
-| `overlay` | | `LookupResolver` (SLAP host discovery, request coalescing, per-host reputation), `TopicBroadcaster` (SHIP, STEAK acknowledgements), signed SHIP/SLAP admin tokens, `Historian` |
-| `storage` | | UHRP content-addressed upload and download |
-| `registry` | | On-chain definitions for baskets, protocols and certificate types |
-| `kvstore` | | `LocalKVStore` (encrypted, wallet baskets) and `GlobalKVStore` (public, overlay-backed) |
-| `identity` | | Certificate-based identity resolution and contacts |
-
-`default = ["primitives", "script"]`; `full` turns every module on (including `socketio`). Platform and transport flags: `http` (reqwest), `websocket` (opt-in, not in `full`), `wasm`, `dhat-profiling`. The dependency order is `primitives → script → transaction → wallet → { messages, auth, overlay }`, with `storage`, `registry` and `kvstore` on `overlay`, `identity` on `auth` and `overlay`, and `compat` and `totp` on `primitives` alone.
+## Install
 
 ```toml
 [dependencies]
-bsv-rs = "0.4"                                                            # primitives + script
-bsv-rs = { version = "0.4", features = ["transaction"] }                  # + transactions, BEEF, SPV
-bsv-rs = { version = "0.4", features = ["wallet"] }                       # + BRC-42 keys, ProtoWallet
-bsv-rs = { version = "0.4", features = ["auth", "http"] }                 # + BRC-103 over HTTP
-bsv-rs = { version = "0.4", features = ["overlay", "http"] }              # + SHIP/SLAP
-bsv-rs = { version = "0.4", features = ["full", "http"] }                 # everything, native
-bsv-rs = { version = "0.4", default-features = false,
-           features = ["auth", "wallet", "transaction", "overlay", "socketio", "wasm"] }  # a Worker
+bsv-rs = { version = "=0.4.5", features = ["transaction", "wallet"] }
 ```
+
+Defaults enable primitives and script. [Cargo.toml](Cargo.toml) lists module
+features, `full`, native transports and `wasm`. A Worker should select the
+features it needs and enable `wasm`; native HTTP transports are separate.
+
+## Proof and evaluator contracts
+
+A one-level merkle path with one hashed leaf is accepted only at offset 0,
+representing a one-transaction block. A nonzero lone-leaf offset is refused
+with `MissingSibling`, both when parsing and computing the root. Obtain a
+valid proof; do not rewrite an offset on trust.
+[tests/merkle_path_lone_leaf.rs](tests/merkle_path_lone_leaf.rs) pins this rule.
+
+`SpendParams` and `TxSpendParams` accept `work_limit: Option<u64>`.
+The default `None` leaves work accounting off. With a bound, reached opcodes
+and bytes fed to hashes are charged before that work. Exhaustion returns
+`ScriptResource::Work`, a LOCAL evaluator decline, not an invalid-script
+verdict. It is not a wall-clock or total computation bound.
+[tests/script_work_budget.rs](tests/script_work_budget.rs) exercises charging
+and the distinction from validity.
+
+The streaming BEEF reader verifies element by element, checks proof roots
+through supplied headers and executes unproven inputs. It holds an ancestry
+index and needed outputs, so streaming does not mean constant memory.
+`StreamVerifier::set_work_limit` and `AsyncStreamVerifier::set_work_limit`
+apply the local work bound per input. Reapply it after resuming a cursor.
+Pausing is between elements or inputs; a work decline cannot resume within a
+script. The implementation is [src/transaction/beef_stream.rs](src/transaction/beef_stream.rs).
+
+Script defaults follow SDK evaluation mode; callers modelling node validation
+select explicit `ScriptFlags` and interpret resource limits separately from
+validity. The flag and resource witnesses live in [tests](tests).
+
+## Build, gate and records
+
+```sh
+cargo build --examples --all-features
+cargo test --test readme_examples --test merkle_path_lone_leaf --test script_work_budget --all-features
+cargo fmt --all -- --check
+```
+
+[.github/workflows/ci.yml](.github/workflows/ci.yml) defines PR/main tests,
+formatting, clippy, vectors, docs and benchmark checks. It checks out the
+pinned external conformance corpus for the vector job; a local run without
+that corpus can skip those tests and is not conformance evidence.
+[RELEASING.md](RELEASING.md) defines the machine gate and trusted publication
+from tags. [CHANGELOG.md](CHANGELOG.md) holds release and API migration notes.
 
 ## Examples
 
-Every code block below is a file under [`examples/`](examples/), compiled by CI (`cargo build --examples --all-features`) and pinned to the README byte for byte by `tests/readme_examples.rs`. The first five run with no network.
+The blocks below are the files in [examples](examples), checked byte for byte
+by [tests/readme_examples.rs](tests/readme_examples.rs). Building them does not
+run their network or signing operations. Network examples require a host's
+own configuration and authorization.
 
 ### Keys, hashes, signatures
 
-`cargo run --example keys`
 
 ```rust
 // examples/keys.rs
@@ -81,7 +103,6 @@ fn main() {
 
 ### Scripts, and the interpreter
 
-`cargo run --example script`
 
 ```rust
 // examples/script.rs
@@ -181,7 +202,6 @@ fn main() {
 
 ### A transaction: build, sign, verify
 
-`cargo run --example transaction --features transaction`
 
 ```rust
 // examples/transaction.rs
@@ -244,7 +264,6 @@ fn main() {
 
 ### BRC-42 keys and the ProtoWallet
 
-`cargo run --example brc42 --features wallet`
 
 ```rust
 // examples/brc42.rs
@@ -315,7 +334,6 @@ fn main() {
 
 ### BEEF: write, read, validate, verify
 
-`cargo run --example beef_spv --features transaction`
 
 ```rust
 // examples/beef_spv.rs
@@ -393,7 +411,7 @@ fn main() {
 
 ### The overlay network
 
-`cargo build --example overlay --features "overlay,http"` (running it reaches the public mainnet hosts)
+The overlay example reaches network services when executed.
 
 ```rust
 // examples/overlay.rs
@@ -436,77 +454,6 @@ async fn main() {
 
 More: BRC-103 over HTTP or Socket.IO (`auth`, `socketio`), the wallet wire protocol (`wallet::wire`), UHRP storage, the registry, the KV stores and identity all carry worked examples in their module docs on [docs.rs](https://docs.rs/bsv-rs).
 
-## The contracts that matter
-
-**The interpreter runs in the TypeScript SDK's default mode, or under a node's flag word.** Without a word, `Spend` is the TypeScript SDK's default evaluation mode: a transaction of version 1 or lower runs strict (minimal pushes and minimally encoded numbers, low-S, an empty CHECKMULTISIG dummy, push-only unlocking scripts, a clean stack, strict DER and public-key encodings, `SIGHASH_FORKID` required); version 2 and above runs the post-Genesis relaxed mode (MINIMALDATA, LOW_S, CLEANSTACK and NULLDUMMY not enforced), as `Spend.isRelaxed()` does upstream; `set_require_minimal` and `set_require_push_only` override either way. That mode is neither of the two words a node validates under. With `set_flags(ScriptFlags::block(era))` the interpreter applies the block-validation word bitcoin-sv v1.2.2 derives for a block of that era, and with `ScriptFlags::standard(era)` the mempool word (the block word plus exactly NULLDUMMY, MINIMALDATA, DISCOURAGE_UPGRADABLE_NOPS and CLEANSTACK); every rule, including NULLFAIL, MINIMALIF and the discouraged NOPs, is enforced at the reference's site under the reference's version gate (at Chronicle a transaction of version 2 or above is malleable and every malleability restriction is off for it). A caller judging a spend on the network's behalf selects the block word; `ScriptFlags` carries the reference's bit values and names, so a word can be compared with a node's own. The opcode set is post-Genesis BSV (OP_MUL, OP_CAT, OP_LSHIFT and the rest enabled; no pre-Genesis size or count limits, but under a word the script-number length limit of the coin's era (750,000 bytes for a coin created after Genesis and 32,000,000 after Chronicle on the block path; the node's policy default of 10,000 on the mempool path, `set_script_num_length_policy` for a node configured otherwise), applied before the decode at every read and on every arithmetic result, while the default mode reads a number of any length as the TypeScript SDK does; no P2SH evaluation; CLTV and CSV are NOPs; an undefined opcode executed and a push cut short of its declared bytes are failures, as on the node; one OP_ELSE per OP_IF), and for a coin created after Chronicle (a word's `UTXO_AFTER_CHRONICLE`; without a word, the relaxed branch, version 2 and above) OP_2MUL, OP_2DIV, OP_VER, OP_VERIF, OP_VERNOTIF and the Chronicle meanings of 0xb3–0xb7 (OP_SUBSTR, OP_LEFT, OP_RIGHT, OP_LSHIFTNUM, OP_RSHIFTNUM) run as the node runs them. A CHECKSIG's signed subscript continues across the unlock/lock boundary after an OP_CODESEPARATOR, so OP_PUSH_TX covenants verify. In the default mode a script element may be up to 1 GiB and the working memory budget is 32 MB for each stack (`memory_limit`); under a word the budget is counted as the node counts it (one budget over both stacks, 32 bytes of overhead per element, every growth charged before it happens), 100 MB by default, the node's policy default, and on the mempool path the node's stack memory policy is a verdict besides (`set_stack_memory_policy` for a node configured otherwise), with `OP_NUM2BIN`'s size bounded by `INT32_MAX` as on the node. Exhausting the local budget is a `ScriptResourceLimit` (`Stack`, `AltStack`, `ElementSize`) that `is_resource_limit()` tells apart from a refusal, and every refusal of it comes before the allocation it would need. On the block path a node's budget is not a constant but its operator's mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.2 does not start without it; 0 means unlimited): a caller modelling a node run with 0 passes `memory_limit: Some(usize::MAX)`, and a caller that judges validity reads an error whose `resource_limit` is `Some` as a decline, never as invalid.
-
-**BEEF linking is linear and `verify` walks by txid.** `Transaction::from_beef` links each distinct unproven parent once and gives every later input sourcing the same txid a stub, so a diamond chain (each level spending both outputs of the last) links in time and memory linear in the BEEF; `verify` gathers the reachable transactions into a map by txid, checks a proven one against the `ChainTracker` and does not descend it, executes every input script of an unproven one against its source looked up by txid, and refuses an unproven transaction whose outputs exceed its inputs. A transaction it reaches with no input, or with no output, is refused, proven or not (`NoInputs`, `NoOutputs`, the streaming reader's kinds; 0.4.3): a root carries an input and a merkle path. A BEEF whose links form a cycle terminates.
-
-**Sighash computation lives in the script templates, not in `Transaction`,** as in the reference SDKs. `SighashCache` computes the three BIP-143 midstates once per transaction and reuses them across inputs (the free functions recompute per call, quadratic in the input count).
-
-**Parsers are bounded.** Every pre-allocation sized by an attacker-controlled count is capped by what the remaining bytes could hold (`primitives::bounded_capacity`): a crafted 20-byte BEEF with a `u32::MAX` input count is an `Err`, never an abort, on native and on `wasm32` (where `panic = abort` would otherwise be unrecoverable).
-
-**wasm32 is a first-class target.** The `wasm` feature routes randomness through the JS host, wall-clock reads through `js_sys::Date` (`std::time::SystemTime` is unimplemented on `wasm32-unknown-unknown`), and the `Peer` handshake timeout through `futures-timer`'s `setTimeout` backend (no tokio time driver exists in a Worker). The Socket.IO transport pulls in no dependency, so enabling it never breaks a wasm build. This build is exercised on every change:
-
-```sh
-cargo build --target wasm32-unknown-unknown --no-default-features \
-  --features "auth,wallet,transaction,overlay,socketio,wasm"
-```
-
-## Conformance
-
-Parity with the reference SDKs is a discipline, not a claim:
-
-- **`tests/vectors/`**: 2,031 JSON vectors shared with the TypeScript and Go SDKs (sighash 500; script evaluation 1,488 across valid, invalid and spend cases; BRC-42 derivation, HMAC-DRBG, AES-256-GCM, certificates, overlay types and admin tokens, wallet wire messages).
-- **The `ts-stack` conformance corpus**: `tests/conformance_scripts.rs` drives the interpreter, the sighash builder and the `Script` API through the script-domain corpus (5,116 vectors, the total pinned) and `tests/conformance_beef.rs` the BUMP, serialization, BEEF and regression corpora. They read `$BSV_CONFORMANCE_DIR` (default `../ts-stack/conformance` beside the crate) and skip, loudly, when the corpus is absent; when present, every vector is executed or counted against an enumerated `unsupported` allowlist with a reason, and the per-class counts are pinned so corpus or harness drift is a red test.
-- **Cross-SDK wire protocol**: the BRC-100 wallet wire (`WalletWireTransceiver` / `WalletWireProcessor`) round-trips all 28 methods against vectors captured from the Go SDK's serializer.
-- **Known divergences are written down**, in `CHANGELOG.md` and in `CLAUDE.md`: the Go SDK's default counterparty (`Anyone` vs `Self`), Go's missing TOTP, overlay caching, historian, reputation and RPuzzle; the TypeScript TOTP default of 2 digits (this crate uses 6, per the RFC); the SDKs' disagreement on the nonce HMAC inputs (`verify_nonce` is only ever called on a peer's own nonces); the Go admin-token signing key; and RFC 6979 nonces for a digest at or above the curve order, where k256 follows the RFC and libsecp256k1 does not (signatures differ in that regime only, and both verify).
-
-## Numbers (measured 2026-10-05 at `1eff2d0`, 0.3.32)
-
-| | |
-|---|---|
-| Source | 91,833 lines of Rust under `src/`, 13 feature-gated modules, one `Error` enum |
-| Tests | 3,014 passed, 0 failed (1,513 unit, 1,332 integration across 47 files, 169 doc tests; the 5 `memory_profiling` tests pass alone with `--test-threads=1` and are not counted); 128 doc examples are `ignore`d illustrations |
-| Vectors | 2,031 shared JSON vectors + the `ts-stack` corpus (5,116 script-domain vectors pinned) |
-| Fuzzing | 4 libFuzzer targets: the script parser, the transaction parser, the wire protocol, base58 |
-| Benchmarks | 4 Criterion suites: hashes, primitives, script, memory (with RSS tracking) |
-| CI | Linux, macOS and Windows on stable and beta; clippy with `-D warnings`; rustfmt; doc build |
-
-Run it yourself: `cargo test --features "full,http,websocket"` (with `~/bsv/ts-stack` beside the crate the conformance census runs too).
-
-## Who runs it
-
-The LOW stack ([bsv-low](https://github.com/Calgooon/bsv-low), a real-money card game on mainnet) runs bsv-rs in every one of its Cloudflare Workers: its overlay engine executes every submitted spend with `Transaction::verify` before broadcasting it, its watchtower co-signs 2-of-3 pot spends and verifies BRC-103 envelopes with `ProtoWallet` and `Peer`, its relay speaks BRC-103 over Socket.IO with this crate's transport, its app-layer authenticates with the BRC-104 middleware built on it, and its monitor parses and classifies spends with `Transaction`. Several of this crate's fixes were found there first (see the changelog: bounded pre-allocation, linear BEEF linking, the interpreter's resource-limit class).
-
-## Standards
-
-| BRC | What | Module |
-|---|---|---|
-| BRC-42 / BRC-43 | Key derivation, security levels, protocol IDs | `wallet` |
-| BRC-52 / BRC-53 | Identity certificates, field encryption | `auth` |
-| BRC-62 / BRC-74 / BRC-95 / BRC-96 | BEEF, BUMP merkle paths, atomic BEEF, BEEF v2 | `transaction` |
-| BRC-77 / BRC-78 | Signed and encrypted messages | `messages` |
-| BRC-100 | The wallet interface and its binary wire protocol | `wallet` |
-| BRC-103 / BRC-104 | Mutual authentication and its HTTP transport (the successors of BRC-31/Authrite; some older comments still use that name) | `auth` |
-| SHIP / SLAP / STEAK | Overlay submission, lookup availability, acknowledgements | `overlay` |
-| UHRP | Content-addressed storage | `storage` |
-
-## Development
-
-```sh
-cargo test --features "full,http,websocket"        # the suite (conformance census with ts-stack present)
-cargo build --examples --all-features              # every README example
-cargo test --test readme_examples                  # the README is the examples, byte for byte
-cargo clippy --all-targets --all-features -- -D warnings
-cargo fmt --check
-cargo doc --no-deps --all-features
-cargo bench                                        # Criterion suites
-cd fuzz && cargo fuzz run fuzz_script_parser       # needs cargo-fuzz
-```
-
-Releases: bump `version` in `Cargo.toml`, write the `CHANGELOG.md` entry (what changed, why, which test pins it), `cargo publish`, tag `vX.Y.Z`, push `main` and the tag. Every public API change is additive within 0.3; a struct gaining a public field is called out in the changelog with what a downstream literal needs.
-
 ## License
 
-MIT or Apache-2.0, at your option ([LICENSE-MIT](LICENSE-MIT), [LICENSE-APACHE](LICENSE-APACHE)).
+Licensed under [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE).
