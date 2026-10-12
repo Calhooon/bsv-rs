@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `MerklePath` refuses a one-level proof holding one hashed leaf at a
+  nonzero offset, with `MissingSibling` and the missing sibling's level
+  and offset. Parsing and `compute_root` share the check in `RootWalker`,
+  including paths built in memory. Offset 0 remains the one-transaction
+  block, its root the txid; `from_coinbase_txid` is unchanged. This closes
+  the disagreement with the BEEF reader. The six witnesses in
+  `tests/merkle_path_lone_leaf.rs` pin the parse, root, combine and BEEF
+  answers on the stack's `lone` and `lone_at_one` bodies.
+
+### Notes - cross-SDK parity
+
+- Intentional divergence: TS returns the txid for a lone leaf at any
+  offset (`ts-stack@edf6e03`, `MerklePath.ts:345,390-391`), as does Go
+  (`go-sdk@v1.7.1`, `transaction/merklepath.go:354-363`). This crate accepts
+  only offset 0, the owner's ruling recorded in bsv-stack-lean's
+  `docs/readings/one-transaction-block-lone-leaf.md`, section 4. Callers
+  holding a nonzero lone-leaf proof must obtain a valid proof; its offset
+  must not be rewritten on trust. No public type changes.
+
 ## [0.4.4] - 2026-10-10
 
 The spend of an unproven transaction is linear in its inputs, and the reader

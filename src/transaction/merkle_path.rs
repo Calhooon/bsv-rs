@@ -629,8 +629,19 @@ impl<'a> RootWalker<'a> {
     fn root_from(&mut self, txid: &str, index: u64) -> Result<String> {
         let mut working_hash = txid.to_string();
 
-        // Special case for blocks with only one transaction
+        // A block with one transaction has its lone leaf at offset 0.
+        // Match the BEEF reader; TS returns the txid at any offset
+        // (ts-stack@edf6e03 MerklePath.ts:345,390-391).
         if self.path.len() == 1 && self.path[0].len() == 1 {
+            if index != 0 {
+                return Err(crate::Error::MerklePathError(format!(
+                    "{:?}",
+                    super::beef_stream::Reason::MissingSibling {
+                        level: 0,
+                        offset: index ^ 1,
+                    }
+                )));
+            }
             return Ok(working_hash);
         }
 
