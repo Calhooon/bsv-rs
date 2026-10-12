@@ -298,8 +298,8 @@ fn chain(n: usize, atomic: bool) -> Chain {
 #[test]
 fn the_twenty_kinds_are_twenty_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 20);
-    assert_eq!(all.len(), 20);
+    assert_eq!(Kind::ALL.len(), 21);
+    assert_eq!(all.len(), 21);
 }
 
 #[test]
@@ -2106,4 +2106,87 @@ fn tracker_for(tx: &Transaction) -> MockChainTracker {
     let mut tracker = MockChainTracker::new(800_000);
     tracker.add_root(800_000, tx.id());
     tracker
+}
+
+// Mining witnesses: bsv-stack-lean #68, reading section 3, sibling@87f0461.
+
+fn mining_invalid(bytes: &[u8], headers: &HashMap<u64, Hash32>, at: u64, name: &str) {
+    for answer in [scripts(bytes, headers), structure(bytes, headers)] {
+        match answer {
+            Verdict::Invalid { offset, kind, .. } => {
+                assert_eq!((offset, format!("{kind:?}")), (at, name.into()))
+            }
+            other => panic!("expected {name} at {at}, got {other:?}"),
+        }
+    }
+}
+fn mining_spend(answer: Verdict, at: u64, name: &str) {
+    match answer {
+        Verdict::SpendRefused { offset, why, .. } => {
+            assert_eq!(offset, at);
+            assert_eq!(format!("{why:?}"), name);
+        }
+        other => panic!("expected {name} at {at}, got {other:?}"),
+    }
+}
+fn mining_child(
+    inputs: &[(Hash32, u32, &[u8])],
+    outputs: &[(u64, &[u8])],
+    proven: bool,
+) -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>) {
+    let (parent, bump, mut headers) = funded(&[(2_100_000_000_000_000, OP_TRUE)]);
+    let child = tx_with(inputs, outputs);
+    let mut bumps = vec![bump];
+    if proven {
+        let proof = bump_bytes(800_001, 1, &[vec![LeafSpec::Hash(0, txid(&child), true)]]);
+        headers.insert(800_001, txid(&child));
+        bumps.push(proof);
+    }
+    wire(
+        V1,
+        None,
+        &bumps,
+        &[
+            Entry::Raw(parent, Some(0)),
+            Entry::Raw(child, proven.then_some(1)),
+        ],
+    )
+    .pipe_headers(headers)
+}
+trait MiningWire {
+    fn pipe_headers(
+        self,
+        headers: HashMap<u64, Hash32>,
+    ) -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>);
+}
+impl MiningWire for (Vec<u8>, Vec<u64>) {
+    fn pipe_headers(
+        self,
+        headers: HashMap<u64, Hash32>,
+    ) -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>) {
+        (self.0, self.1, headers)
+    }
+}
+fn mining_parent_id() -> Hash32 {
+    txid(&funded(&[(2_100_000_000_000_000, OP_TRUE)]).0)
+}
+
+#[test]
+fn mining_row4_proven_coinbase() {
+    let raw = raw_tx(&[([0; 32], u32::MAX)], 1);
+    let bump = bump_bytes(800_000, 1, &[vec![LeafSpec::Hash(0, txid(&raw), true)]]);
+    let headers = one_header(800_000, txid(&raw));
+    let (bytes, _) = wire(V1, None, &[bump], &[Entry::Raw(raw, Some(0))]);
+    assert!(scripts(&bytes, &headers).is_valid());
+}
+
+#[test]
+fn mining_row4_unproven_coinbase() {
+    for n in [1, 0] {
+        let raw = raw_tx(&[([0; 32], u32::MAX)], n);
+        for version in [V1, V2] {
+            let (bytes, offsets) = wire(version, None, &[], &[Entry::Raw(raw.clone(), None)]);
+            mining_invalid(&bytes, &HashMap::new(), offsets[0], "UnprovenCoinbase");
+        }
+    }
 }

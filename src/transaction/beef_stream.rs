@@ -149,11 +149,13 @@ pub enum Kind {
     NoInputs,
     /// A raw transaction with an input and no output (since 0.4.3).
     NoOutputs,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    UnprovenCoinbase,
 }
 
 impl Kind {
     /// The twenty kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 20] = [
+    pub const ALL: [Kind; 21] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -174,6 +176,7 @@ impl Kind {
         Kind::UnrelatedTransaction,
         Kind::NoInputs,
         Kind::NoOutputs,
+        Kind::UnprovenCoinbase,
     ];
 }
 
@@ -282,6 +285,8 @@ pub enum Reason {
     /// `lean/BsvScript/TxRules.lean:86`, `checkTransactionCommon_voutEmpty`),
     /// so a transaction with neither is [`Reason::NoInputs`].
     NoOutputs,
+    /// Mining check from bsv-script-lean@87f0461 TxRules.lean, bsv-stack-lean #68.
+    UnprovenCoinbase,
 }
 
 impl Reason {
@@ -308,6 +313,7 @@ impl Reason {
             Reason::UnrelatedTransaction { .. } => Kind::UnrelatedTransaction,
             Reason::NoInputs => Kind::NoInputs,
             Reason::NoOutputs => Kind::NoOutputs,
+            Reason::UnprovenCoinbase => Kind::UnprovenCoinbase,
         }
     }
 }
@@ -354,6 +360,26 @@ pub(crate) fn no_transaction(inputs: usize, outputs: usize) -> Option<Reason> {
     } else {
         None
     }
+}
+
+// [SRC] sibling@87f0461 TxRules.lean:31-38,101-110; reading #68.
+fn is_coinbase(inputs: &[InputRef]) -> bool {
+    matches!(inputs, [i] if i.prev == [0; 32] && i.vout == u32::MAX)
+}
+
+fn check_transaction(
+    offset: u64,
+    inputs: &[InputRef],
+    outputs: &[OutputRef],
+    bump_index: Option<u64>,
+) -> Result<(), Refusal> {
+    if bump_index.is_none() && is_coinbase(inputs) {
+        return Err(Refusal::new(offset, Reason::UnprovenCoinbase));
+    }
+    if let Some(reason) = no_transaction(inputs.len(), outputs.len()) {
+        return Err(Refusal::new(offset, reason));
+    }
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -1457,9 +1483,7 @@ impl BeefDecoder {
     /// BUMP index (the Lean's `parseElement`).
     fn tx_done(&mut self) -> Result<Element, Refusal> {
         let tx = self.tx.take().expect("a transaction is in hand");
-        if let Some(reason) = no_transaction(tx.inputs.len(), tx.outputs.len()) {
-            return Err(Refusal::new(tx.offset, reason));
-        }
+        check_transaction(tx.offset, &tx.inputs, &tx.outputs, tx.bump_index)?;
         self.frame.txs_left -= 1;
         Ok(Element::Tx {
             offset: tx.offset,
@@ -1965,9 +1989,7 @@ impl BeefIndex {
                 // transaction, with or without a BUMP index. The stream
                 // refuses it as it is read; this holds an element built by
                 // hand to the same rule.
-                if let Some(reason) = no_transaction(body.inputs.len(), body.outputs.len()) {
-                    return Err(Refusal::new(*offset, reason).into());
-                }
+                check_transaction(*offset, &body.inputs, &body.outputs, *bump_index)?;
                 // The Lean's `checkTx`: with a BUMP index, the BUMP carries
                 // the txid and its proof vouches for the inputs; without one,
                 // each input names an earlier transaction of this BEEF.
