@@ -1802,6 +1802,11 @@ pub enum SpendRefusal {
     CreatesValue,
     /// An input value or running input total outside the sibling's MoneyRange.
     InputValueOutOfRange,
+    /// An exact P2SH output template in a regular transaction mined after Genesis.
+    P2shOutput {
+        /// Output index, named at the output value field.
+        vout: u32,
+    },
 }
 
 /// What stops a step: invalid bytes, or a spend the interpreter refused.
@@ -2034,7 +2039,7 @@ impl BeefIndex {
         from: u32,
         spent: &mut dyn FnMut() -> bool,
         work_limit: Option<u64>,
-        _tip: Option<ChainTip>,
+        tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
         match element {
             Element::Bump(_) => unreachable!("a BUMP is folded with its header answer"),
@@ -2105,6 +2110,26 @@ impl BeefIndex {
                 let seen = self.txs.get(txid).is_some_and(|e| e.raw);
                 if self.check_spends && !seen {
                     if bump_index.is_none() {
+                        // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204.
+                        let after_genesis = tip
+                            .is_none_or(|t| u64::from(t.height) + 1 >= u64::from(t.genesis_height));
+                        if after_genesis {
+                            for (vout, output) in body.outputs.iter().enumerate() {
+                                let script = &body.raw[output.script.clone()];
+                                if script.len() == 23
+                                    && script[0] == 0xa9
+                                    && script[1] == 0x14
+                                    && script[22] == 0x87
+                                {
+                                    return Err(Stop::Spend {
+                                        offset: output.at,
+                                        txid: *txid,
+                                        input: None,
+                                        why: SpendRefusal::P2shOutput { vout: vout as u32 },
+                                    });
+                                }
+                            }
+                        }
                         if let Some(next) =
                             self.check_spends_of(*offset, txid, body, from, spent, work_limit)?
                         {
