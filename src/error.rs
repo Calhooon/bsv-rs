@@ -68,6 +68,14 @@ pub enum Error {
     #[error("reader underflow: need {needed} bytes, only {available} available")]
     ReaderUnderflow { needed: usize, available: usize },
 
+    /// A varint using more bytes than its value requires. Width includes the marker.
+    #[error("non-canonical varint: {value} encoded in {width} bytes")]
+    NonCanonicalVarInt { width: u8, value: u64 },
+
+    /// A node CompactSize above `MAX_COMPACT_SIZE`.
+    #[error("compact size too large: {0}")]
+    CompactSizeTooLarge(u64),
+
     /// Invalid checksum.
     #[error("invalid checksum")]
     InvalidChecksum,

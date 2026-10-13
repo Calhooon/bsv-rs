@@ -1,6 +1,6 @@
 [package]
 name = "bsv-rs"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 description = "BSV SDK for Rust: primitives, the script interpreter, transactions and BEEF/SPV, BRC-42 wallets, BRC-103 auth, the overlay network. Reference parity with the TypeScript SDK, native and wasm32."
 license = "MIT OR Apache-2.0"
@@ -93,7 +93,8 @@ optional = true
 default = ["primitives", "script"]
 primitives = []
 script = ["primitives"]
-transaction = ["script"]
+block = ["primitives"]
+transaction = ["script", "block"]
 wallet = ["transaction"]
 messages = ["wallet"]
 compat = ["primitives"]
@@ -111,7 +112,7 @@ identity = ["auth", "overlay"]
 # `Peer::to_peer` in Cloudflare Workers / browser executors. The feature flips
 # `futures-timer` to its `gloo-timers`/`setTimeout` backend, which works there.
 wasm = ["getrandom/js", "dep:futures-timer", "futures-timer/wasm-bindgen", "dep:js-sys"]
-full = ["primitives", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity", "socketio"]
+full = ["primitives", "block", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity", "socketio"]
 http = ["dep:reqwest"]
 websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
 # Socket.IO 5 / Engine.IO 4 + BRC-103 transport. Substrate-agnostic:
