@@ -13,7 +13,7 @@ use super::beef_tx::{BEEF_V1, BEEF_V2};
 use super::input::TransactionInput;
 use super::merkle_path::MerklePath;
 use super::output::TransactionOutput;
-use crate::primitives::{bounded_capacity, from_hex, sha256d, to_hex, Reader, Writer};
+use crate::primitives::{bounded_capacity, from_hex, sha256d, to_hex, var_int_len, Reader, Writer};
 use crate::script::{LockingScript, SigningContext, UnlockingScript};
 use crate::Result;
 
@@ -1622,7 +1622,7 @@ impl Transaction {
         let mut size = 8; // version (4) + locktime (4)
 
         // Input count varint
-        size += varint_size(self.inputs.len() as u64);
+        size += var_int_len(self.inputs.len() as u64);
 
         // Inputs
         for input in &self.inputs {
@@ -1643,17 +1643,17 @@ impl Transaction {
                 })
                 .unwrap_or(0);
 
-            size += varint_size(script_len as u64) + script_len;
+            size += var_int_len(script_len as u64) + script_len;
         }
 
         // Output count varint
-        size += varint_size(self.outputs.len() as u64);
+        size += var_int_len(self.outputs.len() as u64);
 
         // Outputs
         for output in &self.outputs {
             size += 8; // satoshis
             let script_len = output.locking_script.to_binary().len();
-            size += varint_size(script_len as u64) + script_len;
+            size += var_int_len(script_len as u64) + script_len;
         }
 
         size
@@ -2135,19 +2135,6 @@ impl PartialEq for Transaction {
 
 impl Eq for Transaction {}
 
-/// Calculates the size of a varint.
-fn varint_size(val: u64) -> usize {
-    if val < 0xFD {
-        1
-    } else if val <= 0xFFFF {
-        3
-    } else if val <= 0xFFFFFFFF {
-        5
-    } else {
-        9
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2360,12 +2347,12 @@ mod tests {
     }
 
     #[test]
-    fn test_varint_size() {
-        assert_eq!(varint_size(0), 1);
-        assert_eq!(varint_size(0xFC), 1);
-        assert_eq!(varint_size(0xFD), 3);
-        assert_eq!(varint_size(0xFFFF), 3);
-        assert_eq!(varint_size(0x10000), 5);
+    fn test_var_int_len() {
+        assert_eq!(var_int_len(0), 1);
+        assert_eq!(var_int_len(0xFC), 1);
+        assert_eq!(var_int_len(0xFD), 3);
+        assert_eq!(var_int_len(0xFFFF), 3);
+        assert_eq!(var_int_len(0x10000), 5);
     }
 
     #[test]

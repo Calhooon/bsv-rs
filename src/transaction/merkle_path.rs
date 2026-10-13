@@ -4,6 +4,9 @@
 //! It is used for Simplified Payment Verification (SPV) to prove that a transaction
 //! is included in a block without needing the full block data.
 //!
+//! A computed root can be compared with [`crate::block::BlockHeader::merkle_root_hex`].
+//! [`crate::block::merkle_root`] computes the same root from the full transaction list.
+//!
 //! # BRC-74 Binary Format
 //!
 //! ```text
@@ -768,8 +771,16 @@ fn hash_pair(left: &str, right: &str) -> String {
         data.extend_from_slice(&right_bytes);
     }
 
-    // Double SHA-256
-    let hash = sha256d(&data);
+    // Valid hash pairs share the block primitive. Preserve the legacy
+    // reading of malformed display strings for callers constructing leaves.
+    let hash = if data.len() == 64 {
+        crate::block::merkle_parent(
+            data[..32].try_into().expect("32 bytes"),
+            data[32..].try_into().expect("32 bytes"),
+        )
+    } else {
+        sha256d(&data)
+    };
 
     // Reverse back to display format
     let mut result = hash.to_vec();

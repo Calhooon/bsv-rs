@@ -48,6 +48,9 @@ pub mod primitives;
 #[cfg(feature = "script")]
 pub mod script;
 
+#[cfg(feature = "block")]
+pub mod block;
+
 #[cfg(feature = "transaction")]
 pub mod transaction;
 

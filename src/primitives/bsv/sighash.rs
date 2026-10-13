@@ -237,6 +237,7 @@ pub fn parse_transaction(raw: &[u8]) -> Result<RawTransaction> {
     })
 }
 
+#[cfg(any(feature = "script", test))]
 fn varint_size(n: u64) -> u64 {
     match n {
         0..=0xfc => 1,
@@ -246,6 +247,7 @@ fn varint_size(n: u64) -> u64 {
     }
 }
 
+#[cfg(any(feature = "script", test))]
 fn output_size(output: &TxOutput) -> u64 {
     8 + varint_size(output.script.len() as u64) + output.script.len() as u64
 }
@@ -692,18 +694,21 @@ pub struct TxSighashCache {
     hash_prevouts: OnceLock<[u8; 32]>,
     hash_sequence: OnceLock<[u8; 32]>,
     hash_outputs_all: OnceLock<[u8; 32]>,
+    #[cfg(any(feature = "script", test))]
     output_bytes: u64,
 }
 
 impl TxSighashCache {
     /// The cache over a transaction's parts; no midstate is computed yet.
     pub fn new(version: i32, inputs: Vec<TxInput>, outputs: Vec<TxOutput>, locktime: u32) -> Self {
+        #[cfg(any(feature = "script", test))]
         let output_bytes = outputs.iter().map(output_size).sum();
         Self {
             version,
             inputs,
             outputs,
             locktime,
+            #[cfg(any(feature = "script", test))]
             output_bytes,
             hash_prevouts: OnceLock::new(),
             hash_sequence: OnceLock::new(),
@@ -772,6 +777,7 @@ impl TxSighashCache {
     /// double hash includes its 32-byte second SHA-256 input. Shared BIP-143
     /// cache hits cost zero; SINGLE outputs are not cached by this cache.
     /// A concurrent cache fill may make this reservation conservative.
+    #[cfg(any(feature = "script", test))]
     pub(crate) fn hashing_work(&self, input_index: usize, subscript: &[u8], scope: u32) -> u64 {
         let base = scope & SIGHASH_BASE_MASK;
         let anyone = scope & SIGHASH_ANYONECANPAY != 0;

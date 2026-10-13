@@ -153,6 +153,11 @@ pub fn to_base58(data: &[u8]) -> String {
 ///
 /// Leading '1' characters are decoded as zero bytes.
 ///
+/// Unlike bitcoin-sv@6504a3af `src/base58.cpp:25-79` (`DecodeBase58`),
+/// this rejects empty input and surrounding whitespace. This preserves the
+/// TypeScript SDK behavior at ts-stack@edf6e03 `utils.ts:288-296`.
+/// Base58Check uses the same strict alphabet reading.
+///
 /// # Arguments
 ///
 /// * `s` - The Base58 string to decode
@@ -185,8 +190,11 @@ pub fn from_base58(s: &str) -> Result<Vec<u8>> {
 
 /// Encodes data with a version prefix using Base58Check encoding.
 ///
+/// Checksum rule: bitcoin-sv@6504a3af `src/base58.cpp:132-138`, at the
+/// bsv-script-lean@50d437b node pin. The version prefix is the caller's choice.
+///
 /// Base58Check = Base58(version || payload || checksum)
-/// where checksum = first 4 bytes of SHA256(SHA256(version || payload))
+/// where checksum is the leading 4 bytes of SHA256(SHA256(version || payload))
 ///
 /// This is used for Bitcoin addresses and WIF private keys.
 ///
@@ -231,6 +239,9 @@ pub fn to_base58_check(payload: &[u8], version: &[u8]) -> String {
 ///
 /// Validates the checksum and returns the version bytes and payload separately.
 ///
+/// Source: bitcoin-sv@6504a3af `src/base58.cpp:143-156`: short bodies and
+/// mismatched checksums are refused. Whitespace is refused by `from_base58`.
+///
 /// # Arguments
 ///
 /// * `s` - The Base58Check encoded string
@@ -259,6 +270,14 @@ pub fn from_base58_check(s: &str) -> Result<(Vec<u8>, Vec<u8>)> {
 }
 
 /// Decodes a Base58Check encoded string with a custom prefix length.
+/// Checksum rule: bitcoin-sv@6504a3af `src/base58.cpp:143-156`.
+///
+/// ```
+/// use bsv_rs::primitives::encoding::{to_base58_check, from_base58_check_with_prefix_length};
+/// let encoded = to_base58_check(&[42], &[1, 2]);
+/// assert_eq!(from_base58_check_with_prefix_length(&encoded, 2)?, (vec![1, 2], vec![42]));
+/// # Ok::<(), bsv_rs::Error>(())
+/// ```
 ///
 /// # Arguments
 ///
@@ -622,7 +641,12 @@ impl<'a> Reader<'a> {
     // Bitcoin-specific
     // ------------------------------------------------------------------------
 
-    /// Reads a Bitcoin variable-length integer.
+    /// Reads a canonical Bitcoin variable-length integer.
+    ///
+    /// Since 0.6.0, wider-than-necessary encodings return `NonCanonicalVarInt`.
+    /// The full u64 range is supported; `read_compact_size` also applies the
+    /// node's size bound. Source: bitcoin-sv@6504a3af `src/serialize.h:315-340`,
+    /// through sibling@50d437b `lean/BsvScript/Tx.lean:45-57`.
     ///
     /// Bitcoin varints are encoded as follows:
     /// - `0x00-0xFC`: 1 byte, value as-is
@@ -648,13 +672,47 @@ impl<'a> Reader<'a> {
     /// assert_eq!(reader.read_var_int().unwrap(), 0xFD);
     /// ```
     pub fn read_var_int(&mut self) -> Result<u64> {
-        let first = self.read_u8()?;
-        match first {
-            0x00..=0xFC => Ok(first as u64),
+        let start = self.position();
+        let value = self.read_var_int_lenient()?;
+        let width = self.position() - start;
+        if width != var_int_len(value) {
+            return Err(Error::NonCanonicalVarInt {
+                width: width as u8,
+                value,
+            });
+        }
+        Ok(value)
+    }
+
+    /// Read a varint with the permissive behavior of 0.5, for legacy byte formats.
+    /// ```
+    /// use bsv_rs::primitives::Reader;
+    /// assert_eq!(Reader::new(&[0xfd, 0, 0]).read_var_int_lenient()?, 0);
+    /// # Ok::<(), bsv_rs::Error>(())
+    /// ```
+    pub fn read_var_int_lenient(&mut self) -> Result<u64> {
+        let prefix = self.read_u8()?;
+        match prefix {
+            0x00..=0xFC => Ok(prefix as u64),
             0xFD => Ok(self.read_u16_le()? as u64),
             0xFE => Ok(self.read_u32_le()? as u64),
             0xFF => self.read_u64_le(),
         }
+    }
+
+    /// Read canonical CompactSize, then enforce the node's `MAX_SIZE`.
+    /// Source: bitcoin-sv@6504a3af `src/serialize.h:315-340`, through
+    /// bsv-script-lean@50d437b `lean/BsvScript/Tx.lean:45-57` (canonical half).
+    /// ```
+    /// use bsv_rs::primitives::{Reader, to_var_int, MAX_COMPACT_SIZE};
+    /// assert!(Reader::new(&to_var_int(MAX_COMPACT_SIZE + 1)).read_compact_size().is_err());
+    /// ```
+    pub fn read_compact_size(&mut self) -> Result<u64> {
+        let value = self.read_var_int()?;
+        if value > MAX_COMPACT_SIZE {
+            return Err(Error::CompactSizeTooLarge(value));
+        }
+        Ok(value)
     }
 
     /// Reads a Bitcoin varint as a usize, for use as a length.
@@ -899,6 +957,22 @@ impl Writer {
         self
     }
 
+    /// Write canonical CompactSize, refusing values above the node's `MAX_SIZE`.
+    /// On error the writer is unchanged. Source: bitcoin-sv@6504a3af
+    /// `src/serialize.h:296-313` (sibling #63, #64).
+    /// ```
+    /// use bsv_rs::primitives::{Writer, MAX_COMPACT_SIZE};
+    /// let mut writer = Writer::new();
+    /// assert!(writer.write_compact_size(MAX_COMPACT_SIZE + 1).is_err());
+    /// assert!(writer.is_empty());
+    /// ```
+    pub fn write_compact_size(&mut self, value: u64) -> Result<&mut Self> {
+        if value > MAX_COMPACT_SIZE {
+            return Err(Error::CompactSizeTooLarge(value));
+        }
+        Ok(self.write_var_int(value))
+    }
+
     // ------------------------------------------------------------------------
     // Byte sequences
     // ------------------------------------------------------------------------
@@ -925,6 +999,47 @@ impl Writer {
         self.data.extend_from_slice(data);
         self
     }
+}
+
+/// The node's maximum CompactSize (`bitcoin-sv@6504a3af src/serialize.h:34`).
+/// ```
+/// assert_eq!(bsv_rs::primitives::MAX_COMPACT_SIZE, u32::MAX as u64);
+/// ```
+pub const MAX_COMPACT_SIZE: u64 = u32::MAX as u64;
+
+/// Encoded varint width, including its marker (`serialize.h:280-292` at 6504a3af).
+/// ```
+/// assert_eq!(bsv_rs::primitives::var_int_len(253), 3);
+/// ```
+pub const fn var_int_len(value: u64) -> usize {
+    match value {
+        0..=0xfc => 1,
+        0xfd..=0xffff => 3,
+        0x10000..=0xffff_ffff => 5,
+        _ => 9,
+    }
+}
+
+/// Encode any u64 in canonical varint form; no CompactSize bound is imposed.
+/// ```
+/// assert_eq!(bsv_rs::primitives::to_var_int(253), [0xfd, 0xfd, 0]);
+/// ```
+pub fn to_var_int(value: u64) -> Vec<u8> {
+    let mut writer = Writer::with_capacity(var_int_len(value));
+    writer.write_var_int(value);
+    writer.into_bytes()
+}
+
+/// Read a canonical varint prefix and return its value and consumed byte count.
+/// Following bytes are left to the caller. Short input returns `ReaderUnderflow`.
+/// ```
+/// assert_eq!(bsv_rs::primitives::from_var_int(&[0xfd, 0xfd, 0, 42])?, (253, 3));
+/// # Ok::<(), bsv_rs::Error>(())
+/// ```
+pub fn from_var_int(bytes: &[u8]) -> Result<(u64, usize)> {
+    let mut reader = Reader::new(bytes);
+    let value = reader.read_var_int()?;
+    Ok((value, reader.position()))
 }
 
 // ============================================================================
@@ -1741,7 +1856,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ts_varint_reader() {
+    fn test_ts_lenient_varint_reader_and_canonical_default() {
         // From Reader.test.ts
         let buf = vec![50];
         let mut reader = Reader::new(&buf);
@@ -1754,6 +1869,13 @@ mod tests {
         let mut buf = vec![254, 0, 0, 0, 0];
         buf[1..5].copy_from_slice(&50000u32.to_le_bytes());
         let mut reader = Reader::new(&buf);
-        assert_eq!(reader.read_var_int().unwrap(), 50000);
+        assert_eq!(
+            reader.read_var_int(),
+            Err(Error::NonCanonicalVarInt {
+                width: 5,
+                value: 50000
+            })
+        );
+        assert_eq!(Reader::new(&buf).read_var_int_lenient().unwrap(), 50000);
     }
 }

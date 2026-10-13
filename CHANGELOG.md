@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-14
+
+### Chain primitives
+
+The design is `docs/p0/bsv-rs-060-primitives-design.md` in bsv-stack-lean.
+Node rules are cited through bsv-script-lean@50d437b
+`lean/BsvChain/{Header,Pow,Merkle}.lean` and `lean/BsvScript/Tx.lean`,
+which cite bitcoin-sv v1.2.3 at 6504a3af (#63, #64, #65).
+
+- New `block` feature, enabled by `transaction` and listed in `full`:
+  `BlockHeader` (exact 80-byte frame, `version: i32`, internal-order hashes,
+  `hash`/`id`), `CompactTarget` (`SetCompact`, negative and overflow flags),
+  `U256::to_compact` and `to_compact_signed` (`GetCompact`),
+  `check_proof_of_work` with network limits and non-exhaustive `PowError`,
+  `ChainWork` (`GetBlockProof`, numeric order, strict 1-to-64-digit hex input),
+  `merkle_root`, `block_merkle_root` and `merkle_parent`. List roots carry the
+  node's `mutated` flag; a caller accepting a list must refuse a mutated result
+  (CVE-2012-2459). Difficulty adjustment remains the host's responsibility.
+- New `primitives::U256`: four little-endian u64 limbs, modulo-2^256
+  arithmetic, checked division, fixed-width bytes and numeric hex.
+- `primitives::Hash32` moves from `transaction::beef_stream`, with a
+  compatible re-export at the old path.
+- `Reader::read_var_int` now refuses non-canonical encodings, as the node's
+  `ReadCompactSize` and ts-sdk's `readVarIntNumStrict` do. This also applies
+  to transactions, whole and streaming BEEF, and BUMP parsers.
+  `read_var_int_lenient` preserves 0.5's reading. Streaming refusals reuse
+  `BadVarint` at the field's leading byte, including across chunk boundaries.
+- New `read_compact_size`, `write_compact_size` and `MAX_COMPACT_SIZE` apply
+  the node's `MAX_SIZE = u32::MAX`; general varints retain the u64 range.
+  `var_int_len`, `to_var_int` and `from_var_int` expose the shared encoding.
+  New exhaustive `Error` variants `NonCanonicalVarInt { width, value }`
+  (width includes the marker) and `CompactSizeTooLarge`: update exhaustive
+  matches. Stored non-canonical transaction, BEEF or BUMP bytes must be
+  revalidated when a consumer adopts 0.6.0; no stored data is rewritten here.
+- Base58Check signatures and behavior stay unchanged. Rust transcriptions
+  of the node's 12 raw base58 rows and 50 key rows, compact-target tables,
+  varint refusals, merkle properties and three pinned header runs are tested.
+- No dependency added, no serde on the new types. wasm32 builds cover
+  `block`, `transaction` and the existing application feature combination.
+
+### Notes - cross-SDK parity
+
+Raw `from_base58` retains the TypeScript SDK's refusal of empty input and
+surrounding whitespace (`ts-stack@edf6e03`, `utils.ts:288-296`), differing
+from the node's `DecodeBase58` (`src/base58.cpp:25-79` at 6504a3af).
+Canonical varints agree with the node and TS strict readers; Go v1.7.1
+`util/varint.go:71-105` remains lenient. A host wanting the node's size bound
+uses the CompactSize methods. The tests are `canonical_varint`,
+`chain_encoding` and `chain_primitives`; the vectors CI job runs all three.
+
 ## [0.5.0] - 2026-10-12
 
 ### Mining checks in the streaming BEEF reader (bsv-stack-lean #68)

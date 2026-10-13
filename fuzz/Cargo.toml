@@ -43,3 +43,9 @@ name = "fuzz_beef_parser"
 path = "fuzz_targets/fuzz_beef_parser.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_chain_primitives"
+path = "fuzz_targets/fuzz_chain_primitives.rs"
+test = false
+doc = false

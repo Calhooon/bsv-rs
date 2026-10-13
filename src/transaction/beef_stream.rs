@@ -77,7 +77,7 @@ use std::sync::Arc;
 use sha2::{Digest, Sha256};
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::primitives::{sha256d, to_hex, Reader, Writer};
+use crate::primitives::{to_hex, Reader, Writer};
 use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
@@ -86,7 +86,7 @@ use super::merkle_path::{MerklePath, MerklePathLeaf};
 
 /// A 32-byte digest in the order the wire carries it (a txid or a merkle
 /// node; its display form is the bytes reversed, in hex).
-pub type Hash32 = [u8; 32];
+pub use crate::primitives::Hash32;
 
 /// The display form of a digest: the bytes reversed, in hex.
 pub fn display_hex(hash: &Hash32) -> String {
@@ -105,7 +105,7 @@ pub fn display_hex(hash: &Hash32) -> String {
 pub enum Kind {
     /// The version word is neither `0100BEEF` nor `0200BEEF`.
     BadVersion,
-    /// A varint whose lead byte promises bytes the stream does not have.
+    /// A varint cut short or encoded non-canonically.
     BadVarint,
     /// A fixed-width field cut short.
     Truncated,
@@ -195,7 +195,7 @@ pub enum Reason {
         /// The word, little-endian.
         word: u32,
     },
-    /// A varint cut short.
+    /// A varint cut short or encoded non-canonically.
     BadVarint,
     /// A fixed-width field cut short.
     Truncated {
@@ -602,10 +602,7 @@ impl Element {
 
 /// The parent of two nodes: the double SHA-256 of left then right.
 fn pair(left: &Hash32, right: &Hash32) -> Hash32 {
-    let mut data = [0u8; 64];
-    data[..32].copy_from_slice(left);
-    data[32..].copy_from_slice(right);
-    sha256d(&data)
+    crate::block::merkle_parent(left, right)
 }
 
 /// A node on a hashed leaf's path: its offset at the current level, its hash,
@@ -1075,13 +1072,9 @@ impl BeefDecoder {
                     if !self.fill(input, n) {
                         return Ok(Step::NeedMore);
                     }
-                    let mut le = [0u8; 8];
-                    let value = if n == 1 {
-                        self.scratch[0] as u64
-                    } else {
-                        le[..n - 1].copy_from_slice(&self.scratch[1..n]);
-                        u64::from_le_bytes(le)
-                    };
+                    let value = Reader::new(&self.scratch[..n])
+                        .read_var_int()
+                        .map_err(|_| Refusal::new(self.field_at, Reason::BadVarint))?;
                     self.absorb_scratch(n);
                     self.have = 0;
                     self.on_varint(value)?

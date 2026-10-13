@@ -67,6 +67,13 @@ dhat-profiling = ["dep:dhat"]
 
 ## Known cross-SDK divergences (keep this list honest)
 
+- Raw base58 rejects empty input and surrounding whitespace, as TS does;
+  bitcoin-sv@6504a3af `src/base58.cpp:25-79` accepts them. The node's checksum
+  and 50 key vectors pass in `tests/chain_encoding.rs`.
+- Varint readers are canonical from 0.6.0, as node and TS strict readers are;
+  go-sdk@v1.7.1 `util/varint.go:71-105` remains lenient. Legacy callers can
+  use `read_var_int_lenient`; node size bounds use the CompactSize methods.
+
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
 - Go lacks TOTP, overlay caching/historian/reputation, and the RPuzzle template.
 - TS TOTP defaults to 2 digits; this crate uses 6 (RFC 6238).
