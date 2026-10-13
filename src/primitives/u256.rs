@@ -52,8 +52,9 @@ impl U256 {
     /// ```
     pub fn from_le_bytes(bytes: [u8; 32]) -> Self {
         let mut limbs = [0; 4];
-        for (limb, chunk) in limbs.iter_mut().zip(bytes.chunks_exact(8)) {
-            *limb = u64::from_le_bytes(chunk.try_into().expect("eight bytes"));
+        let (chunks, _) = bytes.as_slice().as_chunks::<8>();
+        for (limb, chunk) in limbs.iter_mut().zip(chunks) {
+            *limb = u64::from_le_bytes(*chunk);
         }
         Self(limbs)
     }
@@ -64,8 +65,9 @@ impl U256 {
     /// ```
     pub fn to_le_bytes(&self) -> [u8; 32] {
         let mut bytes = [0; 32];
-        for (chunk, limb) in bytes.chunks_exact_mut(8).zip(self.0) {
-            chunk.copy_from_slice(&limb.to_le_bytes());
+        let (chunks, _) = bytes.as_mut_slice().as_chunks_mut::<8>();
+        for (chunk, limb) in chunks.iter_mut().zip(self.0) {
+            *chunk = limb.to_le_bytes();
         }
         bytes
     }
