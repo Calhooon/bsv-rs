@@ -188,7 +188,8 @@ fn teranode_header_runs_link_work_and_pow() {
         assert_eq!(data.len(), count * HEADER_SIZE);
         let mut prev = None;
         let mut sum = ChainWork::ZERO;
-        for frame in data.chunks_exact(HEADER_SIZE) {
+        for frame in data.as_chunks::<HEADER_SIZE>().0 {
+            let frame: &[u8] = frame;
             let header = BlockHeader::from_binary(frame).unwrap();
             assert_eq!(header.to_binary(), frame);
             if let Some(hash) = prev {
