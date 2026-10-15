@@ -202,6 +202,33 @@ jobs:
         env:
           RUSTDOCFLAGS: -Dwarnings
 
+  # the declared rust-version (bsv-stack-lean #139): the library with every feature, native and
+  # wasm32, on that toolchain, the dependencies resolved to versions it supports
+  msrv:
+    name: msrv
+    runs-on: ubuntu-latest
+    env:
+      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: "1.88.0"
+          targets: wasm32-unknown-unknown
+
+      - name: The manifest declares this toolchain
+        run: grep -qx 'rust-version = "1.88"' Cargo.toml
+
+      - name: Check the library
+        run: cargo check --lib --all-features
+
+      - name: Check the library on wasm32
+        run: cargo check --lib --target wasm32-unknown-unknown --no-default-features --features "full,wasm"
+
   # the unused dependencies (bsv-stack-lean #137): cargo-machete reads the manifests and the
   # sources of the crate and fuzz/, no build; non-blocking until a captain asks. The tool is
   # installed by version from crates.io with its own lock, without the workflow's -Dwarnings
