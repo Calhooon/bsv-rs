@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### The lint bar (bsv-stack-lean #134, #135, #137, #139, #140, #144, #145)
+
+No version move and no public signature changed.
+
+- `[lints]` in `Cargo.toml`: `unsafe_code = "forbid"` (the crate has no
+  `unsafe`), `missing_docs = "deny"`, and clippy's `unwrap_used`,
+  `expect_used`, `panic`, `todo`, `unimplemented` and `dbg_macro` denied.
+  `clippy.toml` lets a test function unwrap, expect and panic; each test,
+  bench and example file that needs them carries one allow naming #134.
+- The library's 115 unwrap, expect and panic sites: the infallible ones
+  rewritten without a panic path (slice-to-array conversions, guarded pops
+  and lookups, the curve constants built from bytes); the documented
+  `# Panics` contracts and infallible public signatures allowed at the site
+  with the reason. `Script::write_bin` and `LookupResolver::new` now document
+  their panics.
+- Behavior: the host reputation tracker and the cached key deriver read a
+  lock poisoned by a panic elsewhere instead of panicking again.
+- Docs on every public item: the 261 opcode constants of `script::op`, the
+  fields of the `Error` struct variants and of `PowError`, and the wallet
+  serde helpers.
+- `rust-version = "1.88"` (1.87 refuses `slice::as_chunks`); the gate's
+  `msrv` job checks the library on 1.88.0, native and wasm32.
+- New gate jobs: `secrets` (gitleaks 8.30.1 over the history, built from a
+  sha256-pinned source; judged findings in `.gitleaksignore`), `actionlint`
+  (1.7.12, the same way, with a check that every `uses:` is pinned by a
+  commit sha) and `unused dependencies` (cargo-machete 0.9.2, non-blocking;
+  none found).
+
 ## [0.6.1] - 2026-10-15
 
 ### Incremental hashing
