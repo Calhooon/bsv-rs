@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-15
+
+### Incremental hashing
+
+- New `primitives::hash::Sha256` and `primitives::hash::Sha256d`: `new()`,
+  `update(&[u8])` (returns `&mut Self`, so calls chain), `finalize(self) ->
+  [u8; 32]`, `Default`, `Clone`, and a `Debug` that prints no state.
+  `Sha256d::finalize` is SHA256(SHA256(everything updated)). The types wrap
+  `sha2`; none of its types appear in the public API.
+- `sha256` and `sha256d` are now defined through the hashers (one
+  implementation); their signatures and results are unchanged.
+- The site they serve: the relay's `inline_spool_key`
+  (`src/beef_door.rs`), which hashes an inline payment 64 KiB at a time and
+  kept a direct `sha2` for it while bsv-rs had one-shot hashes only.
+- `tests/hash_stream.rs`: every row of bsv-stack-lean's BEEF-of-any-size
+  corpus (`tests/vectors/beef_of_any_size/`) hashed whole and in chunks of 1,
+  7, 64 KiB, its full length and seeded random boundaries, against the
+  corpus's pinned digests; generated buffers of 0 to 300,000 bytes. Run by
+  the vectors job.
+
 ## [0.6.0] - 2026-10-14
 
 ### Chain primitives
