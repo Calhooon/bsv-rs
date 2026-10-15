@@ -11,6 +11,7 @@
 //! - Memory usage awareness through RSS tracking
 //! - Cross-platform support (Linux, macOS, Windows)
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: bench code: a failed unwrap is the bench failing
+#![allow(missing_docs)] // #135: criterion_group! generates the bench's public function, which takes no doc
 
 use bsv_rs::primitives::bsv::shamir::split_private_key;
 use bsv_rs::primitives::ec::PrivateKey;

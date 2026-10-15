@@ -1,3 +1,4 @@
+//! `Headers::mining_tip`: `None` by default, and a reference to a `Headers` forwards its own.
 #![cfg(feature = "transaction")]
 use bsv_rs::transaction::beef_stream::{ChainTip, Hash32, Headers};
 struct OldHeaders;

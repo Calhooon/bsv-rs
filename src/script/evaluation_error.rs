@@ -64,6 +64,7 @@ impl fmt::Display for ScriptResource {
 /// the attempted usage (the reference's `ScriptResourceLimitError` fields).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ScriptResourceLimit {
+    /// The resource the refused operation would exceed.
     pub resource: ScriptResource,
     /// Budget in bytes for memory resources, units for work.
     pub limit: u64,
@@ -73,6 +74,8 @@ pub struct ScriptResourceLimit {
     pub work_spent: Option<u64>,
 }
 
+/// A script evaluation that failed: the message, the spend it was evaluating
+/// and the interpreter's state at the failure.
 #[derive(Debug, Clone)]
 pub struct ScriptEvaluationError {
     /// The error message describing what went wrong.

@@ -7,286 +7,547 @@ use std::collections::HashMap;
 use std::sync::LazyLock;
 
 // Push value
+/// Pushes an empty byte vector, the number zero and false.
 pub const OP_FALSE: u8 = 0x00;
+/// Pushes an empty byte vector, the number zero and false (the same byte as `OP_FALSE`).
 pub const OP_0: u8 = 0x00;
 
 // Direct push data (OP_DATA_1 through OP_DATA_75: push exactly N bytes)
+/// Pushes the next 1 byte.
 pub const OP_DATA_1: u8 = 0x01;
+/// Pushes the next 2 bytes.
 pub const OP_DATA_2: u8 = 0x02;
+/// Pushes the next 3 bytes.
 pub const OP_DATA_3: u8 = 0x03;
+/// Pushes the next 4 bytes.
 pub const OP_DATA_4: u8 = 0x04;
+/// Pushes the next 5 bytes.
 pub const OP_DATA_5: u8 = 0x05;
+/// Pushes the next 6 bytes.
 pub const OP_DATA_6: u8 = 0x06;
+/// Pushes the next 7 bytes.
 pub const OP_DATA_7: u8 = 0x07;
+/// Pushes the next 8 bytes.
 pub const OP_DATA_8: u8 = 0x08;
+/// Pushes the next 9 bytes.
 pub const OP_DATA_9: u8 = 0x09;
+/// Pushes the next 10 bytes.
 pub const OP_DATA_10: u8 = 0x0a;
+/// Pushes the next 11 bytes.
 pub const OP_DATA_11: u8 = 0x0b;
+/// Pushes the next 12 bytes.
 pub const OP_DATA_12: u8 = 0x0c;
+/// Pushes the next 13 bytes.
 pub const OP_DATA_13: u8 = 0x0d;
+/// Pushes the next 14 bytes.
 pub const OP_DATA_14: u8 = 0x0e;
+/// Pushes the next 15 bytes.
 pub const OP_DATA_15: u8 = 0x0f;
+/// Pushes the next 16 bytes.
 pub const OP_DATA_16: u8 = 0x10;
+/// Pushes the next 17 bytes.
 pub const OP_DATA_17: u8 = 0x11;
+/// Pushes the next 18 bytes.
 pub const OP_DATA_18: u8 = 0x12;
+/// Pushes the next 19 bytes.
 pub const OP_DATA_19: u8 = 0x13;
+/// Pushes the next 20 bytes.
 pub const OP_DATA_20: u8 = 0x14;
+/// Pushes the next 21 bytes.
 pub const OP_DATA_21: u8 = 0x15;
+/// Pushes the next 22 bytes.
 pub const OP_DATA_22: u8 = 0x16;
+/// Pushes the next 23 bytes.
 pub const OP_DATA_23: u8 = 0x17;
+/// Pushes the next 24 bytes.
 pub const OP_DATA_24: u8 = 0x18;
+/// Pushes the next 25 bytes.
 pub const OP_DATA_25: u8 = 0x19;
+/// Pushes the next 26 bytes.
 pub const OP_DATA_26: u8 = 0x1a;
+/// Pushes the next 27 bytes.
 pub const OP_DATA_27: u8 = 0x1b;
+/// Pushes the next 28 bytes.
 pub const OP_DATA_28: u8 = 0x1c;
+/// Pushes the next 29 bytes.
 pub const OP_DATA_29: u8 = 0x1d;
+/// Pushes the next 30 bytes.
 pub const OP_DATA_30: u8 = 0x1e;
+/// Pushes the next 31 bytes.
 pub const OP_DATA_31: u8 = 0x1f;
+/// Pushes the next 32 bytes.
 pub const OP_DATA_32: u8 = 0x20;
+/// Pushes the next 33 bytes.
 pub const OP_DATA_33: u8 = 0x21;
+/// Pushes the next 34 bytes.
 pub const OP_DATA_34: u8 = 0x22;
+/// Pushes the next 35 bytes.
 pub const OP_DATA_35: u8 = 0x23;
+/// Pushes the next 36 bytes.
 pub const OP_DATA_36: u8 = 0x24;
+/// Pushes the next 37 bytes.
 pub const OP_DATA_37: u8 = 0x25;
+/// Pushes the next 38 bytes.
 pub const OP_DATA_38: u8 = 0x26;
+/// Pushes the next 39 bytes.
 pub const OP_DATA_39: u8 = 0x27;
+/// Pushes the next 40 bytes.
 pub const OP_DATA_40: u8 = 0x28;
+/// Pushes the next 41 bytes.
 pub const OP_DATA_41: u8 = 0x29;
+/// Pushes the next 42 bytes.
 pub const OP_DATA_42: u8 = 0x2a;
+/// Pushes the next 43 bytes.
 pub const OP_DATA_43: u8 = 0x2b;
+/// Pushes the next 44 bytes.
 pub const OP_DATA_44: u8 = 0x2c;
+/// Pushes the next 45 bytes.
 pub const OP_DATA_45: u8 = 0x2d;
+/// Pushes the next 46 bytes.
 pub const OP_DATA_46: u8 = 0x2e;
+/// Pushes the next 47 bytes.
 pub const OP_DATA_47: u8 = 0x2f;
+/// Pushes the next 48 bytes.
 pub const OP_DATA_48: u8 = 0x30;
+/// Pushes the next 49 bytes.
 pub const OP_DATA_49: u8 = 0x31;
+/// Pushes the next 50 bytes.
 pub const OP_DATA_50: u8 = 0x32;
+/// Pushes the next 51 bytes.
 pub const OP_DATA_51: u8 = 0x33;
+/// Pushes the next 52 bytes.
 pub const OP_DATA_52: u8 = 0x34;
+/// Pushes the next 53 bytes.
 pub const OP_DATA_53: u8 = 0x35;
+/// Pushes the next 54 bytes.
 pub const OP_DATA_54: u8 = 0x36;
+/// Pushes the next 55 bytes.
 pub const OP_DATA_55: u8 = 0x37;
+/// Pushes the next 56 bytes.
 pub const OP_DATA_56: u8 = 0x38;
+/// Pushes the next 57 bytes.
 pub const OP_DATA_57: u8 = 0x39;
+/// Pushes the next 58 bytes.
 pub const OP_DATA_58: u8 = 0x3a;
+/// Pushes the next 59 bytes.
 pub const OP_DATA_59: u8 = 0x3b;
+/// Pushes the next 60 bytes.
 pub const OP_DATA_60: u8 = 0x3c;
+/// Pushes the next 61 bytes.
 pub const OP_DATA_61: u8 = 0x3d;
+/// Pushes the next 62 bytes.
 pub const OP_DATA_62: u8 = 0x3e;
+/// Pushes the next 63 bytes.
 pub const OP_DATA_63: u8 = 0x3f;
+/// Pushes the next 64 bytes.
 pub const OP_DATA_64: u8 = 0x40;
+/// Pushes the next 65 bytes.
 pub const OP_DATA_65: u8 = 0x41;
+/// Pushes the next 66 bytes.
 pub const OP_DATA_66: u8 = 0x42;
+/// Pushes the next 67 bytes.
 pub const OP_DATA_67: u8 = 0x43;
+/// Pushes the next 68 bytes.
 pub const OP_DATA_68: u8 = 0x44;
+/// Pushes the next 69 bytes.
 pub const OP_DATA_69: u8 = 0x45;
+/// Pushes the next 70 bytes.
 pub const OP_DATA_70: u8 = 0x46;
+/// Pushes the next 71 bytes.
 pub const OP_DATA_71: u8 = 0x47;
+/// Pushes the next 72 bytes.
 pub const OP_DATA_72: u8 = 0x48;
+/// Pushes the next 73 bytes.
 pub const OP_DATA_73: u8 = 0x49;
+/// Pushes the next 74 bytes.
 pub const OP_DATA_74: u8 = 0x4a;
+/// Pushes the next 75 bytes.
 pub const OP_DATA_75: u8 = 0x4b;
 
+/// Pushes the number of bytes given by the next byte.
 pub const OP_PUSHDATA1: u8 = 0x4c;
+/// Pushes the number of bytes given by the next two bytes, little-endian.
 pub const OP_PUSHDATA2: u8 = 0x4d;
+/// Pushes the number of bytes given by the next four bytes, little-endian.
 pub const OP_PUSHDATA4: u8 = 0x4e;
+/// Pushes the number -1.
 pub const OP_1NEGATE: u8 = 0x4f;
+/// Reserved: fails the script when executed.
 pub const OP_RESERVED: u8 = 0x50;
+/// Pushes the number 1, true (the same byte as `OP_1`).
 pub const OP_TRUE: u8 = 0x51;
+/// Pushes the number 1.
 pub const OP_1: u8 = 0x51;
+/// Pushes the number 2.
 pub const OP_2: u8 = 0x52;
+/// Pushes the number 3.
 pub const OP_3: u8 = 0x53;
+/// Pushes the number 4.
 pub const OP_4: u8 = 0x54;
+/// Pushes the number 5.
 pub const OP_5: u8 = 0x55;
+/// Pushes the number 6.
 pub const OP_6: u8 = 0x56;
+/// Pushes the number 7.
 pub const OP_7: u8 = 0x57;
+/// Pushes the number 8.
 pub const OP_8: u8 = 0x58;
+/// Pushes the number 9.
 pub const OP_9: u8 = 0x59;
+/// Pushes the number 10.
 pub const OP_10: u8 = 0x5a;
+/// Pushes the number 11.
 pub const OP_11: u8 = 0x5b;
+/// Pushes the number 12.
 pub const OP_12: u8 = 0x5c;
+/// Pushes the number 13.
 pub const OP_13: u8 = 0x5d;
+/// Pushes the number 14.
 pub const OP_14: u8 = 0x5e;
+/// Pushes the number 15.
 pub const OP_15: u8 = 0x5f;
+/// Pushes the number 16.
 pub const OP_16: u8 = 0x60;
 
 // Control flow
+/// Does nothing.
 pub const OP_NOP: u8 = 0x61;
+/// Pushes the transaction version as 4 little-endian bytes for a UTXO created after Chronicle; fails the script when executed before.
 pub const OP_VER: u8 = 0x62;
+/// Executes the following branch if the top stack item is true, popping it.
 pub const OP_IF: u8 = 0x63;
+/// Executes the following branch if the top stack item is false, popping it.
 pub const OP_NOTIF: u8 = 0x64;
+/// After Chronicle, a conditional on the top item being the transaction version as 4 little-endian bytes; before, fails the script when executed.
 pub const OP_VERIF: u8 = 0x65;
+/// After Chronicle, a conditional on the top item not being the transaction version as 4 little-endian bytes; before, fails the script when executed.
 pub const OP_VERNOTIF: u8 = 0x66;
+/// Switches the current conditional to its other branch.
 pub const OP_ELSE: u8 = 0x67;
+/// Ends the current conditional.
 pub const OP_ENDIF: u8 = 0x68;
+/// Fails the script unless the top stack item is true, popping it.
 pub const OP_VERIFY: u8 = 0x69;
+/// Ends execution; after Genesis, at the top level the stack then decides the verdict.
 pub const OP_RETURN: u8 = 0x6a;
 
 // Stack ops
+/// Moves the top item of the main stack to the alt stack.
 pub const OP_TOALTSTACK: u8 = 0x6b;
+/// Moves the top item of the alt stack to the main stack.
 pub const OP_FROMALTSTACK: u8 = 0x6c;
+/// Removes the top two stack items.
 pub const OP_2DROP: u8 = 0x6d;
+/// Duplicates the top two stack items.
 pub const OP_2DUP: u8 = 0x6e;
+/// Duplicates the top three stack items.
 pub const OP_3DUP: u8 = 0x6f;
+/// Copies the third and fourth items to the top.
 pub const OP_2OVER: u8 = 0x70;
+/// Moves the fifth and sixth items to the top.
 pub const OP_2ROT: u8 = 0x71;
+/// Swaps the top two pairs of items.
 pub const OP_2SWAP: u8 = 0x72;
+/// Duplicates the top stack item if it is true.
 pub const OP_IFDUP: u8 = 0x73;
+/// Pushes the number of stack items.
 pub const OP_DEPTH: u8 = 0x74;
+/// Removes the top stack item.
 pub const OP_DROP: u8 = 0x75;
+/// Duplicates the top stack item.
 pub const OP_DUP: u8 = 0x76;
+/// Removes the second item from the top.
 pub const OP_NIP: u8 = 0x77;
+/// Copies the second item to the top.
 pub const OP_OVER: u8 = 0x78;
+/// Pops n, then copies the item n deep (0 is the top) to the top.
 pub const OP_PICK: u8 = 0x79;
+/// Pops n, then moves the item n deep (0 is the top) to the top.
 pub const OP_ROLL: u8 = 0x7a;
+/// Moves the third item to the top.
 pub const OP_ROT: u8 = 0x7b;
+/// Swaps the top two items.
 pub const OP_SWAP: u8 = 0x7c;
+/// Copies the top item below the second item.
 pub const OP_TUCK: u8 = 0x7d;
 
 // Data manipulation ops (BSV re-enabled)
+/// Concatenates the top two items.
 pub const OP_CAT: u8 = 0x7e;
+/// The legacy name of 0x7f, `OP_SPLIT`; the Chronicle `OP_SUBSTR` is `OP_NOP4` (0xb3).
 pub const OP_SUBSTR: u8 = 0x7f; // Legacy name
+/// Splits an item at a position into two items.
 pub const OP_SPLIT: u8 = 0x7f; // BSV name
+/// The legacy name of 0x80, `OP_NUM2BIN`; the Chronicle `OP_LEFT` is `OP_NOP5` (0xb4).
 pub const OP_LEFT: u8 = 0x80; // Legacy name
+/// Converts a number to a byte vector of a given length.
 pub const OP_NUM2BIN: u8 = 0x80; // BSV name
+/// The legacy name of 0x81, `OP_BIN2NUM`; the Chronicle `OP_RIGHT` is `OP_NOP6` (0xb5).
 pub const OP_RIGHT: u8 = 0x81; // Legacy name
+/// Converts a byte vector to its minimal number encoding.
 pub const OP_BIN2NUM: u8 = 0x81; // BSV name
+/// Pushes the length of the top item, keeping it.
 pub const OP_SIZE: u8 = 0x82;
 
 // Bit logic
+/// Flips every bit of the top item.
 pub const OP_INVERT: u8 = 0x83;
+/// Bitwise AND of the top two items, of equal length.
 pub const OP_AND: u8 = 0x84;
+/// Bitwise OR of the top two items, of equal length.
 pub const OP_OR: u8 = 0x85;
+/// Bitwise XOR of the top two items, of equal length.
 pub const OP_XOR: u8 = 0x86;
+/// Pushes true if the top two items are byte-equal, else false.
 pub const OP_EQUAL: u8 = 0x87;
+/// `OP_EQUAL` then `OP_VERIFY`.
 pub const OP_EQUALVERIFY: u8 = 0x88;
+/// Reserved: fails the script when executed.
 pub const OP_RESERVED1: u8 = 0x89;
+/// Reserved: fails the script when executed.
 pub const OP_RESERVED2: u8 = 0x8a;
 
 // Numeric ops
+/// Adds 1 to the top number.
 pub const OP_1ADD: u8 = 0x8b;
+/// Subtracts 1 from the top number.
 pub const OP_1SUB: u8 = 0x8c;
+/// Doubles the top number; disabled unless the UTXO was created after Chronicle.
 pub const OP_2MUL: u8 = 0x8d;
+/// Halves the top number; disabled unless the UTXO was created after Chronicle.
 pub const OP_2DIV: u8 = 0x8e;
+/// Negates the top number.
 pub const OP_NEGATE: u8 = 0x8f;
+/// Replaces the top number by its absolute value.
 pub const OP_ABS: u8 = 0x90;
+/// Pushes 1 if the top number is 0, else 0.
 pub const OP_NOT: u8 = 0x91;
+/// Pushes 0 if the top number is 0, else 1.
 pub const OP_0NOTEQUAL: u8 = 0x92;
+/// Adds the top two numbers.
 pub const OP_ADD: u8 = 0x93;
+/// Subtracts the top number from the second.
 pub const OP_SUB: u8 = 0x94;
+/// Multiplies the top two numbers.
 pub const OP_MUL: u8 = 0x95;
+/// Divides the second number by the top number.
 pub const OP_DIV: u8 = 0x96;
+/// The remainder of the second number divided by the top number.
 pub const OP_MOD: u8 = 0x97;
+/// Shifts the bits of the second item left by the top number, keeping its length.
 pub const OP_LSHIFT: u8 = 0x98;
+/// Shifts the bits of the second item right by the top number, keeping its length.
 pub const OP_RSHIFT: u8 = 0x99;
+/// Pushes 1 if both top numbers are nonzero, else 0.
 pub const OP_BOOLAND: u8 = 0x9a;
+/// Pushes 1 if either top number is nonzero, else 0.
 pub const OP_BOOLOR: u8 = 0x9b;
+/// Pushes 1 if the top two numbers are equal, else 0.
 pub const OP_NUMEQUAL: u8 = 0x9c;
+/// `OP_NUMEQUAL` then `OP_VERIFY`.
 pub const OP_NUMEQUALVERIFY: u8 = 0x9d;
+/// Pushes 1 if the top two numbers differ, else 0.
 pub const OP_NUMNOTEQUAL: u8 = 0x9e;
+/// Pushes 1 if the second number is less than the top number, else 0.
 pub const OP_LESSTHAN: u8 = 0x9f;
+/// Pushes 1 if the second number is greater than the top number, else 0.
 pub const OP_GREATERTHAN: u8 = 0xa0;
+/// Pushes 1 if the second number is at most the top number, else 0.
 pub const OP_LESSTHANOREQUAL: u8 = 0xa1;
+/// Pushes 1 if the second number is at least the top number, else 0.
 pub const OP_GREATERTHANOREQUAL: u8 = 0xa2;
+/// Pushes the smaller of the top two numbers.
 pub const OP_MIN: u8 = 0xa3;
+/// Pushes the larger of the top two numbers.
 pub const OP_MAX: u8 = 0xa4;
+/// Pushes 1 if x is in [min, max) for the top three numbers x, min, max, else 0.
 pub const OP_WITHIN: u8 = 0xa5;
 
 // Crypto ops
+/// Replaces the top item by its RIPEMD-160 hash.
 pub const OP_RIPEMD160: u8 = 0xa6;
+/// Replaces the top item by its SHA-1 hash.
 pub const OP_SHA1: u8 = 0xa7;
+/// Replaces the top item by its SHA-256 hash.
 pub const OP_SHA256: u8 = 0xa8;
+/// Replaces the top item by RIPEMD-160 of its SHA-256.
 pub const OP_HASH160: u8 = 0xa9;
+/// Replaces the top item by its double SHA-256.
 pub const OP_HASH256: u8 = 0xaa;
+/// Marks where the script signed by later signature checks begins.
 pub const OP_CODESEPARATOR: u8 = 0xab;
+/// Pops a public key and a signature and pushes whether the signature is valid for this input.
 pub const OP_CHECKSIG: u8 = 0xac;
+/// `OP_CHECKSIG` then `OP_VERIFY`.
 pub const OP_CHECKSIGVERIFY: u8 = 0xad;
+/// Pushes whether m of the n public keys signed, the signatures in key order.
 pub const OP_CHECKMULTISIG: u8 = 0xae;
+/// `OP_CHECKMULTISIG` then `OP_VERIFY`.
 pub const OP_CHECKMULTISIGVERIFY: u8 = 0xaf;
 
 // Expansion NOPs (OP_NOP1 through OP_NOP77)
+/// Upgradable NOP 1: does nothing; fails the script when executed under `DISCOURAGE_UPGRADABLE_NOPS`.
 pub const OP_NOP1: u8 = 0xb0;
+/// Upgradable NOP 2, formerly `OP_CHECKLOCKTIMEVERIFY`: a NOP for a post-Genesis UTXO; fails the script when executed under `DISCOURAGE_UPGRADABLE_NOPS`.
 pub const OP_NOP2: u8 = 0xb1;
+/// Upgradable NOP 3, formerly `OP_CHECKSEQUENCEVERIFY`: a NOP for a post-Genesis UTXO; fails the script when executed under `DISCOURAGE_UPGRADABLE_NOPS`.
 pub const OP_NOP3: u8 = 0xb2;
+/// Upgradable NOP 4 before Chronicle; `OP_SUBSTR` (data, offset, length) for a UTXO created after it.
 pub const OP_NOP4: u8 = 0xb3;
+/// Upgradable NOP 5 before Chronicle; `OP_LEFT` (data, length) for a UTXO created after it.
 pub const OP_NOP5: u8 = 0xb4;
+/// Upgradable NOP 6 before Chronicle; `OP_RIGHT` (data, length) for a UTXO created after it.
 pub const OP_NOP6: u8 = 0xb5;
+/// Upgradable NOP 7 before Chronicle; `OP_LSHIFTNUM`, a numeric left shift, for a UTXO created after it.
 pub const OP_NOP7: u8 = 0xb6;
+/// Upgradable NOP 8 before Chronicle; `OP_RSHIFTNUM`, a numeric right shift, for a UTXO created after it.
 pub const OP_NOP8: u8 = 0xb7;
+/// Upgradable NOP 9: does nothing; fails the script when executed under `DISCOURAGE_UPGRADABLE_NOPS`.
 pub const OP_NOP9: u8 = 0xb8;
+/// Upgradable NOP 10: does nothing; fails the script when executed under `DISCOURAGE_UPGRADABLE_NOPS`.
 pub const OP_NOP10: u8 = 0xb9;
+/// Undefined opcode 0xba, named `OP_NOP11` in the TypeScript table: fails the script when executed.
 pub const OP_NOP11: u8 = 0xba;
+/// Undefined opcode 0xbb, named `OP_NOP12` in the TypeScript table: fails the script when executed.
 pub const OP_NOP12: u8 = 0xbb;
+/// Undefined opcode 0xbc, named `OP_NOP13` in the TypeScript table: fails the script when executed.
 pub const OP_NOP13: u8 = 0xbc;
+/// Undefined opcode 0xbd, named `OP_NOP14` in the TypeScript table: fails the script when executed.
 pub const OP_NOP14: u8 = 0xbd;
+/// Undefined opcode 0xbe, named `OP_NOP15` in the TypeScript table: fails the script when executed.
 pub const OP_NOP15: u8 = 0xbe;
+/// Undefined opcode 0xbf, named `OP_NOP16` in the TypeScript table: fails the script when executed.
 pub const OP_NOP16: u8 = 0xbf;
+/// Undefined opcode 0xc0, named `OP_NOP17` in the TypeScript table: fails the script when executed.
 pub const OP_NOP17: u8 = 0xc0;
+/// Undefined opcode 0xc1, named `OP_NOP18` in the TypeScript table: fails the script when executed.
 pub const OP_NOP18: u8 = 0xc1;
+/// Undefined opcode 0xc2, named `OP_NOP19` in the TypeScript table: fails the script when executed.
 pub const OP_NOP19: u8 = 0xc2;
+/// Undefined opcode 0xc3, named `OP_NOP20` in the TypeScript table: fails the script when executed.
 pub const OP_NOP20: u8 = 0xc3;
+/// Undefined opcode 0xc4, named `OP_NOP21` in the TypeScript table: fails the script when executed.
 pub const OP_NOP21: u8 = 0xc4;
+/// Undefined opcode 0xc5, named `OP_NOP22` in the TypeScript table: fails the script when executed.
 pub const OP_NOP22: u8 = 0xc5;
+/// Undefined opcode 0xc6, named `OP_NOP23` in the TypeScript table: fails the script when executed.
 pub const OP_NOP23: u8 = 0xc6;
+/// Undefined opcode 0xc7, named `OP_NOP24` in the TypeScript table: fails the script when executed.
 pub const OP_NOP24: u8 = 0xc7;
+/// Undefined opcode 0xc8, named `OP_NOP25` in the TypeScript table: fails the script when executed.
 pub const OP_NOP25: u8 = 0xc8;
+/// Undefined opcode 0xc9, named `OP_NOP26` in the TypeScript table: fails the script when executed.
 pub const OP_NOP26: u8 = 0xc9;
+/// Undefined opcode 0xca, named `OP_NOP27` in the TypeScript table: fails the script when executed.
 pub const OP_NOP27: u8 = 0xca;
+/// Undefined opcode 0xcb, named `OP_NOP28` in the TypeScript table: fails the script when executed.
 pub const OP_NOP28: u8 = 0xcb;
+/// Undefined opcode 0xcc, named `OP_NOP29` in the TypeScript table: fails the script when executed.
 pub const OP_NOP29: u8 = 0xcc;
+/// Undefined opcode 0xcd, named `OP_NOP30` in the TypeScript table: fails the script when executed.
 pub const OP_NOP30: u8 = 0xcd;
+/// Undefined opcode 0xce, named `OP_NOP31` in the TypeScript table: fails the script when executed.
 pub const OP_NOP31: u8 = 0xce;
+/// Undefined opcode 0xcf, named `OP_NOP32` in the TypeScript table: fails the script when executed.
 pub const OP_NOP32: u8 = 0xcf;
+/// Undefined opcode 0xd0, named `OP_NOP33` in the TypeScript table: fails the script when executed.
 pub const OP_NOP33: u8 = 0xd0;
+/// Undefined opcode 0xd1, named `OP_NOP34` in the TypeScript table: fails the script when executed.
 pub const OP_NOP34: u8 = 0xd1;
+/// Undefined opcode 0xd2, named `OP_NOP35` in the TypeScript table: fails the script when executed.
 pub const OP_NOP35: u8 = 0xd2;
+/// Undefined opcode 0xd3, named `OP_NOP36` in the TypeScript table: fails the script when executed.
 pub const OP_NOP36: u8 = 0xd3;
+/// Undefined opcode 0xd4, named `OP_NOP37` in the TypeScript table: fails the script when executed.
 pub const OP_NOP37: u8 = 0xd4;
+/// Undefined opcode 0xd5, named `OP_NOP38` in the TypeScript table: fails the script when executed.
 pub const OP_NOP38: u8 = 0xd5;
+/// Undefined opcode 0xd6, named `OP_NOP39` in the TypeScript table: fails the script when executed.
 pub const OP_NOP39: u8 = 0xd6;
+/// Undefined opcode 0xd7, named `OP_NOP40` in the TypeScript table: fails the script when executed.
 pub const OP_NOP40: u8 = 0xd7;
+/// Undefined opcode 0xd8, named `OP_NOP41` in the TypeScript table: fails the script when executed.
 pub const OP_NOP41: u8 = 0xd8;
+/// Undefined opcode 0xd9, named `OP_NOP42` in the TypeScript table: fails the script when executed.
 pub const OP_NOP42: u8 = 0xd9;
+/// Undefined opcode 0xda, named `OP_NOP43` in the TypeScript table: fails the script when executed.
 pub const OP_NOP43: u8 = 0xda;
+/// Undefined opcode 0xdb, named `OP_NOP44` in the TypeScript table: fails the script when executed.
 pub const OP_NOP44: u8 = 0xdb;
+/// Undefined opcode 0xdc, named `OP_NOP45` in the TypeScript table: fails the script when executed.
 pub const OP_NOP45: u8 = 0xdc;
+/// Undefined opcode 0xdd, named `OP_NOP46` in the TypeScript table: fails the script when executed.
 pub const OP_NOP46: u8 = 0xdd;
+/// Undefined opcode 0xde, named `OP_NOP47` in the TypeScript table: fails the script when executed.
 pub const OP_NOP47: u8 = 0xde;
+/// Undefined opcode 0xdf, named `OP_NOP48` in the TypeScript table: fails the script when executed.
 pub const OP_NOP48: u8 = 0xdf;
+/// Undefined opcode 0xe0, named `OP_NOP49` in the TypeScript table: fails the script when executed.
 pub const OP_NOP49: u8 = 0xe0;
+/// Undefined opcode 0xe1, named `OP_NOP50` in the TypeScript table: fails the script when executed.
 pub const OP_NOP50: u8 = 0xe1;
+/// Undefined opcode 0xe2, named `OP_NOP51` in the TypeScript table: fails the script when executed.
 pub const OP_NOP51: u8 = 0xe2;
+/// Undefined opcode 0xe3, named `OP_NOP52` in the TypeScript table: fails the script when executed.
 pub const OP_NOP52: u8 = 0xe3;
+/// Undefined opcode 0xe4, named `OP_NOP53` in the TypeScript table: fails the script when executed.
 pub const OP_NOP53: u8 = 0xe4;
+/// Undefined opcode 0xe5, named `OP_NOP54` in the TypeScript table: fails the script when executed.
 pub const OP_NOP54: u8 = 0xe5;
+/// Undefined opcode 0xe6, named `OP_NOP55` in the TypeScript table: fails the script when executed.
 pub const OP_NOP55: u8 = 0xe6;
+/// Undefined opcode 0xe7, named `OP_NOP56` in the TypeScript table: fails the script when executed.
 pub const OP_NOP56: u8 = 0xe7;
+/// Undefined opcode 0xe8, named `OP_NOP57` in the TypeScript table: fails the script when executed.
 pub const OP_NOP57: u8 = 0xe8;
+/// Undefined opcode 0xe9, named `OP_NOP58` in the TypeScript table: fails the script when executed.
 pub const OP_NOP58: u8 = 0xe9;
+/// Undefined opcode 0xea, named `OP_NOP59` in the TypeScript table: fails the script when executed.
 pub const OP_NOP59: u8 = 0xea;
+/// Undefined opcode 0xeb, named `OP_NOP60` in the TypeScript table: fails the script when executed.
 pub const OP_NOP60: u8 = 0xeb;
+/// Undefined opcode 0xec, named `OP_NOP61` in the TypeScript table: fails the script when executed.
 pub const OP_NOP61: u8 = 0xec;
+/// Undefined opcode 0xed, named `OP_NOP62` in the TypeScript table: fails the script when executed.
 pub const OP_NOP62: u8 = 0xed;
+/// Undefined opcode 0xee, named `OP_NOP63` in the TypeScript table: fails the script when executed.
 pub const OP_NOP63: u8 = 0xee;
+/// Undefined opcode 0xef, named `OP_NOP64` in the TypeScript table: fails the script when executed.
 pub const OP_NOP64: u8 = 0xef;
+/// Undefined opcode 0xf0, named `OP_NOP65` in the TypeScript table: fails the script when executed.
 pub const OP_NOP65: u8 = 0xf0;
+/// Undefined opcode 0xf1, named `OP_NOP66` in the TypeScript table: fails the script when executed.
 pub const OP_NOP66: u8 = 0xf1;
+/// Undefined opcode 0xf2, named `OP_NOP67` in the TypeScript table: fails the script when executed.
 pub const OP_NOP67: u8 = 0xf2;
+/// Undefined opcode 0xf3, named `OP_NOP68` in the TypeScript table: fails the script when executed.
 pub const OP_NOP68: u8 = 0xf3;
+/// Undefined opcode 0xf4, named `OP_NOP69` in the TypeScript table: fails the script when executed.
 pub const OP_NOP69: u8 = 0xf4;
+/// Undefined opcode 0xf5, named `OP_NOP70` in the TypeScript table: fails the script when executed.
 pub const OP_NOP70: u8 = 0xf5;
+/// Undefined opcode 0xf6, named `OP_NOP71` in the TypeScript table: fails the script when executed.
 pub const OP_NOP71: u8 = 0xf6;
+/// Undefined opcode 0xf7, named `OP_NOP72` in the TypeScript table: fails the script when executed.
 pub const OP_NOP72: u8 = 0xf7;
+/// Undefined opcode 0xf8, named `OP_NOP73` in the TypeScript table: fails the script when executed.
 pub const OP_NOP73: u8 = 0xf8;
+/// Undefined opcode 0xfc, named `OP_NOP77` in the TypeScript table: fails the script when executed.
 pub const OP_NOP77: u8 = 0xfc;
 
 // Template matching params
+/// A template-matching placeholder for a small data push, never executed.
 pub const OP_SMALLDATA: u8 = 0xf9;
+/// A template-matching placeholder for a small integer, never executed.
 pub const OP_SMALLINTEGER: u8 = 0xfa;
+/// A template-matching placeholder for a list of public keys, never executed.
 pub const OP_PUBKEYS: u8 = 0xfb;
+/// A template-matching placeholder for a public key hash, never executed.
 pub const OP_PUBKEYHASH: u8 = 0xfd;
+/// A template-matching placeholder for a public key, never executed.
 pub const OP_PUBKEY: u8 = 0xfe;
 
+/// The invalid opcode 0xff: fails the script when executed.
 pub const OP_INVALIDOPCODE: u8 = 0xff;
 
 /// Maps opcode names to their values.

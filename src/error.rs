@@ -10,11 +10,21 @@ pub enum Error {
     // ===================
     /// Invalid key length for cryptographic operations.
     #[error("invalid key length: expected {expected}, got {actual}")]
-    InvalidKeyLength { expected: usize, actual: usize },
+    InvalidKeyLength {
+        /// The length the operation requires, in bytes.
+        expected: usize,
+        /// The length supplied, in bytes.
+        actual: usize,
+    },
 
     /// Invalid data length for cryptographic operations.
     #[error("invalid data length: expected {expected}, got {actual}")]
-    InvalidDataLength { expected: usize, actual: usize },
+    InvalidDataLength {
+        /// The length the operation requires, in bytes.
+        expected: usize,
+        /// The length supplied, in bytes.
+        actual: usize,
+    },
 
     /// Invalid hex string.
     #[error("invalid hex string: {0}")]
@@ -66,11 +76,21 @@ pub enum Error {
 
     /// Reader underflow (not enough bytes to read).
     #[error("reader underflow: need {needed} bytes, only {available} available")]
-    ReaderUnderflow { needed: usize, available: usize },
+    ReaderUnderflow {
+        /// The bytes the read asked for.
+        needed: usize,
+        /// The bytes left in the reader.
+        available: usize,
+    },
 
     /// A varint using more bytes than its value requires. Width includes the marker.
     #[error("non-canonical varint: {value} encoded in {width} bytes")]
-    NonCanonicalVarInt { width: u8, value: u64 },
+    NonCanonicalVarInt {
+        /// The encoded width in bytes, the marker included.
+        width: u8,
+        /// The value the varint carries.
+        value: u64,
+    },
 
     /// A node CompactSize above `MAX_COMPACT_SIZE`.
     #[error("compact size too large: {0}")]
@@ -185,7 +205,12 @@ pub enum Error {
     /// Message version mismatch.
     #[cfg(feature = "messages")]
     #[error("message version mismatch: expected {expected}, got {actual}")]
-    MessageVersionMismatch { expected: String, actual: String },
+    MessageVersionMismatch {
+        /// The version prefix this crate reads, as hex.
+        expected: String,
+        /// The version prefix the message carries, as hex.
+        actual: String,
+    },
 
     /// General message error.
     #[cfg(feature = "messages")]
@@ -195,7 +220,12 @@ pub enum Error {
     /// Message recipient mismatch.
     #[cfg(feature = "messages")]
     #[error("message recipient mismatch: expected {expected}, got {actual}")]
-    MessageRecipientMismatch { expected: String, actual: String },
+    MessageRecipientMismatch {
+        /// The recipient public key the message names, compressed, as hex.
+        expected: String,
+        /// The public key of the private key supplied to read it, compressed, as hex.
+        actual: String,
+    },
 
     // ===================
     // Compat errors
@@ -208,7 +238,12 @@ pub enum Error {
     /// Invalid entropy length for mnemonic generation.
     #[cfg(feature = "compat")]
     #[error("invalid entropy length: expected {expected}, got {actual}")]
-    InvalidEntropyLength { expected: String, actual: usize },
+    InvalidEntropyLength {
+        /// The entropy lengths accepted, in bits.
+        expected: String,
+        /// The entropy length supplied, in bits.
+        actual: usize,
+    },
 
     /// Invalid word in mnemonic phrase.
     #[cfg(feature = "compat")]

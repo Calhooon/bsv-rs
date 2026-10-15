@@ -5,6 +5,7 @@
 //! These benchmarks measure the performance of cryptographic operations
 //! across all modules in the BSV primitives library.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: bench code: a failed unwrap is the bench failing
+#![allow(missing_docs)] // #135: criterion_group! generates the bench's public function, which takes no doc
 
 use bsv_rs::primitives::bsv::schnorr::Schnorr;
 use bsv_rs::primitives::bsv::shamir::split_private_key;
