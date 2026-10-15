@@ -1,0 +1,46 @@
+# gitleaks findings read and judged not secrets (bsv-stack-lean #140): each line is one finding's
+# fingerprint (commit:file:rule:line). Every one is the generic-api-key rule on public test data
+# or prose; a new finding anywhere fails the secrets job until it is fixed or judged here.
+
+# The shared cross-SDK vectors (tests/vectors/, never edited): BRC-42 and symmetric-key test
+# keys from the reference suites, identity public keys and wallet-wire arguments.
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:10
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:12
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:16
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:18
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:22
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:28
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:30
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:4
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_private.json:generic-api-key:6
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_public.json:generic-api-key:15
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_public.json:generic-api-key:21
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_public.json:generic-api-key:27
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_public.json:generic-api-key:3
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/brc42_public.json:generic-api-key:9
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/symmetric_key.json:generic-api-key:14
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/symmetric_key.json:generic-api-key:19
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/symmetric_key.json:generic-api-key:24
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/symmetric_key.json:generic-api-key:4
+513073b9ce2e02e2c2faf4222cfaec85883418e0:tests/vectors/symmetric_key.json:generic-api-key:9
+64a391a67f0ed03bee9f3e6a99fefdd3fedbc45e:tests/vectors/wallet_wire/discoverByIdentityKey-simple-args.json:generic-api-key:3
+64a391a67f0ed03bee9f3e6a99fefdd3fedbc45e:tests/vectors/wallet_wire/internalizeAction-simple-args.json:generic-api-key:22
+91dacc5870989907ffe865efd42152c3edac1b65:tests/vectors/overlay_admin_token.json:generic-api-key:12
+91dacc5870989907ffe865efd42152c3edac1b65:tests/vectors/overlay_admin_token.json:generic-api-key:19
+91dacc5870989907ffe865efd42152c3edac1b65:tests/vectors/overlay_admin_token.json:generic-api-key:26
+91dacc5870989907ffe865efd42152c3edac1b65:tests/vectors/overlay_admin_token.json:generic-api-key:5
+
+# Test fixtures: public identity keys, txids and test root keys written in the tests.
+04708f2f8b5fcc413ef19d2c56ffcc71025a42e8:tests/identity_tests.rs:generic-api-key:139
+04708f2f8b5fcc413ef19d2c56ffcc71025a42e8:tests/identity_tests.rs:generic-api-key:303
+04708f2f8b5fcc413ef19d2c56ffcc71025a42e8:tests/kvstore_integration_tests.rs:generic-api-key:502
+04708f2f8b5fcc413ef19d2c56ffcc71025a42e8:tests/wallet_tests.rs:generic-api-key:887
+04708f2f8b5fcc413ef19d2c56ffcc71025a42e8:tests/wallet_tests.rs:generic-api-key:915
+25b6823ee3645f61771ce9317d146e3d62c593db:tests/registry_integration_tests.rs:generic-api-key:374
+
+# Documentation and code naming a key type or a test key: CHANGELOG.md, src/primitives/CLAUDE.md,
+# src/identity/types.rs, and src/hash.rs at 513073b.
+513073b9ce2e02e2c2faf4222cfaec85883418e0:src/hash.rs:generic-api-key:7
+5e4b95038ceab83631774f4e291401805cf2f781:src/identity/types.rs:generic-api-key:871
+64a391a67f0ed03bee9f3e6a99fefdd3fedbc45e:src/primitives/CLAUDE.md:generic-api-key:259
+97b243e9823f2cb0cefc3ab28ebbb78c3001f4f9:CHANGELOG.md:generic-api-key:144

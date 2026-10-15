@@ -202,6 +202,32 @@ jobs:
         env:
           RUSTDOCFLAGS: -Dwarnings
 
+  # the secrets scan (bsv-stack-lean #140): gitleaks over every commit of the checkout, the
+  # values redacted; the findings judged not secrets are named by fingerprint in .gitleaksignore.
+  # gitleaks is built from its release source, the tarball pinned by sha256 (no third-party action)
+  secrets:
+    name: secrets
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: 8.30.1
+      GITLEAKS_SHA256: e90fb266d75837e75894c778bf594ab8e2787f12dce5a62651f21b893eaf9abb
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Build gitleaks from its pinned source
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/gitleaks.tar.gz" "https://github.com/gitleaks/gitleaks/archive/refs/tags/v${GITLEAKS_VERSION}.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/gitleaks-${GITLEAKS_VERSION}"
+          go build -o "$RUNNER_TEMP/bin/gitleaks" .
+
+      - name: Scan the history
+        run: '"$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner --exit-code 1 .'
+
   # the declared rust-version (bsv-stack-lean #139): the library with every feature, native and
   # wasm32, on that toolchain, the dependencies resolved to versions it supports
   msrv:
