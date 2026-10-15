@@ -3,6 +3,7 @@
 //! This module provides:
 //! - Single hash functions: SHA-1, SHA-256, SHA-512, RIPEMD-160
 //! - Bitcoin-specific composite hashes: hash256 (double SHA-256), hash160 (RIPEMD-160(SHA-256(x)))
+//! - Incremental hashers: [`Sha256`] and [`Sha256d`], fed in chunks of any size
 //! - HMAC: HMAC-SHA256, HMAC-SHA512
 //! - Key derivation: PBKDF2-SHA512
 //!
@@ -26,6 +27,20 @@
 //! // Bitcoin hash160 for addresses
 //! let h160 = hash::hash160(b"public_key_bytes");
 //! assert_eq!(h160.len(), 20);
+//! ```
+//!
+//! ## Incremental hashing
+//!
+//! ```rust
+//! use bsv_rs::primitives::hash::{self, Sha256, Sha256d};
+//!
+//! let mut hasher = Sha256::new();
+//! hasher.update(b"a").update(b"bc");
+//! assert_eq!(hasher.finalize(), hash::sha256(b"abc"));
+//!
+//! let mut hasher = Sha256d::new();
+//! hasher.update(b"hel").update(b"lo");
+//! assert_eq!(hasher.finalize(), hash::sha256d(b"hello"));
 //! ```
 //!
 //! ## HMAC
@@ -55,7 +70,7 @@
 use hmac::{Hmac, Mac};
 use ripemd::Ripemd160;
 use sha1::Sha1;
-use sha2::{Digest, Sha256, Sha512};
+use sha2::{Digest, Sha512};
 
 /// Computes the SHA-1 hash of the input data.
 ///
@@ -113,7 +128,104 @@ pub fn sha1(data: &[u8]) -> [u8; 20] {
 pub fn sha256(data: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(data);
-    hasher.finalize().into()
+    hasher.finalize()
+}
+
+/// An incremental SHA-256 hasher.
+///
+/// Feeding the input in any number of [`update`](Sha256::update) calls, of any
+/// sizes, gives the same digest as [`sha256`] over the concatenation: the
+/// one-shot function is defined through this hasher. `update` returns the
+/// hasher, so calls chain; [`finalize`](Sha256::finalize) consumes it, and a
+/// clone finalizes a prefix while the original keeps reading.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::hash::{sha256, Sha256};
+///
+/// let data = vec![7u8; 200_000];
+/// let mut hasher = Sha256::new();
+/// for chunk in data.chunks(64 * 1024) {
+///     hasher.update(chunk);
+/// }
+/// assert_eq!(hasher.finalize(), sha256(&data));
+/// ```
+#[derive(Clone, Default)]
+pub struct Sha256 {
+    inner: sha2::Sha256,
+}
+
+impl Sha256 {
+    /// Creates a hasher over the empty input.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Appends `data` to the input; returns the hasher so calls chain.
+    pub fn update(&mut self, data: &[u8]) -> &mut Self {
+        self.inner.update(data);
+        self
+    }
+
+    /// Returns the SHA-256 digest of everything updated.
+    pub fn finalize(self) -> [u8; 32] {
+        self.inner.finalize().into()
+    }
+}
+
+impl std::fmt::Debug for Sha256 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sha256").finish_non_exhaustive()
+    }
+}
+
+/// An incremental double SHA-256 hasher: SHA256(SHA256(input)).
+///
+/// [`finalize`](Sha256d::finalize) returns the double hash of everything
+/// updated, equal to [`sha256d`] over the concatenation for any chunking:
+/// the one-shot function is defined through this hasher. `update` chains as
+/// on [`Sha256`].
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::hash::{sha256d, Sha256d};
+///
+/// let mut hasher = Sha256d::new();
+/// hasher.update(b"hel").update(b"lo");
+/// assert_eq!(hasher.finalize(), sha256d(b"hello"));
+/// ```
+#[derive(Clone, Default)]
+pub struct Sha256d {
+    inner: Sha256,
+}
+
+impl Sha256d {
+    /// Creates a hasher over the empty input.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Appends `data` to the input; returns the hasher so calls chain.
+    pub fn update(&mut self, data: &[u8]) -> &mut Self {
+        self.inner.update(data);
+        self
+    }
+
+    /// Returns SHA256(SHA256(everything updated)).
+    pub fn finalize(self) -> [u8; 32] {
+        let once = self.inner.finalize();
+        let mut second = Sha256::new();
+        second.update(&once);
+        second.finalize()
+    }
+}
+
+impl std::fmt::Debug for Sha256d {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Sha256d").finish_non_exhaustive()
+    }
 }
 
 /// Computes the SHA-512 hash of the input data.
@@ -192,8 +304,9 @@ pub fn ripemd160(data: &[u8]) -> [u8; 20] {
 /// // The result is SHA256(SHA256("hello"))
 /// ```
 pub fn sha256d(data: &[u8]) -> [u8; 32] {
-    let first = sha256(data);
-    sha256(&first)
+    let mut hasher = Sha256d::new();
+    hasher.update(data);
+    hasher.finalize()
 }
 
 /// Computes the hash160: RIPEMD160(SHA256(data)).
@@ -278,7 +391,7 @@ pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20] {
 /// assert_eq!(mac.len(), 32);
 /// ```
 pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32] {
-    type HmacSha256 = Hmac<Sha256>;
+    type HmacSha256 = Hmac<sha2::Sha256>;
 
     let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
@@ -502,6 +615,52 @@ mod tests {
         let expected = sha256(&first);
         let result = sha256d(data);
         assert_eq!(result, expected);
+    }
+
+    // The incremental hashers
+    #[test]
+    fn test_sha256_hasher_million_a_in_chunks() {
+        // FIPS 180-2 appendix B.3: one million repetitions of "a"
+        let chunk = [b'a'; 1000];
+        let mut hasher = Sha256::new();
+        for _ in 0..1000 {
+            hasher.update(&chunk);
+        }
+        assert_eq!(
+            hex::encode(hasher.finalize()),
+            "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"
+        );
+    }
+
+    #[test]
+    fn test_hashers_empty_input() {
+        assert_eq!(Sha256::new().finalize(), sha256(b""));
+        assert_eq!(Sha256::default().finalize(), sha256(b""));
+        assert_eq!(
+            hex::encode(Sha256d::new().finalize()),
+            "5df6e0e2761359d30a8275058e299fcc0381534545f55cf43e41983f5d4c9456"
+        );
+        assert_eq!(Sha256d::default().finalize(), sha256d(b""));
+    }
+
+    #[test]
+    fn test_sha256d_hasher_chained() {
+        let mut hasher = Sha256d::new();
+        hasher.update(b"he").update(b"").update(b"llo");
+        assert_eq!(
+            hex::encode(hasher.finalize()),
+            "9595c9df90075148eb06860365df33584b75bff782a510c6cd4883a419833d50"
+        );
+    }
+
+    #[test]
+    fn test_hashers_debug_shows_no_state() {
+        let mut hasher = Sha256::new();
+        hasher.update(b"secret");
+        assert_eq!(format!("{hasher:?}"), "Sha256 { .. }");
+        let mut hasher = Sha256d::new();
+        hasher.update(b"secret");
+        assert_eq!(format!("{hasher:?}"), "Sha256d { .. }");
     }
 
     // hash160 tests
