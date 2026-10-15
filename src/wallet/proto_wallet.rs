@@ -450,15 +450,15 @@ impl ProtoWallet {
     /// If `hash_to_directly_sign` is provided, it will be signed directly.
     /// At least one must be provided.
     pub fn create_signature(&self, args: CreateSignatureArgs) -> Result<CreateSignatureResult> {
-        if args.data.is_none() && args.hash_to_directly_sign.is_none() {
-            return Err(Error::WalletError(
-                "data or hashToDirectlySign must be provided".to_string(),
-            ));
-        }
-
-        let hash = args
-            .hash_to_directly_sign
-            .unwrap_or_else(|| sha256(args.data.as_ref().unwrap()));
+        let hash = match (args.hash_to_directly_sign, args.data.as_ref()) {
+            (Some(hash), _) => hash,
+            (None, Some(data)) => sha256(data),
+            (None, None) => {
+                return Err(Error::WalletError(
+                    "data or hashToDirectlySign must be provided".to_string(),
+                ));
+            }
+        };
 
         // Default counterparty is 'anyone' for signatures
         let counterparty = args.counterparty.unwrap_or(Counterparty::Anyone);
@@ -479,15 +479,15 @@ impl ProtoWallet {
     /// If `hash_to_directly_verify` is provided, it will be verified directly.
     /// At least one must be provided.
     pub fn verify_signature(&self, args: VerifySignatureArgs) -> Result<VerifySignatureResult> {
-        if args.data.is_none() && args.hash_to_directly_verify.is_none() {
-            return Err(Error::WalletError(
-                "data or hashToDirectlyVerify must be provided".to_string(),
-            ));
-        }
-
-        let hash = args
-            .hash_to_directly_verify
-            .unwrap_or_else(|| sha256(args.data.as_ref().unwrap()));
+        let hash = match (args.hash_to_directly_verify, args.data.as_ref()) {
+            (Some(hash), _) => hash,
+            (None, Some(data)) => sha256(data),
+            (None, None) => {
+                return Err(Error::WalletError(
+                    "data or hashToDirectlyVerify must be provided".to_string(),
+                ));
+            }
+        };
 
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let for_self = args.for_self.unwrap_or(false);

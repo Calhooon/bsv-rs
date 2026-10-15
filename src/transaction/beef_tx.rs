@@ -131,6 +131,7 @@ impl BeefTx {
     /// Returns the transaction ID.
     ///
     /// Computes and caches the txid if not already known.
+    #[allow(clippy::panic)] // #134: every constructor sets a transaction, raw bytes or a txid; a Result here is a breaking change
     pub fn txid(&self) -> String {
         if let Some(ref txid) = self.txid {
             return txid.clone();
@@ -306,6 +307,7 @@ impl BeefTx {
     }
 
     /// Writes the transaction data (raw bytes or serialized).
+    #[allow(clippy::panic)] // #134: called only for an entry with data; the writers it serves return no Result
     fn write_tx_data(&self, writer: &mut Writer) {
         if let Some(ref raw_tx) = self.raw_tx {
             writer.write_bytes(raw_tx);

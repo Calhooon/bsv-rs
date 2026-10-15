@@ -7,6 +7,7 @@
 //! count.
 #![allow(deprecated)]
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::script::{LockingScript, UnlockingScript};
 use bsv_rs::transaction::{

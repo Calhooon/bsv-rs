@@ -1223,6 +1223,7 @@ impl BeefDecoder {
     }
 
     /// A fixed-width field is complete.
+    #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn on_fixed(&mut self, _n: usize) -> Result<Option<Element>, Refusal> {
         match self.st {
             St::Word => {
@@ -1376,6 +1377,7 @@ impl BeefDecoder {
     }
 
     /// A varint is complete.
+    #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn on_varint(&mut self, value: u64) -> Result<Option<Element>, Refusal> {
         match self.st {
             St::NBumps => {
@@ -1466,6 +1468,7 @@ impl BeefDecoder {
     }
 
     /// A script has passed.
+    #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn on_run_done(&mut self) {
         let tx = self.tx.as_mut().expect("a transaction is in hand");
         if self.st == St::InScript {
@@ -1486,6 +1489,7 @@ impl BeefDecoder {
     }
 
     /// A leaf is complete.
+    #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn leaf_done(&mut self, leaf: Leaf) -> Result<Option<Element>, Refusal> {
         let bump = self.bump.as_mut().expect("a BUMP is in hand");
         bump.levels
@@ -1497,6 +1501,7 @@ impl BeefDecoder {
     }
 
     /// The next leaf, the next level, or the BUMP's end and its root.
+    #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn next_leaf(&mut self) -> Result<Option<Element>, Refusal> {
         let bump = self.bump.as_mut().expect("a BUMP is in hand");
         if bump.leaves_left > 0 {
@@ -1522,6 +1527,7 @@ impl BeefDecoder {
     /// A transaction and its frame bytes are complete. The mining byte
     /// checks run in the Lean's parseElement order, naming the transaction,
     /// output value field or input's previous txid.
+    #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn tx_done(&mut self) -> Result<Element, Refusal> {
         let tx = self.tx.take().expect("a transaction is in hand");
         check_transaction(tx.offset, &tx.inputs, &tx.outputs, tx.bump_index)?;
@@ -2286,6 +2292,7 @@ impl BeefIndex {
     /// `spent` is asked between two inputs: `Ok(Some(i))` is a pause before
     /// input `i`, at least one input after `from` having run.
     #[allow(clippy::too_many_arguments)] // One resumed spend and its caller's mining context.
+    #[allow(clippy::expect_used)] // #134: the reader indexed every parent before its spend; a SpendRefusal for a broken invariant is a public enum change
     fn check_spends_of(
         &self,
         offset: u64,

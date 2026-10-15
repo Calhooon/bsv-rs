@@ -262,16 +262,10 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         let lookup_result = self.lookup_value(key, 10).await?;
 
         // Optimization: if value is the same, return existing outpoint
-        if lookup_result.value_exists
-            && lookup_result.value == stored_value
-            && !lookup_result.outpoints.is_empty()
-        {
-            // Safe: guarded by !lookup_result.outpoints.is_empty() above
-            return Ok(lookup_result
-                .outpoints
-                .last()
-                .expect("outpoints non-empty")
-                .clone());
+        if lookup_result.value_exists && lookup_result.value == stored_value {
+            if let Some(outpoint) = lookup_result.outpoints.last() {
+                return Ok(outpoint.clone());
+            }
         }
 
         // Prepare value (encrypt if needed)
@@ -837,13 +831,10 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             )
             .await?;
 
-        if list_result.outputs.is_empty() {
-            return Ok(LookupValueResult::not_found(String::new()));
-        }
-
         // Get the most recent output (last in the list)
-        // Safe: guarded by is_empty() check above
-        let last_output = list_result.outputs.last().expect("outputs non-empty");
+        let Some(last_output) = list_result.outputs.last() else {
+            return Ok(LookupValueResult::not_found(String::new()));
+        };
 
         // Parse the locking script - it's Option<Vec<u8>>
         let locking_script_bytes = last_output
@@ -975,15 +966,10 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
 
     async fn acquire_key_lock(&self, key: &str) {
         let mut state = self.state.lock().await;
-        if state.key_locks.contains_key(key) {
+        if let Some(waiters) = state.key_locks.get_mut(key) {
             // Create a oneshot channel and wait
             let (tx, rx) = tokio::sync::oneshot::channel();
-            // Safe: guarded by contains_key(key) check above
-            state
-                .key_locks
-                .get_mut(key)
-                .expect("key exists in key_locks")
-                .push(tx);
+            waiters.push(tx);
             drop(state);
             let _ = rx.await;
         } else {

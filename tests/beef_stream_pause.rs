@@ -10,6 +10,7 @@
 //! reading reached; a resume re-reads that transaction and runs the scripts
 //! from that input on, the inputs already checked never run again.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::cell::Cell;
 use std::collections::HashMap;

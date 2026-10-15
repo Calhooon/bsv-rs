@@ -478,6 +478,16 @@ pub fn bounded_capacity(count: usize, remaining: usize, min_elem_bytes: usize) -
     count.min(remaining / min_elem_bytes.max(1))
 }
 
+/// `bytes` as a fixed-size array; `InvalidDataLength` when its length is not `N`.
+#[cfg(any(feature = "block", feature = "compat"))]
+#[inline]
+pub(crate) fn fixed_bytes<const N: usize>(bytes: &[u8]) -> Result<[u8; N]> {
+    bytes.try_into().map_err(|_| Error::InvalidDataLength {
+        expected: N,
+        actual: bytes.len(),
+    })
+}
+
 /// A binary reader for parsing Bitcoin data structures.
 ///
 /// `Reader` provides methods for reading integers in little-endian format

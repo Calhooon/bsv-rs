@@ -261,7 +261,9 @@ impl Beef {
             if top.next_input == top.tx.inputs.len() {
                 // Every input of this transaction is linked: hand it to the
                 // input of its parent that it sources, or back to the caller.
-                let done = stack.pop().expect("the stack is not empty").tx;
+                let Some(Frame { tx: done, .. }) = stack.pop() else {
+                    break;
+                };
                 match stack.last_mut() {
                     Some(parent) => {
                         parent.tx.inputs[parent.next_input - 1].source_transaction =

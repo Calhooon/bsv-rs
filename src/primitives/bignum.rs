@@ -245,6 +245,7 @@ impl BigNumber {
     /// let n = BigNumber::from_hex("1234").unwrap();
     /// assert_eq!(n.to_bytes_be(4), vec![0x00, 0x00, 0x12, 0x34]);
     /// ```
+    #[allow(clippy::panic)] // #134: the documented `# Panics` contract; a Result here is a breaking change
     pub fn to_bytes_be(&self, len: usize) -> Vec<u8> {
         let bytes = self.inner.magnitude().to_bytes_be();
         let byte_len = bytes.len();
@@ -281,6 +282,7 @@ impl BigNumber {
     /// let n = BigNumber::from_hex("1234").unwrap();
     /// assert_eq!(n.to_bytes_le(4), vec![0x34, 0x12, 0x00, 0x00]);
     /// ```
+    #[allow(clippy::panic)] // #134: the documented `# Panics` contract; a Result here is a breaking change
     pub fn to_bytes_le(&self, len: usize) -> Vec<u8> {
         let bytes = self.inner.magnitude().to_bytes_le();
         let byte_len = bytes.len();
@@ -636,16 +638,24 @@ impl BigNumber {
     /// This is the order of the generator point G on the secp256k1 curve.
     /// All private keys must be in the range [1, n-1].
     pub fn secp256k1_order() -> BigNumber {
-        BigNumber::from_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141")
-            .expect("valid constant")
+        // 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+        BigNumber::from_bytes_be(&[
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xfe, 0xba, 0xae, 0xdc, 0xe6, 0xaf, 0x48, 0xa0, 0x3b, 0xbf, 0xd2, 0x5e, 0x8c,
+            0xd0, 0x36, 0x41, 0x41,
+        ])
     }
 
     /// Returns the secp256k1 field prime (p).
     ///
     /// This is the prime that defines the finite field for secp256k1.
     pub fn secp256k1_prime() -> BigNumber {
-        BigNumber::from_hex("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F")
-            .expect("valid constant")
+        // 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F
+        BigNumber::from_bytes_be(&[
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
+            0xff, 0xff, 0xfc, 0x2f,
+        ])
     }
 
     // ========================================================================

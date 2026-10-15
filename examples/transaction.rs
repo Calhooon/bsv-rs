@@ -1,6 +1,7 @@
 //! A transaction built, signed, serialized and VERIFIED, with no network.
 //!
 //! Run with `cargo run --example transaction --features transaction`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: example code: a failed unwrap is the example failing
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::script::templates::P2PKH;
 use bsv_rs::script::{SignOutputs, UnlockingScript};

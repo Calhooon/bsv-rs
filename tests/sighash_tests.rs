@@ -1,4 +1,5 @@
 //! Integration tests for sighash computation with 499 test vectors.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::bsv::sighash::{
     compute_sighash, compute_sighash_for_signing, parse_transaction, SighashCache, SighashParams,

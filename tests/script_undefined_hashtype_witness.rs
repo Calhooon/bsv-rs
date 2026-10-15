@@ -19,6 +19,7 @@
 //! before verification.
 //!
 //! Every outpoint is synthetic; the previous outputs never existed on any chain.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
 use bsv_rs::script::{

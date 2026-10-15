@@ -37,7 +37,8 @@
 //! ```
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+// a cache lock poisoned by a panic elsewhere still holds whole entries (#134): read on, never panic again
+use std::sync::{Mutex, PoisonError};
 
 use crate::error::Result;
 use crate::primitives::{PrivateKey, PublicKey, SymmetricKey};
@@ -234,7 +235,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
 
         // Check cache first
         {
-            let mut cache = self.public_key_cache.lock().unwrap();
+            let mut cache = self
+                .public_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = cache.get(&cache_key) {
                 return Ok(cached);
             }
@@ -245,7 +249,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
             .inner
             .derive_public_key(protocol, key_id, counterparty, for_self)?;
         {
-            let mut cache = self.public_key_cache.lock().unwrap();
+            let mut cache = self
+                .public_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             cache.put(cache_key, derived.clone());
         }
 
@@ -262,7 +269,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
 
         // Check cache first
         {
-            let mut cache = self.private_key_cache.lock().unwrap();
+            let mut cache = self
+                .private_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = cache.get(&cache_key) {
                 return Ok(cached);
             }
@@ -273,7 +283,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
             .inner
             .derive_private_key(protocol, key_id, counterparty)?;
         {
-            let mut cache = self.private_key_cache.lock().unwrap();
+            let mut cache = self
+                .private_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             cache.put(cache_key, derived.clone());
         }
 
@@ -299,7 +312,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
 
         // Check cache first
         {
-            let mut cache = self.private_key_cache.lock().unwrap();
+            let mut cache = self
+                .private_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = cache.get(&cache_key) {
                 return Ok(cached);
             }
@@ -310,7 +326,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
             .inner
             .derive_private_key_raw(invoice_number, counterparty)?;
         {
-            let mut cache = self.private_key_cache.lock().unwrap();
+            let mut cache = self
+                .private_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             cache.put(cache_key, derived.clone());
         }
 
@@ -327,7 +346,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
 
         // Check cache first
         {
-            let mut cache = self.symmetric_key_cache.lock().unwrap();
+            let mut cache = self
+                .symmetric_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = cache.get(&cache_key) {
                 return Ok(cached);
             }
@@ -338,7 +360,10 @@ impl KeyDeriverApi for CachedKeyDeriver {
             .inner
             .derive_symmetric_key(protocol, key_id, counterparty)?;
         {
-            let mut cache = self.symmetric_key_cache.lock().unwrap();
+            let mut cache = self
+                .symmetric_key_cache
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
             cache.put(cache_key, derived.clone());
         }
 

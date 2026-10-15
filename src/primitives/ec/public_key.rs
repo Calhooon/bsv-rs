@@ -121,18 +121,22 @@ impl PublicKey {
     /// Returns the X coordinate as bytes (32 bytes, big-endian).
     pub fn x(&self) -> [u8; 32] {
         let encoded = self.inner.to_encoded_point(false);
-        let x_bytes = encoded.x().expect("point not at infinity");
         let mut result = [0u8; 32];
-        result.copy_from_slice(x_bytes);
+        // a public key is never the identity, so its uncompressed encoding carries x
+        if let Some(x_bytes) = encoded.x() {
+            result.copy_from_slice(x_bytes);
+        }
         result
     }
 
     /// Returns the Y coordinate as bytes (32 bytes, big-endian).
     pub fn y(&self) -> [u8; 32] {
         let encoded = self.inner.to_encoded_point(false);
-        let y_bytes = encoded.y().expect("point not at infinity");
         let mut result = [0u8; 32];
-        result.copy_from_slice(y_bytes);
+        // a public key is never the identity, so its uncompressed encoding carries y
+        if let Some(y_bytes) = encoded.y() {
+            result.copy_from_slice(y_bytes);
+        }
         result
     }
 

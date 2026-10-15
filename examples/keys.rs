@@ -1,6 +1,7 @@
 //! Keys, hashes and signatures: the default feature set, no network.
 //!
 //! Run with `cargo run --example keys`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: example code: a failed unwrap is the example failing
 use bsv_rs::primitives::{sha256, to_hex, PrivateKey};
 
 fn main() {

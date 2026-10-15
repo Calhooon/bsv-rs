@@ -3,6 +3,7 @@
 //! `int_serialization.h:61-118` defines the checked sign-magnitude decoding;
 //! `script_num.cpp:80-91` and `interpreter.cpp:1807-1809` define its error.
 //! Both node words and the TypeScript SDK default mode are exercised.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
 use bsv_rs::script::{

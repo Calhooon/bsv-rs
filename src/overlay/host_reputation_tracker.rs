@@ -25,7 +25,8 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::RwLock;
+// a lock poisoned by a panic elsewhere still holds whole entries (#134): read on, never panic again
+use std::sync::{PoisonError, RwLock};
 use tokio::sync::broadcast;
 
 /// Default capacity for the rank change broadcast channel.
@@ -231,7 +232,7 @@ impl HostReputationTracker {
     /// Save entries to storage (if storage is configured).
     fn save_to_storage(&self) {
         if let Some(ref storage) = self.storage {
-            let entries = self.entries.read().unwrap();
+            let entries = self.entries.read().unwrap_or_else(PoisonError::into_inner);
             if let Ok(json) = serde_json::to_string(&*entries) {
                 storage.set(REPUTATION_STORAGE_KEY, &json);
             }
@@ -245,7 +246,7 @@ impl HostReputationTracker {
     /// host's computed reputation score changes.
     pub fn record_success(&self, host: &str, latency_ms: u64) {
         let now = now_ms();
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = self.entries.write().unwrap_or_else(PoisonError::into_inner);
         let entry = entries
             .entry(host.to_string())
             .or_insert_with(|| HostReputationEntry::new(host.to_string()));
@@ -300,7 +301,7 @@ impl HostReputationTracker {
     /// if the host's computed reputation score changes.
     pub fn record_failure(&self, host: &str, reason: Option<&str>) {
         let now = now_ms();
-        let mut entries = self.entries.write().unwrap();
+        let mut entries = self.entries.write().unwrap_or_else(PoisonError::into_inner);
         let entry = entries
             .entry(host.to_string())
             .or_insert_with(|| HostReputationEntry::new(host.to_string()));
@@ -371,7 +372,7 @@ impl HostReputationTracker {
     ///
     /// Useful for testing or when you need to evaluate at a specific timestamp.
     pub fn rank_hosts_at(&self, hosts: &[String], now: u64) -> Vec<RankedHost> {
-        let entries = self.entries.read().unwrap();
+        let entries = self.entries.read().unwrap_or_else(PoisonError::into_inner);
 
         // Deduplicate hosts while preserving order
         let mut seen = std::collections::HashSet::new();
@@ -420,14 +421,21 @@ impl HostReputationTracker {
 
     /// Get snapshot of a single host's reputation.
     pub fn snapshot(&self, host: &str) -> Option<HostReputationEntry> {
-        self.entries.read().unwrap().get(host).cloned()
+        self.entries
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(host)
+            .cloned()
     }
 
     /// Reset all tracking data.
     ///
     /// If storage is configured, clears stored data as well.
     pub fn reset(&self) {
-        self.entries.write().unwrap().clear();
+        self.entries
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
         if let Some(ref storage) = self.storage {
             storage.remove(REPUTATION_STORAGE_KEY);
         }
@@ -506,7 +514,7 @@ impl HostReputationTracker {
     ///
     /// Useful for debugging or manual persistence.
     pub fn to_json(&self) -> String {
-        let entries = self.entries.read().unwrap();
+        let entries = self.entries.read().unwrap_or_else(PoisonError::into_inner);
         serde_json::to_string(&*entries).unwrap_or_else(|_| "{}".to_string())
     }
 
@@ -515,7 +523,7 @@ impl HostReputationTracker {
     /// Replaces all existing entries with the imported data.
     pub fn from_json(&self, json: &str) -> bool {
         if let Ok(entries) = serde_json::from_str::<HashMap<String, HostReputationEntry>>(json) {
-            let mut current = self.entries.write().unwrap();
+            let mut current = self.entries.write().unwrap_or_else(PoisonError::into_inner);
             *current = entries;
             drop(current);
             self.save_to_storage();
@@ -800,7 +808,11 @@ mod tests {
 
     impl ReputationStorage for MockStorage {
         fn get(&self, key: &str) -> Option<String> {
-            self.data.lock().unwrap().get(key).cloned()
+            self.data
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .get(key)
+                .cloned()
         }
 
         fn set(&self, key: &str, value: &str) {
@@ -811,7 +823,10 @@ mod tests {
         }
 
         fn remove(&self, key: &str) {
-            self.data.lock().unwrap().remove(key);
+            self.data
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .remove(key);
         }
     }
 

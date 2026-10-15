@@ -2,6 +2,7 @@
 //!
 //! Compiled by `cargo build --example overlay --features "overlay,http"`; running
 //! it reaches the public overlay hosts of the mainnet preset.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: example code: a failed unwrap is the example failing
 use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, TopicBroadcaster,
     TopicBroadcasterConfig,

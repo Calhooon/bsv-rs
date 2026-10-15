@@ -33,9 +33,8 @@
 //! # Then run the bundler shown in the vector file's _source_fixture
 //! # and replace tests/vectors/overlay_admin_token_ts_parity.json.
 //! ```
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "overlay")]
-#![allow(clippy::unwrap_used)]
 
 use bsv_rs::overlay::{create_signed_overlay_admin_token, Protocol};
 use bsv_rs::primitives::PrivateKey;

@@ -494,8 +494,7 @@ impl MerklePath {
             if leaf.txid {
                 // txid nodes enable computing their parent
                 let parent_offset = leaf.offset >> 1;
-                if computed_offsets.is_empty() || *computed_offsets.last().unwrap() != parent_offset
-                {
+                if computed_offsets.last() != Some(&parent_offset) {
                     computed_offsets.push(parent_offset);
                 }
             } else {
@@ -508,9 +507,7 @@ impl MerklePath {
                 };
                 let peer = self.path[0].iter().find(|l| l.offset == peer_offset);
                 if let Some(p) = peer {
-                    if !p.txid
-                        && (drop_offsets.is_empty() || *drop_offsets.last().unwrap() != p.offset)
-                    {
+                    if !p.txid && drop_offsets.last() != Some(&p.offset) {
                         drop_offsets.push(p.offset);
                     }
                 }
@@ -773,11 +770,14 @@ fn hash_pair(left: &str, right: &str) -> String {
 
     // Valid hash pairs share the block primitive. Preserve the legacy
     // reading of malformed display strings for callers constructing leaves.
-    let hash = if data.len() == 64 {
-        crate::block::merkle_parent(
-            data[..32].try_into().expect("32 bytes"),
-            data[32..].try_into().expect("32 bytes"),
-        )
+    let pair = data.split_at_checked(32).and_then(|(left, right)| {
+        Some((
+            <&[u8; 32]>::try_from(left).ok()?,
+            <&[u8; 32]>::try_from(right).ok()?,
+        ))
+    });
+    let hash = if let Some((left, right)) = pair {
+        crate::block::merkle_parent(left, right)
     } else {
         sha256d(&data)
     };

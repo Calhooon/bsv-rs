@@ -931,12 +931,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         };
 
         // Build the query
-        let query_attributes: serde_json::Value = if attributes.len() == 1 {
+        let query_attributes: serde_json::Value = match attributes.values().next() {
             // Single attribute uses "any" matcher for flexible matching
-            let value = attributes.values().next().unwrap();
-            serde_json::json!({ "any": value })
-        } else {
-            serde_json::to_value(&attributes).unwrap_or_default()
+            Some(value) if attributes.len() == 1 => serde_json::json!({ "any": value }),
+            _ => serde_json::to_value(&attributes).unwrap_or_default(),
         };
 
         let question = LookupQuestion::new(

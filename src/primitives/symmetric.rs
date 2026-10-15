@@ -84,6 +84,7 @@ impl SymmetricKey {
     ///
     /// let key = SymmetricKey::random();
     /// ```
+    #[allow(clippy::expect_used)] // #134: an infallible public signature; a Result here is a breaking change
     pub fn random() -> Self {
         let mut key = [0u8; KEY_SIZE];
         getrandom::getrandom(&mut key).expect("Failed to generate random bytes");

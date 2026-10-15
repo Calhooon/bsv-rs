@@ -35,7 +35,7 @@ use std::cmp::Ordering;
 
 use crate::error::{Error, Result};
 use crate::primitives::ec::{PrivateKey, PublicKey};
-use crate::primitives::encoding::{from_base58, to_base58};
+use crate::primitives::encoding::{fixed_bytes, from_base58, to_base58};
 use crate::primitives::hash::{hash160, sha256d, sha512_hmac};
 use crate::primitives::BigNumber;
 
@@ -130,8 +130,8 @@ impl ExtendedKey {
         let (il, ir) = hmac.split_at(32);
 
         // IL is the master secret key, IR is the master chain code
-        let secret_key: [u8; 32] = il.try_into().unwrap();
-        let chain_code: [u8; 32] = ir.try_into().unwrap();
+        let secret_key: [u8; 32] = fixed_bytes(il)?;
+        let chain_code: [u8; 32] = fixed_bytes(ir)?;
 
         // Verify the key is valid (not zero and less than curve order)
         let key_num = BigNumber::from_bytes_be(&secret_key);
@@ -205,12 +205,12 @@ impl ExtendedKey {
         }
 
         // Parse fields
-        let version: [u8; 4] = payload[0..4].try_into().unwrap();
+        let version: [u8; 4] = fixed_bytes(&payload[0..4])?;
         let depth = payload[4];
-        let parent_fingerprint: [u8; 4] = payload[5..9].try_into().unwrap();
-        let child_number = u32::from_be_bytes(payload[9..13].try_into().unwrap());
-        let chain_code: [u8; 32] = payload[13..45].try_into().unwrap();
-        let key_data: [u8; 33] = payload[45..78].try_into().unwrap();
+        let parent_fingerprint: [u8; 4] = fixed_bytes(&payload[5..9])?;
+        let child_number = u32::from_be_bytes(fixed_bytes(&payload[9..13])?);
+        let chain_code: [u8; 32] = fixed_bytes(&payload[13..45])?;
+        let key_data: [u8; 33] = fixed_bytes(&payload[45..78])?;
 
         // Determine if private or public key
         let is_private = key_data[0] == 0x00;
@@ -354,7 +354,7 @@ impl ExtendedKey {
         }
 
         // Child chain code is IR
-        let child_chain_code: [u8; 32] = ir.try_into().unwrap();
+        let child_chain_code: [u8; 32] = fixed_bytes(ir)?;
 
         // Derive child key
         let (child_key, child_is_private) = if self.is_private {
@@ -379,7 +379,7 @@ impl ExtendedKey {
             let parent_pubkey = PublicKey::from_bytes(&self.key)?;
 
             // Compute G * IL
-            let il_bytes: [u8; 32] = il.try_into().unwrap();
+            let il_bytes: [u8; 32] = fixed_bytes(il)?;
             let offset_point = PublicKey::from_scalar_mul_generator(&il_bytes)?;
 
             // Add to parent public key
@@ -391,7 +391,7 @@ impl ExtendedKey {
         // Parent fingerprint is first 4 bytes of HASH160(parent_pubkey)
         let parent_pubkey = self.public_key_bytes()?;
         let parent_hash = hash160(&parent_pubkey);
-        let parent_fp: [u8; 4] = parent_hash[..4].try_into().unwrap();
+        let parent_fp: [u8; 4] = fixed_bytes(&parent_hash[..4])?;
 
         Ok(Self {
             version: self.version,
@@ -595,7 +595,7 @@ impl ExtendedKey {
     pub fn fingerprint(&self) -> Result<[u8; 4]> {
         let pubkey_bytes = self.public_key_bytes()?;
         let hash = hash160(&pubkey_bytes);
-        Ok(hash[..4].try_into().unwrap())
+        fixed_bytes(&hash[..4])
     }
 
     /// Returns the network this key is for.

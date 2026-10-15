@@ -51,6 +51,7 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 
 use crate::error::{Error, Result};
 use crate::primitives::ec::{PrivateKey, PublicKey};
+use crate::primitives::encoding::fixed_bytes;
 use crate::primitives::hash::{sha256_hmac, sha512};
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 
@@ -115,8 +116,8 @@ pub fn electrum_encrypt(
 
     // Derive keys: SHA512(compressed_shared)
     let key_material = sha512(&shared_compressed);
-    let iv: [u8; 16] = key_material[0..16].try_into().unwrap();
-    let aes_key: [u8; 16] = key_material[16..32].try_into().unwrap();
+    let iv: [u8; 16] = fixed_bytes(&key_material[0..16])?;
+    let aes_key: [u8; 16] = fixed_bytes(&key_material[16..32])?;
     let hmac_key = &key_material[32..64];
 
     // Encrypt with AES-128-CBC
@@ -220,8 +221,8 @@ pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) 
     // Derive keys
     let shared_compressed = shared_secret.to_compressed();
     let key_material = sha512(&shared_compressed);
-    let iv: [u8; 16] = key_material[0..16].try_into().unwrap();
-    let aes_key: [u8; 16] = key_material[16..32].try_into().unwrap();
+    let iv: [u8; 16] = fixed_bytes(&key_material[0..16])?;
+    let aes_key: [u8; 16] = fixed_bytes(&key_material[16..32])?;
     let hmac_key = &key_material[32..64];
 
     // Verify MAC
@@ -289,7 +290,7 @@ pub fn bitcore_encrypt(
     // Key derivation from X coordinate only
     let x_coord = shared_secret.x();
     let key_material = sha512(&x_coord);
-    let key_e: [u8; 32] = key_material[0..32].try_into().unwrap();
+    let key_e: [u8; 32] = fixed_bytes(&key_material[0..32])?;
     let key_m = &key_material[32..64];
 
     // Encrypt with AES-256-CBC (key_e used directly, not hashed)
@@ -363,7 +364,7 @@ pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>> {
             "Data too short for IV".to_string(),
         ));
     }
-    let iv: [u8; 16] = iv_and_ciphertext[0..16].try_into().unwrap();
+    let iv: [u8; 16] = fixed_bytes(&iv_and_ciphertext[0..16])?;
     let ciphertext = &iv_and_ciphertext[16..];
 
     // Compute ECDH shared secret
@@ -372,7 +373,7 @@ pub fn bitcore_decrypt(data: &[u8], to: &PrivateKey) -> Result<Vec<u8>> {
     // Key derivation from X coordinate only
     let x_coord = shared_secret.x();
     let key_material = sha512(&x_coord);
-    let key_e: [u8; 32] = key_material[0..32].try_into().unwrap();
+    let key_e: [u8; 32] = fixed_bytes(&key_material[0..32])?;
     let key_m = &key_material[32..64];
 
     // Verify MAC (over iv || ciphertext)

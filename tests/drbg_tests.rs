@@ -1,4 +1,5 @@
 //! DRBG test vectors from NIST SP 800-90A
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::drbg::HmacDrbg;
 use serde::Deserialize;

@@ -2413,10 +2413,9 @@ impl Spend {
     }
 
     fn pop_stack(&mut self) -> Result<Vec<u8>, ScriptEvaluationError> {
-        if self.stack.is_empty() {
+        let Some(item) = self.stack.pop() else {
             return Err(self.error("Attempted to pop from an empty stack."));
-        }
-        let item = self.stack.pop().unwrap();
+        };
         self.stack_mem -= item.len();
         self.release(item.len());
         Ok(item)
@@ -2448,10 +2447,9 @@ impl Spend {
     }
 
     fn pop_alt_stack(&mut self) -> Result<Vec<u8>, ScriptEvaluationError> {
-        if self.alt_stack.is_empty() {
+        let Some(item) = self.alt_stack.pop() else {
             return Err(self.error("Attempted to pop from an empty alt stack."));
-        }
-        let item = self.alt_stack.pop().unwrap();
+        };
         self.alt_stack_mem -= item.len();
         self.release(item.len());
         Ok(item)

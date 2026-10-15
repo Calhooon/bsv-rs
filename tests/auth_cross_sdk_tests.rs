@@ -2,7 +2,7 @@
 //!
 //! Tests certificate serialization and parsing compatibility
 //! with TypeScript and Go BSV SDKs.
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "auth")]
 
 use bsv_rs::auth::certificates::Certificate;

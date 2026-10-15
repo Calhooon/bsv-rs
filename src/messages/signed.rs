@@ -153,16 +153,14 @@ pub fn verify(message: &[u8], sig: &[u8], recipient: Option<&PrivateKey>) -> Res
         verifier_privkey = anyone_priv;
     } else {
         // Specific recipient - need recipient's private key
-        if recipient.is_none() {
+        let Some(recipient_key) = recipient else {
             // Reconstruct the expected public key from bytes we've seen
             let expected_pubkey_bytes = &sig[offset - 1..offset + 32];
             return Err(Error::MessageError(format!(
                 "this signature can only be verified with knowledge of a specific private key. The associated public key is: {}",
                 hex::encode(expected_pubkey_bytes)
             )));
-        }
-
-        let recipient_key = recipient.unwrap();
+        };
         verifier_privkey = recipient_key.clone();
         let verifier_pubkey = recipient_key.public_key();
 

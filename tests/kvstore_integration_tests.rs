@@ -3,7 +3,7 @@
 //! Tests for the key-value store module including LocalKVStore, GlobalKVStore,
 //! KVStoreConfig, and KVStoreInterpreter. Tests use mock wallets to verify
 //! the store operations without requiring a live wallet backend.
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "kvstore")]
 
 use bsv_rs::kvstore::{

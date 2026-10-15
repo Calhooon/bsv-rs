@@ -1,0 +1,5 @@
+# The lint bar (bsv-stack-lean #134): a test function may unwrap, expect and panic; a failure
+# there is the test failing. Library code is held to the `[lints.clippy]` table in Cargo.toml.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

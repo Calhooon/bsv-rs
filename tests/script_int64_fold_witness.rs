@@ -3,6 +3,7 @@
 //! The witness ids and bytes are retained from the specification's public
 //! corpus. Expectations follow `int_serialization.h:61-118`,
 //! `script_num.cpp:80-91`, and `interpreter.cpp:1807-1809`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::{from_hex, to_hex};
 use bsv_rs::script::{

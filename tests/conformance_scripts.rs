@@ -36,6 +36,7 @@
 //! a flag configuration the default mode cannot express are counted per-class
 //! below, with the class totals pinned.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use serde_json::Value;
 use std::collections::BTreeMap;

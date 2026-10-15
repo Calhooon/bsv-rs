@@ -2,6 +2,7 @@
 //! keys from their identity keys, then sign and verify under a protocol.
 //!
 //! Run with `cargo run --example brc42 --features wallet`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: example code: a failed unwrap is the example failing
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::wallet::{
     Counterparty, CreateSignatureArgs, KeyDeriver, ProtoWallet, Protocol, SecurityLevel,

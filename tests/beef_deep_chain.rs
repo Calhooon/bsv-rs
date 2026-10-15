@@ -19,6 +19,7 @@
 //! The scripts are `OP_TRUE` locks spent by empty unlocks, so `verify` executes
 //! a real script per link without signing a hundred thousand transactions.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::time::{Duration, Instant};
 

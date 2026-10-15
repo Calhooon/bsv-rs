@@ -4,7 +4,7 @@
 //! each broadcaster sends the correct request and handles various responses properly.
 //!
 //! Run with: `cargo test --features "full,http" --test broadcaster_http_tests`
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(all(feature = "transaction", feature = "http"))]
 
 use bsv_rs::transaction::{

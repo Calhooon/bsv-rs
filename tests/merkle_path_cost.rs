@@ -26,6 +26,7 @@
 //!    is run alone: `BEEF_DEPTH=<n> cargo test --features transaction --test
 //!    merkle_path_cost -- --exact <name>`, the exit code being the observation.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::time::{Duration, Instant};
 

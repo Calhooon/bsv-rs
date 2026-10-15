@@ -144,10 +144,13 @@ impl KeyShares {
             points.push(point);
         }
 
+        let (Some(threshold), Some(integrity)) = (threshold, integrity) else {
+            return Err(Error::CryptoError("No shares to recombine".to_string()));
+        };
         Ok(Self {
             points,
-            threshold: threshold.unwrap(),
-            integrity: integrity.unwrap(),
+            threshold,
+            integrity,
         })
     }
 

@@ -383,6 +383,7 @@ fn compute_hash_outputs(outputs: &[TxOutput], input_index: usize, scope: u32) ->
 ///
 /// Panics if `params.input_index` is out of range (the historical contract of
 /// this function; [`SighashCache::preimage`] returns an error instead).
+#[allow(clippy::panic)] // #134: the documented `# Panics` contract; a Result here is a breaking change
 pub fn build_sighash_preimage(params: &SighashParams) -> Vec<u8> {
     let mut cache = SighashCache::from_parts(
         params.version,
@@ -852,6 +853,7 @@ impl TxSighashCache {
     ///
     /// Under the BIP-143 digest, if `input_index` is out of range (the
     /// contract of [`build_sighash_preimage`]).
+    #[allow(clippy::panic)] // #134: the documented `# Panics` contract; a Result here is a breaking change
     pub fn sighash_dispatched_for_signing(
         &self,
         input_index: usize,
