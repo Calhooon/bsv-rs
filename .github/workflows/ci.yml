@@ -170,7 +170,7 @@ jobs:
             ubuntu-vectors-
 
       - name: Run the chain primitive vectors
-        run: cargo test --all-features --test chain_primitives --test chain_encoding --test canonical_varint --verbose
+        run: cargo test --all-features --test chain_primitives --test chain_encoding --test canonical_varint --test hash_stream --verbose
 
       - name: Run the vector-backed tests
         run: cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --verbose -- --nocapture

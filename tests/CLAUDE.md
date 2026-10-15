@@ -23,6 +23,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `cross_sdk_tests.rs` | 17 | default | BRC-42, symmetric encryption, WIF/address vectors |
 | `drbg_tests.rs` | 6 | default | HMAC-DRBG with NIST SP 800-90A vectors |
 | `ec_tests.rs` | 39 | default | Elliptic curve ops, BRC-42 derivation, ECDH, pubkey validation |
+| `hash_stream.rs` | 3 | default | `Sha256` and `Sha256d` equal `sha256` and `sha256d` for every row of bsv-stack-lean's BEEF-of-any-size corpus (`vectors/beef_of_any_size/`, 47 committed rows, the 5 generated ones from `$BSV_RS_BEEF_ROWS_DIR`) in chunks of 1, 7, 64 KiB, whole and seeded random, and for generated buffers of 0 to 300,000 bytes |
 | `identity_tests.rs` | 69 | `identity` | Certificates, contacts, queries, broadcast results |
 | `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
