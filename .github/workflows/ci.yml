@@ -202,6 +202,38 @@ jobs:
         env:
           RUSTDOCFLAGS: -Dwarnings
 
+  # the workflows linted (bsv-stack-lean #145), shellcheck on every run script: actionlint is built
+  # from its release source, the tarball pinned by sha256. Every `uses:` in ci.yml and release.yml
+  # is pinned by a commit sha with its version beside it (#144)
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 454800bd4f854592bcfe79b161f71d56e35940eb7016e48a26dd356adc9d400a
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Build actionlint from its pinned source
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/archive/refs/tags/v${ACTIONLINT_VERSION}.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/actionlint-${ACTIONLINT_VERSION}"
+          go build -o "$RUNNER_TEMP/bin/actionlint" ./cmd/actionlint
+
+      - name: Every action pinned by a commit sha
+        run: |
+          if grep -nE '^\s*-?\s*uses:' .github/workflows/*.yml | grep -vE 'uses: (\./|[^@ ]+@[0-9a-f]{40} # v)'; then
+            echo "::error::a uses: line above is not pinned by a 40-hex commit sha with its version"
+            exit 1
+          fi
+
+      - name: Lint the workflows
+        run: '"$RUNNER_TEMP/bin/actionlint" -no-color'
+
   # the secrets scan (bsv-stack-lean #140): gitleaks over every commit of the checkout, the
   # values redacted; the findings judged not secrets are named by fingerprint in .gitleaksignore.
   # gitleaks is built from its release source, the tarball pinned by sha256 (no third-party action)
