@@ -26,6 +26,7 @@ use std::collections::HashMap;
 pub mod hex_bytes {
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes the bytes as one hex string.
     pub fn serialize<S>(bytes: &Vec<u8>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -33,6 +34,7 @@ pub mod hex_bytes {
         serializer.serialize_str(&hex::encode(bytes))
     }
 
+    /// Deserializes one hex string into the bytes.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
     where
         D: Deserializer<'de>,
@@ -48,6 +50,7 @@ pub mod hex_bytes {
 pub mod hex_bytes_option {
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes the bytes as one hex string, or none.
     pub fn serialize<S>(bytes: &Option<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -58,6 +61,7 @@ pub mod hex_bytes_option {
         }
     }
 
+    /// Deserializes one hex string, or none, into the bytes.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
     where
         D: Deserializer<'de>,
@@ -75,6 +79,7 @@ pub mod hex_bytes_option {
 pub mod hex_txid {
     use serde::{Deserialize, Deserializer, Serializer};
 
+    /// Serializes the 32 bytes as one hex string.
     pub fn serialize<S>(bytes: &[u8; 32], serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -82,6 +87,7 @@ pub mod hex_txid {
         serializer.serialize_str(&hex::encode(bytes))
     }
 
+    /// Deserializes one hex string of 32 bytes into the array.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<[u8; 32], D::Error>
     where
         D: Deserializer<'de>,
@@ -105,6 +111,7 @@ pub mod hex_txid {
 pub mod hex_txid_vec_option {
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+    /// Serializes each 32-byte id as a hex string, or none.
     pub fn serialize<S>(txids: &Option<Vec<[u8; 32]>>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -118,6 +125,7 @@ pub mod hex_txid_vec_option {
         }
     }
 
+    /// Deserializes an array of hex strings of 32 bytes each, or none, into the ids.
     pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<[u8; 32]>>, D::Error>
     where
         D: Deserializer<'de>,

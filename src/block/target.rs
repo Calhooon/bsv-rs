@@ -119,19 +119,34 @@ pub const POW_LIMIT_REGTEST: U256 = U256([u64::MAX, u64::MAX, u64::MAX, 0x7fff_f
 pub enum PowError {
     /// Negative target.
     #[error("negative compact target: {bits:#010x}")]
-    BitsNegative { bits: u32 },
+    BitsNegative {
+        /// The header's compact target.
+        bits: u32,
+    },
     /// Zero target, including a value truncated to zero.
     #[error("zero compact target: {bits:#010x}")]
-    BitsZero { bits: u32 },
+    BitsZero {
+        /// The header's compact target.
+        bits: u32,
+    },
     /// Target overflow.
     #[error("overflowing compact target: {bits:#010x}")]
-    BitsOverflow { bits: u32 },
+    BitsOverflow {
+        /// The header's compact target.
+        bits: u32,
+    },
     /// Target exceeds the supplied network limit.
     #[error("compact target above proof-of-work limit: {bits:#010x}")]
-    BitsAboveLimit { bits: u32 },
+    BitsAboveLimit {
+        /// The header's compact target.
+        bits: u32,
+    },
     /// Hash exceeds the decoded target.
     #[error("hash above compact target: {bits:#010x}")]
-    HighHash { bits: u32 },
+    HighHash {
+        /// The header's compact target.
+        bits: u32,
+    },
 }
 
 impl PowError {

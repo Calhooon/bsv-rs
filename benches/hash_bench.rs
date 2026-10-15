@@ -1,4 +1,5 @@
 //! Benchmarks for hash functions.
+#![allow(missing_docs)] // #135: criterion_group! generates the bench's public function, which takes no doc
 
 use bsv_rs::primitives::hash;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};

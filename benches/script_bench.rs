@@ -2,6 +2,7 @@
 //!
 //! Run with: cargo bench --bench script_bench
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: bench code: a failed unwrap is the bench failing
+#![allow(missing_docs)] // #135: criterion_group! generates the bench's public function, which takes no doc
 
 use bsv_rs::primitives::ec::PrivateKey;
 use bsv_rs::script::templates::{Multisig, PushDrop, P2PK, P2PKH};

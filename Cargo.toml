@@ -79,10 +79,16 @@ js-sys = { version = "0.3", optional = true }
 # URL encoding (for storage module)
 urlencoding = "2.1"
 
-# The lint bar (bsv-stack-lean #134): the levels the gate holds on every target. unwrap,
+# The lint bar (bsv-stack-lean #134, #135): the levels the gate holds on every target. unwrap,
 # expect and panic are denied where money moves, the library; a test function takes them
 # by clippy.toml, a test, bench or example file by its own allow naming #134, and a
 # library site that cannot lose one without a breaking change by an allow at the site.
+[lints.rust]
+# no `unsafe` in the crate (#135)
+unsafe_code = "forbid"
+# every public item says what it is (#135)
+missing_docs = "deny"
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
