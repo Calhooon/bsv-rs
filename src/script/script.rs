@@ -420,6 +420,11 @@ impl Script {
     }
 
     /// Appends binary data to the script, determining the appropriate opcode based on length.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `bin` is 4 GiB or longer: no push opcode carries it.
+    #[allow(clippy::panic)] // #134: the documented `# Panics` contract; a Result here is a breaking change
     pub fn write_bin(&mut self, bin: &[u8]) -> &mut Self {
         // parse FIRST, then drop the byte cache: on a `from_binary` script the raw bytes are the
         // only source of chunks, and the old order (invalidate, then parse) parsed from nothing and

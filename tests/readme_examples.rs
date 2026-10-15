@@ -1,12 +1,13 @@
 //! The README's code blocks ARE the `examples/` files, byte for byte.
 //!
 //! Every ```rust block in `README.md` that opens with a `// examples/<name>.rs`
-//! line must equal the body of that file (its module doc comment stripped),
+//! line must equal the body of that file (its doc block and lint attribute stripped),
 //! and every example file must appear in the README. The examples are
 //! compiled by `cargo build --examples --all-features` (CI), so a README
 //! snippet can never drift from something that builds. Edit the example file,
 //! then paste it into the README under its marker line; this test names the
 //! first divergent line.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::fs;
 use std::path::Path;
@@ -41,11 +42,12 @@ fn readme_blocks(readme: &str) -> Vec<(String, String)> {
     out
 }
 
-/// An example file without its leading `//!` doc block and the blank line after it.
+/// An example file without its leading `//!` doc block, its crate lint attribute and the
+/// blank line after them.
 fn example_body(path: &Path) -> String {
     let src = fs::read_to_string(path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
     let mut lines = src.lines().peekable();
-    while matches!(lines.peek(), Some(l) if l.starts_with("//!")) {
+    while matches!(lines.peek(), Some(l) if l.starts_with("//!") || l.starts_with("#![")) {
         lines.next();
     }
     while matches!(lines.peek(), Some(l) if l.trim().is_empty()) {

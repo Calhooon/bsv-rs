@@ -2,7 +2,7 @@
 //!
 //! Tests for BRC-77 message signing/verification and BRC-78 encryption/decryption.
 //! Includes cross-SDK test vectors from TypeScript SDK for compatibility verification.
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "messages")]
 
 use bsv_rs::messages::{decrypt, encrypt, sign, verify, ENCRYPTED_VERSION, SIGNED_VERSION};

@@ -7,6 +7,7 @@
 //! - spend_valid.json: ~570+ valid spend execution vectors
 //! - script_valid.json: ~590+ valid script parsing vectors
 //! - script_invalid.json: ~500+ invalid scripts that should fail
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
 use serde::Deserialize;

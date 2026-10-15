@@ -13,6 +13,7 @@
 //! generator's x and `s` = the order, with the FORKID hash type, from the same
 //! differential run against bitcoin-sv v1.2.2 (`879fc8b`). Every outpoint is
 //! synthetic.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;

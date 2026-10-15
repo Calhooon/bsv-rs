@@ -12,6 +12,7 @@
 //! are replayed with their counts: the elements, the bytes, the steps, the
 //! cost model's work and the index's entries.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 #[path = "support/beef_chain.rs"]
 mod beef_chain;

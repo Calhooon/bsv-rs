@@ -190,6 +190,7 @@ impl P256PrivateKey {
     /// # Returns
     ///
     /// The signature
+    #[allow(clippy::expect_used)] // #134: an infallible public signature; a Result here is a breaking change
     pub fn sign_hash(&self, hash: &[u8; 32]) -> P256Signature {
         // Use prehash signing (sign a hash directly)
         let signature: P256EcdsaSignature = self.inner.sign_prehash(hash).expect("signing failed");
@@ -370,18 +371,22 @@ impl P256PublicKey {
     /// Returns the X coordinate (32 bytes, big-endian).
     pub fn x(&self) -> [u8; 32] {
         let point = self.inner.to_encoded_point(false);
-        let x_bytes = point.x().expect("not at infinity");
         let mut result = [0u8; 32];
-        result.copy_from_slice(x_bytes);
+        // a public key is never the identity, so its uncompressed encoding carries x
+        if let Some(x_bytes) = point.x() {
+            result.copy_from_slice(x_bytes);
+        }
         result
     }
 
     /// Returns the Y coordinate (32 bytes, big-endian).
     pub fn y(&self) -> [u8; 32] {
         let point = self.inner.to_encoded_point(false);
-        let y_bytes = point.y().expect("not at infinity");
         let mut result = [0u8; 32];
-        result.copy_from_slice(y_bytes);
+        // a public key is never the identity, so its uncompressed encoding carries y
+        if let Some(y_bytes) = point.y() {
+            result.copy_from_slice(y_bytes);
+        }
         result
     }
 }
@@ -527,6 +532,7 @@ impl P256Signature {
     ///
     /// If S > n/2, returns a new signature with S' = n - S.
     /// Otherwise returns a clone of this signature.
+    #[allow(clippy::expect_used)] // #134: an infallible public signature; a Result here is a breaking change
     pub fn to_low_s(&self) -> P256Signature {
         if self.is_low_s() {
             return self.clone();

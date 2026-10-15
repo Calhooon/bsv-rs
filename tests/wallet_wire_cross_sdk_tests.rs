@@ -13,7 +13,7 @@
 //! Strategy: We use the Rust SDK's WalletWireProcessor to process Go-encoded
 //! request messages, and verify that Rust can decode Go-encoded response data.
 //! This proves cross-SDK interoperability at the byte level.
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "wallet")]
 
 use serde_json::Value;

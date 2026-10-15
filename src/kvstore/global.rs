@@ -731,9 +731,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
 
     async fn acquire_key_lock(&self, key: &str) {
         let mut locks = self.key_locks.lock().await;
-        if locks.contains_key(key) {
+        if let Some(waiters) = locks.get_mut(key) {
             let (tx, rx) = tokio::sync::oneshot::channel();
-            locks.get_mut(key).unwrap().push(tx);
+            waiters.push(tx);
             drop(locks);
             let _ = rx.await;
         } else {

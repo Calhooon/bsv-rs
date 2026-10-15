@@ -1,6 +1,7 @@
 //! R404-H1 / bsv-stack-lean #75 B: one input must stop inside its script.
 //! Phantom outpoints and a deterministic throwaway key; nothing broadcast.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{
     build_sighash_preimage_original, compute_sighash_dispatched_for_signing, SighashParams,
     TxInput, TxOutput, TxSighashCache, SIGHASH_ALL, SIGHASH_CHRONICLE, SIGHASH_FORKID,

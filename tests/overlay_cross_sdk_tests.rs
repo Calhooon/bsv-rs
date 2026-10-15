@@ -14,7 +14,7 @@
 //!
 //! [`create_overlay_admin_token`]: bsv_rs::overlay::create_overlay_admin_token
 //! [`create_signed_overlay_admin_token`]: bsv_rs::overlay::create_signed_overlay_admin_token
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "overlay")]
 #![allow(deprecated)]
 

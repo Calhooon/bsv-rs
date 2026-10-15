@@ -5,6 +5,7 @@
 //! the bytes `Beef::to_binary` writes for that chain (`beef_stream_deep.rs`
 //! holds the two equal).
 #![allow(dead_code)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::io::Read;
 

@@ -86,6 +86,7 @@ impl KeyDeriver {
     /// # Returns
     ///
     /// A tuple of (private_key, public_key) for the "anyone" identity.
+    #[allow(clippy::expect_used)] // #134: the scalar 1 is a valid key; an infallible public signature
     pub fn anyone_key() -> (PrivateKey, PublicKey) {
         // In the TypeScript SDK, "anyone" uses PrivateKey(1), but for compatibility
         // we'll check both approaches. The TS SDK uses `new PrivateKey(1)` which

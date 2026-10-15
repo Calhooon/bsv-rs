@@ -148,11 +148,13 @@ impl Schnorr {
     ) -> bool {
         // Recompute challenge e = H(A || B || S || S' || R) mod n
         let e = Self::compute_challenge(big_a, big_b, big_s, &proof.s_prime, &proof.r);
-        let e_bytes = e.to_bytes_be(32);
-        let e_bytes_arr: [u8; 32] = e_bytes.try_into().expect("e should be 32 bytes");
+        let Ok(e_bytes_arr) = <[u8; 32]>::try_from(e.to_bytes_be(32)) else {
+            return false;
+        };
 
-        let z_bytes = proof.z.to_bytes_be(32);
-        let z_bytes_arr: [u8; 32] = z_bytes.try_into().expect("z should be 32 bytes");
+        let Ok(z_bytes_arr) = <[u8; 32]>::try_from(proof.z.to_bytes_be(32)) else {
+            return false;
+        };
 
         // Check: z*G == R + e*A
         let z_g = match PublicKey::from_scalar_mul_generator(&z_bytes_arr) {

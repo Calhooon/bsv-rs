@@ -258,6 +258,7 @@ pub fn create_overlay_admin_token(
 ///     "tm_mytopic",
 /// );
 /// ```
+#[allow(clippy::expect_used)] // #134: an infallible public signature; a Result here is a breaking change
 pub fn create_signed_overlay_admin_token(
     root_key: &PrivateKey,
     protocol: Protocol,

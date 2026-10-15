@@ -16,6 +16,7 @@
 //! SKIP (pass with an eprintln). Present corpus → every vector is executed or
 //! explicitly counted as unsupported with a reason; totals are pinned.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use serde_json::Value;
 use std::path::PathBuf;

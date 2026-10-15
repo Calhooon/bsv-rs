@@ -11,6 +11,7 @@
 //! any count (`1 OP_RSHIFTNUM 2147483648` was 0, a valid spend) and tested a
 //! left shift only against its local memory budget (a resource limit, not a
 //! verdict). The default mode keeps the TypeScript SDK's behaviour.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
 use bsv_rs::script::evaluation_error::ScriptEvaluationError;

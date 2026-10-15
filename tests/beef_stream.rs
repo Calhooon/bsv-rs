@@ -9,6 +9,7 @@
 //! scripts. Where the Lean wrote an element's offset by hand (40, 999) the
 //! row asserts the offset the wire gives.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::collections::HashMap;
 

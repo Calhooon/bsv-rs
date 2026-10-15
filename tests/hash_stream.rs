@@ -5,6 +5,7 @@
 //! every row's bytes hashed whole and in chunks of 1, 7, 64 KiB, the row's
 //! full length and seeded random boundaries, against the digests the corpus
 //! pins. Then generated buffers of 0 to 300,000 bytes.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::hash::{sha256, sha256d, Sha256, Sha256d};
 use rand::rngs::StdRng;

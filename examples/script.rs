@@ -1,6 +1,7 @@
 //! Scripts: build, parse, classify, and EXECUTE with the interpreter.
 //!
 //! Run with `cargo run --example script`.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: example code: a failed unwrap is the example failing
 use bsv_rs::script::templates::P2PKH;
 use bsv_rs::script::{
     LockingScript, ProtocolEra, Script, ScriptFlags, Spend, SpendParams, UnlockingScript,

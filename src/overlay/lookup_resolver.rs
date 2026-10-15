@@ -104,6 +104,11 @@ pub struct LookupResolver {
 
 impl LookupResolver {
     /// Create a new resolver with configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a host override's service name does not start with `ls_`.
+    #[allow(clippy::panic)] // #134: a bad override name is the caller's bug, as the TypeScript throws; a Result here is a breaking change
     pub fn new(config: LookupResolverConfig) -> Self {
         let facilitator = config.facilitator.unwrap_or_else(|| {
             Arc::new(HttpsOverlayLookupFacilitator::new(

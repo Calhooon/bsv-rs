@@ -762,7 +762,9 @@ impl Transaction {
             };
             if top.inputs_left == 0 {
                 // After processing all ancestors, add this transaction
-                let frame = stack.pop().expect("the stack is not empty");
+                let Some(frame) = stack.pop() else {
+                    return Ok(());
+                };
                 seen_txids.insert(frame.txid);
                 ancestors.push(frame.tx.clone_for_beef());
                 continue;
@@ -1452,7 +1454,9 @@ impl Transaction {
                     .clone();
 
                 // Take the template temporarily
-                let template = self.inputs[i].unlocking_script_template.take().unwrap();
+                let Some(template) = self.inputs[i].unlocking_script_template.take() else {
+                    continue;
+                };
 
                 let context =
                     SigningContext::new(&raw_tx, i, source_satoshis, locking_script.as_script());
@@ -2058,6 +2062,7 @@ impl Clone for Transaction {
     /// `unlocking_script_template` is left `None` (templates hold closures).
     /// The ancestry is copied depth first with an explicit stack, so a deep
     /// chain costs heap, not stack.
+    #[allow(clippy::expect_used)] // #134: the loop pops only what it pushed and returns at the root; Clone has no Result
     fn clone(&self) -> Self {
         /// One transaction being copied, and the next input to look at.
         struct Frame<'a> {

@@ -720,7 +720,8 @@ pub fn validate_create_action_input(
         .as_ref()
         .map(|s| validate_hex_string(s, "unlockingScript", None, None))
         .transpose()?
-        .map(|s| crate::primitives::from_hex(&s).unwrap());
+        .map(|s| crate::primitives::from_hex(&s))
+        .transpose()?;
 
     let unlocking_script_length = input
         .unlocking_script_length

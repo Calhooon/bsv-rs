@@ -10,6 +10,7 @@
 //! - Performance timing via Criterion
 //! - Memory usage awareness through RSS tracking
 //! - Cross-platform support (Linux, macOS, Windows)
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: bench code: a failed unwrap is the bench failing
 
 use bsv_rs::primitives::bsv::shamir::split_private_key;
 use bsv_rs::primitives::ec::PrivateKey;

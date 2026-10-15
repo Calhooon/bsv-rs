@@ -22,6 +22,7 @@
 //!
 //! Every outpoint is synthetic; nothing here was ever on a chain.
 #![cfg(feature = "transaction")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

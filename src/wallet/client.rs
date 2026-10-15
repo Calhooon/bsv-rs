@@ -171,8 +171,10 @@ impl WalletClient {
             }
         }
 
-        // Safe to unwrap here because we just set it above (or auto_detect did)
-        Ok(self.connected.as_ref().expect("connected was just set"))
+        // set just above (or by auto_detect)
+        self.connected
+            .as_ref()
+            .ok_or_else(|| Error::WalletError("no wallet substrate connected".to_string()))
     }
 
     /// Auto-detects available substrate by trying each in order.

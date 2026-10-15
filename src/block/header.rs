@@ -3,6 +3,7 @@
 //! `lean/BsvChain/Header.lean:24-67` (#63).
 
 use super::{check_proof_of_work, ChainWork, CompactTarget, PowError};
+use crate::primitives::encoding::fixed_bytes;
 use crate::primitives::{from_hex, sha256d, Hash32, Reader, Writer, U256};
 use crate::{Error, Result};
 
@@ -72,14 +73,15 @@ impl BlockHeader {
     /// # Ok::<(), bsv_rs::Error>(())
     /// ```
     pub fn from_reader(reader: &mut Reader<'_>) -> Result<Self> {
-        let bytes = reader.read_bytes(HEADER_SIZE)?;
+        // the whole frame is taken before any field, so a short reader moves nothing
+        let mut frame = Reader::new(reader.read_bytes(HEADER_SIZE)?);
         Ok(Self {
-            version: i32::from_le_bytes(bytes[..4].try_into().expect("four bytes")),
-            prev_hash: bytes[4..36].try_into().expect("32 bytes"),
-            merkle_root: bytes[36..68].try_into().expect("32 bytes"),
-            time: u32::from_le_bytes(bytes[68..72].try_into().expect("four bytes")),
-            bits: u32::from_le_bytes(bytes[72..76].try_into().expect("four bytes")),
-            nonce: u32::from_le_bytes(bytes[76..80].try_into().expect("four bytes")),
+            version: frame.read_i32_le()?,
+            prev_hash: fixed_bytes(frame.read_bytes(32)?)?,
+            merkle_root: fixed_bytes(frame.read_bytes(32)?)?,
+            time: frame.read_u32_le()?,
+            bits: frame.read_u32_le()?,
+            nonce: frame.read_u32_le()?,
         })
     }
 

@@ -1,6 +1,7 @@
 //! Benchmarks for script operations, template construction, and transaction serialization.
 //!
 //! Run with: cargo bench --bench script_bench
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: bench code: a failed unwrap is the bench failing
 
 use bsv_rs::primitives::ec::PrivateKey;
 use bsv_rs::script::templates::{Multisig, PushDrop, P2PK, P2PKH};

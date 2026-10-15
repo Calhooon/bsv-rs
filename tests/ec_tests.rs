@@ -1,4 +1,5 @@
 //! Integration tests for the EC module with BRC-42 test vectors.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::ec::{PrivateKey, PublicKey};
 use bsv_rs::primitives::hash::sha256;

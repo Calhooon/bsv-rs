@@ -364,6 +364,8 @@ pub fn hash160(data: &[u8]) -> [u8; 20] {
 pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20] {
     type HmacSha1 = Hmac<Sha1>;
 
+    #[allow(clippy::expect_used)]
+    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
     let mut mac = HmacSha1::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().into()
@@ -393,6 +395,8 @@ pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20] {
 pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32] {
     type HmacSha256 = Hmac<sha2::Sha256>;
 
+    #[allow(clippy::expect_used)]
+    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
     let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().into()
@@ -422,6 +426,8 @@ pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32] {
 pub fn sha512_hmac(key: &[u8], data: &[u8]) -> [u8; 64] {
     type HmacSha512 = Hmac<Sha512>;
 
+    #[allow(clippy::expect_used)]
+    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
     let mut mac = HmacSha512::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().into()

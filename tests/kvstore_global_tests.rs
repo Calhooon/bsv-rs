@@ -16,7 +16,7 @@
 //! The mock wallet returns empty overlay results by default, so tests exercise
 //! the code paths around wallet calls, validation, and error propagation without
 //! requiring a live overlay network.
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "kvstore")]
 
 use bsv_rs::kvstore::{

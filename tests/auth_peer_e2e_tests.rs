@@ -10,7 +10,7 @@
 //! - Error handling for invalid auth version
 //! - General message callback invocation
 //! - Certificate request callback invocation
-
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "auth")]
 
 use async_trait::async_trait;

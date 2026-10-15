@@ -8,6 +8,7 @@
 //! bytes for the coin's era, `consensus.h:64`) and on the mempool path (the
 //! policy default of 10,000, `policy.h:156`). 0.3.27: valid under the block
 //! word, the standard word and the default mode.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
 use bsv_rs::script::{

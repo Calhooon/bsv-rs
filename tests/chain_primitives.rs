@@ -1,6 +1,7 @@
 //! Node vectors at bitcoin-sv@6504a3af, through bsv-script-lean@50d437b
 //! lean/BsvChain/{Header,Pow,Merkle}.lean, issues #63, #64 and #65.
 #![cfg(feature = "block")]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::block::*;
 use bsv_rs::primitives::{sha256, Hash32, Reader, Writer, U256};

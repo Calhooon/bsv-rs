@@ -36,10 +36,11 @@ impl ChainWork {
         let target = compact.target;
         // No compact representation can decode to U256::MAX: its mantissa
         // carries at most 23 bits, so adding one cannot overflow here.
-        let proof = target
-            .not()
-            .checked_div(target.wrapping_add(U256::ONE))
-            .expect("valid compact target plus one is nonzero");
+        // so the division cannot miss; were it to, zero is this function's answer
+        // for a target with no work, as above.
+        let Some(proof) = target.not().checked_div(target.wrapping_add(U256::ONE)) else {
+            return Self::ZERO;
+        };
         Self(proof.wrapping_add(U256::ONE))
     }
 

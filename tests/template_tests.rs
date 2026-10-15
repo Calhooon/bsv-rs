@@ -2,6 +2,7 @@
 //!
 //! These tests verify end-to-end functionality of the P2PKH and RPuzzle templates,
 //! including script creation, signing, and spend validation.
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::bsv::sighash::{SIGHASH_ALL, SIGHASH_FORKID};
 use bsv_rs::primitives::ec::PrivateKey;

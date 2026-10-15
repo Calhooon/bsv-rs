@@ -32,6 +32,7 @@
 //!
 //! Every row names what it allocates; the rows that allocate tens of megabytes
 //! run one at a time (`HEAVY`).
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
 use bsv_rs::script::flags::{DEFAULT_STACK_MEMORY_USAGE_POLICY, STACK_ELEMENT_OVERHEAD};

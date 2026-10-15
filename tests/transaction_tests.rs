@@ -7,6 +7,7 @@
 //! - BEEF and MerklePath parsing
 //! - SPV verification
 //! - Invalid transaction and BUMP vectors
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 mod transaction;
 
