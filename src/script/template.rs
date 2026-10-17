@@ -14,8 +14,8 @@
 //! ```
 
 use crate::primitives::bsv::sighash::{
-    compute_sighash_for_signing, parse_transaction, SighashParams, SIGHASH_ALL,
-    SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
+    after_last_code_separator, compute_sighash_dispatched_for_signing, parse_transaction,
+    SighashParams, SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_FORKID, SIGHASH_NONE, SIGHASH_SINGLE,
 };
 use crate::primitives::bsv::TransactionSignature;
 use crate::primitives::ec::PrivateKey;
@@ -51,6 +51,26 @@ impl SignOutputs {
 ///
 /// This provides all the information needed to compute a sighash and produce
 /// a signature for a specific input.
+///
+/// # The scriptCode
+///
+/// The signature commits to a scriptCode, and where the CHECKSIG executes
+/// decides what it is: the context cannot know that, so it is an input.
+/// Without an override ([`SigningContext::script_code`] `None`) the scriptCode
+/// is the source output's locking script, which is what the node signs for a
+/// CHECKSIG in the locking script that no `OP_CODESEPARATOR` precedes
+/// (bitcoin-sv v1.2.3 `src/script/interpreter.cpp:1471-1473`: the script from
+/// the last executed separator to its end). It is wrong in two cases, and the
+/// override ([`SigningContext::with_script_code`]) is what to pass:
+///
+/// - a CHECKSIG in the locking script after an executed `OP_CODESEPARATOR`:
+///   pass the locking script's bytes after that separator;
+/// - a CHECKSIG executing inside the UNLOCKING script of a post-Chronicle
+///   spend: the node signs the unlocking script from its last executed
+///   separator to its end followed by the locking script
+///   (`interpreter.cpp:1474-1481`, CHECKMULTISIG `:1569-1576`, gated on
+///   `IsChronicle(flags)`; `VerifyScript` passes the scriptPubKey as
+///   `checksigData`, `:2336-2342`): pass [`chronicle_unlocking_script_code`].
 #[derive(Debug, Clone)]
 pub struct SigningContext<'a> {
     /// The raw transaction bytes being signed.
@@ -61,10 +81,14 @@ pub struct SigningContext<'a> {
     pub source_satoshis: u64,
     /// The locking script of the UTXO being spent.
     pub locking_script: &'a Script,
+    /// The scriptCode the signature commits to when it is not the locking
+    /// script (see the type's documentation for when it is not); `None` signs
+    /// over `locking_script`.
+    pub script_code: Option<&'a Script>,
 }
 
 impl<'a> SigningContext<'a> {
-    /// Creates a new signing context.
+    /// Creates a new signing context, its scriptCode the locking script.
     pub fn new(
         raw_tx: &'a [u8],
         input_index: usize,
@@ -76,17 +100,48 @@ impl<'a> SigningContext<'a> {
             input_index,
             source_satoshis,
             locking_script,
+            script_code: None,
         }
     }
 
-    /// Computes the sighash for this input with the given scope.
+    /// The same context signing over `script_code` in place of the locking
+    /// script: the bytes the CHECKSIG's scriptCode holds at the site where it
+    /// executes (for a CHECKSIG in a post-Chronicle unlocking script,
+    /// [`chronicle_unlocking_script_code`]). The bytes are signed as given:
+    /// under the BIP143 digest whole, under the original digest with their
+    /// `OP_CODESEPARATOR`s removed, as the node serializes them
+    /// (`interpreter.cpp:1864-1892`).
+    pub fn with_script_code(mut self, script_code: &'a Script) -> Self {
+        self.script_code = Some(script_code);
+        self
+    }
+
+    /// Computes the digest a signature over this input with the hash type
+    /// `scope` must verify against, in the internal byte order ECDSA signs.
     ///
-    /// The scope should include SIGHASH_FORKID for BSV transactions.
+    /// The digest is chosen as the node's `SignatureHash` chooses it
+    /// (bitcoin-sv v1.2.3 `interpreter.cpp:2112-2124`), through
+    /// [`compute_sighash_dispatched_for_signing`]: BIP143 when `scope` carries
+    /// `SIGHASH_FORKID` and not `SIGHASH_CHRONICLE`, the original digest
+    /// otherwise, and under the original digest the constant `one` (`0x01`
+    /// then 31 zero bytes) when `SIGHASH_SINGLE` names an output the
+    /// transaction does not have (`:2095-2100`).
+    ///
+    /// # Errors
+    ///
+    /// The transaction does not parse, or it has no input at `input_index`.
     pub fn compute_sighash(&self, scope: u32) -> Result<[u8; 32]> {
         let tx = parse_transaction(self.raw_tx)?;
-        let subscript = self.locking_script.to_binary();
+        if self.input_index >= tx.inputs.len() {
+            return Err(crate::Error::CryptoError(format!(
+                "Input index {} out of range (transaction has {} inputs)",
+                self.input_index,
+                tx.inputs.len()
+            )));
+        }
+        let subscript = self.script_code.unwrap_or(self.locking_script).to_binary();
 
-        Ok(compute_sighash_for_signing(&SighashParams {
+        Ok(compute_sighash_dispatched_for_signing(&SighashParams {
             version: tx.version,
             inputs: &tx.inputs,
             outputs: &tx.outputs,
@@ -97,6 +152,37 @@ impl<'a> SigningContext<'a> {
             scope,
         }))
     }
+}
+
+/// The scriptCode of a CHECKSIG executing inside the unlocking script of a
+/// post-Chronicle spend: the bytes of `unlocking_script` after its last
+/// `OP_CODESEPARATOR` (all of it when it has none), followed by
+/// `locking_script` (bitcoin-sv v1.2.3 `src/script/interpreter.cpp:1471-1481`,
+/// CHECKMULTISIG `:1569-1576`; the node's `VerifyScript` passes the
+/// scriptPubKey as `checksigData`, `:2336-2342`). Pass it to [`SigningContext::with_script_code`].
+///
+/// `unlocking_script` is the script as it will be spent; its bytes before the
+/// last separator are not signed, so a signature pushed there can be a
+/// placeholder while the digest is computed. The helper assumes the CHECKSIG
+/// executes after the unlocking script's last separator and that separator
+/// executes (none sits in an unexecuted branch or after the CHECKSIG); for any
+/// other layout form the scriptCode by hand from the separator the node last
+/// executed before the CHECKSIG. A separator is the opcode as the node's
+/// parser reads it, never a `0xab` inside push data.
+///
+/// Before Chronicle (or for a CHECKSIG in the locking script) the node signs
+/// no unlocking script bytes; the context's default is right there. For a
+/// hash type without `SIGHASH_FORKID` the node also deletes the signature's
+/// own push from the scriptCode (`CleanupScriptCode`, `:255-263`), which only
+/// matters when the signature is pushed after the last separator.
+pub fn chronicle_unlocking_script_code(
+    unlocking_script: &Script,
+    locking_script: &Script,
+) -> Script {
+    let unlocking = unlocking_script.to_binary();
+    let mut code = after_last_code_separator(&unlocking).to_vec();
+    code.extend_from_slice(&locking_script.to_binary());
+    Script::from_binary(&code).unwrap_or_default()
 }
 
 /// Computes the sighash scope byte from options.
