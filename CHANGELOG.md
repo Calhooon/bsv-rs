@@ -112,7 +112,7 @@ signatures to be empty.").
   share the default's disagreement for a CHECKSIG in a post-Chronicle
   unlocking script. This crate keeps that default and adds the explicit
   override and helper.
-- The dispatch and the SINGLE sentinel were this crate's own disagreements;
+- The SINGLE sentinel is shared with @bsv/sdk 3.0.0's original-digest formatter (7 of the same 241 measured transactions); the Chronicle-bit dispatch was this crate's own disagreement.
   go-sdk's signer dispatches on the CHRONICLE bit (`go-sdk@v1.7.2`
   `transaction/signaturehash.go:26-30`).
 
@@ -143,6 +143,8 @@ No public signature changed.
   (1.7.12, the same way, with a check that every `uses:` is pinned by a
   commit sha) and `unused dependencies` (cargo-machete 0.9.2, non-blocking;
   none found).
+
+Correction (2026-10-17): the parity note above first said both the dispatch and the SINGLE sentinel were this crate's own; the sentinel is shared with @bsv/sdk 3.0.0, as the sentence now reads.
 
 ## [0.6.1] - 2026-10-15
 
