@@ -7,7 +7,7 @@ use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{sha256, to_hex, PublicKey, Signature};
+use crate::primitives::{to_hex, PublicKey, Signature};
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
@@ -401,9 +401,10 @@ impl<W: WalletInterface> ContactsManager<W> {
                         scope,
                     };
 
-                    let preimage =
-                        crate::primitives::bsv::sighash::build_sighash_preimage(&sighash_params);
-                    let preimage_hash = sha256(&preimage);
+                    let preimage_hash =
+                        crate::primitives::bsv::sighash::compute_sighash_dispatched_for_signing(
+                            &sighash_params,
+                        );
 
                     // Sign with wallet
                     let sig_result = self
@@ -685,9 +686,10 @@ impl<W: WalletInterface> ContactsManager<W> {
                         scope,
                     };
 
-                    let preimage =
-                        crate::primitives::bsv::sighash::build_sighash_preimage(&sighash_params);
-                    let preimage_hash = sha256(&preimage);
+                    let preimage_hash =
+                        crate::primitives::bsv::sighash::compute_sighash_dispatched_for_signing(
+                            &sighash_params,
+                        );
 
                     // Sign with wallet
                     let sig_result = self
