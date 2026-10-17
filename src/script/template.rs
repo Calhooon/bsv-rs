@@ -170,11 +170,22 @@ impl<'a> SigningContext<'a> {
 /// executed before the CHECKSIG. A separator is the opcode as the node's
 /// parser reads it, never a `0xab` inside push data.
 ///
-/// Before Chronicle (or for a CHECKSIG in the locking script) the node signs
-/// no unlocking script bytes; the context's default is right there. For a
-/// hash type without `SIGHASH_FORKID` the node also deletes the signature's
-/// own push from the scriptCode (`CleanupScriptCode`, `:255-263`), which only
-/// matters when the signature is pushed after the last separator.
+/// Before Chronicle a CHECKSIG in the unlocking script signs the unlocking
+/// script from its last executed separator to its end alone, without the
+/// locking script (`interpreter.cpp:1471`, the lock appended only under
+/// `IsChronicle(flags)`, `:1474`); such a CHECKSIG executes only where the
+/// unlocking script need not be push-only (pre-Genesis; after Genesis
+/// `VerifyScript` refuses it, and after Chronicle it still does for a
+/// non-malleable transaction version, `:2321-2330`). For a CHECKSIG in the
+/// locking script no unlocking script byte is signed; the context's default
+/// is right there.
+///
+/// Under a hash type with `SIGHASH_FORKID` (CHRONICLE or not) the node
+/// deletes nothing from the scriptCode; without it the node deletes the
+/// signature's own push (`CleanupScriptCode`, `:255-263`), which neither this
+/// helper nor `SigningContext` does: it only matters when the signature is
+/// pushed after the last separator, and then the caller removes it from the
+/// scriptCode it passes.
 pub fn chronicle_unlocking_script_code(
     unlocking_script: &Script,
     locking_script: &Script,
