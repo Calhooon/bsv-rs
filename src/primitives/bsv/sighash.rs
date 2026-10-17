@@ -71,7 +71,7 @@
 //! RFC 6979 §2.3.4, whereas libsecp256k1 and the TypeScript `@bsv/sdk` seed
 //! it with the raw digest bytes. The two derivations agree for every in-range
 //! digest (< n) and diverge only for digest >= n; in that regime both stacks
-//! still produce *valid* low-S signatures over the same reduced message —
+//! still produce *valid* low-S signatures over the same reduced message,
 //! only the deterministic signature bytes differ. In-range digests are signed
 //! byte-identically across all three stacks. This asymmetry is pinned by
 //! `rfc6979_in_range_digest_der_is_pinned` and
@@ -407,7 +407,7 @@ pub fn build_sighash_preimage(params: &SighashParams) -> Vec<u8> {
 }
 
 // ============================================================================
-// SighashCache — midstate reuse across inputs
+// SighashCache: midstate reuse across inputs
 // ============================================================================
 
 /// A cache of the BIP-143 midstate hashes (`hashPrevouts`, `hashSequence`,
@@ -429,7 +429,7 @@ pub fn build_sighash_preimage(params: &SighashParams) -> Vec<u8> {
 /// fresh per-call computation (asserted by unit tests).
 ///
 /// The cache borrows the transaction, so the transaction cannot be mutated
-/// while the cache is alive — a stale-midstate hazard by construction.
+/// while the cache is alive, a stale-midstate hazard by construction.
 ///
 /// # Example
 ///
@@ -453,9 +453,9 @@ pub struct SighashCache<'t> {
     inputs: &'t [TxInput],
     outputs: &'t [TxOutput],
     locktime: u32,
-    /// Cached hashPrevouts — valid for every non-ANYONECANPAY scope.
+    /// Cached hashPrevouts, valid for every non-ANYONECANPAY scope.
     hash_prevouts: Option<[u8; 32]>,
-    /// Cached hashSequence — valid for every scope in the ALL class
+    /// Cached hashSequence, valid for every scope in the ALL class
     /// (!ANYONECANPAY && base not in {SINGLE, NONE}).
     hash_sequence: Option<[u8; 32]>,
     /// Cached hashOutputs for the ALL class (base not in {SINGLE, NONE}).
@@ -1527,7 +1527,7 @@ mod tests {
     }
 
     /// Every scope class (ALL/NONE/SINGLE × ANYONECANPAY, FORKID set, plus
-    /// non-standard base values that behave as ALL) — one shared cache across
+    /// non-standard base values that behave as ALL), one shared cache across
     /// all inputs must equal the free function on every call.
     #[test]
     fn sighash_cache_preimage_equals_free_functions_all_scope_classes() {
@@ -1613,7 +1613,7 @@ mod tests {
         }
     }
 
-    /// SINGLE with input_index >= outputs.len() must hit the zeros branch —
+    /// SINGLE with input_index >= outputs.len() must hit the zeros branch,
     /// and still equal the free function exactly (the fund-loss family).
     #[test]
     fn sighash_cache_single_out_of_range_zeros() {
