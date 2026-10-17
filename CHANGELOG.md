@@ -21,8 +21,9 @@ signature the node refuses.
   `SIGHASH_FORKID` and not `SIGHASH_CHRONICLE` (0x20), and the original
   digest for every other type (`src/script/interpreter.cpp:2112-2124`). The
   context now computes through `compute_sighash_dispatched_for_signing`, the
-  dispatcher the interpreter's verdicts already use: one function for the
-  signer and the verifier.
+  dispatch the interpreter's verdicts already use
+  (`TxSighashCache::sighash_dispatched_for_signing`, pinned equal to it): one
+  rule for the signer and the verifier.
 - The SINGLE sentinel. Under the original digest, `SIGHASH_SINGLE` with the
   input index at or beyond the outputs signs the constant `one` (`0x01` then
   31 zero bytes in signing order; `interpreter.cpp:2089`, `:2095-2100`). The
@@ -76,15 +77,44 @@ it no longer compiles. The migration is one line: add `script_code: None`,
 or build it with `SigningContext::new`. The digest of a non-FORKID or
 CHRONICLE type changes.
 
+### The identity token signatures (the review of 0.7.0)
+
+The review of this release found three signing paths that did not reach the
+dispatcher: `IdentityClient::revoke_certificate_revelation`, and the contact
+update and removal of `ContactsManager` (`add_contact` over a listed contact,
+`remove_contact`). Each built the BIP143 preimage, took ONE SHA-256 of it and
+passed that to the wallet as `hash_to_directly_sign`, which the wallet signs
+as given; the node verifies against the double SHA-256 (`SignatureHashBIP143`,
+`ss.GetHash()`). The reference passes `data: sha256(preimage)` and its wallet
+hashes `data` again (`@bsv/sdk` 3.0.0 `src/script/templates/PushDrop.ts:245-248`,
+`ProtoWallet.ts:62`). Every signature these paths produced was one the node
+refuses; the paths were not changed by this release. They now sign
+`compute_sighash_dispatched_for_signing` of the same parameters (scope
+ALL|FORKID, so the BIP143 digest, double SHA-256). No public signature
+changed.
+
+Pinned in `tests/identity_spend_witness.rs`:
+`an_identity_revocation_signature_verifies_under_the_node_word`,
+`a_contact_update_signature_verifies_under_the_node_word` and
+`a_contact_removal_signature_verifies_under_the_node_word` drive each path
+against a wallet that records the unlocking script and run it through `Spend`
+under `ScriptFlags::block(ProtocolEra::PostChronicle)`; on the code before
+the fix each verdict was the NULLFAIL error ("OP_CHECKSIG requires failing
+signatures to be empty.").
+
 ### Notes: cross-SDK parity
 
 - The scriptCode: the go-sdk and `@bsv/sdk` default templates also sign the
-  locking script alone, so they share the default's disagreement for a
-  CHECKSIG in a post-Chronicle unlocking script. This crate keeps that default
-  and adds the explicit override and helper.
+  locking script alone (`go-sdk@v1.7.2`
+  `transaction/template/p2pkh/p2pkh.go:83-91`,
+  `transaction/signaturehash.go:277`; `@bsv/sdk` 3.0.0
+  `src/script/templates/P2PKH.ts:92-100`, `SignatureUtils.ts:153`), so they
+  share the default's disagreement for a CHECKSIG in a post-Chronicle
+  unlocking script. This crate keeps that default and adds the explicit
+  override and helper.
 - The dispatch and the SINGLE sentinel were this crate's own disagreements;
   go-sdk's signer dispatches on the CHRONICLE bit (`go-sdk@v1.7.2`
-  `transaction/signaturehash.go:24-29`).
+  `transaction/signaturehash.go:26-30`).
 
 ### The lint bar (bsv-stack-lean #134, #135, #137, #139, #140, #144, #145)
 
