@@ -230,7 +230,7 @@ fn test_parse_all_vectors_transactions() {
 }
 
 /// The midstate-reuse `SighashCache` must be byte-identical to the free
-/// functions on every cross-SDK vector — and not only at the vector's own
+/// functions on every cross-SDK vector, and not only at the vector's own
 /// input index: one shared cache is run across EVERY input of each vector's
 /// transaction (with the vector's scope and subscript), so cached midstates
 /// are actually reused and compared against fresh per-call computation. The
@@ -443,7 +443,7 @@ mod the_default_signing_digest {
         assert!(single_beyond_outputs > 0, "the sentinel case is covered");
         assert!(
             wrong.is_empty(),
-            "{} of {} default digests differ from the dispatcher's; the first (seed, version, \
+            "{} of {} default digests differ from the dispatcher's; one (seed, version, \
              inputs, outputs, input, scope): {:?}",
             wrong.len(),
             checked,

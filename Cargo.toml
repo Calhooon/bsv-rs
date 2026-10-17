@@ -1,6 +1,6 @@
 [package]
 name = "bsv-rs"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2021"
 # the lowest toolchain the library builds on (1.87 refuses slice::as_chunks); the gate's msrv job (bsv-stack-lean #139)
 rust-version = "1.88"
@@ -71,10 +71,10 @@ futures-util = { version = "0.3", optional = true }
 # Async futures (for overlay module parallel operations)
 futures = "0.3"
 
-# Runtime-agnostic timer (wasm32 only — CF Workers have no tokio time-driver)
+# Runtime-agnostic timer (wasm32 only: CF Workers have no tokio time-driver)
 futures-timer = { version = "3", optional = true }
 
-# JS host bindings (wasm32 only — std::time::SystemTime is unimplemented on
+# JS host bindings (wasm32 only: std::time::SystemTime is unimplemented on
 # wasm32-unknown-unknown, so wall-clock helpers use `js_sys::Date::now()` there)
 js-sys = { version = "0.3", optional = true }
 
@@ -128,7 +128,7 @@ identity = ["auth", "overlay"]
 # `futures-timer/wasm-bindgen` is REQUIRED on wasm32: without it `futures-timer`
 # selects its native timer-thread backend, so `Delay::new` panics
 # (`thread::spawn` is unsupported on wasm32-unknown-unknown) the first time the
-# wasm `wait_with_timeout` (Peer handshake timeout) polls it — hanging/aborting
+# wasm `wait_with_timeout` (Peer handshake timeout) polls it: hanging/aborting
 # `Peer::to_peer` in Cloudflare Workers / browser executors. The feature flips
 # `futures-timer` to its `gloo-timers`/`setTimeout` backend, which works there.
 wasm = ["getrandom/js", "dep:futures-timer", "futures-timer/wasm-bindgen", "dep:js-sys"]

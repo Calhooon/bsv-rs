@@ -62,7 +62,7 @@ pub use flags::{ProtocolEra, ScriptFlags, ScriptFlagsError};
 pub use spend::{Spend, SpendParams, TxSpendParams};
 
 // Template types
-pub use template::{ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
+pub use template::{chronicle_unlocking_script_code, ScriptTemplate, ScriptTemplateUnlock, SignOutputs, SigningContext};
 
 // Transaction interface types
 pub use transaction::{
@@ -357,11 +357,16 @@ pub trait ScriptTemplate {
 
 pub enum SignOutputs { All, None, Single }
 
-pub struct SigningContext<'a> { pub raw_tx, pub input_index, pub source_satoshis, pub locking_script }
-impl SigningContext<'_> {
-    pub fn new(...) -> Self
-    pub fn compute_sighash(&self, scope: u32) -> Result<[u8; 32]>
+pub struct SigningContext<'a> { pub raw_tx, pub input_index, pub source_satoshis, pub locking_script, pub script_code: Option<&'a Script> }
+impl<'a> SigningContext<'a> {
+    pub fn new(...) -> Self                                        // script_code None: the locking script
+    pub fn with_script_code(self, script_code: &'a Script) -> Self // the scriptCode where the CHECKSIG executes
+    pub fn compute_sighash(&self, scope: u32) -> Result<[u8; 32]>  // the node's dispatch (0.7.0)
 }
+
+// a CHECKSIG inside a post-Chronicle unlocking script: the unlock after its last
+// OP_CODESEPARATOR, then the lock (interpreter.cpp:1471-1481)
+pub fn chronicle_unlocking_script_code(unlocking_script: &Script, locking_script: &Script) -> Script
 
 pub struct ScriptTemplateUnlock { sign_fn, estimate_length_fn }
 impl ScriptTemplateUnlock {

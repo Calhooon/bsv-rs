@@ -7,9 +7,88 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-17
+
+### The default signing digest is the node's
+
+`SigningContext::compute_sighash`, the digest every template's `unlock`
+(`P2PKH`, `P2PK`, `Multisig`, `RPuzzle`, `PushDrop`) and `Transaction::sign`
+sign, disagreed with bitcoin-sv v1.2.3 in three places; each produced a
+signature the node refuses.
+
+- The dispatch. The context computed the BIP143 digest for every hash type.
+  The node's `SignatureHash` computes BIP143 only for a type that carries
+  `SIGHASH_FORKID` and not `SIGHASH_CHRONICLE` (0x20), and the original
+  digest for every other type (`src/script/interpreter.cpp:2112-2124`). The
+  context now computes through `compute_sighash_dispatched_for_signing`, the
+  dispatcher the interpreter's verdicts already use: one function for the
+  signer and the verifier.
+- The SINGLE sentinel. Under the original digest, `SIGHASH_SINGLE` with the
+  input index at or beyond the outputs signs the constant `one` (`0x01` then
+  31 zero bytes in signing order; `interpreter.cpp:2089`, `:2095-2100`). The
+  context built a BIP143 preimage with a zero hashOutputs instead. It now
+  returns the constant, as the dispatcher does.
+- The scriptCode. The context always signed over the source output's locking
+  script. Post-Chronicle, a CHECKSIG executing inside the unlocking script
+  signs the unlocking script from its last executed `OP_CODESEPARATOR` to
+  its end, followed by the locking script (`interpreter.cpp:1471-1481`,
+  CHECKMULTISIG `:1569-1576`, gated on `IsChronicle(flags)`; `VerifyScript`
+  passes the scriptPubKey as `checksigData`, `:2336-2342`). The context
+  cannot know where the CHECKSIG executes, so the scriptCode is now an
+  explicit input: the new field `SigningContext::script_code:
+  Option<&Script>` and the builder `SigningContext::with_script_code(self,
+  &Script) -> Self` set it, and the new function
+  `script::chronicle_unlocking_script_code(unlocking: &Script, locking:
+  &Script) -> Script` forms the Chronicle one. The default (`None`) stays the
+  locking script, which is right for a CHECKSIG in the lock that no executed
+  separator precedes. The type's documentation says when it is wrong and what
+  to pass.
+- An input index the transaction does not have is now an `Err`
+  (`Error::CryptoError`) from `compute_sighash`; before, it panicked in the
+  preimage builder.
+
+The templates sign `FORKID` types without `CHRONICLE`, so their digests and
+signatures are byte-identical to 0.6.1's; what changes is the digest of a
+custom template that calls `compute_sighash` with a type without FORKID or
+with CHRONICLE.
+
+Pinned in `tests/sighash_tests.rs` (in the CI's sighash step):
+`the_default_signing_digest_is_the_dispatchers_for_every_hash_type` (the 18
+types of {ALL, NONE, SINGLE} x {with, without ANYONECANPAY} x {FORKID,
+FORKID|CHRONICLE, no FORKID}, over every input of generated transactions,
+SINGLE beyond the outputs included, and two locks, one with a separator;
+2,880 of 4,320 digests differed on 0.6.1),
+`a_single_beyond_the_outputs_under_the_original_digest_signs_the_constant_one`,
+`a_chronicle_hash_type_signed_through_the_context_verifies_under_the_node_word`
+(P2PK spends signed through the context and run under the Chronicle block
+word; 0.6.1's 0x61 signature was a false top),
+`a_signing_context_naming_an_absent_input_is_an_error_not_a_panic`,
+`the_chronicle_script_code_is_the_unlock_after_its_last_separator_then_the_lock`,
+`the_chronicle_script_code_reads_separators_as_the_parser_reads_them`,
+`a_check_in_the_unlocking_script_signed_over_the_helpers_script_code_verifies`
+(the shape `<utxoSig> <sig> OP_CODESEPARATOR <pub> OP_CHECKSIGVERIFY` over
+`<utxoPub> OP_CHECKSIG`: valid with the helper's scriptCode for ALL|FORKID
+and ALL|FORKID|CHRONICLE, refused with the locking script alone), and the
+guard `the_forkid_digest_of_the_templates_is_unchanged`.
+
+Semver: minor. `SigningContext` gains a public field, so a struct literal of
+it no longer compiles. The migration is one line: add `script_code: None`,
+or build it with `SigningContext::new`. The digest of a non-FORKID or
+CHRONICLE type changes.
+
+### Notes: cross-SDK parity
+
+- The scriptCode: the go-sdk and `@bsv/sdk` default templates also sign the
+  locking script alone, so they share the default's disagreement for a
+  CHECKSIG in a post-Chronicle unlocking script. This crate keeps that default
+  and adds the explicit override and helper.
+- The dispatch and the SINGLE sentinel were this crate's own disagreements;
+  go-sdk's signer dispatches on the CHRONICLE bit (`go-sdk@v1.7.2`
+  `transaction/signaturehash.go:24-29`).
+
 ### The lint bar (bsv-stack-lean #134, #135, #137, #139, #140, #144, #145)
 
-No version move and no public signature changed.
+No public signature changed.
 
 - `[lints]` in `Cargo.toml`: `unsafe_code = "forbid"` (the crate has no
   `unsafe`), `missing_docs = "deny"`, and clippy's `unwrap_used`,
@@ -647,7 +726,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.35] - 2026-10-08
 
-### Fixed — no walk over a BEEF's ancestry recurses (bsv-stack-lean #57, P0-5)
+### Fixed: no walk over a BEEF's ancestry recurses (bsv-stack-lean #57, P0-5)
 
 - A stranger's BEEF that is one chain of unproven transactions took the stack
   one frame (or several) per link: on a 1 MiB thread, the order of a WASM
@@ -674,7 +753,7 @@ a reader whose memory does not grow with the body.
   building (quadratic in a chain's depth); it stores each ancestor without its
   sources, and writes the same bytes.
 
-### Added — `Beef::from_binary_with_limits` and `BeefLimits`
+### Added: `Beef::from_binary_with_limits` and `BeefLimits`
 
 - `BeefLimits { max_txs, max_bumps, max_bytes }` and
   `Beef::from_binary_with_limits(bin, &limits)`: a door that reads a stranger's
@@ -683,7 +762,7 @@ a reader whose memory does not grow with the body.
   before an entry of that kind is read. `Beef::from_binary` is unchanged (no
   bound beyond the bytes). `tests/beef_limits.rs`.
 
-### Changed — `Transaction` implements `Drop`
+### Changed: `Transaction` implements `Drop`
 
 - The ancestry is dropped one transaction at a time. A type with `Drop`
   cannot have a field moved out of an owned value, so code such as
@@ -696,7 +775,7 @@ a reader whose memory does not grow with the body.
   unchanged; the overlay engine's `GET /tx/bump` route
   (`crates/overlay-cloudflare/src/routes.rs`) needs the one-line migration.
 
-### Fixed — the BUMP parse is linear in its leaves (bsv-stack-lean #57, P0-5c)
+### Fixed: the BUMP parse is linear in its leaves (bsv-stack-lean #57, P0-5c)
 
 - `MerklePath::from_reader` (under `from_binary`, `from_hex` and every BEEF
   parse) checks that every level-0 leaf computes the same root, and each check
@@ -717,7 +796,7 @@ a reader whose memory does not grow with the body.
   over the maximum height 64")`; `MerklePath::new` and `new_unchecked` refuse a
   path of more than 64 levels the same way, and no shift by a height can panic.
 
-### Changed — `{:?}` of a `Transaction` prints a linked source as its txid
+### Changed: `{:?}` of a `Transaction` prints a linked source as its txid
 
 - `Transaction` and `TransactionInput` implement `Debug` by hand: an input's
   `source_transaction` prints as `Some("<txid>")`, never as the source's whole
@@ -728,7 +807,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.34] - 2026-10-08
 
-### Changed — QUEUED, REQUESTED_BY_NETWORK and CONFIRMED are accepted on a 2xx
+### Changed: QUEUED, REQUESTED_BY_NETWORK and CONFIRMED are accepted on a 2xx
 
 - The reference's spec (`specs/broadcast/arc.yaml`) and go-sdk accept these three
   non-error states; the reference's TypeScript code reports them as an invalid
@@ -736,7 +815,7 @@ a reader whose memory does not grow with the body.
   a hint about the transaction and never evidence. An unknown word is still an
   invalid response. (bsv-stack-lean #35, the owner's ruling of 2026-10-08.)
 
-### Fixed — an ARC answer is judged by its `txStatus`, never by the HTTP code
+### Fixed: an ARC answer is judged by its `txStatus`, never by the HTTP code
 
 - `ArcBroadcaster::broadcast` read the HTTP code and nothing else: every 2xx
   was a `BroadcastResponse` with the body's `txStatus` as its message, so a
@@ -767,7 +846,7 @@ a reader whose memory does not grow with the body.
   receive `Err(BroadcastFailure)` with the real verdict; a caller that treated
   `response.message == "REJECTED"` as a failure by hand can drop that check.
 
-### Notes — cross-SDK parity
+### Notes: cross-SDK parity
 
 - The success `message` stays the status word alone; the reference appends
   the `extraInfo` (`ARC.ts:176`). The success path keeps ARC's echoed `txid`
@@ -803,7 +882,7 @@ a reader whose memory does not grow with the body.
   tested with a synthetic data length, without a multi-gigabyte allocation.
   The existing splice witness cases carry v1.2.3 expectations.
 
-### Notes — cross-SDK parity
+### Notes: cross-SDK parity
 
 - The default mode retains the TypeScript SDK's unrestricted number reader.
   Under a flag word the splice operands follow the pinned node's fixed-width
@@ -811,7 +890,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.32] - 2026-10-05
 
-### Fixed — the `int64` operand reader above 8 bytes follows the node's measured reading
+### Fixed: the `int64` operand reader above 8 bytes follows the node's measured reading
 
 - Under a word, the offset and length operands of `OP_SUBSTR`, `OP_LEFT` and
   `OP_RIGHT` (the reference's `int64` path, `CScriptNum` with `big_int`
@@ -862,7 +941,7 @@ a reader whose memory does not grow with the body.
   `OP_LEFT`/`OP_RIGHT`). `tests/script_int64_operand_witness.rs` (0.3.29) stays
   green, its assertions unchanged.
 
-### Notes — cross-SDK parity
+### Notes: cross-SDK parity
 
 - The TypeScript SDK reads these operands as script numbers of any length;
   this crate's default mode keeps that. Under a word this crate follows the
@@ -871,7 +950,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.31] - 2026-09-29
 
-### Documented — the block path's stack budget (the guard of Calhooon/bsv-rs#30)
+### Documented: the block path's stack budget (the guard of Calhooon/bsv-rs#30)
 
 - The docs of `Spend` (the module's memory budget section, `Spend::memory_limit`,
   `Spend::stack_memory_policy`, `Spend::set_stack_memory_policy`),
@@ -905,7 +984,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.30] - 2026-09-27
 
-### Fixed — the stack memory budget under a word (Calhooon/bsv-rs#30)
+### Fixed: the stack memory budget under a word (Calhooon/bsv-rs#30)
 
 - The interpreter held one local budget in every mode, 32,000,000 bytes for
   each stack apart, counting the bytes alone, and stopped a script that
@@ -979,7 +1058,7 @@ a reader whose memory does not grow with the body.
   32,000,001-byte read, the shifts refused before the shift on the mempool
   path and on both, and the shift's exact length at a number length of 16.
 
-### Fixed — `OP_NUM2BIN`'s size bound under a word (Calhooon/bsv-rs#30)
+### Fixed: `OP_NUM2BIN`'s size bound under a word (Calhooon/bsv-rs#30)
 
 - Under a word a size below 0 or above `INT32_MAX` is refused before anything
   is allocated, `SCRIPT_ERR_PUSH_SIZE` on every path, as the reference
@@ -1004,7 +1083,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.29] - 2026-09-27
 
-### Fixed — an undefined base hash type refused under STRICTENC (Calhooon/bsv-rs#23)
+### Fixed: an undefined base hash type refused under STRICTENC (Calhooon/bsv-rs#23)
 
 - `Spend::check_signature_encoding` tested the DER form, the low-S rule and
   the FORKID bit and never the base type, so a signature made over the BIP143
@@ -1030,7 +1109,7 @@ a reader whose memory does not grow with the body.
   any of the other bits passes the test and then fails to verify (a false
   top), every undefined base is refused. RED on 0.3.28: 5 of 7 rows.
 
-### Fixed — the signature hash dispatched on the CHRONICLE bit (Calhooon/bsv-rs#22)
+### Fixed: the signature hash dispatched on the CHRONICLE bit (Calhooon/bsv-rs#22)
 
 - The interpreter computed the BIP143 digest for every hash type. The
   reference's `SignatureHash` (`src/script/interpreter.cpp:2112-2124`) does
@@ -1075,7 +1154,7 @@ a reader whose memory does not grow with the body.
   created before Chronicle; a CHRONICLE-bit signature made over BIP143, which
   the reference refuses). RED on 0.3.28: 21 of 21 rows.
 
-### Fixed — the two bounds of the numeric shifts (Calhooon/bsv-rs#21)
+### Fixed: the two bounds of the numeric shifts (Calhooon/bsv-rs#21)
 
 - `OP_LSHIFTNUM` and `OP_RSHIFTNUM` shifted by a count of any size, so
   `1 OP_RSHIFTNUM 2147483648` was 0 and a valid spend, and a left shift's size
@@ -1103,7 +1182,7 @@ a reader whose memory does not grow with the body.
   path's 10,000; a zero value follows the same tests; an ordinary shift and a
   coin created before Chronicle are unchanged).
 
-### Fixed — the `int64` reading of the `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` operands (Calhooon/bsv-rs#20)
+### Fixed: the `int64` reading of the `OP_SUBSTR`, `OP_LEFT` and `OP_RIGHT` operands (Calhooon/bsv-rs#20)
 
 - The three Chronicle splice opcodes read their length and offset operands as
   script numbers of any length under the era's limit. The reference builds
@@ -1130,7 +1209,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.28] - 2026-09-23
 
-### Fixed — the low-S check at the curve order (Calhooon/bsv-rs#14)
+### Fixed: the low-S check at the curve order (Calhooon/bsv-rs#14)
 
 - A signature whose `r` or `s` is at or above the curve order was refused as
   high-S (`The signature must have a low S value.`) before verification. The
@@ -1149,7 +1228,7 @@ a reader whose memory does not grow with the body.
   boundary tests in `spend.rs` (`s = n/2` low, `s = n/2 + 1` and `s = n - 1`
   high, `s = n`, `s = n + 1` and `r = n` the zero signature).
 
-### Fixed — the script-number length limit (Calhooon/bsv-rs#17)
+### Fixed: the script-number length limit (Calhooon/bsv-rs#17)
 
 - The interpreter read a script number of any length. The reference builds
   every number it reads with the maximum length of the coin's era and throws
@@ -1206,7 +1285,7 @@ a reader whose memory does not grow with the body.
 
 ## [0.3.27] - 2026-09-23
 
-### Fixed — five consensus rules the interpreter got wrong in every mode (Calhooon/bsv-rs#12)
+### Fixed: five consensus rules the interpreter got wrong in every mode (Calhooon/bsv-rs#12)
 
 The same differential run against bitcoin-sv v1.2.2 (`879fc8b`) that found #10
 recorded five further divergences from the block-validation rules, each with a
@@ -1276,7 +1355,7 @@ unless named.
   and every error text of 0.3.26 are unchanged; `is_opcode_disabled` is
   private.
 
-### Notes — cross-SDK parity
+### Notes: cross-SDK parity
 
 - The TypeScript SDK's default mode already runs the Chronicle opcodes on its
   relaxed branch and refuses undefined opcodes; it applies the single-ELSE rule
@@ -1291,7 +1370,7 @@ unless named.
 
 ## [0.3.26] - 2026-09-23
 
-### Added — the node's flag words (`script::flags`)
+### Added: the node's flag words (`script::flags`)
 
 - `ScriptFlags`: the script verification flag word with bitcoin-sv v1.2.2's
   bit values (`src/script/script_flags.h:13-111`) and names (`from_names`,
@@ -1341,7 +1420,7 @@ unless named.
   beside it. `examples/script.rs` (and the README block that is that file)
   shows the three verdicts of one untidy version-1 spend.
 
-### Fixed — a consensus oracle can select the block word (Calhooon/bsv-rs#10)
+### Fixed: a consensus oracle can select the block word (Calhooon/bsv-rs#10)
 
 - Used as a consensus validator, the interpreter judged a version-1 spend by
   MINIMALDATA, CLEANSTACK and NULLDUMMY, relay-only rules that no block word
@@ -1364,7 +1443,7 @@ unless named.
 - `tests/script_mutators_keep_parsed_chunks.rs` reformatted (the 0.3.25 file
   was not `cargo fmt --check`-clean).
 
-### Notes — cross-SDK parity
+### Notes: cross-SDK parity
 
 - The TypeScript SDK's `verifyFlags` applies a flag as given: under explicit
   flags it enforces NULLDUMMY, MINIMALDATA, LOW_S and CLEANSTACK at every
@@ -1442,13 +1521,13 @@ unless named.
 
 ## [0.3.23] - 2026-09-09
 
-### Fixed — reference parity in the script interpreter (`Spend`)
+### Fixed: reference parity in the script interpreter (`Spend`)
 
 - `OP_NUM2BIN` refuses a size operand larger than the local memory budget BEFORE
   allocating it (the TypeScript SDK's `element-size` check). Previously a
   9-byte script (`OP_1 <1e9> OP_NUM2BIN`) allocated up to
   `MAX_SCRIPT_ELEMENT_SIZE` (1 GB) and only then tripped the stack budget on
-  the push — on a Cloudflare Worker that is an isolate kill, not a refusal.
+  the push, on a Cloudflare Worker that is an isolate kill, not a refusal.
 - Resource exhaustion is its own error class: `ScriptEvaluationError` gains
   `resource_limit: Option<ScriptResourceLimit { resource: ScriptResource
   (Stack | AltStack | ElementSize), limit, attempted }>` and
@@ -1463,7 +1542,7 @@ unless named.
 
 ## [0.3.22] - 2026-09-09
 
-### Fixed — BEEF linking is linear and verify walks by txid
+### Fixed: BEEF linking is linear and verify walks by txid
 
 - **`Beef::find_atomic_transaction` / `Transaction::from_beef` link each
   distinct unproven parent ONCE, and every later input sourcing the same txid
@@ -1514,7 +1593,7 @@ unless named.
 
 ## [0.3.21] - 2026-09-09 (YANKED: links every duplicate input by cloning, exponential on diamond chains; use 0.3.22)
 
-### Fixed — BEEF ancestry linking for every input (ts-sdk parity)
+### Fixed: BEEF ancestry linking for every input (ts-sdk parity)
 
 - **`Beef::find_atomic_transaction` / `Transaction::from_beef` link EVERY input's
   `source_transaction` fully, however many inputs source the same
@@ -1533,9 +1612,9 @@ unless named.
   live on zanaadu beta (2026-09-08) the first day its overlay executed scripts
   on submit.
 
-### Added — midstate-reuse sighash API (`SighashCache`)
+### Added: midstate-reuse sighash API (`SighashCache`)
 
-- **`primitives::bsv::sighash::SighashCache`** — a cache over one
+- **`primitives::bsv::sighash::SighashCache`**, a cache over one
   transaction's BIP-143 midstates (`hashPrevouts`, `hashSequence`,
   `hashOutputs`), following rust-bitcoin's `SighashCache` pattern. Each
   midstate is computed lazily at most once per scope class and reused across
@@ -1550,7 +1629,7 @@ unless named.
   `sighash(...)` (display order), `sighash_for_signing(...)` (signing order).
 - `build_sighash_preimage` (and therefore `compute_sighash` /
   `compute_sighash_for_signing`) is now a thin wrapper over a fresh
-  single-use `SighashCache` — one preimage implementation in the crate,
+  single-use `SighashCache`, one preimage implementation in the crate,
   public API and behavior unchanged. Byte-equality is pinned by scope-class
   unit tests, by the 499-vector cross-SDK sighash suite run through the cache
   across every input, and by the 5,116-vector ts-stack conformance census
@@ -1562,19 +1641,19 @@ unless named.
 - RFC 6979 digest-domain note on `PrivateKey::sign` and in the `sighash`
   module docs: for a digest >= n (P ≈ 2⁻¹²⁸ for sha256d output), k256 seeds
   the nonce DRBG with `bits2octets(digest)` per the RFC while libsecp256k1
-  and `@bsv/sdk` seed it with the raw digest bytes — deterministic signature
+  and `@bsv/sdk` seed it with the raw digest bytes, deterministic signature
   bytes differ across stacks in that regime only; in-range digests are signed
   byte-identically. Pinned by `rfc6979_in_range_digest_der_is_pinned` and
   `rfc6979_digest_ge_n_der_is_pinned` in `tests/ec_tests.rs`.
 
-## [0.3.19] — 2026-08-25
+## [0.3.19] - 2026-08-25
 
-### Fixed — BEEF merkle-path reattachment (ts-sdk parity)
+### Fixed: BEEF merkle-path reattachment (ts-sdk parity)
 
 - **`Transaction::from_beef` and `Beef::find_atomic_transaction` dropped the
   merkle path.** Both cloned the parsed transaction out of the BEEF, so the
   returned transaction carried `merkle_path: None` even when the BEEF proved
-  it — every caller asking "is this mined?" got "no" forever. Bumps live in
+  it, every caller asking "is this mined?" got "no" forever. Bumps live in
   `Beef::bumps` and are referenced by `BeefTx::bump_index` rather than being
   stored inside the transaction, so they must be reattached explicitly.
   This diverged from the TypeScript reference: `@bsv/sdk`'s
@@ -1591,9 +1670,9 @@ unless named.
   the fixture builds its BEEF through this crate's own writer so it cannot
   drift from the wire format.
 
-## [0.3.16] — 2026-07-09
+## [0.3.16] - 2026-07-09
 
-### Fixed — Spend engine ts-sdk parity
+### Fixed: Spend engine ts-sdk parity
 
 Four `Spend` divergences from the TypeScript `@bsv/sdk` engine, surfaced by
 executing large OP_PUSH_TX-style covenant scripts that are valid under ts-sdk
@@ -1629,7 +1708,7 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   satoshis or an input's `unlocking_script`) left `to_binary()`/`hash()`/
   `id()` returning stale cached serializations with no way to flush them.
 
-## [0.3.14] — 2026-07-04
+## [0.3.14] - 2026-07-04
 
 ### Fixed
 
@@ -1641,19 +1720,19 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   element was read*. A ~20-byte crafted BEEF whose transaction input-count
   varint is `0xFE FF FF FF FF` (u32::MAX) makes `Transaction::from_beef` /
   `Transaction::from_binary` allocate billions of `TransactionInput`s and
-  abort — a trivially cheap denial-of-service (and on `wasm32`, where the build
+  abort, a trivially cheap denial-of-service (and on `wasm32`, where the build
   is `panic = abort`, it is unrecoverable: `.ok()` cannot catch it).
 
   All such sites now bound the pre-allocation to what the remaining buffer could
   actually contain via the new `primitives::bounded_capacity(count, remaining,
-  min_elem_bytes)` helper — `count.min(remaining / min_elem_bytes)`. The read
+  min_elem_bytes)` helper, `count.min(remaining / min_elem_bytes)`. The read
   loop already errors the instant the buffer is exhausted, so parse results are
   unchanged for both valid and malicious input; only the (now bounded) capacity
   hint changes. A bogus count now yields `Err`, never a panic.
 
   Hardened sites: `transaction::Transaction::{from_reader, from_ef}`
   (input/output counts, and the EF `source_output_index` placeholder-output
-  fabrication, which is now rejected above a 16 MiB allocation budget — the
+  fabrication, which is now rejected above a 16 MiB allocation budget, the
   placeholder length is computed in `u64` via `ef_source_placeholder_len` so the
   `+ 1` cannot overflow on 32-bit targets: on `wasm32` `source_output_index as
   usize + 1` wrapped `u32::MAX` to `0`, defeating the budget check and then
@@ -1663,7 +1742,7 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   arrays, keyrings), and `auth` certificate/header parsing. Purely defensive;
   no API change beyond the additive `bounded_capacity` export → patch bump.
 
-## [0.3.11] — 2026-05-20
+## [0.3.11] - 2026-05-20
 
 ### Fixed
 
@@ -1674,21 +1753,21 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   `futures-timer` *without* its `wasm-bindgen` feature. On
   `wasm32-unknown-unknown` that selected `futures-timer`'s native timer-thread
   backend, so `Delay::new` panicked (`thread::spawn` is unsupported) on the
-  first poll — hanging/aborting any `Peer::to_peer` call that initiates a
+  first poll, hanging/aborting any `Peer::to_peer` call that initiates a
   handshake inside a Cloudflare Worker or browser `wasm-bindgen-futures`
   executor. Enabling `futures-timer/wasm-bindgen` flips it to the
   `gloo-timers`/`setTimeout` backend, which works in those environments.
   Pure additive feature wiring (no API change) → patch bump.
 
-## [0.3.7] — 2026-04-21
+## [0.3.7] - 2026-04-21
 
 ### Added
 
-- **`bsv_rs::overlay::create_signed_overlay_admin_token`** — produces
+- **`bsv_rs::overlay::create_signed_overlay_admin_token`**, produces
   TS-parity 5-field signed SHIP/SLAP advertisement tokens. Byte-exact
   match with `@bsv/sdk 1.10.1`'s
   `pushdrop.lock(fields, [2, protocol_name], '1', 'anyone', forSelf=true,
-  includeSignature=true, lockPosition='before')` — the exact call
+  includeSignature=true, lockPosition='before')`, the exact call
   `@bsv/overlay-discovery-services/src/WalletAdvertiser.ts` makes and
   what `nanostore.babbage.systems` / `overlay-us-1.bsvb.tech` validators
   admit under `tm_ship` / `tm_slap`.
@@ -1713,11 +1792,11 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
   Takes `&PrivateKey` (not `&PublicKey`) because the function has to
   SIGN the advert.
 
-- **`tests/vectors/overlay_admin_token_ts_parity.json`** — byte-exact
+- **`tests/vectors/overlay_admin_token_ts_parity.json`**, byte-exact
   parity vectors generated from `@bsv/sdk 1.10.1`. 5 cases covering SHIP
   (3 inputs, including long topic) + SLAP (2 inputs).
 
-- **`tests/overlay_admin_token_ts_parity_tests.rs`** — blocking parity
+- **`tests/overlay_admin_token_ts_parity_tests.rs`**, blocking parity
   gate: loads the TS vectors and asserts
   `create_signed_overlay_admin_token(...)` reproduces them verbatim,
   plus a determinism guard for RFC-6979 signing.
@@ -1726,15 +1805,15 @@ and accepted by mainnet nodes but failed bsv-rs local validation:
 
 - **`bsv_rs::overlay::create_overlay_admin_token`** (soft deprecation,
   still compiles). It emits a 4-field unsigned PushDrop with the
-  identity key as locking key — a shape `@bsv/overlay-discovery-services`
+  identity key as locking key, a shape `@bsv/overlay-discovery-services`
   requires but never admits, so any advert built with it is silently
   rejected by peer validators. See the `#[deprecated]` attribute for
   the migration pointer. The `decode_overlay_admin_token` reader still
   accepts both 4- and 5-field shapes for backward-compat.
 
-### Notes — cross-SDK parity
+### Notes: cross-SDK parity
 
-- **Matches TS (`@bsv/sdk` 1.10.1)** byte-exact — the version deployed
+- **Matches TS (`@bsv/sdk` 1.10.1)** byte-exact, the version deployed
   at `nanostore.babbage.systems` and `overlay-us-1.bsvb.tech`. Locking
   key + signing key both use `counterparty=Anyone, forSelf=true`, which
   is what `pushdrop.lock(...)` emits when `WalletAdvertiser.ts` calls
