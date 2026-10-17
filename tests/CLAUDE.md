@@ -25,6 +25,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `ec_tests.rs` | 39 | default | Elliptic curve ops, BRC-42 derivation, ECDH, pubkey validation |
 | `hash_stream.rs` | 3 | default | `Sha256` and `Sha256d` equal `sha256` and `sha256d` for every row of bsv-stack-lean's BEEF-of-any-size corpus (`vectors/beef_of_any_size/`, 47 committed rows, the 5 generated ones from `$BSV_RS_BEEF_ROWS_DIR`) in chunks of 1, 7, 64 KiB, whole and seeded random, and for generated buffers of 0 to 300,000 bytes |
 | `identity_tests.rs` | 69 | `identity` | Certificates, contacts, queries, broadcast results |
+| `identity_spend_witness.rs` | 3 | `identity` | The identity token signatures (the revocation, the contact update and removal) through `Spend` under the Chronicle block word: each path signs the dispatcher's digest, not one SHA-256 of the preimage (0.7.0's review) |
 | `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
 | `kvstore_integration_tests.rs` | 93 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
