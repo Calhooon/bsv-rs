@@ -16,7 +16,7 @@ use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{from_base64, sha256, to_hex, PrivateKey, PublicKey, Signature};
+use crate::primitives::{from_base64, to_hex, PrivateKey, PublicKey, Signature};
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Broadcaster, Transaction};
 use crate::wallet::{
@@ -741,9 +741,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             scope,
         };
 
-        // Build preimage and hash it
-        let preimage = crate::primitives::bsv::sighash::build_sighash_preimage(&sighash_params);
-        let preimage_hash = sha256(&preimage);
+        // The digest the node verifies: the dispatcher's (sha256d, BIP143 under FORKID)
+        let preimage_hash = crate::primitives::bsv::sighash::compute_sighash_dispatched_for_signing(
+            &sighash_params,
+        );
 
         // Step 5: Sign using wallet.create_signature with "anyone" counterparty
         let protocol =
