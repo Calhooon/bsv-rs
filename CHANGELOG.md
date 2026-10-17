@@ -88,7 +88,7 @@ as given; the node verifies against the double SHA-256 (`SignatureHashBIP143`,
 `ss.GetHash()`). The reference passes `data: sha256(preimage)` and its wallet
 hashes `data` again (`@bsv/sdk` 3.0.0 `src/script/templates/PushDrop.ts:245-248`,
 `ProtoWallet.ts:62`). Every signature these paths produced was one the node
-refuses; the paths were not changed by this release. They now sign
+refuses; the bug predates this release (since `ee3adff`). They now sign
 `compute_sighash_dispatched_for_signing` of the same parameters (scope
 ALL|FORKID, so the BIP143 digest, double SHA-256). No public signature
 changed.
