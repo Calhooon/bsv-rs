@@ -1,21 +1,48 @@
 # bsv-rs
 
-**0.5.0**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
-BEEF and SPV, wallets, authentication and overlay clients. Optional features
-support native applications and wasm hosts. Compatibility is tested against
-shared vectors; the crate also has explicit local evaluator contracts and
-documented differences from other SDKs.
+**0.7.0**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
+BEEF and SPV, block headers and proof of work, wallets, authentication and
+overlay clients. Optional features support native applications and wasm hosts.
+Compatibility is tested against shared vectors; the crate also has explicit
+local evaluator contracts and documented differences from other SDKs.
+
+The release of record is the tag `v0.7.0`; the version on crates.io is 0.7.0,
+the same release. [CHANGELOG.md](CHANGELOG.md) says what each release changed.
 
 ## Install
 
 ```toml
 [dependencies]
-bsv-rs = { version = "=0.5.0", features = ["transaction", "wallet"] }
+bsv-rs = { version = "=0.7.0", features = ["transaction", "wallet"] }
 ```
 
-Defaults enable primitives and script. [Cargo.toml](Cargo.toml) lists module
-features, `full`, native transports and `wasm`. A Worker should select the
-features it needs and enable `wasm`; native HTTP transports are separate.
+Defaults enable `primitives` and `script`. [Cargo.toml](Cargo.toml) lists the
+module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
+`totp`, `auth`, `overlay`, `storage`, `registry`, `kvstore`, `identity`,
+`socketio`), `full` (all of those), the native transports `http` and
+`websocket` (neither in `full`) and `wasm`. `transaction` enables `block`. A
+Worker should select the features it needs and enable `wasm`; native HTTP
+transports are separate. The declared minimum Rust is 1.88 (`rust-version`).
+
+## The signing digest (0.7.0)
+
+`SigningContext::compute_sighash`, the digest every template's `unlock` and
+`Transaction::sign` sign, computes through
+`compute_sighash_dispatched_for_signing`: the BIP143 digest for a hash type
+that carries `SIGHASH_FORKID` and not `SIGHASH_CHRONICLE`, the original digest
+for every other type, and the constant `one` for `SIGHASH_SINGLE` with the
+input index at or beyond the outputs. The scriptCode is the locking script
+unless `SigningContext::with_script_code` names another;
+`script::chronicle_unlocking_script_code` forms the one a CHECKSIG in a
+post-Chronicle unlocking script signs. An input index the transaction does not
+have is an `Err`. `SigningContext` gained the public field `script_code`, so a
+struct literal of it adds `script_code: None` (or uses `SigningContext::new`).
+The templates sign FORKID types without CHRONICLE, so their signatures are
+unchanged from 0.6.1. The identity paths `IdentityClient::revoke_certificate_revelation`
+and the contact update and removal of `ContactsManager` now sign the same
+dispatched digest. [tests/sighash_tests.rs](tests/sighash_tests.rs) and
+[tests/identity_spend_witness.rs](tests/identity_spend_witness.rs) pin these;
+the CHANGELOG's 0.7.0 entry names each test.
 
 ## Proof and evaluator contracts
 
@@ -57,8 +84,9 @@ tip: `Headers::mining_tip` and the async `ChainTracker::mining_tip` supply a
 `ChainTip`, and without one the reader declines the transaction as
 unverifiable instead of guessing. The new kinds and refusals extend public
 exhaustive enums; [CHANGELOG.md](CHANGELOG.md) carries the 0.5.0 migration
-notes. The node's rules are read through the sibling specification's pins, so
-the node implementation decides what the reader refuses.
+notes and cites the node's source for each rule. A separate repository,
+bsv-script-lean (`~/bsv/bsv-script-lean`), measures this crate against its
+specification of the node; this README states none of its results.
 
 ## Build, gate and records
 
@@ -69,7 +97,8 @@ cargo fmt --all -- --check
 ```
 
 [.github/workflows/ci.yml](.github/workflows/ci.yml) defines PR/main tests,
-formatting, clippy, vectors, docs and benchmark checks. It checks out the
+formatting, clippy, vectors, docs, the workflow lint, the secrets scan, the
+minimum Rust check, the unused dependency check and benchmark checks. It checks out the
 pinned external conformance corpus for the vector job; a local run without
 that corpus can skip those tests and is not conformance evidence.
 [RELEASING.md](RELEASING.md) defines the machine gate and trusted publication
