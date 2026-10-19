@@ -7,8 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Proposed as a minor release (new public API in `block`; nothing existing
-changes shape).
+## [0.7.2] - 2026-10-19
+
+Additive, no migration, as 0.7.1 was: new public API in `block`, nothing existing
+changes shape (the stack's keeper on the owner's word of 2026-10-19; a 0.8.0 if the
+crate's captain prefers it before the tag).
 
 ### Added: the node's difficulty rule (`block`)
 
