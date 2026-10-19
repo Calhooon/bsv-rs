@@ -25,7 +25,7 @@ profiling tests. `transaction` enables `block`. A Worker should select the
 features it needs and enable `wasm`; native HTTP transports are separate. The
 declared minimum Rust is 1.88 (`rust-version`).
 
-## The signing digest (0.7.1)
+## The signing digest (0.7.0)
 
 `SigningContext::compute_sighash`, the digest every template's `unlock` and
 `Transaction::sign` sign, computes through
@@ -44,7 +44,7 @@ unchanged from 0.6.1. The identity paths
 removal of `ContactsManager` now sign the same dispatched digest.
 [tests/sighash_tests.rs](tests/sighash_tests.rs) and
 [tests/identity_spend_witness.rs](tests/identity_spend_witness.rs) pin these;
-the CHANGELOG's 0.7.1 entry names each test.
+the CHANGELOG's 0.7.0 entry names each test.
 
 ## Proof and evaluator contracts
 
