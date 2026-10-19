@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Proposed as a minor release (new public API in `block`; nothing existing
+changes shape).
+
+### Added: the node's difficulty rule (`block`)
+
+0.7.0 left difficulty adjustment to the host. The rule moves here from
+chaintracks-cloudflare@74cc110 `src/consensus.rs`, where it was ported from
+bitcoin-sv v1.2.3 (`6504a3aff65ba97c0f6c80962b033e35ecbfed4b`); each
+function's doc names the node function and the lines it ports. Behind the
+existing `block` feature; no new dependency.
+
+- `ChainParams::{main, test, regtest}`: `powLimit`, `nPowTargetSpacing`,
+  `nPowTargetTimespan`, `fPowAllowMinDifficultyBlocks`, `fPowNoRetargeting`
+  and `daaHeight` (`src/chainparams.cpp:1047-1068`, `:1343-1364`,
+  `:1471-1490`), with `difficulty_adjustment_interval`, `pow_limit_bits` and
+  `window_depth` (how many ancestors the rule may read). Checkpoints and the
+  genesis hash stay the host's. `#[non_exhaustive]`: start from a constructor.
+- `next_work_required(params, chain, prev_height, new_time) -> Result<u32,
+  DifficultyError>`: `GetNextWorkRequired` (`src/pow.cpp:95-117`) with its
+  three regimes: regtest's no-retarget, the legacy retarget with the
+  emergency adjustment and testnet's minimum-difficulty rule (`:22-93`,
+  `:119-148`), and the DAA (`:177-297`). Also public, as the node exports
+  them: `calculate_next_work_required` and `next_cash_work_required`.
+- `HeaderAncestry`, the smallest view of the chain the rule reads
+  (`link_at(height) -> Option<HeaderLink>`, `HeaderLink { height, time, bits
+  }`), implemented for `[HeaderLink]`; its `work_between` defaults to
+  `chain_work_between`, the `GetBlockProof` sum the node's `nChainWork`
+  difference is (`src/block_index.h:661-666`), and a host that stores chain
+  work may override it. `median_time_past` is `GetMedianTimePast`
+  (`src/block_index.h:720-737`).
+- `DifficultyError` (`#[non_exhaustive]`): `MissingAncestor` (the host does
+  not hold a header the rule reads), `ChainTooShort` and `ZeroWork` (where the
+  node asserts or throws), `InvalidParams` (a host's parameters with no
+  adjustment interval). Nothing panics, on any chain or parameters.
+- Tests (`tests/chain_difficulty.rs`, in CI's chain vector step): the node's
+  `pow_tests.cpp` tables (`get_next_work` and its three bounds,
+  `retargeting_test`, `cash_difficulty_test`) carried over from chaintracks
+  with their citations, the regimes' edges, and the real testnet run
+  1602530..=1602710 (Teranode v0.16.0's file, sha256 pinned): the 34 headers
+  with a full DAA window carry the rule's bits, 8 of them under the
+  20-minute rule, and a header mined 600 s after 1602682 at the minimum
+  difficulty does not.
+
+### Notes: cross-SDK parity
+
+Neither `@bsv/sdk` (ts-sdk `src/`) nor go-sdk carries a difficulty rule;
+there is no SDK function to conform to, so the node decides.
+
 ## [0.7.1] - 2026-10-19
 
 ### Added: HKDF (RFC 5869), SHA-256 and SHA-512
