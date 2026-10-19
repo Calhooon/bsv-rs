@@ -5,7 +5,7 @@
 //! - Bitcoin-specific composite hashes: hash256 (double SHA-256), hash160 (RIPEMD-160(SHA-256(x)))
 //! - Incremental hashers: [`Sha256`] and [`Sha256d`], fed in chunks of any size
 //! - HMAC: HMAC-SHA256, HMAC-SHA512
-//! - Key derivation: PBKDF2-SHA512
+//! - Key derivation functions: PBKDF2 over HMAC-SHA512, and HKDF over HMAC-SHA256 or HMAC-SHA512 (RFC 5869)
 //!
 //! # Examples
 //!
@@ -66,7 +66,25 @@
 //! let derived_key = hash::pbkdf2_sha512(password, salt, iterations, key_len);
 //! assert_eq!(derived_key.len(), 64);
 //! ```
+//!
+//! ## HKDF
+//!
+//! ```rust
+//! use bsv_rs::primitives::hash;
+//!
+//! // RFC 5869 A.1
+//! let ikm = [0x0b; 22];
+//! let salt = hex::decode("000102030405060708090a0b0c").unwrap();
+//! let info = hex::decode("f0f1f2f3f4f5f6f7f8f9").unwrap();
+//! let mut okm = [0u8; 42];
+//! hash::hkdf_sha256(&salt, &ikm, &info, &mut okm).unwrap();
+//! assert_eq!(
+//!     hex::encode(okm),
+//!     "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865"
+//! );
+//! ```
 
+use crate::error::{Error, Result};
 use hmac::{Hmac, Mac};
 use ripemd::Ripemd160;
 use sha1::Sha1;
@@ -471,6 +489,175 @@ pub fn pbkdf2_sha512(password: &[u8], salt: &[u8], iterations: u32, key_len: usi
     let mut output = vec![0u8; key_len];
     pbkdf2::pbkdf2_hmac::<Sha512>(password, salt, iterations, &mut output);
     output
+}
+
+/// The longest HKDF-SHA256 output, `255 * 32` bytes (RFC 5869 §2.3).
+pub const HKDF_SHA256_MAX_OKM: usize = 255 * 32;
+
+/// The longest HKDF-SHA512 output, `255 * 64` bytes (RFC 5869 §2.3).
+pub const HKDF_SHA512_MAX_OKM: usize = 255 * 64;
+
+/// HKDF-Extract over any HMAC (RFC 5869 §2.2): `PRK = HMAC-Hash(salt, IKM)`.
+///
+/// An empty `salt` is the RFC's "not provided": HMAC pads its key with zeros to
+/// the block size, so the empty key and `HashLen` zero bytes are the same key.
+fn hkdf_extract_with<M: Mac + hmac::digest::KeyInit>(
+    salt: &[u8],
+    ikm: &[u8],
+) -> hmac::digest::Output<M> {
+    #[allow(clippy::expect_used)]
+    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
+    let mut mac = <M as Mac>::new_from_slice(salt).expect("HMAC can take key of any size");
+    Mac::update(&mut mac, ikm);
+    mac.finalize().into_bytes()
+}
+
+/// HKDF-Expand over any HMAC (RFC 5869 §2.3):
+/// `T(i) = HMAC-Hash(PRK, T(i - 1) || info || i)`, `OKM` the first `L` bytes of `T(1) || T(2) || ...`.
+///
+/// Refuses a `PRK` shorter than `HashLen` and an `okm` longer than `255 * HashLen`
+/// (both the RFC's preconditions) without writing `okm`.
+fn hkdf_expand_with<M: Mac + hmac::digest::KeyInit + Clone>(
+    prk: &[u8],
+    info: &[u8],
+    okm: &mut [u8],
+) -> Result<()> {
+    let hash_len = <M as hmac::digest::OutputSizeUser>::output_size();
+    if prk.len() < hash_len {
+        return Err(Error::InvalidKeyLength {
+            expected: hash_len,
+            actual: prk.len(),
+        });
+    }
+    if okm.len() > 255 * hash_len {
+        return Err(Error::InvalidDataLength {
+            expected: 255 * hash_len,
+            actual: okm.len(),
+        });
+    }
+    #[allow(clippy::expect_used)]
+    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
+    let base = <M as Mac>::new_from_slice(prk).expect("HMAC can take key of any size");
+    let mut previous: Option<hmac::digest::Output<M>> = None;
+    for (i, chunk) in okm.chunks_mut(hash_len).enumerate() {
+        let mut mac = base.clone();
+        if let Some(t) = &previous {
+            Mac::update(&mut mac, t);
+        }
+        Mac::update(&mut mac, info);
+        // i < 255 by the length check, so the counter i + 1 fits one byte
+        Mac::update(&mut mac, &[(i + 1) as u8]);
+        let t = mac.finalize().into_bytes();
+        chunk.copy_from_slice(&t[..chunk.len()]);
+        previous = Some(t);
+    }
+    Ok(())
+}
+
+/// HKDF-SHA256 extract (RFC 5869 §2.2): the 32-byte pseudorandom key of `ikm` under `salt`.
+///
+/// An empty `salt` is the RFC's "not provided" (equal to 32 zero bytes).
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::hash::{hkdf_sha256_expand, hkdf_sha256_extract};
+///
+/// // RFC 5869 A.3: no salt, no info
+/// let prk = hkdf_sha256_extract(&[], &[0x0b; 22]);
+/// assert_eq!(
+///     hex::encode(prk),
+///     "19ef24a32c717b167f33a91d6f648bdf96596776afdb6377ac434c1c293ccb04"
+/// );
+/// let mut okm = [0u8; 42];
+/// hkdf_sha256_expand(&prk, &[], &mut okm).unwrap();
+/// assert_eq!(
+///     hex::encode(okm),
+///     "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8"
+/// );
+/// ```
+pub fn hkdf_sha256_extract(salt: &[u8], ikm: &[u8]) -> [u8; 32] {
+    hkdf_extract_with::<Hmac<sha2::Sha256>>(salt, ikm).into()
+}
+
+/// HKDF-SHA256 expand (RFC 5869 §2.3): fills `okm` from `prk` and `info`.
+///
+/// # Errors
+///
+/// [`Error::InvalidKeyLength`] for a `prk` shorter than 32 bytes;
+/// [`Error::InvalidDataLength`] for an `okm` longer than [`HKDF_SHA256_MAX_OKM`].
+/// `okm` is not written on an error.
+pub fn hkdf_sha256_expand(prk: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()> {
+    hkdf_expand_with::<Hmac<sha2::Sha256>>(prk, info, okm)
+}
+
+/// HKDF-SHA256 (RFC 5869): extract with `salt` over `ikm`, then expand `info` into `okm`.
+///
+/// An empty `salt` is the RFC's "not provided". Intermediate values are not
+/// zeroized; a caller holding secrets wipes its own buffers.
+///
+/// # Errors
+///
+/// [`Error::InvalidDataLength`] for an `okm` longer than [`HKDF_SHA256_MAX_OKM`];
+/// `okm` is not written on an error.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::hash::hkdf_sha256;
+///
+/// let mut okm = [0u8; 32];
+/// hkdf_sha256(b"salt", b"input key material", b"context", &mut okm).unwrap();
+/// let mut too_long = vec![0u8; 255 * 32 + 1];
+/// assert!(hkdf_sha256(b"salt", b"input key material", b"context", &mut too_long).is_err());
+/// ```
+pub fn hkdf_sha256(salt: &[u8], ikm: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()> {
+    let prk = hkdf_sha256_extract(salt, ikm);
+    hkdf_sha256_expand(&prk, info, okm)
+}
+
+/// HKDF-SHA512 extract (RFC 5869 §2.2): the 64-byte pseudorandom key of `ikm` under `salt`.
+///
+/// An empty `salt` is the RFC's "not provided" (equal to 64 zero bytes).
+pub fn hkdf_sha512_extract(salt: &[u8], ikm: &[u8]) -> [u8; 64] {
+    hkdf_extract_with::<Hmac<Sha512>>(salt, ikm).into()
+}
+
+/// HKDF-SHA512 expand (RFC 5869 §2.3): fills `okm` from `prk` and `info`.
+///
+/// # Errors
+///
+/// [`Error::InvalidKeyLength`] for a `prk` shorter than 64 bytes;
+/// [`Error::InvalidDataLength`] for an `okm` longer than [`HKDF_SHA512_MAX_OKM`].
+/// `okm` is not written on an error.
+pub fn hkdf_sha512_expand(prk: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()> {
+    hkdf_expand_with::<Hmac<Sha512>>(prk, info, okm)
+}
+
+/// HKDF-SHA512 (RFC 5869): extract with `salt` over `ikm`, then expand `info` into `okm`.
+///
+/// An empty `salt` is the RFC's "not provided". Intermediate values are not
+/// zeroized; a caller holding secrets wipes its own buffers.
+///
+/// # Errors
+///
+/// [`Error::InvalidDataLength`] for an `okm` longer than [`HKDF_SHA512_MAX_OKM`];
+/// `okm` is not written on an error.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::hash::hkdf_sha512;
+///
+/// // Wycheproof hkdf_sha512_test.json tcId 1: empty salt, empty info
+/// let ikm = hex::decode("24aeff2645e3e0f5494a9a102778c43a").unwrap();
+/// let mut okm = [0u8; 20];
+/// hkdf_sha512(&[], &ikm, &[], &mut okm).unwrap();
+/// assert_eq!(hex::encode(okm), "dd2599840b09699c6200b5cba79002b3aa75c61b");
+/// ```
+pub fn hkdf_sha512(salt: &[u8], ikm: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()> {
+    let prk = hkdf_sha512_extract(salt, ikm);
+    hkdf_sha512_expand(&prk, info, okm)
 }
 
 #[cfg(test)]
@@ -961,5 +1148,242 @@ mod tests {
             hex::encode(result),
             "75a48a19d4cbe100644e8ac1397eea747a2d33ab"
         );
+    }
+
+    // HKDF (RFC 5869 Appendix A: A.1 to A.3 are HKDF-SHA256, A.4 to A.7 HKDF-SHA1).
+    // The SHA-1 cases run through the same private extract and expand the public
+    // SHA-256 and SHA-512 functions use, so all seven vectors exercise the construction.
+    struct Rfc5869 {
+        case: &'static str,
+        ikm: &'static str,
+        salt: &'static str,
+        info: &'static str,
+        l: usize,
+        prk: &'static str,
+        okm: &'static str,
+    }
+
+    const RFC5869_SHA256: [Rfc5869; 3] = [
+        Rfc5869 {
+            case: "A.1",
+            ikm: "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            salt: "000102030405060708090a0b0c",
+            info: "f0f1f2f3f4f5f6f7f8f9",
+            l: 42,
+            prk: "077709362c2e32df0ddc3f0dc47bba6390b6c73bb50f9c3122ec844ad7c2b3e5",
+            okm: "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf34007208d5b887185865",
+        },
+        Rfc5869 {
+            case: "A.2",
+            ikm: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+            salt: "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+            info: "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+            l: 82,
+            prk: "06a6b88c5853361a06104c9ceb35b45cef760014904671014a193f40c15fc244",
+            okm: "b11e398dc80327a1c8e7f78c596a49344f012eda2d4efad8a050cc4c19afa97c59045a99cac7827271cb41c65e590e09da3275600c2f09b8367793a9aca3db71cc30c58179ec3e87c14c01d5c1f3434f1d87",
+        },
+        Rfc5869 {
+            case: "A.3",
+            ikm: "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            salt: "",
+            info: "",
+            l: 42,
+            prk: "19ef24a32c717b167f33a91d6f648bdf96596776afdb6377ac434c1c293ccb04",
+            okm: "8da4e775a563c18f715f802a063c5a31b8a11f5c5ee1879ec3454e5f3c738d2d9d201395faa4b61a96c8",
+        },
+    ];
+
+    const RFC5869_SHA1: [Rfc5869; 4] = [
+        Rfc5869 {
+            case: "A.4",
+            ikm: "0b0b0b0b0b0b0b0b0b0b0b",
+            salt: "000102030405060708090a0b0c",
+            info: "f0f1f2f3f4f5f6f7f8f9",
+            l: 42,
+            prk: "9b6c18c432a7bf8f0e71c8eb88f4b30baa2ba243",
+            okm: "085a01ea1b10f36933068b56efa5ad81a4f14b822f5b091568a9cdd4f155fda2c22e422478d305f3f896",
+        },
+        Rfc5869 {
+            case: "A.5",
+            ikm: "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f404142434445464748494a4b4c4d4e4f",
+            salt: "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
+            info: "b0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+            l: 82,
+            prk: "8adae09a2a307059478d309b26c4115a224cfaf6",
+            okm: "0bd770a74d1160f7c9f12cd5912a06ebff6adcae899d92191fe4305673ba2ffe8fa3f1a4e5ad79f3f334b3b202b2173c486ea37ce3d397ed034c7f9dfeb15c5e927336d0441f4c4300e2cff0d0900b52d3b4",
+        },
+        Rfc5869 {
+            case: "A.6",
+            ikm: "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
+            salt: "",
+            info: "",
+            l: 42,
+            prk: "da8c8a73c7fa77288ec6f5e7c297786aa0d32d01",
+            okm: "0ac1af7002b3d761d1e55298da9d0506b9ae52057220a306e07b6b87e8df21d0ea00033de03984d34918",
+        },
+        Rfc5869 { // salt not provided
+            case: "A.7",
+            ikm: "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
+            salt: "",
+            info: "",
+            l: 42,
+            prk: "2adccada18779e7c2077ad2eb19d3f3e731385dd",
+            okm: "2c91117204d745f3500d636a62f64f0ab3bae548aa53d423b0d1f27ebba6f5e5673a081d70cce7acfc48",
+        },
+    ];
+
+    #[test]
+    fn test_hkdf_sha256_rfc5869_a1_to_a3() {
+        for v in &RFC5869_SHA256 {
+            let (ikm, salt, info) = (
+                hex::decode(v.ikm).unwrap(),
+                hex::decode(v.salt).unwrap(),
+                hex::decode(v.info).unwrap(),
+            );
+            let prk = hkdf_sha256_extract(&salt, &ikm);
+            assert_eq!(hex::encode(prk), v.prk, "{} PRK", v.case);
+            let mut okm = vec![0u8; v.l];
+            hkdf_sha256_expand(&prk, &info, &mut okm).unwrap();
+            assert_eq!(hex::encode(&okm), v.okm, "{} OKM (expand)", v.case);
+            let mut okm = vec![0u8; v.l];
+            hkdf_sha256(&salt, &ikm, &info, &mut okm).unwrap();
+            assert_eq!(hex::encode(&okm), v.okm, "{} OKM (one call)", v.case);
+        }
+    }
+
+    #[test]
+    fn test_hkdf_sha1_rfc5869_a4_to_a7() {
+        type HmacSha1 = Hmac<Sha1>;
+        for v in &RFC5869_SHA1 {
+            let (ikm, salt, info) = (
+                hex::decode(v.ikm).unwrap(),
+                hex::decode(v.salt).unwrap(),
+                hex::decode(v.info).unwrap(),
+            );
+            let prk = hkdf_extract_with::<HmacSha1>(&salt, &ikm);
+            assert_eq!(hex::encode(prk), v.prk, "{} PRK", v.case);
+            let mut okm = vec![0u8; v.l];
+            hkdf_expand_with::<HmacSha1>(&prk, &info, &mut okm).unwrap();
+            assert_eq!(hex::encode(&okm), v.okm, "{} OKM", v.case);
+        }
+        // A.7's "salt not provided" is HashLen zero bytes (RFC 5869 §2.2), the same key as the empty salt
+        let ikm = hex::decode(RFC5869_SHA1[3].ikm).unwrap();
+        assert_eq!(
+            hex::encode(hkdf_extract_with::<HmacSha1>(&[0u8; 20], &ikm)),
+            RFC5869_SHA1[3].prk
+        );
+    }
+
+    #[test]
+    fn test_hkdf_absent_salt_is_hash_len_zeros() {
+        let ikm = [0x0b; 22];
+        assert_eq!(
+            hkdf_sha256_extract(&[], &ikm),
+            hkdf_sha256_extract(&[0u8; 32], &ikm)
+        );
+        assert_eq!(
+            hkdf_sha512_extract(&[], &ikm),
+            hkdf_sha512_extract(&[0u8; 64], &ikm)
+        );
+        // and a salt is not ignored
+        assert_ne!(
+            hkdf_sha256_extract(&[1], &ikm),
+            hkdf_sha256_extract(&[], &ikm)
+        );
+    }
+
+    /// HKDF-SHA512 on RFC 5869 A.1's inputs and on A.3's (empty salt and info), L = 42 and 64;
+    /// the expected bytes are `openssl kdf -keylen L -kdfopt digest:SHA512 -kdfopt hexkey:... HKDF`
+    /// (OpenSSL 3.6.2 and 3.6.4, an independent implementation).
+    #[test]
+    fn test_hkdf_sha512_rfc5869_inputs_vs_openssl() {
+        let ikm = [0x0b; 22];
+        let salt = hex::decode("000102030405060708090a0b0c").unwrap();
+        let info = hex::decode("f0f1f2f3f4f5f6f7f8f9").unwrap();
+        let mut okm = [0u8; 42];
+        hkdf_sha512(&salt, &ikm, &info, &mut okm).unwrap();
+        assert_eq!(
+            hex::encode(okm),
+            "832390086cda71fb47625bb5ceb168e4c8e26a1a16ed34d9fc7fe92c1481579338da362cb8d9f925d7cb"
+        );
+        let mut okm = [0u8; 64];
+        hkdf_sha512(&[], &ikm, &[], &mut okm).unwrap();
+        assert_eq!(
+            hex::encode(okm),
+            "f5fa02b18298a72a8c23898a8703472c6eb179dc204c03425c970e3b164bf90fff22d04836d0e2343bacc4e7cb6045faaa698e0e3b3eb91331306def1db8319e"
+        );
+    }
+
+    #[test]
+    fn test_hkdf_output_bound_is_255_blocks() {
+        let mut okm = vec![0u8; HKDF_SHA256_MAX_OKM];
+        hkdf_sha256(b"salt", b"ikm", b"info", &mut okm).unwrap();
+        let mut okm = vec![0u8; HKDF_SHA512_MAX_OKM];
+        hkdf_sha512(b"salt", b"ikm", b"info", &mut okm).unwrap();
+
+        let mut over = vec![0xaau8; HKDF_SHA256_MAX_OKM + 1];
+        assert_eq!(
+            hkdf_sha256(b"salt", b"ikm", b"info", &mut over),
+            Err(Error::InvalidDataLength {
+                expected: HKDF_SHA256_MAX_OKM,
+                actual: HKDF_SHA256_MAX_OKM + 1
+            })
+        );
+        assert!(
+            over.iter().all(|&b| b == 0xaa),
+            "okm is not written on an error"
+        );
+        let mut over = vec![0xaau8; HKDF_SHA512_MAX_OKM + 1];
+        assert_eq!(
+            hkdf_sha512(b"salt", b"ikm", b"info", &mut over),
+            Err(Error::InvalidDataLength {
+                expected: HKDF_SHA512_MAX_OKM,
+                actual: HKDF_SHA512_MAX_OKM + 1
+            })
+        );
+        assert!(
+            over.iter().all(|&b| b == 0xaa),
+            "okm is not written on an error"
+        );
+    }
+
+    #[test]
+    fn test_hkdf_expand_refuses_a_short_prk() {
+        let mut okm = [0u8; 32];
+        assert_eq!(
+            hkdf_sha256_expand(&[0u8; 31], b"", &mut okm),
+            Err(Error::InvalidKeyLength {
+                expected: 32,
+                actual: 31
+            })
+        );
+        assert_eq!(
+            hkdf_sha512_expand(&[0u8; 63], b"", &mut okm),
+            Err(Error::InvalidKeyLength {
+                expected: 64,
+                actual: 63
+            })
+        );
+        // a PRK longer than HashLen is accepted (RFC 5869 §2.3: "at least HashLen octets")
+        hkdf_sha256_expand(&[0u8; 33], b"", &mut okm).unwrap();
+    }
+
+    #[test]
+    fn test_hkdf_empty_okm_and_block_boundaries() {
+        let mut empty = [0u8; 0];
+        hkdf_sha256(b"s", b"k", b"i", &mut empty).unwrap();
+        // a shorter output is the prefix of a longer one at every length around a block boundary
+        let mut long = [0u8; 200];
+        hkdf_sha512(b"s", b"k", b"i", &mut long).unwrap();
+        for l in [1, 63, 64, 65, 127, 128, 129, 200] {
+            let mut short = vec![0u8; l];
+            hkdf_sha512(b"s", b"k", b"i", &mut short).unwrap();
+            assert_eq!(short, long[..l], "L = {l}");
+        }
+        let mut a = [0u8; 32];
+        let mut b = [0u8; 32];
+        hkdf_sha256(b"s", b"k", b"info-a", &mut a).unwrap();
+        hkdf_sha256(b"s", b"k", b"info-b", &mut b).unwrap();
+        assert_ne!(a, b);
     }
 }

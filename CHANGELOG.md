@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: HKDF (RFC 5869), SHA-256 and SHA-512
+
+`primitives::hash` gains HKDF beside PBKDF2: `hkdf_sha256` and
+`hkdf_sha512` (extract then expand into a caller's buffer),
+`hkdf_sha256_extract` / `hkdf_sha512_extract` (the pseudorandom key) and
+`hkdf_sha256_expand` / `hkdf_sha512_expand`, with `HKDF_SHA256_MAX_OKM`
+and `HKDF_SHA512_MAX_OKM` (`255 * HashLen`). An empty salt is the RFC's
+"not provided" (HashLen zero bytes, the same HMAC key). Expand refuses an
+output over `255 * HashLen` (`Error::InvalidDataLength`) and a PRK shorter
+than HashLen (`Error::InvalidKeyLength`) without writing the output. No new
+dependency: the construction runs on the crate's `hmac` 0.12 and `sha2`
+0.10. Additive, no migration.
+
+- RFC 5869 Appendix A, all seven cases: A.1 to A.3 through the public
+  HKDF-SHA256 functions (PRK and OKM), A.4 to A.7 (HKDF-SHA1, A.7 with the
+  salt not provided) through the same private extract and expand
+  (`src/primitives/hash.rs` tests).
+- Project Wycheproof `hkdf_sha256_test.json` (86 tests: 83 valid, 3
+  `SizeTooLarge` refused) and `hkdf_sha512_test.json` (83 tests: 80 valid, 3
+  refused), C2SP/wycheproof at `e0df04e0`, copied under
+  `tests/vectors/wycheproof/` with their sha256 pinned
+  (`tests/hkdf_wycheproof.rs`).
+- HKDF-SHA512 on A.1's and A.3's inputs against OpenSSL's `openssl kdf ...
+  HKDF`.
+
+### Notes: cross-SDK parity
+
+Neither `@bsv/sdk` nor go-sdk exposes HKDF; there is no reference function
+to conform to, so RFC 5869 and the vectors above decide.
+
 ## [0.7.0] - 2026-10-17
 
 ### The default signing digest is the node's

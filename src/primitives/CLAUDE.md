@@ -12,7 +12,7 @@ This module provides cryptographic primitives compatible with the BSV TypeScript
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module declarations and re-exports | 36 |
-| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2 | 800 |
+| `hash.rs` | SHA-1, SHA-256, SHA-512, RIPEMD-160, HMAC, PBKDF2, HKDF (RFC 5869) | 800 |
 | `symmetric.rs` | AES-256-GCM encryption (32-byte nonce for BSV SDK compatibility) | 972 |
 | `encoding.rs` | Hex, Base58, Base58Check, Base64, UTF-8, Reader/Writer | 1696 |
 | `bignum.rs` | Arbitrary-precision integers for EC scalars | 1550 |
@@ -35,6 +35,10 @@ pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20]   // HMAC-SHA1
 pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32]
 pub fn sha512_hmac(key: &[u8], data: &[u8]) -> [u8; 64]
 pub fn pbkdf2_sha512(password: &[u8], salt: &[u8], iterations: u32, key_len: usize) -> Vec<u8>
+pub fn hkdf_sha256(salt: &[u8], ikm: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()>  // RFC 5869
+pub fn hkdf_sha512(salt: &[u8], ikm: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()>
+pub fn hkdf_sha256_extract(salt: &[u8], ikm: &[u8]) -> [u8; 32]   // and hkdf_sha512_extract -> [u8; 64]
+pub fn hkdf_sha256_expand(prk: &[u8], info: &[u8], okm: &mut [u8]) -> Result<()>  // and hkdf_sha512_expand
 
 // Encoding
 pub fn to_hex(data: &[u8]) -> String
@@ -292,7 +296,7 @@ Key error variants in `src/error.rs`:
 cargo test primitives
 ```
 
-Tests include NIST vectors, RFC 2202 HMAC-SHA1 vectors, PBKDF2-SHA512 vectors, TypeScript/Go SDK compatibility, round-trip encoding, UTF-8 multi-byte handling, and edge cases. Test vectors in `tests/vectors/symmetric_key.json`.
+Tests include NIST vectors, RFC 2202 HMAC-SHA1 vectors, PBKDF2-SHA512 vectors, RFC 5869 A.1 to A.7 and Wycheproof HKDF vectors (`tests/hkdf_wycheproof.rs`), TypeScript/Go SDK compatibility, round-trip encoding, UTF-8 multi-byte handling, and edge cases. Test vectors in `tests/vectors/symmetric_key.json`.
 
 ## Related Documentation
 
