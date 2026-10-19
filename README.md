@@ -1,19 +1,19 @@
 # bsv-rs
 
-**0.7.0**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
+**0.7.1**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
 BEEF and SPV, block headers and proof of work, wallets, authentication and
 overlay clients. Optional features support native applications and wasm hosts.
 Compatibility is tested against shared vectors; the crate also has explicit
 local evaluator contracts and documented differences from other SDKs.
 
-The release of record is the tag `v0.7.0`; the version on crates.io is 0.7.0,
+The release of record is the tag `v0.7.1`; the version on crates.io is 0.7.1,
 the same release. [CHANGELOG.md](CHANGELOG.md) says what each release changed.
 
 ## Install
 
 ```toml
 [dependencies]
-bsv-rs = { version = "=0.7.0", features = ["transaction", "wallet"] }
+bsv-rs = { version = "=0.7.1", features = ["transaction", "wallet"] }
 ```
 
 Defaults enable `primitives` and `script`. [Cargo.toml](Cargo.toml) lists the
@@ -25,7 +25,7 @@ profiling tests. `transaction` enables `block`. A Worker should select the
 features it needs and enable `wasm`; native HTTP transports are separate. The
 declared minimum Rust is 1.88 (`rust-version`).
 
-## The signing digest (0.7.0)
+## The signing digest (0.7.1)
 
 `SigningContext::compute_sighash`, the digest every template's `unlock` and
 `Transaction::sign` sign, computes through
@@ -44,7 +44,7 @@ unchanged from 0.6.1. The identity paths
 removal of `ContactsManager` now sign the same dispatched digest.
 [tests/sighash_tests.rs](tests/sighash_tests.rs) and
 [tests/identity_spend_witness.rs](tests/identity_spend_witness.rs) pin these;
-the CHANGELOG's 0.7.0 entry names each test.
+the CHANGELOG's 0.7.1 entry names each test.
 
 ## Proof and evaluator contracts
 
