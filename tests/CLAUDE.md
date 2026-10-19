@@ -15,6 +15,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `auth_integration_tests.rs` | 70 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads, nonce handling |
 | `auth_peer_e2e_tests.rs` | 21 | `auth` | BRC-31 peer mutual authentication end-to-end via loopback |
 | `broadcaster_http_tests.rs` | 27 | `transaction`+`http` | ARC, WoC, Teranode broadcasters with wiremock; the ARC 2xx verdict vector served through wiremock (bsv-stack-lean #35, P0-2) |
+| `chain_difficulty.rs` | 10 | `block` | The difficulty rule (`next_work_required`) on bitcoin-sv v1.2.3's `pow_tests.cpp` tables, the regimes' edges and the real testnet run 1602530..=1602710 (`chain_vectors/test_1602530_1602710.bin`, sha256 pinned) |
 | `chaintracker_http_tests.rs` | 10 | `transaction`+`http` | WhatsOnChain chain tracker with wiremock |
 | `compat_bip39_tests.rs` | 29 | `compat` | BIP-39 mnemonics with official TREZOR vectors |
 | `compat_integration_tests.rs` | 31 | `compat` | BIP-32/39, BSM, ECIES, Base58 workflows |
