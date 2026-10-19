@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-19
+
 ### Added: HKDF (RFC 5869), SHA-256 and SHA-512
 
 `primitives::hash` gains HKDF beside PBKDF2: `hkdf_sha256` and
