@@ -4,7 +4,7 @@
 //!
 //! This module provides:
 //! - Hash functions (SHA-1, SHA-256, SHA-512, RIPEMD-160, hash256, hash160)
-//! - HMAC and PBKDF2
+//! - HMAC, PBKDF2 and HKDF (RFC 5869)
 //! - Symmetric encryption (AES-256-GCM)
 //! - Encoding (hex, base58, base64)
 //! - BigNumber for arbitrary-precision arithmetic
@@ -41,7 +41,8 @@ pub use encoding::{
     var_int_len, Reader, Writer, MAX_COMPACT_SIZE,
 };
 pub use hash::{
-    hash160, pbkdf2_sha512, ripemd160, sha1, sha1_hmac, sha256, sha256_hmac, sha256d, sha512,
-    sha512_hmac,
+    hash160, hkdf_sha256, hkdf_sha256_expand, hkdf_sha256_extract, hkdf_sha512, hkdf_sha512_expand,
+    hkdf_sha512_extract, pbkdf2_sha512, ripemd160, sha1, sha1_hmac, sha256, sha256_hmac, sha256d,
+    sha512, sha512_hmac, HKDF_SHA256_MAX_OKM, HKDF_SHA512_MAX_OKM,
 };
 pub use symmetric::SymmetricKey;
