@@ -86,7 +86,8 @@ pub enum DifficultyError {
     InvalidParams,
     /// `ComputeTarget` divides by zero work, where the node throws
     /// (src/pow.cpp:207, `base_uint::operator/=`): every header between the
-    /// two carries bits with no work.
+    /// two carries bits with no work, or the work times the spacing is below
+    /// the clamped timespan.
     #[error("no work between heights {first} and {last}")]
     ZeroWork {
         /// Height of the first suitable block.
@@ -309,7 +310,8 @@ fn compute_target<C: HeaderAncestry + ?Sized>(
 ) -> Result<U256, DifficultyError> {
     let spacing = params.pow_target_spacing;
     let mut work = *chain.work_between(first.height, last.height)?.as_u256();
-    work = work.wrapping_mul_u64(spacing as u64);
+    // `work *= nPowTargetSpacing` binds `operator*=(uint32_t)`, as the retarget's does
+    work = work.wrapping_mul_u64(u64::from(spacing as u32));
     let actual = (i64::from(last.time) - i64::from(first.time))
         .min(spacing.saturating_mul(288))
         .max(spacing.saturating_mul(72));
@@ -346,7 +348,11 @@ pub fn next_cash_work_required<C: HeaderAncestry + ?Sized>(
     {
         return Ok(params.pow_limit_bits());
     }
-    if i64::from(prev_height) < params.difficulty_adjustment_interval().max(147) {
+    let interval = params.difficulty_adjustment_interval();
+    if interval <= 0 {
+        return Err(DifficultyError::InvalidParams);
+    }
+    if i64::from(prev_height) < interval.max(147) {
         // the node asserts here (:275), and in `GetSuitableBlock` (:215) on
         // `prev - 144` for an interval shorter than 147
         return Err(DifficultyError::ChainTooShort { prev_height });

@@ -356,6 +356,14 @@ fn the_rule_refuses_where_the_node_asserts() {
         Err(DifficultyError::InvalidParams)
     );
     let _ = broken.window_depth(5);
+    // the same refusal on the DAA path (the review's fold: InvalidParams, never ZeroWork)
+    let mut broken_daa = ChainParams::main();
+    broken_daa.daa_height = 0;
+    broken_daa.pow_target_spacing = 0;
+    assert_eq!(
+        next_work_required(&broken_daa, &short[..], 5, 0),
+        Err(DifficultyError::InvalidParams)
+    );
     broken.pow_target_timespan = -1;
     broken.pow_target_spacing = 600;
     let _ = calculate_next_work_required(&broken, short[0], 0);
