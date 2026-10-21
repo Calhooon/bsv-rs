@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-21
+
 Breaking: 0.8.0. `Error` is now `#[non_exhaustive]` and gains `WalletBusy`;
 a downstream exhaustive `match` adds a wildcard arm. bsv-wallet-toolbox-rs
 (which answers the new variant), bsv-tracker and bsv-wallet-cli repin to
