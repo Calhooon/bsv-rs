@@ -66,7 +66,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 | (core) | `InvalidKeyLength`, `InvalidDataLength`, `InvalidHex`, `InvalidBase58`, `InvalidBase64`, `CryptoError`, `InvalidSignature`, `InvalidPublicKey`, `InvalidPrivateKey`, `PointAtInfinity`, `DecryptionFailed`, `InvalidNonce`, `InvalidTag`, `InvalidUtf8`, `ReaderUnderflow`, `InvalidChecksum` |
 | `script` | `ScriptParseError`, `ScriptExecutionError`, `InvalidOpcode`, `DisabledOpcode`, `StackUnderflow`, `StackOverflow`, `Bip276Error`, `InvalidAddress`, `InvalidAddressLength`, `UnsupportedAddress` |
 | `transaction` | `TransactionError`, `MerklePathError`, `BeefError`, `FeeModelError` |
-| `wallet` | `WalletError`, `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
+| `wallet` | `WalletError`, `WalletBusy`, `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
 | `messages` | `MessageVersionMismatch`, `MessageError`, `MessageRecipientMismatch` |
 | `compat` | `InvalidMnemonic`, `InvalidEntropyLength`, `InvalidMnemonicWord`, `InvalidExtendedKey`, `HardenedFromPublic`, `InvalidDerivationPath`, `EciesDecryptionFailed`, `EciesHmacMismatch` |
 | `auth` | `AuthError`, `SessionNotFound`, `CertificateValidationError`, `TransportError` |

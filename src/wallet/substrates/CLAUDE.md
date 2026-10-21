@@ -216,6 +216,8 @@ Substrates return `Error::WalletError` for:
 
 JSON error responses are parsed to extract error codes and descriptions. The wallet server may return structured error responses with `code` and `description` fields.
 
+`HttpWalletJson` reads a 503 as `Error::WalletBusy` instead (the wallet took no action; repeat the call): the detail is the body's `message`, else `(code N) description`, else the body text; `Retry-After` in delta-seconds becomes `retry_after_ms`, an HTTP-date `None`. `HttpWalletWire` has no busy code on the wire (the BRC-100 result frame defines 5, 6, 7 and none for busy), so it keeps `WalletError`.
+
 ## Originator Handling
 
 Both substrates convert the originator string to an HTTP origin header:
