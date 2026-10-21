@@ -1,7 +1,8 @@
-//! The HTTP JSON substrate's busy answer (Calhooon/bsv-wallet-cli#44): a 503
-//! reads back as `Error::WalletBusy`, `Retry-After` in delta-seconds as
-//! `retry_after_ms`, an HTTP-date as `None`; every other status keeps its
-//! `WalletError` text.
+//! The HTTP JSON substrate's busy answer (Calhooon/bsv-wallet-cli#44): the
+//! body's code `STORE_BUSY` or `ERR_SERVER_BUSY`, at any status, reads back as
+//! `Error::WalletBusy`, `Retry-After` in delta-seconds as `retry_after_ms`, an
+//! HTTP-date as `None`; a 503 without that code, and every other answer, keeps
+//! its `WalletError` text.
 //!
 //! Run with: `cargo test --features "wallet,http" --test wallet_http_json_busy_tests`
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -60,44 +61,88 @@ fn wallet_busy_displays_its_detail_and_compares_on_both_fields() {
 }
 
 #[tokio::test]
-async fn a_503_with_retry_after_seconds_is_wallet_busy_with_the_delay() {
+async fn the_producers_store_busy_body_is_wallet_busy_with_the_delay() {
+    // bsv-wallet-cli's busy answer, byte for byte (handlers.rs, AppError)
     let err = create_action_against(
         ResponseTemplate::new(503)
-            .insert_header("Retry-After", "2")
-            .set_body_json(serde_json::json!({ "message": "store busy: database is locked" })),
+            .insert_header("Retry-After", "1")
+            .set_body_json(serde_json::json!({
+                "code": "STORE_BUSY",
+                "message": "Store busy: database is locked",
+            })),
     )
     .await;
     assert_eq!(
         err,
         Error::WalletBusy {
-            detail: "store busy: database is locked".into(),
-            retry_after_ms: Some(2000),
+            detail: "Store busy: database is locked".into(),
+            retry_after_ms: Some(1000),
         }
     );
 }
 
 #[tokio::test]
-async fn a_503_without_retry_after_is_wallet_busy_with_no_delay() {
-    let err = create_action_against(
-        ResponseTemplate::new(503)
-            .set_body_json(serde_json::json!({ "code": 1, "description": "writer held" })),
-    )
+async fn store_busy_on_a_500_is_wallet_busy() {
+    let err = create_action_against(ResponseTemplate::new(500).set_body_json(serde_json::json!({
+        "code": "STORE_BUSY",
+        "message": "Store busy: sqlite code 5",
+    })))
     .await;
     assert_eq!(
         err,
         Error::WalletBusy {
-            detail: "(code 1) writer held".into(),
+            detail: "Store busy: sqlite code 5".into(),
             retry_after_ms: None,
         }
     );
 }
 
 #[tokio::test]
-async fn a_503_with_an_http_date_retry_after_is_wallet_busy_with_no_delay() {
+async fn the_ts_toolbox_err_server_busy_body_is_wallet_busy_with_its_description() {
+    // ts-stack@edf6e03 wallet-toolbox `storage/remoting/edgePolicy.ts:668-672`
+    let err = create_action_against(
+        ResponseTemplate::new(503)
+            .insert_header("Retry-After", "1")
+            .set_body_json(serde_json::json!({
+                "status": "error",
+                "code": "ERR_SERVER_BUSY",
+                "description": "The service is temporarily at capacity.",
+            })),
+    )
+    .await;
+    assert_eq!(
+        err,
+        Error::WalletBusy {
+            detail: "The service is temporarily at capacity.".into(),
+            retry_after_ms: Some(1000),
+        }
+    );
+}
+
+#[tokio::test]
+async fn the_first_of_two_retry_after_headers_wins() {
+    let err = create_action_against(
+        ResponseTemplate::new(503)
+            .append_header("Retry-After", "7")
+            .append_header("Retry-After", "1")
+            .set_body_json(serde_json::json!({ "code": "STORE_BUSY", "message": "busy" })),
+    )
+    .await;
+    assert_eq!(
+        err,
+        Error::WalletBusy {
+            detail: "busy".into(),
+            retry_after_ms: Some(7000),
+        }
+    );
+}
+
+#[tokio::test]
+async fn a_busy_body_with_an_http_date_retry_after_has_no_delay() {
     let err = create_action_against(
         ResponseTemplate::new(503)
             .insert_header("Retry-After", "Wed, 21 Oct 2026 07:28:00 GMT")
-            .set_body_json(serde_json::json!({ "message": "busy" })),
+            .set_body_json(serde_json::json!({ "code": "STORE_BUSY", "message": "busy" })),
     )
     .await;
     assert_eq!(
@@ -106,6 +151,52 @@ async fn a_503_with_an_http_date_retry_after_is_wallet_busy_with_no_delay() {
             detail: "busy".into(),
             retry_after_ms: None,
         }
+    );
+}
+
+#[tokio::test]
+async fn an_html_503_from_a_proxy_stays_wallet_error() {
+    // A proxy's 503 promises nothing about the wallet: the status is not the word
+    let html = "<html><body><h1>503 Service Temporarily Unavailable</h1></body></html>";
+    let err = create_action_against(
+        ResponseTemplate::new(503)
+            .insert_header("Retry-After", "1")
+            .set_body_string(html),
+    )
+    .await;
+    assert_eq!(
+        err,
+        Error::WalletError(format!(
+            "HTTP 503 Service Unavailable for createAction: {}",
+            html
+        ))
+    );
+}
+
+#[tokio::test]
+async fn a_503_with_a_message_and_no_code_stays_wallet_error() {
+    let err = create_action_against(
+        ResponseTemplate::new(503).set_body_json(serde_json::json!({ "message": "busy" })),
+    )
+    .await;
+    assert_eq!(
+        err,
+        Error::WalletError(
+            r#"HTTP 503 Service Unavailable for createAction: {"message":"busy"}"#.into()
+        )
+    );
+}
+
+#[tokio::test]
+async fn a_503_with_a_numeric_code_keeps_the_coded_wallet_error() {
+    let err = create_action_against(
+        ResponseTemplate::new(503)
+            .set_body_json(serde_json::json!({ "code": 1, "description": "writer held" })),
+    )
+    .await;
+    assert_eq!(
+        err,
+        Error::WalletError("wallet error (code 1): writer held".into())
     );
 }
 

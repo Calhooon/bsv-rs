@@ -148,13 +148,10 @@ impl HttpWalletJson {
                 .map(str::to_owned);
             let text = response.text().await.unwrap_or_default();
 
-            // A 503 is the wallet's busy answer: it took no action
-            if status == reqwest::StatusCode::SERVICE_UNAVAILABLE {
-                return Err(wallet_busy_from_response(
-                    method,
-                    &text,
-                    retry_after.as_deref(),
-                ));
+            // The body's busy word, at any status, is the wallet's promise
+            // that it took no action; the status alone promises nothing
+            if let Some(busy) = wallet_busy_from_response(&text, retry_after.as_deref()) {
+                return Err(busy);
             }
 
             // Try to parse error response
@@ -855,14 +852,20 @@ struct JsonErrorResponse {
     description: String,
 }
 
-/// A busy answer's body: the reference servers' `message`, or this crate's
-/// `code`/`description` pair; every field optional.
+/// The body codes that answer busy: bsv-wallet-cli's `STORE_BUSY` (a
+/// contended store), and the TS wallet toolbox edge's capacity answer
+/// `ERR_SERVER_BUSY` (ts-stack@edf6e03
+/// `packages/wallet/wallet-toolbox/src/storage/remoting/edgePolicy.ts:668-672`,
+/// a 503 with `Retry-After: 1`).
+const BUSY_CODES: [&str; 2] = ["STORE_BUSY", "ERR_SERVER_BUSY"];
+
+/// A busy answer's body: a string `code`, and the detail as `message`
+/// (bsv-wallet-cli) or `description` (the TS toolbox).
 #[derive(Deserialize)]
 struct JsonBusyResponse {
+    code: String,
     #[serde(default)]
     message: Option<String>,
-    #[serde(default)]
-    code: Option<u8>,
     #[serde(default)]
     description: Option<String>,
 }
@@ -1052,30 +1055,23 @@ fn wallet_error_from_code(code: u8, description: &str) -> Error {
     Error::WalletError(format!("wallet error (code {}): {}", code, description))
 }
 
-/// Creates [`Error::WalletBusy`] from a 503 answer: the body's `message`, or
-/// its `code`/`description`, or the body itself as the detail.
-fn wallet_busy_from_response(method: &str, body: &str, retry_after: Option<&str>) -> Error {
-    let parsed = serde_json::from_str::<JsonBusyResponse>(body).ok();
-    let detail = match parsed {
-        Some(JsonBusyResponse {
-            message: Some(message),
-            ..
-        }) if !message.is_empty() => message,
-        Some(JsonBusyResponse {
-            code,
-            description: Some(description),
-            ..
-        }) if !description.is_empty() => match code {
-            Some(code) => format!("(code {}) {}", code, description),
-            None => description,
-        },
-        _ if !body.trim().is_empty() => body.trim().to_string(),
-        _ => format!("HTTP 503 for {}", method),
-    };
-    Error::WalletBusy {
+/// Creates [`Error::WalletBusy`] from an error answer whose body's `code` is
+/// one of [`BUSY_CODES`], at any status; any other body is `None`. The detail
+/// is the body's `message`, else its `description`, else the code.
+fn wallet_busy_from_response(body: &str, retry_after: Option<&str>) -> Option<Error> {
+    let busy = serde_json::from_str::<JsonBusyResponse>(body).ok()?;
+    if !BUSY_CODES.contains(&busy.code.as_str()) {
+        return None;
+    }
+    let detail = busy
+        .message
+        .filter(|m| !m.is_empty())
+        .or(busy.description.filter(|d| !d.is_empty()))
+        .unwrap_or(busy.code);
+    Some(Error::WalletBusy {
         detail,
         retry_after_ms: retry_after.and_then(parse_retry_after_ms),
-    }
+    })
 }
 
 /// Reads a `Retry-After` value as milliseconds when it is delta-seconds
@@ -1142,20 +1138,38 @@ mod tests {
     }
 
     #[test]
-    fn a_busy_body_without_message_or_description_keeps_the_body_or_the_status() {
+    fn a_busy_code_without_message_or_description_is_its_own_detail() {
         assert_eq!(
-            wallet_busy_from_response("createAction", "store contended", None),
-            Error::WalletBusy {
-                detail: "store contended".into(),
+            wallet_busy_from_response(r#"{"code":"STORE_BUSY"}"#, None),
+            Some(Error::WalletBusy {
+                detail: "STORE_BUSY".into(),
                 retry_after_ms: None,
-            }
+            })
         );
         assert_eq!(
-            wallet_busy_from_response("createAction", "", None),
-            Error::WalletBusy {
-                detail: "HTTP 503 for createAction".into(),
-                retry_after_ms: None,
-            }
+            wallet_busy_from_response(r#"{"code":"STORE_BUSY","message":""}"#, Some("3")),
+            Some(Error::WalletBusy {
+                detail: "STORE_BUSY".into(),
+                retry_after_ms: Some(3000),
+            })
+        );
+    }
+
+    #[test]
+    fn a_body_without_a_busy_code_is_not_busy() {
+        assert_eq!(wallet_busy_from_response("store contended", None), None);
+        assert_eq!(wallet_busy_from_response("", Some("1")), None);
+        assert_eq!(
+            wallet_busy_from_response(r#"{"message":"busy"}"#, None),
+            None
+        );
+        assert_eq!(
+            wallet_busy_from_response(r#"{"code":1,"description":"writer held"}"#, None),
+            None
+        );
+        assert_eq!(
+            wallet_busy_from_response(r#"{"code":"INSUFFICIENT_FUNDS","message":"x"}"#, None),
+            None
         );
     }
 
