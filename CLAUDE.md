@@ -24,7 +24,7 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 | Path | What |
 |---|---|
 | `src/lib.rs` | The crate docs and the feature-gated module tree with convenience re-exports |
-| `src/error.rs` | The one `Error` enum (58 variants, feature-gated) and `Result<T>` |
+| `src/error.rs` | The one `Error` enum (67 variants, feature-gated) and `Result<T>` |
 | `src/util/` | wasm32-safe time helpers (`pub(crate)`) |
 | `src/primitives/` | hash, EC (secp256k1, P-256, Shamir, ECDH), symmetric (AES-256-GCM), `BigNumber`, DRBG, encoding, `bsv/` (sighash, `SighashCache`) |
 | `src/block/` | `BlockHeader`, `CompactTarget`, `check_proof_of_work`, `ChainWork`, merkle roots; `ChainParams` and `next_work_required` (the node's `GetNextWorkRequired`, `difficulty.rs`) |

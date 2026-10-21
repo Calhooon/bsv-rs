@@ -342,6 +342,7 @@ Additional types in `types.rs` cover all wallet operations (actions, outputs, ce
 | Error | Description |
 |-------|-------------|
 | `WalletError(String)` | General wallet error (includes validation failures) |
+| `WalletBusy { detail, retry_after_ms }` | The wallet took NO action (a contended store, a lock not acquired); repeat the same call after `retry_after_ms` or a moment. HTTP 503 + `Retry-After` |
 | `KeyDerivationError(String)` | Key derivation failed |
 | `ProtocolValidationError(String)` | Invalid protocol name or parameters |
 | `InvalidCounterparty(String)` | Invalid counterparty specification |
