@@ -7,11 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Breaking: the next release is 0.8.0. `Error` is an exhaustive public enum and
-gains a variant, so a downstream `match` over it with no wildcard arm no
-longer compiles. The consumers repin to `"0.8"`: bsv-wallet-toolbox-rs (which
-answers the new variant), bsv-tracker and bsv-wallet-cli. The migration for a
-`match` is one arm: `Error::WalletBusy { .. }`, or a wildcard.
+Breaking: 0.8.0. `Error` is now `#[non_exhaustive]` and gains `WalletBusy`;
+a downstream exhaustive `match` adds a wildcard arm. bsv-wallet-toolbox-rs
+(which answers the new variant), bsv-tracker and bsv-wallet-cli repin to
+`"0.8"`. The stack's precedent (bsv-stack-lean `docs/RULINGS-2026-10-09.md`
+section 2, bsv-middleware-rs 0.3.0): a variant added to an exhaustive public
+enum makes the enum `#[non_exhaustive]` and the release a minor.
 
 ### Added: `Error::WalletBusy`, a typed busy answer (Calhooon/bsv-wallet-cli#44)
 
@@ -24,40 +25,54 @@ is typed end to end.
 
 - `Error::WalletBusy { detail: String, retry_after_ms: Option<u64> }`, behind
   `wallet`, Display `wallet busy: {detail}`. The contract (the variant's doc):
-  the wallet could not take the action at this moment and took NO action
-  (nothing written, no transaction built, no coin locked), so the caller may
-  repeat the same call after `retry_after_ms` when given, or after a moment.
-  It is the SDK's word for a contended store or a lock not acquired; a
-  server answers it as HTTP 503 with `Retry-After`.
-- `HttpWalletJson` reads a 503 as `WalletBusy`: the detail is the body's
-  `message`, else its `description` (prefixed `(code N)` when a code is
-  given), else the body's text, else `HTTP 503 for <call>`; `Retry-After` in
-  delta-seconds becomes `retry_after_ms` (saturating), and an HTTP-date, or
-  anything else, reads as `None`. Every other status keeps its `WalletError`
-  text, byte for byte.
+  the wallet answered that it refused the call before acting (a contended
+  store, a lock not acquired) and promised that nothing was written, built or
+  locked, so the caller may repeat the same call unchanged after
+  `retry_after_ms`, or after a moment when it is `None`. The SDK reports the
+  server's promise; it cannot check it. `retry_after_ms` is unbounded, the
+  server's word.
+- `HttpWalletJson` reads the body's code `STORE_BUSY` or `ERR_SERVER_BUSY`,
+  at any status, as `WalletBusy`: the detail is the body's `message`, else
+  its `description`, else the code; `Retry-After` in delta-seconds becomes
+  `retry_after_ms` (saturating; the first header when there are two), and an
+  HTTP-date, or anything else, reads as `None`. A 503 without it keeps its
+  `WalletError` text, as does every other answer, byte for byte. The stack's
+  rule (bsv-stack-lean `docs/BSV-NORTH-STAR.md` section 5): the SDK reads the
+  status word, never the HTTP code; a proxy's HTML 503 promises nothing.
 - Tests: `tests/wallet_http_json_busy_tests.rs` (wiremock; RED on the code
-  without the 503 branch for the three 503 cases):
-  `a_503_with_retry_after_seconds_is_wallet_busy_with_the_delay`,
-  `a_503_without_retry_after_is_wallet_busy_with_no_delay`,
-  `a_503_with_an_http_date_retry_after_is_wallet_busy_with_no_delay`,
+  without the busy branch for the four busy cases):
+  `the_producers_store_busy_body_is_wallet_busy_with_the_delay`,
+  `store_busy_on_a_500_is_wallet_busy`,
+  `the_ts_toolbox_err_server_busy_body_is_wallet_busy_with_its_description`,
+  `the_first_of_two_retry_after_headers_wins`,
+  `an_html_503_from_a_proxy_stays_wallet_error`,
+  `a_503_with_a_message_and_no_code_stays_wallet_error`,
+  `a_503_with_a_numeric_code_keeps_the_coded_wallet_error`,
+  `a_busy_body_with_an_http_date_retry_after_has_no_delay`,
   `every_other_status_keeps_the_wallet_error_mapping`,
   `wallet_busy_displays_its_detail_and_compares_on_both_fields`; the
-  `Retry-After` reader and the detail fallbacks in `http_json`'s unit tests.
+  `Retry-After` reader and the body reader in `http_json`'s unit tests.
 
 ### Notes: cross-SDK parity
 
-Neither reference has a busy word. ts-sdk@9e3ede6
-`src/wallet/substrates/HTTPWalletJSON.ts` maps a 400 with `isError` and code
-5, 6 or 7 to `WERR_REVIEW_ACTIONS`, `WERR_INVALID_PARAMETER` or
-`WERR_INSUFFICIENT_FUNDS`, and every other failure to a generic `Error`
-carrying `data.message`; go-sdk@v1.7.2 `wallet/substrates/http_wallet_json.go:62-64`
-reads every non-200 as one formatted error. The 503 branch is this crate's
-addition; the body field it reads first is TS's `message`, so a TS or Go
-client reading the same answer still gets its own generic error with the
-same text. The BRC-100 wire is unchanged: its result frame carries one error
-byte, the references define codes 5, 6 and 7 on it (TS's `WERR_*`; Go's
-`wallet.Error.Code` names none) and none for busy, so
-`WalletWireTransceiver` keeps reading every non-zero byte as `WalletError`.
+Neither reference SDK's wallet substrate, nor the BRC-100 wire, has a busy
+word. ts-stack@edf6e03 `packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:335-340`
+deserializes a wallet error only from a 400 carrying `isError` (codes 5, 6, 7:
+`WERR_REVIEW_ACTIONS`, `WERR_INVALID_PARAMETER`, `WERR_INSUFFICIENT_FUNDS`) and
+throws `HTTPWalletJSON <call> failed with HTTP status <status>` for every other
+failure, the body unread; go-sdk@v1.7.1 `wallet/substrates/http_wallet_json.go:62-64`
+(read at the tag; v1.7.2 holds the same lines) reads every non-200 as
+`HTTP request failed with status <status>: <body>`. A TS or Go client reading
+a busy answer gets that generic error, not this crate's detail. The busy codes
+are servers' words: bsv-wallet-cli answers `STORE_BUSY` (503,
+`Retry-After: 1`), and the TS wallet toolbox's edge answers capacity with 503
+`{code: 'ERR_SERVER_BUSY'}` and `Retry-After: 1`
+(`packages/wallet/wallet-toolbox/src/storage/remoting/edgePolicy.ts:668-672`;
+overlay-express the same, `packages/overlays/overlay-express/src/security/edgePolicy.ts:671`); this crate's client reads them.
+The BRC-100 wire is unchanged: its result frame carries one error byte, the
+references define codes 5, 6 and 7 on it (TS's `WERR_*`; Go's
+`wallet.Error.Code` names none) and none for busy, so `WalletWireTransceiver`
+keeps reading every non-zero byte as `WalletError`.
 
 ## [0.7.2] - 2026-10-19
 

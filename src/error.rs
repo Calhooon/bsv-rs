@@ -4,6 +4,7 @@ use thiserror::Error;
 
 /// Main error type for the BSV SDK.
 #[derive(Error, Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     // ===================
     // Primitives errors
@@ -184,24 +185,25 @@ pub enum Error {
     #[error("wallet error: {0}")]
     WalletError(String),
 
-    /// The wallet could not take the action at this moment and took NO action.
+    /// The wallet is busy: a refusal before acting, in the wallet's word.
     ///
-    /// The contract: nothing was written, no transaction was built, no coin
-    /// was locked, so the caller may repeat the same call unchanged, after
-    /// `retry_after_ms` when it is given, or after a moment when it is not.
-    /// It is the SDK's word for a contended store or a lock not acquired (a
-    /// store's busy answer, a writer held by another call); a wallet that
-    /// cannot promise that nothing happened answers [`Error::WalletError`]
-    /// instead. A server answers it as HTTP 503 with `Retry-After`, and the
-    /// HTTP JSON substrate (`wallet::substrates::HttpWalletJson`, behind
-    /// `http`) reads a 503 back as this variant.
+    /// The wallet answered that it refused the call before acting (a
+    /// contended store, a lock not acquired) and promised that nothing was
+    /// written, built or locked, so the caller may repeat the same call
+    /// unchanged after `retry_after_ms`, or after a moment when it is `None`.
+    /// The SDK reports the server's promise; it cannot check it.
+    /// `HttpWalletJson` reads it from the body's code (`STORE_BUSY`,
+    /// `ERR_SERVER_BUSY`), never from the HTTP status; a 503 without that
+    /// code stays [`Error::WalletError`].
     #[cfg(feature = "wallet")]
     #[error("wallet busy: {detail}")]
     WalletBusy {
         /// What was busy, in the wallet's words.
         detail: String,
         /// How long the wallet asks the caller to wait before repeating the
-        /// call, in milliseconds; `None` when it did not say.
+        /// call, in milliseconds; `None` when it did not say. Unbounded: the
+        /// server's word, not checked (a huge `Retry-After` saturates to
+        /// `u64::MAX`), so a caller caps its own wait.
         retry_after_ms: Option<u64>,
     },
 

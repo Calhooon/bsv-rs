@@ -342,7 +342,7 @@ Additional types in `types.rs` cover all wallet operations (actions, outputs, ce
 | Error | Description |
 |-------|-------------|
 | `WalletError(String)` | General wallet error (includes validation failures) |
-| `WalletBusy { detail, retry_after_ms }` | The wallet took NO action (a contended store, a lock not acquired); repeat the same call after `retry_after_ms` or a moment. HTTP 503 + `Retry-After` |
+| `WalletBusy { detail, retry_after_ms }` | The wallet answered that it refused the call before acting (a contended store, a lock not acquired) and promised that nothing was written, built or locked, so the caller may repeat the same call unchanged after `retry_after_ms`, or after a moment when it is `None`. The SDK reports the server's promise; it cannot check it. `HttpWalletJson` reads it from the body's code (`STORE_BUSY`, `ERR_SERVER_BUSY`), never from the HTTP status; a 503 without that code stays `WalletError` |
 | `KeyDerivationError(String)` | Key derivation failed |
 | `ProtocolValidationError(String)` | Invalid protocol name or parameters |
 | `InvalidCounterparty(String)` | Invalid counterparty specification |
