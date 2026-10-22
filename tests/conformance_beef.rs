@@ -882,6 +882,23 @@ fn conformance_atomic_beef() {
 
     let file = load_json(&atomic_beef_vectors());
     assert_eq!(s(&file, "id"), "sdk.transactions.atomic-beef");
+    // The two vectors `@bsv/sdk` 3 refuses (a raw ancestor behind a proof)
+    // are `intended`: their expected values are this crate's ruling, and run
+    // here as the rest.
+    let intended: Vec<&str> = file["vectors"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|v| v["parity_class"].as_str() == Some("intended"))
+        .map(|v| s(v, "id"))
+        .collect();
+    assert_eq!(
+        intended,
+        [
+            "raw-unproven-ancestor-after-proven-descendant",
+            "subject-present-not-last"
+        ]
+    );
     let mut suite = Suite::default();
     for vector in file["vectors"].as_array().unwrap() {
         let id = s(vector, "id");
@@ -925,7 +942,9 @@ fn conformance_atomic_beef() {
                 .map(|t| t.id() == s(expected, "subject_txid"))
                 .unwrap_or(false),
             // `from_atomic_beef` finds the subject and does not judge the
-            // graph (nor does the reference's `fromAtomicBEEF`).
+            // graph; `@bsv/sdk` 3's `fromAtomicBEEF` does (`isAtomic`, its
+            // closure cut at each proof), 2.1.4's did not: a stated
+            // divergence (CLAUDE.md).
             Err(_) => true,
         };
         let got = (full, structure, whole.clone().map(|_| ()), valid, subject);
