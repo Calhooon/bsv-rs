@@ -7,6 +7,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-22
+
+A patch. The atomic BEEF rule is judged on the subject's graph (BRC-95), not
+on wire position. Both readers accept more and refuse no BEEF they accepted
+before; no public type changes shape. One persisted format moves: a stream
+`Cursor` is BSC3, and a BSC2 cursor is refused (restart its reading).
+
+### Fixed: the atomic rule on the subject's graph (BRC-95; the bsv-dd x402 refund, P0-65)
+
+The rule was positional: the subject the last raw transaction, and every
+other entry spent by a LATER raw transaction. The stream marked a parent only
+when it was in the index when its child was read (`beef_stream.rs`, the
+`referenced` mark in the fold), and `Beef::verify_structure` did the same
+walk in the order held (`atomic_rule`). BRC-95 (`BRCs transactions/0095.md`)
+defines the rule on the graph (every transaction in the subject's dependency
+graph, nothing else present) and says nothing about order. The TypeScript
+writer (`@bsv/sdk` 2.1.4 `Beef.sortTxs` / `partitionTxs`) writes every proven
+transaction first in encounter order, then the unproven ones in dependency
+order: a raw unproven ancestor can follow the proven transaction that spends
+it. That wire is legal, and bsv-rs refused it `UnrelatedTransaction` (the
+bsv-dd x402 refund). This crate's own `to_binary_atomic`, whose sort mirrors
+the reference's, wrote BEEFs its own two readers refused.
+
+- The rule, one predicate for both readers (`beef_stream::atomic_unrelated`,
+  called by `BeefIndex::finish` and `Beef::verify_structure`): the subject is
+  a raw transaction of the BEEF, else `SubjectMissing`; every other entry, raw
+  or txid-only, is reached from the subject by following the inputs of raw
+  entries, else `UnrelatedTransaction` (the stream names the least by the
+  Lean's trie order, at its offset, as before). Position is not judged.
+- An entry is in the subject's graph exactly when it is the subject or some
+  raw entry spends it (a txid is a hash, so no chain of spends returns), so
+  the predicate reads one flag per entry. The stream now also counts a spend
+  by a transaction read BEFORE its parent: `BeefIndex` keeps the txids a raw
+  transaction named before the BEEF held them (only a proven transaction can),
+  and an entry read later starts spent. The deep chain's peak heap is 0.8.0's
+  (`memory_profiling`: 274, 219, 175 B per element at 1,000, 10,000, 100,000
+  links), and the Lean's counts (`model_work`, `spec_size`) are unchanged.
+- Unchanged: the spend checks, the BRC-62 clause that a transaction without a
+  BUMP spends earlier transactions, the offsets, the twenty-four `Kind`s, the
+  `Reason` list.
+- The words of two refused shapes move. A subject that is a raw transaction
+  of the BEEF is no longer missing: the Lean's W4 rows `wrong_subject` and
+  `wrong_subject_true` (the second link of three named) refuse
+  `UnrelatedTransaction` at the third link (278, 282; `SubjectMissing` at 4
+  until 0.8.0), and `example_atomic_parent` (the BRC-62 example behind a
+  prefix naming the parent) `UnrelatedTransaction` at the payment (521).
+  `unrelated` and `unrelated_true` keep 278 and 282. All five still refuse;
+  with scripts, the rows without `OP_TRUE` outputs are a refused spend first,
+  as at 0.8.0. `SubjectMissing` is now a subject the BEEF holds only as a
+  txid-only entry, or not at all.
+- `Cursor` bytes are BSC3: the txids named ahead follow the transactions.
+- Tests (`tests/beef_atomic_graph.rs`): one atomic BEEF of seven transactions
+  (a raw unproven ancestor that only a proven transaction spends, a proven
+  parent and child) in each of its 364 orders the BRC-62 clause allows,
+  accepted by the stream with and without scripts and by `verify_structure`
+  and `verify_valid`
+  (`an_atomic_beef_is_accepted_by_both_readers_in_every_order_its_dependencies_allow`,
+  `a_raw_unproven_ancestor_after_its_proven_descendant_is_accepted`); an
+  unrelated entry (raw proven, raw unproven, txid-only) at every position,
+  refused by all four (`an_unrelated_entry_is_refused_by_both_readers_in_every_order`);
+  a subject the BEEF does not carry raw, `SubjectMissing` in every order
+  (`a_subject_the_beef_does_not_carry_raw_is_missing_in_every_order`);
+  `to_binary_atomic`'s output from each merge order accepted by both readers
+  (`what_this_crates_writer_writes_its_own_two_readers_accept`); a cursor at
+  every `k` (`a_cursor_carries_the_txids_named_before_they_were_read`); the
+  W4 bytes (`the_leans_w4_bytes_are_refused_under_the_graph_rule`). Six of
+  the seven were red on 0.8.0. `tests/beef_stream.rs` pins the moved words
+  (`a_subject_whose_graph_leaves_a_later_link_out_is_refused`, the example's
+  and the W4 test's).
+- Vectors: `tests/transaction/vectors/atomic-beef.json`
+  (`sdk.transactions.atomic-beef`, the ts-stack corpus's format, six vectors)
+  is staged for the corpus's `vectors/sdk/transactions/`;
+  `tests/conformance_beef.rs` runs it (`conformance_atomic_beef`) from the
+  corpus when it carries the file, else from the staged copy. The accepted
+  bytes are the writers': Go's `AtomicBytes` (dependency order), TypeScript's
+  `toBinaryAtomic` (the partition order; the raw ancestor after its proven
+  descendant; an unrelated entry, refused), this crate's `to_binary_atomic`
+  (the subject not last); the missing subject is hand-built (no writer writes
+  an atomic BEEF for a txid it does not hold). Two vectors were red on 0.8.0.
+
+### Notes: cross-SDK parity
+
+Each SDK reads the shape the others write, and none reads it as this crate
+now does. `@bsv/sdk` 2.1.4's reader sorts and does not judge the graph:
+`Transaction.fromAtomicBEEF` and `Beef.verifyValid` accept the vector with an
+unrelated entry; its `toBinaryAtomic` writes that entry, and cuts every entry
+the sort puts after the subject (`getBeefForAtomic`, `txs.splice(i + 1)`), so
+it never writes the subject other than last. go-sdk@v1.7.2's reader asks only
+that the subject be present (`NewBeefFromAtomicBytes`); its `AtomicBytes`
+writes the subject last and cuts the ancestry at each proof. This crate
+follows BRC-95 in both readers; its writer, the reference's sort without the
+cut, can write a raw ancestor after the subject, and every reader of the
+three accepts that. A reference bug found on the way, not followed: 2.1.4's
+`BeefTx` names an entry built from raw bytes by the unreversed hash
+(`BeefTx.ts:51-53`, `toHex(hash256(rawTx))`), and a proven entry is never
+parsed, so `Beef.mergeRawTx(raw, bumpIndex)` gives a proven transaction a
+byte-reversed txid that nothing finds (the vectors' TypeScript generator uses
+`mergeTransaction`).
+
 ## [0.8.0] - 2026-10-21
 
 Breaking: 0.8.0. `Error` is now `#[non_exhaustive]` and gains `WalletBusy`;

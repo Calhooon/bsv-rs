@@ -10,6 +10,8 @@
 //!   - vectors/regressions/beef-isvalid-hydration.json (go-sdk#167)
 //!   - vectors/regressions/tx-sequence-zero-sighash.json (ts-sdk#371)
 //!   - vectors/regressions/fee-model-mismatch.json   (go-sdk#267)
+//!   - vectors/sdk/transactions/atomic-beef.json     (BRC-95; staged here at
+//!     tests/transaction/vectors/atomic-beef.json until the corpus carries it)
 //!
 //! Corpus location: `$BSV_CONFORMANCE_DIR`, defaulting to
 //! `../ts-stack/conformance` relative to the crate root. Missing corpus →
@@ -856,4 +858,82 @@ fn conformance_transactions_regressions() {
         0,
         TX_REGRESSION_KNOWN_FAILURES.len(),
     );
+}
+
+// ============================================================================
+// sdk.transactions.atomic-beef (BRC-95): staged in this crate
+// ============================================================================
+
+/// The corpus's file when it carries one, else the staged copy: the atomic
+/// BEEF vectors are not upstream yet, so they run with or without the corpus.
+fn atomic_beef_vectors() -> PathBuf {
+    let staged = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/transaction/vectors/atomic-beef.json");
+    corpus_dir()
+        .map(|dir| dir.join("vectors/sdk/transactions/atomic-beef.json"))
+        .filter(|path| path.is_file())
+        .unwrap_or(staged)
+}
+
+#[test]
+fn conformance_atomic_beef() {
+    use bsv_rs::transaction::beef_stream::{verify_stream, verify_stream_structure, Kind, Verdict};
+    use std::collections::HashMap;
+
+    let file = load_json(&atomic_beef_vectors());
+    assert_eq!(s(&file, "id"), "sdk.transactions.atomic-beef");
+    let mut suite = Suite::default();
+    for vector in file["vectors"].as_array().unwrap() {
+        let id = s(vector, "id");
+        let input = &vector["input"];
+        let expected = &vector["expected"];
+        let bytes = from_hex(s(input, "beef_hex"));
+        let headers: HashMap<u64, [u8; 32]> = input["headers"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(height, root)| {
+                let mut r: [u8; 32] = from_hex(root.as_str().unwrap()).try_into().unwrap();
+                r.reverse();
+                (height.parse().unwrap(), r)
+            })
+            .collect();
+        let want = match (expected["valid"].as_bool().unwrap(), s(expected, "error")) {
+            (true, _) => Ok(()),
+            (false, "unrelated-transaction") => Err(Kind::UnrelatedTransaction),
+            (false, "subject-missing") => Err(Kind::SubjectMissing),
+            (false, other) => panic!("{id}: an error this harness does not know: {other}"),
+        };
+        let stream = |v: Verdict| match v {
+            Verdict::Valid { .. } => Ok(()),
+            Verdict::Invalid { kind, .. } => Err(kind),
+            other => panic!("{id}: {other:?}"),
+        };
+        // The streaming reader, with and without its spend checks; the whole
+        // path's structure and its validity.
+        let full = stream(verify_stream(bytes.as_slice(), &headers, None).unwrap());
+        let structure = stream(verify_stream_structure(bytes.as_slice(), &headers, None).unwrap());
+        let whole = Beef::from_binary(&bytes).unwrap().verify_structure();
+        let valid = Beef::from_binary(&bytes).unwrap().verify_valid(false).valid;
+        let roots_carried = whole.as_ref().map_or(true, |roots| {
+            roots
+                .iter()
+                .all(|(h, r)| s(&input["headers"], &h.to_string()) == r.as_str())
+        });
+        let subject = match want {
+            Ok(()) => Transaction::from_atomic_beef(&bytes)
+                .map(|t| t.id() == s(expected, "subject_txid"))
+                .unwrap_or(false),
+            // `from_atomic_beef` finds the subject and does not judge the
+            // graph (nor does the reference's `fromAtomicBEEF`).
+            Err(_) => true,
+        };
+        let got = (full, structure, whole.clone().map(|_| ()), valid, subject);
+        suite.check(
+            id,
+            got == (want, want, want, want.is_ok(), true) && roots_carried,
+            format!("expected {want:?}, got (stream, structure, whole, valid, subject) {got:?}"),
+        );
+    }
+    suite.finish("sdk.transactions.atomic-beef", 6, 0, 0);
 }
