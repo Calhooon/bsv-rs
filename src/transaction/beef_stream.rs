@@ -16,10 +16,12 @@
 //!   ([`AsyncByteSource`], [`verify_stream_async`]) alike.
 //! - [`BeefIndex`] is the reader's state (the Lean's `Index` and `fold`): the
 //!   BUMPs by position, the txids their level 0 carries, the transactions by
-//!   txid with a spent flag, the txids named before they were read, the
-//!   last raw transaction. One entry per element
-//!   and one per level-0 txid; never a sibling hash, never a transaction's
-//!   bytes after its step.
+//!   txid with a spent flag, the last raw transaction, and under a subject
+//!   the txids named before they were read. One entry per element and one
+//!   per level-0 txid, plus, only under a subject, 32 bytes per input of a
+//!   proven transaction whose parent is not yet read (0.8.1; an input is 41
+//!   bytes or more on the wire, so this too is linear in the bytes read);
+//!   never a sibling hash, never a transaction's bytes after its step.
 //! - [`verify_stream`] is one pass: one step per element, each BUMP's root
 //!   checked against the [`Headers`] as it streams, each unproven
 //!   transaction's inputs resolved against the index and executed against the
@@ -138,8 +140,10 @@ pub enum Kind {
     TrailingBytes,
     /// Atomic: the subject is not a raw transaction of the BEEF.
     SubjectMissing,
-    /// Atomic: an entry outside the subject's dependency graph (BRC-95): one
-    /// that is not the subject and that no raw transaction spends.
+    /// Atomic: an entry outside the subject's dependency graph (BRC-95). The
+    /// entry named is one that is not the subject and that no raw
+    /// transaction spends (the least by the trie order): such an entry
+    /// exists exactly when some entry is unreachable from the subject.
     UnrelatedTransaction,
     /// A raw transaction with no input (since 0.4.1).
     NoInputs,
@@ -276,7 +280,7 @@ pub enum Reason {
         /// The subject.
         subject: Hash32,
     },
-    /// The entry no raw transaction spends, outside the subject's graph.
+    /// An entry outside the subject's graph that no raw transaction spends.
     UnrelatedTransaction {
         /// Its txid.
         txid: Hash32,
@@ -1894,8 +1898,12 @@ pub struct BeefIndex {
     /// an entry read later is spent (0.8.1). Only a proven transaction names
     /// a txid not yet read (an unproven one spends earlier transactions), so
     /// this holds the inputs of the proven transactions that the BEEF does
-    /// not carry, and the parents still to come.
+    /// not carry, and the parents still to come. Kept only under a subject
+    /// (`atomic`): without one nothing reads it.
     named_ahead: HashSet<Hash32>,
+    /// A subject is known, so the atomic rule will be judged and
+    /// `named_ahead` is kept ([`BeefIndex::hold_to_subject`]).
+    atomic: bool,
     steps: u64,
     work: u64,
     check_spends: bool,
@@ -1942,6 +1950,7 @@ impl BeefIndex {
             txs: HashMap::new(),
             last_raw: None,
             named_ahead: HashSet::new(),
+            atomic: false,
             steps: 0,
             work: 0,
             check_spends,
@@ -1970,18 +1979,38 @@ impl BeefIndex {
         self.steps
     }
 
+    /// Keeps what the atomic rule needs: the txids a raw transaction names
+    /// before the BEEF holds them (0.8.1). The readers call it when a
+    /// subject is known (the caller's, or the prefix's once the header is
+    /// read), before the first element; an index folded without it counts a
+    /// spend only by a transaction read after its parent, so
+    /// [`finish`](Self::finish) under a subject refuses more, never accepts
+    /// wrongly.
+    pub fn hold_to_subject(&mut self) {
+        self.atomic = true;
+    }
+
     /// The entries the index holds: one per BUMP, one per transaction, one
-    /// per (level-0 txid, BUMP) pair.
+    /// per (level-0 txid, BUMP) pair, and, under a subject, one per txid a
+    /// proven transaction named before the BEEF held it (at most one per
+    /// input read, 41 bytes or more on the wire).
     pub fn entries(&self) -> u64 {
-        (self.bumps.len() + self.proven.len() + self.proven_again.len() + self.txs.len()) as u64
+        (self.bumps.len()
+            + self.proven.len()
+            + self.proven_again.len()
+            + self.txs.len()
+            + self.named_ahead.len()) as u64
     }
 
     /// The Lean's `Index.size` for this state: its index keeps a BUMP's
     /// level-0 txids twice (the BUMP's own set and the proven set), so this
-    /// is [`entries`](Self::entries) plus the distinct proven txids. The
-    /// bound `memory_bounded_per_element` is stated on this number.
+    /// is [`entries`](Self::entries) plus the distinct proven txids, less
+    /// the txids named ahead, which the Lean's index does not keep (0.8.1).
+    /// The bound `memory_bounded_per_element` is stated on this number; the
+    /// named set is outside it (32 bytes per input of a proven transaction
+    /// whose parent is not yet read, under a subject).
     pub fn spec_size(&self) -> u64 {
-        self.entries() + self.proven.len() as u64
+        self.entries() + self.proven.len() as u64 - self.named_ahead.len() as u64
     }
 
     /// The Lean cost model's count for the elements folded in: one unit per
@@ -2215,9 +2244,10 @@ impl BeefIndex {
                 for input in &body.inputs {
                     match self.txs.get_mut(&input.prev) {
                         Some(parent) => parent.referenced = true,
-                        None => {
+                        None if self.atomic => {
                             self.named_ahead.insert(input.prev);
                         }
+                        None => {}
                     }
                 }
                 let keep = |vout: usize| match &self.wanted {
@@ -2515,26 +2545,33 @@ pub(crate) struct AtomicEntry {
 /// BRC-95's atomic rule on the subject's dependency graph: the one predicate
 /// of both readers ([`BeefIndex::finish`] and `Beef::verify_structure`,
 /// 0.8.1). The subject is a raw transaction of the BEEF, else
-/// [`Kind::SubjectMissing`]; the answer is then the entries outside the
-/// subject's graph, and an atomic BEEF is valid under the rule when it is
-/// empty.
+/// [`Kind::SubjectMissing`]; the answer is then the entries other than the
+/// subject that no raw entry spends, and it is empty exactly when every
+/// entry is in the subject's graph (reached from the subject by following
+/// the inputs of raw entries).
 ///
-/// An entry is in the subject's graph (reached from the subject by following
-/// the inputs of raw entries) exactly when it is the subject or a raw entry
-/// spends it. A txid is a hash, so no chain of spends returns to where it
-/// began: from an entry that a raw entry spends, the spenders lead on to an
-/// entry nothing spends, which is the subject when every other entry is
-/// spent, and the path back is the subject's inputs followed down. The other
-/// way, an entry of the graph other than the subject is spent by the entry
-/// before it on its path. So the rule needs one flag per entry, not the
-/// edges: whether some raw entry, anywhere in the BEEF, names it.
+/// The equivalence holds for the whole BEEF, not per entry: an entry that a
+/// raw entry outside the graph spends is outside the graph and spent, but
+/// then that spender, or one further up its chain, is spent by nothing and
+/// is answered. A txid is a hash, so no chain of spends returns to where it
+/// began: from any entry, the spenders lead up to an entry nothing spends,
+/// which is the subject when the answer is empty, and the path back is the
+/// subject's inputs followed down. The other way, an entry of the graph
+/// other than the subject is spent by the entry before it on its path. So
+/// the verdict needs one flag per entry, not the edges: whether some raw
+/// entry, anywhere in the BEEF, names it; the entry a refusal names is an
+/// unspent one outside the graph.
 ///
 /// Position is not judged: BRC-95 (`BRCs transactions/0095.md`) defines the
 /// rule on the graph, the TypeScript writer puts every proven transaction
 /// before the unproven ones (a raw unproven ancestor can follow its proven
 /// descendant), and the Go writer puts the subject last. Until 0.8.0 both
 /// readers counted a spend only by a transaction read after its parent, and
-/// refused the first shape (the bsv-dd x402 refund, P0-65).
+/// refused the first shape (the bsv-dd x402 refund, P0-65). The graph
+/// follows the inputs of every raw entry, proven or not (the owner's ruling,
+/// 2026-10-22); `@bsv/sdk` 3 cuts it at each proven transaction (ts-stack
+/// `Beef.ts:420-434`) and refuses a raw ancestor behind a proof, a stated
+/// divergence.
 pub(crate) fn atomic_unrelated<'a, K: Eq + ?Sized + 'a>(
     subject: &K,
     entries: impl IntoIterator<Item = (&'a K, AtomicEntry)>,
@@ -2686,6 +2723,8 @@ struct Pending {
 }
 
 const CURSOR_MAGIC: &[u8; 4] = b"BSC3";
+/// 0.5.0 to 0.8.0's layout: BSC3 without the txids named ahead.
+const CURSOR_MAGIC_BSC2: &[u8; 4] = b"BSC2";
 
 impl Cursor {
     /// The elements read.
@@ -2714,9 +2753,13 @@ impl Cursor {
 
     /// The cursor's bytes. Equal states give equal bytes; a cursor between
     /// two elements encodes the verified coinbase heights as well, and the
-    /// txids named before they were read (BSC3, 0.8.1: the atomic rule
-    /// counts a spend by a transaction read before its parent). Older
-    /// cursors (BSC2, BSC1) are refused: restart their reading.
+    /// txids named before they were read, strictly ascending (BSC3, 0.8.1:
+    /// the atomic rule counts a spend by a transaction read before its
+    /// parent). [`from_binary`](Self::from_binary) reads a BSC2 cursor as
+    /// BSC3 with no txid named ahead: that only refuses more (a spend by a
+    /// transaction read before the cursor is not counted for a parent read
+    /// after it), and accepts at least what 0.8.0 accepted from it. BSC1 is
+    /// refused: restart its reading.
     /// A paused cursor appends the transaction and the input reached.
     pub fn to_binary(&self) -> Vec<u8> {
         fn put_hash(w: &mut Writer, h: &Option<Hash32>) {
@@ -2863,9 +2906,11 @@ impl Cursor {
             }
         }
         let mut r = Reader::new(bin);
-        if r.read_bytes(4)? != CURSOR_MAGIC {
-            return Err(bad("the leading word"));
-        }
+        let named_ahead = match r.read_bytes(4)? {
+            magic if magic == CURSOR_MAGIC => true,
+            magic if magic == CURSOR_MAGIC_BSC2 => false,
+            _ => return Err(bad("the leading word")),
+        };
         let check_spends = match r.read_u8()? {
             0 => false,
             1 => true,
@@ -2961,13 +3006,23 @@ impl Cursor {
                 },
             );
         }
-        for _ in 0..r.read_var_int()? {
-            let txid = hash(&mut r)?;
-            if index.txs.contains_key(&txid) {
-                return Err(bad("a txid named ahead that the index holds"));
+        if named_ahead {
+            let mut previous: Option<Hash32> = None;
+            for _ in 0..r.read_var_int()? {
+                let txid = hash(&mut r)?;
+                if previous.is_some_and(|p| p >= txid) {
+                    return Err(bad("txids named ahead out of order"));
+                }
+                if index.txs.contains_key(&txid) {
+                    return Err(bad("a txid named ahead that the index holds"));
+                }
+                index.named_ahead.insert(txid);
+                previous = Some(txid);
             }
-            index.named_ahead.insert(txid);
         }
+        // The readers hold the index to a subject once one is known: the
+        // caller's, or the prefix's once the header is read.
+        index.atomic = subject.is_some() || frame_subject.is_some();
         index.wanted = match r.read_u8()? {
             0 => None,
             1 => {
@@ -3027,7 +3082,10 @@ struct Judge {
 }
 
 impl Judge {
-    fn new(subject: Option<Hash32>, index: BeefIndex) -> Self {
+    fn new(subject: Option<Hash32>, mut index: BeefIndex) -> Self {
+        if subject.is_some() {
+            index.hold_to_subject();
+        }
         Self {
             index,
             subject,
@@ -3038,6 +3096,9 @@ impl Judge {
 
     fn resumed(cursor: Cursor) -> (Frame, Self) {
         let mut judge = Self::new(cursor.subject, cursor.index);
+        if cursor.frame.subject.is_some() {
+            judge.index.hold_to_subject();
+        }
         judge.resume_at = cursor.pending;
         (cursor.frame, judge)
     }
@@ -3072,6 +3133,11 @@ impl Judge {
             return Ok(());
         }
         self.subject_checked = true;
+        // The header precedes the first element: a prefix's subject is known
+        // before anything is folded.
+        if decoder.subject().is_some() {
+            self.index.hold_to_subject();
+        }
         match (self.subject, decoder.subject()) {
             (Some(named), Some(prefixed)) if named != prefixed => {
                 Err(Refusal::new(4, Reason::SubjectMissing { subject: named }))

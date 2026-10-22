@@ -130,8 +130,11 @@ fn read_chain(n: usize) -> (Duration, u64) {
         );
         // One step per element: the BUMP and the n transactions.
         assert_eq!(reader.index().steps(), n as u64 + 1);
-        // One entry per element and one for the txid the BUMP carries.
-        assert_eq!(reader.index().entries(), n as u64 + 2);
+        // One entry per element and one for the txid the BUMP carries, and,
+        // under the subject, the proven funding transaction's parent, outside
+        // the BEEF, named ahead (0.8.1); the Lean's count keeps n + 3.
+        assert_eq!(reader.index().entries(), n as u64 + 3);
+        assert_eq!(reader.index().spec_size(), n as u64 + 3);
         // Every output but the tip's and the funding's second is spent and
         // gone: two outputs of one script byte each, at any depth.
         assert_eq!(reader.index().retained_outputs(), (2, 2));

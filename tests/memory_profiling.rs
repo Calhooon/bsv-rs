@@ -390,3 +390,120 @@ fn test_beef_stream_memory_is_flat_per_element() {
         "the bytes per element grew with the depth: {at_1_000} then {at_100_000}"
     );
 }
+
+/// The streaming reader on a BEEF made of proven transactions with many
+/// inputs, their parents outside the BEEF (the shape of a BEEF of mined
+/// ancestors). The index holds one entry per element; under a subject it
+/// also holds, until the end, each txid a proven transaction named before
+/// the BEEF held it (0.8.1, `named_ahead`): 32 bytes and a table slot per
+/// such input, an input being 41 bytes or more on the wire. Without a
+/// subject nothing reads that set, and the reader keeps none of it.
+#[cfg(feature = "transaction")]
+#[test]
+fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
+    use bsv_rs::primitives::Writer;
+    use bsv_rs::script::{LockingScript, UnlockingScript};
+    use bsv_rs::transaction::beef_stream::Hash32;
+    use bsv_rs::transaction::{
+        verify_stream, verify_stream_structure, MerklePath, Transaction, TransactionInput,
+        TransactionOutput, ATOMIC_BEEF, BEEF_V1,
+    };
+    use std::collections::HashMap;
+
+    let _serial = serial();
+
+    fn peak(f: impl FnOnce()) -> u64 {
+        let _profiler = dhat::Profiler::builder().testing().build();
+        f();
+        dhat::HeapStats::get().max_bytes as u64
+    }
+    fn internal(txid: &str) -> Hash32 {
+        let mut h: Hash32 = hex::decode(txid).unwrap().try_into().unwrap();
+        h.reverse();
+        h
+    }
+
+    const TXS: usize = 100;
+    const INPUTS: usize = 1_000;
+    // TXS proven transactions of INPUTS inputs each, every parent distinct
+    // and outside the BEEF; one BUMP (its own block) per transaction.
+    let mut bumps = Vec::new();
+    let mut raws = Vec::new();
+    let mut headers: HashMap<u64, Hash32> = HashMap::new();
+    for t in 0..TXS {
+        let mut tx = Transaction::new();
+        for i in 0..INPUTS {
+            let mut input = TransactionInput::new(format!("{:064x}", t * INPUTS + i + 1), 0);
+            input.unlocking_script = Some(UnlockingScript::from_binary(&[]).unwrap());
+            tx.inputs.push(input);
+        }
+        tx.outputs.push(TransactionOutput::new(
+            1,
+            LockingScript::from_binary(&[0x51]).unwrap(),
+        ));
+        let height = 980_000 + t as u32;
+        let bump = MerklePath::from_coinbase_txid(&tx.id(), height);
+        headers.insert(
+            u64::from(height),
+            internal(&bump.compute_root(None).unwrap()),
+        );
+        bumps.push(bump);
+        raws.push(tx.to_binary());
+    }
+    let mut w = Writer::new();
+    w.write_u32_le(BEEF_V1);
+    w.write_var_int(TXS as u64);
+    for bump in &bumps {
+        w.write_bytes(&bump.to_binary());
+    }
+    w.write_var_int(TXS as u64);
+    for (i, raw) in raws.iter().enumerate() {
+        w.write_bytes(raw);
+        w.write_u8(1);
+        w.write_var_int(i as u64);
+    }
+    let plain = w.into_bytes();
+    // The same behind an atomic prefix naming the last transaction (the
+    // others are outside its graph: refused, after the whole read).
+    let last = Transaction::from_binary(raws.last().unwrap()).unwrap().id();
+    let mut atomic = Vec::with_capacity(36 + plain.len());
+    atomic.extend_from_slice(&ATOMIC_BEEF.to_le_bytes());
+    atomic.extend_from_slice(&internal(&last));
+    atomic.extend_from_slice(&plain);
+
+    let structure = peak(|| {
+        let v = verify_stream_structure(plain.as_slice(), &headers, None).unwrap();
+        assert!(v.is_valid(), "{v:?}");
+    });
+    let full = peak(|| {
+        let v = verify_stream(plain.as_slice(), &headers, None).unwrap();
+        assert!(v.is_valid(), "{v:?}");
+    });
+    let under_subject = peak(|| {
+        let v = verify_stream_structure(atomic.as_slice(), &headers, None).unwrap();
+        assert!(!v.is_valid(), "{v:?}");
+    });
+    let inputs = (TXS * INPUTS) as f64;
+    let per_input = (under_subject.saturating_sub(structure)) as f64 / inputs;
+    println!("\n=== BEEF stream, {TXS} proven transactions of {INPUTS} inputs ===");
+    println!(
+        "  BEEF {} B; no subject: structure {structure} B, scripts {full} B; \
+         under a subject: {under_subject} B ({per_input:.1} B per input named ahead)",
+        plain.len()
+    );
+    // Without a subject: the element in hand (one transaction of INPUTS
+    // inputs) and a few entries per element, at any input count: well under
+    // the 32 bytes per input the set would cost.
+    let element = (raws[0].len() * 4) as u64;
+    for (name, bytes) in [("structure", structure), ("scripts", full)] {
+        assert!(
+            bytes < element + TXS as u64 * 2_048,
+            "{name}: {bytes} B with no subject"
+        );
+    }
+    // Under a subject: 32 bytes and the table's slot per input, bounded.
+    assert!(
+        (32.0..160.0).contains(&per_input),
+        "{per_input:.1} B per input named ahead"
+    );
+}

@@ -7,9 +7,9 @@
     "BRC-62"
   ],
   "version": "1.0.0",
-  "reference_impl": "@bsv/sdk@2.1.4 and go-sdk@v1.7.2 (the writers); the rule is BRC-95's",
+  "reference_impl": "bsv-rs@0.8.1: the expected values are this crate's ruling (BRC-95's graph followed through the inputs of every raw entry, proven or not; the owner's ruling of 2026-10-22), not the TypeScript SDK's. The bytes are the writers': @bsv/sdk@2.1.4, go-sdk@v1.7.2 and bsv-rs. @bsv/sdk 3.x (ts-stack 4d0ea63, Beef.ts:420-434) cuts the graph at each proven transaction and refuses the two vectors marked intended; it agrees on the other four",
   "parity_class": "required",
-  "description": "An atomic BEEF is valid when the subject is a transaction of the BEEF and every other entry is reachable from the subject by following the inputs of raw entries; position is not judged. Each proven entry carries a one-leaf BUMP (a block of one transaction, the root the txid); input.headers is the merkle root per height a chain tracker must carry. Every output is OP_TRUE and every unlocking script empty, so the spends execute. Staged in bsv-rs (tests/transaction/vectors/atomic-beef.json) for vectors/sdk/transactions/.",
+  "description": "An atomic BEEF is valid when the subject is a transaction of the BEEF and every other entry is reachable from the subject by following the inputs of raw entries, proven or not (this crate's ruling; @bsv/sdk 3.x stops at each proven transaction, as BRC-95's 'up to the point where each input can be confirmed with a Merkle proof' reads); position is not judged. Each proven entry carries a one-leaf BUMP (a block of one transaction, the root the txid); input.headers is the merkle root per height a chain tracker must carry. Every output is OP_TRUE and every unlocking script empty, so the spends execute. Staged in bsv-rs (tests/transaction/vectors/atomic-beef.json) for vectors/sdk/transactions/.",
   "vectors": [
     {
       "id": "dependency-order-subject-last",
@@ -67,7 +67,9 @@
     },
     {
       "id": "raw-unproven-ancestor-after-proven-descendant",
-      "description": "The TypeScript writer's order on Z (proven) -> A (raw, unproven) -> P (proven) -> S1: P is written before its raw unproven ancestor A, which only P spends. BRC-95 judges the graph, not the position: valid. bsv-rs before 0.8.1 refused it UnrelatedTransaction (the bsv-dd x402 refund, P0-65).",
+      "description": "The TypeScript writer's order on Z (proven) -> A (raw, unproven) -> P (proven) -> S1: P is written before its raw unproven ancestor A, which only P spends. BRC-95 judges the graph, not the position: valid. bsv-rs before 0.8.1 refused it UnrelatedTransaction (the bsv-dd x402 refund, P0-65). ts-stack 3.x (@bsv/sdk 3.0.0 at 4d0ea63, npm 3.2.1) refuses it: its closure (Beef.ts:420-434 #collectAtomicTransactions) does not follow the inputs of the proven P, so A is outside it and isAtomic is false (Transaction.fromAtomicBEEF: 'Atomic BEEF contains unrelated transaction data.'). The expected value is bsv-rs's ruling.",
+      "parity_class": "intended",
+      "skip_reason": "ts-stack 3.x cuts the subject's graph at each proven transaction and refuses a raw ancestor behind a proof; the expected value is bsv-rs's ruling (a stated divergence, bsv-rs CHANGELOG 0.8.1).",
       "input": {
         "beef_hex": "01010101850259d5c7f0efe1fbf12869ab1b2e4d8d60df9c683bffcb24db9001eb3e383c0100beef02fea1bb0d0001010002d430e4bdd40ff8e7c97784af10b582fe08530edc22900d0237ecd53e2b6df215fea0bb0d00010100025ceb233088ee6a0ae15c7ae83a5392073d400abc62ca98d8eea1cc17c5cc62ad0401000000016556f01b05df2fbe88262545264715260d79b7575c269a8cb43346398a8b02880000000000ffffffff015e01000000000000015100000000010001000000012a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a0000000000ffffffff02e8030000000000000151f401000000000000015100000000010101000000015ceb233088ee6a0ae15c7ae83a5392073d400abc62ca98d8eea1cc17c5cc62ad0000000000ffffffff019001000000000000015100000000000100000001d430e4bdd40ff8e7c97784af10b582fe08530edc22900d0237ecd53e2b6df2150000000000ffffffff012c0100000000000001510000000000",
         "headers": {
@@ -95,7 +97,9 @@
     },
     {
       "id": "subject-present-not-last",
-      "description": "The subject present but not last: P, Z, S1, then A (S1's ancestor through the proven P, spending the earlier Z). Every entry is in the subject's graph and every unproven entry follows what it spends: valid. The TypeScript writer never writes this shape (toBinaryAtomic cuts every entry after the subject) nor does the Go writer (the subject last, the ancestry cut at each proof); bsv-rs's writer does, merged in the order P, Z, S1, A.",
+      "description": "The subject present but not last: P, Z, S1, then A (S1's ancestor through the proven P, spending the earlier Z). Every entry is in the subject's graph and every unproven entry follows what it spends: valid. The TypeScript writer never writes this shape (toBinaryAtomic cuts every entry after the subject) nor does the Go writer (the subject last, the ancestry cut at each proof); bsv-rs's writer does, merged in the order P, Z, S1, A. ts-stack 3.x (@bsv/sdk 3.0.0 at 4d0ea63, npm 3.2.1) refuses it: its closure (Beef.ts:420-434 #collectAtomicTransactions) does not follow the inputs of the proven P, so A is outside it and isAtomic is false (Transaction.fromAtomicBEEF: 'Atomic BEEF contains unrelated transaction data.'). The expected value is bsv-rs's ruling.",
+      "parity_class": "intended",
+      "skip_reason": "ts-stack 3.x cuts the subject's graph at each proven transaction and refuses a raw ancestor behind a proof; the expected value is bsv-rs's ruling (a stated divergence, bsv-rs CHANGELOG 0.8.1).",
       "input": {
         "beef_hex": "01010101850259d5c7f0efe1fbf12869ab1b2e4d8d60df9c683bffcb24db9001eb3e383c0100beef02fea1bb0d0001010002d430e4bdd40ff8e7c97784af10b582fe08530edc22900d0237ecd53e2b6df215fea0bb0d00010100025ceb233088ee6a0ae15c7ae83a5392073d400abc62ca98d8eea1cc17c5cc62ad0401000000016556f01b05df2fbe88262545264715260d79b7575c269a8cb43346398a8b02880000000000ffffffff015e01000000000000015100000000010001000000012a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a0000000000ffffffff02e8030000000000000151f40100000000000001510000000001010100000001d430e4bdd40ff8e7c97784af10b582fe08530edc22900d0237ecd53e2b6df2150000000000ffffffff012c010000000000000151000000000001000000015ceb233088ee6a0ae15c7ae83a5392073d400abc62ca98d8eea1cc17c5cc62ad0000000000ffffffff01900100000000000001510000000000",
         "headers": {
