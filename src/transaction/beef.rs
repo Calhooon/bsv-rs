@@ -37,7 +37,7 @@ use crate::primitives::{from_hex, to_hex, Reader, Writer};
 use crate::Result;
 
 use super::beef_stream::{
-    atomic_unrelated, display_hex, merkle_path_root, AtomicEntry, Kind, Reason, Refusal,
+    atomic_unreached, display_hex, merkle_path_root, AtomicNode, Hash32, Kind, Reason, Refusal,
 };
 use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::merkle_path::MerklePath;
@@ -807,33 +807,33 @@ impl Beef {
         Ok(roots)
     }
 
-    /// The atomic rule on the subject's graph: the streaming reader's
-    /// predicate ([`atomic_unrelated`]) over this BEEF's entries, whatever
-    /// order they hold.
+    /// The atomic rule on the subject's graph: the streaming reader's walk
+    /// ([`atomic_unreached`]) over this BEEF's entries, whatever order they
+    /// hold.
     fn atomic_rule(&self, subject: &str) -> std::result::Result<(), Kind> {
-        let spent: HashSet<String> = self
-            .txs
-            .iter()
-            .filter(|tx| !tx.is_txid_only())
-            .flat_map(spent_txids)
-            .collect();
-        let entries: Vec<(String, AtomicEntry)> = self
-            .txs
-            .iter()
-            .map(|tx| {
-                let txid = tx.txid();
-                let entry = AtomicEntry {
-                    raw: !tx.is_txid_only(),
-                    spent: spent.contains(&txid),
-                };
-                (txid, entry)
-            })
-            .collect();
-        let unrelated = atomic_unrelated(subject, entries.iter().map(|(t, e)| (t.as_str(), *e)))?;
-        if !unrelated.is_empty() {
-            return Err(Kind::UnrelatedTransaction);
+        let Some(subject) = internal_txid(subject) else {
+            return Err(Kind::SubjectMissing);
+        };
+        // By txid: raw when any of its entries is, with the txids a raw
+        // entry's inputs name.
+        let mut table: HashMap<Hash32, AtomicEntry> = HashMap::new();
+        for tx in &self.txs {
+            let Some(txid) = internal_txid(&tx.txid()) else {
+                continue;
+            };
+            let entry = table.entry(txid).or_default();
+            if !tx.is_txid_only() && !entry.raw {
+                entry.raw = true;
+                entry.prevs = spent_txids(tx)
+                    .iter()
+                    .filter_map(|t| internal_txid(t))
+                    .collect();
+            }
         }
-        Ok(())
+        match atomic_unreached(&subject, &mut table)? {
+            Some(_) => Err(Kind::UnrelatedTransaction),
+            None => Ok(()),
+        }
     }
 
     /// Sorts transactions by dependency order.
@@ -1305,6 +1305,34 @@ fn no_trailing_bytes(reader: &Reader) -> Result<()> {
         reason: Reason::TrailingBytes,
     };
     Err(crate::Error::BeefError(refusal.to_string()))
+}
+
+/// An entry of a BEEF as the atomic walk reads it.
+#[derive(Default)]
+struct AtomicEntry {
+    raw: bool,
+    prevs: Vec<Hash32>,
+    reached: bool,
+}
+
+impl AtomicNode for AtomicEntry {
+    fn raw(&self) -> bool {
+        self.raw
+    }
+    fn prevs(&self) -> &[Hash32] {
+        &self.prevs
+    }
+    fn reached(&mut self) -> &mut bool {
+        &mut self.reached
+    }
+}
+
+/// A display-hex txid in internal byte order, the key of the stream's
+/// tables; `None` for a string that is not 32 bytes of hex.
+fn internal_txid(txid: &str) -> Option<Hash32> {
+    let mut h: Hash32 = from_hex(txid).ok()?.try_into().ok()?;
+    h.reverse();
+    Some(h)
 }
 
 /// The txids a raw transaction's inputs spend (display hex), proven or not.

@@ -877,7 +877,9 @@ fn atomic_beef_vectors() -> PathBuf {
 
 #[test]
 fn conformance_atomic_beef() {
-    use bsv_rs::transaction::beef_stream::{verify_stream, verify_stream_structure, Kind, Verdict};
+    use bsv_rs::transaction::beef_stream::{
+        verify_stream, verify_stream_structure, Kind, Reason, Verdict,
+    };
     use std::collections::HashMap;
 
     let file = load_json(&atomic_beef_vectors());
@@ -899,6 +901,25 @@ fn conformance_atomic_beef() {
             "subject-present-not-last"
         ]
     );
+    // The X/Y pair (two entries outside the graph, the parent spent by the
+    // child): the stream names the earliest unreached entry by the trie
+    // order, at its offset (the walk of the Lean's `finish`).
+    let named: HashMap<&str, (u64, &str)> = HashMap::from([
+        (
+            "unrelated-pair-parent-named",
+            (
+                124,
+                "640639c3d0bd8a5ef167e9700ed22e54ac7b79a9872c436cba9f73f1cf5118fe",
+            ),
+        ),
+        (
+            "unrelated-pair-child-named",
+            (
+                187,
+                "e948b6fd127c559f972e31248b867a2b338659a4e542c1301213a8d95e97edca",
+            ),
+        ),
+    ]);
     let mut suite = Suite::default();
     for vector in file["vectors"].as_array().unwrap() {
         let id = s(vector, "id");
@@ -928,7 +949,17 @@ fn conformance_atomic_beef() {
         };
         // The streaming reader, with and without its spend checks; the whole
         // path's structure and its validity.
-        let full = stream(verify_stream(bytes.as_slice(), &headers, None).unwrap());
+        let verdict = verify_stream(bytes.as_slice(), &headers, None).unwrap();
+        let names_as_pinned = named.get(id).is_none_or(|(offset, txid)| {
+            let mut txid: [u8; 32] = from_hex(txid).try_into().unwrap();
+            txid.reverse();
+            matches!(
+                &verdict,
+                Verdict::Invalid { offset: at, reason: Reason::UnrelatedTransaction { txid: t }, .. }
+                    if at == offset && *t == txid
+            )
+        });
+        let full = stream(verdict);
         let structure = stream(verify_stream_structure(bytes.as_slice(), &headers, None).unwrap());
         let whole = Beef::from_binary(&bytes).unwrap().verify_structure();
         let valid = Beef::from_binary(&bytes).unwrap().verify_valid(false).valid;
@@ -950,9 +981,10 @@ fn conformance_atomic_beef() {
         let got = (full, structure, whole.clone().map(|_| ()), valid, subject);
         suite.check(
             id,
-            got == (want, want, want, want.is_ok(), true) && roots_carried,
+            got == (want, want, want, want.is_ok(), true) && roots_carried && names_as_pinned,
             format!("expected {want:?}, got (stream, structure, whole, valid, subject) {got:?}"),
         );
     }
-    suite.finish("sdk.transactions.atomic-beef", 6, 0, 0);
+    assert_eq!(named.len(), 2);
+    suite.finish("sdk.transactions.atomic-beef", 8, 0, 0);
 }
