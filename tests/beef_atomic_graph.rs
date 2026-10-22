@@ -329,10 +329,10 @@ fn a_raw_unproven_ancestor_after_its_proven_descendant_is_accepted() {
 }
 
 #[test]
-fn a_cursor_carries_the_txids_named_before_they_were_read() {
-    // The stream counts a spend by a transaction read before its parent
+fn a_cursor_carries_the_edges_the_walk_needs() {
+    // The stream walks the subject's graph at the end over the edges it kept
     // (BSC3): a cursor between the proven `P` and its raw ancestor `A` holds
-    // `A` as named, and the resumed reading accepts, at every `k`.
+    // `P`'s edge to `A`, and the resumed reading accepts, at every `k`.
     let graph = Graph::build();
     let roots = graph.roots();
     let order: Vec<&Node> = ["Z", "V", "P", "W", "A", "C", "S"]
@@ -764,13 +764,12 @@ fn proven_with_inputs(inputs: usize, atomic: bool) -> (Vec<u8>, HashMap<u64, Has
 }
 
 #[test]
-fn the_txids_named_ahead_are_kept_only_under_a_subject() {
-    // A proven transaction's parents are outside the BEEF as a rule, so
-    // without a subject nothing reads what its inputs name: the cursor after
-    // it holds its three entries (BUMP, level-0 txid, transaction) in both
-    // modes, at any input count. Under a subject (the prefix's, or the
-    // caller's) each input whose parent is unread is one more entry, 32 bytes
-    // of the cursor, and `entries` counts it.
+fn the_edges_are_kept_only_under_a_subject() {
+    // Without a subject nothing walks what a transaction's inputs name: the
+    // cursor after a proven transaction holds its three entries (BUMP,
+    // level-0 txid, transaction) in both modes, at any input count. Under a
+    // subject (the prefix's, or the caller's) each input is one more entry,
+    // an edge of 32 bytes in the cursor, and `entries` counts it.
     const INPUTS: usize = 10_000;
     for scripts in [false, true] {
         for (atomic, named) in [(false, false), (true, false), (false, true)] {
@@ -806,10 +805,7 @@ fn the_txids_named_ahead_are_kept_only_under_a_subject() {
     }
 }
 
-/// The TS partition order's bytes and its transactions in order. The txids
-/// named ahead after `k` elements: the outside parents of `Z` and `V` once
-/// each is read, and `A` from the step that reads `P` to the one that reads
-/// `A`.
+/// The TS partition order's bytes and its transactions in order.
 fn ts_order(graph: &Graph) -> (Vec<u8>, Vec<&Node>) {
     let order: Vec<&Node> = ["Z", "V", "P", "W", "A", "C", "S"]
         .iter()
@@ -818,43 +814,56 @@ fn ts_order(graph: &Graph) -> (Vec<u8>, Vec<&Node>) {
     (write(&graph.subject(), &graph.bumps, &raw(&order)), order)
 }
 
+/// The inputs of a node's transaction.
+fn inputs_of(node: &Node) -> usize {
+    Transaction::from_binary(&node.raw).unwrap().inputs.len()
+}
+
 #[test]
-fn a_bsc2_cursor_reads_as_bsc3_with_nothing_named_ahead() {
-    // 0.8.0's cursor (BSC2) is BSC3 without the list. It reads with an
-    // empty list: equal to BSC3's where nothing was named ahead, and where
-    // something was, the resumed reading refuses (a spend read before the
-    // cursor is not counted), as 0.8.0 refused the whole: it never accepts
-    // more than BSC3 does.
+fn a_bsc2_cursor_reads_as_bsc3_with_no_edges() {
+    // 0.8.0's cursor (BSC2) is BSC3 without the input count and the edges.
+    // It reads with none: equal to BSC3's where no edge was kept, and where
+    // one was, the walk from the resumed reading lacks it and reaches less.
+    // It never accepts more than BSC3 does: it accepts here exactly when the
+    // transactions read before it are `Z` and `V`, whose inputs name parents
+    // outside the BEEF.
     let graph = Graph::build();
     let roots = graph.roots();
     let (bytes, order) = ts_order(&graph);
     let bumps = graph.bumps.len() as u64;
     let whole = verify_stream(bytes.as_slice(), &roots, None).unwrap();
     assert!(whole.is_valid());
+    let mut refused = 0;
     for k in 0..=bumps + order.len() as u64 {
         let mut reader = StreamVerifier::new(bytes.as_slice(), &roots, None);
         for _ in 0..k {
             assert!(matches!(reader.step().unwrap(), Progress::Stepped));
         }
         let stored = reader.cursor().to_binary();
-        // Between two elements, with every output kept: the list, then the
-        // `wanted` byte, 0 (no pending transaction follows).
-        let read = |name: &str| (bumps..k).any(|i| order[(i - bumps) as usize].name == name);
-        let a_ahead = read("P") && !read("A");
-        let named = usize::from(read("Z")) + usize::from(read("V")) + usize::from(a_ahead);
-        let tail = 1 + 1 + 32 * named;
-        assert_eq!(stored[stored.len() - tail], named as u8, "k = {k}");
+        // Between two elements, with every output kept: the input count, the
+        // edges (one entry per raw transaction read: txid, count, the txids),
+        // then the `wanted` byte, 0 (no pending transaction follows).
+        let read: Vec<&Node> = (bumps..k).map(|i| order[(i - bumps) as usize]).collect();
+        let edges: usize = read.iter().map(|n| inputs_of(n)).sum();
+        let tail = 8 + 1 + read.len() * (32 + 1) + 32 * edges + 1;
+        assert_eq!(
+            stored[stored.len() - tail..][..8],
+            (edges as u64).to_le_bytes(),
+            "k = {k}"
+        );
+        assert_eq!(stored[stored.len() - tail + 8], read.len() as u8, "k = {k}");
         let mut bsc2 = b"BSC2".to_vec();
         bsc2.extend_from_slice(&stored[4..stored.len() - tail]);
         bsc2.push(0);
         let cursor = Cursor::from_binary(&bsc2).unwrap();
         let rest = &bytes[cursor.offset() as usize..];
-        if named == 0 {
+        if read.is_empty() {
             assert_eq!(cursor, Cursor::from_binary(&stored).unwrap(), "k = {k}");
         }
-        if !a_ahead {
+        if read.iter().all(|n| ["Z", "V"].contains(&n.name)) {
             assert_eq!(resume(cursor, rest, &roots).unwrap(), whole, "k = {k}");
         } else {
+            refused += 1;
             match resume(cursor, rest, &roots).unwrap() {
                 Verdict::Invalid { kind, .. } => {
                     assert_eq!(kind, Kind::UnrelatedTransaction, "k = {k}")
@@ -863,39 +872,173 @@ fn a_bsc2_cursor_reads_as_bsc3_with_nothing_named_ahead() {
             }
         }
     }
+    // After `P`, `W`, `A`, `C` and `S`.
+    assert_eq!(refused, 5);
 }
 
 #[test]
-fn a_cursor_whose_named_list_is_not_strictly_ascending_is_refused() {
+fn a_cursor_whose_edges_are_not_strictly_ascending_is_refused() {
     let graph = Graph::build();
     let roots = graph.roots();
     let (bytes, _) = ts_order(&graph);
-    // After the BUMPs, `Z`, `V` and `P`: the outside parents of `Z` and `V`,
-    // and `A`, are named ahead.
+    // After the BUMPs, `Z`, `V` and `P`: the edges of the three, one input
+    // each.
     let mut reader = StreamVerifier::new(bytes.as_slice(), &roots, None);
     for _ in 0..graph.bumps.len() + 3 {
         assert!(matches!(reader.step().unwrap(), Progress::Stepped));
     }
     let stored = reader.cursor().to_binary();
-    let at = stored.len() - 1 - 3 * 32 - 1;
+    let at = stored.len() - 1 - 3 * (32 + 1 + 32) - 1;
     assert_eq!(stored[at], 3);
-    let a = stored[at + 1..at + 33].to_vec();
-    // The one txid twice: a list that does not ascend strictly.
-    let mut twice = stored[..at].to_vec();
-    twice.push(2);
-    twice.extend_from_slice(&a);
-    twice.extend_from_slice(&a);
-    twice.push(0);
-    let err = Cursor::from_binary(&twice).unwrap_err().to_string();
+    assert_eq!(stored[at - 8..at], 3u64.to_le_bytes());
+    let first = stored[at + 1..at + 1 + 65].to_vec();
+    let with = |entries: &[&[u8]]| {
+        let mut bin = stored[..at].to_vec();
+        bin.push(entries.len() as u8);
+        for entry in entries {
+            bin.extend_from_slice(entry);
+        }
+        bin.push(0);
+        Cursor::from_binary(&bin)
+    };
+    // The one transaction twice: a list that does not ascend strictly.
+    let err = with(&[&first, &first]).unwrap_err().to_string();
     assert!(err.contains("out of order"), "{err}");
     // A smaller txid after it: descending.
-    let mut down = stored[..at].to_vec();
-    down.push(2);
-    down.extend_from_slice(&a);
-    down.extend_from_slice(&[0u8; 32]);
-    down.push(0);
-    let err = Cursor::from_binary(&down).unwrap_err().to_string();
+    let mut low = vec![0u8; 32];
+    low.extend_from_slice(&first[32..]);
+    let err = with(&[&first, &low]).unwrap_err().to_string();
     assert!(err.contains("out of order"), "{err}");
+    // Edges of a txid the index does not hold raw.
+    let err = with(&[&low]).unwrap_err().to_string();
+    assert!(err.contains("no raw transaction"), "{err}");
     // The stored one reads.
     assert!(Cursor::from_binary(&stored).is_ok());
+}
+
+/// The X/Y pair beside a proven subject `S`: a proven `Y` and a raw
+/// unproven `X` that spends it, which nothing spends, written `Y`, `X`, `S`.
+/// Both are outside the subject's graph, but a raw entry spends `Y`. `Y`'s
+/// amount is the first from 1,000 up that puts `Y` before `X` in the trie
+/// order (`parent_earlier`), or after it. Returns the bytes, the headers,
+/// `Y` and `X`.
+fn xy_pair(parent_earlier: bool) -> (Vec<u8>, HashMap<u64, Hash32>, Node, Node) {
+    let trie_order = |txid: &str| internal(txid).map(u8::reverse_bits);
+    let s = tx(&[(&"2e".repeat(32), 0)], &[1_000]);
+    let (y, x) = (1_000u64..)
+        .map(|amount| {
+            let y = tx(&[(&"2f".repeat(32), 0)], &[amount]);
+            let x = tx(&[(&y.id(), 0)], &[1]);
+            (y, x)
+        })
+        .find(|(y, x)| (trie_order(&y.id()) < trie_order(&x.id())) == parent_earlier)
+        .unwrap();
+    let bumps = vec![
+        MerklePath::from_coinbase_txid(&s.id(), 980_000),
+        MerklePath::from_coinbase_txid(&y.id(), 980_001),
+    ];
+    let node = |name, t: &Transaction, bump, spends| Node {
+        name,
+        raw: t.to_binary(),
+        txid: t.id(),
+        bump,
+        spends,
+    };
+    let (s, y, x) = (
+        node("S", &s, Some(0), vec![]),
+        node("Y", &y, Some(1), vec![]),
+        node("X", &x, None, vec!["Y"]),
+    );
+    let bytes = write(
+        &internal(&s.txid),
+        &bumps,
+        &[Entry::Raw(&y), Entry::Raw(&x), Entry::Raw(&s)],
+    );
+    let roots = bumps
+        .iter()
+        .map(|b| {
+            (
+                u64::from(b.block_height),
+                internal(&b.compute_root(None).unwrap()),
+            )
+        })
+        .collect();
+    (bytes, roots, y, x)
+}
+
+/// The stream offset of a raw entry: where its bytes sit in a V1 BEEF.
+fn offset_of(bytes: &[u8], node: &Node) -> u64 {
+    bytes
+        .windows(node.raw.len())
+        .position(|w| w == node.raw.as_slice())
+        .unwrap() as u64
+}
+
+/// Both readers on the X/Y pair: the stream, with and without its spend
+/// checks, names `named` at its offset; the whole path refuses it
+/// `UnrelatedTransaction` (its verdict is a kind, it names no entry); the
+/// `@bsv/sdk` 3 model refuses it too.
+fn assert_xy_names(bytes: &[u8], roots: &HashMap<u64, Hash32>, named: &Node, offset: u64) {
+    let expected = Verdict::Invalid {
+        offset,
+        kind: Kind::UnrelatedTransaction,
+        reason: Reason::UnrelatedTransaction {
+            txid: internal(&named.txid),
+        },
+    };
+    assert_eq!(offset, offset_of(bytes, named));
+    assert_eq!(
+        verify_stream_structure(bytes, roots, None).unwrap(),
+        expected
+    );
+    assert_eq!(verify_stream(bytes, roots, None).unwrap(), expected);
+    let refused = Err(Kind::UnrelatedTransaction);
+    assert_eq!(verdicts(bytes, roots), [refused, refused, refused, refused]);
+    assert!(!ts3_accepts(bytes));
+}
+
+#[test]
+fn an_unreached_parent_earlier_by_the_trie_order_is_the_entry_named() {
+    // `Y` is spent (by `X`) and unreached; it comes first in the trie
+    // order, so the walk's refusal names it, at its offset. The flag
+    // predicate of 0.8.1's first cut named `X`, the unspent one.
+    let (bytes, roots, y, _) = xy_pair(true);
+    assert_xy_names(&bytes, &roots, &y, 124);
+}
+
+#[test]
+fn an_unreached_child_earlier_by_the_trie_order_is_the_entry_named() {
+    let (bytes, roots, _, x) = xy_pair(false);
+    assert_xy_names(&bytes, &roots, &x, 187);
+}
+
+#[test]
+fn the_xy_vectors_are_the_pair_this_crates_writer_writes() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/transaction/vectors/atomic-beef.json");
+    let file: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    for (id, parent_earlier) in [
+        ("unrelated-pair-parent-named", true),
+        ("unrelated-pair-child-named", false),
+    ] {
+        let (bytes, roots, ..) = xy_pair(parent_earlier);
+        let hex = bsv_rs::primitives::to_hex(&bytes);
+        let vector = file["vectors"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["id"] == id)
+            .unwrap_or_else(|| panic!("{id} missing; its bytes: {hex}"));
+        assert_eq!(vector["input"]["beef_hex"], hex.as_str(), "{id}");
+        for (height, root) in roots {
+            let mut root = root;
+            root.reverse();
+            assert_eq!(
+                vector["input"]["headers"][height.to_string()],
+                bsv_rs::primitives::to_hex(&root).as_str(),
+                "{id}"
+            );
+        }
+    }
 }

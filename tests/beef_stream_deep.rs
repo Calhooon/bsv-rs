@@ -131,10 +131,10 @@ fn read_chain(n: usize) -> (Duration, u64) {
         // One step per element: the BUMP and the n transactions.
         assert_eq!(reader.index().steps(), n as u64 + 1);
         // One entry per element and one for the txid the BUMP carries, and,
-        // under the subject, the proven funding transaction's parent, outside
-        // the BEEF, named ahead (0.8.1); the Lean's count keeps n + 3.
-        assert_eq!(reader.index().entries(), n as u64 + 3);
-        assert_eq!(reader.index().spec_size(), n as u64 + 3);
+        // under the subject, one edge per input (0.8.1: each of the n
+        // transactions has one); the Lean's count has the proven txid twice.
+        assert_eq!(reader.index().entries(), 2 * n as u64 + 2);
+        assert_eq!(reader.index().spec_size(), 2 * n as u64 + 3);
         // Every output but the tip's and the funding's second is spent and
         // gone: two outputs of one script byte each, at any depth.
         assert_eq!(reader.index().retained_outputs(), (2, 2));
@@ -275,17 +275,20 @@ fn summary(bytes: &[u8], headers: &HashMap<u64, Hash32>) -> (u64, u64, u64, u64,
 
 #[test]
 fn the_leans_deep_rows_have_the_leans_counts() {
-    // `#eval summary (run stub chainHeaders (chain 100000))`.
+    // `#eval summary (run stub chainHeaders (chain 100000))`
+    // (bsv-stack-lean@3bb286e `lean/BeefOfAnySize/Scenarios.lean:141,148`):
+    // the index counts one edge per input (0.8.1), and the atomic end adds
+    // the pass over the table and the walk's fuel three times.
     let (bytes, headers) = lean_chain(100_000, false);
     assert_eq!(
         summary(&bytes, &headers),
-        (100_002, 6_000_112, 100_002, 6_700_132, 100_004, true)
+        (100_002, 6_000_112, 100_002, 6_700_132, 200_005, true)
     );
     // The same at 10,000 links, atomic on the last link.
     let (bytes, headers) = lean_chain(10_000, true);
     assert_eq!(
         summary(&bytes, &headers),
-        (10_002, 600_112, 10_002, 680_133, 10_004, true)
+        (10_002, 600_112, 10_002, 740_145, 20_005, true)
     );
 }
 

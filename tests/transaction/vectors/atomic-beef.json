@@ -181,6 +181,60 @@
         "atomic-beef",
         "error-case"
       ]
+    },
+    {
+      "id": "unrelated-pair-parent-named",
+      "description": "Two entries outside the subject's graph, one of them spent: beside the proven subject S, a proven Y and a raw unproven X that spends Y and that nothing spends, written Y, X, S. The walk from S over the inputs of raw entries reaches neither, so the BEEF is refused (BRC-95: nothing else may be present). Y comes before X in the trie order (the txid's bytes, each byte's bits reversed, least first), so bsv-rs's streaming reader (verify_stream, verify_stream_structure; the Lean's finish) names Y (640639c3d0bd8a5ef167e9700ed22e54ac7b79a9872c436cba9f73f1cf5118fe) at offset 124, the earliest unreached entry; the whole-BEEF reader (Beef::verify_structure, verify_valid) refuses it UnrelatedTransaction and names no entry. @bsv/sdk 3.x refuses it (its closure from S stops at the proven S; Transaction.fromAtomicBEEF: 'Atomic BEEF contains unrelated transaction data.' names no entry); @bsv/sdk 2.1.4's readers and go-sdk's NewBeefFromAtomicBytes do not judge the graph. Y's amount is the first from 1,000 up that gives this trie order. Hand-built by bsv-rs's test writer (tests/beef_atomic_graph.rs xy_pair, no sort).",
+      "input": {
+        "beef_hex": "01010101e1ef33341a5a2a6f142afdac109e74ffbf66a8971793424774e61741d7c0d3e90100beef02fe20f40e0001010002e1ef33341a5a2a6f142afdac109e74ffbf66a8971793424774e61741d7c0d3e9fe21f40e0001010002fe1851cff1739fba6c432c87a9797bac542ed20e70e967f15e8abdd0c33906640301000000012f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f0000000000ffffffff01ec0300000000000001510000000001010100000001fe1851cff1739fba6c432c87a9797bac542ed20e70e967f15e8abdd0c33906640000000000ffffffff0101000000000000000151000000000001000000012e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e0000000000ffffffff01e8030000000000000151000000000100",
+        "headers": {
+          "980000": "e9d3c0d74117e6744742931797a866bfff749e10acfd2a146f2a5a1a3433efe1",
+          "980001": "640639c3d0bd8a5ef167e9700ed22e54ac7b79a9872c436cba9f73f1cf5118fe"
+        },
+        "writer": "bsv-rs tests/beef_atomic_graph.rs xy_pair (hand-built, written as given)",
+        "order": [
+          "Y",
+          "X",
+          "S"
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "subject_txid": "e9d3c0d74117e6744742931797a866bfff749e10acfd2a146f2a5a1a3433efe1",
+        "error": "unrelated-transaction"
+      },
+      "tags": [
+        "brc-95",
+        "atomic-beef",
+        "error-case"
+      ]
+    },
+    {
+      "id": "unrelated-pair-child-named",
+      "description": "Two entries outside the subject's graph, one of them spent: beside the proven subject S, a proven Y and a raw unproven X that spends Y and that nothing spends, written Y, X, S. The walk from S over the inputs of raw entries reaches neither, so the BEEF is refused (BRC-95: nothing else may be present). Y comes after X in the trie order (the txid's bytes, each byte's bits reversed, least first), so bsv-rs's streaming reader (verify_stream, verify_stream_structure; the Lean's finish) names X (e948b6fd127c559f972e31248b867a2b338659a4e542c1301213a8d95e97edca) at offset 187, the earliest unreached entry; the whole-BEEF reader (Beef::verify_structure, verify_valid) refuses it UnrelatedTransaction and names no entry. @bsv/sdk 3.x refuses it (its closure from S stops at the proven S; Transaction.fromAtomicBEEF: 'Atomic BEEF contains unrelated transaction data.' names no entry); @bsv/sdk 2.1.4's readers and go-sdk's NewBeefFromAtomicBytes do not judge the graph. Y's amount is the first from 1,000 up that gives this trie order. Hand-built by bsv-rs's test writer (tests/beef_atomic_graph.rs xy_pair, no sort).",
+      "input": {
+        "beef_hex": "01010101e1ef33341a5a2a6f142afdac109e74ffbf66a8971793424774e61741d7c0d3e90100beef02fe20f40e0001010002e1ef33341a5a2a6f142afdac109e74ffbf66a8971793424774e61741d7c0d3e9fe21f40e0001010002ab9e408998955ed5e944863f3cb036e58176cb6e486930da589b36b5dad005530301000000012f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f0000000000ffffffff01e80300000000000001510000000001010100000001ab9e408998955ed5e944863f3cb036e58176cb6e486930da589b36b5dad005530000000000ffffffff0101000000000000000151000000000001000000012e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e0000000000ffffffff01e8030000000000000151000000000100",
+        "headers": {
+          "980000": "e9d3c0d74117e6744742931797a866bfff749e10acfd2a146f2a5a1a3433efe1",
+          "980001": "5305d0dab5369b58da3069486ecb7681e536b03c3f8644e9d55e959889409eab"
+        },
+        "writer": "bsv-rs tests/beef_atomic_graph.rs xy_pair (hand-built, written as given)",
+        "order": [
+          "Y",
+          "X",
+          "S"
+        ]
+      },
+      "expected": {
+        "valid": false,
+        "subject_txid": "e9d3c0d74117e6744742931797a866bfff749e10acfd2a146f2a5a1a3433efe1",
+        "error": "unrelated-transaction"
+      },
+      "tags": [
+        "brc-95",
+        "atomic-beef",
+        "error-case"
+      ]
     }
   ]
 }

@@ -13,7 +13,7 @@ A patch. The atomic BEEF rule is judged on the subject's graph (BRC-95), not
 on wire position. Both readers accept more and refuse no BEEF they accepted
 before; no public type changes shape. One persisted format moves: a stream
 `Cursor` is written BSC3, and a BSC2 cursor still reads (as BSC3 with no
-txid named ahead), so no reading restarts.
+edge), so no reading restarts.
 
 ### Fixed: the atomic rule on the subject's graph (BRC-95; the bsv-dd x402 refund, P0-65)
 
@@ -31,44 +31,51 @@ it. That wire is legal, and bsv-rs refused it `UnrelatedTransaction` (the
 bsv-dd x402 refund). This crate's own `to_binary_atomic`, whose sort mirrors
 the reference's, wrote BEEFs its own two readers refused.
 
-- The rule, one predicate for both readers (`beef_stream::atomic_unrelated`,
-  called by `BeefIndex::finish` and `Beef::verify_structure`): the subject is
-  a raw transaction of the BEEF, else `SubjectMissing`; every other entry, raw
-  or txid-only, is reached from the subject by following the inputs of raw
-  entries, proven or not (the owner's ruling, 2026-10-22), else
-  `UnrelatedTransaction`. Position is not judged.
-- The predicate reads one flag per entry, whether some raw entry spends it:
-  the set of entries other than the subject that nothing spends is empty
-  exactly when every entry is reachable from the subject (a txid is a hash,
-  so no chain of spends returns). Per entry the two differ: an entry spent
-  only by a raw entry outside the graph is spent and unreachable, but then
-  that spender's chain ends in an unspent entry outside the graph, and the
-  refusal names an unspent entry outside the graph (in the stream, the least
-  by the Lean's trie order, at its offset, as before).
-- The stream now also counts a spend by a transaction read BEFORE its
-  parent: under a subject, `BeefIndex` keeps the txids a raw transaction
-  named before the BEEF held them (only a proven transaction can), and an
-  entry read later starts spent. The set is kept only when a subject is
-  known (the caller's, or the prefix's: the header precedes the first
-  element; `BeefIndex::hold_to_subject`, new); without one nothing reads it.
-  `entries()` counts it; `spec_size()`, the Lean's `Index.size`, does not
-  (the Lean's index keeps no such set), so the Lean's rows are unchanged. The
-  deep chain's `entries` moves from n + 2 to n + 3 (`tests/beef_stream_deep.rs`:
-  its proven funding transaction's parent, outside the BEEF, is named under
-  the subject). The bound: per element, plus
-  32 bytes and a table slot per input of a proven transaction whose parent is
-  not yet read, only under a subject; an input is 41 bytes or more on the
-  wire, so this is linear in the bytes read, but it is not per element (a
-  proven transaction's parents are outside the BEEF as a rule, so they are
-  held to the end). Measured: the cursor after one proven transaction of
-  10,000 inputs is 230 B without a subject (structure only; 241 B with
-  scripts), 320,264 B under one (the review measured 320,264 B without a
-  subject before this was gated); `memory_profiling`'s new row
+- The rule, one walk for both readers (`beef_stream::atomic_unreached`,
+  called by `BeefIndex::finish` and `Beef::verify_structure`; the Lean's
+  `finish`, bsv-stack-lean `lean/BeefOfAnySize.lean` `walk`/`finish`): the
+  subject is a raw transaction of the BEEF, else `SubjectMissing`; every
+  other entry, raw or txid-only, is reached from the subject by following
+  the inputs of raw entries, proven or not (the owner's ruling, 2026-10-22),
+  else `UnrelatedTransaction`. Position is not judged.
+- The entry a refusal names (the ruled text, 2026-10-22): the earliest, by
+  the trie order (the txid's bytes, each byte's bits reversed, least first),
+  of the entries the walk does not reach, at its offset in the stream (the
+  whole path's verdict is a `Kind`, naming none). The first cut of this
+  release read one flag per entry (some raw entry spends it). That gives the
+  same verdict, since the refusal set is empty exactly when every entry is
+  reachable (a txid is a hash, so no chain of spends returns), but it names
+  a different entry. Beside the subject, take a raw `X` that nothing spends
+  and its parent `Y` that only `X` spends. Both are unreached; the flag named
+  `X` even when `Y` is earlier, and the walk names `Y`. No flag stands in for
+  the edges: two BEEFs with the same flags can leave different entries
+  unreached.
+- The stream keeps the edges: under a subject, each raw transaction's entry
+  holds the txids its inputs name (the Lean's `prevs`), and the walk marks
+  entries in place. They are kept only when a subject is known (the caller's,
+  or the prefix's: the header precedes the first element;
+  `BeefIndex::hold_to_subject`, new); without one nothing walks them.
+  `entries()` counts them. `spec_size()` is the Lean's `Index.size`, which
+  counts one edge per input of every raw transaction read, with or without a
+  subject (a counter here, not a table), and `model_work()` adds the Lean's
+  atomic end (one pass over the table and the walk's fuel three times). So the
+  Lean's deep rows move, as the Lean's own did (bsv-stack-lean@3bb286e
+  `lean/BeefOfAnySize/Scenarios.lean:141,148`): 100,000 links, index 100,004
+  to 200,005; 10,000 links atomic, work 680,133 to 740,145 and index 10,004
+  to 20,005 (`tests/beef_stream_deep.rs`). The deep chain's `entries` under
+  its subject is 2n + 2 (one edge per link).
+- The bound: per element, plus 32 bytes per input of a raw transaction, only
+  under a subject. An input is 41 bytes or more on the wire, so this is
+  linear in the bytes read, but it is not per element. Measured
+  (`memory_profiling`): the deep chain under its subject peaks at 352, 281
+  and 225 B per element at 1,000, 10,000 and 100,000 links (0.8.0: 274, 219,
+  175; the test's bound moves from 320 to 400 B, and the flatness check
+  holds). The new row
   (`test_beef_stream_memory_on_proven_transactions_with_many_inputs`, 100
-  proven transactions of 1,000 inputs, a 4.1 MB BEEF) peaks at 259 KB without
-  a subject (6.67 MB before the gate) and adds 64 B per input under one. The
-  deep chain, all unproven, is 0.8.0's (274, 219, 175 B per element at 1,000,
-  10,000, 100,000 links).
+  proven transactions of 1,000 inputs, a 4.1 MB BEEF) peaks at 262 KB
+  without a subject and adds 32 B per input under one. The cursor after one
+  proven transaction of 10,000 inputs is 238 B without a subject (structure
+  only; 249 B with scripts) and 320,305 B under one.
 - Unchanged: the spend checks, the BRC-62 clause that a transaction without a
   BUMP spends earlier transactions, the offsets, the twenty-four `Kind`s, the
   `Reason` list.
@@ -82,13 +89,15 @@ the reference's, wrote BEEFs its own two readers refused.
   with scripts, the rows without `OP_TRUE` outputs are a refused spend first,
   as at 0.8.0. `SubjectMissing` is now a subject the BEEF holds only as a
   txid-only entry, or not at all.
-- `Cursor` bytes are BSC3: the txids named ahead follow the transactions,
-  strictly ascending (`Cursor::from_binary` refuses a list out of order or
-  with a repeat). A BSC2 cursor (0.5.0 to 0.8.0) reads as BSC3 with an empty
-  set: sound, since an empty set only refuses more (a spend read before the
-  cursor is not counted for a parent read after it) and never accepts
-  wrongly, and it accepts at least what 0.8.0 accepted from that cursor, so a
-  stored reading continues. The precedent for a cursor format change is
+- `Cursor` bytes are BSC3. After the transactions come the inputs counted
+  and the edges, one list per raw transaction, by txid strictly ascending
+  (`Cursor::from_binary` refuses a list out of order, with a repeat, or
+  naming a txid the index does not hold raw). A BSC2 cursor (0.5.0 to 0.8.0)
+  reads as BSC3 with no edge. That is sound: the walk from it lacks the edges
+  of the transactions read before the cursor, reaches less, and only refuses
+  more, never accepting wrongly. A stored atomic reading resumed from BSC2
+  accepts when the transactions read before the cursor spend nothing the
+  walk needs, and otherwise refuses `UnrelatedTransaction`. The precedent for a cursor format change is
   0.5.0 (BSC1 to BSC2, a minor, BSC1 refused); a patch may move to BSC3
   because a BSC2 cursor still reads. One downstream hand-parses the magic:
   bsv-messagebox-cloudflare-public `src/beef_door.rs:665` (`tip_of` checks
@@ -109,19 +118,25 @@ the reference's, wrote BEEFs its own two readers refused.
   `to_binary_atomic`'s output from each merge order, the closure, accepted by
   both readers (`what_this_crates_writer_writes_its_own_two_readers_accept`,
   rewritten with the writer change below); a cursor at
-  every `k` (`a_cursor_carries_the_txids_named_before_they_were_read`); the
+  every `k` (`a_cursor_carries_the_edges_the_walk_needs`); the
   W4 bytes (`the_leans_w4_bytes_are_refused_under_the_graph_rule`). Six of
   the seven were red on 0.8.0. The review's folds add three, red on the
-  first cut of this release: the set kept only under a subject, counted by
-  `entries` (`the_txids_named_ahead_are_kept_only_under_a_subject`), a BSC2
-  cursor read at every `k` (`a_bsc2_cursor_reads_as_bsc3_with_nothing_named_ahead`),
-  a list out of order refused
-  (`a_cursor_whose_named_list_is_not_strictly_ascending_is_refused`).
+  first cut of this release: the edges kept only under a subject, counted
+  by `entries` (`the_edges_are_kept_only_under_a_subject`), a BSC2 cursor
+  read at every `k` (`a_bsc2_cursor_reads_as_bsc3_with_no_edges`), a list
+  out of order refused (`a_cursor_whose_edges_are_not_strictly_ascending_is_refused`).
+  The walk adds the X/Y pair in both trie orders, both readers refusing and
+  the stream naming the earliest unreached entry at its offset:
+  `an_unreached_parent_earlier_by_the_trie_order_is_the_entry_named` (`Y`,
+  at 124; red on the flag predicate, which named `X` at 187) and
+  `an_unreached_child_earlier_by_the_trie_order_is_the_entry_named` (`X`, at
+  187). `the_xy_vectors_are_the_pair_this_crates_writer_writes` pins the
+  vectors' bytes.
   `tests/beef_stream.rs` pins the moved words
   (`a_subject_whose_graph_leaves_a_later_link_out_is_refused`, the example's
   and the W4 test's).
 - Vectors: `tests/transaction/vectors/atomic-beef.json`
-  (`sdk.transactions.atomic-beef`, the ts-stack corpus's format, six vectors)
+  (`sdk.transactions.atomic-beef`, the ts-stack corpus's format, eight vectors)
   is staged for the corpus's `vectors/sdk/transactions/`;
   `tests/conformance_beef.rs` runs it (`conformance_atomic_beef`) from the
   corpus when it carries the file, else from the staged copy. The accepted
@@ -135,7 +150,13 @@ the reference's, wrote BEEFs its own two readers refused.
   `subject-present-not-last`, are `parity_class` `intended` (with a
   `skip_reason`): `@bsv/sdk` 3.x refuses them (below), so the corpus cannot
   hold them as `required`; `reference_impl` says the expected values are this
-  crate's ruling. `conformance_atomic_beef` pins which two.
+  crate's ruling. `conformance_atomic_beef` pins which two. The X/Y pair is
+  two vectors, `unrelated-pair-parent-named` and `unrelated-pair-child-named`
+  (refused, `required` by the file's class: `@bsv/sdk` 3.x refuses them too,
+  as its model in the tests does). Each description names the entry each
+  reader names: the stream names `Y` at 124 in the first and `X` at 187 in
+  the second, and `conformance_atomic_beef` pins both. The whole path and
+  TS 3 name none. The first was red on the flag predicate.
 
 ### Changed: the atomic writer emits the BRC-95 closure (what TS 3 and Go write)
 

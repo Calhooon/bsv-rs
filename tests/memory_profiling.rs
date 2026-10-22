@@ -371,11 +371,13 @@ fn test_beef_stream_memory_is_flat_per_element() {
         );
     }
     // The verdicts: the index is a bounded number of bytes per element (a
-    // table slot is 65 bytes; a growing table holds old and new for a moment),
-    // and the scripts add nothing that stays (each output goes when spent).
+    // table slot is the txid and its entry; a growing table holds old and new
+    // for a moment; under the subject each link also keeps its one edge, 32
+    // bytes and the entry's pointer to it, since 0.8.1), and the scripts add nothing that stays (each output goes when
+    // spent).
     for (n, _, structure, full) in &rows {
-        assert!(*structure < 320.0, "N={n}: {structure} B per element");
-        assert!(*full < 320.0, "N={n}: {full} B per element");
+        assert!(*structure < 400.0, "N={n}: {structure} B per element");
+        assert!(*full < 400.0, "N={n}: {full} B per element");
         assert!(
             (*full - *structure).abs() * (*n as f64) < 16.0 * 1024.0,
             "N={n}: the scripts kept {:.0} B more than the structure",
@@ -394,10 +396,10 @@ fn test_beef_stream_memory_is_flat_per_element() {
 /// The streaming reader on a BEEF made of proven transactions with many
 /// inputs, their parents outside the BEEF (the shape of a BEEF of mined
 /// ancestors). The index holds one entry per element; under a subject it
-/// also holds, until the end, each txid a proven transaction named before
-/// the BEEF held it (0.8.1, `named_ahead`): 32 bytes and a table slot per
-/// such input, an input being 41 bytes or more on the wire. Without a
-/// subject nothing reads that set, and the reader keeps none of it.
+/// also holds, until the end, the txid each input names (0.8.1, the edges
+/// the atomic walk follows, the Lean's `prevs`): 32 bytes per input, an
+/// input being 41 bytes or more on the wire. Without a subject nothing walks
+/// them, and the reader keeps none.
 #[cfg(feature = "transaction")]
 #[test]
 fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
@@ -488,7 +490,7 @@ fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
     println!("\n=== BEEF stream, {TXS} proven transactions of {INPUTS} inputs ===");
     println!(
         "  BEEF {} B; no subject: structure {structure} B, scripts {full} B; \
-         under a subject: {under_subject} B ({per_input:.1} B per input named ahead)",
+         under a subject: {under_subject} B ({per_input:.1} B per input, its edge)",
         plain.len()
     );
     // Without a subject: the element in hand (one transaction of INPUTS
@@ -501,9 +503,10 @@ fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
             "{name}: {bytes} B with no subject"
         );
     }
-    // Under a subject: 32 bytes and the table's slot per input, bounded.
+    // Under a subject: the edge's 32 bytes per input (in the transaction's
+    // entry, no table slot of its own), bounded.
     assert!(
-        (32.0..160.0).contains(&per_input),
-        "{per_input:.1} B per input named ahead"
+        (28.0..160.0).contains(&per_input),
+        "{per_input:.1} B per input, its edge"
     );
 }
