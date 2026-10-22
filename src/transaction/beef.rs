@@ -1115,6 +1115,17 @@ impl Beef {
     }
 
     /// Serializes this BEEF as Atomic BEEF for a specific transaction.
+    ///
+    /// The BEEF written is the subject's BRC-95 closure, not every entry this
+    /// one holds (0.8.1): from the subject, the inputs of each raw entry are
+    /// followed, stopping at a transaction a BUMP of this BEEF proves and at
+    /// a txid-only entry; every other entry is dropped, with the BUMPs that
+    /// no kept entry needs, and the kept BUMPs are renumbered. The order is
+    /// the reference's sort, the subject last. This is what `@bsv/sdk` 3
+    /// (`Beef.#collectAtomicTransactions`) and go-sdk (`selectAtomicBeef`)
+    /// write, and every reader accepts it: the readers of this crate, of
+    /// 0.8.0, of TS 2, TS 3 and Go. [`to_binary`](Self::to_binary) still
+    /// writes every entry.
     pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>> {
         if self.needs_sort {
             self.sort_txs();
@@ -1126,6 +1137,7 @@ impl Beef {
                 txid
             )));
         }
+        let closure = self.atomic_closure(txid)?;
 
         let mut writer = Writer::new();
         writer.write_u32_le(ATOMIC_BEEF);
@@ -1136,8 +1148,79 @@ impl Beef {
         reversed.reverse();
         writer.write_bytes(&reversed);
 
-        self.to_writer(&mut writer);
+        closure.to_writer(&mut writer);
         Ok(writer.into_bytes())
+    }
+
+    /// A BUMP of this BEEF proves `tx`: its BUMP index names a BUMP whose
+    /// level 0 carries the txid (the reference's `#hasMatchingBump`).
+    fn proves(&self, tx: &BeefTx) -> bool {
+        tx.bump_index()
+            .and_then(|i| self.bumps.get(i))
+            .is_some_and(|bump| bump.contains(&tx.txid()))
+    }
+
+    /// The BEEF of `subject`'s BRC-95 closure ([`to_binary_atomic`](Self::to_binary_atomic)).
+    fn atomic_closure(&self, subject: &str) -> Result<Beef> {
+        let at: HashMap<String, usize> = self
+            .txs
+            .iter()
+            .enumerate()
+            .map(|(i, tx)| (tx.txid(), i))
+            .collect();
+        let mut included: HashSet<usize> = HashSet::new();
+        let mut stack: Vec<usize> = at.get(subject).copied().into_iter().collect();
+        while let Some(i) = stack.pop() {
+            if !included.insert(i) {
+                continue;
+            }
+            let tx = &self.txs[i];
+            if tx.is_txid_only() || self.proves(tx) {
+                continue;
+            }
+            stack.extend(spent_txids(tx).iter().filter_map(|t| at.get(t)));
+        }
+
+        let mut beef = Beef::with_version(self.version);
+        let mut renumbered: HashMap<usize, usize> = HashMap::new();
+        let mut keep = |index: usize, beef: &mut Beef| {
+            *renumbered.entry(index).or_insert_with(|| {
+                beef.bumps.push(self.bumps[index].clone());
+                beef.bumps.len() - 1
+            })
+        };
+        for (i, tx) in self.txs.iter().enumerate() {
+            if !included.contains(&i) {
+                continue;
+            }
+            let mut copy = tx.clone();
+            let txid = tx.txid();
+            if tx.is_txid_only() {
+                // A txid-only entry is valid when a BUMP of the BEEF proves
+                // it: keep the first that carries it.
+                if let Some(index) = self.bumps.iter().position(|b| b.contains(&txid)) {
+                    keep(index, &mut beef);
+                }
+            } else if let Some(index) = tx.bump_index() {
+                if index >= self.bumps.len() {
+                    return Err(crate::Error::BeefError(format!(
+                        "{txid} names BUMP {index} of {}",
+                        self.bumps.len()
+                    )));
+                }
+                copy.set_bump_index(Some(keep(index, &mut beef)));
+            }
+            beef.txs.push(copy);
+        }
+        beef.sort_txs();
+        // Every other entry is an ancestor of the subject: last is in
+        // dependency order whatever the sort did with it.
+        if let Some(i) = beef.txs.iter().position(|tx| tx.txid() == subject) {
+            let tx = beef.txs.remove(i);
+            beef.txs.push(tx);
+            beef.rebuild_index();
+        }
+        Ok(beef)
     }
 
     /// Returns true if this is an Atomic BEEF.

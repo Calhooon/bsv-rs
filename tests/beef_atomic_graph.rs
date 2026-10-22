@@ -483,58 +483,196 @@ fn a_subject_the_beef_does_not_carry_raw_is_missing_in_every_order() {
 
 #[test]
 fn what_this_crates_writer_writes_its_own_two_readers_accept() {
-    // `to_binary_atomic` sorts as the TypeScript writer does (`sort_txs`:
-    // proven first in encounter order, then unproven in dependency order):
-    // the proven `P` is written before its raw unproven ancestor `A`, the
-    // proven parent `V` and child `W` before the unproven. Until 0.8.0 the
-    // crate's own readers refused what its writer wrote. Merged in each of
-    // the 364 orders.
+    // `to_binary_atomic` writes the subject's BRC-95 closure (0.8.1): from
+    // `S`, the inputs of raw entries, stopping at each proof. `P`, `W` and
+    // `Z` are proven, so `A` (behind `P`) and `V` (behind `W`) are not
+    // written; the order is the reference's sort, the subject last. Merged
+    // in each of the 364 orders, the bytes are one BEEF, accepted by both
+    // readers and by the TypeScript 3 rule.
     let graph = Graph::build();
     let roots = graph.roots();
-    let mut subject_not_last = 0;
-    let orders = orders(&graph);
-    for order in &orders {
+    let subject = graph.node("S").txid.clone();
+    for order in &orders(&graph) {
         let mut beef = Beef::new();
         for bump in &graph.bumps {
             beef.merge_bump(bump.clone());
         }
-        // Merged in this order, the subject's place included; the bump
-        // indexes are the merge's (each BUMP is its own block).
         for node in order {
             beef.merge_raw_tx(node.raw.clone(), node.bump);
         }
-        let subject = graph.node("S").txid.clone();
         let bytes = beef.to_binary_atomic(&subject).unwrap();
-        let written: Vec<String> = Beef::from_binary(&bytes)
-            .unwrap()
-            .txs
+        let written = Beef::from_binary(&bytes).unwrap();
+        let txids: HashSet<String> = written.txs.iter().map(|t| t.txid()).collect();
+        let expected: HashSet<String> = ["S", "P", "C", "Z", "W"]
             .iter()
-            .map(|t| t.txid())
+            .map(|n| graph.node(n).txid.clone())
             .collect();
-        let at = |name: &str| {
-            written
-                .iter()
-                .position(|t| *t == graph.node(name).txid)
-                .unwrap()
-        };
-        assert!(at("P") < at("A"), "the proven descendant first");
-        // The sort is the reference's repeated scan in merge order: `A`,
-        // which `S` does not spend, is written after it when merged after
-        // it. The positional rule refused that too (`SubjectMissing`).
-        if at("S") != written.len() - 1 {
-            assert_eq!(at("A"), written.len() - 1);
-            subject_not_last += 1;
-        }
+        assert_eq!(txids, expected, "merged {}", names(order));
+        assert_eq!(written.txs.last().unwrap().txid(), subject);
+        assert_eq!(written.bumps.len(), 3);
         assert_eq!(
             verdicts(&bytes, &roots),
             [Ok(()), Ok(()), Ok(()), Ok(())],
             "merged {}",
             names(order)
         );
+        assert!(ts3_accepts(&bytes), "merged {}", names(order));
         let tx = Transaction::from_atomic_beef(&bytes).unwrap();
         assert_eq!(tx.id(), subject);
     }
-    assert!(subject_not_last > 0 && subject_not_last < orders.len());
+}
+
+/// The `@bsv/sdk` 3 rule, modelled (ts-stack `4d0ea63` `Beef.ts:420-434`,
+/// `isAtomic` `:482-491`): from the subject, follow the inputs of each raw
+/// entry a BUMP index does not prove (a BUMP whose level 0 carries its txid)
+/// and of no txid-only entry; atomic when that closure is every entry.
+fn ts3_accepts(bytes: &[u8]) -> bool {
+    let beef = Beef::from_binary(bytes).unwrap();
+    let Some(subject) = beef.atomic_txid.clone() else {
+        return false;
+    };
+    let at: HashMap<String, usize> = beef
+        .txs
+        .iter()
+        .enumerate()
+        .map(|(i, t)| (t.txid(), i))
+        .collect();
+    if at.len() != beef.txs.len() {
+        return false;
+    }
+    let Some(&root) = at.get(&subject) else {
+        return false;
+    };
+    let mut included = HashSet::new();
+    let mut stack = vec![root];
+    while let Some(i) = stack.pop() {
+        if !included.insert(i) {
+            continue;
+        }
+        let entry = &beef.txs[i];
+        let proven = entry
+            .bump_index()
+            .and_then(|b| beef.bumps.get(b))
+            .is_some_and(|b| b.contains(&entry.txid()));
+        if proven || entry.is_txid_only() {
+            continue;
+        }
+        let t = match entry.tx() {
+            Some(t) => t.clone(),
+            None => Transaction::from_binary(entry.raw_tx().unwrap()).unwrap(),
+        };
+        for input in &t.inputs {
+            if let Some(&j) = at.get(&input.get_source_txid().unwrap()) {
+                stack.push(j);
+            }
+        }
+    }
+    included.len() == beef.txs.len()
+}
+
+#[test]
+fn the_atomic_writer_emits_the_brc95_closure_and_drops_the_rest() {
+    // A Beef holding the graph (a proven parent `V` and child `W`, the raw
+    // unproven `A` behind the proven `P`) and an unrelated branch (`X`
+    // proven, `Y` spending it). The atomic BEEF of `S` is its closure: `A`
+    // and `V` behind a proof, `X` and `Y` absent, their BUMPs dropped and
+    // the rest renumbered. The non-atomic writer keeps every entry.
+    let graph = Graph::build();
+    let x = tx(&[(&"2f".repeat(32), 0)], &[50]);
+    let y = tx(&[(&x.id(), 0)], &[40]);
+    let mut bumps = graph.bumps.clone();
+    bumps.insert(0, MerklePath::from_coinbase_txid(&x.id(), 990_000));
+    let mut roots = graph.roots();
+    roots.insert(990_000, internal(&bumps[0].compute_root(None).unwrap()));
+
+    let mut beef = Beef::new();
+    for bump in &bumps {
+        beef.merge_bump(bump.clone());
+    }
+    beef.merge_raw_tx(x.to_binary(), Some(0));
+    beef.merge_raw_tx(y.to_binary(), None);
+    for node in &graph.nodes {
+        beef.merge_raw_tx(node.raw.clone(), node.bump.map(|b| b + 1));
+    }
+    let all = beef.clone().to_binary();
+    let subject = graph.node("S").txid.clone();
+    let bytes = beef.to_binary_atomic(&subject).unwrap();
+
+    let written = Beef::from_binary(&bytes).unwrap();
+    let txids: Vec<String> = written.txs.iter().map(|t| t.txid()).collect();
+    for absent in [
+        x.id(),
+        y.id(),
+        graph.node("A").txid.clone(),
+        graph.node("V").txid.clone(),
+    ] {
+        assert!(!txids.contains(&absent), "{absent} written");
+    }
+    assert_eq!(txids.len(), 5);
+    assert_eq!(txids.last(), Some(&subject));
+    // The BUMPs of `P`, `Z`, `W`, renumbered from 0; each proves its entry.
+    assert_eq!(written.bumps.len(), 3);
+    for entry in &written.txs {
+        if let Some(b) = entry.bump_index() {
+            assert!(written.bumps[b].contains(&entry.txid()));
+        }
+    }
+    assert_eq!(verdicts(&bytes, &roots), [Ok(()), Ok(()), Ok(()), Ok(())]);
+    assert!(ts3_accepts(&bytes));
+    // The writer's BEEF held whole is refused as atomic by TS 3 (`A`, `V`
+    // behind proofs; `X`, `Y` unrelated) and by this crate (`X`, `Y`).
+    let mut whole = bytes[..36].to_vec();
+    whole.extend_from_slice(&all);
+    assert!(!ts3_accepts(&whole));
+    assert_eq!(
+        verdicts(&whole, &roots),
+        [Err(Kind::UnrelatedTransaction); 4]
+    );
+    // The non-atomic writer is unchanged: all nine.
+    assert_eq!(Beef::from_binary(&all).unwrap().txs.len(), 9);
+}
+
+#[test]
+fn every_accepted_vector_round_trips_through_the_atomic_writer() {
+    // The staged BRC-95 vectors: each the readers accept, read and written
+    // again by `to_binary_atomic`, is accepted by both readers and by the
+    // TypeScript 3 rule; the two TS 3 refuses come back as their closure.
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/transaction/vectors/atomic-beef.json");
+    let file: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut accepted = 0;
+    for vector in file["vectors"].as_array().unwrap() {
+        if vector["expected"]["valid"] != serde_json::Value::Bool(true) {
+            continue;
+        }
+        let id = vector["id"].as_str().unwrap();
+        let bytes = from_hex(vector["input"]["beef_hex"].as_str().unwrap()).unwrap();
+        let roots: HashMap<u64, Hash32> = vector["input"]["headers"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(h, r)| (h.parse().unwrap(), internal(r.as_str().unwrap())))
+            .collect();
+        let subject = vector["expected"]["subject_txid"].as_str().unwrap();
+        let mut beef = Beef::from_binary(&bytes).unwrap();
+        let again = beef.to_binary_atomic(subject).unwrap();
+        assert_eq!(
+            verdicts(&again, &roots),
+            [Ok(()), Ok(()), Ok(()), Ok(())],
+            "{id}"
+        );
+        assert!(ts3_accepts(&again), "{id}");
+        assert_eq!(
+            ts3_accepts(&bytes),
+            vector["parity_class"].as_str() != Some("intended"),
+            "{id}: the TS 3 model's verdict on the vector"
+        );
+        let written = Beef::from_binary(&again).unwrap();
+        assert_eq!(written.txs.last().unwrap().txid(), subject, "{id}");
+        accepted += 1;
+    }
+    assert_eq!(accepted, 4);
 }
 
 /// The Lean's W4 bytes (`bsv-stack-lean corpus/beef-of-any-size`, copied
