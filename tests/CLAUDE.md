@@ -19,7 +19,8 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `chaintracker_http_tests.rs` | 10 | `transaction`+`http` | WhatsOnChain chain tracker with wiremock |
 | `compat_bip39_tests.rs` | 29 | `compat` | BIP-39 mnemonics with official TREZOR vectors |
 | `compat_integration_tests.rs` | 31 | `compat` | BIP-32/39, BSM, ECIES, Base58 workflows |
-| `conformance_beef.rs` | 3 | `transaction` | The ts-stack conformance corpus's BUMP, serialization, BEEF and transaction-regression suites, every mismatch classified against pinned counts; reads `$BSV_CONFORMANCE_DIR` (default `../ts-stack/conformance`) and skips loudly without it |
+| `beef_atomic_graph.rs` | 7 | `transaction` | The atomic rule on the subject's graph (0.8.1, BRC-95): one atomic BEEF in each of its 364 orders the BRC-62 clause allows (the TS partition order, a raw unproven ancestor after its proven descendant, the subject not last), accepted by the stream (with and without scripts) and the whole path; an unrelated entry (raw proven, raw unproven, txid-only) refused at every position; a subject not raw in the BEEF `SubjectMissing`; `to_binary_atomic`'s output accepted by both readers; a cursor at every `k`; the Lean's W4 bytes still refused |
+| `conformance_beef.rs` | 4 | `transaction` | The ts-stack conformance corpus's BUMP, serialization, BEEF and transaction-regression suites, every mismatch classified against pinned counts; reads `$BSV_CONFORMANCE_DIR` (default `../ts-stack/conformance`) and skips loudly without it; `sdk.transactions.atomic-beef` (BRC-95, six vectors) from the corpus when it carries the file, else from the staged `transaction/vectors/atomic-beef.json`, so it runs either way |
 | `conformance_scripts.rs` | 2 | `transaction` | The corpus's script domain (5,116 evaluation vectors pinned, the sighash and script regressions) through `Spend`, the sighash builder and the `Script` API, every mismatch classified against pinned counts; the same corpus and skip |
 | `cross_sdk_tests.rs` | 17 | default | BRC-42, symmetric encryption, WIF/address vectors |
 | `drbg_tests.rs` | 6 | default | HMAC-DRBG with NIST SP 800-90A vectors |
@@ -101,6 +102,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 | `bump_invalid.rs` | Invalid BUMP vectors with expected error messages |
 | `bigtx.rs` | Large transaction test vectors |
 | `beef_cross_sdk.rs` | BEEF (BRC-62) and MerklePath vectors from TypeScript/Go SDKs |
+| `atomic-beef.json` | BRC-95 vectors in the ts-stack corpus format, staged for `vectors/sdk/transactions/` (six: Go's dependency order, TS's partition order, a raw unproven ancestor after its proven descendant (TS), the subject not last (this crate's writer), an unrelated entry (TS's writer, refused), the subject missing (hand-built, refused)) |
 
 ## Test Categories by Module
 

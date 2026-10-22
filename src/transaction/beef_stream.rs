@@ -16,7 +16,8 @@
 //!   ([`AsyncByteSource`], [`verify_stream_async`]) alike.
 //! - [`BeefIndex`] is the reader's state (the Lean's `Index` and `fold`): the
 //!   BUMPs by position, the txids their level 0 carries, the transactions by
-//!   txid with a spent flag, the last raw transaction. One entry per element
+//!   txid with a spent flag, the txids named before they were read, the
+//!   last raw transaction. One entry per element
 //!   and one per level-0 txid; never a sibling hash, never a transaction's
 //!   bytes after its step.
 //! - [`verify_stream`] is one pass: one step per element, each BUMP's root
@@ -135,9 +136,10 @@ pub enum Kind {
     StubNotProven,
     /// A byte after the frame's end.
     TrailingBytes,
-    /// Atomic: the subject is not the last transaction.
+    /// Atomic: the subject is not a raw transaction of the BEEF.
     SubjectMissing,
-    /// Atomic: a transaction that is not the subject and that nothing spends.
+    /// Atomic: an entry outside the subject's dependency graph (BRC-95): one
+    /// that is not the subject and that no raw transaction spends.
     UnrelatedTransaction,
     /// A raw transaction with no input (since 0.4.1).
     NoInputs,
@@ -269,12 +271,12 @@ pub enum Reason {
     },
     /// The byte at the offset belongs to no field.
     TrailingBytes,
-    /// The subject that is not the tip.
+    /// The subject that is not a raw transaction of the BEEF.
     SubjectMissing {
         /// The subject.
         subject: Hash32,
     },
-    /// The transaction nothing spends.
+    /// The entry no raw transaction spends, outside the subject's graph.
     UnrelatedTransaction {
         /// Its txid.
         txid: Hash32,
@@ -1763,7 +1765,7 @@ struct Retained {
 struct TxEntry {
     /// The stream offset of its earliest entry.
     at: u64,
-    /// A later transaction spent it.
+    /// A raw transaction of the BEEF spends it, read before it or after.
     referenced: bool,
     /// Its raw bytes were read (a txid-only entry leaves this false).
     raw: bool,
@@ -1888,6 +1890,12 @@ pub struct BeefIndex {
     txs: HashMap<Hash32, TxEntry>,
     /// The last raw transaction and its offset.
     last_raw: Option<(Hash32, u64)>,
+    /// The txids a raw transaction's inputs named before the BEEF held them:
+    /// an entry read later is spent (0.8.1). Only a proven transaction names
+    /// a txid not yet read (an unproven one spends earlier transactions), so
+    /// this holds the inputs of the proven transactions that the BEEF does
+    /// not carry, and the parents still to come.
+    named_ahead: HashSet<Hash32>,
     steps: u64,
     work: u64,
     check_spends: bool,
@@ -1933,6 +1941,7 @@ impl BeefIndex {
             proven_again: HashSet::new(),
             txs: HashMap::new(),
             last_raw: None,
+            named_ahead: HashSet::new(),
             steps: 0,
             work: 0,
             check_spends,
@@ -2080,9 +2089,10 @@ impl BeefIndex {
                 if !self.proven.contains_key(txid) {
                     return Err(Refusal::new(*offset, Reason::StubNotProven { txid: *txid }).into());
                 }
+                let named = self.named_ahead.remove(txid);
                 self.txs.entry(*txid).or_insert(TxEntry {
                     at: *offset,
-                    referenced: false,
+                    referenced: named,
                     raw: false,
                     coinbase_height: None,
                     outputs: None,
@@ -2203,8 +2213,11 @@ impl BeefIndex {
                     }
                 }
                 for input in &body.inputs {
-                    if let Some(parent) = self.txs.get_mut(&input.prev) {
-                        parent.referenced = true;
+                    match self.txs.get_mut(&input.prev) {
+                        Some(parent) => parent.referenced = true,
+                        None => {
+                            self.named_ahead.insert(input.prev);
+                        }
                     }
                 }
                 let keep = |vout: usize| match &self.wanted {
@@ -2240,11 +2253,12 @@ impl BeefIndex {
                         }
                     }
                     None => {
+                        let named = self.named_ahead.remove(txid);
                         self.txs.insert(
                             *txid,
                             TxEntry {
                                 at: *offset,
-                                referenced: false,
+                                referenced: named,
                                 raw: true,
                                 coinbase_height,
                                 live: live_of(&outputs),
@@ -2444,27 +2458,33 @@ impl BeefIndex {
         Ok(None)
     }
 
-    /// The atomic check at the end (the Lean's `finish`): the subject is the
-    /// last raw transaction, and every other transaction was spent by a later
-    /// one. `subject_at` is the offset a missing subject is named at.
+    /// The atomic check at the end (the Lean's `finish`), on the subject's
+    /// graph (`atomic_unrelated`, 0.8.1): the subject is a raw transaction
+    /// of the BEEF, and every other entry is spent by a raw transaction of
+    /// it, read before or after. Position is not judged. `subject_at` is the
+    /// offset a missing subject is named at.
     pub fn finish(&mut self, subject: Option<&Hash32>, subject_at: u64) -> Result<(), Refusal> {
         let Some(subject) = subject else {
             return Ok(());
         };
-        if self.last_raw.map(|(txid, _)| txid) != Some(*subject) {
-            return Err(Refusal::new(
-                subject_at,
-                Reason::SubjectMissing { subject: *subject },
-            ));
-        }
+        let entries = self.txs.iter().map(|(txid, e)| {
+            (
+                txid,
+                AtomicEntry {
+                    raw: e.raw,
+                    spent: e.referenced,
+                },
+            )
+        });
+        let unrelated = atomic_unrelated(subject, entries)
+            .map_err(|_| Refusal::new(subject_at, Reason::SubjectMissing { subject: *subject }))?;
         // Of several unrelated transactions the Lean names the one its trie
         // meets earliest: the least by the bits of the txid, low bit leading.
         let trie_order = |txid: &Hash32| txid.map(u8::reverse_bits);
-        let unrelated = self
-            .txs
-            .iter()
-            .filter(|(txid, entry)| !entry.referenced && *txid != subject)
-            .min_by_key(|(txid, _)| trie_order(txid));
+        let unrelated = unrelated
+            .into_iter()
+            .min_by_key(|txid| trie_order(txid))
+            .map(|txid| (txid, &self.txs[txid]));
         if let Some((txid, entry)) = unrelated {
             return Err(Refusal::new(
                 entry.at,
@@ -2480,6 +2500,58 @@ impl Default for BeefIndex {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// An entry of a BEEF as the atomic rule reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct AtomicEntry {
+    /// Its raw bytes are in the BEEF (a txid-only entry's are not).
+    pub(crate) raw: bool,
+    /// An input of a raw transaction of the BEEF names it, wherever that
+    /// transaction sits.
+    pub(crate) spent: bool,
+}
+
+/// BRC-95's atomic rule on the subject's dependency graph: the one predicate
+/// of both readers ([`BeefIndex::finish`] and `Beef::verify_structure`,
+/// 0.8.1). The subject is a raw transaction of the BEEF, else
+/// [`Kind::SubjectMissing`]; the answer is then the entries outside the
+/// subject's graph, and an atomic BEEF is valid under the rule when it is
+/// empty.
+///
+/// An entry is in the subject's graph (reached from the subject by following
+/// the inputs of raw entries) exactly when it is the subject or a raw entry
+/// spends it. A txid is a hash, so no chain of spends returns to where it
+/// began: from an entry that a raw entry spends, the spenders lead on to an
+/// entry nothing spends, which is the subject when every other entry is
+/// spent, and the path back is the subject's inputs followed down. The other
+/// way, an entry of the graph other than the subject is spent by the entry
+/// before it on its path. So the rule needs one flag per entry, not the
+/// edges: whether some raw entry, anywhere in the BEEF, names it.
+///
+/// Position is not judged: BRC-95 (`BRCs transactions/0095.md`) defines the
+/// rule on the graph, the TypeScript writer puts every proven transaction
+/// before the unproven ones (a raw unproven ancestor can follow its proven
+/// descendant), and the Go writer puts the subject last. Until 0.8.0 both
+/// readers counted a spend only by a transaction read after its parent, and
+/// refused the first shape (the bsv-dd x402 refund, P0-65).
+pub(crate) fn atomic_unrelated<'a, K: Eq + ?Sized + 'a>(
+    subject: &K,
+    entries: impl IntoIterator<Item = (&'a K, AtomicEntry)>,
+) -> Result<Vec<&'a K>, Kind> {
+    let mut subject_raw = false;
+    let mut unrelated = Vec::new();
+    for (txid, entry) in entries {
+        if txid == subject {
+            subject_raw |= entry.raw;
+        } else if !entry.spent {
+            unrelated.push(txid);
+        }
+    }
+    if !subject_raw {
+        return Err(Kind::SubjectMissing);
+    }
+    Ok(unrelated)
 }
 
 // ---------------------------------------------------------------------------
@@ -2613,7 +2685,7 @@ struct Pending {
     input: u32,
 }
 
-const CURSOR_MAGIC: &[u8; 4] = b"BSC2";
+const CURSOR_MAGIC: &[u8; 4] = b"BSC3";
 
 impl Cursor {
     /// The elements read.
@@ -2641,8 +2713,10 @@ impl Cursor {
     }
 
     /// The cursor's bytes. Equal states give equal bytes; a cursor between
-    /// two elements encodes the verified coinbase heights as well. BSC2
-    /// rejects older cursors without this metadata: restart their reading.
+    /// two elements encodes the verified coinbase heights as well, and the
+    /// txids named before they were read (BSC3, 0.8.1: the atomic rule
+    /// counts a spend by a transaction read before its parent). Older
+    /// cursors (BSC2, BSC1) are refused: restart their reading.
     /// A paused cursor appends the transaction and the input reached.
     pub fn to_binary(&self) -> Vec<u8> {
         fn put_hash(w: &mut Writer, h: &Option<Hash32>) {
@@ -2740,6 +2814,12 @@ impl Cursor {
                     }
                 }
             }
+        }
+        let mut named: Vec<&Hash32> = index.named_ahead.iter().collect();
+        named.sort_unstable();
+        w.write_var_int(named.len() as u64);
+        for txid in named {
+            w.write_bytes(txid);
         }
         match &index.wanted {
             None => {
@@ -2881,6 +2961,13 @@ impl Cursor {
                 },
             );
         }
+        for _ in 0..r.read_var_int()? {
+            let txid = hash(&mut r)?;
+            if index.txs.contains_key(&txid) {
+                return Err(bad("a txid named ahead that the index holds"));
+            }
+            index.named_ahead.insert(txid);
+        }
         index.wanted = match r.read_u8()? {
             0 => None,
             1 => {
@@ -3000,8 +3087,8 @@ impl Judge {
         }
         let subject = self.subject.or(decoder.subject());
         // A missing subject is named at the prefix's 32 bytes; without a
-        // prefix, at the transaction that is the tip instead, or at the
-        // stream's end when there is none.
+        // prefix, at the last raw transaction instead, or at the stream's end
+        // when there is none.
         let subject_at = if decoder.subject().is_some() {
             4
         } else {

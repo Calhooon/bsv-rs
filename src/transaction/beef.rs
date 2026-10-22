@@ -36,7 +36,9 @@ use crate::primitives::encoding::bounded_capacity;
 use crate::primitives::{from_hex, to_hex, Reader, Writer};
 use crate::Result;
 
-use super::beef_stream::{display_hex, merkle_path_root, Kind, Reason, Refusal};
+use super::beef_stream::{
+    atomic_unrelated, display_hex, merkle_path_root, AtomicEntry, Kind, Reason, Refusal,
+};
 use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
@@ -695,19 +697,18 @@ impl Beef {
     ///   this BEEF, or one that never becomes valid: [`Kind::InputNamesNoElement`].
     ///   The transactions are sorted first ([`sort_txs`](Self::sort_txs)), as
     ///   the reference sorts them; the stream reads its order as written.
-    /// - Atomic (NL-8 W4): the subject is the last raw transaction, else
-    ///   [`Kind::SubjectMissing`]; every other transaction or txid-only entry
-    ///   is spent by a later raw transaction, else
-    ///   [`Kind::UnrelatedTransaction`]. "Last" and "later" are the order the
-    ///   transactions hold when this is called, before its sort: the wire's
-    ///   for a BEEF just read, the writer's for one built here.
+    /// - Atomic (NL-8 W4, BRC-95): the subject is a raw transaction of this
+    ///   BEEF, else [`Kind::SubjectMissing`]; every other transaction or
+    ///   txid-only entry is in the subject's dependency graph (reached from
+    ///   the subject through the inputs of raw transactions), else
+    ///   [`Kind::UnrelatedTransaction`]. Position is not judged (0.8.1): the
+    ///   streaming reader's rule, the same predicate.
     ///
     /// A byte after the frame (NL-8 W3) is refused by [`from_binary`](Self::from_binary)
     /// before this runs.
     pub fn verify_structure(&mut self) -> std::result::Result<HashMap<u32, String>, Kind> {
-        // The atomic rule reads the order as held, so it is judged before
-        // the sort and answered after the rest, where the reader's `finish`
-        // answers it.
+        // The atomic rule is answered after the rest, where the reader's
+        // `finish` answers it.
         let atomic = match self.atomic_txid.clone() {
             Some(subject) => self.atomic_rule(&subject),
             None => Ok(()),
@@ -806,29 +807,30 @@ impl Beef {
         Ok(roots)
     }
 
-    /// The atomic rule on the transactions in the order they hold (the
-    /// streaming reader's `BeefIndex::finish`): `subject` is the last raw
-    /// transaction, and every other entry is spent by a later raw
-    /// transaction.
+    /// The atomic rule on the subject's graph: the streaming reader's
+    /// predicate ([`atomic_unrelated`]) over this BEEF's entries, whatever
+    /// order they hold.
     fn atomic_rule(&self, subject: &str) -> std::result::Result<(), Kind> {
-        let mut last_raw: Option<String> = None;
-        let mut referenced: HashMap<String, bool> = HashMap::new();
-        for tx in &self.txs {
-            let txid = tx.txid();
-            if !tx.is_txid_only() {
-                for prev in spent_txids(tx) {
-                    if let Some(r) = referenced.get_mut(&prev) {
-                        *r = true;
-                    }
-                }
-                last_raw = Some(txid.clone());
-            }
-            referenced.entry(txid).or_insert(false);
-        }
-        if last_raw.as_deref() != Some(subject) {
-            return Err(Kind::SubjectMissing);
-        }
-        if referenced.iter().any(|(txid, r)| !r && txid != subject) {
+        let spent: HashSet<String> = self
+            .txs
+            .iter()
+            .filter(|tx| !tx.is_txid_only())
+            .flat_map(spent_txids)
+            .collect();
+        let entries: Vec<(String, AtomicEntry)> = self
+            .txs
+            .iter()
+            .map(|tx| {
+                let txid = tx.txid();
+                let entry = AtomicEntry {
+                    raw: !tx.is_txid_only(),
+                    spent: spent.contains(&txid),
+                };
+                (txid, entry)
+            })
+            .collect();
+        let unrelated = atomic_unrelated(subject, entries.iter().map(|(t, e)| (t.as_str(), *e)))?;
+        if !unrelated.is_empty() {
             return Err(Kind::UnrelatedTransaction);
         }
         Ok(())

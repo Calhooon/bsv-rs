@@ -565,18 +565,29 @@ fn a_root_the_headers_do_not_carry_is_refused_at_the_bump() {
 }
 
 #[test]
-fn a_subject_that_is_not_the_tip_is_refused() {
+fn a_subject_whose_graph_leaves_a_later_link_out_is_refused() {
     // `wrong_subject_refused`: the second link as the subject of the
-    // three-link chain; the subject's 32 bytes sit at offset 4.
+    // three-link chain. Under the graph rule (0.8.1, BRC-95) the subject is
+    // a raw transaction of the BEEF, so it is not missing; the third link is
+    // outside its graph and is the refusal, at its offset. Until 0.8.0 the
+    // positional rule named the subject at offset 4, `SubjectMissing`.
     let entries = chain_entries(3);
     let second = match &entries[2] {
         Entry::Raw(raw, _) => txid(raw),
         Entry::TxidOnly(_) => unreachable!(),
     };
     let c = chain_of(&entries, Some(second));
+    let (third, third_at) = c.txs[3];
     assert_eq!(
         refusal(structure(&c.bytes, &c.headers)),
-        (4, Reason::SubjectMissing { subject: second })
+        (third_at, Reason::UnrelatedTransaction { txid: third })
+    );
+    // A subject the BEEF does not carry is still missing, at offset 4.
+    let stranger = tag(&[7]);
+    let c = chain_of(&entries, Some(stranger));
+    assert_eq!(
+        refusal(structure(&c.bytes, &c.headers)),
+        (4, Reason::SubjectMissing { subject: stranger })
     );
 }
 
@@ -897,7 +908,14 @@ fn the_brc62_example_is_cut_as_the_lean_cuts_it_and_is_accepted() {
     );
 
     // `atomic_example_accepted`, `atomic_example_wrong_subject`.
-    let (Element::Tx { txid: parent, .. }, Element::Tx { txid: payment, .. }) = (&els[1], &els[2])
+    let (
+        Element::Tx { txid: parent, .. },
+        Element::Tx {
+            txid: payment,
+            offset: payment_at,
+            ..
+        },
+    ) = (&els[1], &els[2])
     else {
         panic!("two transactions follow")
     };
@@ -914,9 +932,14 @@ fn the_brc62_example_is_cut_as_the_lean_cuts_it_and_is_accepted() {
             roots
         }
     );
+    // The parent as the subject: present, so not missing (0.8.1); the
+    // payment is outside its graph, at its offset behind the 36-byte prefix.
     assert_eq!(
         refusal(verify_stream(atomic(parent).as_slice(), &headers, None).unwrap()),
-        (4, Reason::SubjectMissing { subject: *parent })
+        (
+            payment_at + 36,
+            Reason::UnrelatedTransaction { txid: *payment }
+        )
     );
 
     // `trailing_refused`.
@@ -927,14 +950,16 @@ fn the_brc62_example_is_cut_as_the_lean_cuts_it_and_is_accepted() {
         (677, Reason::TrailingBytes)
     );
 
-    // A subject the caller names, without the prefix: the payment is the tip;
-    // the parent is not, and the refusal names the transaction that is.
+    // A subject the caller names, without the prefix: the payment's graph
+    // holds the parent; the parent's does not hold the payment, and the
+    // refusal names it (0.8.1; `SubjectMissing` at the payment until 0.8.0).
     assert!(verify_stream(bytes.as_slice(), &headers, Some(*payment))
         .unwrap()
         .is_valid());
+    assert_eq!(*payment_at, 485);
     assert_eq!(
         refusal(verify_stream(bytes.as_slice(), &headers, Some(*parent)).unwrap()),
-        (485, Reason::SubjectMissing { subject: *parent })
+        (485, Reason::UnrelatedTransaction { txid: *payment })
     );
     // A subject the caller names against a prefix that names another.
     assert_eq!(
@@ -1717,7 +1742,8 @@ fn the_whole_path_refuses_a_byte_after_the_frame() {
 #[test]
 fn the_whole_path_holds_an_atomic_beef_to_its_subject() {
     // NL-8 W4. `wrong_subject`: the second link named as the subject of the
-    // three-link chain (the reader: 4, `SubjectMissing`).
+    // three-link chain (the reader, under the graph rule of 0.8.1: the third
+    // link's offset, `UnrelatedTransaction`; 4, `SubjectMissing` until 0.8.0).
     let entries = chain_entries(3);
     let second = match &entries[2] {
         Entry::Raw(raw, _) => txid(raw),
@@ -1725,10 +1751,10 @@ fn the_whole_path_holds_an_atomic_beef_to_its_subject() {
     };
     let c = chain_of(&entries, Some(second));
     assert_eq!(c.bytes.len(), 339);
-    assert_eq!(whole(&c.bytes), Err("SubjectMissing".to_string()));
+    assert_eq!(whole(&c.bytes), Err("UnrelatedTransaction".to_string()));
     assert_eq!(
         reader_kind(&c.bytes, &[(800_000, c.anchor_root)]).as_deref(),
-        Some("SubjectMissing")
+        Some("UnrelatedTransaction")
     );
 
     // `unrelated`: a side transaction nothing spends (the reader: its offset,
@@ -1746,8 +1772,9 @@ fn the_whole_path_holds_an_atomic_beef_to_its_subject() {
     assert!(whole(&c.bytes).is_ok());
 
     // `example_atomic_parent`: the BRC-62 example behind a prefix naming its
-    // parent, which is not the last transaction (the reader: 4,
-    // `SubjectMissing`).
+    // parent; the payment is outside the parent's graph (the reader, under
+    // the graph rule of 0.8.1: the payment's offset, `UnrelatedTransaction`;
+    // 4, `SubjectMissing` until 0.8.0).
     let els = elements(&example()).unwrap();
     let (Element::Bump(bump), Element::Tx { txid: parent, .. }, Element::Tx { txid: payment, .. }) =
         (&els[0], &els[1], &els[2])
@@ -1762,10 +1789,10 @@ fn the_whole_path_holds_an_atomic_beef_to_its_subject() {
     };
     let bytes = atomic(parent);
     assert_eq!(bytes.len(), 713);
-    assert_eq!(whole(&bytes), Err("SubjectMissing".to_string()));
+    assert_eq!(whole(&bytes), Err("UnrelatedTransaction".to_string()));
     assert_eq!(
         reader_kind(&bytes, &[(bump.block_height, bump.root)]).as_deref(),
-        Some("SubjectMissing")
+        Some("UnrelatedTransaction")
     );
     // `example_atomic_payment`: the payment is the subject.
     assert!(whole(&atomic(payment)).is_ok());
