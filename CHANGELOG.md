@@ -106,8 +106,9 @@ the reference's, wrote BEEFs its own two readers refused.
   refused by all four (`an_unrelated_entry_is_refused_by_both_readers_in_every_order`);
   a subject the BEEF does not carry raw, `SubjectMissing` in every order
   (`a_subject_the_beef_does_not_carry_raw_is_missing_in_every_order`);
-  `to_binary_atomic`'s output from each merge order accepted by both readers
-  (`what_this_crates_writer_writes_its_own_two_readers_accept`); a cursor at
+  `to_binary_atomic`'s output from each merge order, the closure, accepted by
+  both readers (`what_this_crates_writer_writes_its_own_two_readers_accept`,
+  rewritten with the writer change below); a cursor at
   every `k` (`a_cursor_carries_the_txids_named_before_they_were_read`); the
   W4 bytes (`the_leans_w4_bytes_are_refused_under_the_graph_rule`). Six of
   the seven were red on 0.8.0. The review's folds add three, red on the
@@ -127,13 +128,50 @@ the reference's, wrote BEEFs its own two readers refused.
   bytes are the writers': Go's `AtomicBytes` (dependency order), TypeScript's
   `toBinaryAtomic` (the partition order; the raw ancestor after its proven
   descendant; an unrelated entry, refused), this crate's `to_binary_atomic`
-  (the subject not last); the missing subject is hand-built (no writer writes
+  before the writer change below (the subject not last); the missing subject
+  is hand-built (no writer writes
   an atomic BEEF for a txid it does not hold). Two vectors were red on 0.8.0.
   Those two, `raw-unproven-ancestor-after-proven-descendant` and
   `subject-present-not-last`, are `parity_class` `intended` (with a
   `skip_reason`): `@bsv/sdk` 3.x refuses them (below), so the corpus cannot
   hold them as `required`; `reference_impl` says the expected values are this
   crate's ruling. `conformance_atomic_beef` pins which two.
+
+### Changed: the atomic writer emits the BRC-95 closure (what TS 3 and Go write)
+
+`Beef::to_binary_atomic` wrote every entry the `Beef` held. A `Beef` that
+merged ancestors behind a proof then emitted a raw ancestor of a proven
+transaction, which `@bsv/sdk` 3's readers refuse, and an entry outside the
+subject's graph, which every reader but 2.1.4's refuses. It now writes the
+subject's closure: from the subject, the inputs of raw entries are
+followed, stopping at a transaction a BUMP of this BEEF proves (its BUMP
+index names a BUMP whose level 0 carries its txid) and at txid-only
+entries; every other entry is dropped, with the BUMPs no kept entry needs,
+and the kept BUMPs are renumbered (a txid-only entry keeps the first BUMP
+that carries it). The order is the reference's sort, the subject last. This
+is `@bsv/sdk` 3's `#collectAtomicTransactions` / `#copySelectedTransactions`
+(ts-stack `Beef.ts:375-472`) and go-sdk's `selectAtomicBeef`
+(`transaction/beef.go:1719-1749`). The output shrinks by what no reader
+needs; nothing it writes is refused by a reader of 0.8.0, TS 2, TS 3 or Go
+that accepted the subject's graph. `to_binary` (non-atomic) is unchanged.
+A raw entry whose BUMP index is out of range is now an error
+(`BeefError`), as Go's is; it was written as is before.
+
+- Tests (`tests/beef_atomic_graph.rs`): a `Beef` holding a proven parent
+  and child, a raw unproven ancestor of a proven transaction and an
+  unrelated branch writes the closure, accepted by both readers and by the
+  TS 3 rule modelled in the test, the ancestor behind the proof and the
+  branch absent, three BUMPs renumbered
+  (`the_atomic_writer_emits_the_brc95_closure_and_drops_the_rest`); every
+  accepted vector of `atomic-beef.json` read and written again is accepted by
+  both readers and the TS 3 model, which also refuses exactly the two
+  `intended` vectors as they stand
+  (`every_accepted_vector_round_trips_through_the_atomic_writer`); the 364
+  merge orders write one closure (`what_this_crates_writer_writes_its_own_two_readers_accept`).
+  All three red before the change.
+- Downstreams that call `to_binary_atomic` (bsv-overlay-cloudflare,
+  rust-message-box, bsv-messagebox-cloudflare-public, bsv-wallet-toolbox-rs)
+  get the smaller BEEF on their next `cargo update -p bsv-rs`.
 
 ### Notes: cross-SDK parity
 
@@ -163,7 +201,8 @@ followed: 2.1.4's `BeefTx` names an entry built from raw bytes by the
 unreversed hash (`BeefTx.ts:51-53`, `toHex(hash256(rawTx))`), and a proven
 entry is never parsed, so `Beef.mergeRawTx(raw, bumpIndex)` gives a proven
 transaction a byte-reversed txid that nothing finds (the vectors' TypeScript
-generator uses `mergeTransaction`).
+generator uses `mergeTransaction`). The writer emits the cut closure (the
+change above), so what this crate writes, TS 3 reads.
 
 ## [0.8.0] - 2026-10-21
 

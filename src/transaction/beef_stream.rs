@@ -2571,7 +2571,8 @@ pub(crate) struct AtomicEntry {
 /// follows the inputs of every raw entry, proven or not (the owner's ruling,
 /// 2026-10-22); `@bsv/sdk` 3 cuts it at each proven transaction (ts-stack
 /// `Beef.ts:420-434`) and refuses a raw ancestor behind a proof, a stated
-/// divergence.
+/// divergence. This crate's writer emits the cut closure
+/// (`Beef::to_binary_atomic`), which every reader accepts.
 pub(crate) fn atomic_unrelated<'a, K: Eq + ?Sized + 'a>(
     subject: &K,
     entries: impl IntoIterator<Item = (&'a K, AtomicEntry)>,
