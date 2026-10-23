@@ -1,0 +1,14 @@
+# Lane oracle-northstar: docs/NORTH-STAR.md, the crate's scoreboard row and its research queue (#84)
+
+**Repository.** `bsv-rs`, your worktree on a branch from `origin/beta`. `docs/lanes/README.md` binds you. Two hours.
+
+**Read in this order.** #84 and the epic #101 in full (the row, the phases, the loop, the dependents map, the never-without-the-owner list). Every issue #75 to #100 (`gh issue view N --repo Calhooon/bsv-rs`): their exit tests and stack-alignment lines. The CLI's `docs/NORTH-STAR.md` if landed (`git -C ~/bsv/bsv-wallet-cli show origin/beta:docs/NORTH-STAR.md`) and its epic Calhooon/bsv-wallet-cli#106 (the shared scoreboard's shape: mirror its sections so the three crates' pages read alike). `~/bsv/bsv-stack-lean/NORTH-STAR.md` and `docs/BSV-NORTH-STAR.md` (the six tests; pointers, never restated rules). The reports of the other wave-1 lanes as they land (`cca runs --project bsv-rs`; the captain will hand you the numbers): #77's benches, #78's baseline, #80's wasm sizes.
+
+**The work.**
+1. `docs/NORTH-STAR.md`: the scoreboard row as a table whose cells name the CI job and the artifact that writes each number (empty until the job exists, never a number typed by hand); the six phases with each issue's exit test in one line; the loop (a code lane, a cold review lane, small PRs, the hot-path proof: conformance run, mutation floor, adversarial review); the never-without-the-owner list; the ranked research queue (every open issue of the programme, ranked, with what it is blocked on); the dependents line pointing at `docs/DEPENDENTS.md`; the stack-alignment section as pointers to the stack's charters and the sibling's harness by pin.
+2. `README.md`: one line under its opening heading pointing at `docs/NORTH-STAR.md` (no other README change; its example blocks are pinned by `tests/readme_examples.rs`).
+3. A `scoreboard` step in `ci.yml` that collects the artifacts the other jobs produce (`benches/baseline.json`, `docs/ratchets.json`, the wasm sizes, the mutation summary when it exists) into one JSON job summary; where a producer has not landed yet, the step says so by name rather than failing.
+
+**Bounds.** Docs and one collecting step. No number typed by hand: a cell either names its producer or says "not yet measured". No edit under `src/` or to `Cargo.toml`.
+
+**Report.** `REPORT: STATUS done|blocked`, the base and tip commits, the page's section list, which cells have a producer today, the commands and their tails, the six tests each choice passes.
