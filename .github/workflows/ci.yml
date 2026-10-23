@@ -173,7 +173,7 @@ jobs:
         run: cargo test --all-features --test chain_primitives --test chain_difficulty --test chain_encoding --test canonical_varint --test hash_stream --test hkdf_wycheproof --verbose
 
       - name: Run the vector-backed tests
-        run: cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --verbose -- --nocapture
+        run: cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --test wallet_http_json_busy_tests --verbose -- --nocapture
 
   docs:
     name: Documentation
