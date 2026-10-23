@@ -136,7 +136,7 @@ impl HttpWalletJson {
         let response = request
             .send()
             .await
-            .map_err(|e| Error::WalletError(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| request_error(e, "HTTP request failed"))?;
 
         // Check for error status
         if !response.status().is_success() {
@@ -162,17 +162,25 @@ impl HttpWalletJson {
                 ));
             }
 
-            return Err(Error::WalletError(format!(
-                "HTTP {} for {}: {}",
-                status, method, text
-            )));
+            let detail = format!("HTTP {} for {}: {}", status, method, text);
+
+            // A gateway status without the wallet's word is the edge's
+            // answer: the way failed, and nothing is promised
+            if TRANSPORT_STATUSES.contains(&status.as_u16()) {
+                return Err(Error::WalletTransport {
+                    status: Some(status.as_u16()),
+                    detail,
+                });
+            }
+
+            return Err(Error::WalletError(detail));
         }
 
         // Parse response
         response
             .json::<R>()
             .await
-            .map_err(|e| Error::WalletError(format!("failed to parse JSON response: {}", e)))
+            .map_err(|e| request_error(e, "failed to parse JSON response"))
     }
 
     // =========================================================================
@@ -1047,6 +1055,29 @@ fn counterparty_to_string(counterparty: &Counterparty) -> String {
         Counterparty::Self_ => "self".to_string(),
         Counterparty::Anyone => "anyone".to_string(),
         Counterparty::Other(pubkey) => crate::primitives::to_hex(&pubkey.to_compressed()),
+    }
+}
+
+/// The statuses an edge answers when the way to the wallet failed (RFC 9110
+/// section 15.6: 502 Bad Gateway, 503 Service Unavailable, 504 Gateway
+/// Timeout); without the wallet's body code they are
+/// [`Error::WalletTransport`].
+const TRANSPORT_STATUSES: [u16; 3] = [502, 503, 504];
+
+/// Creates the error for a failed send or body read: a connection error
+/// (refused, reset, DNS; reqwest's request kind) or a timeout is
+/// [`Error::WalletTransport`] with no status; a request that could not be
+/// built, a redirect refused and a success body that is not the expected
+/// JSON stay [`Error::WalletError`].
+fn request_error(e: reqwest::Error, context: &str) -> Error {
+    let detail = format!("{}: {}", context, e);
+    if e.is_timeout() || e.is_request() {
+        Error::WalletTransport {
+            status: None,
+            detail,
+        }
+    } else {
+        Error::WalletError(detail)
     }
 }
 
