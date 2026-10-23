@@ -1,5 +1,7 @@
 # bsv-rs
 
+The programme, measured scoreboard and research queue are in [docs/NORTH-STAR.md](docs/NORTH-STAR.md).
+
 **0.7.1**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
 BEEF and SPV, block headers and proof of work, wallets, authentication and
 overlay clients. Optional features support native applications and wasm hosts.
