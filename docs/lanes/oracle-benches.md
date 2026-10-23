@@ -1,0 +1,16 @@
+# Lane oracle-benches: the benches widened and gated (#77)
+
+**Repository.** `bsv-rs`, your worktree on a branch from `origin/beta`. `docs/lanes/README.md` binds you. Four hours.
+
+**Read in this order.** #77 and the epic #101 (the scoreboard row: every number is read off these benches and nowhere else). `benches/CLAUDE.md` and the four benches (`hash_bench`, `primitives_bench`, `script_bench`, `memory_bench`: the criterion shape, the RSS tracking in `memory_bench`). `ci.yml`'s `benchmarks` job (critcmp of `primitives_bench` and `hash_bench` base against PR, no threshold, no baseline file; it is replaced, not extended) and `benchmarks-build`. `src/transaction/beef_stream.rs` (`BeefIndex`, the cursor, `verify_stream`), `tests/beef_stream_deep.rs` and `tests/beef_limits.rs` (how a large BEEF is built by this crate's writer), `src/transaction/merkle_path.rs`, `src/script/templates/p2pkh.rs` and `src/transaction/transaction.rs` `sign`/`verify`, `src/wallet/wire/encoding.rs`. The sibling's corpus: `~/bsv/bsv-script-lean/corpus/INDEX.md` and `corpus/seed/`, read at the clone's current commit, which you name; `harness/README.md` for how `run_bsvrs` drives the evaluator.
+
+**The work.**
+1. New benches, criterion, `harness = false`: `beef_stream` (a 1 MB and a 10 MB BEEF built by `to_binary`, read by the streaming reader with and without script execution; wall time and the high-water RSS as `memory_bench` measures it, reported per size so the memory line's slope is a number), `merkle_path` (verify at depth 20, 10,000 paths, one block's root), `transaction_sign_verify` (100 P2PKH inputs: sign all, verify all), `wire_codec` (encode and decode each of the 28 calls' request and result; one group per call), `script_spend` (the seed corpus's rows through `Spend` under the block word; the corpus read from a path `BSV_SCRIPT_CORPUS` names, skipping loudly without it, as the conformance tests do).
+2. `benches/baseline.json`: p50 and p99 per bench on the machine the lane ran on, named by model and core count only; the Linux baseline recorded on the runner in a second CI run (say in the report which run recorded it).
+3. `tools/bench-compare` (a small Rust bin under `tools/bench-compare/` with its own manifest, outside the workspace): runs the benches, compares p99 to the baseline, fails past 5 percent, prints the table; `--record` rewrites the baseline, used only by a PR that says so.
+4. `ci.yml`: the `benchmarks` job runs `tools/bench-compare` against the Linux baseline on every PR and push to `beta`; `benchmarks-build` stays. If the runner's noise needs a wider margin, say so with the numbers from three runs.
+5. The numbers for the scoreboard, as a comment on #101 in the report's words; the captain moves them into `docs/NORTH-STAR.md` (#84).
+
+**Bounds.** You are the one lane that edits `Cargo.toml` and `Cargo.lock` this wave: the `[[bench]]` entries and, if needed, a dev-dependency, nothing else; `--locked` green after. No change under `src/` except a `pub` a bench needs, named in the report. The benches measure; they never assert a verdict (the conformance files do that). No network.
+
+**Report.** `REPORT: STATUS done|blocked`, the base and tip commits, every bench's p50 and p99 and the two memory high-water marks, the baseline's machine line, the commands and their tails, the six tests each choice passes.

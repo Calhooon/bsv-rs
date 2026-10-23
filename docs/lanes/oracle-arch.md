@@ -1,0 +1,18 @@
+# Lane oracle-arch: architecture rules as tests, and the feature matrix (#80)
+
+**Repository.** `bsv-rs`, your worktree on a branch from `origin/beta`. `docs/lanes/README.md` binds you. Three hours.
+
+**Read in this order.** #80 and the epic #101. `CLAUDE.md` rules 4, 5, 6 (hermetic tests, no panic on input, wasm32 a target of every change) and the features table. The CLI's rule 28 test (`git -C ~/bsv/bsv-wallet-cli show origin/main:tests/rule_28_sites.rs`) and its `oracle-lints` brief (`origin/beta:docs/lanes/oracle-lints.md`): a source scan with an allowlist that names today's violations by file, passing now and refusing any new site. `src/wallet/substrates/`, `src/auth/transports/`, `src/transaction/broadcasters/`, `src/transaction/chain_trackers/`, `src/overlay/` (the overlay hosts and facilitators also hold HTTP clients: decide whether they are a fifth home or an allowlisted exception, and say why). The 2026-10-23 count of 276 unwrap/expect outside tests by file (#78's text). `ci.yml`'s `msrv` job (it already checks the library on wasm32 under one feature set).
+
+**The work.** One test file per rule under `tests/arch_*.rs`, each printing the offending file and line, each with an allowlist that names today's sites so it passes on `beta` now:
+1. `arch_network_sites.rs`: `reqwest::`, `tokio_tungstenite::`, `web_sys::fetch` or any HTTP or socket client type only under `wallet/substrates`, `auth/transports`, `transaction/broadcasters`, `transaction/chain_trackers` and the overlay homes you name.
+2. `arch_no_unwrap.rs`: unwrap/expect outside `#[cfg(test)]` modules and `tests/`, allowlisted by file with today's counts as ceilings (the ceiling falls as #78's ratchet records it; the two tools agree on the count, shown in the report).
+3. `arch_no_string_errors.rs`: no `contains("`, `starts_with("` or `==` on an error's text inside `src/wallet/substrates/`, `src/auth/transports/`, `src/transaction/broadcasters/`, `src/transaction/chain_trackers/`; today's sites allowlisted whole until #87.
+4. `arch_no_env.rs`: `std::env` nowhere under `src/` (tests may read `BSV_CONFORMANCE_DIR`; the library never reads the environment).
+5. `arch_no_system_time.rs`: `std::time::SystemTime` and `std::thread::spawn` nowhere under `src/` outside `crate::util` and `#[cfg(not(target_arch = "wasm32"))]` blocks (CLAUDE.md rule 6 as a test).
+6. The feature matrix in `ci.yml`: a job `features` running `cargo hack check --each-feature --no-dev-deps` over the 21 features (cargo-hack by version, built from source into `$RUNNER_TEMP/tools`), and a job `wasm32` building each Cloudflare slice for `wasm32-unknown-unknown`: `"auth,wallet,transaction,overlay,socketio,wasm"` (CLAUDE.md rule 6), `"wallet,auth,transaction,wasm"` (the watchtower), `"transaction,wasm"` (the monitor), `"block"` (chaintracks), `"overlay,wasm"` (the overlay worker), `"auth,socketio,wasm"` (the relay); #96 adds the size budget later, so print each `.wasm`'s size in the job log now.
+7. `docs/ARCH-RULES.md`: the five rules, their allowlists, the issue that empties each (#87 for 3, #85 and #86 for the unwraps in script and BEEF).
+
+**Bounds.** Tests, two jobs and the document. No edit under `src/`, no edit to `Cargo.toml`. A planted violation in a scratch copy must fail each test; show the five runs in the report. If a slice in 6 does not build today, that is a finding, named with its error's tail, never a fix here.
+
+**Report.** `REPORT: STATUS done|blocked`, the base and tip commits, each rule with its allowlist size, the five planted-violation tails, the `cargo hack` tail and the six wasm sizes, the six tests each choice passes.

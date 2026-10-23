@@ -1,0 +1,16 @@
+# Lane oracle-fuzz: the fuzz corpus widened to every reader (#82)
+
+**Repository.** `bsv-rs`, your worktree on a branch from `origin/beta`. `docs/lanes/README.md` binds you. Three hours.
+
+**Read in this order.** #82 and the epic #101. `fuzz/Cargo.toml`, `fuzz/CLAUDE.md` and the six targets under `fuzz/fuzz_targets/` (the shape). `CLAUDE.md` rule 5 (bounded pre-allocation, `get` not index, `ScriptResourceLimit`). The readers: `src/transaction/merkle_path.rs`; `src/wallet/substrates/http_json.rs` (the response decoding per call); `src/wallet/wire/encoding.rs` (the 28 calls' request and result decoders; `fuzz_wire_protocol` covers the frame, not each decoder); `src/compat/bip32.rs`, `src/compat/ecies.rs`; `src/script/spend.rs` (`Spend` with a step and memory budget: `set_flags`, `memory_limit`); `src/auth/transports/` and `src/auth/` message decoders (`AuthMessage` from JSON and bytes). The sibling's corpus `~/bsv/bsv-script-lean/corpus/seed/` and `corpus/fuzz/` (the seeds for the script target; its format in `corpus/fuzz/README.md`).
+
+**The work.**
+1. Targets: `fuzz_merkle_path`, `fuzz_http_json_responses` (each call's response decoder on arbitrary JSON and bytes), `fuzz_wire_decoders` (each of the 28 calls' request and result decoders, the call chosen by the leading byte), `fuzz_bip32`, `fuzz_ecies`, `fuzz_script_spend` (an arbitrary locking and unlocking script pair through `Spend` under the block and the standard word with a small step budget and the memory limit set; the assertion is no panic and no allocation past the limit, never a verdict), `fuzz_auth_messages`. Each target's assertion is "returns, never panics"; a target that also checks a round trip says so.
+2. `fuzz/corpus/<target>/`: a seed corpus per target from the tree's own vectors (`tests/vectors/`, `tests/transaction/vectors/`, the wallet-wire message files) and, for the script target, the sibling's seed rows converted; under 2 MB total in git, larger seeds under `/Volumes/Lanes/out/bsv-rs/oracle-fuzz/` with the path in the report.
+3. A `fuzz` job in `.github/workflows/nightly.yml` (shared with `oracle-nightly`, #81: one of you creates the file; read `lane/oracle-nightly` if it exists and add your job to its file, else create it with the schedule and say so in the report): a matrix over every target, one hour each with the corpus checked in, new corpus entries uploaded as an artifact (a PR opened by the job if the repository allows it; say which), a crash an issue with the input attached.
+4. Each target run locally for ten minutes; a crash found is an issue with the input and the panic's tail, never fixed here.
+5. `fuzz/CLAUDE.md` updated with the targets table; `docs/NIGHTLY.md`'s fuzz section (shared with #81).
+
+**Bounds.** `fuzz/Cargo.toml` is yours; the root `Cargo.toml` is not. No edit under `src/` except a `pub` a target needs, named in the report. Ten minutes per target locally, no more.
+
+**Report.** `REPORT: STATUS done|blocked`, the base and tip commits, each target's run (minutes, executions, corpus size, crashes), the issues filed, the commands and their tails, the six tests each choice passes.
