@@ -387,3 +387,106 @@ jobs:
       - name: Build benchmarks
         run: cargo bench --no-run
 
+  # Add each new producer job to needs when it lands (#77, #78, #80).
+  # Missing producers are reported by name; this job never invents measurements.
+  scoreboard:
+    name: scoreboard
+    if: ${{ always() }}
+    needs: [test, clippy, fmt, vectors, docs, actionlint, secrets, msrv, machete, benchmarks, benchmarks-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Download available scoreboard inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/scoreboard-inputs
+          pattern: '{*bench*,*ratchet*,*wasm*,*mutant*,*mutation*}'
+
+      - name: scoreboard
+        env:
+          SCOREBOARD_REPOSITORY: ${{ github.repository }}
+          SCOREBOARD_COMMIT: ${{ github.sha }}
+          SCOREBOARD_RUN: ${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          repository = os.environ["SCOREBOARD_REPOSITORY"]
+          commit = os.environ["SCOREBOARD_COMMIT"]
+          run_id = os.environ["SCOREBOARD_RUN"]
+          definitions = {
+              "benchmarks": ("benchmarks (#77)", ("bench",), ("benches/baseline.json", "baseline.json")),
+              "ratchets": ("ratchet (#78)", ("ratchet",), ("docs/ratchets.json", "ratchets.json")),
+              "wasm_sizes": ("wasm32 (#80/#96)", ("wasm",), ("wasm-sizes.json",)),
+              "mutation": ("nightly.yml / mutants (#81)", ("mutant", "mutation"), ("mutation-summary.json",)),
+          }
+          report = {
+              "repository": repository,
+              "commit": commit,
+              "run_id": run_id,
+              "inputs": {
+                  key: {"producer": spec[0], "status": "not yet measured", "records": []}
+                  for key, spec in definitions.items()
+              },
+              "errors": [],
+          }
+
+          def reject_constant(value):
+              raise ValueError("Non-finite JSON constant: " + value)
+
+          def record(key, raw, source):
+              try:
+                  data = json.loads(raw, parse_constant=reject_constant)
+                  json.dumps(data, allow_nan=False)
+              except (ValueError, UnicodeDecodeError):
+                  report["errors"].append("Invalid JSON from " + source["file"])
+                  return
+              report["inputs"][key]["records"].append({
+                  "source": source,
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+                  "data": data,
+              })
+              report["inputs"][key]["status"] = "available"
+
+          try:
+              downloads = Path(os.environ["RUNNER_TEMP"], "scoreboard-inputs")
+              for path in sorted(downloads.rglob("*.json")):
+                  relative = path.relative_to(downloads)
+                  artifact = relative.parts[0]
+                  for key, (_, stems, filenames) in definitions.items():
+                      if any(stem in artifact.lower() for stem in stems) and any(
+                          relative.as_posix().endswith("/" + name) for name in filenames
+                      ):
+                          record(key, path.read_bytes(), {
+                              "kind": "current_run",
+                              "commit": commit,
+                              "run_id": run_id,
+                              "artifact": artifact,
+                              "file": relative.as_posix(),
+                          })
+              for key, filename in (("benchmarks", "benches/baseline.json"), ("ratchets", "docs/ratchets.json")):
+                  baseline = Path(filename)
+                  if baseline.is_file():
+                      record(key, baseline.read_bytes(), {
+                          "kind": "repository_baseline",
+                          "commit": commit,
+                          "file": filename,
+                      })
+          except OSError as error:
+              report["errors"].append(str(error))
+
+          encoded = json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n"
+          Path(os.environ["RUNNER_TEMP"], "scoreboard.json").write_text(encoded)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("## bsv-rs scoreboard\n\n```json\n" + encoded + "```\n")
+          for entry in report["inputs"].values():
+              print(f"{entry['producer']}: {entry['status']}")
+          if report["errors"]:
+              raise SystemExit("scoreboard: collection failed; see the JSON errors")
+          PY
