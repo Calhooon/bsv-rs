@@ -111,11 +111,13 @@ An explicit baseline update is:
 cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- --record
 ```
 
-This replaces only the measured platform's entry in `benches/baseline.json`.
+This replaces only the measured machine's entry in `benches/baseline.json`,
+keyed by platform, CPU model and core count.
 Use it only in a PR whose description requests a baseline update. The table
 and retained run show exactly what changed. Ordinary comparisons never write
-the baseline. An existing platform with a different CPU is refused; a runner
-hardware change needs a separately reviewed baseline.
+the baseline. A run on a CPU model or core count with no entry exits 2 and names
+the recorded entries; hosted runners draw from several CPUs, so each one the
+job lands on needs its own reviewed entry.
 
 The CI `benchmarks` job runs on every PR and on pushes to `beta`.
 `benchmarks-build` also compiles every bench with all features on pushes.

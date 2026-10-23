@@ -112,3 +112,15 @@ fn a_missing_bench_changed_corpus_or_machine_never_passes() {
     actual.benchmarks.clear();
     assert!(validate_run(&actual).is_err());
 }
+
+#[test]
+fn each_runner_cpu_is_its_own_baseline_entry() {
+    let base = fixture();
+    let mut other = base.clone();
+    other.machine.model = "another cpu".into();
+    assert_ne!(machine_key(&base), machine_key(&other));
+    let mut more_cores = base.clone();
+    more_cores.machine.cores = 4;
+    assert_ne!(machine_key(&base), machine_key(&more_cores));
+    assert_eq!(machine_key(&base), machine_key(&base.clone()));
+}
