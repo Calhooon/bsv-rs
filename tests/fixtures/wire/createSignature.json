@@ -1,0 +1,209 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "signature": [
+              48,
+              6,
+              2,
+              1,
+              1,
+              2,
+              1,
+              1
+            ]
+          }
+        },
+        "processor_observed": {
+          "args": {
+            "counterparty": null,
+            "data": [
+              0
+            ],
+            "hashToDirectlySign": null,
+            "keyID": "fixture",
+            "protocolID": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "create_signature",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "00083006020101020101",
+        "request_hex": "0f1066697874757265732e696e76616c6964010c66697874757265206b6579730766697874757265000100ffffffffffffffffff",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "00083006020101020101"
+      },
+      "input": {
+        "args": {
+          "counterparty": null,
+          "data": [
+            0
+          ],
+          "hashToDirectlySign": null,
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "result": {
+          "signature": [
+            48,
+            6,
+            2,
+            1,
+            1,
+            2,
+            1,
+            1
+          ]
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "signature": [
+              48,
+              6,
+              2,
+              1,
+              1,
+              2,
+              1,
+              1
+            ]
+          }
+        },
+        "processor_observed": {
+          "args": {
+            "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "data": null,
+            "hashToDirectlySign": [
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17,
+              17
+            ],
+            "keyID": "fixture",
+            "protocolID": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "create_signature",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "00083006020101020101",
+        "request_hex": "0f1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5ffffffffffffffffff201111111111111111111111111111111111111111111111111111111111111111",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "00083006020101020101"
+      },
+      "input": {
+        "args": {
+          "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "data": null,
+          "hashToDirectlySign": [
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17
+          ],
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "result": {
+          "signature": [
+            48,
+            6,
+            2,
+            1,
+            1,
+            2,
+            1,
+            1
+          ]
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 15. createSignature"
+    }
+  ],
+  "schema_version": 1
+}

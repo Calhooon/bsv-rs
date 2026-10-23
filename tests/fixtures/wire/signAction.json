@@ -1,0 +1,187 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {}
+        },
+        "processor_observed": null,
+        "processor_response_hex": "013e77616c6c6574206572726f723a207369676e416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "021066697874757265732e696e76616c696400076669787475726500",
+        "response_encoder": "WireWriter",
+        "response_hex": "000000ffffffffffffffffff"
+      },
+      "input": {
+        "args": {
+          "reference": "Zml4dHVyZQ==",
+          "spends": {}
+        },
+        "result": {}
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "sendWithResults": [
+              {
+                "status": "sending",
+                "txid": "3131313131313131313131313131313131313131313131313131313131313131"
+              }
+            ],
+            "tx": "0100beef0000",
+            "txid": [
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49
+            ]
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "013e77616c6c6574206572726f723a207369676e416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "021066697874757265732e696e76616c696401020151fffcffffff01000000076669787475726501000101013131313131313131313131313131313131313131313131313131313131313131",
+        "response_encoder": "WireWriter",
+        "response_hex": "0001313131313131313131313131313131313131313131313131313131313131313101060100beef000001313131313131313131313131313131313131313131313131313131313131313101"
+      },
+      "input": {
+        "args": {
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": true,
+            "returnTxidOnly": true,
+            "sendWith": [
+              [
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49
+              ]
+            ]
+          },
+          "reference": "Zml4dHVyZQ==",
+          "spends": {
+            "2": {
+              "sequenceNumber": 4294967294,
+              "unlockingScript": "51"
+            }
+          }
+        },
+        "result": {
+          "sendWithResults": [
+            {
+              "status": "sending",
+              "txid": "3131313131313131313131313131313131313131313131313131313131313131"
+            }
+          ],
+          "tx": "0100beef0000",
+          "txid": [
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49
+          ]
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 2. signAction"
+    }
+  ],
+  "schema_version": 1
+}

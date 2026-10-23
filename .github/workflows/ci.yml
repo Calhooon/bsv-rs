@@ -230,6 +230,41 @@ jobs:
       - name: Run doc tests
         run: cargo test --doc --all-features
 
+  fixtures:
+    name: fixtures
+    runs-on: ubuntu-latest
+    env:
+      BSV_FIXTURES_RECORD: "0"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Keep build output outside the checkout
+        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-fixtures-target" >> "$GITHUB_ENV"
+
+      - name: Cache cargo registry and fixture build
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/bsv-fixtures-target
+          key: ubuntu-fixtures-${{ hashFiles('**/Cargo.lock', 'Cargo.toml') }}
+
+      # This library does not currently commit Cargo.lock. If a later lane
+      # supplies it, use that lock unchanged; otherwise lock this job's resolve.
+      - name: Resolve dependencies when no lock is committed
+        run: test -f Cargo.lock || cargo generate-lockfile
+
+      - name: Replay the public surface fixtures
+        run: cargo test --features "full,http" --test fixtures_replay --locked
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

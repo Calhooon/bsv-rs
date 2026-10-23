@@ -1,0 +1,75 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "header": "500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+          }
+        },
+        "processor_observed": {
+          "args": {
+            "height": 0
+          },
+          "method": "get_header_for_height",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "00500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "request_hex": "1a1066697874757265732e696e76616c696400",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "00500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "input": {
+        "args": {
+          "height": 0
+        },
+        "result": {
+          "header": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "header": "50abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+          }
+        },
+        "processor_observed": {
+          "args": {
+            "height": 800000
+          },
+          "method": "get_header_for_height",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "0050abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
+        "request_hex": "1a1066697874757265732e696e76616c6964fe00350c00",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "0050abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+      },
+      "input": {
+        "args": {
+          "height": 800000
+        },
+        "result": {
+          "header": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 26. getHeaderForHeight"
+    }
+  ],
+  "schema_version": 1
+}

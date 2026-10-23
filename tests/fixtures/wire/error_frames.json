@@ -1,0 +1,3998 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 1): fixture refusal",
+          "error": "WalletError(\"wallet error (code 1): fixture refusal\")"
+        },
+        "response_hex": "010f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 1,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_1"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 2): fixture refusal",
+          "error": "WalletError(\"wallet error (code 2): fixture refusal\")"
+        },
+        "response_hex": "020f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 2,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_2"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 3): fixture refusal",
+          "error": "WalletError(\"wallet error (code 3): fixture refusal\")"
+        },
+        "response_hex": "030f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 3,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_3"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 4): fixture refusal",
+          "error": "WalletError(\"wallet error (code 4): fixture refusal\")"
+        },
+        "response_hex": "040f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 4,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_4"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 5): fixture refusal",
+          "error": "WalletError(\"wallet error (code 5): fixture refusal\")"
+        },
+        "response_hex": "050f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 5,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_5"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 6): fixture refusal",
+          "error": "WalletError(\"wallet error (code 6): fixture refusal\")"
+        },
+        "response_hex": "060f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 6,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_6"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 7): fixture refusal",
+          "error": "WalletError(\"wallet error (code 7): fixture refusal\")"
+        },
+        "response_hex": "070f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 7,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_7"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 8): fixture refusal",
+          "error": "WalletError(\"wallet error (code 8): fixture refusal\")"
+        },
+        "response_hex": "080f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 8,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_8"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 9): fixture refusal",
+          "error": "WalletError(\"wallet error (code 9): fixture refusal\")"
+        },
+        "response_hex": "090f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 9,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_9"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 10): fixture refusal",
+          "error": "WalletError(\"wallet error (code 10): fixture refusal\")"
+        },
+        "response_hex": "0a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 10,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_10"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 11): fixture refusal",
+          "error": "WalletError(\"wallet error (code 11): fixture refusal\")"
+        },
+        "response_hex": "0b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 11,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_11"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 12): fixture refusal",
+          "error": "WalletError(\"wallet error (code 12): fixture refusal\")"
+        },
+        "response_hex": "0c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 12,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_12"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 13): fixture refusal",
+          "error": "WalletError(\"wallet error (code 13): fixture refusal\")"
+        },
+        "response_hex": "0d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 13,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_13"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 14): fixture refusal",
+          "error": "WalletError(\"wallet error (code 14): fixture refusal\")"
+        },
+        "response_hex": "0e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 14,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_14"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 15): fixture refusal",
+          "error": "WalletError(\"wallet error (code 15): fixture refusal\")"
+        },
+        "response_hex": "0f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 15,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_15"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 16): fixture refusal",
+          "error": "WalletError(\"wallet error (code 16): fixture refusal\")"
+        },
+        "response_hex": "100f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 16,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_16"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 17): fixture refusal",
+          "error": "WalletError(\"wallet error (code 17): fixture refusal\")"
+        },
+        "response_hex": "110f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 17,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_17"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 18): fixture refusal",
+          "error": "WalletError(\"wallet error (code 18): fixture refusal\")"
+        },
+        "response_hex": "120f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 18,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_18"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 19): fixture refusal",
+          "error": "WalletError(\"wallet error (code 19): fixture refusal\")"
+        },
+        "response_hex": "130f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 19,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_19"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 20): fixture refusal",
+          "error": "WalletError(\"wallet error (code 20): fixture refusal\")"
+        },
+        "response_hex": "140f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 20,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_20"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 21): fixture refusal",
+          "error": "WalletError(\"wallet error (code 21): fixture refusal\")"
+        },
+        "response_hex": "150f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 21,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_21"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 22): fixture refusal",
+          "error": "WalletError(\"wallet error (code 22): fixture refusal\")"
+        },
+        "response_hex": "160f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 22,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_22"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 23): fixture refusal",
+          "error": "WalletError(\"wallet error (code 23): fixture refusal\")"
+        },
+        "response_hex": "170f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 23,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_23"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 24): fixture refusal",
+          "error": "WalletError(\"wallet error (code 24): fixture refusal\")"
+        },
+        "response_hex": "180f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 24,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_24"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 25): fixture refusal",
+          "error": "WalletError(\"wallet error (code 25): fixture refusal\")"
+        },
+        "response_hex": "190f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 25,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_25"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 26): fixture refusal",
+          "error": "WalletError(\"wallet error (code 26): fixture refusal\")"
+        },
+        "response_hex": "1a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 26,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_26"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 27): fixture refusal",
+          "error": "WalletError(\"wallet error (code 27): fixture refusal\")"
+        },
+        "response_hex": "1b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 27,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_27"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 28): fixture refusal",
+          "error": "WalletError(\"wallet error (code 28): fixture refusal\")"
+        },
+        "response_hex": "1c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 28,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_28"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 29): fixture refusal",
+          "error": "WalletError(\"wallet error (code 29): fixture refusal\")"
+        },
+        "response_hex": "1d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 29,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_29"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 30): fixture refusal",
+          "error": "WalletError(\"wallet error (code 30): fixture refusal\")"
+        },
+        "response_hex": "1e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 30,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_30"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 31): fixture refusal",
+          "error": "WalletError(\"wallet error (code 31): fixture refusal\")"
+        },
+        "response_hex": "1f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 31,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_31"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 32): fixture refusal",
+          "error": "WalletError(\"wallet error (code 32): fixture refusal\")"
+        },
+        "response_hex": "200f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 32,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_32"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 33): fixture refusal",
+          "error": "WalletError(\"wallet error (code 33): fixture refusal\")"
+        },
+        "response_hex": "210f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 33,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_33"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 34): fixture refusal",
+          "error": "WalletError(\"wallet error (code 34): fixture refusal\")"
+        },
+        "response_hex": "220f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 34,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_34"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 35): fixture refusal",
+          "error": "WalletError(\"wallet error (code 35): fixture refusal\")"
+        },
+        "response_hex": "230f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 35,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_35"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 36): fixture refusal",
+          "error": "WalletError(\"wallet error (code 36): fixture refusal\")"
+        },
+        "response_hex": "240f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 36,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_36"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 37): fixture refusal",
+          "error": "WalletError(\"wallet error (code 37): fixture refusal\")"
+        },
+        "response_hex": "250f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 37,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_37"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 38): fixture refusal",
+          "error": "WalletError(\"wallet error (code 38): fixture refusal\")"
+        },
+        "response_hex": "260f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 38,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_38"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 39): fixture refusal",
+          "error": "WalletError(\"wallet error (code 39): fixture refusal\")"
+        },
+        "response_hex": "270f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 39,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_39"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 40): fixture refusal",
+          "error": "WalletError(\"wallet error (code 40): fixture refusal\")"
+        },
+        "response_hex": "280f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 40,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_40"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 41): fixture refusal",
+          "error": "WalletError(\"wallet error (code 41): fixture refusal\")"
+        },
+        "response_hex": "290f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 41,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_41"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 42): fixture refusal",
+          "error": "WalletError(\"wallet error (code 42): fixture refusal\")"
+        },
+        "response_hex": "2a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 42,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_42"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 43): fixture refusal",
+          "error": "WalletError(\"wallet error (code 43): fixture refusal\")"
+        },
+        "response_hex": "2b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 43,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_43"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 44): fixture refusal",
+          "error": "WalletError(\"wallet error (code 44): fixture refusal\")"
+        },
+        "response_hex": "2c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 44,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_44"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 45): fixture refusal",
+          "error": "WalletError(\"wallet error (code 45): fixture refusal\")"
+        },
+        "response_hex": "2d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 45,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_45"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 46): fixture refusal",
+          "error": "WalletError(\"wallet error (code 46): fixture refusal\")"
+        },
+        "response_hex": "2e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 46,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_46"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 47): fixture refusal",
+          "error": "WalletError(\"wallet error (code 47): fixture refusal\")"
+        },
+        "response_hex": "2f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 47,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_47"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 48): fixture refusal",
+          "error": "WalletError(\"wallet error (code 48): fixture refusal\")"
+        },
+        "response_hex": "300f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 48,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_48"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 49): fixture refusal",
+          "error": "WalletError(\"wallet error (code 49): fixture refusal\")"
+        },
+        "response_hex": "310f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 49,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_49"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 50): fixture refusal",
+          "error": "WalletError(\"wallet error (code 50): fixture refusal\")"
+        },
+        "response_hex": "320f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 50,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_50"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 51): fixture refusal",
+          "error": "WalletError(\"wallet error (code 51): fixture refusal\")"
+        },
+        "response_hex": "330f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 51,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_51"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 52): fixture refusal",
+          "error": "WalletError(\"wallet error (code 52): fixture refusal\")"
+        },
+        "response_hex": "340f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 52,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_52"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 53): fixture refusal",
+          "error": "WalletError(\"wallet error (code 53): fixture refusal\")"
+        },
+        "response_hex": "350f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 53,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_53"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 54): fixture refusal",
+          "error": "WalletError(\"wallet error (code 54): fixture refusal\")"
+        },
+        "response_hex": "360f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 54,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_54"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 55): fixture refusal",
+          "error": "WalletError(\"wallet error (code 55): fixture refusal\")"
+        },
+        "response_hex": "370f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 55,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_55"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 56): fixture refusal",
+          "error": "WalletError(\"wallet error (code 56): fixture refusal\")"
+        },
+        "response_hex": "380f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 56,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_56"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 57): fixture refusal",
+          "error": "WalletError(\"wallet error (code 57): fixture refusal\")"
+        },
+        "response_hex": "390f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 57,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_57"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 58): fixture refusal",
+          "error": "WalletError(\"wallet error (code 58): fixture refusal\")"
+        },
+        "response_hex": "3a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 58,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_58"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 59): fixture refusal",
+          "error": "WalletError(\"wallet error (code 59): fixture refusal\")"
+        },
+        "response_hex": "3b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 59,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_59"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 60): fixture refusal",
+          "error": "WalletError(\"wallet error (code 60): fixture refusal\")"
+        },
+        "response_hex": "3c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 60,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_60"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 61): fixture refusal",
+          "error": "WalletError(\"wallet error (code 61): fixture refusal\")"
+        },
+        "response_hex": "3d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 61,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_61"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 62): fixture refusal",
+          "error": "WalletError(\"wallet error (code 62): fixture refusal\")"
+        },
+        "response_hex": "3e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 62,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_62"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 63): fixture refusal",
+          "error": "WalletError(\"wallet error (code 63): fixture refusal\")"
+        },
+        "response_hex": "3f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 63,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_63"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 64): fixture refusal",
+          "error": "WalletError(\"wallet error (code 64): fixture refusal\")"
+        },
+        "response_hex": "400f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 64,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_64"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 65): fixture refusal",
+          "error": "WalletError(\"wallet error (code 65): fixture refusal\")"
+        },
+        "response_hex": "410f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 65,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_65"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 66): fixture refusal",
+          "error": "WalletError(\"wallet error (code 66): fixture refusal\")"
+        },
+        "response_hex": "420f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 66,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_66"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 67): fixture refusal",
+          "error": "WalletError(\"wallet error (code 67): fixture refusal\")"
+        },
+        "response_hex": "430f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 67,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_67"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 68): fixture refusal",
+          "error": "WalletError(\"wallet error (code 68): fixture refusal\")"
+        },
+        "response_hex": "440f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 68,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_68"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 69): fixture refusal",
+          "error": "WalletError(\"wallet error (code 69): fixture refusal\")"
+        },
+        "response_hex": "450f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 69,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_69"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 70): fixture refusal",
+          "error": "WalletError(\"wallet error (code 70): fixture refusal\")"
+        },
+        "response_hex": "460f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 70,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_70"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 71): fixture refusal",
+          "error": "WalletError(\"wallet error (code 71): fixture refusal\")"
+        },
+        "response_hex": "470f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 71,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_71"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 72): fixture refusal",
+          "error": "WalletError(\"wallet error (code 72): fixture refusal\")"
+        },
+        "response_hex": "480f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 72,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_72"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 73): fixture refusal",
+          "error": "WalletError(\"wallet error (code 73): fixture refusal\")"
+        },
+        "response_hex": "490f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 73,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_73"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 74): fixture refusal",
+          "error": "WalletError(\"wallet error (code 74): fixture refusal\")"
+        },
+        "response_hex": "4a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 74,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_74"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 75): fixture refusal",
+          "error": "WalletError(\"wallet error (code 75): fixture refusal\")"
+        },
+        "response_hex": "4b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 75,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_75"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 76): fixture refusal",
+          "error": "WalletError(\"wallet error (code 76): fixture refusal\")"
+        },
+        "response_hex": "4c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 76,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_76"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 77): fixture refusal",
+          "error": "WalletError(\"wallet error (code 77): fixture refusal\")"
+        },
+        "response_hex": "4d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 77,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_77"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 78): fixture refusal",
+          "error": "WalletError(\"wallet error (code 78): fixture refusal\")"
+        },
+        "response_hex": "4e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 78,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_78"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 79): fixture refusal",
+          "error": "WalletError(\"wallet error (code 79): fixture refusal\")"
+        },
+        "response_hex": "4f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 79,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_79"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 80): fixture refusal",
+          "error": "WalletError(\"wallet error (code 80): fixture refusal\")"
+        },
+        "response_hex": "500f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 80,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_80"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 81): fixture refusal",
+          "error": "WalletError(\"wallet error (code 81): fixture refusal\")"
+        },
+        "response_hex": "510f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 81,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_81"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 82): fixture refusal",
+          "error": "WalletError(\"wallet error (code 82): fixture refusal\")"
+        },
+        "response_hex": "520f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 82,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_82"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 83): fixture refusal",
+          "error": "WalletError(\"wallet error (code 83): fixture refusal\")"
+        },
+        "response_hex": "530f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 83,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_83"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 84): fixture refusal",
+          "error": "WalletError(\"wallet error (code 84): fixture refusal\")"
+        },
+        "response_hex": "540f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 84,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_84"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 85): fixture refusal",
+          "error": "WalletError(\"wallet error (code 85): fixture refusal\")"
+        },
+        "response_hex": "550f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 85,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_85"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 86): fixture refusal",
+          "error": "WalletError(\"wallet error (code 86): fixture refusal\")"
+        },
+        "response_hex": "560f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 86,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_86"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 87): fixture refusal",
+          "error": "WalletError(\"wallet error (code 87): fixture refusal\")"
+        },
+        "response_hex": "570f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 87,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_87"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 88): fixture refusal",
+          "error": "WalletError(\"wallet error (code 88): fixture refusal\")"
+        },
+        "response_hex": "580f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 88,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_88"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 89): fixture refusal",
+          "error": "WalletError(\"wallet error (code 89): fixture refusal\")"
+        },
+        "response_hex": "590f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 89,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_89"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 90): fixture refusal",
+          "error": "WalletError(\"wallet error (code 90): fixture refusal\")"
+        },
+        "response_hex": "5a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 90,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_90"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 91): fixture refusal",
+          "error": "WalletError(\"wallet error (code 91): fixture refusal\")"
+        },
+        "response_hex": "5b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 91,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_91"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 92): fixture refusal",
+          "error": "WalletError(\"wallet error (code 92): fixture refusal\")"
+        },
+        "response_hex": "5c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 92,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_92"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 93): fixture refusal",
+          "error": "WalletError(\"wallet error (code 93): fixture refusal\")"
+        },
+        "response_hex": "5d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 93,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_93"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 94): fixture refusal",
+          "error": "WalletError(\"wallet error (code 94): fixture refusal\")"
+        },
+        "response_hex": "5e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 94,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_94"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 95): fixture refusal",
+          "error": "WalletError(\"wallet error (code 95): fixture refusal\")"
+        },
+        "response_hex": "5f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 95,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_95"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 96): fixture refusal",
+          "error": "WalletError(\"wallet error (code 96): fixture refusal\")"
+        },
+        "response_hex": "600f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 96,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_96"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 97): fixture refusal",
+          "error": "WalletError(\"wallet error (code 97): fixture refusal\")"
+        },
+        "response_hex": "610f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 97,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_97"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 98): fixture refusal",
+          "error": "WalletError(\"wallet error (code 98): fixture refusal\")"
+        },
+        "response_hex": "620f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 98,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_98"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 99): fixture refusal",
+          "error": "WalletError(\"wallet error (code 99): fixture refusal\")"
+        },
+        "response_hex": "630f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 99,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_99"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 100): fixture refusal",
+          "error": "WalletError(\"wallet error (code 100): fixture refusal\")"
+        },
+        "response_hex": "640f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 100,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_100"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 101): fixture refusal",
+          "error": "WalletError(\"wallet error (code 101): fixture refusal\")"
+        },
+        "response_hex": "650f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 101,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_101"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 102): fixture refusal",
+          "error": "WalletError(\"wallet error (code 102): fixture refusal\")"
+        },
+        "response_hex": "660f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 102,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_102"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 103): fixture refusal",
+          "error": "WalletError(\"wallet error (code 103): fixture refusal\")"
+        },
+        "response_hex": "670f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 103,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_103"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 104): fixture refusal",
+          "error": "WalletError(\"wallet error (code 104): fixture refusal\")"
+        },
+        "response_hex": "680f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 104,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_104"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 105): fixture refusal",
+          "error": "WalletError(\"wallet error (code 105): fixture refusal\")"
+        },
+        "response_hex": "690f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 105,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_105"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 106): fixture refusal",
+          "error": "WalletError(\"wallet error (code 106): fixture refusal\")"
+        },
+        "response_hex": "6a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 106,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_106"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 107): fixture refusal",
+          "error": "WalletError(\"wallet error (code 107): fixture refusal\")"
+        },
+        "response_hex": "6b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 107,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_107"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 108): fixture refusal",
+          "error": "WalletError(\"wallet error (code 108): fixture refusal\")"
+        },
+        "response_hex": "6c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 108,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_108"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 109): fixture refusal",
+          "error": "WalletError(\"wallet error (code 109): fixture refusal\")"
+        },
+        "response_hex": "6d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 109,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_109"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 110): fixture refusal",
+          "error": "WalletError(\"wallet error (code 110): fixture refusal\")"
+        },
+        "response_hex": "6e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 110,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_110"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 111): fixture refusal",
+          "error": "WalletError(\"wallet error (code 111): fixture refusal\")"
+        },
+        "response_hex": "6f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 111,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_111"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 112): fixture refusal",
+          "error": "WalletError(\"wallet error (code 112): fixture refusal\")"
+        },
+        "response_hex": "700f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 112,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_112"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 113): fixture refusal",
+          "error": "WalletError(\"wallet error (code 113): fixture refusal\")"
+        },
+        "response_hex": "710f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 113,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_113"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 114): fixture refusal",
+          "error": "WalletError(\"wallet error (code 114): fixture refusal\")"
+        },
+        "response_hex": "720f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 114,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_114"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 115): fixture refusal",
+          "error": "WalletError(\"wallet error (code 115): fixture refusal\")"
+        },
+        "response_hex": "730f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 115,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_115"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 116): fixture refusal",
+          "error": "WalletError(\"wallet error (code 116): fixture refusal\")"
+        },
+        "response_hex": "740f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 116,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_116"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 117): fixture refusal",
+          "error": "WalletError(\"wallet error (code 117): fixture refusal\")"
+        },
+        "response_hex": "750f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 117,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_117"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 118): fixture refusal",
+          "error": "WalletError(\"wallet error (code 118): fixture refusal\")"
+        },
+        "response_hex": "760f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 118,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_118"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 119): fixture refusal",
+          "error": "WalletError(\"wallet error (code 119): fixture refusal\")"
+        },
+        "response_hex": "770f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 119,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_119"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 120): fixture refusal",
+          "error": "WalletError(\"wallet error (code 120): fixture refusal\")"
+        },
+        "response_hex": "780f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 120,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_120"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 121): fixture refusal",
+          "error": "WalletError(\"wallet error (code 121): fixture refusal\")"
+        },
+        "response_hex": "790f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 121,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_121"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 122): fixture refusal",
+          "error": "WalletError(\"wallet error (code 122): fixture refusal\")"
+        },
+        "response_hex": "7a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 122,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_122"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 123): fixture refusal",
+          "error": "WalletError(\"wallet error (code 123): fixture refusal\")"
+        },
+        "response_hex": "7b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 123,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_123"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 124): fixture refusal",
+          "error": "WalletError(\"wallet error (code 124): fixture refusal\")"
+        },
+        "response_hex": "7c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 124,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_124"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 125): fixture refusal",
+          "error": "WalletError(\"wallet error (code 125): fixture refusal\")"
+        },
+        "response_hex": "7d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 125,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_125"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 126): fixture refusal",
+          "error": "WalletError(\"wallet error (code 126): fixture refusal\")"
+        },
+        "response_hex": "7e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 126,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_126"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 127): fixture refusal",
+          "error": "WalletError(\"wallet error (code 127): fixture refusal\")"
+        },
+        "response_hex": "7f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 127,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_127"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 128): fixture refusal",
+          "error": "WalletError(\"wallet error (code 128): fixture refusal\")"
+        },
+        "response_hex": "800f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 128,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_128"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 129): fixture refusal",
+          "error": "WalletError(\"wallet error (code 129): fixture refusal\")"
+        },
+        "response_hex": "810f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 129,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_129"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 130): fixture refusal",
+          "error": "WalletError(\"wallet error (code 130): fixture refusal\")"
+        },
+        "response_hex": "820f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 130,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_130"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 131): fixture refusal",
+          "error": "WalletError(\"wallet error (code 131): fixture refusal\")"
+        },
+        "response_hex": "830f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 131,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_131"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 132): fixture refusal",
+          "error": "WalletError(\"wallet error (code 132): fixture refusal\")"
+        },
+        "response_hex": "840f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 132,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_132"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 133): fixture refusal",
+          "error": "WalletError(\"wallet error (code 133): fixture refusal\")"
+        },
+        "response_hex": "850f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 133,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_133"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 134): fixture refusal",
+          "error": "WalletError(\"wallet error (code 134): fixture refusal\")"
+        },
+        "response_hex": "860f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 134,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_134"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 135): fixture refusal",
+          "error": "WalletError(\"wallet error (code 135): fixture refusal\")"
+        },
+        "response_hex": "870f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 135,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_135"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 136): fixture refusal",
+          "error": "WalletError(\"wallet error (code 136): fixture refusal\")"
+        },
+        "response_hex": "880f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 136,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_136"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 137): fixture refusal",
+          "error": "WalletError(\"wallet error (code 137): fixture refusal\")"
+        },
+        "response_hex": "890f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 137,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_137"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 138): fixture refusal",
+          "error": "WalletError(\"wallet error (code 138): fixture refusal\")"
+        },
+        "response_hex": "8a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 138,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_138"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 139): fixture refusal",
+          "error": "WalletError(\"wallet error (code 139): fixture refusal\")"
+        },
+        "response_hex": "8b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 139,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_139"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 140): fixture refusal",
+          "error": "WalletError(\"wallet error (code 140): fixture refusal\")"
+        },
+        "response_hex": "8c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 140,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_140"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 141): fixture refusal",
+          "error": "WalletError(\"wallet error (code 141): fixture refusal\")"
+        },
+        "response_hex": "8d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 141,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_141"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 142): fixture refusal",
+          "error": "WalletError(\"wallet error (code 142): fixture refusal\")"
+        },
+        "response_hex": "8e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 142,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_142"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 143): fixture refusal",
+          "error": "WalletError(\"wallet error (code 143): fixture refusal\")"
+        },
+        "response_hex": "8f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 143,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_143"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 144): fixture refusal",
+          "error": "WalletError(\"wallet error (code 144): fixture refusal\")"
+        },
+        "response_hex": "900f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 144,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_144"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 145): fixture refusal",
+          "error": "WalletError(\"wallet error (code 145): fixture refusal\")"
+        },
+        "response_hex": "910f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 145,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_145"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 146): fixture refusal",
+          "error": "WalletError(\"wallet error (code 146): fixture refusal\")"
+        },
+        "response_hex": "920f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 146,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_146"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 147): fixture refusal",
+          "error": "WalletError(\"wallet error (code 147): fixture refusal\")"
+        },
+        "response_hex": "930f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 147,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_147"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 148): fixture refusal",
+          "error": "WalletError(\"wallet error (code 148): fixture refusal\")"
+        },
+        "response_hex": "940f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 148,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_148"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 149): fixture refusal",
+          "error": "WalletError(\"wallet error (code 149): fixture refusal\")"
+        },
+        "response_hex": "950f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 149,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_149"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 150): fixture refusal",
+          "error": "WalletError(\"wallet error (code 150): fixture refusal\")"
+        },
+        "response_hex": "960f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 150,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_150"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 151): fixture refusal",
+          "error": "WalletError(\"wallet error (code 151): fixture refusal\")"
+        },
+        "response_hex": "970f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 151,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_151"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 152): fixture refusal",
+          "error": "WalletError(\"wallet error (code 152): fixture refusal\")"
+        },
+        "response_hex": "980f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 152,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_152"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 153): fixture refusal",
+          "error": "WalletError(\"wallet error (code 153): fixture refusal\")"
+        },
+        "response_hex": "990f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 153,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_153"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 154): fixture refusal",
+          "error": "WalletError(\"wallet error (code 154): fixture refusal\")"
+        },
+        "response_hex": "9a0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 154,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_154"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 155): fixture refusal",
+          "error": "WalletError(\"wallet error (code 155): fixture refusal\")"
+        },
+        "response_hex": "9b0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 155,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_155"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 156): fixture refusal",
+          "error": "WalletError(\"wallet error (code 156): fixture refusal\")"
+        },
+        "response_hex": "9c0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 156,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_156"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 157): fixture refusal",
+          "error": "WalletError(\"wallet error (code 157): fixture refusal\")"
+        },
+        "response_hex": "9d0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 157,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_157"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 158): fixture refusal",
+          "error": "WalletError(\"wallet error (code 158): fixture refusal\")"
+        },
+        "response_hex": "9e0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 158,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_158"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 159): fixture refusal",
+          "error": "WalletError(\"wallet error (code 159): fixture refusal\")"
+        },
+        "response_hex": "9f0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 159,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_159"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 160): fixture refusal",
+          "error": "WalletError(\"wallet error (code 160): fixture refusal\")"
+        },
+        "response_hex": "a00f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 160,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_160"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 161): fixture refusal",
+          "error": "WalletError(\"wallet error (code 161): fixture refusal\")"
+        },
+        "response_hex": "a10f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 161,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_161"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 162): fixture refusal",
+          "error": "WalletError(\"wallet error (code 162): fixture refusal\")"
+        },
+        "response_hex": "a20f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 162,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_162"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 163): fixture refusal",
+          "error": "WalletError(\"wallet error (code 163): fixture refusal\")"
+        },
+        "response_hex": "a30f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 163,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_163"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 164): fixture refusal",
+          "error": "WalletError(\"wallet error (code 164): fixture refusal\")"
+        },
+        "response_hex": "a40f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 164,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_164"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 165): fixture refusal",
+          "error": "WalletError(\"wallet error (code 165): fixture refusal\")"
+        },
+        "response_hex": "a50f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 165,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_165"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 166): fixture refusal",
+          "error": "WalletError(\"wallet error (code 166): fixture refusal\")"
+        },
+        "response_hex": "a60f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 166,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_166"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 167): fixture refusal",
+          "error": "WalletError(\"wallet error (code 167): fixture refusal\")"
+        },
+        "response_hex": "a70f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 167,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_167"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 168): fixture refusal",
+          "error": "WalletError(\"wallet error (code 168): fixture refusal\")"
+        },
+        "response_hex": "a80f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 168,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_168"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 169): fixture refusal",
+          "error": "WalletError(\"wallet error (code 169): fixture refusal\")"
+        },
+        "response_hex": "a90f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 169,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_169"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 170): fixture refusal",
+          "error": "WalletError(\"wallet error (code 170): fixture refusal\")"
+        },
+        "response_hex": "aa0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 170,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_170"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 171): fixture refusal",
+          "error": "WalletError(\"wallet error (code 171): fixture refusal\")"
+        },
+        "response_hex": "ab0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 171,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_171"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 172): fixture refusal",
+          "error": "WalletError(\"wallet error (code 172): fixture refusal\")"
+        },
+        "response_hex": "ac0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 172,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_172"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 173): fixture refusal",
+          "error": "WalletError(\"wallet error (code 173): fixture refusal\")"
+        },
+        "response_hex": "ad0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 173,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_173"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 174): fixture refusal",
+          "error": "WalletError(\"wallet error (code 174): fixture refusal\")"
+        },
+        "response_hex": "ae0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 174,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_174"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 175): fixture refusal",
+          "error": "WalletError(\"wallet error (code 175): fixture refusal\")"
+        },
+        "response_hex": "af0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 175,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_175"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 176): fixture refusal",
+          "error": "WalletError(\"wallet error (code 176): fixture refusal\")"
+        },
+        "response_hex": "b00f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 176,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_176"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 177): fixture refusal",
+          "error": "WalletError(\"wallet error (code 177): fixture refusal\")"
+        },
+        "response_hex": "b10f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 177,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_177"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 178): fixture refusal",
+          "error": "WalletError(\"wallet error (code 178): fixture refusal\")"
+        },
+        "response_hex": "b20f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 178,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_178"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 179): fixture refusal",
+          "error": "WalletError(\"wallet error (code 179): fixture refusal\")"
+        },
+        "response_hex": "b30f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 179,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_179"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 180): fixture refusal",
+          "error": "WalletError(\"wallet error (code 180): fixture refusal\")"
+        },
+        "response_hex": "b40f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 180,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_180"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 181): fixture refusal",
+          "error": "WalletError(\"wallet error (code 181): fixture refusal\")"
+        },
+        "response_hex": "b50f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 181,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_181"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 182): fixture refusal",
+          "error": "WalletError(\"wallet error (code 182): fixture refusal\")"
+        },
+        "response_hex": "b60f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 182,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_182"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 183): fixture refusal",
+          "error": "WalletError(\"wallet error (code 183): fixture refusal\")"
+        },
+        "response_hex": "b70f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 183,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_183"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 184): fixture refusal",
+          "error": "WalletError(\"wallet error (code 184): fixture refusal\")"
+        },
+        "response_hex": "b80f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 184,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_184"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 185): fixture refusal",
+          "error": "WalletError(\"wallet error (code 185): fixture refusal\")"
+        },
+        "response_hex": "b90f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 185,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_185"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 186): fixture refusal",
+          "error": "WalletError(\"wallet error (code 186): fixture refusal\")"
+        },
+        "response_hex": "ba0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 186,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_186"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 187): fixture refusal",
+          "error": "WalletError(\"wallet error (code 187): fixture refusal\")"
+        },
+        "response_hex": "bb0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 187,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_187"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 188): fixture refusal",
+          "error": "WalletError(\"wallet error (code 188): fixture refusal\")"
+        },
+        "response_hex": "bc0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 188,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_188"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 189): fixture refusal",
+          "error": "WalletError(\"wallet error (code 189): fixture refusal\")"
+        },
+        "response_hex": "bd0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 189,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_189"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 190): fixture refusal",
+          "error": "WalletError(\"wallet error (code 190): fixture refusal\")"
+        },
+        "response_hex": "be0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 190,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_190"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 191): fixture refusal",
+          "error": "WalletError(\"wallet error (code 191): fixture refusal\")"
+        },
+        "response_hex": "bf0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 191,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_191"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 192): fixture refusal",
+          "error": "WalletError(\"wallet error (code 192): fixture refusal\")"
+        },
+        "response_hex": "c00f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 192,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_192"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 193): fixture refusal",
+          "error": "WalletError(\"wallet error (code 193): fixture refusal\")"
+        },
+        "response_hex": "c10f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 193,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_193"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 194): fixture refusal",
+          "error": "WalletError(\"wallet error (code 194): fixture refusal\")"
+        },
+        "response_hex": "c20f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 194,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_194"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 195): fixture refusal",
+          "error": "WalletError(\"wallet error (code 195): fixture refusal\")"
+        },
+        "response_hex": "c30f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 195,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_195"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 196): fixture refusal",
+          "error": "WalletError(\"wallet error (code 196): fixture refusal\")"
+        },
+        "response_hex": "c40f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 196,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_196"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 197): fixture refusal",
+          "error": "WalletError(\"wallet error (code 197): fixture refusal\")"
+        },
+        "response_hex": "c50f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 197,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_197"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 198): fixture refusal",
+          "error": "WalletError(\"wallet error (code 198): fixture refusal\")"
+        },
+        "response_hex": "c60f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 198,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_198"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 199): fixture refusal",
+          "error": "WalletError(\"wallet error (code 199): fixture refusal\")"
+        },
+        "response_hex": "c70f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 199,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_199"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 200): fixture refusal",
+          "error": "WalletError(\"wallet error (code 200): fixture refusal\")"
+        },
+        "response_hex": "c80f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 200,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_200"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 201): fixture refusal",
+          "error": "WalletError(\"wallet error (code 201): fixture refusal\")"
+        },
+        "response_hex": "c90f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 201,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_201"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 202): fixture refusal",
+          "error": "WalletError(\"wallet error (code 202): fixture refusal\")"
+        },
+        "response_hex": "ca0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 202,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_202"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 203): fixture refusal",
+          "error": "WalletError(\"wallet error (code 203): fixture refusal\")"
+        },
+        "response_hex": "cb0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 203,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_203"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 204): fixture refusal",
+          "error": "WalletError(\"wallet error (code 204): fixture refusal\")"
+        },
+        "response_hex": "cc0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 204,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_204"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 205): fixture refusal",
+          "error": "WalletError(\"wallet error (code 205): fixture refusal\")"
+        },
+        "response_hex": "cd0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 205,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_205"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 206): fixture refusal",
+          "error": "WalletError(\"wallet error (code 206): fixture refusal\")"
+        },
+        "response_hex": "ce0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 206,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_206"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 207): fixture refusal",
+          "error": "WalletError(\"wallet error (code 207): fixture refusal\")"
+        },
+        "response_hex": "cf0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 207,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_207"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 208): fixture refusal",
+          "error": "WalletError(\"wallet error (code 208): fixture refusal\")"
+        },
+        "response_hex": "d00f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 208,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_208"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 209): fixture refusal",
+          "error": "WalletError(\"wallet error (code 209): fixture refusal\")"
+        },
+        "response_hex": "d10f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 209,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_209"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 210): fixture refusal",
+          "error": "WalletError(\"wallet error (code 210): fixture refusal\")"
+        },
+        "response_hex": "d20f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 210,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_210"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 211): fixture refusal",
+          "error": "WalletError(\"wallet error (code 211): fixture refusal\")"
+        },
+        "response_hex": "d30f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 211,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_211"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 212): fixture refusal",
+          "error": "WalletError(\"wallet error (code 212): fixture refusal\")"
+        },
+        "response_hex": "d40f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 212,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_212"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 213): fixture refusal",
+          "error": "WalletError(\"wallet error (code 213): fixture refusal\")"
+        },
+        "response_hex": "d50f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 213,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_213"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 214): fixture refusal",
+          "error": "WalletError(\"wallet error (code 214): fixture refusal\")"
+        },
+        "response_hex": "d60f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 214,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_214"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 215): fixture refusal",
+          "error": "WalletError(\"wallet error (code 215): fixture refusal\")"
+        },
+        "response_hex": "d70f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 215,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_215"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 216): fixture refusal",
+          "error": "WalletError(\"wallet error (code 216): fixture refusal\")"
+        },
+        "response_hex": "d80f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 216,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_216"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 217): fixture refusal",
+          "error": "WalletError(\"wallet error (code 217): fixture refusal\")"
+        },
+        "response_hex": "d90f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 217,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_217"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 218): fixture refusal",
+          "error": "WalletError(\"wallet error (code 218): fixture refusal\")"
+        },
+        "response_hex": "da0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 218,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_218"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 219): fixture refusal",
+          "error": "WalletError(\"wallet error (code 219): fixture refusal\")"
+        },
+        "response_hex": "db0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 219,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_219"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 220): fixture refusal",
+          "error": "WalletError(\"wallet error (code 220): fixture refusal\")"
+        },
+        "response_hex": "dc0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 220,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_220"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 221): fixture refusal",
+          "error": "WalletError(\"wallet error (code 221): fixture refusal\")"
+        },
+        "response_hex": "dd0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 221,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_221"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 222): fixture refusal",
+          "error": "WalletError(\"wallet error (code 222): fixture refusal\")"
+        },
+        "response_hex": "de0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 222,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_222"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 223): fixture refusal",
+          "error": "WalletError(\"wallet error (code 223): fixture refusal\")"
+        },
+        "response_hex": "df0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 223,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_223"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 224): fixture refusal",
+          "error": "WalletError(\"wallet error (code 224): fixture refusal\")"
+        },
+        "response_hex": "e00f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 224,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_224"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 225): fixture refusal",
+          "error": "WalletError(\"wallet error (code 225): fixture refusal\")"
+        },
+        "response_hex": "e10f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 225,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_225"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 226): fixture refusal",
+          "error": "WalletError(\"wallet error (code 226): fixture refusal\")"
+        },
+        "response_hex": "e20f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 226,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_226"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 227): fixture refusal",
+          "error": "WalletError(\"wallet error (code 227): fixture refusal\")"
+        },
+        "response_hex": "e30f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 227,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_227"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 228): fixture refusal",
+          "error": "WalletError(\"wallet error (code 228): fixture refusal\")"
+        },
+        "response_hex": "e40f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 228,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_228"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 229): fixture refusal",
+          "error": "WalletError(\"wallet error (code 229): fixture refusal\")"
+        },
+        "response_hex": "e50f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 229,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_229"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 230): fixture refusal",
+          "error": "WalletError(\"wallet error (code 230): fixture refusal\")"
+        },
+        "response_hex": "e60f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 230,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_230"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 231): fixture refusal",
+          "error": "WalletError(\"wallet error (code 231): fixture refusal\")"
+        },
+        "response_hex": "e70f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 231,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_231"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 232): fixture refusal",
+          "error": "WalletError(\"wallet error (code 232): fixture refusal\")"
+        },
+        "response_hex": "e80f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 232,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_232"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 233): fixture refusal",
+          "error": "WalletError(\"wallet error (code 233): fixture refusal\")"
+        },
+        "response_hex": "e90f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 233,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_233"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 234): fixture refusal",
+          "error": "WalletError(\"wallet error (code 234): fixture refusal\")"
+        },
+        "response_hex": "ea0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 234,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_234"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 235): fixture refusal",
+          "error": "WalletError(\"wallet error (code 235): fixture refusal\")"
+        },
+        "response_hex": "eb0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 235,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_235"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 236): fixture refusal",
+          "error": "WalletError(\"wallet error (code 236): fixture refusal\")"
+        },
+        "response_hex": "ec0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 236,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_236"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 237): fixture refusal",
+          "error": "WalletError(\"wallet error (code 237): fixture refusal\")"
+        },
+        "response_hex": "ed0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 237,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_237"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 238): fixture refusal",
+          "error": "WalletError(\"wallet error (code 238): fixture refusal\")"
+        },
+        "response_hex": "ee0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 238,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_238"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 239): fixture refusal",
+          "error": "WalletError(\"wallet error (code 239): fixture refusal\")"
+        },
+        "response_hex": "ef0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 239,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_239"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 240): fixture refusal",
+          "error": "WalletError(\"wallet error (code 240): fixture refusal\")"
+        },
+        "response_hex": "f00f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 240,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_240"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 241): fixture refusal",
+          "error": "WalletError(\"wallet error (code 241): fixture refusal\")"
+        },
+        "response_hex": "f10f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 241,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_241"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 242): fixture refusal",
+          "error": "WalletError(\"wallet error (code 242): fixture refusal\")"
+        },
+        "response_hex": "f20f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 242,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_242"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 243): fixture refusal",
+          "error": "WalletError(\"wallet error (code 243): fixture refusal\")"
+        },
+        "response_hex": "f30f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 243,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_243"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 244): fixture refusal",
+          "error": "WalletError(\"wallet error (code 244): fixture refusal\")"
+        },
+        "response_hex": "f40f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 244,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_244"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 245): fixture refusal",
+          "error": "WalletError(\"wallet error (code 245): fixture refusal\")"
+        },
+        "response_hex": "f50f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 245,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_245"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 246): fixture refusal",
+          "error": "WalletError(\"wallet error (code 246): fixture refusal\")"
+        },
+        "response_hex": "f60f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 246,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_246"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 247): fixture refusal",
+          "error": "WalletError(\"wallet error (code 247): fixture refusal\")"
+        },
+        "response_hex": "f70f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 247,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_247"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 248): fixture refusal",
+          "error": "WalletError(\"wallet error (code 248): fixture refusal\")"
+        },
+        "response_hex": "f80f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 248,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_248"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 249): fixture refusal",
+          "error": "WalletError(\"wallet error (code 249): fixture refusal\")"
+        },
+        "response_hex": "f90f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 249,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_249"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 250): fixture refusal",
+          "error": "WalletError(\"wallet error (code 250): fixture refusal\")"
+        },
+        "response_hex": "fa0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 250,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_250"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 251): fixture refusal",
+          "error": "WalletError(\"wallet error (code 251): fixture refusal\")"
+        },
+        "response_hex": "fb0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 251,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_251"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 252): fixture refusal",
+          "error": "WalletError(\"wallet error (code 252): fixture refusal\")"
+        },
+        "response_hex": "fc0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 252,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_252"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 253): fixture refusal",
+          "error": "WalletError(\"wallet error (code 253): fixture refusal\")"
+        },
+        "response_hex": "fd0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 253,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_253"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 254): fixture refusal",
+          "error": "WalletError(\"wallet error (code 254): fixture refusal\")"
+        },
+        "response_hex": "fe0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 254,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_254"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 255): fixture refusal",
+          "error": "WalletError(\"wallet error (code 255): fixture refusal\")"
+        },
+        "response_hex": "ff0f66697874757265207265667573616c00"
+      },
+      "input": {
+        "code": 255,
+        "message": "fixture refusal",
+        "stack": ""
+      },
+      "name": "status_255"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 1): refusé",
+          "error": "WalletError(\"wallet error (code 1): refusé\")"
+        },
+        "response_hex": "01077265667573c3a90766697874757265"
+      },
+      "input": {
+        "code": 1,
+        "message": "refusé",
+        "stack": "66697874757265"
+      },
+      "name": "stack_bytes"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 1): fixture refusal",
+          "error": "WalletError(\"wallet error (code 1): fixture refusal\")"
+        },
+        "response_hex": "010f66697874757265207265667573616cffffffffffffffffff"
+      },
+      "input": {
+        "code": 1,
+        "message": "fixture refusal",
+        "stack": null
+      },
+      "name": "nil_stack"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "reader underflow: need 1 bytes, only 0 available",
+          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+        },
+        "response_hex": ""
+      },
+      "input": {
+        "malformed_hex": ""
+      },
+      "name": "empty"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "reader underflow: need 1 bytes, only 0 available",
+          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+        },
+        "response_hex": "01"
+      },
+      "input": {
+        "malformed_hex": "01"
+      },
+      "name": "missing_message"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "reader underflow: need 1 bytes, only 0 available",
+          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+        },
+        "response_hex": "0100"
+      },
+      "input": {
+        "malformed_hex": "0100"
+      },
+      "name": "missing_stack_length"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: invalid UTF-8: invalid utf-8 sequence of 1 bytes from index 0",
+          "error": "WalletError(\"invalid UTF-8: invalid utf-8 sequence of 1 bytes from index 0\")"
+        },
+        "response_hex": "0101ff00"
+      },
+      "input": {
+        "malformed_hex": "0101ff00"
+      },
+      "name": "invalid_utf8"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "reader underflow: need 3 bytes, only 1 available",
+          "error": "ReaderUnderflow { needed: 3, available: 1 }"
+        },
+        "response_hex": "010361"
+      },
+      "input": {
+        "malformed_hex": "010361"
+      },
+      "name": "truncated_message"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "non-canonical varint: 1 encoded in 3 bytes",
+          "error": "NonCanonicalVarInt { width: 3, value: 1 }"
+        },
+        "response_hex": "01fd01006100"
+      },
+      "input": {
+        "malformed_hex": "01fd01006100"
+      },
+      "name": "noncanonical_length"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "reader underflow: need 3 bytes, only 1 available",
+          "error": "ReaderUnderflow { needed: 3, available: 1 }"
+        },
+        "response_hex": "01000301"
+      },
+      "input": {
+        "malformed_hex": "01000301"
+      },
+      "name": "truncated_stack"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 1): wallet error: fixture refusal",
+          "error": "WalletError(\"wallet error (code 1): wallet error: fixture refusal\")"
+        },
+        "response_hex": "011d77616c6c6574206572726f723a2066697874757265207265667573616c00"
+      },
+      "input": {
+        "processor_error": "WalletError(\"fixture refusal\")"
+      },
+      "name": "processor_generic"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 6): wallet error: invalid parameter: fixture",
+          "error": "WalletError(\"wallet error (code 6): wallet error: invalid parameter: fixture\")"
+        },
+        "response_hex": "062877616c6c6574206572726f723a20696e76616c696420706172616d657465723a206669787475726500"
+      },
+      "input": {
+        "processor_error": "WalletError(\"invalid parameter: fixture\")"
+      },
+      "name": "processor_parameter"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 7): wallet error: insufficient funds: fixture",
+          "error": "WalletError(\"wallet error (code 7): wallet error: insufficient funds: fixture\")"
+        },
+        "response_hex": "072977616c6c6574206572726f723a20696e73756666696369656e742066756e64733a206669787475726500"
+      },
+      "input": {
+        "processor_error": "WalletError(\"insufficient funds: fixture\")"
+      },
+      "name": "processor_funds"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Error Handling"
+    }
+  ],
+  "schema_version": 1
+}

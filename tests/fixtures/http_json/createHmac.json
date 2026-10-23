@@ -1,0 +1,252 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "hmac": [
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13
+            ]
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "data": [
+              0
+            ],
+            "keyId": "fixture",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "POST",
+          "path": "/createHmac"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c2264617461223a5b305d7d",
+        "response_body_hex": "7b22686d6163223a5b31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31335d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": null,
+          "data": [
+            0
+          ],
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "response_body": {
+          "hmac": [
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13
+          ]
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "hmac": [
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13,
+              13
+            ]
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "data": [
+              0,
+              1,
+              127,
+              128,
+              254,
+              255
+            ],
+            "keyId": "fixture",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "POST",
+          "path": "/createHmac"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c22636f756e7465727061727479223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535222c2264617461223a5b302c312c3132372c3132382c3235342c3235355d7d",
+        "response_body_hex": "7b22686d6163223a5b31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31332c31335d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "data": [
+            0,
+            1,
+            127,
+            128,
+            254,
+            255
+          ],
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "response_body": {
+          "hmac": [
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13,
+            13
+          ]
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / createHmac"
+    }
+  ],
+  "schema_version": 1
+}

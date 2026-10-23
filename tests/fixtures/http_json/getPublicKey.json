@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "publicKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "identityKey": true
+          },
+          "method": "POST",
+          "path": "/getPublicKey"
+        },
+        "request_body_hex": "7b226964656e746974794b6579223a747275657d",
+        "response_body_hex": "7b227075626c69634b6579223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938227d"
+      },
+      "input": {
+        "args": {
+          "counterparty": null,
+          "forSelf": null,
+          "identityKey": true,
+          "keyID": null,
+          "protocolID": null
+        },
+        "response_body": {
+          "publicKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "publicKey": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "forSelf": true,
+            "identityKey": false,
+            "keyId": "fixture",
+            "protocolId": [
+              2,
+              "fixture keys"
+            ]
+          },
+          "method": "POST",
+          "path": "/getPublicKey"
+        },
+        "request_body_hex": "7b226964656e746974794b6579223a66616c73652c2270726f746f636f6c4964223a5b322c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c22636f756e7465727061727479223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535222c22666f7253656c66223a747275657d",
+        "response_body_hex": "7b227075626c69634b6579223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535227d"
+      },
+      "input": {
+        "args": {
+          "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "forSelf": true,
+          "identityKey": false,
+          "keyID": "fixture",
+          "protocolID": [
+            2,
+            "fixture keys"
+          ]
+        },
+        "response_body": {
+          "publicKey": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / getPublicKey"
+    }
+  ],
+  "schema_version": 1
+}

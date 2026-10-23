@@ -1,0 +1,141 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "accepted": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action",
+            "outputs": [],
+            "tx": "0100beef0000"
+          },
+          "method": "POST",
+          "path": "/internalizeAction"
+        },
+        "request_body_hex": "7b227478223a22303130306265656630303030222c226f757470757473223a5b5d2c226465736372697074696f6e223a226669787475726520616374696f6e227d",
+        "response_body_hex": "7b226163636570746564223a747275657d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action",
+          "outputs": [],
+          "tx": "0100beef0000"
+        },
+        "response_body": {
+          "accepted": true
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "accepted": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action",
+            "labels": [
+              "alpha",
+              "omega"
+            ],
+            "outputs": [
+              {
+                "outputIndex": 0,
+                "paymentRemittance": {
+                  "derivationPrefix": "Zml4dHVyZQ==",
+                  "derivationSuffix": "c3VmZml4",
+                  "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+                },
+                "protocol": "wallet payment"
+              },
+              {
+                "insertionRemittance": {
+                  "basket": "fixtures",
+                  "customInstructions": "keep",
+                  "tags": [
+                    "alpha",
+                    "omega"
+                  ]
+                },
+                "outputIndex": 1,
+                "protocol": "basket insertion"
+              }
+            ],
+            "seekPermission": false,
+            "tx": "0100beef0000"
+          },
+          "method": "POST",
+          "path": "/internalizeAction"
+        },
+        "request_body_hex": "7b227478223a22303130306265656630303030222c226f757470757473223a5b7b226f7574707574496e646578223a302c2270726f746f636f6c223a2277616c6c6574207061796d656e74222c227061796d656e7452656d697474616e6365223a7b2264657269766174696f6e507265666978223a225a6d6c34644856795a513d3d222c2264657269766174696f6e537566666978223a226333566d5a6d6c34222c2273656e6465724964656e746974794b6579223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938227d7d2c7b226f7574707574496e646578223a312c2270726f746f636f6c223a226261736b657420696e73657274696f6e222c22696e73657274696f6e52656d697474616e6365223a7b226261736b6574223a226669787475726573222c22637573746f6d496e737472756374696f6e73223a226b656570222c2274616773223a5b22616c706861222c226f6d656761225d7d7d5d2c226465736372697074696f6e223a226669787475726520616374696f6e222c226c6162656c73223a5b22616c706861222c226f6d656761225d2c227365656b5065726d697373696f6e223a66616c73657d",
+        "response_body_hex": "7b226163636570746564223a747275657d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action",
+          "labels": [
+            "alpha",
+            "omega"
+          ],
+          "outputs": [
+            {
+              "outputIndex": 0,
+              "paymentRemittance": {
+                "derivationPrefix": "Zml4dHVyZQ==",
+                "derivationSuffix": "c3VmZml4",
+                "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+              },
+              "protocol": "wallet payment"
+            },
+            {
+              "insertionRemittance": {
+                "basket": "fixtures",
+                "customInstructions": "keep",
+                "tags": [
+                  "alpha",
+                  "omega"
+                ]
+              },
+              "outputIndex": 1,
+              "protocol": "basket insertion"
+            }
+          ],
+          "seekPermission": false,
+          "tx": "0100beef0000"
+        },
+        "response_body": {
+          "accepted": true
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / internalizeAction"
+    }
+  ],
+  "schema_version": 1
+}

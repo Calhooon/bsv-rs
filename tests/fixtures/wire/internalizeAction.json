@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "accepted": true
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "014577616c6c6574206572726f723a20696e7465726e616c697a65416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "051066697874757265732e696e76616c6964060100beef000000ffffffffffffffffff0e6669787475726520616374696f6eff",
+        "response_encoder": "WireWriter",
+        "response_hex": "00"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action",
+          "outputs": [],
+          "tx": "0100beef0000"
+        },
+        "result": {
+          "accepted": true
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "accepted": true
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "014577616c6c6574206572726f723a20696e7465726e616c697a65416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "051066697874757265732e696e76616c6964060100beef00000200010279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f817980766697874757265067375666669780102086669787475726573046b6565700205616c706861056f6d6567610205616c706861056f6d6567610e6669787475726520616374696f6e00",
+        "response_encoder": "WireWriter",
+        "response_hex": "00"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action",
+          "labels": [
+            "alpha",
+            "omega"
+          ],
+          "outputs": [
+            {
+              "outputIndex": 0,
+              "paymentRemittance": {
+                "derivationPrefix": "Zml4dHVyZQ==",
+                "derivationSuffix": "c3VmZml4",
+                "senderIdentityKey": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+              },
+              "protocol": "wallet payment"
+            },
+            {
+              "insertionRemittance": {
+                "basket": "fixtures",
+                "customInstructions": "keep",
+                "tags": [
+                  "alpha",
+                  "omega"
+                ]
+              },
+              "outputIndex": 1,
+              "protocol": "basket insertion"
+            }
+          ],
+          "seekPermission": false,
+          "tx": "0100beef0000"
+        },
+        "result": {
+          "accepted": true
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 5. internalizeAction"
+    }
+  ],
+  "schema_version": 1
+}

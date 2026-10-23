@@ -1,0 +1,87 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "relinquished": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+            "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI="
+          },
+          "method": "POST",
+          "path": "/relinquishCertificate"
+        },
+        "request_body_hex": "7b22636572746966696361746554797065223a22455245524552455245524552455245524552455245524552455245524552455245524552455245524552453d222c2273657269616c4e756d626572223a22496949694969496949694969496949694969496949694969496949694969496949694969496949694969493d222c22636572746966696572223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535227d",
+        "response_body_hex": "7b2272656c696e71756973686564223a747275657d"
+      },
+      "input": {
+        "args": {
+          "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI="
+        },
+        "response_body": {
+          "relinquished": true
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "relinquished": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+            "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI="
+          },
+          "method": "POST",
+          "path": "/relinquishCertificate"
+        },
+        "request_body_hex": "7b22636572746966696361746554797065223a22455245524552455245524552455245524552455245524552455245524552455245524552455245524552453d222c2273657269616c4e756d626572223a22496949694969496949694969496949694969496949694969496949694969496949694969496949694969493d222c22636572746966696572223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535227d",
+        "response_body_hex": "7b2272656c696e71756973686564223a747275657d"
+      },
+      "input": {
+        "args": {
+          "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI="
+        },
+        "response_body": {
+          "relinquished": true
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / relinquishCertificate"
+    }
+  ],
+  "schema_version": 1
+}
