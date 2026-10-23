@@ -10,18 +10,18 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 
 - `main`: the stable line. Quick fixes only. Any tag is the owner's word. `main` merges into `beta` after every stable patch.
 - `release/0.8.2`: the keeper's (captain-bsv-stack-lean). PR #102 (release/0.8.2 into main) is open and green on every job. Nothing here touches it, the tag `v0.8.2`, the `lane/*` branches or the `[Unreleased]` heading until the tag exists.
-- `beta`: this captain's line (#75). Cut from `main` the hour `v0.8.2` exists, never under the release branch; protected like `main`; CI on `[main, beta]`; every programme PR targets `beta`; `vX.Y.Z-beta.N` publishes a prerelease; `beta` merges into `main` at a phase exit as the next minor after the toolbox's and the CLI's betas built against a prerelease and the CLI's gate ran. NOT YET CUT.
+- `beta`: this captain's line (#75). CUT 2026-10-23 22:1xZ from `main` at `v0.8.2` (`efe12e6`); protection copied from `main` (the four contexts, strict, admins, linear history, no force push or delete; read back with `gh api repos/Calhooon/bsv-rs/branches/beta/protection`); CI on `[main, beta]` by PR #103; every programme PR targets `beta`; `vX.Y.Z-beta.N` publishes a prerelease (the owner's word); `beta` merges into `main` at a phase exit as the next minor after the toolbox's and the CLI's betas built against a prerelease and the CLI's gate ran.
 
-## Where it stands (2026-10-23, evening)
+## Where it stands (2026-10-23, 22:20Z)
 
-- Landed on main: 0.8.1 (the atomic rule on the subject's graph), then the #73 transport-fault commits under `[Unreleased]`, which release/0.8.2 carries.
-- In flight: PR #102 (0.8.2), the keeper's to merge and tag. A background watch in this captain's session polls origin for the tag every five minutes (48 h) and wakes the captain.
-- Written, uncommitted, in the checkout: `docs/lanes/README.md` and the ten wave-1 briefs (beta-line, oracle-fixtures, oracle-benches, oracle-ratchet, oracle-deny, oracle-arch, oracle-nightly, oracle-fuzz, oracle-dependents, oracle-northstar), and this file. They land in the #75 PR into `beta`.
-- Blocked: the beta cut and every lane launch, on the `v0.8.2` tag.
+- Landed on main: 0.8.2 (`efe12e6`, PR #102 merged 21:59Z, tagged `v0.8.2`; the release run was in progress at 22:10Z, the keeper's).
+- `beta` cut and protected (above). PR #103 (`lane/beta-line` into `beta`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. Merge on green; it is the one PR merged on the captain's own review (it is the captain's work).
+- Wave 1 launched 22:15Z: nine code lanes (table below), each in its worktree from `origin/beta` at `efe12e6`, task = README + brief, no model named. Each was told to rebase onto `origin/beta` before its report so its PR runs CI once #103 is in.
+- Blocked: nothing.
 - Stale cca records: five `cli44-bsv-rs-review` lanes and one `lens-readme-bsvrs` lane show `blocked` with no account (the #44 wave); not this wave's.
 - Two untracked symlinks at the checkout root (`bsv-rs` to itself, `rust-sdk` broken), dated August; left in place.
 
-## The hour the tag lands (the captain's checklist)
+## The hour the tag landed (the captain's checklist; steps 1 to 3 done 2026-10-23)
 
 1. `git fetch origin`; confirm the tag's commit is on `origin/main`; `git push origin <tag commit>:refs/heads/beta`; copy `main`'s protection to `beta` (`gh api` read back).
 2. Commit `docs/lanes/`, `HANDOFF.md` and the #75 workflow edits on `lane/beta-line` from `beta`; PR into `beta`; cold review; merge. (Until `[main, beta]` is in `ci.yml` on `beta`, a PR into `beta` runs no CI: the #75 PR is the one exception, merged on the captain's own gate run, said so in the PR.)
@@ -34,16 +34,16 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 
 | lane | issue | status | PR | review |
 |---|---|---|---|---|
-| beta-line | #75 | briefed | | |
-| oracle-ratchet | #78 | briefed | | |
-| oracle-deny | #79 | briefed | | |
-| oracle-arch | #80 | briefed | | |
-| oracle-fixtures | #76 | briefed | | |
-| oracle-benches | #77 | briefed | | |
-| oracle-fuzz | #82 | briefed | | |
-| oracle-nightly | #81 | briefed | | |
-| oracle-dependents | #83 | briefed | | |
-| oracle-northstar | #84 | briefed | | |
+| beta-line | #75 | PR open | #103 | captain's own |
+| oracle-ratchet | #78 | running | | |
+| oracle-deny | #79 | running | | |
+| oracle-arch | #80 | running | | |
+| oracle-fixtures | #76 | running | | |
+| oracle-benches | #77 | running | | |
+| oracle-fuzz | #82 | running | | |
+| oracle-nightly | #81 | running | | |
+| oracle-dependents | #83 | running | | |
+| oracle-northstar | #84 | running | | |
 
 ## What the dependents' captains asked (captain-bsv-wallet-cli, 2026-10-23)
 
