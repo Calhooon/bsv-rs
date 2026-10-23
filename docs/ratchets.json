@@ -1,0 +1,176 @@
+{
+  "schema": 1,
+  "source_commit": "efe12e63c6f27cc4d4c888f12a5b7897e492f073",
+  "toolchain": "1.95.0",
+  "metrics": {
+    "files_over_800": 40,
+    "unwrap_expect": 40,
+    "functions_over_60": 96,
+    "cognitive_complexity_over_25": 2,
+    "missing_docs": 0,
+    "duplicate_windows_40": 8826,
+    "pedantic_warnings": 2720
+  },
+  "files_over_800": [
+    {
+      "path": "src/auth/peer.rs",
+      "lines": 1053
+    },
+    {
+      "path": "src/auth/transports/http.rs",
+      "lines": 1255
+    },
+    {
+      "path": "src/auth/utils/validation.rs",
+      "lines": 972
+    },
+    {
+      "path": "src/compat/bip32.rs",
+      "lines": 1512
+    },
+    {
+      "path": "src/compat/bip39/mnemonic.rs",
+      "lines": 963
+    },
+    {
+      "path": "src/compat/ecies.rs",
+      "lines": 1189
+    },
+    {
+      "path": "src/identity/client.rs",
+      "lines": 2052
+    },
+    {
+      "path": "src/identity/contacts.rs",
+      "lines": 1278
+    },
+    {
+      "path": "src/identity/types.rs",
+      "lines": 886
+    },
+    {
+      "path": "src/kvstore/global.rs",
+      "lines": 838
+    },
+    {
+      "path": "src/kvstore/local.rs",
+      "lines": 1730
+    },
+    {
+      "path": "src/kvstore/types.rs",
+      "lines": 842
+    },
+    {
+      "path": "src/overlay/host_reputation_tracker.rs",
+      "lines": 986
+    },
+    {
+      "path": "src/overlay/lookup_resolver.rs",
+      "lines": 907
+    },
+    {
+      "path": "src/primitives/bignum.rs",
+      "lines": 1578
+    },
+    {
+      "path": "src/primitives/bsv/shamir.rs",
+      "lines": 1026
+    },
+    {
+      "path": "src/primitives/bsv/sighash.rs",
+      "lines": 1718
+    },
+    {
+      "path": "src/primitives/encoding.rs",
+      "lines": 1891
+    },
+    {
+      "path": "src/primitives/hash.rs",
+      "lines": 1389
+    },
+    {
+      "path": "src/primitives/p256.rs",
+      "lines": 916
+    },
+    {
+      "path": "src/primitives/symmetric.rs",
+      "lines": 1067
+    },
+    {
+      "path": "src/registry/client.rs",
+      "lines": 1132
+    },
+    {
+      "path": "src/registry/types.rs",
+      "lines": 1666
+    },
+    {
+      "path": "src/script/flags.rs",
+      "lines": 872
+    },
+    {
+      "path": "src/script/op.rs",
+      "lines": 1121
+    },
+    {
+      "path": "src/script/script.rs",
+      "lines": 1297
+    },
+    {
+      "path": "src/script/spend.rs",
+      "lines": 4419
+    },
+    {
+      "path": "src/script/templates/pushdrop.rs",
+      "lines": 825
+    },
+    {
+      "path": "src/totp/core.rs",
+      "lines": 930
+    },
+    {
+      "path": "src/transaction/beef.rs",
+      "lines": 3214
+    },
+    {
+      "path": "src/transaction/beef_stream.rs",
+      "lines": 3652
+    },
+    {
+      "path": "src/transaction/merkle_path.rs",
+      "lines": 1470
+    },
+    {
+      "path": "src/transaction/transaction.rs",
+      "lines": 3000
+    },
+    {
+      "path": "src/wallet/proto_wallet.rs",
+      "lines": 1411
+    },
+    {
+      "path": "src/wallet/substrates/http_json.rs",
+      "lines": 1212
+    },
+    {
+      "path": "src/wallet/types.rs",
+      "lines": 1951
+    },
+    {
+      "path": "src/wallet/validation.rs",
+      "lines": 1171
+    },
+    {
+      "path": "src/wallet/wire/encoding.rs",
+      "lines": 2560
+    },
+    {
+      "path": "src/wallet/wire/processor.rs",
+      "lines": 949
+    },
+    {
+      "path": "src/wallet/wire/transceiver.rs",
+      "lines": 1666
+    }
+  ]
+}
