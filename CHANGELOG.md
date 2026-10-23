@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: the wallet's transport fault (Calhooon/bsv-rs#73)
+
+The owner's ruling of 2026-10-23 (bsv-stack-lean DECISIONS 13.2): busy is the
+body word, never the HTTP status, and a 503 without it is a proxy's or an
+edge's answer. 0.8.1 put that answer in `Error::WalletError`, the variant of
+a refusal, so a caller could not tell "the way failed, ask again" from "the
+wallet refused".
+
+- `Error::WalletTransport { status: Option<u16>, detail: String }`: a caller
+  may retry it; it carries no promise about what the wallet did (the request
+  may or may not have reached it), which is the one way it differs from
+  `WalletBusy`. `Error` is `#[non_exhaustive]`, so the variant is additive.
+- `HttpWalletJson` answers it for a 502, 503 or 504 whose body carries no
+  busy code (`STORE_BUSY`, `ERR_SERVER_BUSY`) and no numeric wallet code
+  (`status` the code, `detail` the usual `HTTP <status> for <method>: <body>`
+  text), and for a connection error (refused, reset, DNS) or a timeout
+  (`status` `None`). A caller that matched the bare 503's `WalletError` text
+  matches `WalletTransport` now.
+- Unchanged: `WalletBusy` is read from the body's code at any status; a 4xx,
+  a 500, and a 5xx with a numeric wallet code stay `WalletError`;
+  `HttpWalletWire` keeps `WalletError`. Nothing in the crate retries.
+- The docs rows: `src/wallet/CLAUDE.md` (the error table) and
+  `src/wallet/substrates/CLAUDE.md` (error handling) carry the transport
+  fault beside the busy row.
+
 ## [0.8.1] - 2026-10-22
 
 A patch. The atomic BEEF rule is judged on the subject's graph (BRC-95), not
