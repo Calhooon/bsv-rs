@@ -168,6 +168,31 @@ harness = false
 name = "script_bench"
 harness = false
 
+[[bench]]
+name = "beef_stream"
+harness = false
+required-features = ["transaction"]
+
+[[bench]]
+name = "merkle_path"
+harness = false
+required-features = ["transaction"]
+
+[[bench]]
+name = "transaction_sign_verify"
+harness = false
+required-features = ["transaction"]
+
+[[bench]]
+name = "wire_codec"
+harness = false
+required-features = ["wallet"]
+
+[[bench]]
+name = "script_spend"
+harness = false
+required-features = ["transaction"]
+
 # The README's code blocks ARE these files (tests/readme_examples.rs pins the
 # bytes); `cargo build --examples --all-features` compiles every one.
 [[example]]

@@ -659,18 +659,38 @@ jobs:
 
   benchmarks:
     name: Benchmark Regression Check
-    runs-on: ubuntu-latest
-    # Only run on PRs to avoid redundant runs on main
-    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/beta')
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
-          fetch-depth: 0  # Need full history for branch checkout
+          persist-credentials: false
+
+      - name: Keep benchmark output outside the checkout
+        run: |
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-bench-target" >> "$GITHUB_ENV"
+          echo "BSV_SCRIPT_CORPUS=$RUNNER_TEMP/bsv-script-corpus" >> "$GITHUB_ENV"
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
         with:
           toolchain: stable
+
+      # This repository is private. The captain supplies a read-only repository
+      # token; absence is a setup failure, never a silently skipped script bench.
+      - name: Read the seed corpus at the lane's source revision
+        env:
+          GH_TOKEN: ${{ secrets.BSV_SCRIPT_CORPUS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::BSV_SCRIPT_CORPUS_TOKEN needs read access to the private sibling corpus"
+            exit 1
+          fi
+          mkdir -p "$BSV_SCRIPT_CORPUS"
+          gh api --method GET -H 'Accept: application/vnd.github.raw+json' \
+            'repos/Calgooon/bsv-script-lean/contents/corpus/seed/seed.jsonl?ref=8840488cc7922fa908ebcaa6333e885a49c6ca7c' \
+            > "$BSV_SCRIPT_CORPUS/seed.jsonl"
+          test -s "$BSV_SCRIPT_CORPUS/seed.jsonl"
 
       - name: Cache cargo registry
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -678,37 +698,46 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
-          key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
+            ${{ env.CARGO_TARGET_DIR }}
+          key: ${{ runner.os }}-bench-${{ hashFiles('Cargo.lock', 'tools/bench-compare/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-bench-
 
-      - name: Install critcmp
-        run: cargo install critcmp
+      - name: Test the comparison gate
+        run: |
+          cargo fmt --manifest-path tools/bench-compare/Cargo.toml -- --check
+          cargo clippy --locked --all-targets --manifest-path tools/bench-compare/Cargo.toml -- -D warnings
+          cargo test --locked --manifest-path tools/bench-compare/Cargo.toml
 
-      # the two ref names reach the shell through the environment, never by expansion into the script
-      - name: Benchmark main branch
+      # Record mode is explicit in the PR's description. Its artifact must be
+      # reviewed and committed, then the marker removed for the comparison run.
+      - name: Compare p99, or record an explicitly requested baseline
         env:
-          BASE_REF: ${{ github.base_ref }}
+          RECORD_BASELINE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.body, '[bench-baseline-record]') }}
         run: |
-          git checkout "$BASE_REF"
-          cargo bench --bench primitives_bench --bench hash_bench -- --save-baseline main
+          args=()
+          if [ "$RECORD_BASELINE" = 'true' ]; then
+            cp benches/baseline.json "$RUNNER_TEMP/linux-baseline.json"
+            args+=(--record --baseline "$RUNNER_TEMP/linux-baseline.json")
+          fi
+          cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- \
+            "${args[@]}" --output "$RUNNER_TEMP/bench-results"
 
-      - name: Benchmark PR branch
-        env:
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          git checkout "$HEAD_REF"
-          cargo bench --bench primitives_bench --bench hash_bench -- --save-baseline pr
-
-      - name: Compare benchmarks
-        run: |
-          critcmp main pr
+      - name: Retain measurements and any proposed baseline
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmark-evidence-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/bench-results/run.json
+            ${{ runner.temp }}/bench-results/bench.log
+            ${{ runner.temp }}/linux-baseline.json
+          if-no-files-found: warn
 
   benchmarks-build:
     name: Benchmarks Build
     runs-on: ubuntu-latest
-    # Run on push to main to ensure benchmarks compile
+    # Keep a build-only check on pushes, including every feature-gated bench.
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -724,13 +753,15 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            target
+            ${{ runner.temp }}/bsv-rs-bench-build
           key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-bench-
 
       - name: Build benchmarks
-        run: cargo bench --no-run
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/bsv-rs-bench-build
+        run: cargo bench --no-run --all-features --locked
 
   # Add each new producer job to needs when it lands (#77, #78, #80).
   # Missing producers are reported by name; this job never invents measurements.
