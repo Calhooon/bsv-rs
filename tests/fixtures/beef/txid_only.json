@@ -1,0 +1,62 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "hex": "0200beef0001025ca3adcccbb568b494312d3bc67f4134794271653441fd8f12b19f2bbf1a0460",
+        "stream": {
+          "bytes_read": 39,
+          "elements": [
+            {
+              "kind": "txid_only",
+              "offset": 7,
+              "txid": "60041abf2b9fb1128ffd41346571427934417fc63b2d3194b468b5cbccada35c"
+            }
+          ],
+          "subject": null,
+          "version": 4022206466
+        }
+      },
+      "input": {
+        "seed": "bsv-rs oracle-fixtures README transaction v1",
+        "txid": "60041abf2b9fb1128ffd41346571427934417fc63b2d3194b468b5cbccada35c"
+      },
+      "name": "unproven_stub"
+    },
+    {
+      "expected": {
+        "hex": "0200beef01fe00350c00010200020b10df15d04b578a8c6ac69f4677a375a6200cf73d431775521e22d3ec603dd2010101020b10df15d04b578a8c6ac69f4677a375a6200cf73d431775521e22d3ec603dd2",
+        "stream": {
+          "bytes_read": 82,
+          "elements": [
+            {
+              "hex": "fe00350c00010200020b10df15d04b578a8c6ac69f4677a375a6200cf73d431775521e22d3ec603dd20101",
+              "kind": "bump",
+              "offset": 5,
+              "root": "0c1511adca15eabe28c6c6b2d0704df0500a23891071c4f658355a6e30d6aa70"
+            },
+            {
+              "kind": "txid_only",
+              "offset": 50,
+              "txid": "d23d60ecd3221e527517433df70c20a675a377469fc66a8c8a574bd015df100b"
+            }
+          ],
+          "subject": null,
+          "version": 4022206466
+        }
+      },
+      "input": {
+        "source": "tests/vectors/beef_of_any_size/stub_proven.bin"
+      },
+      "name": "proven_stub"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "transactions/0096.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "Specification"
+    }
+  ],
+  "schema_version": 1
+}

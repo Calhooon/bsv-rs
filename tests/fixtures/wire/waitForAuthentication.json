@@ -1,0 +1,67 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "authenticated": true
+          }
+        },
+        "processor_observed": {
+          "args": {},
+          "method": "wait_for_authentication",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "0001",
+        "request_hex": "181066697874757265732e696e76616c6964",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "0001"
+      },
+      "input": {
+        "args": {},
+        "result": {
+          "authenticated": true
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "authenticated": true
+          }
+        },
+        "processor_observed": {
+          "args": {},
+          "method": "wait_for_authentication",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "0001",
+        "request_hex": "181066697874757265732e696e76616c6964",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "0001"
+      },
+      "input": {
+        "args": {},
+        "result": {
+          "authenticated": true
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 24. waitForAuthentication"
+    }
+  ],
+  "schema_version": 1
+}

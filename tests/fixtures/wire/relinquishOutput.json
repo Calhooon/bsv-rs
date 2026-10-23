@@ -1,0 +1,65 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "relinquished": true
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "014477616c6c6574206572726f723a2072656c696e71756973684f757470757420726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "071066697874757265732e696e76616c6964086669787475726573313131313131313131313131313131313131313131313131313131313131313102",
+        "response_encoder": "WireWriter",
+        "response_hex": "00"
+      },
+      "input": {
+        "args": {
+          "basket": "fixtures",
+          "output": "3131313131313131313131313131313131313131313131313131313131313131.2"
+        },
+        "result": {
+          "relinquished": true
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "relinquished": true
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "014477616c6c6574206572726f723a2072656c696e71756973684f757470757420726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "071066697874757265732e696e76616c6964086669787475726573313131313131313131313131313131313131313131313131313131313131313102",
+        "response_encoder": "WireWriter",
+        "response_hex": "00"
+      },
+      "input": {
+        "args": {
+          "basket": "fixtures",
+          "output": "3131313131313131313131313131313131313131313131313131313131313131.2"
+        },
+        "result": {
+          "relinquished": true
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 7. relinquishOutput"
+    }
+  ],
+  "schema_version": 1
+}

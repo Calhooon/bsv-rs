@@ -1,0 +1,157 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "keyId": "fixture",
+            "linkage": {
+              "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "encryptedLinkage": "00",
+              "encryptedLinkageProof": "00",
+              "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+            },
+            "proofType": 0,
+            "protocol": {
+              "protocolName": "fixture keys",
+              "securityLevel": "1"
+            }
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "keyId": "fixture",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ],
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "method": "POST",
+          "path": "/revealSpecificKeyLinkage"
+        },
+        "request_body_hex": "7b22636f756e7465727061727479223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938222c227665726966696572223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535222c2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265227d",
+        "response_body_hex": "7b226b65794964223a2266697874757265222c226c696e6b616765223a7b22636f756e7465727061727479223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938222c22656e637279707465644c696e6b616765223a223030222c22656e637279707465644c696e6b61676550726f6f66223a223030222c2270726f766572223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938222c227665726966696572223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535227d2c2270726f6f6654797065223a302c2270726f746f636f6c223a7b2270726f746f636f6c4e616d65223a2266697874757265206b657973222c2273656375726974794c6576656c223a2231227d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "keyID": "fixture",
+          "privileged": null,
+          "privilegedReason": null,
+          "protocolID": [
+            1,
+            "fixture keys"
+          ],
+          "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        },
+        "response_body": {
+          "keyId": "fixture",
+          "linkage": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "encryptedLinkage": "00",
+            "encryptedLinkageProof": "00",
+            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "proofType": 0,
+          "protocol": {
+            "protocolName": "fixture keys",
+            "securityLevel": "1"
+          }
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "keyId": "fixture",
+            "linkage": {
+              "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "encryptedLinkage": "00017f80feff",
+              "encryptedLinkageProof": "00017f80feff",
+              "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+            },
+            "proofType": 1,
+            "protocol": {
+              "protocolName": "fixture keys",
+              "securityLevel": "1"
+            }
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "keyId": "fixture",
+            "privileged": true,
+            "privilegedReason": "fixture reason",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ],
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "method": "POST",
+          "path": "/revealSpecificKeyLinkage"
+        },
+        "request_body_hex": "7b22636f756e7465727061727479223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938222c227665726966696572223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535222c2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c2270726976696c65676564223a747275652c2270726976696c65676564526561736f6e223a226669787475726520726561736f6e227d",
+        "response_body_hex": "7b226b65794964223a2266697874757265222c226c696e6b616765223a7b22636f756e7465727061727479223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938222c22656e637279707465644c696e6b616765223a22303030313766383066656666222c22656e637279707465644c696e6b61676550726f6f66223a22303030313766383066656666222c2270726f766572223a22303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938222c227665726966696572223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535227d2c2270726f6f6654797065223a312c2270726f746f636f6c223a7b2270726f746f636f6c4e616d65223a2266697874757265206b657973222c2273656375726974794c6576656c223a2231227d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "keyID": "fixture",
+          "privileged": true,
+          "privilegedReason": "fixture reason",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ],
+          "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        },
+        "response_body": {
+          "keyId": "fixture",
+          "linkage": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "encryptedLinkage": "00017f80feff",
+            "encryptedLinkageProof": "00017f80feff",
+            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "proofType": 1,
+          "protocol": {
+            "protocolName": "fixture keys",
+            "securityLevel": "1"
+          }
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / revealSpecificKeyLinkage"
+    }
+  ],
+  "schema_version": 1
+}

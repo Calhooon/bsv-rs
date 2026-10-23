@@ -1,0 +1,94 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "certificates": [],
+            "totalCertificates": 0
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "014477616c6c6574206572726f723a206c69737443657274696669636174657320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "121066697874757265732e696e76616c696400000101ffff",
+        "response_encoder": "WireWriter",
+        "response_hex": "0000"
+      },
+      "input": {
+        "args": {
+          "certifiers": [],
+          "types": []
+        },
+        "result": {
+          "certificates": [],
+          "totalCertificates": 0
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "display": "reader underflow: need 97 bytes, only 18 available",
+          "error": "ReaderUnderflow { needed: 97, available: 18 }"
+        },
+        "processor_observed": null,
+        "processor_response_hex": "014477616c6c6574206572726f723a206c69737443657274696669636174657320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "121066697874757265732e696e76616c69640102c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50111111111111111111111111111111111111111111111111111111111111111111406010e6669787475726520726561736f6e",
+        "response_encoder": "WireWriter",
+        "response_hex": "0001b9111111111111111111111111111111111111111111111111111111111111111122222222222222222222222222222222222222222222222222222222222222220279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee533333333333333333333333333333333333333333333333333333333333333330101046e616d65074669787475726530060201010201010102046e616d65076669787475726504726f6c650672656164657242303237396265363637656639646362626163353561303632393563653837306230373032396266636462326463653238643935396632383135623136663831373938"
+      },
+      "input": {
+        "args": {
+          "certifiers": [
+            "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          ],
+          "limit": 10,
+          "offset": 3,
+          "privileged": true,
+          "privilegedReason": "fixture reason",
+          "types": [
+            "ERERERERERERERERERERERERERERERERERERERERERE="
+          ]
+        },
+        "result": {
+          "certificates": [
+            {
+              "certificate": {
+                "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+                "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+                "fields": {
+                  "name": "Fixture"
+                },
+                "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+                "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+                "signature": "3006020101020101",
+                "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+              },
+              "keyring": {
+                "name": "Zml4dHVyZQ==",
+                "role": "cmVhZGVy"
+              },
+              "verifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+            }
+          ],
+          "totalCertificates": 1
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 18. listCertificates"
+    }
+  ],
+  "schema_version": 1
+}

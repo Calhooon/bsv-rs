@@ -1,0 +1,79 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "aborted": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "reference": "Zml4dHVyZQ=="
+          },
+          "method": "POST",
+          "path": "/abortAction"
+        },
+        "request_body_hex": "7b227265666572656e6365223a225a6d6c34644856795a513d3d227d",
+        "response_body_hex": "7b2261626f72746564223a747275657d"
+      },
+      "input": {
+        "args": {
+          "reference": "Zml4dHVyZQ=="
+        },
+        "response_body": {
+          "aborted": true
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "aborted": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "reference": "Zml4dHVyZSBmdWxs"
+          },
+          "method": "POST",
+          "path": "/abortAction"
+        },
+        "request_body_hex": "7b227265666572656e6365223a225a6d6c34644856795a53426d64577873227d",
+        "response_body_hex": "7b2261626f72746564223a747275657d"
+      },
+      "input": {
+        "args": {
+          "reference": "Zml4dHVyZSBmdWxs"
+        },
+        "response_body": {
+          "aborted": true
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / abortAction"
+    }
+  ],
+  "schema_version": 1
+}

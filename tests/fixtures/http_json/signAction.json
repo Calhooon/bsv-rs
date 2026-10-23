@@ -1,0 +1,251 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {}
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "reference": "Zml4dHVyZQ==",
+            "spends": {}
+          },
+          "method": "POST",
+          "path": "/signAction"
+        },
+        "request_body_hex": "7b227370656e6473223a7b7d2c227265666572656e6365223a225a6d6c34644856795a513d3d227d",
+        "response_body_hex": "7b7d"
+      },
+      "input": {
+        "args": {
+          "reference": "Zml4dHVyZQ==",
+          "spends": {}
+        },
+        "response_body": {},
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "sendWithResults": [
+              {
+                "status": "sending",
+                "txid": "3131313131313131313131313131313131313131313131313131313131313131"
+              }
+            ],
+            "tx": "0100beef0000",
+            "txid": [
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49,
+              49
+            ]
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "options": {
+              "acceptDelayedBroadcast": false,
+              "noSend": true,
+              "returnTxidOnly": true,
+              "sendWith": [
+                [
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49,
+                  49
+                ]
+              ]
+            },
+            "reference": "Zml4dHVyZQ==",
+            "spends": {
+              "2": {
+                "sequenceNumber": 4294967294,
+                "unlockingScript": "51"
+              }
+            }
+          },
+          "method": "POST",
+          "path": "/signAction"
+        },
+        "request_body_hex": "7b227370656e6473223a7b2232223a7b22756e6c6f636b696e67536372697074223a223531222c2273657175656e63654e756d626572223a343239343936373239347d7d2c227265666572656e6365223a225a6d6c34644856795a513d3d222c226f7074696f6e73223a7b2261636365707444656c6179656442726f616463617374223a66616c73652c2272657475726e547869644f6e6c79223a747275652c226e6f53656e64223a747275652c2273656e6457697468223a5b5b34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34395d5d7d7d",
+        "response_body_hex": "7b2273656e6457697468526573756c7473223a5b7b22737461747573223a2273656e64696e67222c2274786964223a2233313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331227d5d2c227478223a22303130306265656630303030222c2274786964223a5b34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34392c34395d7d"
+      },
+      "input": {
+        "args": {
+          "options": {
+            "acceptDelayedBroadcast": false,
+            "noSend": true,
+            "returnTxidOnly": true,
+            "sendWith": [
+              [
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49,
+                49
+              ]
+            ]
+          },
+          "reference": "Zml4dHVyZQ==",
+          "spends": {
+            "2": {
+              "sequenceNumber": 4294967294,
+              "unlockingScript": "51"
+            }
+          }
+        },
+        "response_body": {
+          "sendWithResults": [
+            {
+              "status": "sending",
+              "txid": "3131313131313131313131313131313131313131313131313131313131313131"
+            }
+          ],
+          "tx": "0100beef0000",
+          "txid": [
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49,
+            49
+          ]
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / signAction"
+    }
+  ],
+  "schema_version": 1
+}

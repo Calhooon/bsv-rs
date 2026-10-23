@@ -1,0 +1,187 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "actions": [],
+            "totalActions": 0
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "labels": []
+          },
+          "method": "POST",
+          "path": "/listActions"
+        },
+        "request_body_hex": "7b226c6162656c73223a5b5d7d",
+        "response_body_hex": "7b22616374696f6e73223a5b5d2c22746f74616c416374696f6e73223a307d"
+      },
+      "input": {
+        "args": {
+          "labels": []
+        },
+        "response_body": {
+          "actions": [],
+          "totalActions": 0
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "actions": [
+              {
+                "description": "fixture action",
+                "inputs": [
+                  {
+                    "inputDescription": "fixture input",
+                    "sequenceNumber": 4294967294,
+                    "sourceLockingScript": "51",
+                    "sourceOutpoint": "3131313131313131313131313131313131313131313131313131313131313131.2",
+                    "sourceSatoshis": 2234,
+                    "unlockingScript": "51"
+                  }
+                ],
+                "isOutgoing": true,
+                "labels": [
+                  "alpha",
+                  "omega"
+                ],
+                "lockTime": 800000,
+                "outputs": [
+                  {
+                    "basket": "fixtures",
+                    "customInstructions": "keep",
+                    "lockingScript": "51",
+                    "outputDescription": "fixture output",
+                    "outputIndex": 2,
+                    "satoshis": 1000,
+                    "spendable": false,
+                    "tags": [
+                      "alpha",
+                      "omega"
+                    ]
+                  }
+                ],
+                "satoshis": -1234,
+                "status": "nosend",
+                "txid": "3131313131313131313131313131313131313131313131313131313131313131",
+                "version": 2
+              }
+            ],
+            "totalActions": 1
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "includeInputSourceLockingScripts": true,
+            "includeInputUnlockingScripts": true,
+            "includeInputs": true,
+            "includeLabels": true,
+            "includeOutputLockingScripts": true,
+            "includeOutputs": true,
+            "labelQueryMode": "all",
+            "labels": [
+              "alpha",
+              "omega"
+            ],
+            "limit": 10,
+            "offset": 3,
+            "seekPermission": false
+          },
+          "method": "POST",
+          "path": "/listActions"
+        },
+        "request_body_hex": "7b226c6162656c73223a5b22616c706861222c226f6d656761225d2c226c6162656c51756572794d6f6465223a22616c6c222c22696e636c7564654c6162656c73223a747275652c22696e636c756465496e70757473223a747275652c22696e636c756465496e707574536f757263654c6f636b696e6753637269707473223a747275652c22696e636c756465496e707574556e6c6f636b696e6753637269707473223a747275652c22696e636c7564654f757470757473223a747275652c22696e636c7564654f75747075744c6f636b696e6753637269707473223a747275652c226c696d6974223a31302c226f6666736574223a332c227365656b5065726d697373696f6e223a66616c73657d",
+        "response_body_hex": "7b22616374696f6e73223a5b7b226465736372697074696f6e223a226669787475726520616374696f6e222c22696e70757473223a5b7b22696e7075744465736372697074696f6e223a226669787475726520696e707574222c2273657175656e63654e756d626572223a343239343936373239342c22736f757263654c6f636b696e67536372697074223a223531222c22736f757263654f7574706f696e74223a22333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133312e32222c22736f757263655361746f73686973223a323233342c22756e6c6f636b696e67536372697074223a223531227d5d2c2269734f7574676f696e67223a747275652c226c6162656c73223a5b22616c706861222c226f6d656761225d2c226c6f636b54696d65223a3830303030302c226f757470757473223a5b7b226261736b6574223a226669787475726573222c22637573746f6d496e737472756374696f6e73223a226b656570222c226c6f636b696e67536372697074223a223531222c226f75747075744465736372697074696f6e223a2266697874757265206f7574707574222c226f7574707574496e646578223a322c227361746f73686973223a313030302c227370656e6461626c65223a66616c73652c2274616773223a5b22616c706861222c226f6d656761225d7d5d2c227361746f73686973223a2d313233342c22737461747573223a226e6f73656e64222c2274786964223a2233313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331333133313331222c2276657273696f6e223a327d5d2c22746f74616c416374696f6e73223a317d"
+      },
+      "input": {
+        "args": {
+          "includeInputSourceLockingScripts": true,
+          "includeInputUnlockingScripts": true,
+          "includeInputs": true,
+          "includeLabels": true,
+          "includeOutputLockingScripts": true,
+          "includeOutputs": true,
+          "labelQueryMode": "all",
+          "labels": [
+            "alpha",
+            "omega"
+          ],
+          "limit": 10,
+          "offset": 3,
+          "seekPermission": false
+        },
+        "response_body": {
+          "actions": [
+            {
+              "description": "fixture action",
+              "inputs": [
+                {
+                  "inputDescription": "fixture input",
+                  "sequenceNumber": 4294967294,
+                  "sourceLockingScript": "51",
+                  "sourceOutpoint": "3131313131313131313131313131313131313131313131313131313131313131.2",
+                  "sourceSatoshis": 2234,
+                  "unlockingScript": "51"
+                }
+              ],
+              "isOutgoing": true,
+              "labels": [
+                "alpha",
+                "omega"
+              ],
+              "lockTime": 800000,
+              "outputs": [
+                {
+                  "basket": "fixtures",
+                  "customInstructions": "keep",
+                  "lockingScript": "51",
+                  "outputDescription": "fixture output",
+                  "outputIndex": 2,
+                  "satoshis": 1000,
+                  "spendable": false,
+                  "tags": [
+                    "alpha",
+                    "omega"
+                  ]
+                }
+              ],
+              "satoshis": -1234,
+              "status": "nosend",
+              "txid": "3131313131313131313131313131313131313131313131313131313131313131",
+              "version": 2
+            }
+          ],
+          "totalActions": 1
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / listActions"
+    }
+  ],
+  "schema_version": 1
+}

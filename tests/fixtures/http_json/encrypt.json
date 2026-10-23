@@ -1,0 +1,316 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "ciphertext": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47
+            ]
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "keyId": "fixture",
+            "plaintext": [
+              0
+            ],
+            "protocolId": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "POST",
+          "path": "/encrypt"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c22706c61696e74657874223a5b305d7d",
+        "response_body_hex": "7b2263697068657274657874223a5b302c312c322c332c342c352c362c372c382c392c31302c31312c31322c31332c31342c31352c31362c31372c31382c31392c32302c32312c32322c32332c32342c32352c32362c32372c32382c32392c33302c33312c33322c33332c33342c33352c33362c33372c33382c33392c34302c34312c34322c34332c34342c34352c34362c34375d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": null,
+          "keyID": "fixture",
+          "plaintext": [
+            0
+          ],
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "response_body": {
+          "ciphertext": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ]
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "ciphertext": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31,
+              32,
+              33,
+              34,
+              35,
+              36,
+              37,
+              38,
+              39,
+              40,
+              41,
+              42,
+              43,
+              44,
+              45,
+              46,
+              47
+            ]
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "keyId": "fixture",
+            "plaintext": [
+              0,
+              1,
+              127,
+              128,
+              254,
+              255
+            ],
+            "protocolId": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "POST",
+          "path": "/encrypt"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c22636f756e7465727061727479223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535222c22706c61696e74657874223a5b302c312c3132372c3132382c3235342c3235355d7d",
+        "response_body_hex": "7b2263697068657274657874223a5b302c312c322c332c342c352c362c372c382c392c31302c31312c31322c31332c31342c31352c31362c31372c31382c31392c32302c32312c32322c32332c32342c32352c32362c32372c32382c32392c33302c33312c33322c33332c33342c33352c33362c33372c33382c33392c34302c34312c34322c34332c34342c34352c34362c34375d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "keyID": "fixture",
+          "plaintext": [
+            0,
+            1,
+            127,
+            128,
+            254,
+            255
+          ],
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "response_body": {
+          "ciphertext": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47
+          ]
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / encrypt"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,72 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "hex": "010000000111111111111111111111111111111111111111111111111111111111111111110000000000ffffffff0110270000000000001976a91455e68f29c1783ff6788d71459f3252369517878b88ac00000000",
+        "txid": "60041abf2b9fb1128ffd41346571427934417fc63b2d3194b468b5cbccada35c"
+      },
+      "input": {
+        "seed": "bsv-rs oracle-fixtures README transaction v1",
+        "source": "examples/transaction.rs",
+        "transaction": "funding"
+      },
+      "name": "examples/transaction.rs/funding"
+    },
+    {
+      "expected": {
+        "hex": "01000000015ca3adcccbb568b494312d3bc67f4134794271653441fd8f12b19f2bbf1a0460000000006b483045022100ce3632b52c901509e9948f1d6d526818228667388d8bc53309aa95dfb6f7f1d002205b03a2cdcbb46f3d1c7bac9b31c2c3588104796742b1ecd25f1c33bfbc0af74841210285f379d193affd73da926557ac656bb6835384cca62e47a9de71ea5dab14a8bcffffffff01ac260000000000001976a91455e68f29c1783ff6788d71459f3252369517878b88ac00000000",
+        "txid": "d5a8cc982595dcbdd0d3b86e664e51a9a1a1eac160b139d95249c00bab72323c"
+      },
+      "input": {
+        "seed": "bsv-rs oracle-fixtures README transaction v1",
+        "source": "examples/transaction.rs",
+        "transaction": "spend"
+      },
+      "name": "examples/transaction.rs/spend"
+    },
+    {
+      "expected": {
+        "hex": "010000000111111111111111111111111111111111111111111111111111111111111111110000000000ffffffff0110270000000000001976a91455e68f29c1783ff6788d71459f3252369517878b88ac00000000",
+        "txid": "60041abf2b9fb1128ffd41346571427934417fc63b2d3194b468b5cbccada35c"
+      },
+      "input": {
+        "seed": "bsv-rs oracle-fixtures README transaction v1",
+        "source": "examples/beef_spv.rs",
+        "transaction": "funding"
+      },
+      "name": "examples/beef_spv.rs/funding"
+    },
+    {
+      "expected": {
+        "hex": "01000000015ca3adcccbb568b494312d3bc67f4134794271653441fd8f12b19f2bbf1a0460000000006b483045022100ce3632b52c901509e9948f1d6d526818228667388d8bc53309aa95dfb6f7f1d002205b03a2cdcbb46f3d1c7bac9b31c2c3588104796742b1ecd25f1c33bfbc0af74841210285f379d193affd73da926557ac656bb6835384cca62e47a9de71ea5dab14a8bcffffffff01ac260000000000001976a91455e68f29c1783ff6788d71459f3252369517878b88ac00000000",
+        "txid": "d5a8cc982595dcbdd0d3b86e664e51a9a1a1eac160b139d95249c00bab72323c"
+      },
+      "input": {
+        "seed": "bsv-rs oracle-fixtures README transaction v1",
+        "source": "examples/beef_spv.rs",
+        "transaction": "spend"
+      },
+      "name": "examples/beef_spv.rs/spend"
+    },
+    {
+      "expected": {
+        "hex": "01000000000000000000",
+        "txid": "d21633ba23f70118185227be58a63527675641ad37967e2aa461559f577aec43"
+      },
+      "input": {
+        "seed": "Transaction::new()",
+        "source": "examples/overlay.rs"
+      },
+      "name": "examples/overlay.rs/empty"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "transactions/0012.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "Specification"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,71 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "height": 0
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {},
+          "method": "POST",
+          "path": "/getHeight"
+        },
+        "request_body_hex": "7b7d",
+        "response_body_hex": "7b22686569676874223a307d"
+      },
+      "input": {
+        "args": {},
+        "response_body": {
+          "height": 0
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "height": 800000
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {},
+          "method": "POST",
+          "path": "/getHeight"
+        },
+        "request_body_hex": "7b7d",
+        "response_body_hex": "7b22686569676874223a3830303030307d"
+      },
+      "input": {
+        "args": {},
+        "response_body": {
+          "height": 800000
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / getHeight"
+    }
+  ],
+  "schema_version": 1
+}

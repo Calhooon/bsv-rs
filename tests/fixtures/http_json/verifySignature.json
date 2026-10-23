@@ -1,0 +1,184 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "valid": false
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "data": [
+              0
+            ],
+            "keyId": "fixture",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ],
+            "signature": [
+              48,
+              6,
+              2,
+              1,
+              1,
+              2,
+              1,
+              1
+            ]
+          },
+          "method": "POST",
+          "path": "/verifySignature"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c2264617461223a5b305d2c227369676e6174757265223a5b34382c362c322c312c312c322c312c315d7d",
+        "response_body_hex": "7b2276616c6964223a66616c73657d"
+      },
+      "input": {
+        "args": {
+          "counterparty": null,
+          "data": [
+            0
+          ],
+          "forSelf": null,
+          "hashToDirectlyVerify": null,
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ],
+          "signature": [
+            48,
+            6,
+            2,
+            1,
+            1,
+            2,
+            1,
+            1
+          ]
+        },
+        "response_body": {
+          "valid": false
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "valid": true
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "forSelf": true,
+            "hashToDirectlyVerify": "1111111111111111111111111111111111111111111111111111111111111111",
+            "keyId": "fixture",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ],
+            "signature": [
+              48,
+              6,
+              2,
+              1,
+              1,
+              2,
+              1,
+              1
+            ]
+          },
+          "method": "POST",
+          "path": "/verifySignature"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c22636f756e7465727061727479223a22303263363034376639343431656437643664333034353430366539356330376364383563373738653462386365663363613761626163303962393563373039656535222c22666f7253656c66223a747275652c2268617368546f4469726563746c79566572696679223a2231313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131222c227369676e6174757265223a5b34382c362c322c312c312c322c312c315d7d",
+        "response_body_hex": "7b2276616c6964223a747275657d"
+      },
+      "input": {
+        "args": {
+          "counterparty": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "data": null,
+          "forSelf": true,
+          "hashToDirectlyVerify": [
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17,
+            17
+          ],
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ],
+          "signature": [
+            48,
+            6,
+            2,
+            1,
+            1,
+            2,
+            1,
+            1
+          ]
+        },
+        "response_body": {
+          "valid": true
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / verifySignature"
+    }
+  ],
+  "schema_version": 1
+}

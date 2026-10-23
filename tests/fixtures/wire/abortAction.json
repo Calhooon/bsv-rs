@@ -1,0 +1,63 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "aborted": true
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "013f77616c6c6574206572726f723a2061626f7274416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "031066697874757265732e696e76616c696466697874757265",
+        "response_encoder": "WireWriter",
+        "response_hex": "00"
+      },
+      "input": {
+        "args": {
+          "reference": "Zml4dHVyZQ=="
+        },
+        "result": {
+          "aborted": true
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "aborted": true
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "013f77616c6c6574206572726f723a2061626f7274416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "031066697874757265732e696e76616c6964666978747572652066756c6c",
+        "response_encoder": "WireWriter",
+        "response_hex": "00"
+      },
+      "input": {
+        "args": {
+          "reference": "Zml4dHVyZSBmdWxs"
+        },
+        "result": {
+          "aborted": true
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 3. abortAction"
+    }
+  ],
+  "schema_version": 1
+}

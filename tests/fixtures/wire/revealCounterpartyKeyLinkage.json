@@ -1,0 +1,115 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "linkage": {
+              "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "encryptedLinkage": "00",
+              "encryptedLinkageProof": "00",
+              "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+            },
+            "revelationTime": "2026-10-19T00:00:00Z"
+          }
+        },
+        "processor_observed": {
+          "args": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "privileged": null,
+            "privilegedReason": null,
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "method": "reveal_counterparty_key_linkage",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "00010001000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179814323032362d31302d31395430303a30303a30305a",
+        "request_hex": "091066697874757265732e696e76616c69640279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "00010001000279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179814323032362d31302d31395430303a30303a30305a"
+      },
+      "input": {
+        "args": {
+          "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "privileged": null,
+          "privilegedReason": null,
+          "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        },
+        "result": {
+          "linkage": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "encryptedLinkage": "00",
+            "encryptedLinkageProof": "00",
+            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "revelationTime": "2026-10-19T00:00:00Z"
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "linkage": {
+              "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "encryptedLinkage": "00017f80feff",
+              "encryptedLinkageProof": "00017f80feff",
+              "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+              "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+            },
+            "revelationTime": "2026-10-19T00:00:00Z"
+          }
+        },
+        "processor_observed": {
+          "args": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "privileged": null,
+            "privilegedReason": null,
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "method": "reveal_counterparty_key_linkage",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "000600017f80feff0600017f80feff0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179814323032362d31302d31395430303a30303a30305a",
+        "request_hex": "091066697874757265732e696e76616c69640279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "000600017f80feff0600017f80feff0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179814323032362d31302d31395430303a30303a30305a"
+      },
+      "input": {
+        "args": {
+          "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "privileged": true,
+          "privilegedReason": "fixture reason",
+          "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        },
+        "result": {
+          "linkage": {
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "encryptedLinkage": "00017f80feff",
+            "encryptedLinkageProof": "00017f80feff",
+            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+          },
+          "revelationTime": "2026-10-19T00:00:00Z"
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 9. revealCounterpartyKeyLinkage"
+    }
+  ],
+  "schema_version": 1
+}

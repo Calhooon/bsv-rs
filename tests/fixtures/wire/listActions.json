@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "actions": [],
+            "totalActions": 0
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "013f77616c6c6574206572726f723a206c697374416374696f6e7320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "041066697874757265732e696e76616c696400ffffffffffffff0101ff",
+        "response_encoder": "WireWriter",
+        "response_hex": "0000"
+      },
+      "input": {
+        "args": {
+          "labels": []
+        },
+        "result": {
+          "actions": [],
+          "totalActions": 0
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "actions": [
+              {
+                "description": "fixture action",
+                "inputs": [
+                  {
+                    "inputDescription": "fixture input",
+                    "sequenceNumber": 4294967294,
+                    "sourceLockingScript": "51",
+                    "sourceOutpoint": "3131313131313131313131313131313131313131313131313131313131313131.2",
+                    "sourceSatoshis": 2234,
+                    "unlockingScript": "51"
+                  }
+                ],
+                "isOutgoing": true,
+                "labels": [
+                  "alpha",
+                  "omega"
+                ],
+                "lockTime": 800000,
+                "outputs": [
+                  {
+                    "basket": "fixtures",
+                    "customInstructions": "keep",
+                    "lockingScript": "51",
+                    "outputDescription": "fixture output",
+                    "outputIndex": 2,
+                    "satoshis": 1000,
+                    "spendable": false,
+                    "tags": [
+                      "alpha",
+                      "omega"
+                    ]
+                  }
+                ],
+                "satoshis": -1234,
+                "status": "nosend",
+                "txid": "3131313131313131313131313131313131313131313131313131313131313131",
+                "version": 2
+              }
+            ],
+            "totalActions": 1
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "013f77616c6c6574206572726f723a206c697374416374696f6e7320726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "request_hex": "041066697874757265732e696e76616c69640205616c706861056f6d65676101010101010101140600",
+        "response_encoder": "WireWriter",
+        "response_hex": "00013131313131313131313131313131313131313131313131313131313131313131ff2efbffffffffffff06010e6669787475726520616374696f6e0205616c706861056f6d65676102fe00350c0001313131313131313131313131313131313131313131313131313131313131313102fdba08015101510d6669787475726520696e707574fefeffffff0102fde8030151000e66697874757265206f75747075740866697874757265730205616c706861056f6d656761046b656570"
+      },
+      "input": {
+        "args": {
+          "includeInputSourceLockingScripts": true,
+          "includeInputUnlockingScripts": true,
+          "includeInputs": true,
+          "includeLabels": true,
+          "includeOutputLockingScripts": true,
+          "includeOutputs": true,
+          "labelQueryMode": "all",
+          "labels": [
+            "alpha",
+            "omega"
+          ],
+          "limit": 10,
+          "offset": 3,
+          "seekPermission": false
+        },
+        "result": {
+          "actions": [
+            {
+              "description": "fixture action",
+              "inputs": [
+                {
+                  "inputDescription": "fixture input",
+                  "sequenceNumber": 4294967294,
+                  "sourceLockingScript": "51",
+                  "sourceOutpoint": "3131313131313131313131313131313131313131313131313131313131313131.2",
+                  "sourceSatoshis": 2234,
+                  "unlockingScript": "51"
+                }
+              ],
+              "isOutgoing": true,
+              "labels": [
+                "alpha",
+                "omega"
+              ],
+              "lockTime": 800000,
+              "outputs": [
+                {
+                  "basket": "fixtures",
+                  "customInstructions": "keep",
+                  "lockingScript": "51",
+                  "outputDescription": "fixture output",
+                  "outputIndex": 2,
+                  "satoshis": 1000,
+                  "spendable": false,
+                  "tags": [
+                    "alpha",
+                    "omega"
+                  ]
+                }
+              ],
+              "satoshis": -1234,
+              "status": "nosend",
+              "txid": "3131313131313131313131313131313131313131313131313131313131313131",
+              "version": 2
+            }
+          ],
+          "totalActions": 1
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 4. listActions"
+    }
+  ],
+  "schema_version": 1
+}

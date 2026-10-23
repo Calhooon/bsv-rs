@@ -1,0 +1,59 @@
+{
+  "cases": [
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "version": "fixture-0.0.0"
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "00666978747572652d302e302e30",
+        "request_hex": "1c1066697874757265732e696e76616c6964",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "00666978747572652d302e302e30"
+      },
+      "input": {
+        "args": {},
+        "result": {
+          "version": "fixture-0.0.0"
+        }
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "error_frames": "wire/error_frames.json",
+      "expected": {
+        "client_result": {
+          "ok": {
+            "version": "fixture-1.2.3"
+          }
+        },
+        "processor_observed": null,
+        "processor_response_hex": "00666978747572652d312e322e33",
+        "request_hex": "1c1066697874757265732e696e76616c6964",
+        "response_encoder": "WalletWireProcessor",
+        "response_hex": "00666978747572652d312e322e33"
+      },
+      "input": {
+        "args": {},
+        "result": {
+          "version": "fixture-1.2.3"
+        }
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "ABI Specification / Method Calls Specification / 28. getVersion"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,546 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet busy: fixture store busy",
+          "error": "WalletBusy { detail: \"fixture store busy\", retry_after_ms: Some(2000) }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": "STORE_BUSY",
+            "message": "fixture store busy"
+          },
+          "retry_after": "2",
+          "status": 503
+        }
+      },
+      "name": "busy_with_retry"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet busy: fixture store busy",
+          "error": "WalletBusy { detail: \"fixture store busy\", retry_after_ms: None }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": "STORE_BUSY",
+            "message": "fixture store busy"
+          },
+          "retry_after": null,
+          "status": 500
+        }
+      },
+      "name": "busy_without_retry"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet busy: fixture capacity busy",
+          "error": "WalletBusy { detail: \"fixture capacity busy\", retry_after_ms: Some(1000) }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": "ERR_SERVER_BUSY",
+            "description": "fixture capacity busy",
+            "status": "error"
+          },
+          "retry_after": "1",
+          "status": 503
+        }
+      },
+      "name": "toolbox_busy_with_retry"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet busy: fixture capacity busy",
+          "error": "WalletBusy { detail: \"fixture capacity busy\", retry_after_ms: None }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": "ERR_SERVER_BUSY",
+            "description": "fixture capacity busy"
+          },
+          "retry_after": null,
+          "status": 429
+        }
+      },
+      "name": "toolbox_busy_without_retry"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet busy: STORE_BUSY",
+          "error": "WalletBusy { detail: \"STORE_BUSY\", retry_after_ms: None }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": "STORE_BUSY"
+          },
+          "retry_after": null,
+          "status": 503
+        }
+      },
+      "name": "busy_code_fallback"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 6): fixture refused",
+          "error": "WalletError(\"wallet error (code 6): fixture refused\")"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": 6,
+            "description": "fixture refused"
+          },
+          "retry_after": null,
+          "status": 400
+        }
+      },
+      "name": "numeric_refusal"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: wallet error (code 6): fixture refused",
+          "error": "WalletError(\"wallet error (code 6): fixture refused\")"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": 6,
+            "description": "fixture refused"
+          },
+          "retry_after": null,
+          "status": 503
+        }
+      },
+      "name": "numeric_refusal_on_503"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: HTTP 403 Forbidden for createAction: {\"code\":\"ERR_PERMISSION_DENIED\",\"description\":\"fixture permission refused\",\"status\":\"error\"}",
+          "error": "WalletError(\"HTTP 403 Forbidden for createAction: {\\\"code\\\":\\\"ERR_PERMISSION_DENIED\\\",\\\"description\\\":\\\"fixture permission refused\\\",\\\"status\\\":\\\"error\\\"}\")"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body": {
+            "code": "ERR_PERMISSION_DENIED",
+            "description": "fixture permission refused",
+            "status": "error"
+          },
+          "retry_after": null,
+          "status": 403
+        }
+      },
+      "name": "brc_string_refusal"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: invalid HMAC length: expected 32, got 3",
+          "error": "WalletError(\"invalid HMAC length: expected 32, got 3\")"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "data": [
+              0
+            ],
+            "keyId": "fixture",
+            "protocolId": [
+              1,
+              "fixture keys"
+            ]
+          },
+          "method": "POST",
+          "path": "/createHmac"
+        },
+        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c2264617461223a5b305d7d"
+      },
+      "input": {
+        "args": {
+          "counterparty": null,
+          "data": [
+            0
+          ],
+          "keyID": "fixture",
+          "protocolID": [
+            1,
+            "fixture keys"
+          ]
+        },
+        "call": "createHmac",
+        "response": {
+          "body": {
+            "hmac": [
+              1,
+              2,
+              3
+            ]
+          },
+          "retry_after": null,
+          "status": 200
+        }
+      },
+      "name": "invalid_hmac_length"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: unknown network: fixture-unknown",
+          "error": "WalletError(\"unknown network: fixture-unknown\")"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {},
+          "method": "POST",
+          "path": "/getNetwork"
+        },
+        "request_body_hex": "7b7d"
+      },
+      "input": {
+        "args": {},
+        "call": "getNetwork",
+        "response": {
+          "body": {
+            "network": "fixture-unknown"
+          },
+          "retry_after": null,
+          "status": 200
+        }
+      },
+      "name": "unknown_network"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet transport fault: HTTP 502 Bad Gateway for createAction: ",
+          "error": "WalletTransport { status: Some(502), detail: \"HTTP 502 Bad Gateway for createAction: \" }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body_text": "",
+          "status": 502
+        }
+      },
+      "name": "bare_502"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet transport fault: HTTP 503 Service Unavailable for createAction: ",
+          "error": "WalletTransport { status: Some(503), detail: \"HTTP 503 Service Unavailable for createAction: \" }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body_text": "",
+          "status": 503
+        }
+      },
+      "name": "bare_503"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet transport fault: HTTP 504 Gateway Timeout for createAction: ",
+          "error": "WalletTransport { status: Some(504), detail: \"HTTP 504 Gateway Timeout for createAction: \" }"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "response": {
+          "body_text": "",
+          "status": 504
+        }
+      },
+      "name": "bare_504"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "display": "wallet error: failed to parse JSON response: error decoding response body",
+          "error": "WalletError(\"failed to parse JSON response: error decoding response body\")"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {},
+          "method": "POST",
+          "path": "/getVersion"
+        },
+        "request_body_hex": "7b7d"
+      },
+      "input": {
+        "args": {},
+        "call": "getVersion",
+        "response": {
+          "body_text": "not JSON",
+          "status": 200
+        }
+      },
+      "name": "malformed_json"
+    },
+    {
+      "expected": {
+        "client_error": {
+          "detail_starts_with": "HTTP request failed: ",
+          "status": null,
+          "variant": "WalletTransport"
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {
+            "description": "fixture action"
+          },
+          "method": "POST",
+          "path": "/createAction"
+        },
+        "request_body_hex": "7b226465736372697074696f6e223a226669787475726520616374696f6e227d"
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "fault": {
+          "client_timeout_ms": 250,
+          "server_delay_ms": 5000
+        }
+      },
+      "name": "timeout"
+    },
+    {
+      "expected": {
+        "client_error": {
+          "detail_starts_with": "HTTP request failed: ",
+          "status": null,
+          "variant": "WalletTransport"
+        }
+      },
+      "input": {
+        "args": {
+          "description": "fixture action"
+        },
+        "call": "createAction",
+        "fault": "accepted loopback connection closed before an HTTP response"
+      },
+      "name": "connection_error"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "Error Handling and Validation"
+    }
+  ],
+  "schema_version": 1
+}

@@ -1,0 +1,71 @@
+{
+  "cases": [
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "network": "mainnet"
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {},
+          "method": "POST",
+          "path": "/getNetwork"
+        },
+        "request_body_hex": "7b7d",
+        "response_body_hex": "7b226e6574776f726b223a226d61696e6e6574227d"
+      },
+      "input": {
+        "args": {},
+        "response_body": {
+          "network": "mainnet"
+        },
+        "response_status": 200
+      },
+      "name": "minimal",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    },
+    {
+      "expected": {
+        "client_result": {
+          "ok": {
+            "network": "testnet"
+          }
+        },
+        "request": {
+          "headers": {
+            "content-type": "application/json",
+            "originator": "http://fixtures.invalid"
+          },
+          "json": {},
+          "method": "POST",
+          "path": "/getNetwork"
+        },
+        "request_body_hex": "7b7d",
+        "response_body_hex": "7b226e6574776f726b223a22746573746e6574227d"
+      },
+      "input": {
+        "args": {},
+        "response_body": {
+          "network": "testnet"
+        },
+        "response_status": 200
+      },
+      "name": "full",
+      "seed": "fixed public curve points; byte ramps and repeated bytes; height 800000; time 2026-10-19T00:00:00Z; no RNG"
+    }
+  ],
+  "references": [
+    {
+      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "document": "wallet/0100.md",
+      "repository": "bsv-blockchain/BRCs",
+      "section": "The Wallet Interface / getNetwork"
+    }
+  ],
+  "schema_version": 1
+}
