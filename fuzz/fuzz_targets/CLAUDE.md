@@ -3,17 +3,29 @@
 
 ## Overview
 
-This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte sequences into the SDK's parsing and decoding functions. The goal is to verify that no input—no matter how malformed—causes a panic, out-of-bounds access, or other undefined behavior. Each target also validates encoding/decoding roundtrips where possible.
+This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte sequences into the SDK's parsing and decoding functions. The goal is to verify that no input, no matter how malformed, causes a panic, out-of-bounds access, or other undefined behavior. Each target also validates encoding/decoding roundtrips where possible.
 
 ## Files
 
-| File | Purpose |
-|------|---------|
-| `fuzz_base58.rs` | Fuzzes Base58, Base58Check, hex, and Base64 decoding plus encode/decode roundtrips |
-| `fuzz_script_parser.rs` | Fuzzes `Script::from_binary` and `Script::from_hex`, exercises type detection and serialization |
-| `fuzz_transaction_parser.rs` | Fuzzes `Transaction::from_binary`, sighash `parse_transaction`, and `MerklePath::from_binary` |
-| `fuzz_beef_parser.rs` | Fuzzes `Beef::from_binary` against the hinted parse and the streaming reader (`verify_stream_structure`: a verdict on any bytes, no root accepted without a header), links every subject (`find_atomic_transaction`), serializes, clones and drops it, then `verify_valid`, the round trip, `Transaction::from_beef` and `from_atomic_beef` |
-| `fuzz_wire_protocol.rs` | Fuzzes `WireReader` deserialization of varint, string, counterparty, protocol ID, and raw bytes |
+Each target's assertion is "returns, never panics"; the column says where a target also checks a round trip or a bound. Its seeds are `fuzz/corpus/<target>/`, written by `fuzz/corpus-gen` from the tree's vectors; the nightly runs each for an hour (`docs/NIGHTLY.md`).
+
+| Target | What it reads | Also checks | Seeds |
+|---|---|---|---|
+| `fuzz_base58` | Base58, Base58Check, hex, Base64 decoding | encode then decode is the input | a WIF, an address, hex, Base64 |
+| `fuzz_script_parser` | `Script::from_binary`, `from_hex`; the type detectors, `to_asm` | | `script_valid.json`'s locking scripts |
+| `fuzz_transaction_parser` | `Transaction::from_binary`, sighash `parse_transaction`, `MerklePath::from_binary` | | `tx_valid.rs`, `bigtx.rs` |
+| `fuzz_beef_parser` | `Beef::from_binary` against the hinted parse; the streaming reader under no headers (no root accepted), then under headers that carry every root (`verify_stream_structure` and `verify_stream`, so the reader walks past the BUMPs to the later doors); `find_atomic_transaction` on every subject, `verify_valid`, `from_beef`, `from_atomic_beef` | the hinted and the plain parse agree | the Lean's 47 rows (`tests/vectors/beef_of_any_size/`), the cross-SDK BEEFs, `atomic-beef.json`, and one seed per refusal the Lean names (`BeefOfAnySize.lean` `Reason`, this crate's `Kind`: all 24 reached, `corpus-gen` prints the census) |
+| `fuzz_chain_primitives` | `BlockHeader`, CompactSize, `ChainWork`, `CompactTarget`, `merkle_root` | header and work round trips | the genesis header |
+| `fuzz_wire_protocol` | `WireReader`'s field readers | | the wallet-wire vectors' parameters |
+| `fuzz_merkle_path` | `MerklePath::from_binary`, `from_hex`; `compute_root` for each txid, `combine`, `trim`, `contains_and_mark` | the bytes reparse to themselves, the root per txid is the reparsed path's | `bump_valid.rs`, `bump_invalid.rs`, BRC-74, the Lean rows' BUMPs |
+| `fuzz_wire_decoders` | the BRC-100 binary substrate per call, the call chosen by the leading byte: even, the frame to `WalletWireProcessor::process_message` over a `ProtoWallet` (the request decoders; the processor decodes the requests of 13 calls, the 15 action, output and certificate calls answer "requires a full wallet implementation" before they read); odd, `data[1]` picks one of the transceiver's 26 calls and the rest is its answer (the result decoders) | the processor never returns `Err` | the wallet-wire vectors (`tests/vectors/wallet_wire/`), an error frame per call |
+| `fuzz_http_json_responses` | `HttpWalletJson`'s response decoding for each of its 28 calls (the status, the busy word, the error body, `Retry-After`, the JSON result), answered by a loopback listener in the process: byte 0 the call, byte 1 the status, byte 2 a `Retry-After` header | | each result vector's JSON at 200, a busy body at 503 with `Retry-After`, an error body at 400, a bare 502 |
+| `fuzz_bip32` | `ExtendedKey::from_string`, `new_master` (the input as a seed), `derive_path` (the input as a path), `derive_public_keys_for_path`, every accessor | a parsed key prints the string it parsed from; a printed key parses back | masters, neutered keys and children on both networks, paths |
+| `fuzz_ecies` | every Electrum and Bitcore decryptor, binary and base64 | the input as a plaintext round-trips through each scheme (one case skipped for #109) | envelopes written by each encryptor |
+| `fuzz_script_spend` | an unlocking and locking script pair through `Spend` under the block and the standard word (byte 0: the word, the era, the version; bytes 1-2 the unlocking length), a work budget of 50,000 and a memory budget of 1 MiB | a counting allocator: no single allocation over twice the budget and no more than four times it live, plus a term linear in the input; never a verdict | the sibling harness's seed rows (`bsv-script-lean/corpus/seed/seed.jsonl`), one per family in git (75), the rest under `/Volumes/Lanes/out/bsv-rs/oracle-fuzz/corpus/`; `script_valid.json`, `spend_valid.json` |
+| `fuzz_auth_messages` | `AuthMessage` from JSON (as the HTTP and WebSocket transports read it, and as the Socket.IO transport reads an event's second argument), `validate`, `signing_data`, key ids; the Engine.IO and Socket.IO frames; the General message's `HttpRequest`/`HttpResponse` payloads; `Certificate` from bytes and JSON; `RequestedCertificateSet`; the auth headers; a nonce's format | payload, certificate and frame encodings reparse to themselves (one frame class skipped for #110) | messages of each type, certificates from `auth_certificate.json`, frames, payloads, written by this crate |
+
+`support/mod.rs` holds the arguments of each wallet call (the serde-shaped ones read from the Go vectors, reshaped to this crate's serde form until #105 is ruled) and `call_shared!`, which both response-decoder targets use.
 
 ## Target Details
 
@@ -35,20 +47,20 @@ Tests `bsv_rs::script::Script`:
 ### fuzz_transaction_parser
 
 Tests transaction-level parsing:
-- `bsv_rs::primitives::bsv::sighash::parse_transaction` — low-level sighash transaction parser
-- `bsv_rs::transaction::Transaction::from_binary` — full transaction parsing with roundtrip via `to_binary`, `id()`, and `to_hex()`
-- `bsv_rs::transaction::MerklePath::from_binary` — Merkle path parsing with roundtrip via `to_binary()`
+- `bsv_rs::primitives::bsv::sighash::parse_transaction`: low-level sighash transaction parser
+- `bsv_rs::transaction::Transaction::from_binary`: full transaction parsing with roundtrip via `to_binary`, `id()`, and `to_hex()`
+- `bsv_rs::transaction::MerklePath::from_binary`: Merkle path parsing with roundtrip via `to_binary()`
 
 ### fuzz_wire_protocol
 
 Tests `bsv_rs::wallet::wire::WireReader` deserialization:
-- `read_var_int()` — variable-length integer decoding
-- `read_string()` — length-prefixed string decoding
-- `read_optional_string()` — optional string decoding
-- `read_counterparty()` — counterparty enum deserialization
-- `read_protocol_id()` — protocol ID tuple deserialization
-- `read_optional_protocol_id()` — optional protocol ID deserialization
-- `read_bytes(n)` — raw byte slice reading (capped at 1024 bytes)
+- `read_var_int()`: variable-length integer decoding
+- `read_string()`: length-prefixed string decoding
+- `read_optional_string()`: optional string decoding
+- `read_counterparty()`: counterparty enum deserialization
+- `read_protocol_id()`: protocol ID tuple deserialization
+- `read_optional_protocol_id()`: optional protocol ID deserialization
+- `read_bytes(n)`: raw byte slice reading (capped at 1024 bytes)
 
 Each method is tested with a fresh `WireReader` instance to independently fuzz each code path.
 
@@ -63,25 +75,24 @@ cargo install cargo-fuzz
 # List available targets
 cargo fuzz list
 
-# Run a specific target
-cargo fuzz run fuzz_base58
-cargo fuzz run fuzz_script_parser
-cargo fuzz run fuzz_transaction_parser
-cargo fuzz run fuzz_wire_protocol
+# Run a target from its seeds for ten minutes
+cargo +nightly fuzz run fuzz_merkle_path fuzz/corpus/fuzz_merkle_path -- -max_total_time=600
 
-# Run with a time limit (seconds)
-cargo fuzz run fuzz_base58 -- -max_total_time=60
+# Keep going past a crash (each crash input lands in fuzz/artifacts/<target>/)
+cargo +nightly fuzz run fuzz_auth_messages -- -fork=1 -ignore_crashes=1 -max_total_time=600
 
-# Run with a specific corpus directory
-cargo fuzz run fuzz_script_parser corpus/fuzz_script_parser
+# Rewrite the seeds from the vectors (and the sibling's rows, with the rest out of git)
+cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- --rest /Volumes/Lanes/out/bsv-rs/oracle-fuzz/corpus
 ```
 
-The fuzz crate depends on `bsv-rs` with the `full` feature flag enabled (see `fuzz/Cargo.toml`), so all modules are available to all targets.
+On a macOS host whose default SDK the linker cannot read (`ld: tapi error: malformed file`), build with `SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`.
+
+The fuzz crate depends on `bsv-rs` with `full` and `http` (see `fuzz/Cargo.toml`), so every module and the HTTP substrate are available to every target.
 
 ## Related
 
-- `../Cargo.toml` — Fuzz crate manifest, defines binary targets and `full` feature dependency
-- `src/primitives/CLAUDE.md` — Base58/hex/Base64 encoding functions being fuzzed
-- `src/script/CLAUDE.md` — Script parsing and type detection being fuzzed
-- `src/transaction/CLAUDE.md` — Transaction and MerklePath parsing being fuzzed
-- `src/wallet/wire/CLAUDE.md` — Wire protocol reader being fuzzed
+- `../Cargo.toml`: Fuzz crate manifest, defines binary targets and `full` feature dependency
+- `src/primitives/CLAUDE.md`: Base58/hex/Base64 encoding functions being fuzzed
+- `src/script/CLAUDE.md`: Script parsing and type detection being fuzzed
+- `src/transaction/CLAUDE.md`: Transaction and MerklePath parsing being fuzzed
+- `src/wallet/wire/CLAUDE.md`: Wire protocol reader being fuzzed
