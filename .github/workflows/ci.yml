@@ -312,6 +312,39 @@ jobs:
       - name: Run cargo-machete
         run: '"$RUNNER_TEMP/tools/bin/cargo-machete" --with-metadata'
 
+  deny:
+    name: deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Install cargo-deny 0.20.2
+        env:
+          RUSTFLAGS: ""
+          CARGO_TARGET_DIR: ${{ runner.temp }}/cargo-deny-target
+        run: cargo install cargo-deny --version 0.20.2 --locked --root "$RUNNER_TEMP/tools"
+
+      # This library does not commit Cargo.lock. Resolve once, then keep that
+      # same lockfile for all three graphs; every check must succeed.
+      - name: Resolve the audit lockfile
+        run: cargo generate-lockfile
+
+      - name: Check all features, the Cloudflare slice and default features
+        run: |
+          result=0
+          "$RUNNER_TEMP/tools/bin/cargo-deny" --locked --all-features check || result=1
+          "$RUNNER_TEMP/tools/bin/cargo-deny" --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check || result=1
+          "$RUNNER_TEMP/tools/bin/cargo-deny" --locked check || result=1
+          exit "$result"
+
   benchmarks:
     name: Benchmark Regression Check
     runs-on: ubuntu-latest
