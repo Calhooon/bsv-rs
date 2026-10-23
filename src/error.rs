@@ -194,7 +194,7 @@ pub enum Error {
     /// The SDK reports the server's promise; it cannot check it.
     /// `HttpWalletJson` reads it from the body's code (`STORE_BUSY`,
     /// `ERR_SERVER_BUSY`), never from the HTTP status; a 503 without that
-    /// code stays [`Error::WalletError`].
+    /// code is [`Error::WalletTransport`].
     #[cfg(feature = "wallet")]
     #[error("wallet busy: {detail}")]
     WalletBusy {
@@ -205,6 +205,26 @@ pub enum Error {
         /// server's word, not checked (a huge `Retry-After` saturates to
         /// `u64::MAX`), so a caller caps its own wait.
         retry_after_ms: Option<u64>,
+    },
+
+    /// The way to the wallet failed: no answer in the wallet's word.
+    ///
+    /// A caller may retry it; it carries no promise about what the wallet
+    /// did (the request may or may not have reached it), which is the one
+    /// way it differs from [`Error::WalletBusy`]. `HttpWalletJson` answers it
+    /// for a 502, 503 or 504 whose body carries no busy code and no numeric
+    /// wallet code, a connection error (refused, reset, DNS) and a timeout;
+    /// every other failure, and every refusal, stays [`Error::WalletError`].
+    /// The crate never retries by itself.
+    #[cfg(feature = "wallet")]
+    #[error("wallet transport fault: {detail}")]
+    WalletTransport {
+        /// The HTTP status of the answer, when one arrived (502, 503 or
+        /// 504); `None` when no answer arrived (a connection error, a
+        /// timeout).
+        status: Option<u16>,
+        /// What failed, in the transport's words.
+        detail: String,
     },
 
     /// Key derivation error.
