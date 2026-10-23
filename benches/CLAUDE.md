@@ -13,8 +13,13 @@ This module contains Criterion-based benchmarks for measuring the performance of
 | `primitives_bench.rs` | Comprehensive benchmarks for all primitives (11 groups) |
 | `script_bench.rs` | Script parsing, templates, signing, and serialization benchmarks (5 groups) |
 | `memory_bench.rs` | Performance benchmarks with RSS memory tracking (4 groups) |
+| `beef_stream.rs` | 1 MB and 10 MB file-backed streams, script/structure timing and fresh-process RSS |
+| `merkle_path.rs` | 10,000 depth-20 proofs into one synthetic block |
+| `transaction_sign_verify.rs` | Sign and verify a transaction with 100 P2PKH inputs |
+| `wire_codec.rs` | Four field codec operations for each of the 28 wallet calls |
+| `script_spend.rs` | External seed corpus through Spend under the block word |
 
-All four are declared as `[[bench]]` in `Cargo.toml` with `harness = false` (Criterion provides its own main).
+All nine are declared as `[[bench]]` in `Cargo.toml` with `harness = false` (Criterion provides its own main).
 
 ## Benchmark Groups
 
@@ -169,33 +174,19 @@ cargo bench -- --baseline main
 
 ## CI Benchmark Regression Detection
 
-The CI workflow performs relative benchmarking on pull requests:
+`tools/bench-compare` runs all nine benches with `--locked --features wallet`,
+reads Criterion samples, and fails a p99 increase greater than 5% against
+`benches/baseline.json` on matching hardware. It refuses missing samples,
+missing corpus input, changed workload inventory and different hardware.
+`--record` is an explicit baseline update for a PR that requests it.
 
-1. Checks out the base branch (main) and runs benchmarks
-2. Checks out the PR branch and runs benchmarks
-3. Compares results using `critcmp`
-
-This approach cancels out VM noise since both measurements happen on the same machine.
-
-### Local Comparison
-
-To compare benchmarks locally (e.g., before/after a change):
-
-```bash
-# Save baseline before changes
-cargo bench -- --save-baseline before
-
-# Make changes, then benchmark again
-cargo bench -- --save-baseline after
-
-# Compare results
-cargo install critcmp
-critcmp before after
-```
+See [README.md](README.md) for the percentile definition, fixture scope,
+external output paths, corpus access, and the Linux recording procedure.
+The `benchmarks` CI job replaces the old `critcmp` comparison.
 
 ## Output
 
-Criterion generates detailed HTML reports in `target/criterion/`. Each benchmark group has its own report showing:
+Criterion writes its reports under `CRITERION_HOME`, or `$CARGO_TARGET_DIR/criterion/`. Set the target directory outside the checkout. The comparison tool uses a fresh external directory per run. Each benchmark group has its own report showing:
 - Execution time statistics (mean, median, std dev)
 - Throughput (for sized operations)
 - Historical comparison graphs
