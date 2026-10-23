@@ -209,14 +209,16 @@ bsv-rs = { version = "0.3", features = ["wallet", "http"] }
 
 Substrates return `Error::WalletError` for:
 - Empty or malformed messages (HttpWalletWire)
-- HTTP request failures
-- Non-2xx status codes
+- HTTP request failures (HttpWalletWire; HttpWalletJson for a request it could not build)
+- Non-2xx status codes (except HttpWalletJson's busy and transport answers below)
 - JSON parsing errors (HttpWalletJson)
 - Invalid response data (base64 decoding, wrong HMAC length, etc.)
 
 JSON error responses are parsed to extract error codes and descriptions. The wallet server may return structured error responses with `code` and `description` fields.
 
-`HttpWalletJson` reads `Error::WalletBusy` from the body's code, never from the HTTP status: a body whose `code` is `STORE_BUSY` (bsv-wallet-cli) or `ERR_SERVER_BUSY` (the TS toolbox edge), at any non-2xx status, is the wallet's answer that it refused the call before acting and promised that nothing was written, built or locked, so the caller may repeat the same call unchanged after `retry_after_ms`, or after a moment when it is `None`. The SDK reports the server's promise; it cannot check it. The detail is the body's `message`, else its `description`, else the code; `Retry-After` in delta-seconds becomes `retry_after_ms` (unbounded, the server's word), an HTTP-date `None`. A 503 without that code stays `WalletError` with its usual text. `HttpWalletWire` has no busy code on the wire (the BRC-100 result frame defines 5, 6, 7 and none for busy), so it keeps `WalletError`.
+`HttpWalletJson` reads `Error::WalletBusy` from the body's code, never from the HTTP status: a body whose `code` is `STORE_BUSY` (bsv-wallet-cli) or `ERR_SERVER_BUSY` (the TS toolbox edge), at any non-2xx status, is the wallet's answer that it refused the call before acting and promised that nothing was written, built or locked, so the caller may repeat the same call unchanged after `retry_after_ms`, or after a moment when it is `None`. The SDK reports the server's promise; it cannot check it. The detail is the body's `message`, else its `description`, else the code; `Retry-After` in delta-seconds becomes `retry_after_ms` (unbounded, the server's word), an HTTP-date `None`. A 503 without that code is `WalletTransport` (below). `HttpWalletWire` has no busy code on the wire (the BRC-100 result frame defines 5, 6, 7 and none for busy), so it keeps `WalletError`.
+
+`HttpWalletJson` answers `Error::WalletTransport { status, detail }` when the way to the wallet failed, with no answer in the wallet's word: a 502, 503 or 504 whose body carries no busy code and no numeric wallet code (`status` the code, `detail` the usual `HTTP <status> for <method>: <body>` text), and a connection error (refused, reset, DNS) or a timeout (`status` `None`). A caller may retry it; it carries no promise about what the wallet did (the request may or may not have reached it), which is the one way it differs from `WalletBusy`. A 4xx, a 500, and a 5xx with a numeric wallet code keep `WalletError`; the crate never retries by itself. `HttpWalletWire` keeps `WalletError` for these.
 
 ## Originator Handling
 
