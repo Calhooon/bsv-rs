@@ -1,5 +1,15 @@
 # Releasing bsv-rs
 
+The beta canary order starts with the toolbox's and CLI's `beta` lines taking
+an explicitly pinned bsv-rs beta prerelease. After the CLI's gate passes, the
+workers' captains and LOW's captain re-pin on their own trains; the apps'
+captains follow the layer they consume. The current pins, feature slices,
+owners and dated re-pin proposals live in [docs/DEPENDENTS.md](docs/DEPENDENTS.md).
+Each pin-move PR refreshes [docs/dependents.lock](docs/dependents.lock) from the
+consumer's remote default branch. Stable requirements do not admit beta
+prereleases. This canary paragraph does not authorize a pin, tag, deployment
+or release; #100 owns the full release policy.
+
 1. Every change reaches `main` through a pull request; `main` is protected, admins included, linear history.
 2. The PR merges (rebase-merge) once its required checks are green: `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`, `deny`.
 
