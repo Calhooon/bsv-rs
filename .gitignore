@@ -26,11 +26,12 @@ Thumbs.db
 *.pfx
 secrets.*
 
-# Fuzzing
+# Fuzzing (fuzz/corpus/ is checked in: the seed corpora, fuzz/fuzz_targets/CLAUDE.md)
 fuzz/target/
 fuzz/Cargo.lock
-fuzz/corpus/
 fuzz/artifacts/
+fuzz/corpus-gen/target/
+fuzz/corpus-gen/Cargo.lock
 .playwright-mcp/
 
 # session/tool artifacts (never published)

@@ -1,0 +1,21 @@
+[package]
+name = "bsv-rs-fuzz-corpus-gen"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Writes the fuzz targets' seed corpora (`fuzz/corpus/<target>/`) from the
+# tree's own vectors, with this crate's own writers. Its own workspace, so the
+# fuzz crate's nightly build never compiles it and it builds on stable.
+[workspace]
+
+[dependencies]
+futures = "0.3"
+hex = "0.4"
+serde = "1"
+serde_json = "1.0"
+sha2 = "0.10"
+
+[dependencies.bsv-rs]
+path = "../.."
+features = ["full", "http"]
