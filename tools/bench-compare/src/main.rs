@@ -530,6 +530,15 @@ fn compare(base: &Run, run: &Run) -> Result<bool> {
     Ok(passed)
 }
 
+/// One baseline entry per platform, CPU model and core count: hosted runners
+/// draw from several CPUs, and a p99 is only compared on the hardware it came from.
+fn machine_key(run: &Run) -> String {
+    format!(
+        "{} / {} / {} cores",
+        run.platform, run.machine.model, run.machine.cores
+    )
+}
+
 fn run() -> Result<bool> {
     let repo = repository()?;
     let opts = options(&repo)?;
@@ -539,7 +548,7 @@ fn run() -> Result<bool> {
         fresh_run(&repo, &opts.output)?
     };
     validate_run(&measured)?;
-    let platform = measured.platform.clone();
+    let platform = machine_key(&measured);
     let mut baseline: Baseline = if opts.baseline.is_file() {
         serde_json::from_slice(&fs::read(&opts.baseline)?)?
     } else if opts.record {
@@ -554,8 +563,8 @@ fn run() -> Result<bool> {
         return Err("unsupported baseline schema".into());
     }
     println!(
-        "Machine: {}, {} cores ({platform})",
-        measured.machine.model, measured.machine.cores
+        "Machine: {}, {} cores ({})",
+        measured.machine.model, measured.machine.cores, measured.platform
     );
     for memory in &measured.memory {
         println!("RSS: {memory}");
@@ -586,7 +595,10 @@ fn run() -> Result<bool> {
         println!("RECORDED {} (explicit --record)", opts.baseline.display());
         Ok(true)
     } else {
-        let base = baseline.platforms.get(&platform).ok_or_else(|| format!("no {platform} baseline; run --record on the CI runner in the explicit baseline PR and commit its artifact"))?;
+        let base = baseline.platforms.get(&platform).ok_or_else(|| {
+            let recorded: Vec<_> = baseline.platforms.keys().map(String::as_str).collect();
+            format!("no baseline for {platform} (recorded: {recorded:?}); run --record on this hardware in an explicit baseline PR and commit its artifact")
+        })?;
         let passed = compare(base, &measured)?;
         println!(
             "{}: p99 threshold is +{:.0}%",
