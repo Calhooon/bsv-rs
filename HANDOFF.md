@@ -12,7 +12,7 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - `release/0.8.2`: the keeper's (captain-bsv-stack-lean). PR #102 (release/0.8.2 into main) is open and green on every job. Nothing here touches it, the tag `v0.8.2`, the `lane/*` branches or the `[Unreleased]` heading until the tag exists.
 - `beta`: this captain's line (#75). CUT 2026-10-23 22:1xZ from `main` at `v0.8.2` (`efe12e6`); protection copied from `main` (the four contexts, strict, admins, linear history, no force push or delete; read back with `gh api repos/Calhooon/bsv-rs/branches/beta/protection`); CI on `[main, beta]` by PR #103; every programme PR targets `beta`; `vX.Y.Z-beta.N` publishes a prerelease (the owner's word); `beta` merges into `main` at a phase exit as the next minor after the toolbox's and the CLI's betas built against a prerelease and the CLI's gate ran.
 
-## Where it stands (2026-10-24, 02:1xZ)
+## Where it stands (2026-10-23, 23:1xZ)
 
 - Landed on main: 0.8.2 (`efe12e6`, PR #102 merged 21:59Z, tagged `v0.8.2`, on crates.io 22:10Z, the Release run green).
 - `beta` cut and protected (above). PR #103 merged 22:4xZ (rebase; `beta` at `77fe502`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. #75's exit test held: the PR ran every check. Merged on the four required checks with the captain's own review (the captain's work).
@@ -41,19 +41,20 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 | oracle-deny | #79 | committed `62dd795`; review running | | oracle-deny-review (Fable, Studio) |
 | oracle-arch | #80 | running (Studio) | | |
 | oracle-fixtures | #76 | committed `28d0c6f`; review running | | oracle-fixtures-review (Studio) |
-| oracle-benches | #77 | STOPPED 02:0xZ (load 255; two commits kept in its worktree); relaunch on a quiet machine with `--worktree oracle-benches` | | |
-| oracle-fuzz | #82 | done on the box (Opus 5.5) `box/lane/oracle-fuzz` `f0b92d5`, five commits; filed #108 (a panic on input in `Certificate::from_binary`), #109, #110, a comment on #105; review running | | oracle-fuzz-review (box) |
+| oracle-benches | #77 | STOPPED 23:0xZ (load 255; two commits kept in its worktree); relaunch on a quiet machine with `--worktree oracle-benches` | | |
+| oracle-fuzz | #82 | done on the box (Opus 5.5) `box/lane/oracle-fuzz` `f0b92d5`, five commits (its origin push removed, see the lessons); filed #108 (a panic on input in `Certificate::from_binary`), #109, #110, a comment on #105; review running | | oracle-fuzz-review (box) |
 | oracle-nightly | #81 | running (Studio) | | |
 | oracle-dependents | #83 | committed `d313d5e`; review running | | oracle-dependents-review (Fable, Studio) |
 | oracle-northstar | #84 | MERGED `a3a8446`, #84 closed | #107 | Fable: fold, three edits applied |
-| fix-108-certificate-reader | #108 | launched 02:1xZ on the box (brief `docs/lanes/fix-108-certificate-reader.md`) | | |
+| fix-108-certificate-reader | #108 | briefed 23:1xZ; the box had no Claude login with room, relaunch pending (brief `docs/lanes/fix-108-certificate-reader.md`) | | |
 
-## Lessons of the night (2026-10-24)
+## Lessons of the night (2026-10-23, late)
 
 - Codex code lanes and one Fable review lane ended their turns with the gate running in the background and no REPORT written (the lane's session ends with its turn; the background wakeup never arrives). `cca runs --resume <lane>` picks a lane up, but the resumed lanes did it again. The answer that works: every brief ends with "Write the full REPORT before your turn ends: never leave the gate in the background and stop", and the cold review lane runs the full gate itself; CI on the PR is the gate of record for a cold-path change.
-- The Studio reached a load of 255 on 10 cores with every captain's lanes on it (23:5xZ to 02:0xZ). The CLI captain's ask, honoured: no new Studio launch for an hour, benches never measured on a loaded machine (the brief's Linux baseline on the runner is the one that counts). New launches go `--host box` (the box needs a Claude login with room). The `--host box` launch pushes the checkout's HEAD as the lane's base: detach the checkout at the wanted commit before launching, then return to `main`.
+- The Studio reached a load of 255 on 10 cores with every captain's lanes on it (22:5xZ to 23:1xZ). The CLI captain's ask, honoured: no new Studio launch for an hour, benches never measured on a loaded machine (the brief's Linux baseline on the runner is the one that counts). New launches go `--host box` (the box needs a Claude login with room). The `--host box` launch pushes the checkout's HEAD as the lane's base: detach the checkout at the wanted commit before launching, then return to `main`.
 - Issues on `beta` do not auto-close from a PR's "Closes": close them by hand with the landing note.
 - A lane's worktree keeps its commits when stopped; relaunch with the same `--worktree` to continue.
+- Lanes never push (the stack's rule; the first briefs said only "not to main or beta"). The fuzz lane pushed `lane/oracle-fuzz` to origin; the `secrets` job (gitleaks over every fetched branch) then failed on EVERY PR with 17 generic-api-key findings in the fuzz seed corpus (identity-key hex in `fuzz/corpus/fuzz_auth_messages/*` and one string in `fuzz/corpus-gen/src/main.rs`, none a secret). The captain removed the origin copy (the commits are on the box and in the captain's local `lane/oracle-fuzz`); the fix is a `.gitleaks.toml` allowlisting `fuzz/corpus/` and the generator's literal, folded into the fuzz review. The README now says: never push; the captain pushes and opens the PR.
 
 ## What the dependents' captains asked (captain-bsv-wallet-cli, 2026-10-23)
 
