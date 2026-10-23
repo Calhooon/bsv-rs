@@ -1,0 +1,19 @@
+#!/bin/sh
+# Run the independent tool without leaving compiler output in the checkout.
+set -eu
+tool_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+: "${CARGO_TARGET_DIR:?Set CARGO_TARGET_DIR outside the checkout}"
+CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-4}
+export CARGO_BUILD_JOBS
+case "$CARGO_TARGET_DIR" in
+  /*) ;;
+  *) echo 'ratchet: CARGO_TARGET_DIR must be absolute' >&2; exit 2 ;;
+esac
+root=$(CDPATH='' cd -- "$tool_dir/../.." && pwd)
+# Require an existing directory so even a rejected path creates nothing here.
+target=$(CDPATH='' cd -- "$CARGO_TARGET_DIR" && pwd -P)
+case "$target/" in
+  "$root/"*) echo 'ratchet: CARGO_TARGET_DIR must be outside the checkout' >&2; exit 2 ;;
+esac
+cd "$root"
+exec cargo +1.95.0 run --quiet --locked --manifest-path "$tool_dir/Cargo.toml" -- "$@"

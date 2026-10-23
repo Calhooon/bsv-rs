@@ -303,6 +303,55 @@ jobs:
             echo "::endgroup::"
           done
 
+  ratchet:
+    name: ratchet
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: ""
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Keep generated files outside the checkout
+        run: |
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-ratchet-target" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/bsv-rs-ratchet-target"
+
+      # Diagnostics are compiler-version dependent; keep the baseline's toolchain.
+      - name: Install the measurement toolchain
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: "1.95.0"
+          components: clippy, rustfmt
+
+      - name: Cache the measurement build
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.CARGO_TARGET_DIR }}
+          key: ${{ runner.os }}-ratchet-1.95.0-${{ hashFiles('tools/ratchet/Cargo.lock', 'tools/ratchet/library.Cargo.lock') }}
+
+      - name: Check the measurement tool
+        run: |
+          cargo +1.95.0 fmt --manifest-path tools/ratchet/Cargo.toml -- --check
+          cargo +1.95.0 clippy --locked --manifest-path tools/ratchet/Cargo.toml --all-targets -- -D warnings
+          cargo +1.95.0 test --locked --manifest-path tools/ratchet/Cargo.toml
+
+      - name: Reject code-health increases
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -n "$BASE_REF" ] && [ "$BASE_REF" != 0000000000000000000000000000000000000000 ]; then
+            tools/ratchet/run --check --against "$BASE_REF"
+          else
+            tools/ratchet/run --check
+          fi
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
