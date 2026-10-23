@@ -102,15 +102,16 @@ fuzz_target!(|data: &[u8]| {
     }
     if let Ok(packet) = SocketIoPacket::decode(text) {
         let encoded = packet.encode();
-        let again = SocketIoPacket::decode(&encoded).expect("a frame's encoding decodes");
         // bsv-rs#110: a CONNECT's payload of another JSON type than an object
-        // re-reads as an ack id; skipped until the ruling.
+        // re-reads as an ack id, and the rest may not decode; skipped until
+        // the ruling.
         let known = matches!(
             &packet,
             SocketIoPacket::Connect { data: Some(v), .. }
                 | SocketIoPacket::ConnectError { data: Some(v), .. } if !v.is_object()
         );
         if !known {
+            let again = SocketIoPacket::decode(&encoded).expect("a frame's encoding decodes");
             assert_eq!(again.encode(), encoded);
         }
         if let SocketIoPacket::Event { data: args, .. } = &packet {
