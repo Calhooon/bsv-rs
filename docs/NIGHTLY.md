@@ -1,11 +1,14 @@
 # Nightly oracles
 
-`.github/workflows/nightly.yml` is the scheduled mutation check for
-[bsv-rs #81](https://github.com/Calhooon/bsv-rs/issues/81), part of
+`.github/workflows/nightly.yml` carries the scheduled mutation check for
+[bsv-rs #81](https://github.com/Calhooon/bsv-rs/issues/81) and the fuzz matrix
+for [bsv-rs #82](https://github.com/Calhooon/bsv-rs/issues/82), part of
 [the north-star programme](https://github.com/Calhooon/bsv-rs/issues/101).
+Never on a push or a PR: the gate is `ci.yml`.
 Its cron requests 03:00 UTC daily; `workflow_dispatch` supports a manual run.
-The scheduled run resolves `beta` once, then every shard and the score job
-checks out that same commit. A manual run tests the selected ref.
+The scheduled run resolves `beta` once, then every mutation shard, the score
+job and every fuzz job check out that same commit. A manual run tests the
+selected ref.
 
 GitHub only schedules workflows present on the repository's default branch
 (`main` at this lane's baseline). Landing this file on `beta` does not activate
@@ -17,11 +20,14 @@ GitHub also requires the workflow on the default branch to enable manual
 dispatch, so a new file on `beta` alone cannot be dispatched yet.
 See [manual dispatch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
 
+Permissions are scoped per job: every job has `contents: read`; only the fuzz
+job, which files its crashes as issues, adds `issues: write`.
+
 ## What runs
 
 `cargo-mutants` 27.1.0 is built from crates.io source with `cargo install
 --version 27.1.0 --locked`. Every action is pinned to a commit with its version
-beside it, following `ci.yml`. The workflow token has only `contents: read`.
+beside it, following `ci.yml`. The mutation jobs' token has only `contents: read`.
 
 There are four disjoint shards per surface, at most twenty concurrent jobs.
 Each shard uses one mutation worker, its own `CARGO_TARGET_DIR`, a 120-second
@@ -134,7 +140,7 @@ does not establish that the whole schedule passed. A bounded sample can use
 belong in the report. Missing shards produce `PARTIAL` rows and fail the score
 check even when a sample catches every selected mutant.
 
-## Findings and the fuzz lane
+## Mutation findings
 
 A surviving mutant becomes a test-gap finding. For `src/script/` and
 `src/transaction/beef*.rs`, file an issue with the source commit, tool version,
@@ -144,17 +150,37 @@ and passes on the intended behavior. Judge a suspected behavior error against
 the pinned references and the script oracle; a surviving equivalent mutation
 still needs an explicit explanation. Keep behavior fixes in their own lane.
 An issue for a lower floor links its complete per-file counts and the artifact.
-The workflow publishes evidence for review; it does not create issues or PRs.
+The mutation jobs publish evidence for review; they do not create issues or PRs.
+The fuzz job files its own crashes (below).
 
-The fuzz jobs and their seed corpora belong to `oracle-fuzz`
-([#82](https://github.com/Calhooon/bsv-rs/issues/82)); the workflow leaves their
-insertion point marked. A crash input becomes an issue with the minimized input
-attached, its hash, target, source commit, toolchain/sanitizer options and exact
-offline replay command. Preserve the original input in the run artifact, add
-the minimized input to the regression corpus through review, and require a
-deterministic regression test with the fix. Inputs and logs carry no production
-keys, account identifiers or deployment hostnames. Corpus additions are artifacts
-for review, not automatic commits.
+## Fuzz (#82)
+
+**What runs.** One job per target of `fuzz/Cargo.toml` (13 today; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for one hour from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=3600`): a crash is recorded and the run goes on.
+
+**Where the results land.**
+
+| What | Where |
+|---|---|
+| New corpus entries | the artifact `corpus-<target>` (14 days). The repository does not let a workflow open a pull request ("Allow GitHub Actions to create and approve pull requests" is off), so no PR is opened: the captain merges an artifact by hand (below). |
+| Crash, OOM and timeout inputs | the artifact `crashes-<target>` (90 days) |
+| The count of new entries, and whether a crash was found | the job summary |
+
+**What a crash becomes.** An issue, one per target and panic site, titled `fuzz: <target>: <file>:<line>:<col>` (or `fuzz: <target>: oom` / `timeout`), with the panic's tail and the input as base64 (up to 4,096 bytes; larger ones are in the artifact). A site that already has an open issue gets a comment with the night's run instead. The job then fails, so the night is red until the issue is closed by a fix and its regression test (CLAUDE.md rule 2), never by editing the target. A target may skip one known case while a ruling is pending, with the issue's number at the skip (`fuzz_ecies`: #109; `fuzz_auth_messages`: #110). A panic inside the crate is never skipped (#108).
+
+**Merging an artifact.** Download `corpus-<target>` into a scratch directory, then minimize it into the checked-in corpus and commit the result in its own commit:
+
+```bash
+cargo +nightly fuzz cmin <target> fuzz/corpus/<target> <scratch>   # keeps the entries that add coverage
+du -sh fuzz/corpus                                                  # the checked-in corpora stay under 2 MB in all
+```
+
+**Locally.** `cargo +nightly fuzz run <target> fuzz/corpus/<target> -- -max_total_time=600`. On a macOS host whose default SDK's `.tbd` files the linker cannot read (`ld: tapi error: malformed file`), set `SDKROOT` to an older SDK (`/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk`). The seeds are written by `fuzz/corpus-gen` (`cargo run --release --manifest-path fuzz/corpus-gen/Cargo.toml -- --rest <dir>`); rerunning it rewrites its own seeds by name and leaves the merged entries.
+
+A crash's input is preserved in the run artifact; its minimized form joins the
+regression corpus through review, with the deterministic regression test of
+the fix. Inputs and logs carry no production keys, account identifiers or
+deployment hostnames. Corpus additions are artifacts for review, not automatic
+commits.
 
 ## Stack alignment
 
