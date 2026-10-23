@@ -9,10 +9,16 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
+async-trait = "0.1"
+futures = "0.3"
+reqwest = { version = "0.12", default-features = false }
+serde = "1"
+serde_json = "1.0"
+tokio = { version = "1", features = ["rt", "net", "time"] }
 
 [dependencies.bsv-rs]
 path = ".."
-features = ["full"]
+features = ["full", "http"]
 
 [[bin]]
 name = "fuzz_script_parser"
@@ -47,5 +53,47 @@ doc = false
 [[bin]]
 name = "fuzz_chain_primitives"
 path = "fuzz_targets/fuzz_chain_primitives.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_merkle_path"
+path = "fuzz_targets/fuzz_merkle_path.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_http_json_responses"
+path = "fuzz_targets/fuzz_http_json_responses.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_wire_decoders"
+path = "fuzz_targets/fuzz_wire_decoders.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_bip32"
+path = "fuzz_targets/fuzz_bip32.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_ecies"
+path = "fuzz_targets/fuzz_ecies.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_script_spend"
+path = "fuzz_targets/fuzz_script_spend.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_auth_messages"
+path = "fuzz_targets/fuzz_auth_messages.rs"
 test = false
 doc = false
