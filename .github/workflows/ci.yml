@@ -41,6 +41,9 @@ jobs:
 
       - name: Select the pins that admit this version
         id: plan
+        env:
+          # a private row is planned only when the read token exists (a fork PR never has it)
+          HAS_READ_TOKEN: ${{ secrets.DEPENDENTS_READ_TOKEN != '' }}
         run: python3 -B .github/scripts/dependents.py plan --sdk "$GITHUB_WORKSPACE" --output "$GITHUB_OUTPUT"
 
   dependent-check:

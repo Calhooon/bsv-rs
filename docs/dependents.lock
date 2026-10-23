@@ -1,6 +1,11 @@
 # Remote default-branch snapshots read 2026-10-23. Pin-move PRs refresh these records.
 # Version requirements belong to the consumers; this lock never widens one.
 schema = 1
+# The private app trees (the agents, Zanaadu, Teragun, the-composer) are not rows here: their
+# repository paths and commits stay out of this public file until the owner says otherwise;
+# docs/DEPENDENTS.md names them as the epic does. A private row, when admitted, is skipped
+# with a warning unless DEPENDENTS_READ_TOKEN is present.
+
 
 [[consumer]]
 id = "bsv-wallet-cli"
@@ -92,7 +97,7 @@ manifests = ["Cargo.toml"]
 targets = ["wasm32-unknown-unknown"]
 features = []
 check_args = ["--workspace", "--lib"]
-test_args = ["--workspace", "--lib", "--tests"]
+test_args = ["--workspace", "--lib"]  # its integration suite's version guard pins bsv-rs 0.8.1 in the lock; excluded until the row re-pins
 
 [[consumer]]
 id = "bsv-middleware-rs"
@@ -164,126 +169,6 @@ requirement = "=0.4.5"
 sdk_features = ["auth", "wallet", "transaction", "script", "wasm"]
 sdk_default_features = true
 manifests = ["Cargo.toml"]
-targets = ["wasm32-unknown-unknown"]
-features = []
-check_args = ["--lib"]
-test_args = []
-
-[[consumer]]
-id = "agents-workers"
-repository = "Calgooon/agents"
-branch = "main"
-rev = "55167cd4682f53cdfe03826d1a0dc7d121937427"
-private = true
-requirement = "0.8"
-sdk_features = ["auth", "wallet", "transaction", "wasm"]
-sdk_default_features = true
-manifests = ["1sat-agent/Cargo.toml", "claude-agent/Cargo.toml", "kling-agent/Cargo.toml", "nano-banana-agent/Cargo.toml", "openai-agent/Cargo.toml", "polymirror-agent/Cargo.toml", "reader-agent/Cargo.toml", "seo-agent/Cargo.toml", "test-agent/Cargo.toml", "veo-agent/Cargo.toml", "whisper-agent/Cargo.toml", "x-research-agent/Cargo.toml"]
-targets = ["wasm32-unknown-unknown"]
-features = []
-check_args = ["--lib"]
-test_args = []
-
-[[consumer]]
-id = "agents-viewer"
-repository = "Calgooon/agents"
-branch = "main"
-rev = "55167cd4682f53cdfe03826d1a0dc7d121937427"
-private = true
-requirement = "0.8"
-sdk_features = ["auth", "wallet", "wasm"]
-sdk_default_features = true
-manifests = ["viewer/Cargo.toml"]
-targets = ["wasm32-unknown-unknown"]
-features = []
-check_args = ["--lib"]
-test_args = []
-
-[[consumer]]
-id = "agents-manage"
-repository = "Calgooon/agents"
-branch = "main"
-rev = "55167cd4682f53cdfe03826d1a0dc7d121937427"
-private = true
-requirement = "0.5.0"
-sdk_features = ["full"]
-sdk_default_features = true
-manifests = ["manage/Cargo.toml"]
-targets = ["native"]
-features = []
-check_args = ["--workspace", "--all-targets"]
-test_args = []
-
-[[consumer]]
-id = "zanaadu"
-repository = "Calgooon/zanaadu-v2"
-branch = "main"
-rev = "98a51ff0f7c0cb21df69107948eb88b63fdd87f7"
-private = true
-requirement = "=0.4.5"
-sdk_features = ["wasm"]
-sdk_default_features = true
-manifests = ["overlay-lib/Cargo.toml", "parity-harness/Cargo.toml"]
-targets = ["wasm32-unknown-unknown"]
-features = []
-check_args = ["--workspace", "--lib"]
-test_args = []
-
-[[consumer]]
-id = "teragunv2"
-repository = "Calgooon/teragunv2"
-branch = "main"
-rev = "787d459c12c0bdaee01e04cc896a8deb30ae7429"
-private = true
-requirement = "0.7"
-sdk_features = ["wallet", "auth", "transaction", "wasm"]
-sdk_default_features = true
-manifests = ["api/Cargo.toml", "gun/Cargo.toml", "gun-signer/Cargo.toml"]
-targets = ["wasm32-unknown-unknown"]
-features = []
-check_args = ["--workspace", "--lib"]
-test_args = []
-
-[[consumer]]
-id = "teragunv2-resolver"
-repository = "Calgooon/teragunv2"
-branch = "main"
-rev = "787d459c12c0bdaee01e04cc896a8deb30ae7429"
-private = true
-requirement = "=0.4.5"
-sdk_features = []
-sdk_default_features = true
-manifests = ["identity/resolver/Cargo.toml"]
-targets = ["native"]
-features = []
-check_args = ["--workspace", "--all-targets"]
-test_args = []
-
-[[consumer]]
-id = "the-composer"
-repository = "Calgooon/the-composer"
-branch = "main"
-rev = "0c04d04ef8d3ebcbd800a7c37a91b7751f2fc696"
-private = true
-requirement = ""
-sdk_features = []
-sdk_default_features = true
-manifests = ["app/package.json"]
-targets = ["native"]
-features = []
-check_args = ["--workspace", "--all-targets"]
-test_args = []
-
-[[consumer]]
-id = "zanaadu-transaction"
-repository = "Calgooon/zanaadu-v2"
-branch = "main"
-rev = "98a51ff0f7c0cb21df69107948eb88b63fdd87f7"
-private = true
-requirement = "=0.4.5"
-sdk_features = ["wasm", "transaction"]
-sdk_default_features = true
-manifests = ["app-layer-lib/Cargo.toml", "middleware/Cargo.toml"]
 targets = ["wasm32-unknown-unknown"]
 features = []
 check_args = ["--lib"]
