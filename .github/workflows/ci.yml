@@ -205,6 +205,9 @@ jobs:
       - name: Run EC tests
         run: cargo test --test ec_tests --all-features --verbose
 
+      - name: Run architecture rules
+        run: cargo test --test arch_network_sites --test arch_no_unwrap --test arch_no_string_errors --test arch_no_env --test arch_no_system_time --all-features -- --nocapture
+
       # the consensus witness files: every rule the differential against bitcoin-sv found, pinned on its
       # witness transaction; never run in CI before this step (0.3.25 to 0.3.28 relied on local runs).
       # script_stack_memory_witness holds about 100 MB at its peak (its large rows run one at a time);
@@ -475,6 +478,80 @@ jobs:
 
       - name: Check the library on wasm32
         run: cargo check --lib --target wasm32-unknown-unknown --no-default-features --features "full,wasm"
+
+  # Each feature must build without dev-dependency feature unification (#80).
+  features:
+    name: features
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Put build output in runner scratch
+        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-features" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Build cargo-hack 0.6.45 from source
+        env:
+          RUSTFLAGS: ""
+        run: cargo install cargo-hack --version 0.6.45 --locked --root "$RUNNER_TEMP/tools"
+
+      - name: Check every feature without dev dependencies
+        run: PATH="$RUNNER_TEMP/tools/bin:$PATH" cargo hack check --each-feature --no-dev-deps
+
+  # These are the six library slices consumed by Workers, not full applications.
+  # Keep dead code in a diagnostic cdylib so the size is not an empty module.
+  # #96 will define the deployment artifact and its size budget.
+  wasm32:
+    name: wasm32 (${{ matrix.consumer }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - consumer: combined
+            features: auth,wallet,transaction,overlay,socketio,wasm
+          - consumer: watchtower
+            features: wallet,auth,transaction,wasm
+          - consumer: monitor
+            features: transaction,wasm
+          - consumer: chaintracks
+            features: block
+          - consumer: overlay
+            features: overlay,wasm
+          - consumer: relay
+            features: auth,socketio,wasm
+    env:
+      SLICE_FEATURES: ${{ matrix.features }}
+      SLICE_NAME: ${{ matrix.consumer }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Put build output in runner scratch
+        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-wasm32" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Build the library slice
+        run: cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES"
+
+      - name: Measure the diagnostic wasm artifact
+        run: |
+          cargo rustc --lib --crate-type cdylib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES" -- -C link-dead-code=yes
+          artifact="$CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/bsv_rs.wasm"
+          bytes=$(wc -c < "$artifact")
+          printf '%s: %s bytes (debug cdylib, dead code retained)\n' "$SLICE_NAME" "$bytes"
 
   # the unused dependencies (bsv-stack-lean #137): cargo-machete reads the manifests and the
   # sources of the crate and fuzz/, no build; non-blocking until a captain asks. The tool is
