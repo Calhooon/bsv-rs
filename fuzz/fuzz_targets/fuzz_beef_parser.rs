@@ -2,8 +2,20 @@
 #![allow(deprecated)]
 use std::collections::HashMap;
 
-use bsv_rs::transaction::{verify_stream_structure, Beef, BeefLimits, Transaction, Verdict};
+use bsv_rs::transaction::{
+    verify_stream, verify_stream_structure, Beef, BeefLimits, Headers, Transaction, Verdict,
+};
 use libfuzzer_sys::fuzz_target;
+
+/// Headers that carry every root, so a BUMP's root is never the refusal and
+/// the reader walks on to the doors after it (the Lean's `Reason`s).
+struct EveryRoot;
+
+impl Headers for EveryRoot {
+    fn carries(&self, _height: u64, _root: &[u8; 32]) -> bool {
+        true
+    }
+}
 
 fuzz_target!(|data: &[u8]| {
     // The hinted parse reads exactly what the parse reads.
@@ -19,10 +31,15 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(Verdict::Valid { roots, .. }) = verify_stream_structure(data, &headers, None) {
         assert!(roots.is_empty(), "a root was accepted with no header");
     }
+    let _ = verify_stream_structure(data, EveryRoot, None);
+    let _ = verify_stream(data, EveryRoot, None);
 
     // Fuzz the BEEF parse and every walk over it - none may panic
     let Ok(mut beef) = Beef::from_binary(data) else {
-        assert!(hinted.is_err(), "the hinted parse accepted what the parse refused");
+        assert!(
+            hinted.is_err(),
+            "the hinted parse accepted what the parse refused"
+        );
         return;
     };
     let hinted = hinted.expect("the hinted parse refused what the parse accepted");
