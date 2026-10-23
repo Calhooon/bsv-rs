@@ -1,0 +1,151 @@
+name: Nightly oracles
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_BUILD_JOBS: '2'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  CARGO_INCREMENTAL: '1'
+  CARGO_MUTANTS_VERSION: '27.1.0'
+
+jobs:
+  source:
+    name: Pin the run to one source commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # GitHub loads schedules from the default branch; judge beta's sources.
+          ref: ${{ github.event_name == 'schedule' && 'beta' || github.ref }}
+          persist-credentials: false
+
+      - id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the scoreboard's failure cases
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_nightly_mutants.py' -v
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+  mutants:
+    name: Mutants (${{ matrix.surface }}, ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    needs: source
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        surface: [script, beef, merkle, wire, substrates]
+        shard: [0, 1, 2, 3]
+    env:
+      SURFACE: ${{ matrix.surface }}
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - name: Prepare external build directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/mutants-tmp" "$RUNNER_TEMP/mutants-target" "$RUNNER_TEMP/tools"
+          echo "TMPDIR=$RUNNER_TEMP/mutants-tmp" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/mutants-target" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Build cargo-mutants from its versioned source
+        run: |
+          cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked \
+            --root "$RUNNER_TEMP/tools" --target-dir "$RUNNER_TEMP/tool-target"
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Run the scoped tests on every mutant
+        run: |
+          status=0
+          python3 .github/scripts/nightly_mutants.py run \
+            --surface "$SURFACE" --shard "$SHARD/4" \
+            --output "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" || status=$?
+          # Misses (2) and timeouts (3) are judged by the per-file floor below.
+          # Baseline, setup and runner failures remain failures of this job.
+          if [[ "$status" != 0 && "$status" != 2 && "$status" != 3 ]]; then
+            exit "$status"
+          fi
+
+      - name: Package the outcomes and mutant diffs
+        if: always()
+        run: |
+          python3 .github/scripts/nightly_mutants.py package \
+            --run "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" \
+            --output "$RUNNER_TEMP/mutation-artifact"
+
+      - name: Upload mutation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutants-${{ matrix.surface }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/mutation-artifact/
+          if-no-files-found: error
+          retention-days: 30
+
+  mutation-score:
+    name: Mutation score floor
+    needs: [source, mutants]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # #81: each file defaults to 80%. A lower measured floor must name its
+      # own improvement issue here, and is the complete score rounded down.
+      MUTATION_FLOORS: '{}'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: mutants-*
+          path: ${{ runner.temp }}/mutation-results
+          merge-multiple: true
+
+      - name: Publish every file's score and enforce its floor
+        if: always()
+        run: |
+          python3 .github/scripts/nightly_mutants.py report \
+            --input "$RUNNER_TEMP/mutation-results" --expected-shards 4 \
+            --output "$RUNNER_TEMP/mutation-scores.json"
+
+      - name: Upload the scoreboard
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-scores
+          path: |
+            ${{ runner.temp }}/mutation-scores.json
+            ${{ runner.temp }}/mutation-scores.md
+          if-no-files-found: error
+          retention-days: 30
+
+  # Fuzz jobs belong to oracle-fuzz (#82). Add that lane's jobs here when
+  # landed; its corpus/crash artifacts follow docs/NIGHTLY.md.
