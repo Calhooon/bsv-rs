@@ -43,8 +43,9 @@ named with `wasm` containing `wasm-sizes.json`; and mutation artifacts named wit
 directory prefix. Repository baselines are collected separately. These are
 collector conventions for producers still to land, not claims that their jobs
 exist. The collector reads artifacts from this CI run only; a mutation producer
-must supply its summary in this run to populate that input. The separate
-`nightly.yml` run keeps its own summary until such forwarding is wired. This
+must supply its summary in this run to populate that input. The nightly
+workflow (#81, #82; not yet in the tree) keeps its own summary until such
+forwarding is wired. This
 avoids treating an earlier run as the current PR's mutation score and preserves
 the reusable release workflow's existing read permissions.
 
@@ -83,7 +84,7 @@ thresholds and protocol decisions stay with the linked issue and its reference.
 ### Phase 2: the hot path
 
 - [#90](https://github.com/Calhooon/bsv-rs/issues/90): script throughput improves by a measured factor with identical conformance verdicts.
-- [#91](https://github.com/Calhooon/bsv-rs/issues/91): the streaming memory benchmark meets the issue's flat-memory exit test; the charter's element/index accounting and any public limit semantics need resolution before code.
+- [#91](https://github.com/Calhooon/bsv-rs/issues/91): the bench's memory line is flat in BEEF size for the streaming mode.
 - [#92](https://github.com/Calhooon/bsv-rs/issues/92): the signing/verification benchmark improves by a measured factor and the vectors pass.
 - [#93](https://github.com/Calhooon/bsv-rs/issues/93): the merkle benchmark improves and the lone-leaf and offset vectors remain unchanged.
 
@@ -158,12 +159,10 @@ older pins. The canary and re-pin policy belongs to
 
 ## Never without the owner's word
 
-The public API's shape, schemas, protocol or wire semantics, cryptography,
-reference or dependent pins, a tag or release, and any spend from a wallet.
-A `stack-charter` issue also needs the stack's word before landing. Record the
-ruling on the issue and in its witness; neither an optimization nor a benchmark
-can supply it. In particular, #91's proposed typed resource refusal must be
-reconciled with the BEEF charter before changing a public error or verdict.
+The public API's shape, the schema, the pins, any release, any spend from a
+wallet (the epic #101). A `stack-charter` issue also needs the stack's word
+before landing; a wire shape, a pin or a charter word moves only through the
+keeper (bsv-stack-lean). Record the ruling on the issue.
 
 ## Staying in line with bsv-stack-lean
 

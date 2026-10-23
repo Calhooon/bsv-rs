@@ -424,7 +424,7 @@ jobs:
               "benchmarks": ("benchmarks (#77)", ("bench",), ("benches/baseline.json", "baseline.json")),
               "ratchets": ("ratchet (#78)", ("ratchet",), ("docs/ratchets.json", "ratchets.json")),
               "wasm_sizes": ("wasm32 (#80/#96)", ("wasm",), ("wasm-sizes.json",)),
-              "mutation": ("nightly.yml / mutants (#81)", ("mutant", "mutation"), ("mutation-summary.json",)),
+              "mutation": ("mutants (#81; the nightly workflow, not yet in the tree)", ("mutant", "mutation"), ("mutation-summary.json",)),
           }
           report = {
               "repository": repository,
