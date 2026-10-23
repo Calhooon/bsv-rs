@@ -7,6 +7,10 @@ on:
     branches: [main, beta]
   # release.yml runs these same jobs on a version tag before it publishes
   workflow_call:
+    secrets:
+      DEPENDENTS_READ_TOKEN:
+        description: Read-only access to the private consumers in docs/dependents.lock
+        required: false
 
 permissions:
   contents: read
@@ -21,6 +25,141 @@ env:
   RUSTFLAGS: -Dwarnings
 
 jobs:
+  dependents-plan:
+    name: Plan pinned dependents
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Test the dependent selector and resolution guard
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_dependents.py'
+
+      - name: Select the pins that admit this version
+        id: plan
+        run: python3 -B .github/scripts/dependents.py plan --sdk "$GITHUB_WORKSPACE" --output "$GITHUB_OUTPUT"
+
+  dependent-check:
+    name: dependent (${{ matrix.id }})
+    needs: dependents-plan
+    if: needs.dependents-plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.dependents-plan.outputs.matrix) }}
+    steps:
+      - name: Keep build output in runner scratch
+        run: |
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/dependents-target" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      # Sibling checkouts keep the downstream and its generated lock outside
+      # the SDK tree. Neither checkout retains a credential.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: sdk
+          persist-credentials: false
+
+      - name: Require read access for a private consumer
+        if: matrix.private
+        env:
+          READ_TOKEN: ${{ secrets.DEPENDENTS_READ_TOKEN }}
+        run: |
+          if [ -z "$READ_TOKEN" ]; then
+            echo '::error::Private dependents require the DEPENDENTS_READ_TOKEN read-only repository secret; the captain must request access from the owner.'
+            exit 1
+          fi
+
+      - name: Check out the locked default-branch revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.rev }}
+          path: consumer
+          token: ${{ matrix.private && secrets.DEPENDENTS_READ_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Check the consumer against the PR tree
+        env:
+          CONSUMER: ${{ matrix.id }}
+        run: python3 -B sdk/.github/scripts/dependents.py run --sdk "$GITHUB_WORKSPACE/sdk" --checkout "$GITHUB_WORKSPACE/consumer" --consumer "$CONSUMER"
+
+  dependents:
+    name: dependents
+    needs: [dependents-plan, dependent-check]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every eligible consumer check
+        env:
+          PLAN_RESULT: ${{ needs.dependents-plan.result }}
+          CHECK_RESULT: ${{ needs.dependent-check.result }}
+          CONSUMER_COUNT: ${{ needs.dependents-plan.outputs.count }}
+        run: |
+          if [ "$PLAN_RESULT" != success ]; then
+            echo '::error::The dependents plan failed or was cancelled.'
+            exit 1
+          fi
+          if [ "$CONSUMER_COUNT" != 0 ] && [ "$CHECK_RESULT" != success ]; then
+            echo '::error::An eligible dependent failed or was cancelled; see the named consumer check.'
+            exit 1
+          fi
+          echo "All $CONSUMER_COUNT eligible consumer checks passed."
+
+  semver:
+    name: semver
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep build output in runner scratch
+        run: |
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/semver-target" >> "$GITHUB_ENV"
+          echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the Rust version supported by the pinned semver tool
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: 1.95.0
+
+      - name: Cache the pinned semver tool
+        id: semver-tool
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/tools
+          key: semver-checks-0.51.0-rust-1.95.0-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install cargo-semver-checks 0.51.0
+        if: steps.semver-tool.outputs.cache-hit != 'true'
+        env:
+          RUSTFLAGS: ""
+        run: cargo install cargo-semver-checks --version 0.51.0 --locked --root "$RUNNER_TEMP/tools"
+
+      - name: Check against the last tag reachable from the PR base
+        env:
+          BASE_REV: ${{ github.event.pull_request.base.sha }}
+        run: |
+          baseline="$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$BASE_REV")"
+          echo "Checking the PR against $baseline (base $BASE_REV)"
+          git clone --quiet --shared "$GITHUB_WORKSPACE" "$RUNNER_TEMP/semver-source"
+          cd "$RUNNER_TEMP/semver-source"
+          # A 0.x minor or a beta suffix must not waive breaking API changes.
+          "$RUNNER_TEMP/tools/bin/cargo-semver-checks" check-release --baseline-rev "$baseline" --release-type minor --all-features
+
   test:
     name: Test Suite
     runs-on: ${{ matrix.os }}

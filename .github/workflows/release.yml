@@ -59,6 +59,8 @@ jobs:
     name: CI
     needs: version
     uses: ./.github/workflows/ci.yml
+    secrets:
+      DEPENDENTS_READ_TOKEN: ${{ secrets.DEPENDENTS_READ_TOKEN }}
     permissions:
       contents: read
 
