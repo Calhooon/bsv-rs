@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import shlex
@@ -70,8 +71,11 @@ def records(sdk):
 def plan(sdk, output):
     version = read_toml(sdk / "Cargo.toml")["package"]["version"]
     included = []
+    has_token = os.environ.get("HAS_READ_TOKEN") == "true"
     for row in records(sdk):
-        if row["requirement"] and admits(row["requirement"], version):
+        if row["private"] and not has_token:
+            print(f"::warning::SKIP {row['id']}: private; DEPENDENTS_READ_TOKEN absent", file=sys.stderr)
+        elif row["requirement"] and admits(row["requirement"], version):
             included.append({key: row[key] for key in ("id", "repository", "rev", "private")})
         else:
             print(f"SKIP {row['id']}: {row['requirement'] or 'no Rust dependency'} excludes {version}", file=sys.stderr)
