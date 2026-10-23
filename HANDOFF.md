@@ -15,8 +15,10 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 ## Where it stands (2026-10-23, 22:20Z)
 
 - Landed on main: 0.8.2 (`efe12e6`, PR #102 merged 21:59Z, tagged `v0.8.2`, on crates.io 22:10Z, the Release run green).
-- `beta` cut and protected (above). PR #103 (`lane/beta-line` into `beta`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. Merge on green; it is the one PR merged on the captain's own review (it is the captain's work).
+- `beta` cut and protected (above). PR #103 merged 22:4xZ (rebase; `beta` at `77fe502`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. #75's exit test held: the PR ran every check. Merged on the four required checks with the captain's own review (the captain's work).
 - Wave 1 launched 22:15Z: nine code lanes (table below), each in its worktree from `origin/beta` at `efe12e6`, task = README + brief, no model named. Each was told to rebase onto `origin/beta` before its report so its PR runs CI once #103 is in.
+- Lane oracle-fuzz: the Codex run was stopped by its classifier at 3 minutes (rule 18: recorded, never retried by the tool). John named Opus 5.5 (22:5xZ, "try opus 55 for the fuzz") and pointed at `~/bsv/bsv-fuzz` (the house's differential harness); relaunched `--model opus` in the same worktree with the drafts left there, on the box.
+- Findings filed: #105 (the HTTP JSON substrate's `certificateType` and nested hex key-linkage results diverge from BRC-100 and the TS JSON substrate; the CLI serves these shapes; found by the CLI's #69 fixtures). A wire shape: on the stack's rulings page, the owner's and the keeper's word before anything moves; the keeper's reading is a coordinated beta of bsv-rs and the CLI conforming to the BRC, the CLI accepting both shapes for one minor. #104 (duplicate dependency versions in the supply-chain gate) was filed by the owner's account at 22:16Z; it belongs to `oracle-deny`'s review.
 - Blocked: nothing.
 - Stale cca records: five `cli44-bsv-rs-review` lanes and one `lens-readme-bsvrs` lane show `blocked` with no account (the #44 wave); not this wave's.
 - Two untracked symlinks at the checkout root (`bsv-rs` to itself, `rust-sdk` broken), dated August; left in place.
@@ -34,13 +36,13 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 
 | lane | issue | status | PR | review |
 |---|---|---|---|---|
-| beta-line | #75 | PR open | #103 | captain's own |
+| beta-line | #75 | merged | #103 | captain's own |
 | oracle-ratchet | #78 | running | | |
 | oracle-deny | #79 | running | | |
 | oracle-arch | #80 | running | | |
 | oracle-fixtures | #76 | running | | |
 | oracle-benches | #77 | running | | |
-| oracle-fuzz | #82 | running | | |
+| oracle-fuzz | #82 | running (Opus 5.5, box; Codex stop at 3 min) | | |
 | oracle-nightly | #81 | running | | |
 | oracle-dependents | #83 | running | | |
 | oracle-northstar | #84 | running | | |
@@ -59,6 +61,10 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - The division: bsv-rs's day-to-day is this captain's; the stack, the line of record (`~/bsv/epoch/LINE.md`), the pins and every charter word stay with the keeper. A pin move, a wire-shape change or a charter word (a transition, a word, the evidence rule) goes through the keeper by message or a bsv-stack-lean issue, and this captain waits for the word. The captains' channel is `~/bsv/epoch/IDENTITY-PROGRAM-2026-10.md`, one line per captain per round, committed by pathspec.
 - 0.8.2 is on crates.io (22:10Z), the Release run green. `lane/bsv-rs-73-transport-fault` is the stack's branch and stays until the keeper removes it.
 - Two inputs to Phase 0: the stack's matrix (`docs/MATRIX.md`, the SDK column) names bsv-rs's gaps at v0.8.1 (rows 26, 30, 23, 35: NETWORK_ERROR for a post-write transport failure, bsv-rs #65; a bare 429 lost with no Retry-After, bsv-rs #66; one courier per call, composition the caller's; no pending state or deadline on a wallet call), to enter the research queue under #87, #94, #95 (folded into the northstar brief); `lean/BeefOfAnySize.lean` (177 theorems) is the definition the BEEF fuzz corpus should cover (folded into the fuzz brief; the running fuzz lane did not get this line, so it is checked at its review).
+
+## The BRC pin (the keeper's word, 2026-10-23 23:0xZ)
+
+The line's pin of `bsv-blockchain/BRCs` is `ed1b015` (2026-10-05; the stack's `docs/PROVENANCE.md`). `5119a9b` (2026-10-19, upstream/master, the CLI's #69 pin) is not on the line. BRC-100 differs between them in wire-shape ways (listOutputs' `totalOutputs` as a decimal string for a BRC-112 balance query, `spendable` as a boolean under BRC-207, internalizeAction's 1000-byte `customInstructions` bound); the keeper runs a recon lane to list each change as an extension or a divergence and propose the re-pin to the owner; the fixtures move pins in one step across the three crates, never one crate ahead. Every bsv-rs citation is at `ed1b015` with the `5119a9b` clause (README rule 4). The running fixtures lane was briefed with `5119a9b`: re-cite at its review. Each beta prerelease gets one channel line, "a prerelease, not on the line", with its sha.
 
 ## Lane rules (the stack's; the short form)
 
