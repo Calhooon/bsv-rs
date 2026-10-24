@@ -32,16 +32,17 @@
 
 use std::collections::{HashMap, HashSet};
 
-use crate::primitives::encoding::bounded_capacity;
 use crate::primitives::{from_hex, to_hex, Reader, Writer};
 use crate::Result;
 
-use super::beef_stream::{
-    atomic_unreached, display_hex, merkle_path_root, AtomicNode, Hash32, Kind, Reason, Refusal,
-};
-use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V1, BEEF_V2};
+use super::beef_stream::{atomic_unreached, display_hex, Kind};
+use super::beef_tx::{BeefTx, ATOMIC_BEEF, BEEF_V2};
+
+mod collect;
+mod in_memory;
 use super::merkle_path::MerklePath;
 use super::transaction::Transaction;
+use collect::AfterFrame;
 
 /// Result of sorting transactions in a BEEF.
 #[derive(Debug, Clone, Default)]
@@ -128,6 +129,14 @@ impl Beef {
     /// Marks the BEEF as needing re-sort.
     fn mark_mutated(&mut self) {
         self.needs_sort = true;
+    }
+
+    /// Appends `tx` under `txid` and returns its index.
+    fn push_tx(&mut self, tx: BeefTx, txid: String) -> usize {
+        self.txs.push(tx);
+        let idx = self.txs.len() - 1;
+        self.txid_index.insert(txid, idx);
+        idx
     }
 
     /// Rebuilds the txid index.
@@ -390,11 +399,7 @@ impl Beef {
 
         let bump_index = None; // Could be set if tx has merklePath
 
-        let new_tx = BeefTx::from_tx(tx, bump_index);
-        self.txs.push(new_tx);
-
-        let idx = self.txs.len() - 1;
-        self.txid_index.insert(txid.clone(), idx);
+        let idx = self.push_tx(BeefTx::from_tx(tx, bump_index), txid);
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
@@ -407,10 +412,7 @@ impl Beef {
         let txid = new_tx.txid();
         self.remove_existing_txid(&txid);
 
-        self.txs.push(new_tx);
-
-        let idx = self.txs.len() - 1;
-        self.txid_index.insert(txid, idx);
+        let idx = self.push_tx(new_tx, txid);
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
@@ -423,11 +425,7 @@ impl Beef {
             return &self.txs[idx];
         }
 
-        let new_tx = BeefTx::from_txid(txid.clone());
-        self.txs.push(new_tx);
-
-        let idx = self.txs.len() - 1;
-        self.txid_index.insert(txid, idx);
+        let idx = self.push_tx(BeefTx::from_txid(txid.clone()), txid);
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
@@ -685,18 +683,25 @@ impl Beef {
     ///   0; at any other offset it is [`Kind::MissingSibling`] (NL-8 W2). Two
     ///   BUMPs at one height with different roots: [`Kind::RootNotCarried`]
     ///   (the headers carry one root per height).
-    /// - A raw transaction with no input: [`Kind::NoInputs`] (0.4.1); one with
-    ///   an input and no output: [`Kind::NoOutputs`] (0.4.3). The first such
-    ///   transaction in the order held when this is called, as the reader
-    ///   meets the first on the wire.
-    /// - A txid-only entry no BUMP of this BEEF proves: [`Kind::StubNotProven`]
-    ///   (NL-8 W5).
-    /// - A BUMP index that names no BUMP, or a BUMP that does not carry the
-    ///   txid: [`Kind::BumpIndexNamesNoBump`], [`Kind::TxidNotInBump`].
-    /// - An input of an unproven transaction that names no transaction of
-    ///   this BEEF, or one that never becomes valid: [`Kind::InputNamesNoElement`].
-    ///   The transactions are sorted first ([`sort_txs`](Self::sort_txs)), as
-    ///   the reference sorts them; the stream reads its order as written.
+    /// - Then the entries in the order held when this is called, each judged
+    ///   as the reader's fold judges an element, so the first refused is the
+    ///   one the reader refuses first on the same bytes (bsv-rs#86): a raw
+    ///   transaction with no input, [`Kind::NoInputs`] (0.4.1), or with an
+    ///   input and no output, [`Kind::NoOutputs`] (0.4.3), which the parse
+    ///   refuses and a BEEF built in memory can hold; a txid-only entry no
+    ///   BUMP of this BEEF proves, [`Kind::StubNotProven`] (NL-8 W5); a BUMP
+    ///   index that names no BUMP, or a BUMP that does not carry the txid,
+    ///   [`Kind::BumpIndexNamesNoBump`], [`Kind::TxidNotInBump`]; an input of
+    ///   an unproven transaction that names no entry of this BEEF,
+    ///   [`Kind::InputNamesNoElement`].
+    /// - An input that names an entry held after it is not refused: the
+    ///   transactions are sorted ([`sort_txs`](Self::sort_txs)), as the
+    ///   reference sorts them (`@bsv/sdk` `Beef.verifyValid`), and one that
+    ///   no order makes valid is [`Kind::InputNamesNoElement`]. The stream
+    ///   reads its order as written and refuses the input
+    ///   (`InputNamesNoElement` at its offset): the one place the two
+    ///   entry points differ on the same bytes, a stated difference
+    ///   (`tests/beef_two_readers_agree.rs`).
     /// - Atomic (NL-8 W4, BRC-95): the subject is a raw transaction of this
     ///   BEEF, else [`Kind::SubjectMissing`]; every other transaction or
     ///   txid-only entry is in the subject's dependency graph (reached from
@@ -713,27 +718,34 @@ impl Beef {
             Some(subject) => self.atomic_rule(&subject),
             None => Ok(()),
         };
-        // The first transaction that is no transaction, in the order held
-        // (the reader's), before the sort moves it.
-        let no_transaction = self.txs.iter().find_map(|tx| {
-            if tx.has_no_inputs() {
-                Some(Kind::NoInputs)
-            } else if tx.has_no_outputs() {
-                Some(Kind::NoOutputs)
-            } else {
-                None
-            }
-        });
-        let sr = self.sort_txs();
+        let roots = self.bump_roots()?;
+        self.entries_as_folded()?;
 
-        // Each BUMP's root, by the streaming reader's walk: once per BUMP,
-        // linear in its leaves (0.4.2). At 0.4.1 each flagged leaf computed
-        // the root afresh, rebuilding every node it needed from level 0: a
-        // BUMP of 8,192 leaves gave no answer in 120 s (bsv-stack-lean NL-8
-        // W1, #61).
+        // The order the reference reads: an input may name a transaction
+        // held after it (`@bsv/sdk` `Beef.verifyValid` sorts first); one no
+        // order makes valid names nothing that becomes valid.
+        let sr = self.sort_txs();
+        if !sr.missing_inputs.is_empty()
+            || !sr.not_valid.is_empty()
+            || !sr.with_missing_inputs.is_empty()
+        {
+            return Err(Kind::InputNamesNoElement);
+        }
+
+        atomic?;
+        Ok(roots)
+    }
+
+    /// Each BUMP's root, by the streaming reader's walk: once per BUMP,
+    /// linear in its leaves (0.4.2). At 0.4.1 each flagged leaf computed
+    /// the root afresh, rebuilding every node it needed from level 0: a BUMP
+    /// of 8,192 leaves gave no answer in 120 s (bsv-stack-lean NL-8 W1, #61).
+    /// The leading BUMP's root at a height is the one the headers carry
+    /// there; another root at that height is [`Kind::RootNotCarried`].
+    fn bump_roots(&self) -> std::result::Result<HashMap<u32, String>, Kind> {
         let mut roots: HashMap<u32, String> = HashMap::new();
         for bump in &self.bumps {
-            let root = display_hex(&merkle_path_root(bump).map_err(|r| r.kind())?);
+            let root = display_hex(&in_memory::merkle_path_root(bump).map_err(|r| r.kind())?);
             match roots.get(&bump.block_height) {
                 Some(existing) if *existing != root => return Err(Kind::RootNotCarried),
                 Some(_) => {}
@@ -742,6 +754,18 @@ impl Beef {
                 }
             }
         }
+        Ok(roots)
+    }
+
+    /// The entries in the order held, each judged as the streaming reader's
+    /// decoder and fold judge it, so the first refused is the one the stream
+    /// refuses first: a raw entry's content (the stream's
+    /// `check_transaction`: an unproven coinbase, no input, no output, a
+    /// value outside `MoneyRange`, a null or repeated outpoint), a txid-only
+    /// entry no BUMP proves, a BUMP index that names no BUMP or a BUMP that
+    /// does not carry the txid, an unproven transaction's input that names
+    /// no entry of this BEEF.
+    fn entries_as_folded(&self) -> std::result::Result<(), Kind> {
         // Every hash of each BUMP's level 0 is a txid that BUMP proves,
         // indexed once.
         let carried: HashSet<(usize, &str)> = self
@@ -757,79 +781,44 @@ impl Beef {
             })
             .collect();
         let proven: HashSet<&str> = carried.iter().map(|(_, h)| *h).collect();
-
-        if let Some(kind) = no_transaction {
-            return Err(kind);
-        }
-
-        let mut valid_txids: HashSet<String> = HashSet::new();
-        for tx in &self.txs {
+        // A raw entry's txid is a hash of its bytes: computed once.
+        let txids: Vec<String> = self.txs.iter().map(BeefTx::txid).collect();
+        let held: HashSet<&str> = txids.iter().map(String::as_str).collect();
+        for (tx, txid) in self.txs.iter().zip(&txids) {
+            if let Some(kind) = in_memory::content_refused(tx) {
+                return Err(kind);
+            }
             if tx.is_txid_only() {
-                let txid = tx.txid();
                 if !proven.contains(txid.as_str()) {
                     return Err(Kind::StubNotProven);
                 }
-                valid_txids.insert(txid);
+                continue;
+            }
+            let refused = match tx.bump_index() {
+                Some(index) if index >= self.bumps.len() => Some(Kind::BumpIndexNamesNoBump),
+                Some(index) if !carried.contains(&(index, txid.as_str())) => {
+                    Some(Kind::TxidNotInBump)
+                }
+                None if tx.input_txids.iter().any(|t| !held.contains(t.as_str())) => {
+                    Some(Kind::InputNamesNoElement)
+                }
+                _ => None,
+            };
+            if let Some(kind) = refused {
+                return Err(kind);
             }
         }
-
-        for tx in &self.txs {
-            if let Some(bump_idx) = tx.bump_index() {
-                if bump_idx >= self.bumps.len() {
-                    return Err(Kind::BumpIndexNamesNoBump);
-                }
-                let txid = tx.txid();
-                if !carried.contains(&(bump_idx, txid.as_str())) {
-                    return Err(Kind::TxidNotInBump);
-                }
-                valid_txids.insert(txid);
-            }
-        }
-
-        if !sr.missing_inputs.is_empty()
-            || !sr.not_valid.is_empty()
-            || !sr.with_missing_inputs.is_empty()
-        {
-            return Err(Kind::InputNamesNoElement);
-        }
-
-        // Verify dependency order
-        for tx in &self.txs {
-            for input_txid in &tx.input_txids {
-                if !valid_txids.contains(input_txid) {
-                    return Err(Kind::InputNamesNoElement);
-                }
-            }
-            valid_txids.insert(tx.txid());
-        }
-
-        atomic?;
-        Ok(roots)
+        Ok(())
     }
 
     /// The atomic rule on the subject's graph: the streaming reader's walk
     /// ([`atomic_unreached`]) over this BEEF's entries, whatever order they
     /// hold.
     fn atomic_rule(&self, subject: &str) -> std::result::Result<(), Kind> {
-        let Some(subject) = internal_txid(subject) else {
+        let Some(subject) = in_memory::wire_hash(subject) else {
             return Err(Kind::SubjectMissing);
         };
-        // By txid: raw when any of its entries is, with the txids a raw
-        // entry's inputs name.
-        let mut table: HashMap<Hash32, AtomicEntry> = HashMap::new();
-        for tx in &self.txs {
-            let Some(txid) = internal_txid(&tx.txid()) else {
-                continue;
-            };
-            let entry = table.entry(txid).or_default();
-            if !tx.is_txid_only() && !entry.raw {
-                entry.raw = true;
-                entry.prevs = spent_txids(tx)
-                    .iter()
-                    .filter_map(|t| internal_txid(t))
-                    .collect();
-            }
-        }
+        let mut table = in_memory::atomic_table(&self.txs);
         match atomic_unreached(&subject, &mut table)? {
             Some(_) => Err(Kind::UnrelatedTransaction),
             None => Ok(()),
@@ -970,7 +959,13 @@ impl Beef {
         result
     }
 
-    /// Parses a BEEF from binary data.
+    /// Parses a BEEF from binary data: the streaming reader's decoder,
+    /// collecting (`collect`, bsv-rs#86). One parser for both entry points:
+    /// the bytes [`verify_stream`](super::beef_stream::verify_stream)
+    /// refuses as a frame or as an element, this refuses, with the stream's
+    /// refusal in its words (`invalid BEEF at byte N: Reason`), the earliest
+    /// of the reading. A BEEF whose bytes parse is returned whatever its
+    /// structure; [`verify_structure`](Self::verify_structure) judges that.
     ///
     /// No count is bounded beyond what the bytes hold. The whole BEEF is
     /// held in memory: this is the reader for small bodies and for building.
@@ -983,10 +978,7 @@ impl Beef {
     /// (bsv-stack-lean NL-8 W3). [`from_reader`](Self::from_reader) reads a
     /// BEEF out of a longer stream and leaves what follows to its caller.
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
-        let mut reader = Reader::new(bin);
-        let beef = Self::from_reader(&mut reader)?;
-        no_trailing_bytes(&reader)?;
-        Ok(beef)
+        Ok(Self::collect(bin, AfterFrame::Refuse, None)?.0)
     }
 
     /// Parses a BEEF from binary data, reserving room for at most
@@ -1005,81 +997,20 @@ impl Beef {
                 and `beef_stream::verify_stream` for a stranger's"
     )]
     pub fn from_binary_with_limits(bin: &[u8], limits: &BeefLimits) -> Result<Self> {
-        let mut reader = Reader::new(bin);
-        let beef = Self::read(&mut reader, Some(limits))?;
-        no_trailing_bytes(&reader)?;
-        Ok(beef)
+        Ok(Self::collect(bin, AfterFrame::Refuse, Some(limits))?.0)
     }
 
     /// Parses a BEEF from a hex string.
     pub fn from_hex(hex: &str) -> Result<Self> {
-        let bin = from_hex(hex)?;
-        Self::from_binary(&bin)
+        Self::from_binary(&from_hex(hex)?)
     }
 
-    /// Parses a BEEF from a Reader.
+    /// Parses a BEEF from a Reader: [`from_binary`](Self::from_binary) on
+    /// the frame at the reader's position, the reader left after it. A
+    /// refusal's offset counts from the frame's leading byte.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        Self::read(reader, None)
-    }
-
-    /// The parse, with the memory hints when a caller gave them. A hint
-    /// reserves room, never more than the bytes left could fill (a BUMP is at
-    /// least 3 bytes, a transaction entry at least 10); it refuses nothing.
-    fn read(reader: &mut Reader, hints: Option<&BeefLimits>) -> Result<Self> {
-        let mut version = reader.read_u32_le()?;
-        let mut atomic_txid = None;
-
-        // Check for Atomic BEEF prefix
-        if version == ATOMIC_BEEF {
-            let txid_slice = reader.read_bytes(32)?;
-            let mut txid_bytes = txid_slice.to_vec();
-            txid_bytes.reverse();
-            atomic_txid = Some(to_hex(&txid_bytes));
-            version = reader.read_u32_le()?;
-        }
-
-        if version != BEEF_V1 && version != BEEF_V2 {
-            return Err(crate::Error::BeefError(format!(
-                "Invalid BEEF version: 0x{:08X}",
-                version
-            )));
-        }
-
-        let mut beef = Self::with_version(version);
-        beef.atomic_txid = atomic_txid;
-
-        // Read bumps
-        let bump_count = reader.read_var_int_num()?;
-        if let Some(hints) = hints {
-            beef.bumps.reserve(bounded_capacity(
-                bump_count.min(hints.max_bumps),
-                reader.remaining(),
-                3,
-            ));
-        }
-        for _ in 0..bump_count {
-            let bump = MerklePath::from_reader(reader)?;
-            beef.bumps.push(bump);
-        }
-
-        // Read transactions
-        let tx_count = reader.read_var_int_num()?;
-        if let Some(hints) = hints {
-            beef.txs.reserve(bounded_capacity(
-                tx_count.min(hints.max_txs),
-                reader.remaining(),
-                10,
-            ));
-        }
-        for _ in 0..tx_count {
-            let tx = BeefTx::from_reader(reader, version)?;
-            let txid = tx.txid();
-            beef.txs.push(tx);
-            let idx = beef.txs.len() - 1;
-            beef.txid_index.insert(txid, idx);
-        }
-
-        beef.needs_sort = true;
+        let (beef, used) = Self::collect(reader.clone().read_remaining(), AfterFrame::Leave, None)?;
+        reader.read_bytes(used)?;
         Ok(beef)
     }
 
@@ -1178,7 +1109,7 @@ impl Beef {
             if tx.is_txid_only() || self.proves(tx) {
                 continue;
             }
-            stack.extend(spent_txids(tx).iter().filter_map(|t| at.get(t)));
+            stack.extend(in_memory::spent_txids(tx).iter().filter_map(|t| at.get(t)));
         }
 
         let mut beef = Beef::with_version(self.version);
@@ -1295,68 +1226,10 @@ impl Default for Beef {
     }
 }
 
-/// A byte after the frame's end: the streaming reader's refusal, in its words.
-fn no_trailing_bytes(reader: &Reader) -> Result<()> {
-    if reader.remaining() == 0 {
-        return Ok(());
-    }
-    let refusal = Refusal {
-        offset: reader.position() as u64,
-        reason: Reason::TrailingBytes,
-    };
-    Err(crate::Error::BeefError(refusal.to_string()))
-}
-
-/// An entry of a BEEF as the atomic walk reads it.
-#[derive(Default)]
-struct AtomicEntry {
-    raw: bool,
-    prevs: Vec<Hash32>,
-    reached: bool,
-}
-
-impl AtomicNode for AtomicEntry {
-    fn raw(&self) -> bool {
-        self.raw
-    }
-    fn prevs(&self) -> &[Hash32] {
-        &self.prevs
-    }
-    fn reached(&mut self) -> &mut bool {
-        &mut self.reached
-    }
-}
-
-/// A display-hex txid in internal byte order, the key of the stream's
-/// tables; `None` for a string that is not 32 bytes of hex.
-fn internal_txid(txid: &str) -> Option<Hash32> {
-    let mut h: Hash32 = from_hex(txid).ok()?.try_into().ok()?;
-    h.reverse();
-    Some(h)
-}
-
-/// The txids a raw transaction's inputs spend (display hex), proven or not.
-fn spent_txids(tx: &BeefTx) -> Vec<String> {
-    let parsed;
-    let t = match tx.tx() {
-        Some(t) => t,
-        None => match tx.raw_tx().map(Transaction::from_binary) {
-            Some(Ok(t)) => {
-                parsed = t;
-                &parsed
-            }
-            _ => return Vec::new(),
-        },
-    };
-    t.inputs
-        .iter()
-        .filter_map(|i| i.get_source_txid().ok())
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transaction::beef_tx::BEEF_V1;
     use crate::transaction::MerklePathLeaf;
 
     #[test]

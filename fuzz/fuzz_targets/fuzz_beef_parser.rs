@@ -3,7 +3,8 @@
 use std::collections::HashMap;
 
 use bsv_rs::transaction::{
-    verify_stream, verify_stream_structure, Beef, BeefLimits, Headers, Transaction, Verdict,
+    verify_stream, verify_stream_structure, Beef, BeefLimits, BeefStream, Element, Headers, Kind,
+    Reason, Transaction, Verdict,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -17,7 +18,93 @@ impl Headers for EveryRoot {
     }
 }
 
+/// The root of the leading BUMP at each height: the one root a chain
+/// carries there, the rule the whole path reads from the BEEF alone.
+fn leading_roots(data: &[u8]) -> HashMap<u64, [u8; 32]> {
+    let mut roots = HashMap::new();
+    for element in BeefStream::new(data) {
+        match element {
+            // A chain's heights: the in-memory height is a `u32`.
+            Ok(Element::Bump(bump)) if u32::try_from(bump.block_height).is_ok() => {
+                roots.entry(bump.block_height).or_insert(bump.root);
+            }
+            Ok(Element::Bump(_)) => {}
+            _ => break,
+        }
+    }
+    roots
+}
+
+fn display(hash: &[u8; 32]) -> String {
+    let mut bytes = *hash;
+    bytes.reverse();
+    bsv_rs::primitives::to_hex(&bytes)
+}
+
+/// The kind and offset a parse refusal names, in the stream's words.
+fn named(text: &str) -> Option<(u64, Kind)> {
+    let rest = &text[text.find("invalid BEEF at byte ")? + "invalid BEEF at byte ".len()..];
+    let (offset, reason) = rest.split_once(": ")?;
+    let name: String = reason
+        .chars()
+        .take_while(char::is_ascii_alphanumeric)
+        .collect();
+    let kind = Kind::ALL.into_iter().find(|k| format!("{k:?}") == name)?;
+    Some((offset.parse().ok()?, kind))
+}
+
+/// The two entry points agree (bsv-rs#86; `tests/beef_two_readers_agree.rs`):
+/// `Beef::from_binary` then `verify_structure`, and `verify_stream_structure`
+/// under the leading roots, accept the same inputs with the same roots and
+/// refuse the rest with the same kind, at the same offset when the parse
+/// names one. The stated difference is the order: an input naming a parent
+/// held after it, which the stream refuses and the whole path does not.
+fn the_two_readers_agree(data: &[u8]) {
+    let stream = verify_stream_structure(data, &leading_roots(data), None).expect("a slice reads");
+    let parsed = Beef::from_binary(data);
+    if let Verdict::Invalid {
+        reason: Reason::InputNamesNoElement { txid },
+        ..
+    } = &stream
+    {
+        if let Ok(beef) = &parsed {
+            if beef.find_txid(&display(txid)).is_some() {
+                return;
+            }
+        }
+    }
+    match (parsed, &stream) {
+        (Err(e), Verdict::Invalid { offset, kind, .. }) => {
+            let text = e.to_string();
+            assert_eq!(
+                named(&text),
+                Some((*offset, *kind)),
+                "the parse refuses as the stream: {text}; {stream:?}"
+            );
+        }
+        (Err(e), _) => panic!("the parse refused what the stream accepts: {e}; {stream:?}"),
+        (Ok(mut beef), _) => match (beef.verify_structure(), &stream) {
+            (Ok(roots), Verdict::Valid { roots: streamed, .. }) => {
+                let mut whole: Vec<(u64, String)> =
+                    roots.into_iter().map(|(h, r)| (u64::from(h), r)).collect();
+                let mut streamed: Vec<(u64, String)> =
+                    streamed.iter().map(|(h, r)| (*h, display(r))).collect();
+                whole.sort();
+                streamed.sort();
+                streamed.dedup();
+                assert_eq!(whole, streamed, "the roots");
+            }
+            (Err(kind), Verdict::Invalid { kind: k, .. }) => {
+                assert_eq!(kind, *k, "the structure refuses as the stream");
+            }
+            (answer, _) => panic!("the two readers disagree: {answer:?}; {stream:?}"),
+        },
+    }
+}
+
 fuzz_target!(|data: &[u8]| {
+    the_two_readers_agree(data);
+
     // The hinted parse reads exactly what the parse reads.
     let hints = BeefLimits {
         max_txs: 64,
