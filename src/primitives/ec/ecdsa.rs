@@ -87,7 +87,7 @@ pub fn verify(msg_hash: &[u8; 32], signature: &Signature, public_key: &PublicKey
     // Bitcoin consensus) accepts them — (r, s) and (r, n − s) are equally
     // valid. Normalize to low-S first so high-S signatures verify, matching
     // ts-sdk. Low-S *policy* is enforced separately at the script layer.
-    let k256_sig = k256_sig.normalize_s().unwrap_or(k256_sig);
+    let k256_sig = k256_sig.normalize_s();
 
     // Verify
     verifying_key.verify_prehash(msg_hash, &k256_sig).is_ok()
@@ -159,7 +159,7 @@ pub fn recover_public_key(
         .map_err(|e| Error::CryptoError(format!("Public key recovery failed: {}", e)))?;
 
     // Convert to our PublicKey type
-    let encoded = verifying_key.to_encoded_point(true);
+    let encoded = verifying_key.to_sec1_point(true);
     PublicKey::from_bytes(encoded.as_bytes())
 }
 
