@@ -55,8 +55,13 @@ classifies by text. Busy stays the body's word. What each directory answers:
   `HttpWalletJson` and `HttpWalletWire` (which answered `WalletError` for a
   connection error, a timeout and a 502, 503 or 504), and for a body cut (was
   `WalletError`); a 429 without a busy code is `Error::TransportFault` with
-  `RateLimited` and its wait (was `WalletError`). `Error::transport_fault()` reads the class of
-  either variant (`WalletTransport` as `MayHaveBeenReceived`; busy is `None`).
+  `RateLimited` and its wait (was `WalletError`). A 503 with `Retry-After`
+  and no busy code stays `WalletTransport { status: Some(503) }` at both
+  substrates, the one place the rule's "a 503 with `Retry-After` is
+  `RATE_LIMITED`" is set aside, to keep the shape 0.8.2's `HttpWalletJson`
+  answered and pinned (`an_html_503_from_a_proxy_is_a_transport_fault`); its
+  wait is not carried there. `Error::transport_fault()` reads the class of either variant
+  (`WalletTransport` as `MayHaveBeenReceived`; busy is `None`).
 - **Chain trackers**: `ChainTrackerError` is exhaustive, so no typed class:
   a send fault stays `NetworkError` with ` (NEVER_SENT)` or
   ` (MAY_HAVE_BEEN_RECEIVED)` after the detail; a fault status stays
