@@ -4,6 +4,7 @@
 
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource};
 use crate::script::flags::STACK_ELEMENT_OVERHEAD;
+use crate::script::op::opcode_to_name;
 
 use super::Spend;
 
@@ -48,6 +49,22 @@ impl Spend {
             )));
         }
         Ok(&self.stack[self.stack.len() - n])
+    }
+
+    /// The guard of a two-operand opcode: `<name> requires at least two items
+    /// to be on the stack.` when the stack holds fewer than two.
+    pub(super) fn require_two_items(
+        &self,
+        opcode: u8,
+        fallback: &str,
+    ) -> Result<(), ScriptEvaluationError> {
+        if self.stack.len() < 2 {
+            return Err(self.error(&format!(
+                "{} requires at least two items to be on the stack.",
+                opcode_to_name(opcode).unwrap_or(fallback)
+            )));
+        }
+        Ok(())
     }
 
     pub(super) fn push_alt_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {

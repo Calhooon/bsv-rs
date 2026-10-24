@@ -6,7 +6,7 @@
 use crate::primitives::BigNumber;
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource};
 use crate::script::flags::STACK_ELEMENT_OVERHEAD;
-use crate::script::op::*;
+use crate::script::op::{OP_NOP4, OP_NOP5, OP_NOP6, OP_NOP7};
 use crate::script::script_num::ScriptNum;
 
 use super::limits::MAX_SCRIPT_ELEMENT_SIZE;

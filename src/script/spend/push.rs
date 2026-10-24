@@ -4,7 +4,7 @@
 
 use crate::primitives::BigNumber;
 use crate::script::evaluation_error::ScriptEvaluationError;
-use crate::script::op::*;
+use crate::script::op::{OP_0, OP_1, OP_1NEGATE, OP_PUSHDATA1, OP_PUSHDATA2};
 use crate::script::script_num::ScriptNum;
 use crate::script::ScriptChunk;
 

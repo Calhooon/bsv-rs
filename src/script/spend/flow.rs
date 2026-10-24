@@ -3,7 +3,7 @@
 //! `OP_ENDIF`), `OP_VERIFY` and `OP_RETURN`; the disabled-opcode rule.
 
 use crate::script::evaluation_error::{ExecutionContext, ScriptEvaluationError};
-use crate::script::op::*;
+use crate::script::op::{opcode_to_name, OP_2DIV, OP_2MUL, OP_NOTIF, OP_VERNOTIF};
 use crate::script::script_num::ScriptNum;
 
 use super::Spend;
@@ -168,7 +168,7 @@ impl Spend {
         Ok(())
     }
 
-    pub(super) fn op_return(&mut self) -> Result<(), ScriptEvaluationError> {
+    pub(super) fn op_return(&mut self) {
         // After Genesis (interpreter.cpp:856-871): at the top level the
         // script ends successfully, whatever follows; inside a conditional,
         // execution stops but the walk continues, so the conditionals must
@@ -186,6 +186,5 @@ impl Spend {
         } else {
             self.returning = true;
         }
-        Ok(())
     }
 }

@@ -3,7 +3,7 @@
 
 use crate::primitives::BigNumber;
 use crate::script::evaluation_error::ScriptEvaluationError;
-use crate::script::op::*;
+use crate::script::op::{opcode_to_name, OP_ROLL};
 use crate::script::script_num::ScriptNum;
 
 use super::Spend;
@@ -161,12 +161,7 @@ impl Spend {
     }
 
     pub(super) fn op_pick_roll(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
-        if self.stack.len() < 2 {
-            return Err(self.error(&format!(
-                "{} requires at least two items to be on the stack.",
-                opcode_to_name(opcode).unwrap_or("OP_PICK/ROLL")
-            )));
-        }
+        self.require_two_items(opcode, "OP_PICK/ROLL")?;
         let n_bytes = self.pop_stack()?;
         let bn = self.read_number(&n_bytes)?;
 
