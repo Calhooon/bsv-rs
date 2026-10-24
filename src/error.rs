@@ -247,6 +247,25 @@ pub enum Error {
         detail: String,
     },
 
+    /// An HMAC tag made under the minimal-length key, refused by name.
+    ///
+    /// BRC-56 (`5119a9b` `wallet/0056.md:66`) keys the HMAC with the shared
+    /// point's X coordinate as exactly 32 big-endian bytes; a sender that
+    /// drops the leading zero bytes (ts-sdk's `KeyDeriver`) makes another
+    /// tag, for about one key in 256 (`:73`). `verify_hmac` accepts the
+    /// 32-byte tag only and names this one rather than reading it as a plain
+    /// mismatch; a tag matching neither key stays [`Error::WalletError`]
+    /// `"HMAC is not valid"`.
+    #[cfg(feature = "wallet")]
+    #[error(
+        "HMAC is not valid: the tag was made under a minimal-length key (the sender drops the {leading_zero_bytes} leading zero byte(s) of the 32-byte X coordinate; BRC-56)"
+    )]
+    HmacMinimalLengthKey {
+        /// How many zero bytes the 32-byte key begins with: the bytes the
+        /// sender dropped.
+        leading_zero_bytes: usize,
+    },
+
     /// Key derivation error.
     #[cfg(feature = "wallet")]
     #[error("key derivation error: {0}")]

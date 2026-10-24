@@ -24,7 +24,7 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 | Path | What |
 |---|---|
 | `src/lib.rs` | The crate docs and the feature-gated module tree with convenience re-exports |
-| `src/error.rs` | The one `Error` enum (67 variants, feature-gated) and `Result<T>` |
+| `src/error.rs` | The one `Error` enum (69 variants, feature-gated) and `Result<T>` |
 | `src/util/` | wasm32-safe time helpers (`pub(crate)`) |
 | `src/primitives/` | hash, EC (secp256k1, P-256, Shamir, ECDH), symmetric (AES-256-GCM), `BigNumber`, DRBG, encoding, `bsv/` (sighash, `SighashCache`) |
 | `src/block/` | `BlockHeader`, `CompactTarget`, `check_proof_of_work`, `ChainWork`, merkle roots; `ChainParams` and `next_work_required` (the node's `GetNextWorkRequired`, `difficulty.rs`) |
@@ -77,6 +77,7 @@ dhat-profiling = ["dep:dhat"]
   use `read_var_int_lenient`; node size bounds use the CompactSize methods.
 
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
+- BRC-56 HMAC key (`5119a9b` `wallet/0056.md:66,73`): this crate keys the HMAC with the shared X coordinate as 32 bytes, as Go (`primitives/ec/symmetric.go:82-90`), Python and rs-sdk; ts-sdk drops its leading zero bytes (`ts-stack@edf6e03` `packages/sdk/src/wallet/KeyDeriver.ts:270`), a different tag for one key in 256. `verify_hmac` accepts the 32-byte tag only and refuses the minimal-length one as `Error::HmacMinimalLengthKey` (#148).
 - Go lacks TOTP, overlay caching/historian/reputation, and the RPuzzle template.
 - TS TOTP defaults to 2 digits; this crate uses 6 (RFC 6238).
 - TS and Go disagree on the nonce HMAC inputs (`protocolID [2,'server hmac']` + UTF-8 keyID vs security level 1 + raw-bytes keyID); this crate follows Go's level with its own base64 keyID. `verify_nonce` is only ever called on a peer's own nonces, so nothing crosses the gap in practice.

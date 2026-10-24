@@ -345,6 +345,7 @@ Additional types in `types.rs` cover all wallet operations (actions, outputs, ce
 | `WalletError(String)` | General wallet error (includes validation failures) |
 | `WalletBusy { detail, retry_after_ms }` | The wallet answered that it refused the call before acting (a contended store, a lock not acquired) and promised that nothing was written, built or locked, so the caller may repeat the same call unchanged after `retry_after_ms`, or after a moment when it is `None`. The SDK reports the server's promise; it cannot check it. `HttpWalletJson` reads it from the body's code (`STORE_BUSY`, `ERR_SERVER_BUSY`), never from the HTTP status; a 503 without that code is `WalletTransport` |
 | `WalletTransport { status, detail }` | The way to the wallet failed, with no answer in the wallet's word: a caller may retry it; it carries no promise about what the wallet did (the request may or may not have reached it), which is the one way it differs from `WalletBusy`. `HttpWalletJson` answers it for a 502, 503 or 504 (`status` set) whose body carries no busy code and no numeric wallet code, and for a connection error (refused, reset, DNS) or a timeout (`status` `None`). Every refusal stays `WalletError`; the crate never retries |
+| `HmacMinimalLengthKey { leading_zero_bytes }` | `verify_hmac`'s refusal of a tag made under the minimal-length key: BRC-56 (`5119a9b` `wallet/0056.md:66`) keys the HMAC with the 32-byte X coordinate; a sender that drops its leading zero bytes (ts-sdk) makes another tag for one key in 256. Computed only on a miss whose key begins with a zero byte; never an acceptance. A tag matching neither key stays `WalletError("HMAC is not valid")` (#148) |
 | `KeyDerivationError(String)` | Key derivation failed |
 | `ProtocolValidationError(String)` | Invalid protocol name or parameters |
 | `InvalidCounterparty(String)` | Invalid counterparty specification |
@@ -379,7 +380,7 @@ The wallet module uses:
 - `sha256`, `sha256_hmac` from `primitives::hash`
 - `Schnorr`, `SchnorrProof` from `primitives::bsv::schnorr` for counterparty linkage ZK proofs
 - `derive_child`, `derive_shared_secret` methods on `PrivateKey`/`PublicKey` for BRC-42 derivation
-- `subtle` crate for constant-time comparison (HMAC verification in `proto_wallet.rs`)
+- `subtle` crate for constant-time comparison (HMAC verification, `key_deriver::verify_hmac_tag`)
 - `async_trait` crate for async trait methods (`WalletInterface`)
 - `serde` / `serde_json` for serialization of types (JSON API compatibility)
 - `hex` crate for hex encoding/decoding in serde helpers
