@@ -265,7 +265,8 @@ pub trait ChainTracker: Send + Sync {
     async fn current_height(&self) -> Result<u32, ChainTrackerError>;
 }
 
-pub enum ChainTrackerError { NetworkError(String), InvalidResponse(String), BlockNotFound(u32), Other(String) }
+#[non_exhaustive]
+pub enum ChainTrackerError { NetworkError(String), TransportFault { fault: TransportFault, status: Option<u16>, detail: String }, InvalidResponse(String), BlockNotFound(u32), Other(String) }
 
 // Test mocks
 pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String> }
@@ -434,7 +435,7 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
 | `MerklePathError` | Empty path, tree height over 64, duplicate offset, invalid offset at height, mismatched roots |
-| `ChainTrackerError` | `NetworkError`, `InvalidResponse`, `BlockNotFound(height)`, `Other` (exhaustive: a fault's class is stated in the detail, #87) |
+| `ChainTrackerError` | `NetworkError`, `TransportFault { fault, status, detail }` (the HTTP trackers' fault, its class typed; `transport_fault()` reads it, `From<ChainTrackerError> for Error` carries it to `Error::TransportFault`), `InvalidResponse`, `BlockNotFound(height)`, `Other` (`#[non_exhaustive]`, #87) |
 | `TransportFault` | `NeverSent`, `MayHaveBeenReceived`, `RateLimited { retry_after_ms }` (`#[non_exhaustive]`, `code()` the broadcasters' word; re-exported from `crate::error`, #87) |
 
 ## Related Documentation

@@ -234,14 +234,18 @@ Both trackers return `ChainTrackerError` variants:
 
 | Error | Condition |
 |-------|-----------|
-| `NetworkError` | HTTP request failed, timeout, a body cut (a decode error whose source is not `serde_json`'s), or `http` feature not enabled; the fault's class ends the detail, `" (NEVER_SENT)"` or `" (MAY_HAVE_BEEN_RECEIVED)"` (#87) |
+| `TransportFault { fault, status, detail }` | A connection never made (`NeverSent`, status `None`); a timeout, a connection lost or a body cut (a decode error whose source is not `serde_json`'s) after the request was written (`MayHaveBeenReceived`, status `None`); a 502, 503 or 504 (`MayHaveBeenReceived`), a 429 or a 503 with `Retry-After` (`RateLimited { retry_after_ms }`), status `Some`, detail `HTTP 429 Too Many Requests` (#87) |
+| `NetworkError` | `http` feature not enabled |
 | `BlockNotFound` | HTTP 404 response (block height doesn't exist) |
-| `InvalidResponse` | Non-success HTTP status, JSON parsing failure (a decode error whose source is `serde_json`'s), or missing required fields; a fault status states its class, `HTTP 429 Too Many Requests (RATE_LIMITED, retry_after_ms 5000)`, `HTTP 503 Service Unavailable (MAY_HAVE_BEEN_RECEIVED)` (#87) |
+| `InvalidResponse` | Any other non-success HTTP status, JSON parsing failure (a decode error whose source is `serde_json`'s), or missing required fields |
 
 A provider's fault is an error, never a verdict: no `Ok(false)` for a fault.
-`ChainTrackerError` is not `#[non_exhaustive]`, so a typed class beside
-`NetworkError` is a breaking change and waits on the owner's word; until then
-the class is in the detail, from the one classifier.
+The class comes from the one classifier
+(`../broadcasters/transport_fault.rs`), the status read before the body;
+`ChainTrackerError::transport_fault()` reads it, and `From<ChainTrackerError>
+for Error` carries it to `Error::TransportFault` (so `Transaction::verify`'s
+error answers `Error::transport_fault()`). `ChainTrackerError` is
+`#[non_exhaustive]` (#87): a `match` on it needs a wildcard arm.
 
 ## SPV Verification with BEEF
 
