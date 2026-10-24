@@ -12,7 +12,9 @@ const HOMES: &[&str] = &[
 
 // Conservatively scan all literal comparisons: error variable names and
 // aliases are not reliable. Today's protocol comparisons are allowed as whole
-// lines, never as permission for an entire file. #87 reviews this list.
+// lines, never as permission for an entire file. #87 reviewed this list
+// (docs/ARCH-RULES.md section 3): every line a protocol comparison, no
+// error-message allowance.
 const ALLOWED: &[(&str, &str, usize)] = &[
     (
         "src/wallet/substrates/http_json.rs",
