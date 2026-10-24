@@ -679,15 +679,18 @@ jobs:
         with:
           toolchain: stable
 
-      # This repository is private. The captain supplies a read-only repository
-      # token; absence is a setup failure, never a silently skipped script bench.
+      # The seed corpus's repository is private. Without the read-only token (a
+      # fork, a PR from outside, a repository without the secret) script_spend
+      # is skipped with a warning and bench-compare reports it as skipped, never
+      # as a pass or a regression; the other eight benches are still compared.
       - name: Read the seed corpus at the lane's source revision
         env:
           GH_TOKEN: ${{ secrets.BSV_SCRIPT_CORPUS_TOKEN }}
         run: |
           if [ -z "$GH_TOKEN" ]; then
-            echo "::error::BSV_SCRIPT_CORPUS_TOKEN needs read access to the private sibling corpus"
-            exit 1
+            echo "::warning::script_spend skipped: BSV_SCRIPT_CORPUS_TOKEN not set (the script corpus is private)"
+            echo "BENCH_SKIP=script_spend" >> "$GITHUB_ENV"
+            exit 0
           fi
           mkdir -p "$BSV_SCRIPT_CORPUS"
           gh api --method GET -H 'Accept: application/vnd.github.raw+json' \
@@ -724,6 +727,9 @@ jobs:
           RECORD_BASELINE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.body, '[bench-baseline-record]') }}
         run: |
           args=()
+          if [ -n "${BENCH_SKIP:-}" ]; then
+            args+=(--skip "$BENCH_SKIP")
+          fi
           if [ "$RECORD_BASELINE" = 'true' ]; then
             cp benches/baseline.json "$RUNNER_TEMP/linux-baseline.json"
             args+=(--record --baseline "$RUNNER_TEMP/linux-baseline.json")

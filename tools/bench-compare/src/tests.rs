@@ -73,6 +73,7 @@ fn fixture() -> Run {
                 "mode": mode, "bytes": bytes, "start_rss_bytes": 100, "peak_rss_bytes": 200, "delta_rss_bytes": 100,
             }))).collect(),
             benchmarks,
+            skipped: Vec::new(),
         }
 }
 
@@ -123,4 +124,48 @@ fn each_runner_cpu_is_its_own_baseline_entry() {
     more_cores.machine.cores = 4;
     assert_ne!(machine_key(&base), machine_key(&more_cores));
     assert_eq!(machine_key(&base), machine_key(&base.clone()));
+}
+
+fn skipping(bench: &str) -> Run {
+    let mut run = fixture();
+    run.benchmarks
+        .retain(|id, _| !id.starts_with(&format!("{bench}/")));
+    run.skipped = vec![bench.into()];
+    run
+}
+
+#[test]
+fn a_skipped_bench_is_absent_from_the_comparison_and_named_in_the_summary() {
+    let base = fixture();
+    let mut run = skipping("script_spend");
+    run.corpus = Value::Null;
+    assert!(!run.benchmarks.contains_key("script_spend/seed_block"));
+    assert!(compare(&base, &run).unwrap());
+    let text = summary(true, &run);
+    assert!(text.contains("8 of 9 benches measured"));
+    assert!(text.contains("SKIPPED script_spend: not measured, neither a pass nor a regression"));
+    // The skip excuses only its own rows: another bench missing still fails.
+    run.benchmarks.remove("merkle_path/verify_depth20_10000");
+    assert!(compare(&base, &run).is_err());
+    // A measured row of a skipped bench, or a skipped baseline, never passes.
+    let mut measured = skipping("script_spend");
+    measured.benchmarks.insert(
+        "script_spend/seed_block".into(),
+        base.benchmarks["script_spend/seed_block"].clone(),
+    );
+    assert!(validate_run(&measured).is_err());
+    assert!(compare(&skipping("script_spend"), &fixture()).is_err());
+    // An unskippable bench name is refused.
+    let mut unknown = fixture();
+    unknown.skipped = vec!["hash_bench".into()];
+    assert!(validate_run(&unknown).is_err());
+}
+
+#[test]
+fn skipping_beef_stream_drops_its_rss_rows_too() {
+    let base = fixture();
+    let mut run = skipping("beef_stream");
+    assert!(validate_run(&run).is_err());
+    run.memory.clear();
+    assert!(compare(&base, &run).unwrap());
 }
