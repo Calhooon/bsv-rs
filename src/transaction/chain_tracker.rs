@@ -50,7 +50,7 @@ pub enum ChainTrackerError {
     /// gave no answer in its word, so the root is neither valid nor invalid.
     ///
     /// [`TransportFault::NeverSent`]: the connection was never made; asking
-    /// again asks for the first time. [`TransportFault::MayHaveBeenReceived`]:
+    /// again is a new request. [`TransportFault::MayHaveBeenReceived`]:
     /// a timeout, a connection lost or a body cut after the request was
     /// written, or a 502, 503 or 504; a lookup is safe to repeat.
     /// [`TransportFault::RateLimited`]: a 429, or a 503 with `Retry-After`;

@@ -62,13 +62,20 @@ classifies by text. Busy stays the body's word. What each directory answers:
   answered and pinned (`an_html_503_from_a_proxy_is_a_transport_fault`); its
   wait is not carried there. `Error::transport_fault()` reads the class of either variant
   (`WalletTransport` as `MayHaveBeenReceived`; busy is `None`).
-- **Chain trackers**: `ChainTrackerError` is exhaustive, so no typed class:
-  a send fault stays `NetworkError` with ` (NEVER_SENT)` or
-  ` (MAY_HAVE_BEEN_RECEIVED)` after the detail; a fault status stays
-  `InvalidResponse` with the class, `HTTP 429 Too Many Requests
-  (RATE_LIMITED, retry_after_ms 5000)`; a body cut is `NetworkError` with
-  ` (MAY_HAVE_BEEN_RECEIVED)` (was `InvalidResponse`). A fault is never
-  `Ok(false)`.
+- **Chain trackers** (WhatsOnChain, the headers service):
+  `ChainTrackerError::TransportFault { fault, status, detail }` (new variant,
+  the three fields of `Error::TransportFault`, the same class; the enum
+  becomes `#[non_exhaustive]`, below) for a send fault (`NeverSent` or
+  `MayHaveBeenReceived`, status `None`), a body cut (`MayHaveBeenReceived`)
+  and a 429, 502, 503 or 504 (the class and its wait, status `Some`, detail
+  `HTTP 429 Too Many Requests`). `InvalidResponse` stays for a body that
+  parsed wrong and any other status; `BlockNotFound` and `Other` are
+  unchanged; `NetworkError` stays for a tracker built without `http`.
+  `ChainTrackerError::transport_fault()` reads the class back, and the new
+  `From<ChainTrackerError> for Error` carries it to `Error::TransportFault`,
+  so `Transaction::verify` answers a tracker's fault as
+  `Error::TransportFault` (was `TransactionError("Chain tracker error: ...")`,
+  which every other tracker error still is). A fault is never `Ok(false)`.
 
 **The old words.** A code word is a rule's word, not a compatibility
 promise; each gives way here:
@@ -86,21 +93,31 @@ promise; each gives way here:
   a body cut, a handshake answered 429, 502, 503 or 504) to
   `Error::TransportFault`, its detail the old text; `HttpWalletWire`'s
   `WalletError` on one to `Error::WalletTransport` (a 429 to
-  `Error::TransportFault`); a tracker's `InvalidResponse` on a body cut to
-  `NetworkError`.
+  `Error::TransportFault`); a tracker's `NetworkError` on a send error or a
+  body cut, and its `InvalidResponse` on a 429, 502, 503 or 504, to
+  `ChainTrackerError::TransportFault`, and `Transaction::verify`'s
+  `TransactionError` on one to `Error::TransportFault`.
 
 **Migration.** A downstream that matched any of those texts reads
 `transport_fault()` instead (`BroadcastFailure::transport_fault()`,
-`Error::transport_fault()`): `Some` of the class for a fault, `None` for the
-far side's answer; a tracker's error has no typed class and states it at
-the end of its detail. A `match` on `Error` already has a wildcard arm
-(`#[non_exhaustive]`).
+`Error::transport_fault()`, `ChainTrackerError::transport_fault()`): `Some`
+of the class for a fault, `None` for the far side's answer. A `match` on
+`Error` already has a wildcard arm (`#[non_exhaustive]`).
+`ChainTrackerError` is `#[non_exhaustive]` from this release (the owner's
+word of 2026-10-24): an exhaustive `match` on it downstream adds a wildcard
+arm (`_ => ...`), and the semver check reads the release as a minor; a
+downstream that builds a `ChainTrackerError` variant (bsv-wallet-toolbox-rs's
+`NetworkError` at `chaintracks_client.rs:262` and
+`fallback_chain_tracker.rs:282,306,342`) still compiles, and the toolbox has
+no exhaustive `match` on the enum (its tests read it with `matches!`).
 
 Tests, RED on the pre-fix sites (the type present, the sites unchanged) and
 GREEN after: `tests/transport_fault_broadcasters.rs` (9; #65's and #66's
 witnesses as `a_timeout_after_the_body_was_written_may_have_been_received`
 and `a_429_with_retry_after_and_a_text_body_is_rate_limited_with_its_wait`),
-`transport_fault_trackers.rs` (6), `transport_fault_wallet.rs` (7),
+`transport_fault_trackers.rs` (7, the typed variant from the fold of
+2026-10-24, `a_trackers_transport_fault_reaches_the_crate_error_typed`
+among them), `transport_fault_wallet.rs` (7),
 `transport_fault_auth.rs` (9). The cold review found the body cut read as a
 parse failure (the classifier asked `is_body()`, which reqwest 0.12.28 never
 sets for a body read): each file's `body_cut` test answers 200 with
@@ -112,6 +129,9 @@ before the fold (`PARSE_ERROR`, `InvalidResponse`, `WalletError`,
 `test_arc_broadcast_with_config_timeout` and `test_teranode_broadcast_timeout`,
 pinned `NETWORK_ERROR` for a timeout after the request was written, which is
 #65's defect; they now read `MAY_HAVE_BEEN_RECEIVED` (their own commit).
+`test_woc_tracker_current_height_server_error` pinned a bare 503 as
+`InvalidResponse`; it now reads `ChainTrackerError::TransportFault`
+(`MayHaveBeenReceived`, status 503).
 
 ### Notes: cross-SDK parity
 
