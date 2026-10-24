@@ -28,8 +28,17 @@ fn a_certificate_length_that_wraps_the_bounds_check_is_refused() {
     assert_eq!(data.len(), 189);
     let result = std::panic::catch_unwind(|| Certificate::from_binary(&data));
     let result = result.expect("Certificate::from_binary panicked on the #108 input");
+    // Two typed refusals meet on these bytes: the revocation outpoint's index
+    // varint reads above u32::MAX, refused first since #120 landed (#121,
+    // `CertificateValidationError`), and behind it the field length that
+    // wrapped the bounds check (#108, `ReaderUnderflow`). Either is the
+    // finding's pin: a refusal, never a panic. The constructed inputs below
+    // carry a valid index and pin the length check alone.
     assert!(
-        matches!(result, Err(Error::ReaderUnderflow { .. })),
+        matches!(
+            result,
+            Err(Error::ReaderUnderflow { .. }) | Err(Error::CertificateValidationError(_))
+        ),
         "{result:?}"
     );
 }
