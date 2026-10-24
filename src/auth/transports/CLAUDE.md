@@ -408,9 +408,7 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `TransportError("failed to connect to WebSocket: {}")`, `TransportError("failed to send WebSocket message: {}")` | The WebSocket transport's connection and send failures: a transport variant already, kept as it is (its tests pin it); its `NeverSent`/`MayHaveBeenReceived` split waits on the owner's word (#87) |
 | `TransportError("WebSocket URL must include a host")` | WebSocket URL has no host component |
 | `TransportError("no handler registered")` | WebSocket send before setting callback |
-| `TransportError("failed to connect to WebSocket: {}")` | WebSocket connection failure |
 | `TransportError("failed to marshal auth message: {}")` | JSON serialization error |
-| `TransportError("failed to send WebSocket message: {}")` | WebSocket write error |
 | `TransportError("WebSocket connection not available")` | Connection dropped after error |
 
 ## Testing
