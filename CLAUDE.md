@@ -74,6 +74,9 @@ dhat-profiling = ["dep:dhat"]
 - Varint readers are canonical from 0.6.0, as node and TS strict readers are;
   go-sdk@v1.7.1 `util/varint.go:71-105` remains lenient. Legacy callers can
   use `read_var_int_lenient`; node size bounds use the CompactSize methods.
+- The wallet wire's optional varints are TS's and Go's plain form (0.9, #149);
+  a listOutputs `offset` below `-1`, which TS writes in two's complement and
+  its own processor reads as absent, is refused at this crate's writer.
 
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
 - Go lacks TOTP, overlay caching/historian/reputation, and the RPuzzle template.
