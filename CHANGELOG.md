@@ -93,9 +93,15 @@ differently. Pinned by one test per site, `u32::MAX` read back exactly and
 
 TypeScript's `Reader.readVarIntNum` (`ts-sdk@9e3ede6`
 `src/primitives/utils.ts:743-763`, called for these indexes in
-`Certificate.ts:169` and `WalletWireProcessor.ts:20`) returns any number up
-to 2^53 with no `u32` bound, so it reads the same frames as an index no
-transaction has; that is the reference's own gap, not followed here.
+`Certificate.ts:169`, `WalletWireProcessor.ts:20` (the outpoint), `:387`
+(the spend's input index), `:803` (the internalized output's index) and
+`WalletWireTransceiver.ts:756` (the action output's index)) returns any
+number up to 2^53 with no `u32` bound, so it reads the same frames as an
+index no transaction has. Go's `ReadVarInt32` (go-sdk v1.7.2
+`util/reader.go:123-126`, called at `sign_action_args.go:63`,
+`internalize_action.go:72` and `list_actions.go:281`) casts to `uint32` and
+truncates as this crate did. Both are the references' own gap, not followed
+here (rule 1: the divergence stated, the keeper's reading the reason).
 
 ## [0.8.2] - 2026-10-23
 
