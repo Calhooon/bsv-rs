@@ -114,6 +114,18 @@ jobs:
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # Each published slice alone (#115): a function dead under one slice fails every consumer
+      # that builds that slice with warnings denied, and --all-features never sees it.
+      - name: Clippy on each slice alone
+        run: |
+          for slice in primitives block compat totp script transaction wallet \
+                       "auth,wallet,transaction,overlay,socketio,wasm" "wallet,auth,transaction,wasm" \
+                       "transaction,wasm" "overlay,wasm" "auth,socketio,wasm"; do
+            echo "::group::$slice"
+            cargo clippy --no-default-features --features "$slice" -- -D warnings
+            echo "::endgroup::"
+          done
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
