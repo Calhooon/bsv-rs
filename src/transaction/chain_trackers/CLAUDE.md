@@ -234,9 +234,9 @@ Both trackers return `ChainTrackerError` variants:
 
 | Error | Condition |
 |-------|-----------|
-| `NetworkError` | HTTP request failed, timeout, a body cut, or `http` feature not enabled; the fault's class ends the detail, `" (NEVER_SENT)"` or `" (MAY_HAVE_BEEN_RECEIVED)"` (#87) |
+| `NetworkError` | HTTP request failed, timeout, a body cut (a decode error whose source is not `serde_json`'s), or `http` feature not enabled; the fault's class ends the detail, `" (NEVER_SENT)"` or `" (MAY_HAVE_BEEN_RECEIVED)"` (#87) |
 | `BlockNotFound` | HTTP 404 response (block height doesn't exist) |
-| `InvalidResponse` | Non-success HTTP status, JSON parsing failure, or missing required fields; a fault status states its class, `HTTP 429 Too Many Requests (RATE_LIMITED, retry_after_ms 5000)`, `HTTP 503 Service Unavailable (MAY_HAVE_BEEN_RECEIVED)` (#87) |
+| `InvalidResponse` | Non-success HTTP status, JSON parsing failure (a decode error whose source is `serde_json`'s), or missing required fields; a fault status states its class, `HTTP 429 Too Many Requests (RATE_LIMITED, retry_after_ms 5000)`, `HTTP 503 Service Unavailable (MAY_HAVE_BEEN_RECEIVED)` (#87) |
 
 A provider's fault is an error, never a verdict: no `Ok(false)` for a fault.
 `ChainTrackerError` is not `#[non_exhaustive]`, so a typed class beside

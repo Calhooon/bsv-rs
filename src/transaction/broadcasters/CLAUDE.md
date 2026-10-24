@@ -250,9 +250,9 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 | Code | Description |
 |------|-------------|
 | `NEVER_SENT` | No byte of the request left (a connection refused, a request that could not be built): the caller may release its inputs |
-| `MAY_HAVE_BEEN_RECEIVED` | A timeout, a connection lost or a body cut after the request was written, or a 502, 503 or 504 (`more` `{"status"}`): the caller holds its inputs |
+| `MAY_HAVE_BEEN_RECEIVED` | A timeout, a connection lost or a body cut (a decode error whose source is not `serde_json`'s) after the request was written, or a 502, 503 or 504 (`more` `{"status"}`): the caller holds its inputs |
 | `RATE_LIMITED` | A 429, or a 503 with `Retry-After`, whatever the body (`more` `{"status", "retry_after_ms"}`, the wait `null` when absent or unreadable): never a verdict on the transaction |
-| `PARSE_ERROR` | Failed to parse the body of an answer that is not a fault |
+| `PARSE_ERROR` | The body of an answer that is not a fault, read whole, is not the expected JSON (a decode error whose source is `serde_json`'s) |
 | `NO_HTTP` | HTTP feature not enabled |
 | `EF_SERIALIZATION_ERROR` | Failed to serialize to EF format (Teranode only) |
 | `{status}` | HTTP status code from service (e.g., "400", "500") |

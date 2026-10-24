@@ -5,7 +5,8 @@
 //! was; none classifies by text. The class reads the error's kind and the
 //! answer's status, before the body: a connection never made is
 //! [`TransportFault::NeverSent`]; a timeout, a connection lost or a body cut
-//! after the request was written, and a 502, 503 or 504, are
+//! (a decode error whose source is not `serde_json`'s) after the request
+//! was written, and a 502, 503 or 504, are
 //! [`TransportFault::MayHaveBeenReceived`]; a 429, and a 503 carrying
 //! `Retry-After`, is [`TransportFault::RateLimited`] with its wait. Every
 //! other status is the far side's answer (`None`), read by the site.
@@ -43,11 +44,22 @@ pub(crate) fn delivery(e: &reqwest::Error) -> TransportFault {
 
 /// The fault of a send or body-read error, as `request_error` of the JSON
 /// substrate reads one: a connection error, a timeout, a request or body
-/// failure. `None` for a request that could not be built, a redirect
-/// refused and a body that is not the expected shape, which are not faults
-/// of the way.
+/// failure, and a body cut. `None` for a request that could not be built, a
+/// redirect refused and a body that is not the expected shape, which are not
+/// faults of the way.
 pub(crate) fn error_fault(e: &reqwest::Error) -> Option<TransportFault> {
-    (not_connected(e) || e.is_timeout() || e.is_request() || e.is_body()).then(|| delivery(e))
+    let way = not_connected(e) || e.is_timeout() || e.is_request() || e.is_body();
+    (way || body_cut(e)).then(|| delivery(e))
+}
+
+/// Whether a body read failed on the way: reqwest's `bytes`, `text` and
+/// `json` give every failure of the read the decode kind (0.12.28,
+/// `async_impl/response.rs:290-296`), so the kind cannot tell a cut from a
+/// body that is not JSON; the source's type does. A decode error whose
+/// source is a `serde_json::Error` is the parse failure it is.
+fn body_cut(e: &reqwest::Error) -> bool {
+    e.is_decode()
+        && !std::error::Error::source(e).is_some_and(|source| source.is::<serde_json::Error>())
 }
 
 /// The fault an answer's status reports, read before its body; `None` when
