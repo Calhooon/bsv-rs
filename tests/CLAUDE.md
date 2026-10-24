@@ -13,6 +13,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 |------|------:|-------------|-------------|
 | `auth_cross_sdk_tests.rs` | 13 | `auth` | Certificate serialization cross-SDK vectors |
 | `auth_integration_tests.rs` | 70 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads, nonce handling |
+| `auth_reader_bounds.rs` | 7 | `auth` | A length the bytes remaining cannot hold is refused, never wrapped past the check: the #108 input and `usize::MAX - k` through `Certificate::from_binary` (`ReaderUnderflow`), the HTTP payload fields at lengths that wrap or truncate on a 32-bit target, valid inputs unchanged (Calhooon/bsv-rs#108) |
 | `auth_peer_e2e_tests.rs` | 21 | `auth` | BRC-31 peer mutual authentication end-to-end via loopback |
 | `broadcaster_http_tests.rs` | 27 | `transaction`+`http` | ARC, WoC, Teranode broadcasters with wiremock; the ARC 2xx verdict vector served through wiremock (bsv-stack-lean #35, P0-2) |
 | `chain_difficulty.rs` | 10 | `block` | The difficulty rule (`next_work_required`) on bitcoin-sv v1.2.3's `pow_tests.cpp` tables, the regimes' edges and the real testnet run 1602530..=1602710 (`chain_vectors/test_1602530_1602710.bin`, sha256 pinned) |
