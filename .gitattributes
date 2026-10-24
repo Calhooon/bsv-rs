@@ -1,0 +1,7 @@
+# The shared vectors and the recorded fixtures are read byte for byte (their
+# sha256 is pinned in the tests that load them; a vector is never edited to
+# make a test pass). No line-ending conversion on any checkout: #146's whole-
+# suite run on Windows found hkdf_wycheproof red on CRLF bytes alone.
+tests/vectors/** -text
+tests/fixtures/** -text
+fuzz/corpus/** -text
