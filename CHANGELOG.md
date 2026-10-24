@@ -20,7 +20,10 @@ public item moved; no word changed: the files are the old arrays byte for
 byte, pinned by sha256 in `tests/compat_bip39_wordlist_files.rs`.
 `.gitattributes` keeps the files out of line-ending conversion. The ratchet's
 path exemption for the nine `.rs` files went with them (`tools/ratchet`; the
-census reads `.rs` only, so no counter moves).
+census reads `.rs` only, so no counter moves). `verify_english_wordlist`
+gains `#[must_use]` (additive; a caller that drops its `bool` now gets a
+warning), which offsets the one pedantic warning the parser's local array
+adds, so the pedantic census stays where it was.
 
 ### Notes: cross-SDK parity
 
