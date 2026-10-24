@@ -66,41 +66,7 @@ impl Spend {
         }
         let size_bytes = self.pop_stack()?;
         let size_bn = self.read_number(&size_bytes)?;
-        let size = size_bn.to_i64().unwrap_or(-1);
-
-        let size = if self.flags.is_some() {
-            // Under a word the reference's bound: a size below 0 or above
-            // INT32_MAX is SCRIPT_ERR_PUSH_SIZE before anything is
-            // allocated, on every path (`interpreter.cpp:1747-1749`); an
-            // element after Genesis is otherwise bounded by the stack
-            // memory budget alone (`src/consensus/consensus.h:81-82`),
-            // charged below.
-            if size < 0 || size > i64::from(i32::MAX) {
-                return Err(self.error(&format!(
-                    "OP_NUM2BIN requires a size from 0 to 2147483647, found {}.",
-                    size_bn.to_dec_string()
-                )));
-            }
-            size as usize
-        } else {
-            if size < 0 || size > MAX_SCRIPT_ELEMENT_SIZE as i64 {
-                return Err(self.error(&format!(
-                    "It's not currently possible to push data larger than {} bytes or negative size.",
-                    MAX_SCRIPT_ELEMENT_SIZE
-                )));
-            }
-            let size = size as usize;
-            // Reference parity (0.3.23): the element the script asks for is
-            // refused BEFORE it is allocated when it alone exceeds the
-            // local memory budget — the TypeScript SDK's `element-size`
-            // resource check. Without this a 9-byte script could make the
-            // evaluator allocate up to MAX_SCRIPT_ELEMENT_SIZE (1 GB) and
-            // only then trip the stack budget on the push.
-            if size > self.memory_limit() {
-                return Err(self.resource_error(ScriptResource::ElementSize, size));
-            }
-            size
-        };
+        let size = self.num2bin_size(&size_bn)?;
 
         let rawnum = self.pop_stack()?;
         let minimal = ScriptNum::minimally_encode(&rawnum);
@@ -124,25 +90,50 @@ impl Spend {
         if minimal.len() == size {
             self.push_stack(minimal)?;
         } else {
-            // Pad to size, preserving sign
-            let mut result = vec![0u8; size];
-            let mut signbit = 0u8;
-
-            if !minimal.is_empty() {
-                signbit = minimal[minimal.len() - 1] & 0x80;
-                let mut minimal_copy = minimal.clone();
-                if let Some(last) = minimal_copy.last_mut() {
-                    *last &= 0x7f;
-                }
-                result[..minimal_copy.len()].copy_from_slice(&minimal_copy);
-            }
-
-            if signbit != 0 {
-                result[size - 1] |= 0x80;
-            }
-            self.push_stack(result)?;
+            self.push_stack(padded(&minimal, size))?;
         }
         Ok(())
+    }
+
+    /// `OP_NUM2BIN`'s size operand, bounded before anything is allocated:
+    /// under a word by `INT32_MAX`, in the default mode by the element bound
+    /// and the local memory budget.
+    fn num2bin_size(&self, size_bn: &BigNumber) -> Result<usize, ScriptEvaluationError> {
+        let size = size_bn.to_i64().unwrap_or(-1);
+
+        if self.flags.is_some() {
+            // Under a word the reference's bound: a size below 0 or above
+            // INT32_MAX is SCRIPT_ERR_PUSH_SIZE before anything is
+            // allocated, on every path (`interpreter.cpp:1747-1749`); an
+            // element after Genesis is otherwise bounded by the stack
+            // memory budget alone (`src/consensus/consensus.h:81-82`),
+            // charged below.
+            if size < 0 || size > i64::from(i32::MAX) {
+                return Err(self.error(&format!(
+                    "OP_NUM2BIN requires a size from 0 to 2147483647, found {}.",
+                    size_bn.to_dec_string()
+                )));
+            }
+            Ok(size as usize)
+        } else {
+            if size < 0 || size > MAX_SCRIPT_ELEMENT_SIZE as i64 {
+                return Err(self.error(&format!(
+                    "It's not currently possible to push data larger than {} bytes or negative size.",
+                    MAX_SCRIPT_ELEMENT_SIZE
+                )));
+            }
+            let size = size as usize;
+            // Reference parity (0.3.23): the element the script asks for is
+            // refused BEFORE it is allocated when it alone exceeds the
+            // local memory budget — the TypeScript SDK's `element-size`
+            // resource check. Without this a 9-byte script could make the
+            // evaluator allocate up to MAX_SCRIPT_ELEMENT_SIZE (1 GB) and
+            // only then trip the stack budget on the push.
+            if size > self.memory_limit() {
+                return Err(self.resource_error(ScriptResource::ElementSize, size));
+            }
+            Ok(size)
+        }
     }
 
     pub(super) fn op_bin2num(&mut self) -> Result<(), ScriptEvaluationError> {
@@ -362,4 +353,26 @@ impl Spend {
         let value = as_number.to_i64().ok_or_else(decode_error)?;
         Ok(value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)))
     }
+}
+
+/// `OP_NUM2BIN`'s result: `minimal` padded with zero bytes to `size`, its
+/// sign bit moved to the last byte.
+fn padded(minimal: &[u8], size: usize) -> Vec<u8> {
+    // Pad to size, preserving sign
+    let mut result = vec![0u8; size];
+    let mut signbit = 0u8;
+
+    if !minimal.is_empty() {
+        signbit = minimal[minimal.len() - 1] & 0x80;
+        let mut minimal_copy = minimal.to_vec();
+        if let Some(last) = minimal_copy.last_mut() {
+            *last &= 0x7f;
+        }
+        result[..minimal_copy.len()].copy_from_slice(&minimal_copy);
+    }
+
+    if signbit != 0 {
+        result[size - 1] |= 0x80;
+    }
+    result
 }

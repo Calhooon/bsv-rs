@@ -77,62 +77,14 @@ impl Spend {
                 }
                 bn1.mod_floor(&bn2)
             }
-            OP_BOOLAND => {
-                if !bn1.is_zero() && !bn2.is_zero() {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_BOOLOR => {
-                if !bn1.is_zero() || !bn2.is_zero() {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_NUMEQUAL | OP_NUMEQUALVERIFY => {
-                if bn1 == bn2 {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_NUMNOTEQUAL => {
-                if bn1 != bn2 {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_LESSTHAN => {
-                if bn1 < bn2 {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_GREATERTHAN => {
-                if bn1 > bn2 {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_LESSTHANOREQUAL => {
-                if bn1 <= bn2 {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_GREATERTHANOREQUAL => {
-                if bn1 >= bn2 {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
+            OP_BOOLAND => truth(!bn1.is_zero() && !bn2.is_zero()),
+            OP_BOOLOR => truth(!bn1.is_zero() || !bn2.is_zero()),
+            OP_NUMEQUAL | OP_NUMEQUALVERIFY => truth(bn1 == bn2),
+            OP_NUMNOTEQUAL => truth(bn1 != bn2),
+            OP_LESSTHAN => truth(bn1 < bn2),
+            OP_GREATERTHAN => truth(bn1 > bn2),
+            OP_LESSTHANOREQUAL => truth(bn1 <= bn2),
+            OP_GREATERTHANOREQUAL => truth(bn1 >= bn2),
             OP_MIN => {
                 if bn1 < bn2 {
                     bn1
@@ -177,5 +129,14 @@ impl Spend {
         let in_range = x_bn >= min_bn && x_bn < max_bn;
         self.push_stack(if in_range { vec![1] } else { vec![] })?;
         Ok(())
+    }
+}
+
+/// A comparison's result as a script number: 1 when it holds, 0 otherwise.
+fn truth(holds: bool) -> BigNumber {
+    if holds {
+        BigNumber::one()
+    } else {
+        BigNumber::zero()
     }
 }
