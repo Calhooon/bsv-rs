@@ -391,13 +391,11 @@ fn sign_with_k(
     // Compute R = k * G
     let r_point = (ProjectivePoint::GENERATOR * k_nonzero.as_ref()).to_affine();
     let r_bytes: FieldBytes = r_point.x();
-    let r = <Scalar as Reduce<U256>>::reduce_bytes(&r_bytes);
+    let r = <Scalar as Reduce<FieldBytes>>::reduce(&r_bytes);
 
     // Compute s = k^-1 * (z + r * d) mod n
-    // Note: from_slice deprecation is from generic-array 0.x, a transitive dependency of k256
-    #[allow(deprecated)]
-    let z_bytes: FieldBytes = *FieldBytes::from_slice(msg_hash);
-    let z = <Scalar as Reduce<U256>>::reduce_bytes(&z_bytes);
+    let z_bytes: FieldBytes = FieldBytes::from(*msg_hash);
+    let z = <Scalar as Reduce<FieldBytes>>::reduce(&z_bytes);
     let k_inv_opt: CtOption<Scalar> = k_nonzero.invert();
     let k_inv: Scalar = k_inv_opt
         .into_option()

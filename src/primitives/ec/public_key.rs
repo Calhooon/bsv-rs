@@ -7,10 +7,10 @@ use crate::error::{Error, Result};
 use crate::primitives::encoding::{from_hex, to_base58_check, to_hex};
 use crate::primitives::hash::{hash160, sha256_hmac};
 use crate::primitives::BigNumber;
-use k256::elliptic_curve::group::prime::PrimeCurveAffine;
+use k256::elliptic_curve::group::CurveAffine;
 use k256::elliptic_curve::scalar::FromUintUnchecked;
-use k256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
-use k256::{AffinePoint, EncodedPoint, ProjectivePoint, PublicKey as K256PublicKey, Scalar, U256};
+use k256::elliptic_curve::sec1::{FromSec1Point, ToSec1Point};
+use k256::{AffinePoint, ProjectivePoint, PublicKey as K256PublicKey, Scalar, U256};
 
 use super::Signature;
 
@@ -37,10 +37,10 @@ impl PublicKey {
     ///
     /// The parsed public key, or an error if the format is invalid
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let encoded = EncodedPoint::from_bytes(bytes)
+        let encoded = k256::Sec1Point::from_bytes(bytes)
             .map_err(|e| Error::InvalidPublicKey(format!("Invalid public key encoding: {}", e)))?;
 
-        let point = AffinePoint::from_encoded_point(&encoded);
+        let point = AffinePoint::from_sec1_point(&encoded);
         if point.is_none().into() {
             return Err(Error::InvalidPublicKey("Point not on curve".to_string()));
         }
@@ -90,7 +90,7 @@ impl PublicKey {
     ///
     /// Format: `02/03 || X` where the prefix indicates Y coordinate parity.
     pub fn to_compressed(&self) -> [u8; 33] {
-        let encoded = self.inner.to_encoded_point(true);
+        let encoded = self.inner.to_sec1_point(true);
         let bytes = encoded.as_bytes();
         let mut result = [0u8; 33];
         result.copy_from_slice(bytes);
@@ -101,7 +101,7 @@ impl PublicKey {
     ///
     /// Format: `04 || X || Y`
     pub fn to_uncompressed(&self) -> [u8; 65] {
-        let encoded = self.inner.to_encoded_point(false);
+        let encoded = self.inner.to_sec1_point(false);
         let bytes = encoded.as_bytes();
         let mut result = [0u8; 65];
         result.copy_from_slice(bytes);
@@ -120,7 +120,7 @@ impl PublicKey {
 
     /// Returns the X coordinate as bytes (32 bytes, big-endian).
     pub fn x(&self) -> [u8; 32] {
-        let encoded = self.inner.to_encoded_point(false);
+        let encoded = self.inner.to_sec1_point(false);
         let mut result = [0u8; 32];
         // a public key is never the identity, so its uncompressed encoding carries x
         if let Some(x_bytes) = encoded.x() {
@@ -131,7 +131,7 @@ impl PublicKey {
 
     /// Returns the Y coordinate as bytes (32 bytes, big-endian).
     pub fn y(&self) -> [u8; 32] {
-        let encoded = self.inner.to_encoded_point(false);
+        let encoded = self.inner.to_sec1_point(false);
         let mut result = [0u8; 32];
         // a public key is never the identity, so its uncompressed encoding carries y
         if let Some(y_bytes) = encoded.y() {

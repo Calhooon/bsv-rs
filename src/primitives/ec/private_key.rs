@@ -9,8 +9,10 @@ use crate::primitives::hash::sha256_hmac;
 use crate::primitives::BigNumber;
 use k256::ecdsa::signature::hazmat::PrehashSigner;
 use k256::ecdsa::SigningKey;
-use k256::elliptic_curve::rand_core::OsRng;
+use k256::elliptic_curve::zeroize::Zeroizing;
 use k256::SecretKey;
+use rand::rngs::OsRng;
+use rand::RngCore;
 
 use super::{PublicKey, Signature};
 
@@ -41,8 +43,15 @@ impl PrivateKey {
     /// assert_eq!(key.to_bytes().len(), 32);
     /// ```
     pub fn random() -> Self {
-        let inner = SecretKey::random(&mut OsRng);
-        Self { inner }
+        // Rejection sampling over the OS CSPRNG, as k256 0.13's `SecretKey::random`
+        // sampled: 32 uniform bytes are a key unless they are zero or at least n.
+        loop {
+            let mut bytes = Zeroizing::new([0u8; 32]);
+            OsRng.fill_bytes(&mut bytes[..]);
+            if let Ok(inner) = SecretKey::from_slice(&bytes[..]) {
+                return Self { inner };
+            }
+        }
     }
 
     /// Creates a private key from raw 32-byte secret.
@@ -156,11 +165,9 @@ impl PrivateKey {
     ///
     /// Digest-domain note: for a `msg_hash` >= n (the secp256k1 group order;
     /// P ≈ 2⁻¹²⁸ for any real hash output), k256 seeds the RFC 6979 nonce
-    /// DRBG with `bits2octets(msg_hash)` per the RFC, whereas libsecp256k1
-    /// and the TypeScript `@bsv/sdk` seed it with the raw digest bytes — the
-    /// deterministic signature BYTES then differ across stacks, though all
-    /// are valid low-S signatures over the same reduced message. In-range
-    /// digests (< n) are signed byte-identically across all three stacks.
+    /// DRBG so that the signature is the one the TypeScript `@bsv/sdk` and the
+    /// Go SDK produce (derived with both, #125); every digest signs
+    /// byte-identically across the stacks.
     /// Pinned by the `rfc6979_*_der_is_pinned` tests in `tests/ec_tests.rs`;
     /// see also the digest-handling note in
     /// [`crate::primitives::bsv::sighash`].

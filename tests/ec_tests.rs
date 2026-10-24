@@ -969,14 +969,12 @@ fn rfc6979_in_range_digest_der_is_pinned() {
     assert!(private_key.public_key().verify(&digest, &signature));
 }
 
-/// RECORDED ASYMMETRY (non-blocking): for a digest >= n, k256 seeds the
-/// RFC 6979 nonce DRBG with bits2octets(digest) per the RFC, while
-/// libsecp256k1 and @bsv/sdk seed it with the raw digest bytes — so the
-/// deterministic signature BYTES differ across stacks in that regime, though
-/// every stack emits a valid low-S signature over the same reduced message.
-/// Unreachable through the sighash path in practice (P ≈ 2⁻¹²⁸ for sha256d
-/// output). This pin freezes the current k256 behavior so a dependency bump
-/// that changes it is noticed.
+/// For a digest >= n, k256 0.14 signs with the bytes @bsv/sdk 2.0.16
+/// (`ECDSA.sign`) and the Go SDK (`signRFC6979`) produce: derived with both on
+/// 2026-10-24 for this key and digest, byte for byte (#125). k256 0.13 signed
+/// `30440220270c...0aaa` here, pinned then as a divergence. Unreachable through
+/// the sighash path in practice (P ≈ 2⁻¹²⁸ for sha256d output). Pinned so a
+/// dependency bump that changes it is noticed.
 #[test]
 fn rfc6979_digest_ge_n_der_is_pinned() {
     let key = {
@@ -990,8 +988,8 @@ fn rfc6979_digest_ge_n_der_is_pinned() {
     let signature = private_key.sign(&digest).unwrap();
     assert_eq!(
         hex::encode(signature.to_der()),
-        "30440220270c504ade45b9bf70ed7dd54f2f253671c4568e3b2a2319d2efc6942b58f7960220076b9b8b0449bc498635d324e2f50365964e65ef0fcbcec9b9941e69f91b0aaa",
-        "k256 digest>=n RFC 6979 behavior changed — re-audit the cross-stack nonce asymmetry pins"
+        "3045022100dd926427ae6b3df4a4e9242dc2261363b557b9af5e8c04a171f72bd8b295ebfa02207e9ae9348c12debe52ee3df2557f5220c05df290aa8449025d5d29440411cf39",
+        "k256 digest>=n RFC 6979 behavior changed: re-audit against libsecp256k1, @bsv/sdk and go-sdk"
     );
     // Still a valid signature over the (reduced) message.
     assert!(private_key.public_key().verify(&digest, &signature));

@@ -67,14 +67,10 @@
 //! [`crate::primitives::ec::PrivateKey::sign`], which uses k256's RFC 6979
 //! deterministic nonce generation. For the astronomically unlikely case of a
 //! digest >= n (the secp256k1 group order; P ≈ 2⁻¹²⁸ for sha256d output),
-//! k256 seeds the nonce DRBG with `bits2octets(digest)` exactly per
-//! RFC 6979 §2.3.4, whereas libsecp256k1 and the TypeScript `@bsv/sdk` seed
-//! it with the raw digest bytes. The two derivations agree for every in-range
-//! digest (< n) and diverge only for digest >= n; in that regime both stacks
-//! still produce *valid* low-S signatures over the same reduced message,
-//! only the deterministic signature bytes differ. In-range digests are signed
-//! byte-identically across all three stacks. This asymmetry is pinned by
-//! `rfc6979_in_range_digest_der_is_pinned` and
+//! k256 0.14 signs with the bytes the TypeScript `@bsv/sdk` and the Go SDK
+//! produce (derived with both, #125), so every digest signs byte-identically
+//! across the stacks; k256 0.13 did not in that regime. Pinned
+//! by `rfc6979_in_range_digest_der_is_pinned` and
 //! `rfc6979_digest_ge_n_der_is_pinned` in `tests/ec_tests.rs` so a future
 //! k256 upgrade that changes it is noticed.
 
