@@ -25,14 +25,14 @@ wildcards = "deny"
 # Re-read these parents when the dependency graph changes. No consumer-specific
 # wrappers from the stack template belong in this crate's policy.
 deny = [
-    # bsv-rs 0.8.2: bsv-rs, k256 0.13.4 and p256 0.13.2.
+    # bsv-rs 0.8.2 on the k256 0.14 line (#125): bsv-rs, k256 0.14.0 and p256 0.14.0.
     { name = "sha2", wrappers = ["bsv-rs", "k256", "p256"], reason = "Use bsv-rs hashing" },
     # bsv-rs 0.8.2: bsv-rs alone; secp256k1 is absent.
     { name = "ripemd", wrappers = ["bsv-rs"], reason = "Use bsv-rs hashing" },
     { name = "secp256k1", wrappers = ["bsv-rs"], reason = "Use bsv-rs keys and signatures" },
     { name = "k256", wrappers = ["bsv-rs"], reason = "Use bsv-rs keys and signatures" },
     { name = "bs58", wrappers = ["bsv-rs"], reason = "Use bsv-rs base58check" },
-    # bsv-rs 0.8.2: bsv-rs, pbkdf2 0.12.2 and rfc6979 0.4.0.
+    # bsv-rs 0.8.2 on the k256 0.14 line (#125): bsv-rs, pbkdf2 0.13.0 and rfc6979 0.6.0.
     { name = "hmac", wrappers = ["bsv-rs", "pbkdf2", "rfc6979"], reason = "Use bsv-rs HMAC" },
     # bsv-rs 0.8.2: bsv-rs alone.
     { name = "p256", wrappers = ["bsv-rs"], reason = "Use bsv-rs keys and signatures" },

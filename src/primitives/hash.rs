@@ -85,7 +85,7 @@
 //! ```
 
 use crate::error::{Error, Result};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use ripemd::Ripemd160;
 use sha1::Sha1;
 use sha2::{Digest, Sha512};
@@ -383,7 +383,7 @@ pub fn sha1_hmac(key: &[u8], data: &[u8]) -> [u8; 20] {
     type HmacSha1 = Hmac<Sha1>;
 
     #[allow(clippy::expect_used)]
-    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
+    // #134: HMAC takes a key of any length; hmac 0.13 has no infallible slice constructor
     let mut mac = HmacSha1::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().into()
@@ -414,7 +414,7 @@ pub fn sha256_hmac(key: &[u8], data: &[u8]) -> [u8; 32] {
     type HmacSha256 = Hmac<sha2::Sha256>;
 
     #[allow(clippy::expect_used)]
-    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
+    // #134: HMAC takes a key of any length; hmac 0.13 has no infallible slice constructor
     let mut mac = HmacSha256::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().into()
@@ -445,7 +445,7 @@ pub fn sha512_hmac(key: &[u8], data: &[u8]) -> [u8; 64] {
     type HmacSha512 = Hmac<Sha512>;
 
     #[allow(clippy::expect_used)]
-    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
+    // #134: HMAC takes a key of any length; hmac 0.13 has no infallible slice constructor
     let mut mac = HmacSha512::new_from_slice(key).expect("HMAC can take key of any size");
     mac.update(data);
     mac.finalize().into_bytes().into()
@@ -501,13 +501,10 @@ pub const HKDF_SHA512_MAX_OKM: usize = 255 * 64;
 ///
 /// An empty `salt` is the RFC's "not provided": HMAC pads its key with zeros to
 /// the block size, so the empty key and `HashLen` zero bytes are the same key.
-fn hkdf_extract_with<M: Mac + hmac::digest::KeyInit>(
-    salt: &[u8],
-    ikm: &[u8],
-) -> hmac::digest::Output<M> {
+fn hkdf_extract_with<M: Mac + KeyInit>(salt: &[u8], ikm: &[u8]) -> hmac::digest::Output<M> {
     #[allow(clippy::expect_used)]
-    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
-    let mut mac = <M as Mac>::new_from_slice(salt).expect("HMAC can take key of any size");
+    // #134: HMAC takes a key of any length; hmac 0.13 has no infallible slice constructor
+    let mut mac = <M as KeyInit>::new_from_slice(salt).expect("HMAC can take key of any size");
     Mac::update(&mut mac, ikm);
     mac.finalize().into_bytes()
 }
@@ -517,7 +514,7 @@ fn hkdf_extract_with<M: Mac + hmac::digest::KeyInit>(
 ///
 /// Refuses a `PRK` shorter than `HashLen` and an `okm` longer than `255 * HashLen`
 /// (both the RFC's preconditions) without writing `okm`.
-fn hkdf_expand_with<M: Mac + hmac::digest::KeyInit + Clone>(
+fn hkdf_expand_with<M: Mac + KeyInit + Clone>(
     prk: &[u8],
     info: &[u8],
     okm: &mut [u8],
@@ -536,8 +533,8 @@ fn hkdf_expand_with<M: Mac + hmac::digest::KeyInit + Clone>(
         });
     }
     #[allow(clippy::expect_used)]
-    // #134: HMAC takes a key of any length; hmac 0.12 has no infallible slice constructor
-    let base = <M as Mac>::new_from_slice(prk).expect("HMAC can take key of any size");
+    // #134: HMAC takes a key of any length; hmac 0.13 has no infallible slice constructor
+    let base = <M as KeyInit>::new_from_slice(prk).expect("HMAC can take key of any size");
     let mut previous: Option<hmac::digest::Output<M>> = None;
     for (i, chunk) in okm.chunks_mut(hash_len).enumerate() {
         let mut mac = base.clone();
