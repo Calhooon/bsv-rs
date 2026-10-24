@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the interpreter is split by opcode group (#85)
+
+`src/script/spend.rs` (4,419 lines) is the directory `src/script/spend/`:
+`mod.rs` keeps `Spend`, its parameters, `validate`, `step` and the dispatcher
+(one static `match`, each arm a direct call to a `pub(super)` method); the
+handlers live in `push`, `flow`, `stack_ops`, `splice`, `bitwise`,
+`arithmetic` and `crypto`, the stack and its memory count in `stack`, the
+budgets and their `ScriptResourceLimit` declines in `limits`, the
+script-number reads in `num`, the flag word's setters in `word`, and the six
+unit-test modules in files of their own. A refactor: no verdict, error text,
+budget or flag site changed, and no public item moved
+(`bsv_rs::script::spend::{Spend, SpendParams, TxSpendParams}` and every
+public method keep their paths and signatures). The sibling's harness
+(`bsv-script-lean` at `8840488`, `harness/run --impl bsv-rs`) is GREEN on all
+nine corpora before (run `20261024-215622`) and after (`20261024-222200`),
+the per-corpus counts and witness files identical; the ts-stack corpus
+totals in `tests/conformance_scripts.rs` and the script witnesses are
+unchanged. The census falls: no file over 800 lines under `src/script/spend/`
+(40 to 39 files), cognitive complexity over 25 from 2 to 1 (the dispatcher's
+52), duplicate windows 8,726 to 8,723, pedantic warnings 2,678 to 2,676;
+functions over 60 lines stay 93. The nightly's mutation surface
+(`src/script/**/*.rs`) already covers the new files and no per-file floor
+named `spend.rs`.
+
 ### Changed: the BIP-39 wordlists are data, not code (#89)
 
 The nine `src/compat/bip39/wordlists/<language>.rs` tables (11,055 lines of

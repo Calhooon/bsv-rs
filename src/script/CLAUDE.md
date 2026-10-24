@@ -31,7 +31,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `bip276.rs` | BIP-276 typed script encoding (`encode_bip276` / `decode_bip276`) |
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding |
 | `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging |
-| `spend.rs` | `Spend` interpreter for validating transaction spends |
+| `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError` |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
 | `transaction.rs` | Transaction interface traits for Transaction module integration |
@@ -405,19 +405,53 @@ pub struct SimpleUtxo               // Test implementation of TransactionOutputC
 - **Disabled before Chronicle only**: OP_2MUL, OP_2DIV (disabled), OP_VER, OP_VERIF, OP_VERNOTIF (BAD_OPCODE when executed, skipped when not), 0xb3–0xb7 (NOPs); for a post-Chronicle UTXO (`UTXO_AFTER_CHRONICLE`, or version > 1 by default) all run per bitcoin-sv v1.2.2 (0.3.27). Undefined opcodes 0xba–0xff executed, a truncated push reached, a second OP_ELSE: failures in every mode.
 - **ASM Rendering**: `OP_FALSE`/`OP_0` renders as `"0"`, not `"OP_0"` in `to_asm()`
 
-### Script Interpreter Configuration (spend.rs)
+### The interpreter's layout (`spend/`, #85)
+
+`spend.rs` was one file of 4,419 lines until #85; it is a directory now, split
+by the node's opcode groups. A refactor: no verdict, error text, budget or flag
+site moved, and every public path is the same (`bsv_rs::script::Spend`,
+`bsv_rs::script::spend::{Spend, SpendParams, TxSpendParams}`); the sibling's
+harness (`bsv-script-lean` `harness/run --impl bsv-rs --corpus all`) reads the
+same before and after. Every handler is an `impl Spend` method in its group's
+module, `pub(super)`; the dispatcher is one static `match` in `mod.rs`, each arm a
+direct call (no trait object, no table of function pointers, no clone added).
+
+| Module | What lives there |
+|--------|------------------|
+| `mod.rs` | The crate docs of the two modes and the budgets; `SpendParams`, `TxSpendParams`, the `Spend` struct and its constructors (`new`, `with_transaction`); `reset`, `validate` (the word's `check`, push-only, the balance, CLEANSTACK, the truthy top), `step` (the walk: the work charge, the truncated push, the disabled opcodes, the minimal push of an executed push) and `execute_opcode`, the dispatcher; `error`, the one constructor of `ScriptEvaluationError`; the default mode's `REQUIRE_*` switches |
+| `word.rs` | `set_flags` (every switch re-derived from `ScriptFlags::gates`), `flags`, and the setters that override a derived rule (`set_require_minimal`, `set_require_push_only`, `set_utxo_after_chronicle`) |
+| `push.rs` | The precomputed `OP_1NEGATE`/`OP_0`-`OP_16` encodings and their handlers, the data pushes, `is_chunk_minimal_push` (MINIMALDATA on a push) |
+| `flow.rs` | The NOPs and DISCOURAGE_UPGRADABLE_NOPS, `OP_NOP4`-`OP_NOP8` (NOPs before Chronicle, the Chronicle splice after), `OP_VER`, the conditionals with MINIMALIF and the one-ELSE rule, `OP_VERIFY`, `OP_RETURN` after Genesis, `is_opcode_disabled` (`OP_2MUL`/`OP_2DIV` before Chronicle). No CLTV/CSV module: they are NOPs for a post-Genesis UTXO |
+| `stack_ops.rs` | The alt-stack moves and the stack opcodes (`OP_2DROP` to `OP_TUCK`, `OP_PICK`/`OP_ROLL`) |
+| `splice.rs` | `OP_SIZE`, `OP_CAT`, `OP_SPLIT` (`split_position`, the `INT32_MAX` bound under a word), `OP_NUM2BIN` (`num2bin_size`, the bound before the allocation; `padded`), `OP_BIN2NUM`, the Chronicle `OP_SUBSTR`/`OP_LEFT`/`OP_RIGHT`/`OP_LSHIFTNUM`/`OP_RSHIFTNUM` (`op_chronicle_splice`, the shift counts' two bounds) and `read_splice_operand` (the `int64` operand under a word) |
+| `bitwise.rs` | `OP_INVERT`, `OP_AND`/`OP_OR`/`OP_XOR`, `OP_EQUAL`/`OP_EQUALVERIFY`, the width-preserving `OP_LSHIFT`/`OP_RSHIFT` (`shifted`) |
+| `arithmetic.rs` | The unary and binary number opcodes (`truth` for a comparison's 1 or 0), `OP_WITHIN` |
+| `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the signature encoding (DER, LOW_S at the order, STRICTENC's defined base type and CHRONICLE bit, FORKID), the public key encoding (COMPRESSED_PUBKEYTYPE), the scriptCode (`build_subscript`, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
+| `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
+| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `DEFAULT_MEMORY_LIMIT`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`) |
+| `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number`, `read_count` (CHECKMULTISIG's 4-byte counts), `push_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
+| `tests.rs`, `flag_tests.rs`, `chronicle_tests.rs`, `low_s_order_tests.rs`, `script_num_length_tests.rs`, `fixed_width_operand_tests.rs` | The unit tests, one file per former inline module; their paths (`script::spend::flag_tests::...`) are unchanged |
+
+A new opcode handler goes in its group's module as a `pub(super) fn` on `Spend`
+and gets one arm in `execute_opcode`. A module stays under 800 lines and a
+handler under 60 (`docs/RATCHETS.md`); a guard several handlers share is one
+helper (`require_two_items`), not a copy per module.
+
+### Script Interpreter Configuration (`spend/`)
 
 ```rust
+// limits.rs
 const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;  // 1GB (BSV unlimited)
 const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;              // 32MB, the default mode's local budget
 const WORD_MEMORY_LIMIT: usize = DEFAULT_STACK_MEMORY_USAGE_POLICY;  // 100MB, under a word
 const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
+// mod.rs
 const REQUIRE_MINIMAL_PUSH: bool = true;        // the default mode, version <= 1 only
 const REQUIRE_PUSH_ONLY_UNLOCKING: bool = true;  // the default mode, every version
 const REQUIRE_LOW_S_SIGNATURES: bool = true;     // the default mode, version <= 1 only
 const REQUIRE_CLEAN_STACK: bool = true;          // the default mode, version <= 1 only
 // NULLDUMMY: the default mode, version <= 1 only. NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS,
-// COMPRESSED_PUBKEYTYPE: only under a word (`set_flags`), derived by `ScriptFlags::gates`.
+// COMPRESSED_PUBKEYTYPE: only under a word (`set_flags`, word.rs), derived by `ScriptFlags::gates`.
 ```
 
 ## Related Documentation
