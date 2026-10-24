@@ -96,7 +96,7 @@ The wallet wire read nine more `u32` fields as a varint and cast them, so
 input's `sequenceNumber`, an action's `version` and `lockTime`
 (`wallet/wire/encoding.rs`), `getHeaderForHeight`'s `height`
 (`wallet/wire/processor.rs`), and `totalActions`, `totalOutputs` and the two
-`totalCertificates` (`listCertificates`, `discoverByIdentityKey`) in the
+`totalCertificates` (`listCertificates`, and the one parser both discover methods share) in the
 results (`wallet/wire/transceiver.rs`). The keeper's reading of #120 by its own
 reasoning: each is a `u32` by the transaction format or by BRC-100's
 `PositiveIntegerOrZero` (at most `2^32 - 1`, `ed1b015` `wallet/0100.md:393-401`;
@@ -108,7 +108,7 @@ the field as the frame's table names it. No valid byte reads differently.
 Pinned by `tests/wire_u32_field_bounds_tests.rs`, one test per site
 (`*_above_u32_max_is_refused_not_truncated`), each RED on the pre-fix code;
 a total drives the count of entries read after it, so its `u32::MAX` is shown
-accepted by the reader going on to the first entry.
+accepted by the reader going on to the entry after it.
 
 ### Notes: cross-SDK parity
 
