@@ -30,13 +30,16 @@ precomputed basepoint tables.
 
 ### Notes: cross-SDK parity
 
-For a digest at or above n, k256 0.14 seeds the RFC 6979 nonce with the
-digest reduced mod n, as the RFC's `bits2octets`, libsecp256k1 (bitcoin-sv
-v1.2.3 `src/secp256k1/src/secp256k1.c:489-501`), `@bsv/sdk` 2.0.16 and the Go
-SDK do; k256 0.13 seeded it with the raw digest. The signature bytes for such
-a digest change (both verify); every digest below n signs as before.
-`rfc6979_digest_ge_n_der_is_pinned` (`tests/ec_tests.rs`) pinned the 0.13
-bytes and fails on this tree until the owner rules on the new pin.
+For a digest at or above n, k256 0.14's deterministic signature is the one
+`@bsv/sdk` 2.0.16 (`ECDSA.sign`) and the Go SDK (`signRFC6979`, the clone at
+`2ca481c`) produce: derived with both on 2026-10-24 for the pinned key and
+digest, `3045022100dd92…cf39`, byte for byte. k256 0.13 signed that regime
+differently, which this crate pinned and listed as a divergence; the pin
+(`rfc6979_digest_ge_n_der_is_pinned`, `tests/ec_tests.rs`) now holds the
+references' bytes and the divergence left the list (the captain's ruling
+under rule 1). Every digest below n signs as before. Which step of the nonce
+derivation differed between the two k256 lines is not stated here: the
+derivation is the evidence, not a reading of the libraries.
 
 ## [0.8.2] - 2026-10-23
 
