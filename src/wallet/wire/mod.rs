@@ -84,6 +84,27 @@ pub use transceiver::WalletWireTransceiver;
 
 use crate::Error;
 
+// The index reader lives here, not in encoding.rs: that file is held at its
+// recorded line limit by the ratchet (docs/RATCHETS.md).
+impl WireReader<'_> {
+    /// Reads an unsigned varint carrying an output or input index.
+    ///
+    /// An index is a `u32` by the transaction format, so a value above
+    /// `u32::MAX` is refused with the field named, never truncated to another
+    /// index.
+    pub(crate) fn read_var_int_index(&mut self, field: &str) -> Result<u32, Error> {
+        let value = self.read_var_int()?;
+        u32::try_from(value).map_err(|_| {
+            Error::WalletError(format!(
+                "invalid {}: expected at most {}, got {}",
+                field,
+                u32::MAX,
+                value
+            ))
+        })
+    }
+}
+
 /// Transport abstraction for wallet wire protocol.
 ///
 /// Implementations of this trait handle the actual transmission of binary
