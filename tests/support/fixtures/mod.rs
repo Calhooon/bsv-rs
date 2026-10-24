@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-pub const BRC_PIN: &str = "5119a9b5148e9ec90eb4865b16f9f732a29703df";
+pub const BRC_PIN: &str = "ed1b015bac53106ff34e5d1831acda378cbe5c04";
 
 // Count entries, not bytes or assertions. A new/dropped case changes this census.
 pub const COUNTS: [(&str, usize, usize); 5] = [

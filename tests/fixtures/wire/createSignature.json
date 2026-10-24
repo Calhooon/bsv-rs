@@ -199,7 +199,7 @@
   ],
   "references": [
     {
-      "commit": "5119a9b5148e9ec90eb4865b16f9f732a29703df",
+      "commit": "ed1b015bac53106ff34e5d1831acda378cbe5c04",
       "document": "wallet/0100.md",
       "repository": "bsv-blockchain/BRCs",
       "section": "ABI Specification / Method Calls Specification / 15. createSignature"
