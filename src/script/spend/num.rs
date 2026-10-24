@@ -11,7 +11,7 @@ use super::Spend;
 impl Spend {
     /// The script-number length limit in force: `None` in the TypeScript
     /// default mode (the SDK reads a number of any length); under a word the
-    /// reference's limit ([`ScriptFlags::max_script_num_length`]) for the
+    /// reference's limit ([`ScriptFlags::max_script_num_length`](crate::script::ScriptFlags::max_script_num_length)) for the
     /// coin's era, following
     /// [`set_utxo_after_chronicle`](Self::set_utxo_after_chronicle), and on
     /// the mempool path the policy of

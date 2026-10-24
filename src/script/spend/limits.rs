@@ -32,7 +32,7 @@ impl Spend {
     /// is `Some`, in every mode. Otherwise, in the TypeScript default mode,
     /// 32,000,000 bytes for each stack apart, counting the bytes alone, as
     /// that SDK counts; under a word, 100,000,000 bytes on the node's count,
-    /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`] bytes per
+    /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`](crate::script::flags::STACK_ELEMENT_OVERHEAD) bytes per
     /// element (the node's policy default, `src/policy/policy.h:153`, on the
     /// block path as on the mempool path: a node's block-path budget is its
     /// operator's mandatory `-maxstackmemoryusageconsensus`,
@@ -57,7 +57,7 @@ impl Spend {
     /// interpreter cannot know: the local budget declines instead,
     /// [`memory_limit`](Self::memory_limit)); on the mempool path the policy of
     /// [`set_stack_memory_policy`](Self::set_stack_memory_policy)
-    /// ([`ScriptFlags::max_stack_memory_usage`]). A growth that would take the
+    /// ([`ScriptFlags::max_stack_memory_usage`](crate::script::ScriptFlags::max_stack_memory_usage)). A growth that would take the
     /// node's count above it is refused before it happens, as the reference
     /// refuses it (`limitedstack.cpp:202-205`, `SCRIPT_ERR_STACK_SIZE`,
     /// `interpreter.cpp:1815-1817`): `Stack size limit exceeded: N bytes, the
