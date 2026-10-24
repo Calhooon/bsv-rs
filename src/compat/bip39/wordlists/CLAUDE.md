@@ -66,7 +66,7 @@ The file digests are pinned in `tests/compat_bip39_wordlist_files.rs`. To check 
 
 ## Boundary Words
 
-| Wordlist | First Word | Last Word |
+| Wordlist | Word 0 | Word 2047 |
 |----------|-----------|-----------|
 | `ENGLISH` | abandon | zoo |
 | `CHINESE_SIMPLIFIED` | 的 | 歇 |
@@ -84,8 +84,8 @@ The file digests are pinned in `tests/compat_bip39_wordlist_files.rs`. To check 
 
 ## Tests
 
-- `mod.rs` (4 unit tests): English integrity at indices 0, 1, 2046, 2047; English ordering; all nine have 2048 words; every list's first and last words.
-- `tests/compat_bip39_wordlist_files.rs` (10): per language, the file's sha256, the file's lines equal to the `static` element for element, and the first and last words; `verify_english_wordlist()`.
+- `mod.rs` (4 unit tests): English integrity at indices 0, 1, 2046, 2047; English ordering; all nine have 2048 words; every list's words at index 0 and 2047.
+- `tests/compat_bip39_wordlist_files.rs` (10): per language, the file's sha256, the file's lines equal to the `static` element for element, and the words at index 0 and 2047; `verify_english_wordlist()`.
 - `tests/compat_bip39_tests.rs` (29): the TREZOR vectors and the cross-SDK cases through `Mnemonic`.
 
 Never edit a `.txt` to make a test pass: a changed word is a changed mnemonic for every user of that language.

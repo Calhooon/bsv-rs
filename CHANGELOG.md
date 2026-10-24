@@ -29,10 +29,17 @@ adds, so the pedantic census stays where it was.
 
 The English, Chinese Simplified, Chinese Traditional, Czech and Italian files
 are byte-identical to `bitcoin/bips@100ba872` `bip-0039/`. Upstream's French,
-Japanese, Korean and Spanish files are Unicode NFD; this crate's arrays have
-always been their NFC form, and the files keep that (a seed is unchanged
-either way, `to_seed` normalizes to NFKD; the phrase this crate prints is
-NFC, as before).
+Japanese, Korean and Spanish files are Unicode NFD, as the Go SDK ships them
+(`go-sdk@2ca481c` `compat/bip39/wordlists/{french,japanese,korean,spanish}.go`,
+its `init` checking upstream's crc32) and as BIP-39 asks of a wordlist
+(`bip-0039.mediawiki:86-87` at that commit: NFKD); this crate's arrays have
+always been their NFC form, and the files keep that, a refactor carrying no
+behavior change. The behavior it keeps: `Mnemonic::word_index` compares bytes,
+so an NFD phrase from Go or a Trezor-style wallet is refused here as
+`InvalidMnemonicWord` and never reaches `to_seed`; a phrase that parses seeds
+the same either way (`to_seed` normalizes to NFKD). The fix, normalizing both
+sides of the lookup, changes what a phrase is and waits on the owner's word
+(the follow-up issue in CLAUDE.md's divergence list).
 
 ### Changed: the transport fault typed end to end (#87)
 
