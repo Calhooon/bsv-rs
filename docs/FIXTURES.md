@@ -14,8 +14,7 @@ cargo test --features "full,http" --test fixtures_replay --locked
 
 The library currently ignores `Cargo.lock`. If no lock is available, resolve
 dependencies with `cargo generate-lockfile` before the locked command. The CI
-job does this only when the checkout has no lock. Lane builds use an external
-manifest and keep that generated file outside the worktree.
+job does this only when the checkout has no lock.
 
 Every file has `schema_version`, pinned `references`, and named `cases`.
 Each case contains its `input` and exact `expected` output. For example,
@@ -130,13 +129,19 @@ by editing the shared vectors or silently rewriting recorded fields.
 
 ## References
 
-All BRC citations use the same full commit:
-`bsv-blockchain/BRCs@5119a9b5148e9ec90eb4865b16f9f732a29703df`
-(2026-10-19). Read the pinned git object, not a BRC working tree:
+All BRC citations use the line's pin, the same full commit:
+`bsv-blockchain/BRCs@ed1b015bac53106ff34e5d1831acda378cbe5c04`
+(2026-10-05; the stack's PROVENANCE, the keeper's word of 2026-10-23). Read
+the pinned git object, not a BRC working tree:
 
 ```sh
-git -C "$HOME/bsv/brcs" show 5119a9b:wallet/0100.md
+git -C "$HOME/bsv/brcs" show ed1b015:wallet/0100.md
 ```
+
+Upstream `5119a9b` (2026-10-19, not on the line) reads the same for every
+section cited here except listOutputs' `totalOutputs` and `spendable` and
+internalizeAction's `customInstructions` bound (bsv-rs #117); a re-pin is the
+keeper's recon and the owner's word, taken by the three crates in one step.
 
 | Surface | Pinned document and sections |
 | --- | --- |
@@ -171,24 +176,28 @@ rather than a BRC violation.
 | Finding | Recorded behavior | BRC citation |
 | --- | --- | --- |
 | F1 | Calls 1 through 7 and 17 through 22 are processor refusal stubs. The client and HTTP methods exist. | Sections 1 through 7, 17 through 22 |
-| F2 | Linkage has no transceiver methods. Its processor ignores `privileged` and `privilegedReason`, and writes encrypted data before the public keys; the BRC table puts the public keys ahead of encrypted data. | Sections 9 and 10 |
-| F3 | The header processor prefixes its 80 bytes with a length, while the client treats that length as a header byte. The recorded header has 81 bytes. | Section 26, Return Values |
+| F2 | Linkage has no transceiver methods. Its processor ignores `privileged` and `privilegedReason`, and writes encrypted data before the public keys; the BRC table puts the public keys ahead of encrypted data. | Sections 9 and 10 (`wallet/0100.md:2008`, `:2036` at `ed1b015`) |
+| F3 | The header processor prefixes its 80 bytes with a length, while the client treats that length as a header byte. The recorded header has 81 bytes. | Section 26, Return Values (`wallet/0100.md:2440`) |
 | F4 | `write_wallet_certificate` writes type, serial, subject, certifier, outpoint, fields, then raw signature. The transceiver certificate reader expects type, subject, serial, certifier, outpoint, length-prefixed signature, then fields. Both acquisition cases and the populated list/discovery cases record `ReaderUnderflow`. | Sections 17, 18, 21, 22 |
 | F5 | HTTP crypto requests use `protocolId` and `keyId`, while the BRC and CLI use `protocolID` and `keyID`. Direct-sign and direct-verify hashes are hex strings rather than byte arrays. | Sections 8, 10 through 16; The Wallet Interface |
 | F6 | HTTP uses `inputBeef`, `returnTxidOnly`, byte-array TXIDs in create/sign results and options, and hex BEEF/AtomicBEEF and signable references. The BRC uses `inputBEEF`, `returnTXIDOnly`, hex TXIDs, byte-array BEEF, and base64 references. | Sections 1, 2, 5, 6; data types BEEF, AtomicBEEF, TXIDHexString, Base64String |
 | F7 | HTTP certificate objects use `certificateType` where the BRC uses `type`. Certificate listing uses a nested `certificate` wrapper. | Sections 17 through 22; The Wallet Interface |
 | F8 | HTTP linkage results use nested `linkage`, and specific linkage uses a `protocol` object and `keyId`. The BRC's result fields are flat with `protocolID` and `keyID`. | Sections 9 and 10; The Wallet Interface |
-| F9 | Optional integer fields use ZigZag in the Rust writer (`10` becomes `20`); the BRC table calls them VarInt values. The BRC's VarInt section specifies unsigned CompactSize and does not specify this transformation. | ABI Specification, VarInt Encoding; sections 1, 2, 4, 6, 18, 21, 22 |
-| F10 | `SendWithResultStatus` uses 0/1/2 for unproven/sending/failed. The BRC-100 table names 1/2/3. | Section 1, Return Values; section 2 |
-| F11 | Wire drops the Rust-only extra create-action result fields and prove-certificate `certificate`/`verifier` fields. The HTTP result retains them. Wire output listings read `spendable` as true even when the supplied Rust result had false. | Sections 1, 6, 19; surface projection, not a claim about valid wallet results |
+| F9 | Optional integer fields use ZigZag in the Rust writer (`10` becomes `20`); the BRC table calls them VarInt values. The BRC's VarInt section specifies unsigned CompactSize and does not specify this transformation. | ABI Specification, VarInt Encoding (`wallet/0100.md:1620`); sections 1, 2, 4, 6, 18, 21, 22 |
+| F10 | `SendWithResultStatus` uses 0/1/2 for unproven/sending/failed. The BRC-100 table names 1/2/3. | Section 1, Return Values; section 2 (`wallet/0100.md:1717`) |
+| F11 | Wire drops the Rust-only extra create-action result fields and prove-certificate `certificate`/`verifier` fields. The HTTP result retains them. Wire output listings read `spendable` as true even when the supplied Rust result had false; at `ed1b015` the wire's `spendable` is "Always `1`" (`wallet/0100.md:1954`), so the wire agrees with the line and the difference is the Rust type's `false` (and upstream `5119a9b`, which allows it). | Sections 1, 6, 19; surface projection, not a claim about valid wallet results |
 | F12 | Non-busy string error codes become `WalletError` containing HTTP status and the raw body; only numeric codes get the special code/description mapping. | Error Handling and Validation; recorded `brc_string_refusal` |
 
 The public Rust crypto argument types also cannot express all BRC optional
 `privileged`, `privilegedReason`, and `seekPermission` fields. Those unavailable
 arguments are a coverage limit; adding them would change a public API and is
-outside this lane. The CLI envelope comparison used the local #69 lane's
-`docs/WIRE.md` and `tests/wire/` at `512c59b`; comparison against its eventual
-`origin/beta` landing is still a captain check.
+outside this lane. The CLI envelope comparison was re-run by the cold review against the CLI's
+landed fixtures (bsv-wallet-cli beta `d93e077`, `tests/wire/*.json`,
+`docs/WIRE.md`); the differences in request bodies and response shapes it found
+(the BEEF, transaction and txid encodings of createAction, signAction and
+internalizeAction; `protocolID`/`keyID` casing on eight calls;
+`hashToDirectlySign`'s encoding) are recorded on bsv-rs #105 as items 5 to 8,
+beside the four shapes already there, and are not fixed here.
 
 The fixture strategy addresses the stack's six tests as follows: fixed bounded
 cases and streaming chunk checks address T1; merkle roots retained beside
