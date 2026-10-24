@@ -1,4 +1,5 @@
 use super::*;
+use crate::primitives::BigNumber;
 
 const N: &str = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141";
 const HALF: &str = "7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0";

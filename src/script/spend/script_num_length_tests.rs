@@ -1,5 +1,6 @@
 use super::*;
 use crate::primitives::to_hex;
+use crate::primitives::BigNumber;
 use crate::script::flags::ProtocolEra;
 
 const PUBKEY: &str = "035935f55855afd8c999bdb5a8d08ae8e73b7618e200d4ef7687cd55d3c2e4c9d7";
