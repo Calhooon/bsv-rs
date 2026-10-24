@@ -31,6 +31,130 @@ functions over 60 lines stay 93. The nightly's mutation surface
 (`src/script/**/*.rs`) already covers the new files and no per-file floor
 named `spend.rs`.
 
+### Changed: the whole-BEEF reader is a mode of the streaming reader (#86)
+
+Two readers were two parsers: `Beef::from_binary` (with `from_hex`,
+`from_reader`, `from_binary_with_limits`, and through it
+`Transaction::from_beef` and `from_atomic_beef`) read a BEEF with its own
+`Reader` code, `MerklePath::from_reader` and `BeefTx::from_reader`, while
+`beef_stream` read it with `BeefDecoder`. They disagreed. The differential
+`tests/beef_two_readers_agree.rs` feeds every BEEF the tree holds (the
+fixtures, the vectors, the Lean's 49 rows, the fuzz seeds, the ts-stack
+corpus when `BSV_CONFORMANCE_DIR` is set, a deep chain, and from each of
+them every prefix, three single-byte changes at every byte and the
+transactions in reverse order) to `Beef::from_binary` then
+`Beef::verify_structure`, and to `verify_stream_structure`. On 0.9.0's tree:
+64,370 inputs, 29,726 disagreements in 85 classes. Now: 0, and 31 inputs in
+the one stated difference below.
+
+The whole reader is the streaming reader's decoder in a collect mode
+(`BeefDecoder::collecting`, crate-private): `src/transaction/beef/collect.rs`
+builds the `Beef` from the decoder's elements in one pass, the BUMPs by
+`Bump::to_merkle_path` (each level's leaves by offset, as before), the
+transactions from the bytes the decoder read, in the order written. One
+parser, one set of bounds, one set of refusals. The collect mode yields a
+transaction whatever its content and keeps the decoder's refusal of it
+beside the collection, so a BEEF whose bytes are a frame still parses and
+`verify_structure` judges it, as it has since 0.4.1; each element is also
+folded into a structure-only `BeefIndex`, so a BEEF whose bytes are refused is
+refused with the stream's verdict: the earliest refusal of the reading.
+`verify_structure` judges the entries in the order held, one pass, as the
+decoder and the fold judge them (`src/transaction/beef/in_memory.rs`: the
+stream's `bump_root` on a `MerklePath`, its `check_transaction` on a
+`BeefTx`, the atomic table). `beef.rs` keeps the type, the writers, the
+merges and the public functions; `merkle_path_root`, `wire_hash` and
+`Bump::to_merkle_path` moved from `beef_stream.rs` to `in_memory.rs` (the
+method's path is unchanged). No public item was renamed, retyped or moved: a
+scratch crate naming every public item of `beef`, `beef_stream` and
+`beef_tx`, each fn at its exact signature, each pub-field struct by literal,
+each enum matched exhaustively, compiles against 0.9.0 and this tree.
+
+What moved, each where the readers disagreed and the whole path now says
+what the stream said:
+
+- **The text of a parse refusal is the stream's**: `BEEF error: invalid BEEF
+  at byte N: Reason`, the variant `Error::BeefError`, for every BEEF whose
+  bytes are no frame. Through 0.9.0 the whole reader answered
+  `Error::ReaderUnderflow`, `BeefError("Invalid BEEF version: 0x...")`,
+  `MerklePathError(...)` ("Path cannot be empty", "Missing hash at height",
+  "Invalid tree height", "Duplicate offset", `MissingSibling { .. }`),
+  `CryptoError` ("non-canonical varint", "exceeds maximum usize"), with no
+  offset. Migration: match `Error::BeefError(m)` and read the offset and the
+  kind from `m`. The three tests that asserted the old text moved to the
+  stream's in their own commit:
+  `a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing`
+  (`beef_limits`: `ReaderUnderflow`, now `Truncated { needed: 1 }` at the
+  byte the first entry was due), `beef_and_merkle_path_agree_on_both_owned_bodies`
+  (`merkle_path_lone_leaf`: `MerklePathError("MissingSibling ...")`, now at
+  byte 12), `the_whole_path_refuses_a_lone_leaf_at_an_offset_other_than_0`
+  (`beef_stream`).
+- **Refused by the parse, read before**: a V2 format byte other than 0, 1
+  or 2 (read as a raw transaction), a V1 has-BUMP byte other than 0 or 1
+  (read as an index), a BUMP leaf flag other than `00`, `01` or `02` (read
+  by its bits): `BadFlag`; a leaf offset outside its level:
+  `OffsetOutsideTree`; a BUMP above a `u32` height, which was cut to its low
+  32 bits and its root keyed there: `RootNotCarried` at the BUMP, the
+  stream's refusal under a chain's headers (the in-memory height is a `u32`;
+  `a_bump_above_a_u32_height_is_refused_not_cut_to_its_low_bits`, red on
+  0.9.0).
+- **Refused by `verify_structure`, accepted before**: the node's rules on a
+  transaction's content, which the stream applies since 0.5.0 (bsv-stack-lean
+  #68) and the
+  whole path never did: an unproven coinbase, a value or a running total
+  outside `MoneyRange`, a null outpoint in a regular transaction, a repeated
+  outpoint (`UnprovenCoinbase`, `ValueOutOfRange`, `NullOutpoint`,
+  `DuplicateInput`).
+- **Read by the parse, refused before**: a BUMP that carries one leaf offset
+  twice and whose walk the stream accepts (`MerklePath::new_unchecked`'s
+  "Duplicate offset"). `MerklePath::from_binary` still refuses it.
+- **The kind named when a BEEF holds two faults** is the one the stream
+  meets first: the parse's for an earlier element's content or fold, and
+  `verify_structure`'s in the order held (through 0.9.0: no input before any
+  BUMP index, every stub before any BUMP index, every BUMP index before any
+  input).
+
+The one stated difference: a transaction written ahead of the parent it
+spends. The stream reads the order written and refuses the input
+(`InputNamesNoElement`, BRC-62's dependency order); `verify_structure` sorts
+first, as `@bsv/sdk`'s `Beef.verifyValid` does (`ts-stack@4d0ea63`
+`packages/sdk/src/transaction/Beef.ts:1054-1088`), and accepts or names the
+next fault. The differential checks each such input is exactly that.
+
+`fuzz_beef_parser` drives both entry points on every input and asserts they
+agree, the order aside: 60 seconds, 178,958 runs, no disagreement and no
+crash.
+
+The cost, `Beef::from_binary` alone 17 to 20 percent faster, and parse then
+`verify_structure` 10 to 13 percent slower (the node's transaction rules
+the whole path never ran, and the txid hash, which the old parse computed
+for its index, now computed by the first `txid()`), on the
+`benches/beef_stream.rs` fixtures of 1 MB and 10 MB, p50 of 30 runs, load
+average 4.3 to 5. The streaming reader's bench is unchanged within 3
+percent.
+
+### Fixed: a read BEEF entry names each input txid once (#86)
+
+`BeefTx::update_input_txids` appended without clearing, and the reader
+called it twice for an unproven raw transaction (`from_raw_tx`, then again
+once the parse was set): `BeefTx::input_txids` named each parent twice and
+`SortResult::missing_inputs` a missing parent twice; a second
+`set_bump_index` did the same. Each call now computes the list afresh.
+`a_read_entry_names_each_input_txid_once` (`beef_tx`), red on 0.9.0.
+
+### Notes: cross-SDK parity (#86)
+
+The whole-BEEF path follows the streaming reader where the reference does
+not (CLAUDE.md's divergence list, 0.4.2); the merge adds the stream's
+existing rules to it where TS reads otherwise (`ts-stack@4d0ea63`): TS
+reads any V2 format byte other than 2 as a raw transaction
+(`packages/sdk/src/transaction/BeefTx.ts:293-301`), any nonzero V1 has-BUMP
+byte as an index (`:306`), and a leaf flag by its bits
+(`MerklePath.ts:133-140`), where both readers here refuse `BadFlag`; TS's
+`verifyValid` does not apply the node's transaction rules; TS refuses a
+repeated leaf offset (`MerklePath.ts:221`), which both readers here accept
+when the walk does. The order of the transactions stays the reference's
+(sorted) on the whole path.
+
 ### Changed: the BIP-39 wordlists are data, not code (#89)
 
 The nine `src/compat/bip39/wordlists/<language>.rs` tables (11,055 lines of
