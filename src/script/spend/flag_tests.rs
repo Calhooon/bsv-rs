@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::*;
 use crate::primitives::from_hex;
 use crate::script::flags::ProtocolEra;

@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::crypto::has_forkid_bit;
 use super::*;
 use crate::script::flags::ProtocolEra;
