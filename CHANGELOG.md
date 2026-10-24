@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the transport fault typed end to end (#87)
+
+0.8.2 (#73) typed the bare 502, 503, 504, connection error and timeout in
+`HttpWalletJson` only. Every other transport classified a failure by where it
+happened, not by what it meant: every broadcaster send error was
+`NETWORK_ERROR`, so a wallet could not tell a refused connection (the inputs
+may be released) from a timeout after the transaction was written (the stub
+relayed it: the inputs must be held; witness #65, W-SDK-1); each broadcaster
+decoded the body before it read the status, so a 429 with a `text/plain` body
+was `PARSE_ERROR` and its `Retry-After` was read nowhere (witness #66,
+W-SDK-2); the auth transports answered `AuthError(String)` for a fault.
+
+One classifier (`src/transaction/broadcasters/transport_fault.rs`,
+`pub(crate)`) reads a `reqwest::Error`'s kind and an answer's status, before
+the body, into the class `TransportFault` (new, `#[non_exhaustive]`,
+re-exported at the crate root and from `transaction`): `NeverSent` (no byte
+left: a connection never made, a request that could not be built),
+`MayHaveBeenReceived` (a timeout, a reset or a body cut after the request was
+written, a 502, 503 or 504), `RateLimited { retry_after_ms }` (a 429, or a 503
+with `Retry-After`, whatever the body; delta seconds or an HTTP date,
+saturating, `None` when absent or unreadable). On wasm32 the fetch API does
+not say whether a connection was made, so a send failure there is never
+`NeverSent`. Every HTTP site of the four transport directories asks it; none
+classifies by text. Busy stays the body's word. What each directory answers:
+
+- **Broadcasters** (ARC, Teranode, WhatsOnChain): `BroadcastFailure.code` is
+  `NEVER_SENT`, `MAY_HAVE_BEEN_RECEIVED` or `RATE_LIMITED` beside the
+  services' own codes; `txid` is set; `more` is `{"status": n}` for an
+  answered fault and `{"status": 429, "retry_after_ms": n|null}` for a rate
+  limit; `BroadcastFailure::transport_fault()` reads the class back. A 500, a
+  4xx and a 2xx are read as before (an ARC 500 with no body is still
+  `PARSE_ERROR`, #65's S2 half). No field was added to the struct.
+- **Auth transports**: `Error::TransportFault { fault, status, detail }`
+  (new variant; `Error` is `#[non_exhaustive]`, so it is additive) for a send
+  or body-read fault on both `SimplifiedFetchTransport` paths, a handshake
+  answered 429, 502, 503 or 504, and a Socket.IO sink failure
+  (`MayHaveBeenReceived`); the detail is the old `AuthError` text. Any other
+  handshake status stays `AuthError`; a General answer of any status is still
+  passed to the caller as its `HttpResponse`. The WebSocket transport keeps
+  `TransportError` (below).
+- **Wallet substrates**: `Error::WalletTransport` as in 0.8.2, now from both
+  `HttpWalletJson` and `HttpWalletWire` (which answered `WalletError` for a
+  connection error, a timeout and a 502, 503 or 504), and for a body cut; a
+  429 without a busy code is `Error::TransportFault` with `RateLimited` and
+  its wait (was `WalletError`). `Error::transport_fault()` reads the class of
+  either variant (`WalletTransport` as `MayHaveBeenReceived`; busy is `None`).
+- **Chain trackers**: `ChainTrackerError` is exhaustive, so no typed class:
+  a send fault stays `NetworkError` with ` (NEVER_SENT)` or
+  ` (MAY_HAVE_BEEN_RECEIVED)` after the detail; a fault status stays
+  `InvalidResponse` with the class, `HTTP 429 Too Many Requests
+  (RATE_LIMITED, retry_after_ms 5000)`; a body cut is `NetworkError` (was
+  `InvalidResponse`). A fault is never `Ok(false)`.
+
+**Migration.** A caller that matched `code == "NETWORK_ERROR"` matches
+`failure.transport_fault().is_some()` (or the three words); one that read a
+Teranode or WhatsOnChain 429, 502, 503 or 504 as the code `"429"` (etc.)
+reads `RATE_LIMITED` or `MAY_HAVE_BEEN_RECEIVED` and `more["status"]`. A caller that
+matched `Error::AuthError` text for "HTTP request failed" or "Auth endpoint
+returned 5xx" matches `Error::TransportFault { .. }` (the detail is the same
+text); one that matched `HttpWalletWire`'s `WalletError("HTTP request
+failed...")` matches `Error::WalletTransport { .. }`. A `match` on `Error`
+already has a wildcard arm (`#[non_exhaustive]`).
+
+Tests, RED on the pre-fix sites (the type present, the sites unchanged) and
+GREEN after: `tests/transport_fault_broadcasters.rs` (8; #65's and #66's
+witnesses as `a_timeout_after_the_body_was_written_may_have_been_received`
+and `a_429_with_retry_after_and_a_text_body_is_rate_limited_with_its_wait`),
+`transport_fault_trackers.rs` (5), `transport_fault_wallet.rs` (5),
+`transport_fault_auth.rs` (8). Two existing tests,
+`test_arc_broadcast_with_config_timeout` and `test_teranode_broadcast_timeout`,
+pinned `NETWORK_ERROR` for a timeout after the request was written, which is
+#65's defect; they now read `MAY_HAVE_BEEN_RECEIVED` (their own commit).
+
+### Notes: cross-SDK parity
+
+The references do not type the fault. TS's `ARC.broadcast` answers code
+`'500'` for a thrown fetch and the status as a string for a non-2xx
+(`ts-sdk@9e3ede6` `src/transaction/broadcasters/ARC.ts:189-195, 219-222`);
+`HTTPWalletJSON` throws an `Error` of a JSON text for a non-2xx (`:87-107`);
+`SimplifiedFetchTransport` throws its network error (`:66, 147`); nothing
+under `src/` reads `Retry-After`. Go's `Arc.BroadcastCtx` answers `"500"` for
+any error of `ArcBroadcast`, which decodes the body as JSON before it records
+the status, so a 429 with a text body is `"500"` (`go-sdk@2ca481c`
+`transaction/broadcaster/arc.go:162-180, 245-249`), and the status as a
+string otherwise (`:318-321`); no `Retry-After`. This crate goes beyond both
+by the stack's rule (the owner's, matrix rows 26 and 30, `lean/Sdk.lean`):
+busy is the body's word, a 502, 503 or 504 without it, a connection error or
+a timeout is a fault with no promise, a broadcaster's fault says whether the
+request was sent, and a rate limit is never a verdict. The wire, every
+request the crate sends and every success path are unchanged.
+
 ### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
 
 RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time

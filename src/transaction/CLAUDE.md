@@ -242,6 +242,7 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 pub enum BroadcastStatus { Success, Error }
 // BroadcastResponse: status, txid, message, competing_txs. Constructors: success(), success_with_competing()
 // BroadcastFailure: status, code, txid, description, more. Constructors: new(), with_txid(), with_details()
+// transport_fault(): the class of NEVER_SENT, MAY_HAVE_BEEN_RECEIVED, RATE_LIMITED (wait from more's retry_after_ms), as a TransportFault (#87)
 // Helpers: is_broadcast_success(), is_broadcast_failure()
 ```
 
@@ -433,7 +434,8 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 | `FeeModelError` | Input missing unlocking script or template |
 | `BeefError` | Invalid version (not V1/V2), missing atomic txid, txid not in BEEF |
 | `MerklePathError` | Empty path, tree height over 64, duplicate offset, invalid offset at height, mismatched roots |
-| `ChainTrackerError` | `NetworkError`, `InvalidResponse`, `BlockNotFound(height)`, `Other` |
+| `ChainTrackerError` | `NetworkError`, `InvalidResponse`, `BlockNotFound(height)`, `Other` (exhaustive: a fault's class is stated in the detail, #87) |
+| `TransportFault` | `NeverSent`, `MayHaveBeenReceived`, `RateLimited { retry_after_ms }` (`#[non_exhaustive]`, `code()` the broadcasters' word; re-exported from `crate::error`, #87) |
 
 ## Related Documentation
 

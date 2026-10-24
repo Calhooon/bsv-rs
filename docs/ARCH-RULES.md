@@ -108,11 +108,24 @@ as whole source lines, with duplicate-count ceilings:
 | `src/transaction/broadcasters/arc.rs` | 2 | Structured ARC status values |
 
 These are protocol fields, not error-message exceptions. No file is exempt
-as a whole. #87 owns the review of these entries alongside typed transport
-errors; error-message allowances must be empty when it lands. Legitimate
-protocol comparisons need not be rewritten into different syntax merely to
-empty a conservative scanner's list. Overlay retry and reputation policy
-are outside this rule's specified four-directory scope.
+as a whole. Legitimate protocol comparisons need not be rewritten into
+different syntax merely to empty a conservative scanner's list. Overlay retry
+and reputation policy are outside this rule's specified four-directory scope.
+
+**#87's review (2026-10-24).** Each of the 17 sites read where it stands, and
+each kept as a protocol comparison: the four originator checks compare a
+caller's URL scheme (`http://`, `https://`) to build an `Origin` header; the
+two WebSocket checks a configured URL's scheme (`ws://`, `wss://`); the six
+lines of `auth/transports/http.rs` header names (`x-bsv-`, `x-bsv-auth`,
+`authorization`, `content-type`) and one the BRC-104 `x-bsv-auth-message-type`
+value `certificateRequest`; the Socket.IO line the `authMessage` event name;
+the two ARC lines the `ORPHAN` word of ARC's structured `txStatus` and
+`extraInfo` (the reference's rule, `ARC.ts:110-180`). None reads an error's
+text: the error-message allowances are empty. Every transport fault is
+classified by type, in one place: `src/transaction/broadcasters/transport_fault.rs`
+reads `reqwest::Error`'s kind and the answer's status (before the body); the
+four directories call it (rule 1 keeps the client in a transport home, and
+`transaction` is the lowest gate the four share). It adds no line to the list.
 
 ## 4. Environment belongs to the caller
 
