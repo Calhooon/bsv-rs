@@ -25,3 +25,17 @@ paths = ['''^fuzz/corpus/''']
 [[allowlists]]
 description = "the fixed test nonce of corpus-gen's auth header seed (#82)"
 regexes = ['''^q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA=$''']
+
+# tests/wallet_brc56_hmac_tests.rs: the six HMAC keys (shared-point X coordinates) of BRC-56's
+# published test vectors (wallet/0056.md at 5119a9b, "never use it for value"), derived from a root
+# key that is the SHA-256 of a public label. Only those six literals are let through, never the file.
+[[allowlists]]
+description = "the six BRC-56 HMAC key vectors (#148)"
+regexes = [
+  '''^b1273850ff41cee365a4d590e3c323822129f66c5a9b2eacb8b9e790e000e396$''',
+  '''^000c82ac78dc853158f24883ccfda332be6ba34f821765357cc4ef2a190a28fd$''',
+  '''^00009dc11102cc72eca3c6e4e232460eac581e9b2cee1bb35c395b635d3f6393$''',
+  '''^1896e0210afac8dbb4ca3bd4ea25c8377d0352ab83e62fe6ffabeca78c1a6113$''',
+  '''^001829e1dd58fc2c45b6edcbb277eecdecbab1c884b42fd779e131fea5881b45$''',
+  '''^0000a52a35523175d6c181e90f463a27cdbf70f4ecf055e912d6fc24ac7d0e3c$''',
+]
