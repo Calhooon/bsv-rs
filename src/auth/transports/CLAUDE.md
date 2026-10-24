@@ -388,12 +388,14 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | Error | Cause |
 |-------|-------|
 | `AuthError("HTTP transport requires the 'http' feature")` | Sending without `http` feature |
-| `AuthError("HTTP request failed: {}")` | Network error from reqwest |
-| `AuthError("Auth endpoint returned {status}: {body}")` | Non-2xx handshake HTTP response |
-| `AuthError("Failed to read auth response: {}")` | Failed to read handshake response body |
+| `TransportFault { fault, status: None, detail: "HTTP request failed: {}" }` | A connection error (`NeverSent`) or a timeout, reset or other send failure (`MayHaveBeenReceived`), both paths (#87); a request that could not be built stays `AuthError` with the same text |
+| `TransportFault { fault, status: Some(s), detail: "Auth endpoint returned {status}: {body}" }` | A handshake answered 429, or 503 with `Retry-After` (`RateLimited` with its wait), or 502, 503, 504 (`MayHaveBeenReceived`); the status read before the body (#87) |
+| `AuthError("Auth endpoint returned {status}: {body}")` | Any other non-2xx handshake HTTP response |
+| `TransportFault`, else `AuthError("Failed to read auth response: {}")` | Failed to read handshake response body |
 | `AuthError("Failed to parse auth response: {} - body: {}")` | Invalid JSON in handshake response |
 | `AuthError("General message must have payload")` | General message missing payload |
-| `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body |
+| `TransportFault`, else `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body (a General answer of any status is passed to the caller as its `HttpResponse`, unchanged) |
+| `TransportFault { fault: MayHaveBeenReceived, status: None, detail: "SocketIoTransport::send: ws: {e}" }` | The Socket.IO sink failed (it cannot say how much of the frame it wrote; was `AuthError`, #87) |
 | `AuthError("Payload too short for ...")` | Malformed payload during deserialization |
 | `AuthError("Invalid ... UTF-8: {}")` | Non-UTF8 string in payload |
 | `AuthError("Empty varint")` | Empty bytes when reading varint |
@@ -403,6 +405,7 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `AuthError("Failed to acquire callback lock")` | Poisoned std::sync::RwLock on callback |
 | `TransportError("base_url is required...")` | WebSocket created with empty URL |
 | `TransportError("WebSocket URL must start with ws://...")` | Invalid WebSocket URL scheme |
+| `TransportError("failed to connect to WebSocket: {}")`, `TransportError("failed to send WebSocket message: {}")` | The WebSocket transport's connection and send failures: a transport variant already, kept as it is (its tests pin it); its `NeverSent`/`MayHaveBeenReceived` split waits on the owner's word (#87) |
 | `TransportError("WebSocket URL must include a host")` | WebSocket URL has no host component |
 | `TransportError("no handler registered")` | WebSocket send before setting callback |
 | `TransportError("failed to connect to WebSocket: {}")` | WebSocket connection failure |

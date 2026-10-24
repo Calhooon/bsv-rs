@@ -32,6 +32,7 @@ Transport layer implementations for auth messages:
 - `http.rs` - SimplifiedFetchTransport for HTTP (BRC-104), MockTransport for testing, HttpRequest/HttpResponse types
 - `websocket_transport.rs` - WebSocketTransport for full-duplex WebSocket communication (requires `websocket` feature)
 - See `transports/CLAUDE.md` for detailed transport documentation
+- A transport fault (a connection error, a timeout, a handshake answered 429, 502, 503 or 504, a Socket.IO sink failure) is `Error::TransportFault { fault, status, detail }`, never `AuthError(String)` (#87); the WebSocket transport keeps `TransportError`
 
 ### utils/
 Utility functions:

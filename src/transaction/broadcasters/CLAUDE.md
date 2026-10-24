@@ -249,11 +249,22 @@ returned if the transaction cannot be serialized to EF format (e.g., missing sou
 
 | Code | Description |
 |------|-------------|
-| `NETWORK_ERROR` | HTTP request failed (timeout, connection error) |
-| `PARSE_ERROR` | Failed to parse response body |
+| `NEVER_SENT` | No byte of the request left (a connection refused, a request that could not be built): the caller may release its inputs |
+| `MAY_HAVE_BEEN_RECEIVED` | A timeout, a connection lost or a body cut after the request was written, or a 502, 503 or 504 (`more` `{"status"}`): the caller holds its inputs |
+| `RATE_LIMITED` | A 429, or a 503 with `Retry-After`, whatever the body (`more` `{"status", "retry_after_ms"}`, the wait `null` when absent or unreadable): never a verdict on the transaction |
+| `PARSE_ERROR` | Failed to parse the body of an answer that is not a fault |
 | `NO_HTTP` | HTTP feature not enabled |
 | `EF_SERIALIZATION_ERROR` | Failed to serialize to EF format (Teranode only) |
 | `{status}` | HTTP status code from service (e.g., "400", "500") |
+
+The three fault words come from the one classifier, `transport_fault.rs`
+(Calhooon/bsv-rs#87; `pub(crate)`, here because a network client lives in a
+transport home and `transaction` is the lowest gate the four homes share):
+it reads the error's kind and the answer's status before the body; every HTTP
+site of the four transport directories asks it, none classifies by text.
+`BroadcastFailure::transport_fault()` reads the class back as a
+`TransportFault`. Until #87 every send error was `NETWORK_ERROR` and the body
+was decoded before the status (a 429 read `PARSE_ERROR`; witnesses #65, #66).
 
 ## Usage Examples
 
