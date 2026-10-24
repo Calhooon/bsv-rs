@@ -194,16 +194,16 @@ impl Certificate {
         };
 
         // Fields
-        let field_count = reader.read_varint()? as usize;
+        let field_count = reader.read_len()?;
         // Each field is >= 2 bytes (name len varint + value len varint); bound
         // the pre-allocation so a bogus count cannot OOM-abort before any read.
         let mut fields =
             HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 2));
         for _ in 0..field_count {
-            let name_len = reader.read_varint()? as usize;
+            let name_len = reader.read_len()?;
             let name = String::from_utf8(reader.read_bytes(name_len)?.to_vec())
                 .map_err(|e| Error::InvalidUtf8(e.to_string()))?;
-            let value_len = reader.read_varint()? as usize;
+            let value_len = reader.read_len()?;
             let value = reader.read_bytes(value_len)?.to_vec();
             fields.insert(name, value);
         }
@@ -344,19 +344,33 @@ impl<'a> BinaryReader<'a> {
     }
 
     fn remaining(&self) -> usize {
-        self.data.len() - self.pos
+        self.data.len().saturating_sub(self.pos)
     }
 
     fn read_bytes(&mut self, n: usize) -> Result<&'a [u8]> {
-        if self.pos + n > self.data.len() {
-            return Err(Error::ReaderUnderflow {
-                needed: n,
-                available: self.remaining(),
-            });
+        // Compared to the bytes remaining, never `pos + n`: a length read
+        // from the input near `usize::MAX` wrapped that sum past the check
+        // (#108).
+        let underflow = Error::ReaderUnderflow {
+            needed: n,
+            available: self.remaining(),
+        };
+        if n > self.remaining() {
+            return Err(underflow);
         }
-        let slice = &self.data[self.pos..self.pos + n];
+        let slice = self.data.get(self.pos..self.pos + n).ok_or(underflow)?;
         self.pos += n;
         Ok(slice)
+    }
+
+    /// Reads a varint length; one that does not fit `usize` (a 32-bit
+    /// target) is refused, never truncated to a shorter length.
+    fn read_len(&mut self) -> Result<usize> {
+        let n = self.read_varint()?;
+        usize::try_from(n).map_err(|_| Error::ReaderUnderflow {
+            needed: usize::MAX,
+            available: self.remaining(),
+        })
     }
 
     fn read_u8(&mut self) -> Result<u8> {
@@ -364,7 +378,7 @@ impl<'a> BinaryReader<'a> {
     }
 
     fn read_remaining(&mut self) -> Vec<u8> {
-        let remaining = self.data[self.pos..].to_vec();
+        let remaining = self.data.get(self.pos..).unwrap_or_default().to_vec();
         self.pos = self.data.len();
         remaining
     }
