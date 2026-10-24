@@ -33,6 +33,7 @@
 ///
 /// Evaluated in each `static`'s initializer, so every `panic!` here is a
 /// compile error on the data, never a runtime one.
+#[allow(clippy::panic)] // #89: called only in the statics' initializers below, so each panic is a compile error on a data file
 const fn parse(text: &'static str) -> [&'static str; 2048] {
     let mut words = [""; 2048];
     let mut rest = text.as_bytes();
