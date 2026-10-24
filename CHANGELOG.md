@@ -307,8 +307,8 @@ bytes (`utf8Bytes(s).length`, `:348-356`). This crate had no internalize
 validator at all. By the owner's word of 2026-10-24 (conform), the new
 `validation::validate_internalize_action_args` refuses one with
 `Error::WalletError("Invalid outputs[i].insertionRemittance.customInstructions:
-must be no more than 1000 bytes, got N")`, the shape of every other length
-refusal in `validation.rs` (bytes by `str::len`, not characters), and
+must be no more than 1000 bytes, got N")`, the shape of the file's byte-length
+refusal (`validate_string_length`) (bytes by `str::len`, not characters), and
 `ProtoWallet`, `WalletClient`, `HttpWalletJson` and `WalletWireTransceiver`
 call it before they act or send. The wire processor's handler does not read
 its arguments yet and is unchanged. The scoped exception is not modelled: no
