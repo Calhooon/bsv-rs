@@ -13,17 +13,27 @@ categories = ["cryptography", "encoding", "parser-implementations"]
 # the workflows and the repository process files are not part of the crate
 exclude = ["/.github/", "/RELEASING.md", "/CLAUDE.md", "/.gitleaksignore"]
 
+# primeorder is named for a feature, never imported (the k256 and p256 lines' comment below)
+[package.metadata.cargo-machete]
+ignored = ["primeorder"]
+
 [dependencies]
 # Hashing
-sha2 = "0.10"
-sha1 = "0.10"
-ripemd = "0.1"
-hmac = "0.12"
-pbkdf2 = { version = "0.12", features = ["hmac"] }
+sha2 = "0.11"
+sha1 = "0.11"
+ripemd = "0.2"
+hmac = "0.13"
+pbkdf2 = { version = "0.13", features = ["hmac"] }
 
 # Elliptic Curves (for later phases)
-k256 = { version = "0.13", features = ["ecdsa", "sha256"] }
-p256 = "0.13"
+# 0.14 for RUSTSEC-2026-0387 (crypto-bigint 0.7). No default features: their `std` turns on
+# `getrandom` 0.4, which has no wasm32-unknown-unknown backend without its own `wasm_js`;
+# keys are drawn from this crate's `getrandom` 0.2 instead (`PrivateKey::random`).
+k256 = { version = "0.14", default-features = false, features = ["alloc", "ecdsa", "sha256", "precomputed-tables"] }
+p256 = { version = "0.14", default-features = false, features = ["alloc", "ecdsa", "precomputed-tables"] }
+# Named only for its `std` feature: the curves' `precomputed-tables` (the basepoint table) need
+# `std` or `critical-section` in it, and the curves' own `std` is the one that brings `getrandom`.
+primeorder = { version = "0.14", default-features = false, features = ["std"] }
 
 # Symmetric Encryption (for later phases)
 aes-gcm = "0.10"
