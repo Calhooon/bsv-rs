@@ -41,17 +41,14 @@ const fn parse(text: &'static str) -> [&'static str; 2048] {
     while i < 2048 {
         let mut end = 0;
         while end < rest.len() && rest[end] != b'\n' {
-            if rest[end] == b'\r' {
-                panic!("a wordlist line carries a CR");
-            }
+            assert!(rest[end] != b'\r', "a wordlist line carries a CR");
             end += 1;
         }
-        if end == rest.len() {
-            panic!("a wordlist has fewer than 2048 LF-terminated lines");
-        }
-        if end == 0 {
-            panic!("a wordlist line is empty");
-        }
+        assert!(
+            end < rest.len(),
+            "a wordlist has fewer than 2048 LF-terminated lines"
+        );
+        assert!(end != 0, "a wordlist line is empty");
         let (word, tail) = rest.split_at(end);
         words[i] = match core::str::from_utf8(word) {
             Ok(word) => word,
@@ -60,9 +57,7 @@ const fn parse(text: &'static str) -> [&'static str; 2048] {
         rest = tail.split_at(1).1;
         i += 1;
     }
-    if !rest.is_empty() {
-        panic!("a wordlist has more than 2048 lines");
-    }
+    assert!(rest.is_empty(), "a wordlist has more than 2048 lines");
     words
 }
 
@@ -101,6 +96,7 @@ pub static SPANISH: [&str; 2048] = parse(include_str!("spanish.txt"));
 /// - Last word is "zoo"
 /// - Array contains exactly 2048 words (enforced by type system)
 #[inline]
+#[must_use]
 pub fn verify_english_wordlist() -> bool {
     ENGLISH.len() == 2048 && ENGLISH[0] == "abandon" && ENGLISH[2047] == "zoo"
 }
