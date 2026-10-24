@@ -90,50 +90,56 @@ impl Spend {
             // overflow ("BigNumber requires N bytes") and clamped the
             // shift count to 63 bits (conformance vectors
             // lshift-truncation.0001/.0003).
-            let len = buf.len();
-            let result: Vec<u8> = if (n as u128) >= (len as u128) * 8 {
-                vec![0u8; len]
-            } else {
-                let byte_shift = (n as usize) / 8;
-                let bit_shift = (n as usize) % 8;
-                let mut out = vec![0u8; len];
-                #[allow(clippy::needless_range_loop)]
-                for i in 0..len {
-                    if opcode == OP_LSHIFT {
-                        let src = i + byte_shift;
-                        let hi = if src < len { buf[src] } else { 0 };
-                        let lo = if bit_shift > 0 && src + 1 < len {
-                            buf[src + 1]
-                        } else {
-                            0
-                        };
-                        out[i] = if bit_shift == 0 {
-                            hi
-                        } else {
-                            (hi << bit_shift) | (lo >> (8 - bit_shift))
-                        };
-                    } else {
-                        // OP_RSHIFT
-                        if i >= byte_shift {
-                            let src = i - byte_shift;
-                            let hi = buf[src];
-                            let carry = if bit_shift > 0 && src >= 1 {
-                                buf[src - 1]
-                            } else {
-                                0
-                            };
-                            out[i] = if bit_shift == 0 {
-                                hi
-                            } else {
-                                (hi >> bit_shift) | (carry << (8 - bit_shift))
-                            };
-                        }
-                    }
-                }
-                out
-            };
+            let result = shifted(&buf, n, opcode);
             self.push_stack(result)?;
         }
         Ok(())
+    }
+}
+
+/// `OP_LSHIFT` / `OP_RSHIFT` on the raw bytes: a width-preserving shift of
+/// `buf` by `n` bits (`n` not negative), the result exactly `buf.len()` bytes.
+fn shifted(buf: &[u8], n: i64, opcode: u8) -> Vec<u8> {
+    let len = buf.len();
+    if (n as u128) >= (len as u128) * 8 {
+        vec![0u8; len]
+    } else {
+        let byte_shift = (n as usize) / 8;
+        let bit_shift = (n as usize) % 8;
+        let mut out = vec![0u8; len];
+        #[allow(clippy::needless_range_loop)]
+        for i in 0..len {
+            if opcode == OP_LSHIFT {
+                let src = i + byte_shift;
+                let hi = if src < len { buf[src] } else { 0 };
+                let lo = if bit_shift > 0 && src + 1 < len {
+                    buf[src + 1]
+                } else {
+                    0
+                };
+                out[i] = if bit_shift == 0 {
+                    hi
+                } else {
+                    (hi << bit_shift) | (lo >> (8 - bit_shift))
+                };
+            } else {
+                // OP_RSHIFT
+                if i >= byte_shift {
+                    let src = i - byte_shift;
+                    let hi = buf[src];
+                    let carry = if bit_shift > 0 && src >= 1 {
+                        buf[src - 1]
+                    } else {
+                        0
+                    };
+                    out[i] = if bit_shift == 0 {
+                        hi
+                    } else {
+                        (hi >> bit_shift) | (carry << (8 - bit_shift))
+                    };
+                }
+            }
+        }
+        out
     }
 }
