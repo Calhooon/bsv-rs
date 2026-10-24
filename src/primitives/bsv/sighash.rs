@@ -1103,6 +1103,12 @@ fn write_script_code_original(w: &mut Writer, script_code: &[u8]) {
 /// parser reads it (`GetOp`, `script.h:164-195`: a `0xab` inside push data is
 /// data), the whole script when it has none. The walk stops where a push is
 /// truncated, as the interpreter's does (`interpreter.cpp:450-451`).
+///
+/// Its one caller is the script templates' signing path, so it compiles only
+/// with `script`: a slice without it (`primitives`, `block`, `compat`, `totp`)
+/// otherwise carries a dead function, and a consumer that denies warnings
+/// cannot build it (#115).
+#[cfg(feature = "script")]
 pub(crate) fn after_last_code_separator(script: &[u8]) -> &[u8] {
     const OP_CODESEPARATOR: u8 = 0xab;
     let mut begin = 0usize;
