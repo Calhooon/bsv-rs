@@ -8,7 +8,9 @@
 
 #![cfg(all(feature = "transaction", feature = "http"))]
 
-use bsv_rs::transaction::{ChainTracker, ChainTrackerError, WhatsOnChainTracker, WocNetwork};
+use bsv_rs::transaction::{
+    ChainTracker, ChainTrackerError, TransportFault, WhatsOnChainTracker, WocNetwork,
+};
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -224,9 +226,17 @@ async fn test_woc_tracker_current_height_server_error() {
 
     assert!(result.is_err(), "Expected error, got: {:?}", result);
     let err = result.unwrap_err();
+    // A bare 503 is a transport fault, not the provider's answer (#87)
     assert!(
-        matches!(err, ChainTrackerError::InvalidResponse(_)),
-        "Expected InvalidResponse, got: {:?}",
+        matches!(
+            err,
+            ChainTrackerError::TransportFault {
+                fault: TransportFault::MayHaveBeenReceived,
+                status: Some(503),
+                ..
+            }
+        ),
+        "Expected TransportFault, got: {:?}",
         err
     );
 }

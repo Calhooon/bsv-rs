@@ -301,36 +301,42 @@ pub(crate) async fn answered(response: Response, txid: &str) -> Result<Response,
 }
 
 // ---------------------------------------------------------------------------
-// The chain trackers' error (`ChainTrackerError` is exhaustive: the class is
-// stated in the detail until it may carry a typed one)
+// The chain trackers' error
 // ---------------------------------------------------------------------------
 
-/// A tracker's failure to send: `NetworkError`, its class stated.
-pub(crate) fn tracker_send_error(e: &reqwest::Error) -> ChainTrackerError {
-    ChainTrackerError::NetworkError(format!("{} ({})", e, delivery(e)))
+fn tracker_fault(fault: TransportFault, status: Option<u16>, detail: String) -> ChainTrackerError {
+    ChainTrackerError::TransportFault {
+        fault,
+        status,
+        detail,
+    }
 }
 
-/// A tracker's failure to read the body: `NetworkError` when the way failed,
-/// else `InvalidResponse`.
+/// A tracker's failure to send: `TransportFault`, `NeverSent` or
+/// `MayHaveBeenReceived`.
+pub(crate) fn tracker_send_error(e: &reqwest::Error) -> ChainTrackerError {
+    tracker_fault(delivery(e), None, e.to_string())
+}
+
+/// A tracker's failure to read the body: `TransportFault` when the way
+/// failed, else `InvalidResponse`.
 pub(crate) fn tracker_body_error(e: &reqwest::Error) -> ChainTrackerError {
     match error_fault(e) {
-        Some(fault) => ChainTrackerError::NetworkError(format!("{} ({})", e, fault)),
+        Some(fault) => tracker_fault(fault, None, e.to_string()),
         None => ChainTrackerError::InvalidResponse(e.to_string()),
     }
 }
 
-/// A tracker's error for an answer that is not a success: `InvalidResponse`
-/// with the status, and the class and wait when the status is a fault.
+/// A tracker's error for an answer that is not a success, the status read
+/// before the body: `TransportFault` with the status when the status is a
+/// fault, else `InvalidResponse`, both `"HTTP {status}"`.
 pub(crate) fn tracker_status_error(response: &Response) -> ChainTrackerError {
     let status = response.status();
-    let detail = match status_fault(status, response.headers()) {
-        Some(TransportFault::RateLimited {
-            retry_after_ms: Some(ms),
-        }) => format!("HTTP {} (RATE_LIMITED, retry_after_ms {})", status, ms),
-        Some(fault) => format!("HTTP {} ({})", status, fault),
-        None => format!("HTTP {}", status),
-    };
-    ChainTrackerError::InvalidResponse(detail)
+    let detail = format!("HTTP {}", status);
+    match status_fault(status, response.headers()) {
+        Some(fault) => tracker_fault(fault, Some(status.as_u16()), detail),
+        None => ChainTrackerError::InvalidResponse(detail),
+    }
 }
 
 #[cfg(test)]

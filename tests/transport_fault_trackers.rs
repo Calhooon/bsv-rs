@@ -1,7 +1,8 @@
 //! The chain trackers' transport fault (Calhooon/bsv-rs#87): a provider's
-//! fault is an error, never a verdict (no `Ok(false)`). `ChainTrackerError` is
-//! exhaustive, so it carries no typed class until the owner's word; the class
-//! and the wait are stated in its detail, the status read before the body.
+//! fault is an error, never a verdict (no `Ok(false)`):
+//! `ChainTrackerError::TransportFault` with its class, its wait and the
+//! answer's status, read before the body; `Transaction::verify` carries it to
+//! `Error::TransportFault`.
 //!
 //! Run with: `cargo test --features "full,http" --test transport_fault_trackers`
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -12,7 +13,7 @@ use std::time::Duration;
 
 use bsv_rs::transaction::{
     BlockHeadersServiceConfig, BlockHeadersServiceTracker, ChainTracker, ChainTrackerError,
-    WhatsOnChainTracker, WocNetwork,
+    TransportFault, WhatsOnChainTracker, WocNetwork,
 };
 use wiremock::matchers::method;
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -66,24 +67,40 @@ async fn answered(answer: ResponseTemplate) -> Vec<(String, ChainTrackerError)> 
     errors_at(&server.uri(), 30_000).await
 }
 
-#[tokio::test]
-async fn a_refused_connection_is_a_network_error_never_sent() {
+/// The typed fault an error must be: its class and status, and its detail
+/// the transport's words with no class appended.
+fn assert_fault(name: &str, err: &ChainTrackerError, class: TransportFault, code: Option<u16>) {
+    match err {
+        ChainTrackerError::TransportFault {
+            fault,
+            status,
+            detail,
+        } => {
+            assert_eq!((*fault, *status), (class, code), "{name}: {detail}");
+            assert!(!detail.contains(class.code()), "{name}: {detail}");
+        }
+        other => panic!("{name}: expected TransportFault, got {other:?}"),
+    }
+    assert_eq!(err.transport_fault(), Some(class), "{name}");
+}
+
+fn closed_port_url() -> String {
     let port = {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.local_addr().unwrap().port()
     };
-    for (name, err) in errors_at(&format!("http://127.0.0.1:{port}"), 30_000).await {
-        match err {
-            ChainTrackerError::NetworkError(detail) => {
-                assert!(detail.ends_with(" (NEVER_SENT)"), "{name}: {detail}");
-            }
-            other => panic!("{name}: expected NetworkError, got {other:?}"),
-        }
+    format!("http://127.0.0.1:{port}")
+}
+
+#[tokio::test]
+async fn a_refused_connection_is_a_transport_fault_never_sent() {
+    for (name, err) in errors_at(&closed_port_url(), 30_000).await {
+        assert_fault(&name, &err, TransportFault::NeverSent, None);
     }
 }
 
 #[tokio::test]
-async fn a_timeout_is_a_network_error_that_may_have_been_received() {
+async fn a_timeout_is_a_transport_fault_that_may_have_been_received() {
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .respond_with(ResponseTemplate::new(200).set_delay(Duration::from_secs(5)))
@@ -102,17 +119,12 @@ async fn a_timeout_is_a_network_error_that_may_have_been_received() {
             .unwrap_err(),
         tracker.current_height().await.unwrap_err(),
     ] {
-        match err {
-            ChainTrackerError::NetworkError(detail) => {
-                assert!(detail.ends_with(" (MAY_HAVE_BEEN_RECEIVED)"), "{detail}");
-            }
-            other => panic!("expected NetworkError, got {other:?}"),
-        }
+        assert_fault("timeout", &err, TransportFault::MayHaveBeenReceived, None);
     }
 }
 
 #[tokio::test]
-async fn a_429_with_retry_after_states_the_rate_limit_and_its_wait() {
+async fn a_429_with_retry_after_is_rate_limited_with_its_wait() {
     let errors = answered(
         ResponseTemplate::new(429)
             .insert_header("Retry-After", "5")
@@ -122,22 +134,28 @@ async fn a_429_with_retry_after_states_the_rate_limit_and_its_wait() {
     for (name, err) in errors {
         assert_eq!(
             err,
-            ChainTrackerError::InvalidResponse(
-                "HTTP 429 Too Many Requests (RATE_LIMITED, retry_after_ms 5000)".into()
-            ),
+            ChainTrackerError::TransportFault {
+                fault: TransportFault::RateLimited {
+                    retry_after_ms: Some(5000)
+                },
+                status: Some(429),
+                detail: "HTTP 429 Too Many Requests".into(),
+            },
             "{name}"
         );
     }
 }
 
 #[tokio::test]
-async fn a_bare_503_states_the_transport_fault() {
+async fn a_bare_503_is_a_transport_fault_that_may_have_been_received() {
     for (name, err) in answered(ResponseTemplate::new(503)).await {
         assert_eq!(
             err,
-            ChainTrackerError::InvalidResponse(
-                "HTTP 503 Service Unavailable (MAY_HAVE_BEEN_RECEIVED)".into()
-            ),
+            ChainTrackerError::TransportFault {
+                fault: TransportFault::MayHaveBeenReceived,
+                status: Some(503),
+                detail: "HTTP 503 Service Unavailable".into(),
+            },
             "{name}"
         );
     }
@@ -151,6 +169,35 @@ async fn a_500_stays_the_providers_answer() {
             ChainTrackerError::InvalidResponse("HTTP 500 Internal Server Error".into()),
             "{name}"
         );
+        assert_eq!(err.transport_fault(), None, "{name}");
+    }
+}
+
+/// `Transaction::verify` asks the tracker for a proven transaction's root;
+/// a fault there is the crate's `Error::TransportFault`, its class read by
+/// `Error::transport_fault()`, never a `TransactionError` text.
+#[cfg(feature = "wallet")]
+#[tokio::test]
+async fn a_trackers_transport_fault_reaches_the_crate_error_typed() {
+    use bsv_rs::script::LockingScript;
+    use bsv_rs::transaction::{MerklePath, Transaction, TransactionInput, TransactionOutput};
+
+    let mut tx = Transaction::new();
+    tx.inputs.push(TransactionInput::new("aa".repeat(32), 0));
+    let op_true = LockingScript::from_binary(&[0x51]).unwrap();
+    tx.outputs.push(TransactionOutput::new(1000, op_true));
+    tx.merkle_path = Some(MerklePath::from_coinbase_txid(&tx.id(), 800_000));
+
+    let tracker = WhatsOnChainTracker::with_base_url(&closed_port_url(), WocNetwork::Mainnet);
+    let err = tx.verify(&tracker, None).await.unwrap_err();
+    assert_eq!(
+        err.transport_fault(),
+        Some(TransportFault::NeverSent),
+        "{err:?}"
+    );
+    match err {
+        bsv_rs::Error::TransportFault { status, .. } => assert_eq!(status, None),
+        other => panic!("expected Error::TransportFault, got {other:?}"),
     }
 }
 
@@ -208,17 +255,9 @@ mod body_cut {
     }
 
     #[tokio::test]
-    async fn a_body_cut_is_a_network_error_that_may_have_been_received() {
+    async fn a_body_cut_is_a_transport_fault_that_may_have_been_received() {
         for (name, err) in errors_at(&cut_body_stub().await, 30_000).await {
-            match err {
-                ChainTrackerError::NetworkError(detail) => {
-                    assert!(
-                        detail.ends_with(" (MAY_HAVE_BEEN_RECEIVED)"),
-                        "{name}: {detail}"
-                    );
-                }
-                other => panic!("{name}: expected NetworkError, got {other:?}"),
-            }
+            assert_fault(&name, &err, TransportFault::MayHaveBeenReceived, None);
         }
     }
 }

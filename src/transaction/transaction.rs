@@ -1851,9 +1851,7 @@ impl Transaction {
                 let is_valid = chain_tracker
                     .is_valid_root_for_height(&root, merkle_path.block_height)
                     .await
-                    .map_err(|e| {
-                        crate::Error::TransactionError(format!("Chain tracker error: {}", e))
-                    })?;
+                    .map_err(crate::Error::from)?;
 
                 if is_valid {
                     continue;
