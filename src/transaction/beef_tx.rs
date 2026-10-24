@@ -244,9 +244,11 @@ impl BeefTx {
 
     /// Updates the input_txids list based on transaction data.
     fn update_input_txids(&mut self) {
+        // Computed afresh: a second call (`set_bump_index`, or a reader that
+        // set the parse after the bytes) names each txid once, not again.
+        self.input_txids = Vec::new();
         if self.has_proof() {
             // If we have a proof, we don't need to track input txids
-            self.input_txids = Vec::new();
             return;
         }
 
@@ -419,6 +421,28 @@ mod tests {
         let beef_tx = BeefTx::from_tx(tx, Some(0));
         // With a proof, input_txids should be empty
         assert!(beef_tx.input_txids.is_empty());
+    }
+
+    /// Through 0.9.0 the reader computed an unproven entry's input txids
+    /// twice (`from_raw_tx`, then again once the parse was set) and kept
+    /// both: `input_txids` named each parent twice, and
+    /// `SortResult::missing_inputs` a missing parent twice. So did a second
+    /// `set_bump_index`.
+    #[test]
+    fn a_read_entry_names_each_input_txid_once() {
+        let raw = from_hex(TEST_TX_HEX).unwrap();
+        let mut bytes = raw.clone();
+        bytes.push(0); // V1: no BUMP index
+        let mut entry = BeefTx::from_reader(&mut Reader::new(&bytes), super::BEEF_V1).unwrap();
+        assert_eq!(entry.input_txids.len(), 1);
+        entry.set_bump_index(None);
+        entry.set_bump_index(None);
+        assert_eq!(entry.input_txids.len(), 1);
+
+        let mut v2 = vec![0u8];
+        v2.extend_from_slice(&raw);
+        let entry = BeefTx::from_reader(&mut Reader::new(&v2), BEEF_V2).unwrap();
+        assert_eq!(entry.input_txids.len(), 1);
     }
 
     #[test]
