@@ -30,9 +30,11 @@ use crate::error::{Error, Result};
 use crate::primitives::hash::sha256;
 use p256::ecdsa::signature::hazmat::PrehashSigner;
 use p256::ecdsa::{Signature as P256EcdsaSignature, SigningKey, VerifyingKey};
-use p256::elliptic_curve::sec1::FromEncodedPoint;
-use p256::{EncodedPoint, PublicKey as P256InternalPublicKey, SecretKey};
+use p256::elliptic_curve::sec1::FromSec1Point;
+use p256::elliptic_curve::zeroize::Zeroizing;
+use p256::{PublicKey as P256InternalPublicKey, SecretKey};
 use rand::rngs::OsRng;
+use rand::RngCore;
 
 /// The P-256 curve order divided by 2, used for low-S normalization.
 /// n/2 = 0x7fffffff800000007fffffffffffffffde737d56d38bcf4279dce5617e3192a8
@@ -73,9 +75,16 @@ impl P256PrivateKey {
     /// let key = P256PrivateKey::random();
     /// ```
     pub fn random() -> Self {
-        let secret_key = SecretKey::random(&mut OsRng);
-        Self {
-            inner: SigningKey::from(secret_key),
+        // Rejection sampling over the OS CSPRNG, as p256 0.13's `SecretKey::random`
+        // sampled: 32 uniform bytes are a key unless they are zero or at least n.
+        loop {
+            let mut bytes = Zeroizing::new([0u8; 32]);
+            OsRng.fill_bytes(&mut bytes[..]);
+            if let Ok(secret_key) = SecretKey::from_slice(&bytes[..]) {
+                return Self {
+                    inner: SigningKey::from(secret_key),
+                };
+            }
         }
     }
 
@@ -265,10 +274,10 @@ impl P256PublicKey {
     /// assert_eq!(pubkey, recovered);
     /// ```
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        let encoded = EncodedPoint::from_bytes(bytes)
+        let encoded = p256::Sec1Point::from_bytes(bytes)
             .map_err(|e| Error::InvalidPublicKey(format!("invalid encoded point: {}", e)))?;
 
-        let public_key = P256InternalPublicKey::from_encoded_point(&encoded);
+        let public_key = P256InternalPublicKey::from_sec1_point(&encoded);
 
         if public_key.is_none().into() {
             return Err(Error::InvalidPublicKey(
@@ -340,7 +349,7 @@ impl P256PublicKey {
     ///
     /// Format: `02/03 || X` where the prefix indicates Y parity.
     pub fn to_compressed(&self) -> [u8; 33] {
-        let point = self.inner.to_encoded_point(true);
+        let point = self.inner.to_sec1_point(true);
         let bytes = point.as_bytes();
         let mut result = [0u8; 33];
         result.copy_from_slice(bytes);
@@ -351,7 +360,7 @@ impl P256PublicKey {
     ///
     /// Format: `04 || X || Y`
     pub fn to_uncompressed(&self) -> [u8; 65] {
-        let point = self.inner.to_encoded_point(false);
+        let point = self.inner.to_sec1_point(false);
         let bytes = point.as_bytes();
         let mut result = [0u8; 65];
         result.copy_from_slice(bytes);
@@ -370,7 +379,7 @@ impl P256PublicKey {
 
     /// Returns the X coordinate (32 bytes, big-endian).
     pub fn x(&self) -> [u8; 32] {
-        let point = self.inner.to_encoded_point(false);
+        let point = self.inner.to_sec1_point(false);
         let mut result = [0u8; 32];
         // a public key is never the identity, so its uncompressed encoding carries x
         if let Some(x_bytes) = point.x() {
@@ -381,7 +390,7 @@ impl P256PublicKey {
 
     /// Returns the Y coordinate (32 bytes, big-endian).
     pub fn y(&self) -> [u8; 32] {
-        let point = self.inner.to_encoded_point(false);
+        let point = self.inner.to_sec1_point(false);
         let mut result = [0u8; 32];
         // a public key is never the identity, so its uncompressed encoding carries y
         if let Some(y_bytes) = point.y() {

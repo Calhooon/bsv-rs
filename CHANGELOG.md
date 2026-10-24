@@ -5,6 +5,39 @@ All notable changes to `bsv-rs` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
+
+RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time
+operations) reached every dependent through k256 0.13.4 and p256 0.13.2, both
+on crypto-bigint 0.5.5, which no 0.5 release fixes. k256 and p256 move to
+0.14.0 (elliptic-curve 0.14.1, crypto-bigint 0.7.6); the hashes move with them
+to their digest 0.11 releases so the crate signs and hashes on one digest
+generation: sha2 0.10 to 0.11, sha1 0.10 to 0.11, hmac 0.12 to 0.13, pbkdf2
+0.12 to 0.13, ripemd 0.1 to 0.2. aes-gcm, aes, cbc and subtle stay where they
+were (the resolver asks nothing of them). No public type, function signature
+or error text of bsv-rs changed. `cargo deny --locked check` is clean on the
+three graphs with an empty ignore list.
+
+k256 and p256 are built without their default features: their `std` turns on
+`getrandom` 0.4, which has no wasm32-unknown-unknown backend without its own
+`wasm_js` feature. `PrivateKey::random` and `P256PrivateKey::random` draw 32
+bytes from the OS CSPRNG through this crate's `getrandom` 0.2 and refuse zero
+and values at or above n, the rejection sampling the 0.13 `SecretKey::random`
+did. `primeorder` is named with only `std` so the curves keep their
+precomputed basepoint tables.
+
+### Notes: cross-SDK parity
+
+For a digest at or above n, k256 0.14 seeds the RFC 6979 nonce with the
+digest reduced mod n, as the RFC's `bits2octets`, libsecp256k1 (bitcoin-sv
+v1.2.3 `src/secp256k1/src/secp256k1.c:489-501`), `@bsv/sdk` 2.0.16 and the Go
+SDK do; k256 0.13 seeded it with the raw digest. The signature bytes for such
+a digest change (both verify); every digest below n signs as before.
+`rfc6979_digest_ge_n_der_is_pinned` (`tests/ec_tests.rs`) pinned the 0.13
+bytes and fails on this tree until the owner rules on the new pin.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added: the wallet's transport fault (Calhooon/bsv-rs#73)
