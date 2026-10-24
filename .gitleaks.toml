@@ -1,20 +1,27 @@
-# gitleaks policy for the `secrets` CI job (gitleaks git --redact --exit-code 1 .; every fetched
-# branch is scanned). The default rules apply everywhere but the two paths below, which hold
-# recorded test material that looks like a key and is not one:
-#   tests/fixtures/   the golden fixtures of #76: bodies and frames recorded from this crate's own
-#                     writers with FIXED test keys (the README seed, fixed public points) and the
-#                     identity keys those produce; gitleaks' generic-api-key rule fires on the hex.
-#   fuzz/corpus/      the fuzz seed corpora of #82: the vectors' bytes, including identity-key hex.
-# A real secret never belongs in either path; a reviewer reads a new file there as a vector, and
-# the `secrets` job keeps scanning everything else.
+# gitleaks policy for the `secrets` CI job (gitleaks 8.30.1, `gitleaks git --redact --exit-code 1 .`;
+# every fetched branch is scanned). The default rules apply everywhere; each allowlist below names
+# the recorded test material it lets through, which looks like a key and is not one. A real secret
+# never belongs in any of them; a reviewer reads a new file under these paths as a vector, and the
+# `secrets` job keeps scanning everything else.
 title = "bsv-rs"
 
 [extend]
 useDefault = true
 
-[allowlist]
-description = "recorded test vectors that carry key-shaped hex of fixed test keys"
-paths = [
-  '''^tests/fixtures/''',
-  '''^fuzz/corpus/''',
-]
+# tests/fixtures/: the golden fixtures of #76, bodies and frames recorded from this crate's own
+# writers with FIXED test keys (the README seed, fixed public points) and the identity keys those
+# produce; gitleaks' generic-api-key rule fires on the hex.
+[[allowlists]]
+description = "golden fixtures recorded with fixed test keys (#76)"
+paths = ['''^tests/fixtures/''']
+
+# fuzz/corpus/: the fuzz seed corpora of #82, the vectors' bytes, including identity-key hex.
+[[allowlists]]
+description = "fuzz seed corpora written from the vectors (#82)"
+paths = ['''^fuzz/corpus/''']
+
+# fuzz/corpus-gen/src/main.rs: the auth header seed's nonce, the base64 of the bytes
+# ab cd ef 12 34 56 78 90 repeated to 32. Only that literal is let through, never the file.
+[[allowlists]]
+description = "the fixed test nonce of corpus-gen's auth header seed (#82)"
+regexes = ['''^q83vEjRWeJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA=$''']
