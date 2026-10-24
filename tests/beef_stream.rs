@@ -1649,9 +1649,10 @@ fn the_whole_path_walks_a_wide_bump_in_linear_time() {
 /// says the same under both values of the txid-only flag.
 fn whole(bytes: &[u8]) -> Result<HashMap<u32, String>, String> {
     let mut beef = Beef::from_binary(bytes).map_err(|e| match e {
-        // MerklePath now refuses this shape during parse, before verify_structure.
-        bsv_rs::Error::MerklePathError(ref message)
-            if message == "MissingSibling { level: 0, offset: 0 }" =>
+        // The parse is the stream's decoder (#86): a BUMP whose walk fails
+        // is refused there, in the stream's words, before verify_structure.
+        bsv_rs::Error::BeefError(ref message)
+            if message.ends_with(": MissingSibling { level: 0, offset: 0 }") =>
         {
             format!("{:?}", Kind::MissingSibling)
         }
@@ -1697,6 +1698,10 @@ fn the_whole_path_refuses_a_lone_leaf_at_an_offset_other_than_0() {
     assert_eq!(bytes.len(), 47);
     assert_eq!(refusal(structure(&bytes, &one_header(800_005, id))).0, 12);
     assert_eq!(whole(&bytes), Err("MissingSibling".to_string()));
+    assert_eq!(
+        Beef::from_binary(&bytes).unwrap_err().to_string(),
+        "BEEF error: invalid BEEF at byte 12: MissingSibling { level: 0, offset: 0 }"
+    );
     assert_eq!(
         reader_kind(&bytes, &[(800_005, id)]).as_deref(),
         Some("MissingSibling")

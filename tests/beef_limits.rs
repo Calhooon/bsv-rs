@@ -86,15 +86,21 @@ fn a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing() {
     claimed.extend_from_slice(&[0xfe, 0xff, 0xff, 0xff, 0xff]);
     for limits in [hints(1_000, 10), hints(usize::MAX, usize::MAX)] {
         let error = Beef::from_binary_with_limits(&claimed, &limits).expect_err("no bytes");
-        assert!(
-            matches!(error, bsv_rs::Error::ReaderUnderflow { .. }),
+        // The parse is the stream's decoder (#86): the refusal in its words,
+        // a field cut short where the first entry was due.
+        assert_eq!(
+            error,
+            bsv_rs::Error::BeefError(format!(
+                "invalid BEEF at byte {}: Truncated {{ needed: 1 }}",
+                claimed.len()
+            )),
             "the refusal is the bytes running out: {error:?}"
         );
         let message = error.to_string();
         assert!(!message.contains("max_"), "no limit is named: {message}");
     }
     let plain = Beef::from_binary(&claimed).expect_err("no bytes");
-    assert!(matches!(plain, bsv_rs::Error::ReaderUnderflow { .. }));
+    assert!(matches!(plain, bsv_rs::Error::BeefError(ref m) if m.contains("Truncated")));
 }
 
 /// An Atomic BEEF over its hints is read too, and with or without hints the
