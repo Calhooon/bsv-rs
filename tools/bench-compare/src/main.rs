@@ -23,6 +23,15 @@ const BENCHES: [&str; 9] = [
     "wire_codec",
     "script_spend",
 ];
+/// The benches `--skip` may name: each one's ids carry its name as their
+/// prefix, so the comparison can drop exactly that bench's rows.
+const SKIPPABLE: [&str; 5] = [
+    "beef_stream",
+    "merkle_path",
+    "transaction_sign_verify",
+    "wire_codec",
+    "script_spend",
+];
 const MARGIN: f64 = 0.05;
 const SAMPLES: usize = 100;
 const CALLS: [&str; 28] = [
@@ -116,6 +125,22 @@ struct Run {
     corpus: Value,
     memory: Vec<Value>,
     benchmarks: BTreeMap<String, Measurement>,
+    /// Benches not measured (`--skip`): neither a pass nor a regression.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    skipped: Vec<String>,
+}
+
+impl Run {
+    fn skips(&self, bench: &str) -> bool {
+        self.skipped.iter().any(|b| b == bench)
+    }
+
+    fn skips_id(&self, id: &str) -> bool {
+        self.skipped.iter().any(|b| {
+            id.strip_prefix(b.as_str())
+                .is_some_and(|r| r.starts_with('/'))
+        })
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -159,6 +184,7 @@ struct Options {
     baseline: PathBuf,
     output: PathBuf,
     from_run: Option<PathBuf>,
+    skip: Vec<String>,
 }
 
 fn repository() -> Result<PathBuf> {
@@ -178,6 +204,7 @@ fn options(repo: &Path) -> Result<Options> {
     let mut baseline = repo.join("benches/baseline.json");
     let mut output = None;
     let mut from_run = None;
+    let mut skip = Vec::new();
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -193,11 +220,21 @@ fn options(repo: &Path) -> Result<Options> {
                     args.next().ok_or("--from-run needs a run.json")?,
                 ))
             }
+            "--skip" => {
+                let bench = args.next().ok_or("--skip needs a bench name")?;
+                if !SKIPPABLE.contains(&bench.as_str()) {
+                    return Err(format!("--skip takes one of {SKIPPABLE:?}, not {bench}").into());
+                }
+                if !skip.contains(&bench) {
+                    skip.push(bench);
+                }
+            }
             "--help" | "-h" => {
-                println!("bench-compare [--record] [--baseline FILE] [--output DIR] [--from-run RUN.json]\n\
+                println!("bench-compare [--record] [--baseline FILE] [--output DIR] [--from-run RUN.json] [--skip BENCH]...\n\
                     Default: run all nine benches and fail any p99 increase over 5%.\n\
                     --record replaces only this platform's baseline; use in a PR explicitly requesting a baseline update.\n\
                     --from-run compares saved evidence without rerunning; cannot be used with --record.\n\
+                    --skip BENCH (repeatable) does not run BENCH; it is reported as skipped, never as a pass or a regression.\n\
                     Set CARGO_TARGET_DIR outside the checkout and BSV_SCRIPT_CORPUS to corpus/seed.");
                 std::process::exit(0);
             }
@@ -206,6 +243,14 @@ fn options(repo: &Path) -> Result<Options> {
     }
     if record && from_run.is_some() {
         return Err("--record requires a fresh measurement; cannot use --from-run".into());
+    }
+    if record && !skip.is_empty() {
+        return Err("--record needs every bench; cannot use --skip".into());
+    }
+    if from_run.is_some() && !skip.is_empty() {
+        return Err(
+            "--from-run compares the saved run as it names its skips; cannot use --skip".into(),
+        );
     }
     let output = match output {
         Some(path) => path,
@@ -222,6 +267,7 @@ fn options(repo: &Path) -> Result<Options> {
         baseline,
         output,
         from_run,
+        skip,
     })
 }
 
@@ -333,8 +379,16 @@ fn validate_run(run: &Run) -> Result<()> {
             return Err(format!("invalid measurement: {id}").into());
         }
     }
+    for (i, bench) in run.skipped.iter().enumerate() {
+        if !SKIPPABLE.contains(&bench.as_str()) || run.skipped[..i].contains(bench) {
+            return Err(format!("invalid skipped bench: {bench}").into());
+        }
+    }
+    if let Some(id) = run.benchmarks.keys().find(|id| run.skips_id(id)) {
+        return Err(format!("a skipped bench was measured: {id}").into());
+    }
     for id in required_ids() {
-        if !run.benchmarks.contains_key(&id) {
+        if !run.skips_id(&id) && !run.benchmarks.contains_key(&id) {
             return Err(format!("missing benchmark: {id}").into());
         }
     }
@@ -343,13 +397,20 @@ fn validate_run(run: &Run) -> Result<()> {
         .keys()
         .filter(|id| id.starts_with("wire_codec/"))
         .count();
-    if wire != 28 * 4 {
+    if !run.skips("wire_codec") && wire != 28 * 4 {
         return Err(format!("need all 112 wire codec measurements; found {wire}").into());
     }
-    if run.corpus["sha256"].as_str().is_none_or(|s| s.len() != 64)
-        || run.corpus["rows"].as_u64().unwrap_or(0) == 0
+    if !run.skips("script_spend")
+        && (run.corpus["sha256"].as_str().is_none_or(|s| s.len() != 64)
+            || run.corpus["rows"].as_u64().unwrap_or(0) == 0)
     {
         return Err("script corpus was absent or its provenance was not reported".into());
+    }
+    if run.skips("beef_stream") {
+        if !run.memory.is_empty() {
+            return Err("beef_stream was skipped but reported RSS".into());
+        }
+        return Ok(());
     }
     if run.memory.len() != 4 {
         return Err("need both BEEF sizes in both modes for RSS".into());
@@ -402,11 +463,10 @@ fn outside_checkout(path: &Path, repo: &Path) -> Result<()> {
     Ok(())
 }
 
-fn fresh_run(repo: &Path, output: &Path) -> Result<Run> {
-    if std::env::var_os("BSV_SCRIPT_CORPUS").is_none() {
-        return Err(
-            "BSV_SCRIPT_CORPUS is required for the gate; script_spend alone may skip".into(),
-        );
+fn fresh_run(repo: &Path, output: &Path, skip: &[String]) -> Result<Run> {
+    if std::env::var_os("BSV_SCRIPT_CORPUS").is_none() && !skip.iter().any(|b| b == "script_spend")
+    {
+        return Err("BSV_SCRIPT_CORPUS is required for the gate unless --skip script_spend".into());
     }
     let target = PathBuf::from(
         std::env::var_os("CARGO_TARGET_DIR").ok_or("set CARGO_TARGET_DIR outside the checkout")?,
@@ -432,7 +492,11 @@ fn fresh_run(repo: &Path, output: &Path) -> Result<Run> {
         .current_dir(repo)
         .args(["bench", "--locked", "--features", &settings.features]);
     for bench in BENCHES {
-        command.args(["--bench", bench]);
+        if skip.iter().any(|b| b == bench) {
+            println!("SKIPPED {bench}: not run (--skip)");
+        } else {
+            command.args(["--bench", bench]);
+        }
     }
     command.args([
         "--",
@@ -492,6 +556,7 @@ fn fresh_run(repo: &Path, output: &Path) -> Result<Run> {
         corpus,
         memory,
         benchmarks,
+        skipped: skip.to_vec(),
     };
     validate_run(&run)?;
     fs::write(output.join("run.json"), serde_json::to_vec_pretty(&run)?)?;
@@ -512,13 +577,17 @@ fn fresh_run(repo: &Path, output: &Path) -> Result<Run> {
 fn compare(base: &Run, run: &Run) -> Result<bool> {
     validate_run(base)?;
     validate_run(run)?;
+    if !base.skipped.is_empty() {
+        return Err("a baseline entry must measure every bench".into());
+    }
     if base.platform != run.platform || base.machine != run.machine {
         return Err("CPU model/core count differs from baseline; record on matching hardware in a baseline PR".into());
     }
-    if base.settings != run.settings || base.corpus != run.corpus {
+    if base.settings != run.settings || (!run.skips("script_spend") && base.corpus != run.corpus) {
         return Err("benchmark settings or script corpus differ from baseline".into());
     }
-    if !base.benchmarks.keys().eq(run.benchmarks.keys()) {
+    let expected = base.benchmarks.keys().filter(|id| !run.skips_id(id));
+    if !expected.eq(run.benchmarks.keys()) {
         return Err("benchmark inventory changed; baseline update needs a PR that says so".into());
     }
     println!("| benchmark | p50 ns | baseline p99 ns | p99 ns | change | status |\n|---|---:|---:|---:|---:|---|");
@@ -540,6 +609,24 @@ fn compare(base: &Run, run: &Run) -> Result<bool> {
     Ok(passed)
 }
 
+/// The verdict's last lines: the measured benches' pass or fail, then each
+/// skipped bench by name, which is neither.
+fn summary(passed: bool, run: &Run) -> String {
+    let mut text = format!(
+        "{} ({} of {} benches measured): p99 threshold is +{:.0}%",
+        if passed { "PASS" } else { "FAIL" },
+        BENCHES.len() - run.skipped.len(),
+        BENCHES.len(),
+        MARGIN * 100.0
+    );
+    for bench in &run.skipped {
+        text.push_str(&format!(
+            "\nSKIPPED {bench}: not measured, neither a pass nor a regression"
+        ));
+    }
+    text
+}
+
 /// One baseline entry per platform, CPU model and core count: hosted runners
 /// draw from several CPUs, and a p99 is only compared on the hardware it came from.
 fn machine_key(run: &Run) -> String {
@@ -555,7 +642,7 @@ fn run() -> Result<bool> {
     let measured: Run = if let Some(path) = &opts.from_run {
         serde_json::from_slice(&fs::read(path)?)?
     } else {
-        fresh_run(&repo, &opts.output)?
+        fresh_run(&repo, &opts.output, &opts.skip)?
     };
     validate_run(&measured)?;
     let platform = machine_key(&measured);
@@ -579,7 +666,10 @@ fn run() -> Result<bool> {
     for memory in &measured.memory {
         println!("RSS: {memory}");
     }
-    for mode in ["structure", "scripts"] {
+    for mode in ["structure", "scripts"]
+        .into_iter()
+        .filter(|_| !measured.skips("beef_stream"))
+    {
         let peak = |bytes: u64| -> Result<f64> {
             measured
                 .memory
@@ -610,11 +700,7 @@ fn run() -> Result<bool> {
             format!("no baseline for {platform} (recorded: {recorded:?}); run --record on this hardware in an explicit baseline PR and commit its artifact")
         })?;
         let passed = compare(base, &measured)?;
-        println!(
-            "{}: p99 threshold is +{:.0}%",
-            if passed { "PASS" } else { "FAIL" },
-            MARGIN * 100.0
-        );
+        println!("{}", summary(passed, &measured));
         Ok(passed)
     }
 }
