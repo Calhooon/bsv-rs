@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the wallet wire's optional varints in the reference's plain form (#149)
+
+`WireWriter::write_signed_var_int` and `write_optional_var_int`, and the
+readers on them (`encoding.rs`), were ZigZag: `Some(10)` left as `0x14`,
+absence as `0x01`, and a peer's `10` read as `5`, its `5` as absent. The
+fields: createAction's input `sequenceNumber`, `lockTime` and `version`;
+signAction's spend `sequenceNumber`; the `limit` and `offset` of listActions,
+listOutputs, listCertificates, discoverByIdentityKey and discoverByAttributes.
+Absence crossed only by accident (nine `0xFF` decoded to `i64::MIN`). A present
+value is now the plain varint (`10` is `0x0A`, `u32::MAX` is
+`FE FF FF FF FF`) and absence is nine `0xFF`, both ways: the bytes TS writes
+(`ts-sdk@9e3ede6` `utils.ts:546-549`, `writeVarIntNum`, `-1` through
+`varIntBn` at `:586`) and Go writes (`go-sdk@2ca481c` `util/writer.go:66-71`),
+and the bytes the shared vectors already carried (`listActions-simple-args.json`'s
+`limit` 10 is `0x0A`; the cross-SDK test never decoded it). The keeper's
+reading: the wire's bytes are the reference's, so ZigZag was the departure,
+not a shape of the wire. signAction's spend reader refuses a sequence number
+above `u32::MAX` naming the field, as Go's `ReadOptionalUint32` does
+(`util/reader.go:210-222`); the validator's narrower bounds (a limit 1 to
+10,000, `validationHelpers.ts:1199`) stay the validator's, not the reader's.
+`write_signed_var_int` takes the field's name and returns a `Result`: `-1` is
+absence, any other negative has no form a reader keeps and is refused with the
+field named; listOutputs' `offset` (an `i32`) goes through it, so an offset
+below `-1` is refused before anything is sent. `read_signed_var_int` refuses a
+value above `i64::MAX` other than nine `0xFF`. Pinned by
+`tests/wire_signed_varint_tests.rs` (12 tests; on the pre-fix tree 10 of
+the 11 that compile there fail), on TS's bytes
+and on the shared vectors read in place. The recordings of #76 that carry
+one of these fields moved in their own commit.
+
+Migration: a 0.8.x `WalletWireTransceiver` and a later processor (or the
+other way) disagree on every present value of these fields; upgrade both
+sides together. A caller of `write_signed_var_int(v)` writes
+`write_signed_var_int("field", v)?`.
+
+### Notes: cross-SDK parity (#149)
+
+The reference's form of these fields is now this crate's. One difference
+stays, stated: TS's listOutputs `offset` may be negative (`validationHelpers.ts:1648`,
+no minimum; BRC-100 `ed1b015` `wallet/0100.md:904`, `:1931` "Signed integer"),
+and TS writes `-2` as `FF FE FF FF FF FF FF FF FF` (two's complement through
+`varIntBn`), which its own processor then reads as absent
+(`WalletWireProcessor.ts:966-979`, any negative) and Go cannot carry (`*uint32`);
+this crate refuses an offset below `-1` at the writer, and `-1` (the newest
+output) leaves as absence's nine `0xFF`, as TS's does. BRC-100 names `VarInt`
+and `-1` for absence (`:1646-1647`, `:1661`, `:1741`, `:1799-1800`; `5119a9b`
+the same nine lines later) and gives no encoding of a negative: its `VarInt`
+(`:1620-1628`) is unsigned.
+
 ### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
 
 RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time
