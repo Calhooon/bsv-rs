@@ -1,6 +1,6 @@
 #![no_main]
 //! Each wallet call's wire decoders (BRC-100's binary substrate), the call
-//! chosen by the leading byte. An even first byte hands the rest to
+//! chosen by the leading byte. An even leading byte hands the rest to
 //! `WalletWireProcessor::process_message` over a `ProtoWallet` as a request
 //! frame (its own leading byte the call code, then the originator and the
 //! call's arguments: the request decoders); an odd one answers the wire

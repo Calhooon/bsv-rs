@@ -187,13 +187,13 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
             let Some(tx) = entry.tx() else {
                 continue;
             };
-            let Some(first) = tx.inputs.first() else {
+            let [spent, ..] = &tx.inputs[..] else {
                 continue;
             };
             let mut twice = tx.clone();
-            twice.inputs.push(first.clone());
+            twice.inputs.push(spent.clone());
             let mut null = tx.clone();
-            let mut input = first.clone();
+            let mut input = spent.clone();
             input.source_txid = Some("00".repeat(32));
             input.source_output_index = 0xffff_ffff;
             null.inputs.push(input);
@@ -590,7 +590,7 @@ fn script_corpus(base: &Path, rest: Option<&Path>) {
                 let Ok(raw) = parse_transaction(&tx) else {
                     continue;
                 };
-                let Some(input) = raw.inputs.first() else {
+                let [input, ..] = &raw.inputs[..] else {
                     continue;
                 };
                 let Ok(locking) = from_hex(row["prevouts"][0]["script"].as_str().unwrap_or(""))
