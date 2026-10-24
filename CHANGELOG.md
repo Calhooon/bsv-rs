@@ -70,15 +70,31 @@ classifies by text. Busy stays the body's word. What each directory answers:
   ` (MAY_HAVE_BEEN_RECEIVED)` (was `InvalidResponse`). A fault is never
   `Ok(false)`.
 
-**Migration.** A caller that matched `code == "NETWORK_ERROR"` matches
-`failure.transport_fault().is_some()` (or the three words); one that read a
-Teranode or WhatsOnChain 429, 502, 503 or 504 as the code `"429"` (etc.)
-reads `RATE_LIMITED` or `MAY_HAVE_BEEN_RECEIVED` and `more["status"]`. A caller that
-matched `Error::AuthError` text for "HTTP request failed" or "Auth endpoint
-returned 5xx" matches `Error::TransportFault { .. }` (the detail is the same
-text); one that matched `HttpWalletWire`'s `WalletError("HTTP request
-failed...")` matches `Error::WalletTransport { .. }`. A `match` on `Error`
-already has a wildcard arm (`#[non_exhaustive]`).
+**The old words.** A code word is a rule's word, not a compatibility
+promise; each gives way here:
+
+- `NETWORK_ERROR` (a broadcaster's send error) to `NEVER_SENT` (a connection
+  never made, a request that could not be built) or `MAY_HAVE_BEEN_RECEIVED`
+  (every other send error, a timeout included).
+- `PARSE_ERROR` (ARC's 429 and its 503 without a body; a body cut at every
+  broadcaster) to `RATE_LIMITED` (a 429, a 503 with `Retry-After`) or
+  `MAY_HAVE_BEEN_RECEIVED` (a 502, 503 or 504, a body cut).
+- Teranode's and WhatsOnChain's `"429"` and `"503"` (and `"502"`, `"504"`)
+  to `RATE_LIMITED` or `MAY_HAVE_BEEN_RECEIVED` the same way, the status in
+  `more["status"]`.
+- `Error::AuthError` on a transport failure (a connection error, a timeout,
+  a body cut, a handshake answered 429, 502, 503 or 504) to
+  `Error::TransportFault`, its detail the old text; `HttpWalletWire`'s
+  `WalletError` on one to `Error::WalletTransport` (a 429 to
+  `Error::TransportFault`); a tracker's `InvalidResponse` on a body cut to
+  `NetworkError`.
+
+**Migration.** A downstream that matched any of those texts reads
+`transport_fault()` instead (`BroadcastFailure::transport_fault()`,
+`Error::transport_fault()`): `Some` of the class for a fault, `None` for the
+far side's answer; a tracker's error has no typed class and states it at
+the end of its detail. A `match` on `Error` already has a wildcard arm
+(`#[non_exhaustive]`).
 
 Tests, RED on the pre-fix sites (the type present, the sites unchanged) and
 GREEN after: `tests/transport_fault_broadcasters.rs` (9; #65's and #66's
