@@ -634,6 +634,8 @@ impl Spend {
     // Opcode Execution
     // ========================================================================
 
+    /// Dispatches an opcode to its handler in the module of its group: one
+    /// static match, each arm a direct call.
     fn execute_opcode(
         &mut self,
         opcode: u8,
@@ -642,75 +644,63 @@ impl Spend {
         let is_executing = !self.returning && !self.if_stack.contains(&false);
 
         match opcode {
-            // ================================================================
-            // Push Operations (0x00-0x60)
-            // ================================================================
-            OP_1NEGATE => self.op_1negate()?,
-            OP_0 => self.op_0()?,
-            OP_1..=OP_16 => self.op_small_integer(opcode)?,
+            // push.rs: the constants and the data pushes (an executed push is
+            // handled in `step`; these arms catch any missed)
+            OP_1NEGATE => self.op_1negate(),
+            OP_0 => self.op_0(),
+            OP_1..=OP_16 => self.op_small_integer(opcode),
+            0x01..=0x4b => self.op_push_data(chunk),
+            OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => self.op_push_data(chunk),
 
-            // ================================================================
-            // NOPs (do nothing)
-            // ================================================================
-            OP_NOP => {}
-            OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP9 | OP_NOP10 => self.op_upgradable_nop(opcode)?,
-            OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 => self.op_nop4_to_nop8(opcode)?,
-            OP_VER => self.op_ver()?,
+            // flow.rs: the NOPs, OP_VER and the flow control
+            OP_NOP => Ok(()),
+            OP_NOP1 | OP_NOP2 | OP_NOP3 | OP_NOP9 | OP_NOP10 => self.op_upgradable_nop(opcode),
+            OP_NOP4 | OP_NOP5 | OP_NOP6 | OP_NOP7 | OP_NOP8 => self.op_nop4_to_nop8(opcode),
+            OP_VER => self.op_ver(),
+            OP_IF | OP_NOTIF => self.op_if(opcode, is_executing),
+            OP_VERIF | OP_VERNOTIF => self.op_verif(opcode, is_executing),
+            OP_ELSE => self.op_else(),
+            OP_ENDIF => self.op_endif(),
+            OP_VERIFY => self.op_verify(),
+            OP_RETURN => self.op_return(),
 
-            // ================================================================
-            // Flow Control (0x63-0x6a)
-            // ================================================================
-            OP_IF | OP_NOTIF => self.op_if(opcode, is_executing)?,
-            OP_VERIF | OP_VERNOTIF => self.op_verif(opcode, is_executing)?,
-            OP_ELSE => self.op_else()?,
-            OP_ENDIF => self.op_endif()?,
-            OP_VERIFY => self.op_verify()?,
-            OP_RETURN => self.op_return()?,
+            // stack_ops.rs
+            OP_TOALTSTACK => self.op_toaltstack(),
+            OP_FROMALTSTACK => self.op_fromaltstack(),
+            OP_2DROP => self.op_2drop(),
+            OP_2DUP => self.op_2dup(),
+            OP_3DUP => self.op_3dup(),
+            OP_2OVER => self.op_2over(),
+            OP_2ROT => self.op_2rot(),
+            OP_2SWAP => self.op_2swap(),
+            OP_IFDUP => self.op_ifdup(),
+            OP_DEPTH => self.op_depth(),
+            OP_DROP => self.op_drop(),
+            OP_DUP => self.op_dup(),
+            OP_NIP => self.op_nip(),
+            OP_OVER => self.op_over(),
+            OP_PICK | OP_ROLL => self.op_pick_roll(opcode),
+            OP_ROT => self.op_rot(),
+            OP_SWAP => self.op_swap(),
+            OP_TUCK => self.op_tuck(),
 
-            // ================================================================
-            // Stack Operations (0x6b-0x7d)
-            // ================================================================
-            OP_TOALTSTACK => self.op_toaltstack()?,
-            OP_FROMALTSTACK => self.op_fromaltstack()?,
-            OP_2DROP => self.op_2drop()?,
-            OP_2DUP => self.op_2dup()?,
-            OP_3DUP => self.op_3dup()?,
-            OP_2OVER => self.op_2over()?,
-            OP_2ROT => self.op_2rot()?,
-            OP_2SWAP => self.op_2swap()?,
-            OP_IFDUP => self.op_ifdup()?,
-            OP_DEPTH => self.op_depth()?,
-            OP_DROP => self.op_drop()?,
-            OP_DUP => self.op_dup()?,
-            OP_NIP => self.op_nip()?,
-            OP_OVER => self.op_over()?,
-            OP_PICK | OP_ROLL => self.op_pick_roll(opcode)?,
-            OP_ROT => self.op_rot()?,
-            OP_SWAP => self.op_swap()?,
-            OP_TUCK => self.op_tuck()?,
-            OP_SIZE => self.op_size()?,
+            // splice.rs (the Chronicle splice at 0xb3-0xb7 is reached through
+            // op_nop4_to_nop8)
+            OP_SIZE => self.op_size(),
+            OP_CAT => self.op_cat(),
+            OP_SPLIT => self.op_split(),
+            OP_NUM2BIN => self.op_num2bin(),
+            OP_BIN2NUM => self.op_bin2num(),
 
-            // ================================================================
-            // Splice Operations (BSV re-enabled)
-            // ================================================================
-            OP_CAT => self.op_cat()?,
-            OP_SPLIT => self.op_split()?,
-            OP_NUM2BIN => self.op_num2bin()?,
-            OP_BIN2NUM => self.op_bin2num()?,
+            // bitwise.rs
+            OP_INVERT => self.op_invert(),
+            OP_AND | OP_OR | OP_XOR => self.op_bitwise_logic(opcode),
+            OP_EQUAL | OP_EQUALVERIFY => self.op_equal(opcode),
+            OP_LSHIFT | OP_RSHIFT => self.op_shift(opcode),
 
-            // ================================================================
-            // Bitwise Operations
-            // ================================================================
-            OP_INVERT => self.op_invert()?,
-            OP_AND | OP_OR | OP_XOR => self.op_bitwise_logic(opcode)?,
-            OP_EQUAL | OP_EQUALVERIFY => self.op_equal(opcode)?,
-            OP_LSHIFT | OP_RSHIFT => self.op_shift(opcode)?,
-
-            // ================================================================
-            // Arithmetic Operations
-            // ================================================================
+            // arithmetic.rs
             OP_1ADD | OP_1SUB | OP_2MUL | OP_2DIV | OP_NEGATE | OP_ABS | OP_NOT | OP_0NOTEQUAL => {
-                self.op_unary_number(opcode)?
+                self.op_unary_number(opcode)
             }
             OP_ADD
             | OP_SUB
@@ -727,45 +717,28 @@ impl Spend {
             | OP_LESSTHANOREQUAL
             | OP_GREATERTHANOREQUAL
             | OP_MIN
-            | OP_MAX => self.op_binary_number(opcode)?,
-            OP_WITHIN => self.op_within()?,
+            | OP_MAX => self.op_binary_number(opcode),
+            OP_WITHIN => self.op_within(),
 
-            // ================================================================
-            // Crypto Operations
-            // ================================================================
-            OP_RIPEMD160 => self.op_ripemd160()?,
-            OP_SHA1 => self.op_sha1()?,
-            OP_SHA256 => self.op_sha256()?,
-            OP_HASH160 => self.op_hash160()?,
-            OP_HASH256 => self.op_hash256()?,
-            OP_CODESEPARATOR => self.op_codeseparator()?,
-            OP_CHECKSIG | OP_CHECKSIGVERIFY => self.op_checksig(opcode)?,
-            OP_CHECKMULTISIG | OP_CHECKMULTISIGVERIFY => {
-                self.op_checkmultisig(opcode)?;
-            }
+            // crypto.rs
+            OP_RIPEMD160 => self.op_ripemd160(),
+            OP_SHA1 => self.op_sha1(),
+            OP_SHA256 => self.op_sha256(),
+            OP_HASH160 => self.op_hash160(),
+            OP_HASH256 => self.op_hash256(),
+            OP_CODESEPARATOR => self.op_codeseparator(),
+            OP_CHECKSIG | OP_CHECKSIGVERIFY => self.op_checksig(opcode),
+            OP_CHECKMULTISIG | OP_CHECKMULTISIGVERIFY => self.op_checkmultisig(opcode),
 
-            // ================================================================
-            // Data Push (handled above, but catch any missed)
-            // ================================================================
-            0x01..=0x4b => self.op_push_data(chunk)?,
-            OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => self.op_push_data(chunk)?,
-
-            // ================================================================
-            // Unknown/Invalid Opcode
-            // ================================================================
             // 0xba-0xff are undefined: the reference's `default:` is
             // SCRIPT_ERR_BAD_OPCODE when one is executed (interpreter.cpp:1795),
             // and this arm is only reached when executing: they fall to the
             // invalid-opcode arm below.
-            _ => {
-                return Err(self.error(&format!(
-                    "Invalid opcode {} (pc={}).",
-                    opcode, self.program_counter
-                )));
-            }
+            _ => Err(self.error(&format!(
+                "Invalid opcode {} (pc={}).",
+                opcode, self.program_counter
+            ))),
         }
-
-        Ok(())
     }
 
     // ========================================================================
@@ -787,10 +760,6 @@ impl Spend {
         )
     }
 }
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
 
 #[cfg(test)]
 mod tests;
