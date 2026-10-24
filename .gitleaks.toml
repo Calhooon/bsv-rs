@@ -1,0 +1,20 @@
+# gitleaks policy for the `secrets` CI job (gitleaks git --redact --exit-code 1 .; every fetched
+# branch is scanned). The default rules apply everywhere but the two paths below, which hold
+# recorded test material that looks like a key and is not one:
+#   tests/fixtures/   the golden fixtures of #76: bodies and frames recorded from this crate's own
+#                     writers with FIXED test keys (the README seed, fixed public points) and the
+#                     identity keys those produce; gitleaks' generic-api-key rule fires on the hex.
+#   fuzz/corpus/      the fuzz seed corpora of #82: the vectors' bytes, including identity-key hex.
+# A real secret never belongs in either path; a reviewer reads a new file there as a vector, and
+# the `secrets` job keeps scanning everything else.
+title = "bsv-rs"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "recorded test vectors that carry key-shaped hex of fixed test keys"
+paths = [
+  '''^tests/fixtures/''',
+  '''^fuzz/corpus/''',
+]
