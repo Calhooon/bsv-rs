@@ -18,8 +18,13 @@ Build output and measurements must be outside this checkout:
 export CARGO_TARGET_DIR=/Volumes/Lanes/targets/bsv-rs-oracle-benches
 export BSV_BENCH_ARTIFACT_DIR=/Volumes/Lanes/out/bsv-rs/oracle-benches/runs
 export BSV_SCRIPT_CORPUS=/path/to/bsv-script-lean/corpus/seed
+cargo generate-lockfile   # this library does not commit Cargo.lock
 cargo run --locked --manifest-path tools/bench-compare/Cargo.toml
 ```
+
+The tool runs `cargo bench --locked`, so the root lockfile must exist; CI
+resolves it in the job, as the `deny` job does. The tool's own lockfile is
+committed (`tools/bench-compare/Cargo.lock`).
 
 On a host without `/Volumes/Lanes`, select an external target and artifact
 directory under that host's `$TMPDIR`. `--output DIR` names a fresh directory;
@@ -46,6 +51,8 @@ line contains only the CPU model and available logical core count. The run
 also records its platform, Rust version, source commit and sampling settings.
 
 `run.json` contains every p50/p99 in nanoseconds and the RSS observations;
+`baseline.json` is the same run alone in the baseline's shape (the scoreboard
+job reads it from the artifact; it is never written over `benches/baseline.json`);
 `bench.log` contains the benchmark output. CI retains them even when a p99
 regression fails the job. The console prints the complete comparison table.
 
