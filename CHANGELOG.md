@@ -184,7 +184,7 @@ ts-sdk makes the HMAC under the minimal-length key: `deriveSymmetricKey`
 builds the key from `x.toArray()` (`ts-stack@edf6e03`
 `packages/sdk/src/wallet/KeyDeriver.ts:270`; `ts-sdk@9e3ede6`
 `src/wallet/KeyDeriver.ts:202`) and `createHmac` and `verifyHmac` key the HMAC
-with `key.toArray()` (`ProtoWallet.ts:295,311`), a `BigNumber`'s minimal
+with `key.toArray()` (ts-stack@edf6e03 `ProtoWallet.ts:295,311`; ts-sdk@9e3ede6 `:212,226`), a `BigNumber`'s minimal
 big-endian bytes. This crate makes it under the 32 bytes, as the Go SDK does
 (`NewSymmetricKey` left-pads to 32, go-sdk@`2ca481c`
 `primitives/ec/symmetric.go:82-90`), and as Python and rs-sdk do by the
