@@ -152,6 +152,45 @@ a timeout is a fault with no promise, a broadcaster's fault says whether the
 request was sent, and a rate limit is never a verdict. The wire, every
 request the crate sends and every success path are unchanged.
 
+### Added: a minimal-length-key HMAC tag refused by name (#148)
+
+BRC-56 keys the HMAC with the shared point's X coordinate as exactly 32
+big-endian bytes, leading zero bytes included (`bsv-blockchain/BRCs` at
+`5119a9b`, `wallet/0056.md:66`); an implementation that encodes the key
+minimal-length drops those bytes and makes another tag, for about one derived
+key in 256 (`:73`). This crate keeps the 32 bytes. `verify_hmac` still accepts
+the 32-byte-key tag only; on a miss whose key begins with a zero byte it
+computes the tag once more under the minimal-length key and, when that one
+matches, answers the new `Error::HmacMinimalLengthKey { leading_zero_bytes }`
+("HMAC is not valid: the tag was made under a minimal-length key ..."), which
+names the sender's encoding. Nothing is accepted twice. A tag matching neither
+key is `WalletError("HMAC is not valid")` as before; `create_hmac` is
+unchanged. The async `WalletInterface::verify_hmac` goes through the same
+path. `tests/wallet_brc56_hmac_tests.rs` holds the six vectors of
+`wallet/0056.md:91-96` (inputs at `:81-85`): `create_hmac` reproduces the six
+tags and `derive_symmetric_key` the six keys byte for byte, `verify_hmac`
+accepts the six, the four minimal-length tags (the rows whose key begins with
+one or two zero bytes) are refused by name, RED before this change (they read
+`HMAC is not valid`), and the two rows with no leading zero byte have one
+encoding and no refusal path. The line's pin `ed1b015` carries no BRC-56
+vectors and no paragraph on the encoding; the vectors are upstream, not on the
+line, taken by the owner's word. The variant is additive under the
+`#[non_exhaustive]` `Error`. The crate holds no counter a host reads: the
+refusal is the count's event, and a host counts it.
+
+### Notes: cross-SDK parity
+
+ts-sdk makes the HMAC under the minimal-length key: `deriveSymmetricKey`
+builds the key from `x.toArray()` (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/KeyDeriver.ts:270`; `ts-sdk@9e3ede6`
+`src/wallet/KeyDeriver.ts:202`) and `createHmac` and `verifyHmac` key the HMAC
+with `key.toArray()` (`ProtoWallet.ts:295,311`), a `BigNumber`'s minimal
+big-endian bytes. This crate makes it under the 32 bytes, as the Go SDK does
+(`NewSymmetricKey` left-pads to 32, go-sdk@`2ca481c`
+`primitives/ec/symmetric.go:82-90`), and as Python and rs-sdk do by the
+keeper's ruling of 2026-10-24. For one key in 256 a ts-sdk tag fails here; the
+refusal names that gap rather than accept it.
+
 ### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
 
 RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time

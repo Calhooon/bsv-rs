@@ -39,7 +39,7 @@ use crate::primitives::bsv::schnorr::Schnorr;
 use crate::primitives::hash::sha256_hmac;
 use crate::primitives::{sha256, PrivateKey, PublicKey, Signature};
 
-use super::key_deriver::KeyDeriverApi;
+use super::key_deriver::{verify_hmac_tag, KeyDeriverApi};
 use super::types::{Counterparty, Protocol, SecurityLevel};
 use super::CachedKeyDeriver;
 
@@ -425,7 +425,10 @@ impl ProtoWallet {
 
     /// Verifies an HMAC using a derived symmetric key.
     ///
-    /// Uses constant-time comparison to prevent timing attacks.
+    /// Uses constant-time comparison to prevent timing attacks. Only the tag
+    /// under the 32-byte key is accepted (BRC-56); a tag under the
+    /// minimal-length key is [`Error::HmacMinimalLengthKey`], any other miss
+    /// `WalletError("HMAC is not valid")`.
     pub fn verify_hmac(&self, args: VerifyHmacArgs) -> Result<VerifyHmacResult> {
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
@@ -434,13 +437,8 @@ impl ProtoWallet {
             &counterparty,
         )?;
 
-        let computed = sha256_hmac(symmetric_key.as_bytes(), &args.data);
-
-        // Constant-time comparison
-        if !constant_time_eq(&computed, &args.hmac) {
-            return Err(Error::WalletError("HMAC is not valid".to_string()));
-        }
-
+        // Constant time; a tag under the minimal-length key is refused by name
+        verify_hmac_tag(&symmetric_key, &args.data, &args.hmac)?;
         Ok(VerifyHmacResult { valid: true })
     }
 
@@ -652,12 +650,6 @@ impl std::fmt::Debug for ProtoWallet {
 // =============================================================================
 // Helper Functions
 // =============================================================================
-
-/// Constant-time comparison of two byte slices.
-fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
-    use subtle::ConstantTimeEq;
-    a.ct_eq(b).into()
-}
 
 /// Gets the current time as an ISO 8601 timestamp.
 fn get_iso_timestamp() -> String {
