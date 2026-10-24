@@ -101,6 +101,7 @@ pub mod transaction;
 pub mod tx_json;
 
 // Re-exports for convenience
+pub use crate::error::TransportFault;
 pub use beef::{Beef, BeefLimits, BeefValidationResult, SortResult};
 pub use beef_stream::{
     referenced_outpoints, resume, verify_stream, verify_stream_async, verify_stream_structure,

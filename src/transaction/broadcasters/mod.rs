@@ -21,6 +21,12 @@ mod arc;
 mod teranode;
 mod whatsonchain;
 
+// The one transport-fault classifier of every HTTP transport (#87): here
+// because a network client lives in a transport home and `transaction` is
+// the lowest feature gate the four homes share.
+#[cfg(feature = "http")]
+pub(crate) mod transport_fault;
+
 pub use arc::{ArcBroadcaster, ArcConfig};
 pub use teranode::{TeranodeBroadcaster, TeranodeConfig};
 pub use whatsonchain::{WhatsOnChainBroadcaster, WocBroadcastConfig, WocBroadcastNetwork};

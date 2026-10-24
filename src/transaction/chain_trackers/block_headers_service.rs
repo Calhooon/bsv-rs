@@ -31,6 +31,8 @@
 
 use async_trait::async_trait;
 
+#[cfg(feature = "http")]
+use crate::transaction::broadcasters::transport_fault as fault;
 use crate::transaction::{ChainTracker, ChainTrackerError};
 
 /// Default URL for the Block Headers Service.
@@ -152,23 +154,20 @@ impl ChainTracker for BlockHeadersServiceTracker {
             .timeout(std::time::Duration::from_millis(self.config.timeout_ms))
             .send()
             .await
-            .map_err(|e| ChainTrackerError::NetworkError(e.to_string()))?;
+            .map_err(|e| fault::tracker_send_error(&e))?;
 
         if response.status().as_u16() == 404 {
             return Err(ChainTrackerError::BlockNotFound(height));
         }
 
         if !response.status().is_success() {
-            return Err(ChainTrackerError::InvalidResponse(format!(
-                "HTTP {}",
-                response.status()
-            )));
+            return Err(fault::tracker_status_error(&response));
         }
 
         let header: HeaderResponse = response
             .json()
             .await
-            .map_err(|e| ChainTrackerError::InvalidResponse(e.to_string()))?;
+            .map_err(|e| fault::tracker_body_error(&e))?;
 
         // Handle both possible field names
         let merkle_root = header
@@ -217,19 +216,16 @@ impl ChainTracker for BlockHeadersServiceTracker {
             .timeout(std::time::Duration::from_millis(self.config.timeout_ms))
             .send()
             .await
-            .map_err(|e| ChainTrackerError::NetworkError(e.to_string()))?;
+            .map_err(|e| fault::tracker_send_error(&e))?;
 
         if !response.status().is_success() {
-            return Err(ChainTrackerError::InvalidResponse(format!(
-                "HTTP {}",
-                response.status()
-            )));
+            return Err(fault::tracker_status_error(&response));
         }
 
         let info: ChainInfo = response
             .json()
             .await
-            .map_err(|e| ChainTrackerError::InvalidResponse(e.to_string()))?;
+            .map_err(|e| fault::tracker_body_error(&e))?;
 
         // Handle various possible field names
         info.height

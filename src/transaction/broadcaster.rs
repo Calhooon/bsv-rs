@@ -23,6 +23,7 @@
 //! ```
 
 use super::transaction::Transaction;
+use crate::error::TransportFault;
 use async_trait::async_trait;
 use serde_json::Value;
 
@@ -112,6 +113,25 @@ impl BroadcastFailure {
             description,
             more: Some(more),
         }
+    }
+
+    /// The transport fault this failure reports, read from its `code`
+    /// (`NEVER_SENT`, `MAY_HAVE_BEEN_RECEIVED`, `RATE_LIMITED`; the wait
+    /// from `more`'s `retry_after_ms`); `None` for the service's own codes.
+    #[must_use]
+    pub fn transport_fault(&self) -> Option<TransportFault> {
+        let retry_after_ms = self
+            .more
+            .as_ref()
+            .and_then(|more| more.get("retry_after_ms"))
+            .and_then(Value::as_u64);
+        [
+            TransportFault::NeverSent,
+            TransportFault::MayHaveBeenReceived,
+            TransportFault::RateLimited { retry_after_ms },
+        ]
+        .into_iter()
+        .find(|fault| fault.code() == self.code)
     }
 }
 

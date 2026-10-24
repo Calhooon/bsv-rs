@@ -3,9 +3,10 @@
 //! This module provides an HTTP-based implementation of the [`WalletWire`] trait,
 //! enabling wallet communication over HTTP using the efficient binary wire protocol.
 
+use crate::transaction::broadcasters::transport_fault as fault;
 use crate::wallet::wire::{WalletCall, WalletWire};
-use crate::Error;
-use reqwest::Client;
+use crate::{Error, TransportFault};
+use reqwest::{Client, StatusCode};
 
 /// HTTP transport for the WalletWire binary protocol.
 ///
@@ -168,23 +169,35 @@ impl WalletWire for HttpWalletWire {
         let response = request
             .send()
             .await
-            .map_err(|e| Error::WalletError(format!("HTTP request failed: {}", e)))?;
+            .map_err(|e| fault::wallet_error(&e, format!("HTTP request failed: {}", e)))?;
 
-        // Check status
+        // Check status: the wire has no busy word, so a fault is the
+        // status's, read before the body
         if !response.status().is_success() {
-            let status = response.status();
+            let code = response.status();
+            let fault = fault::status_fault(code, response.headers());
             let body = response.text().await.unwrap_or_default();
-            return Err(Error::WalletError(format!(
-                "HTTP {} for {}: {}",
-                status, call_name, body
-            )));
+            let detail = format!("HTTP {} for {}: {}", code, call_name, body);
+            let status = Some(code.as_u16());
+            return Err(match (fault, code) {
+                (
+                    Some(fault @ TransportFault::RateLimited { .. }),
+                    StatusCode::TOO_MANY_REQUESTS,
+                ) => Error::TransportFault {
+                    fault,
+                    status,
+                    detail,
+                },
+                (Some(_), _) => Error::WalletTransport { status, detail },
+                (None, _) => Error::WalletError(detail),
+            });
         }
 
         // Return response bytes
         let bytes = response
             .bytes()
             .await
-            .map_err(|e| Error::WalletError(format!("failed to read response body: {}", e)))?;
+            .map_err(|e| fault::wallet_error(&e, format!("failed to read response body: {}", e)))?;
 
         Ok(bytes.to_vec())
     }
