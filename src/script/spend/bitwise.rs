@@ -3,7 +3,7 @@
 //! and `OP_RSHIFT`.
 
 use crate::script::evaluation_error::ScriptEvaluationError;
-use crate::script::op::*;
+use crate::script::op::{opcode_to_name, OP_AND, OP_EQUALVERIFY, OP_LSHIFT, OP_OR};
 
 use super::Spend;
 
@@ -47,12 +47,7 @@ impl Spend {
     }
 
     pub(super) fn op_equal(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
-        if self.stack.len() < 2 {
-            return Err(self.error(&format!(
-                "{} requires at least two items to be on the stack.",
-                opcode_to_name(opcode).unwrap_or("OP_EQUAL")
-            )));
-        }
+        self.require_two_items(opcode, "OP_EQUAL")?;
         let buf2 = self.pop_stack()?;
         let buf1 = self.pop_stack()?;
         let equal = buf1 == buf2;
@@ -70,12 +65,7 @@ impl Spend {
     }
 
     pub(super) fn op_shift(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
-        if self.stack.len() < 2 {
-            return Err(self.error(&format!(
-                "{} requires at least two items to be on the stack.",
-                opcode_to_name(opcode).unwrap_or("OP")
-            )));
-        }
+        self.require_two_items(opcode, "OP")?;
         let n_bytes = self.pop_stack()?;
         let buf = self.pop_stack()?;
 

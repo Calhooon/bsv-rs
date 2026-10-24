@@ -3,7 +3,12 @@
 
 use crate::primitives::BigNumber;
 use crate::script::evaluation_error::ScriptEvaluationError;
-use crate::script::op::*;
+use crate::script::op::{
+    opcode_to_name, OP_0NOTEQUAL, OP_1ADD, OP_1SUB, OP_2DIV, OP_2MUL, OP_ABS, OP_ADD, OP_BOOLAND,
+    OP_BOOLOR, OP_DIV, OP_GREATERTHAN, OP_GREATERTHANOREQUAL, OP_LESSTHAN, OP_LESSTHANOREQUAL,
+    OP_MAX, OP_MIN, OP_MOD, OP_MUL, OP_NEGATE, OP_NOT, OP_NUMEQUAL, OP_NUMEQUALVERIFY,
+    OP_NUMNOTEQUAL, OP_SUB,
+};
 use crate::script::script_num::ScriptNum;
 
 use super::Spend;
@@ -50,12 +55,7 @@ impl Spend {
     }
 
     pub(super) fn op_binary_number(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
-        if self.stack.len() < 2 {
-            return Err(self.error(&format!(
-                "{} requires at least two items to be on the stack.",
-                opcode_to_name(opcode).unwrap_or("OP")
-            )));
-        }
+        self.require_two_items(opcode, "OP")?;
         let buf2 = self.pop_stack()?;
         let buf1 = self.pop_stack()?;
         let bn1 = self.read_number(&buf1)?;

@@ -11,7 +11,7 @@ use crate::primitives::ec::PublicKey;
 use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, BigNumber};
 use crate::script::evaluation_error::{ExecutionContext, ScriptEvaluationError};
 use crate::script::flags::ScriptFlags;
-use crate::script::op::*;
+use crate::script::op::{opcode_to_name, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY};
 use crate::script::{Script, ScriptChunk};
 
 use super::limits::MAX_MULTISIG_KEY_COUNT;
@@ -154,18 +154,12 @@ impl Spend {
         Ok(())
     }
 
-    pub(super) fn op_codeseparator(&mut self) -> Result<(), ScriptEvaluationError> {
+    pub(super) fn op_codeseparator(&mut self) {
         self.last_code_separator = Some(self.program_counter);
-        Ok(())
     }
 
     pub(super) fn op_checksig(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
-        if self.stack.len() < 2 {
-            return Err(self.error(&format!(
-                "{} requires at least two items to be on the stack.",
-                opcode_to_name(opcode).unwrap_or("OP_CHECKSIG")
-            )));
-        }
+        self.require_two_items(opcode, "OP_CHECKSIG")?;
         let pubkey_bytes = self.pop_stack()?;
         let sig_bytes = self.pop_stack()?;
 

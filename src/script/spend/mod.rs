@@ -649,8 +649,7 @@ impl Spend {
             OP_1NEGATE => self.op_1negate(),
             OP_0 => self.op_0(),
             OP_1..=OP_16 => self.op_small_integer(opcode),
-            0x01..=0x4b => self.op_push_data(chunk),
-            OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => self.op_push_data(chunk),
+            0x01..=0x4b | OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => self.op_push_data(chunk),
 
             // flow.rs: the NOPs, OP_VER and the flow control
             OP_NOP => Ok(()),
@@ -662,7 +661,10 @@ impl Spend {
             OP_ELSE => self.op_else(),
             OP_ENDIF => self.op_endif(),
             OP_VERIFY => self.op_verify(),
-            OP_RETURN => self.op_return(),
+            OP_RETURN => {
+                self.op_return();
+                Ok(())
+            }
 
             // stack_ops.rs
             OP_TOALTSTACK => self.op_toaltstack(),
@@ -726,7 +728,10 @@ impl Spend {
             OP_SHA256 => self.op_sha256(),
             OP_HASH160 => self.op_hash160(),
             OP_HASH256 => self.op_hash256(),
-            OP_CODESEPARATOR => self.op_codeseparator(),
+            OP_CODESEPARATOR => {
+                self.op_codeseparator();
+                Ok(())
+            }
             OP_CHECKSIG | OP_CHECKSIGVERIFY => self.op_checksig(opcode),
             OP_CHECKMULTISIG | OP_CHECKMULTISIGVERIFY => self.op_checkmultisig(opcode),
 
