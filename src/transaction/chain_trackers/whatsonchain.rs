@@ -35,6 +35,8 @@
 
 use async_trait::async_trait;
 
+#[cfg(feature = "http")]
+use crate::transaction::broadcasters::transport_fault as fault;
 use crate::transaction::{ChainTracker, ChainTrackerError};
 
 /// WhatsOnChain network selection.
@@ -158,23 +160,20 @@ impl ChainTracker for WhatsOnChainTracker {
             .get(&url)
             .send()
             .await
-            .map_err(|e| ChainTrackerError::NetworkError(e.to_string()))?;
+            .map_err(|e| fault::tracker_send_error(&e))?;
 
         if response.status().as_u16() == 404 {
             return Err(ChainTrackerError::BlockNotFound(height));
         }
 
         if !response.status().is_success() {
-            return Err(ChainTrackerError::InvalidResponse(format!(
-                "HTTP {}",
-                response.status()
-            )));
+            return Err(fault::tracker_status_error(&response));
         }
 
         let header: BlockHeader = response
             .json()
             .await
-            .map_err(|e| ChainTrackerError::InvalidResponse(e.to_string()))?;
+            .map_err(|e| fault::tracker_body_error(&e))?;
 
         // Compare merkle roots case-insensitively
         Ok(header.merkleroot.to_lowercase() == root.to_lowercase())
@@ -207,19 +206,16 @@ impl ChainTracker for WhatsOnChainTracker {
             .get(&url)
             .send()
             .await
-            .map_err(|e| ChainTrackerError::NetworkError(e.to_string()))?;
+            .map_err(|e| fault::tracker_send_error(&e))?;
 
         if !response.status().is_success() {
-            return Err(ChainTrackerError::InvalidResponse(format!(
-                "HTTP {}",
-                response.status()
-            )));
+            return Err(fault::tracker_status_error(&response));
         }
 
         let info: ChainInfo = response
             .json()
             .await
-            .map_err(|e| ChainTrackerError::InvalidResponse(e.to_string()))?;
+            .map_err(|e| fault::tracker_body_error(&e))?;
 
         Ok(info.blocks)
     }

@@ -31,6 +31,13 @@
 //! Before 0.3.34 every 2xx was a success with the status word as its message,
 //! so a wallet recorded as accepted a transaction the node refused.
 //!
+//! Before the body is read, the status is asked for a transport fault
+//! (Calhooon/bsv-rs#87): a 429, or a 503 with `Retry-After`, is `RATE_LIMITED`
+//! with its wait in `more`; a 502, 503 or 504 is `MAY_HAVE_BEEN_RECEIVED`; a
+//! failure to send is `NEVER_SENT` or `MAY_HAVE_BEEN_RECEIVED`
+//! ([`BroadcastFailure::transport_fault`]). None is a verdict on the
+//! transaction.
+//!
 //! # Example
 //!
 //! ```rust,ignore
@@ -54,6 +61,8 @@
 
 use async_trait::async_trait;
 
+#[cfg(feature = "http")]
+use crate::transaction::broadcasters::transport_fault as fault;
 use crate::transaction::{
     BroadcastFailure, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
 };
@@ -383,22 +392,15 @@ impl Broadcaster for ArcBroadcaster {
             .timeout(std::time::Duration::from_millis(self.config.timeout_ms))
             .send()
             .await
-            .map_err(|e| BroadcastFailure {
-                status: BroadcastStatus::Error,
-                code: "NETWORK_ERROR".to_string(),
-                txid: Some(txid.clone()),
-                description: format!("Network error: {}", e),
-                more: None,
-            })?;
+            .map_err(|e| fault::send_failure(&e, &txid))?;
 
+        // The status before the body: a fault is not the service's word
+        let response = fault::answered(response, &txid).await?;
         let status_code = response.status();
-        let body: verdict::ArcTxResponse = response.json().await.map_err(|e| BroadcastFailure {
-            status: BroadcastStatus::Error,
-            code: "PARSE_ERROR".to_string(),
-            txid: Some(txid.clone()),
-            description: format!("Failed to parse response: {}", e),
-            more: None,
-        })?;
+        let body: verdict::ArcTxResponse = response
+            .json()
+            .await
+            .map_err(|e| fault::body_failure(&e, &txid, "Failed to parse response"))?;
 
         if status_code.is_success() {
             verdict::arc_success_verdict(body, &txid)

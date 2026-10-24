@@ -20,6 +20,8 @@ use crate::auth::types::AuthMessage;
 #[cfg(feature = "http")]
 use crate::auth::types::MessageType;
 use crate::primitives::bounded_capacity;
+#[cfg(feature = "http")]
+use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, Result};
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -646,21 +648,17 @@ impl Transport for SimplifiedFetchTransport {
                         .json(message)
                         .send()
                         .await
-                        .map_err(|e| Error::AuthError(format!("HTTP request failed: {}", e)))?;
+                        .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
 
                     if !response.status().is_success() {
-                        let status = response.status();
-                        let body = response.text().await.unwrap_or_default();
-                        return Err(Error::AuthError(format!(
-                            "Auth endpoint returned {}: {}",
-                            status, body
-                        )));
+                        return Err(fault::auth_status_error(response).await);
                     }
 
                     // Parse response as AuthMessage
-                    let response_text = response.text().await.map_err(|e| {
-                        Error::AuthError(format!("Failed to read auth response: {}", e))
-                    })?;
+                    let response_text = response
+                        .text()
+                        .await
+                        .map_err(|e| fault::auth_error(&e, "Failed to read auth response"))?;
 
                     let response_message: AuthMessage = serde_json::from_str(&response_text)
                         .map_err(|e| {
@@ -750,7 +748,7 @@ impl Transport for SimplifiedFetchTransport {
                     let response = request_builder
                         .send()
                         .await
-                        .map_err(|e| Error::AuthError(format!("HTTP request failed: {}", e)))?;
+                        .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
 
                     // Extract response headers and body
                     let response_status = response.status().as_u16();
@@ -758,7 +756,7 @@ impl Transport for SimplifiedFetchTransport {
                     let response_body = response
                         .bytes()
                         .await
-                        .map_err(|e| Error::AuthError(format!("Failed to read response: {}", e)))?
+                        .map_err(|e| fault::auth_error(&e, "Failed to read response"))?
                         .to_vec();
 
                     // Note: Auth headers on response are optional - not all servers return them

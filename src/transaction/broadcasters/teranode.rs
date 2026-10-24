@@ -25,6 +25,8 @@
 use async_trait::async_trait;
 
 #[cfg(feature = "http")]
+use crate::transaction::broadcasters::transport_fault as fault;
+#[cfg(feature = "http")]
 use crate::transaction::BroadcastResponse;
 use crate::transaction::{
     BroadcastFailure, BroadcastResult, BroadcastStatus, Broadcaster, Transaction,
@@ -132,22 +134,15 @@ impl Broadcaster for TeranodeBroadcaster {
             .timeout(std::time::Duration::from_millis(self.config.timeout_ms))
             .send()
             .await
-            .map_err(|e| BroadcastFailure {
-                status: BroadcastStatus::Error,
-                code: "NETWORK_ERROR".to_string(),
-                txid: Some(txid.clone()),
-                description: format!("Network error: {}", e),
-                more: None,
-            })?;
+            .map_err(|e| fault::send_failure(&e, &txid))?;
 
+        // The status before the body: a fault is not the service's word
+        let response = fault::answered(response, &txid).await?;
         let status_code = response.status();
-        let body = response.text().await.map_err(|e| BroadcastFailure {
-            status: BroadcastStatus::Error,
-            code: "PARSE_ERROR".to_string(),
-            txid: Some(txid.clone()),
-            description: format!("Failed to read response: {}", e),
-            more: None,
-        })?;
+        let body = response
+            .text()
+            .await
+            .map_err(|e| fault::body_failure(&e, &txid, "Failed to read response"))?;
 
         if status_code.is_success() {
             Ok(BroadcastResponse {

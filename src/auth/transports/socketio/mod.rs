@@ -101,7 +101,9 @@ use codec::{EngineIoPacket, SocketIoPacket};
 ///
 /// The error type is `String` (rather than [`crate::Error`]) so trivial
 /// substrate adapters need no dependency on the SDK error enum; the
-/// transport maps it into [`crate::Error::AuthError`] at the boundary.
+/// transport maps it into [`crate::Error::TransportFault`] at the boundary
+/// ([`crate::TransportFault::MayHaveBeenReceived`]: the sink cannot say how
+/// much of the frame it wrote).
 ///
 /// Implementors must be `Send + Sync` so [`SocketIoTransport`] satisfies
 /// the [`Transport`] bound and can be shared across the
@@ -220,7 +222,12 @@ impl<S: SocketIoSink + Clone + 'static> Transport for SocketIoTransport<S> {
         };
         self.sink
             .send_socketio(&pkt)
-            .map_err(|e| crate::Error::AuthError(format!("SocketIoTransport::send: ws: {e}")))
+            .map_err(|e| crate::Error::TransportFault {
+                // The sink cannot say how much of the frame it wrote
+                fault: crate::TransportFault::MayHaveBeenReceived,
+                status: None,
+                detail: format!("SocketIoTransport::send: ws: {e}"),
+            })
     }
 
     fn set_callback(&self, callback: Box<TransportCallback>) {

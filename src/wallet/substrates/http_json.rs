@@ -22,9 +22,10 @@ use crate::wallet::{
     VerifySignatureArgs, VerifySignatureResult, WalletCertificate, WalletInterface,
 };
 
-use crate::Error;
+use crate::transaction::broadcasters::transport_fault::{self as fault, delta_seconds_ms};
+use crate::{Error, TransportFault};
 use async_trait::async_trait;
-use reqwest::Client;
+use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 
 /// HTTP substrate using JSON payloads.
@@ -141,17 +142,29 @@ impl HttpWalletJson {
         // Check for error status
         if !response.status().is_success() {
             let status = response.status();
-            let retry_after = response
-                .headers()
-                .get(reqwest::header::RETRY_AFTER)
-                .and_then(|v| v.to_str().ok())
-                .map(str::to_owned);
+            let transport = fault::status_fault(status, response.headers());
+            let retry_after = fault::retry_after(response.headers()).map(str::to_owned);
             let text = response.text().await.unwrap_or_default();
 
             // The body's busy word, at any status, is the wallet's promise
             // that it took no action; the status alone promises nothing
             if let Some(busy) = wallet_busy_from_response(&text, retry_after.as_deref()) {
                 return Err(busy);
+            }
+            let detail = format!("HTTP {} for {}: {}", status, method, text);
+
+            // A 429, whatever the body, is a rate limit with its wait
+            if let (
+                Some(fault @ TransportFault::RateLimited { .. }),
+                StatusCode::TOO_MANY_REQUESTS,
+            ) = (transport, status)
+            {
+                let status = Some(status.as_u16());
+                return Err(Error::TransportFault {
+                    fault,
+                    status,
+                    detail,
+                });
             }
 
             // Try to parse error response
@@ -162,11 +175,9 @@ impl HttpWalletJson {
                 ));
             }
 
-            let detail = format!("HTTP {} for {}: {}", status, method, text);
-
             // A gateway status without the wallet's word is the edge's
             // answer: the way failed, and nothing is promised
-            if TRANSPORT_STATUSES.contains(&status.as_u16()) {
+            if transport.is_some() {
                 return Err(Error::WalletTransport {
                     status: Some(status.as_u16()),
                     detail,
@@ -1058,27 +1069,13 @@ fn counterparty_to_string(counterparty: &Counterparty) -> String {
     }
 }
 
-/// The statuses an edge answers when the way to the wallet failed (RFC 9110
-/// section 15.6: 502 Bad Gateway, 503 Service Unavailable, 504 Gateway
-/// Timeout); without the wallet's body code they are
-/// [`Error::WalletTransport`].
-const TRANSPORT_STATUSES: [u16; 3] = [502, 503, 504];
-
-/// Creates the error for a failed send or body read: a connection error
-/// (refused, reset, DNS; reqwest's request kind) or a timeout is
+/// Creates the error for a failed send or body read: a transport fault of
+/// the one classifier (a connection error, a timeout, a body cut) is
 /// [`Error::WalletTransport`] with no status; a request that could not be
 /// built, a redirect refused and a success body that is not the expected
 /// JSON stay [`Error::WalletError`].
 fn request_error(e: reqwest::Error, context: &str) -> Error {
-    let detail = format!("{}: {}", context, e);
-    if e.is_timeout() || e.is_request() {
-        Error::WalletTransport {
-            status: None,
-            detail,
-        }
-    } else {
-        Error::WalletError(detail)
-    }
+    fault::wallet_error(&e, format!("{}: {}", context, e))
 }
 
 /// Creates a wallet error from an error code.
@@ -1107,15 +1104,9 @@ fn wallet_busy_from_response(body: &str, retry_after: Option<&str>) -> Option<Er
 
 /// Reads a `Retry-After` value as milliseconds when it is delta-seconds
 /// (RFC 9110 section 10.2.3: `1*DIGIT`); an HTTP-date, or anything else,
-/// reads as `None`.
+/// reads as `None` (0.8.2's busy wait; a 429's wait reads a date too).
 fn parse_retry_after_ms(value: &str) -> Option<u64> {
-    let value = value.trim();
-    if value.is_empty() || !value.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
-    }
-    // A delay too long for a u64 of seconds is still a delay: saturate
-    let seconds = value.parse::<u64>().unwrap_or(u64::MAX);
-    Some(seconds.saturating_mul(1000))
+    delta_seconds_ms(value)
 }
 
 #[cfg(test)]

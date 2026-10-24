@@ -227,6 +227,26 @@ pub enum Error {
         detail: String,
     },
 
+    /// A transport fault with its class: no answer in the far side's word.
+    ///
+    /// The auth transports answer it for a connection error, a timeout and
+    /// a handshake answered 429, 502, 503 or 504; the wallet substrates for a
+    /// 429 without a busy code (their other faults stay
+    /// [`Error::WalletTransport`]). A caller may retry it after the wait of
+    /// [`TransportFault::RateLimited`]; the crate never retries by itself.
+    /// [`Error::transport_fault`] reads the class of either variant.
+    #[cfg(feature = "wallet")]
+    #[error("transport fault {fault}: {detail}")]
+    TransportFault {
+        /// What the caller may assume about the far side.
+        fault: TransportFault,
+        /// The HTTP status of the answer, when one arrived; `None` when no
+        /// answer arrived (a connection error, a timeout).
+        status: Option<u16>,
+        /// What failed, in the transport's words.
+        detail: String,
+    },
+
     /// Key derivation error.
     #[cfg(feature = "wallet")]
     #[error("key derivation error: {0}")]
@@ -427,6 +447,72 @@ pub enum Error {
     #[cfg(feature = "identity")]
     #[error("contact not found: {0}")]
     ContactNotFound(String),
+}
+
+/// The class of a transport fault: what a caller may assume about the far
+/// side when no answer arrived in its word (Calhooon/bsv-rs#87).
+///
+/// Busy is the body's word, never the HTTP status: a 502, 503 or 504 without
+/// it, a connection error or a timeout is a fault, retryable, promising
+/// nothing about what the far side did. A broadcaster's failure names the
+/// class in its `code` ([`TransportFault::code`]).
+#[cfg(feature = "transaction")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TransportFault {
+    /// No byte of the request left: the connection was never made, or the
+    /// request could not be built. A spender may release its inputs.
+    NeverSent,
+    /// The request may have reached the far side: a timeout or a connection
+    /// lost after it was written, or a 502, 503 or 504 without the far
+    /// side's word. A spender holds its inputs.
+    MayHaveBeenReceived,
+    /// The far side answered 429, or 503 with `Retry-After`: a rate limit,
+    /// never a verdict on the request.
+    RateLimited {
+        /// The wait `Retry-After` asked for, in milliseconds (delta seconds
+        /// or an HTTP date, saturating; a date passed is 0); `None` when it
+        /// was absent or unreadable. The server's word: a caller caps it.
+        retry_after_ms: Option<u64>,
+    },
+}
+
+#[cfg(feature = "transaction")]
+impl TransportFault {
+    /// The class's code word: `NEVER_SENT`, `MAY_HAVE_BEEN_RECEIVED` or
+    /// `RATE_LIMITED`, as a broadcaster's failure carries it.
+    #[must_use]
+    pub fn code(&self) -> &'static str {
+        match self {
+            Self::NeverSent => "NEVER_SENT",
+            Self::MayHaveBeenReceived => "MAY_HAVE_BEEN_RECEIVED",
+            Self::RateLimited { .. } => "RATE_LIMITED",
+        }
+    }
+}
+
+#[cfg(feature = "transaction")]
+impl std::fmt::Display for TransportFault {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.code())
+    }
+}
+
+#[cfg(feature = "wallet")]
+impl Error {
+    /// The transport fault this error reports, if it is one:
+    /// [`Error::TransportFault`]'s class, and
+    /// [`TransportFault::MayHaveBeenReceived`] for [`Error::WalletTransport`]
+    /// (it promises nothing about what the wallet did). Busy, a refusal and
+    /// every other error are `None`.
+    #[must_use]
+    pub fn transport_fault(&self) -> Option<TransportFault> {
+        match self {
+            Self::TransportFault { fault, .. } => Some(*fault),
+            Self::WalletTransport { .. } => Some(TransportFault::MayHaveBeenReceived),
+            _ => None,
+        }
+    }
 }
 
 /// Result type alias for BSV SDK operations.
