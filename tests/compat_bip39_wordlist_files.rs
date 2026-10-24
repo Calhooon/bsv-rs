@@ -2,7 +2,7 @@
 //!
 //! Each test pins one `src/compat/bip39/wordlists/<language>.txt` by its
 //! sha256, proves the public `static` is exactly that file's lines, and checks
-//! the list's first and last words. The five lists stored as upstream stores
+//! the list's words at index 0 and 2047. The five lists stored as upstream stores
 //! them carry upstream's digest at `bitcoin/bips@100ba872`; French, Japanese,
 //! Korean and Spanish are the NFC form of upstream's NFD files, the words these
 //! arrays carried before #89.

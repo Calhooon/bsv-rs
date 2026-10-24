@@ -27,7 +27,7 @@
 //! 1. Compile-time: each `static` is built by the `const fn` `parse` from its
 //!    file, so a file with another line count, an empty line, a CR or no final
 //!    LF fails the build; the type `[&str; 2048]` is unchanged
-//! 2. Runtime: `verify_english_wordlist()` checks first/last words match BIP-39 spec
+//! 2. Runtime: `verify_english_wordlist()` checks the words at index 0 and 2047 against the BIP-39 list
 
 /// Splits a wordlist file into its 2048 words, one per LF-terminated line.
 ///
