@@ -12,7 +12,7 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - `release/0.8.2`: the keeper's (captain-bsv-stack-lean). PR #102 (release/0.8.2 into main) is open and green on every job. Nothing here touches it, the tag `v0.8.2`, the `lane/*` branches or the `[Unreleased]` heading until the tag exists.
 - `beta`: this captain's line (#75). CUT 2026-10-23 22:1xZ from `main` at `v0.8.2` (`efe12e6`); protection copied from `main` (the four contexts, strict, admins, linear history, no force push or delete; read back with `gh api repos/Calhooon/bsv-rs/branches/beta/protection`); CI on `[main, beta]` by PR #103; every programme PR targets `beta`; `vX.Y.Z-beta.N` publishes a prerelease (the owner's word); `beta` merges into `main` at a phase exit as the next minor after the toolbox's and the CLI's betas built against a prerelease and the CLI's gate ran.
 
-## Where it stands (2026-10-24, 00:4xZ)
+## Where it stands (2026-10-24, 01:3xZ)
 
 - Landed on main: 0.8.2 (`efe12e6`, PR #102 merged 21:59Z, tagged `v0.8.2`, on crates.io 22:10Z, the Release run green).
 - `beta` cut and protected (above). PR #103 merged 22:4xZ (rebase; `beta` at `77fe502`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. #75's exit test held: the PR ran every check. Merged on the four required checks with the captain's own review (the captain's work).
@@ -41,7 +41,7 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 | oracle-deny | #79 | MERGED `64c7013`, #79 closed; `deny` a required check on beta | #113 | Fable: merge, no edits |
 | oracle-arch | #80 | committed `33ee129`; review blocked on the pool; relaunch with `--reuse` | | |
 | oracle-fixtures | #76 | committed `28d0c6f`; review launch blocked twice (Fable points out on the Studio); relaunch with `--reuse` at the reset | | |
-| oracle-benches | #77 | STOPPED 23:0xZ (load 255; two commits kept in its worktree); relaunch on a quiet machine with `--worktree oracle-benches` | | |
+| oracle-benches | #77 | relaunched 01:0xZ `--reuse` (Opus); three commits (`13884dd`, `939def4`, `d57cb77`); its baseline recording runs detached, waiting for a 5-minute load under 20, giving up after 90 minutes (a timer checks at 02:3xZ); the committed `baseline.json` is the first run's, recorded under load, so the review judges the Linux runner's as the one that counts | | review queued |
 | oracle-fuzz | #82 | done on the box (Opus 5.5) `box/lane/oracle-fuzz` `f0b92d5`, five commits (its origin push removed, see the lessons); filed #108, #109, #110, a comment on #105; review blocked on the box's pool; relaunch `--host box --reuse`; the review brief carries the `.gitleaks.toml` fold | | |
 | oracle-nightly | #81 | committed `14fb672`; review brief ready; launch at the reset (coordinate with the fuzz lane's `nightly.yml`) | | |
 | oracle-dependents | #83 | MERGED, #83 closed; `dependents` and `semver` jobs live, not required yet | #114 | Fable: fold (messagebox's version guard excluded; private rows skipped without the token); the captain cut the private app trees' repository paths and SHAs from the public lock pending the owner's word |
@@ -69,10 +69,17 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - The script oracle's captain is captain-bsv-script-lean; its `harness/run --impl bsv-rs --corpus seed` is the before-and-after on every change under `src/script/` or `src/transaction/`; #97 makes it a PR check.
 - The picture of the layers and the loop: http://127.0.0.1:8790/ on this machine.
 
+## The review queue (blocked 2026-10-24 00:4xZ onward)
+
+Seven branches await a cold review on a model other than their lane's: fixtures `28d0c6f` (Codex), arch `33ee129` (Codex), nightly `14fb672` (Codex), ratchet `d1a3cbb` (Codex), fuzz `box/lane/oracle-fuzz` `f0b92d5` (Opus; its review brief carries the `.gitleaks.toml` fold), fix-108 `afe0f83` (Opus, PR #119 draft), fix-120 `7638e00` (Opus, PR #121 draft). Review lanes default to Fable; every POOL account's Fable is at 0 until its week resets (the soonest about 13:00Z on 2026-10-24); the accounts holding Fable are captains' own (rule 4). The owner has been asked (01:0xZ) whether reviews may run on Opus meanwhile (`--model opus`; for the Opus-written branches that is the same model, so those three need Fable or Codex, and Codex's week is at 0%). The box has no Claude login with room (`cca login` there is the owner's). The task files are in the captain's scratchpad `tasks/review-*.txt`; relaunch with `--reuse` where a worktree folder exists.
+
+Open issues filed tonight, in queue order: #117 (the 1,000-byte customInstructions cap, the owner's ruling; the coordinated beta, behind #87), #122 (nine more varint-to-u32 casts, after #121 lands), #109 and #110 (the fuzz lane's divergences, rulings pending), #105 (the JSON substrate's two shapes, the owner's and the keeper's word), #104 (duplicate dependency versions). #120 and #115 are fixed on branches or beta.
+
 ## Rulings received 2026-10-24 00:1xZ (the keeper, relaying the owner)
 
 - #117: internalizeAction refuses `insertionRemittance.customInstructions` over 1,000 UTF-8 bytes (BRC-100 at `5119a9b`:867; no bound at `ed1b015`:860); lands in the coordinated beta with the CLI and the toolbox after the CLI captain's reading of today's app traffic; queued behind #87.
 - BRC-56: bsv-rs holds the 32-byte X with leading zeros (as Go, Python, rs-sdk); ts-sdk at `edf6e03` drops them, one key in 256 differs. Nothing of ours emits the wrong tag; an acceptance window waits for the owner's word.
+- #120 (01:0xZ): refuse a varint output index above u32::MAX with a typed error naming the field; no owner's word needed (no valid wire changes). Done on `lane/fix-120-index-varint`.
 - The deny.toml departures from the stack's seed are the record (stricter, by design); take the seed's new words the same way when it is re-stamped.
 
 ## What the keeper said (captain-bsv-stack-lean, 2026-10-23 22:3xZ)
