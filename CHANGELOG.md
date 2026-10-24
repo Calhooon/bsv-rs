@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the BIP-39 wordlists are data, not code (#89)
+
+The nine `src/compat/bip39/wordlists/<language>.rs` tables (11,055 lines of
+string literals) are nine text files, `<language>.txt`: one word per line,
+2048 lines, LF. Each `pub static` (`ENGLISH`, `JAPANESE`, ...) keeps its name
+and its type `[&str; 2048]`; its initializer is now a private `const fn` over
+`include_str!` of the file, so the arrays are built by the compiler as before
+(no build script, no lazy initialization, nothing at runtime), and a file with
+another line count, an empty line, a CR or no final LF fails the build. No
+public item moved; no word changed: the files are the old arrays byte for
+byte, pinned by sha256 in `tests/compat_bip39_wordlist_files.rs`.
+`.gitattributes` keeps the files out of line-ending conversion. The ratchet's
+path exemption for the nine `.rs` files went with them (`tools/ratchet`; the
+census reads `.rs` only, so no counter moves).
+
+### Notes: cross-SDK parity
+
+The English, Chinese Simplified, Chinese Traditional, Czech and Italian files
+are byte-identical to `bitcoin/bips@100ba872` `bip-0039/`. Upstream's French,
+Japanese, Korean and Spanish files are Unicode NFD; this crate's arrays have
+always been their NFC form, and the files keep that (a seed is unchanged
+either way, `to_seed` normalizes to NFKD; the phrase this crate prints is
+NFC, as before).
+
 ### Changed: the transport fault typed end to end (#87)
 
 0.8.2 (#73) typed the bare 502, 503, 504, connection error and timeout in

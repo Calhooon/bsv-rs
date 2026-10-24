@@ -5,3 +5,7 @@
 tests/vectors/** -text
 tests/fixtures/** -text
 fuzz/corpus/** -text
+# The BIP-39 wordlists are parsed at compile time, one word per LF-terminated
+# line; a CRLF checkout would put a CR in every word (the parser refuses it)
+# and move each file's pinned sha256 (#89).
+src/compat/bip39/wordlists/*.txt -text
