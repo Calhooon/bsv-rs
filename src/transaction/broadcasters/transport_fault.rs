@@ -69,7 +69,8 @@ fn rate_limited(retry_after: Option<&str>) -> TransportFault {
     }
 }
 
-/// The first `Retry-After` header's value, when it is text.
+/// The `Retry-After` value (the one sent earliest when repeated), when it is
+/// text.
 pub(crate) fn retry_after(headers: &HeaderMap) -> Option<&str> {
     headers.get(RETRY_AFTER).and_then(|v| v.to_str().ok())
 }
