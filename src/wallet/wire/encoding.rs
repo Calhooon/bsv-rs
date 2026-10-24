@@ -194,7 +194,7 @@ impl<'a> WireReader<'a> {
         let txid_bytes = self.read_bytes(32)?;
         let mut txid = [0u8; 32];
         txid.copy_from_slice(txid_bytes);
-        let vout = self.read_var_int_index("outpoint index")?;
+        let vout = self.read_var_int_u32("outpoint index")?;
         Ok(Outpoint::new(txid, vout))
     }
 
@@ -419,7 +419,7 @@ impl<'a> WireReader<'a> {
     pub fn read_sign_action_spend(&mut self) -> Result<SignActionSpend, Error> {
         let unlocking_script_len = self.read_var_int()? as usize;
         let unlocking_script = self.read_bytes(unlocking_script_len)?.to_vec();
-        let sequence_number = self.read_optional_var_int()?.map(|v| v as u32);
+        let sequence_number = self.read_optional_var_int_u32("sequenceNumber")?;
         Ok(SignActionSpend {
             unlocking_script,
             sequence_number,
@@ -436,7 +436,7 @@ impl<'a> WireReader<'a> {
         let mut spends =
             HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
-            let index = self.read_var_int_index("sign action spend input index")?;
+            let index = self.read_var_int_u32("sign action spend input index")?;
             let spend = self.read_sign_action_spend()?;
             spends.insert(index, spend);
         }
@@ -600,7 +600,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads an InternalizeOutput.
     pub fn read_internalize_output(&mut self) -> Result<InternalizeOutput, Error> {
-        let output_index = self.read_var_int_index("internalize output index")?;
+        let output_index = self.read_var_int_u32("internalize output index")?;
         let protocol = self.read_string()?;
         let payment_remittance = self.read_optional_wallet_payment()?;
         let insertion_remittance = self.read_optional_basket_insertion()?;
@@ -621,7 +621,7 @@ impl<'a> WireReader<'a> {
         let unlocking_script = self.read_optional_bytes()?;
         let input_description = self.read_string()?;
         // Go uses VarInt for sequence_number (not u32_le)
-        let sequence_number = self.read_var_int()? as u32;
+        let sequence_number = self.read_var_int_u32("sequenceNumber")?;
 
         Ok(WalletActionInput {
             source_outpoint,
@@ -638,7 +638,7 @@ impl<'a> WireReader<'a> {
     /// Go order: OutputIndex → Satoshis → LockingScript → Spendable
     ///          → OutputDescription → Basket → Tags → CustomInstructions
     pub fn read_wallet_action_output(&mut self) -> Result<WalletActionOutput, Error> {
-        let output_index = self.read_var_int_index("action output index")?;
+        let output_index = self.read_var_int_u32("action output index")?;
         let satoshis = self.read_var_int()?;
         let locking_script = self.read_optional_bytes()?;
         let spendable = self.read_optional_bool()?.unwrap_or(false);
@@ -684,8 +684,8 @@ impl<'a> WireReader<'a> {
             }
         };
         // Go uses VarInt for version/lockTime (not u32_le)
-        let version = self.read_var_int()? as u32;
-        let lock_time = self.read_var_int()? as u32;
+        let version = self.read_var_int_u32("version")?;
+        let lock_time = self.read_var_int_u32("lockTime")?;
 
         // Read optional inputs array (Go uses VarInt(MaxUint64) for nil)
         let inputs_count = self.read_var_int()?;

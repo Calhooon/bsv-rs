@@ -84,25 +84,38 @@ pub use transceiver::WalletWireTransceiver;
 
 use crate::Error;
 
-// The index reader lives here, not in encoding.rs: that file is held at its
-// recorded line limit by the ratchet (docs/RATCHETS.md).
+// The u32 field readers live here, not in encoding.rs: that file is held at
+// its recorded line limit by the ratchet (docs/RATCHETS.md).
 impl WireReader<'_> {
-    /// Reads an unsigned varint carrying an output or input index.
+    /// Reads an unsigned varint carrying a `u32` field: an output or input
+    /// index, a sequence number, a version, a lock time, a height, a total.
     ///
-    /// An index is a `u32` by the transaction format, so a value above
-    /// `u32::MAX` is refused with the field named, never truncated to another
-    /// index.
-    pub(crate) fn read_var_int_index(&mut self, field: &str) -> Result<u32, Error> {
+    /// Each is a `u32` by the transaction format or by BRC-100's
+    /// `PositiveIntegerOrZero` (at most `2^32 - 1`), so a value above
+    /// `u32::MAX` is refused with the field named, never truncated.
+    pub(crate) fn read_var_int_u32(&mut self, field: &str) -> Result<u32, Error> {
         let value = self.read_var_int()?;
-        u32::try_from(value).map_err(|_| {
-            Error::WalletError(format!(
-                "invalid {}: expected at most {}, got {}",
-                field,
-                u32::MAX,
-                value
-            ))
-        })
+        var_int_u32(field, value)
     }
+
+    /// Reads an optional signed varint (`-1` for absent) carrying a `u32`
+    /// field, refused above `u32::MAX` as [`Self::read_var_int_u32`] is.
+    pub(crate) fn read_optional_var_int_u32(&mut self, field: &str) -> Result<Option<u32>, Error> {
+        self.read_optional_var_int()?
+            .map(|value| var_int_u32(field, value))
+            .transpose()
+    }
+}
+
+fn var_int_u32(field: &str, value: u64) -> Result<u32, Error> {
+    u32::try_from(value).map_err(|_| {
+        Error::WalletError(format!(
+            "invalid {}: expected at most {}, got {}",
+            field,
+            u32::MAX,
+            value
+        ))
+    })
 }
 
 /// Transport abstraction for wallet wire protocol.

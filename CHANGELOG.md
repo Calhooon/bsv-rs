@@ -89,6 +89,27 @@ differently. Pinned by one test per site, `u32::MAX` read back exactly and
 `u32::MAX + 1` refused, each RED on the pre-fix code
 (`*_index_above_u32_max_is_refused_not_truncated`).
 
+### Fixed: nine more `u32` fields of the wallet wire refused above `u32::MAX`, never cast (#122)
+
+The wallet wire read nine more `u32` fields as a varint and cast them, so
+`u32::MAX + 1` read as 0: `signAction`'s spend `sequenceNumber` and an action
+input's `sequenceNumber`, an action's `version` and `lockTime`
+(`wallet/wire/encoding.rs`), `getHeaderForHeight`'s `height`
+(`wallet/wire/processor.rs`), and `totalActions`, `totalOutputs` and the two
+`totalCertificates` (`listCertificates`, `discoverByIdentityKey`) in the
+results (`wallet/wire/transceiver.rs`). The keeper's reading of #120 by its own
+reasoning: each is a `u32` by the transaction format or by BRC-100's
+`PositiveIntegerOrZero` (at most `2^32 - 1`, `ed1b015` `wallet/0100.md:393-401`;
+the height `PositiveInteger`, `:403-411`), so a larger value is not one the
+wire can mean. #120's helper is now `read_var_int_u32` with an optional
+twin for `signAction`'s `-1`-for-absent field, and the refusal is the same
+`Error::WalletError("invalid <field>: expected at most 4294967295, got <n>")`,
+the field as the frame's table names it. No valid byte reads differently.
+Pinned by `tests/wire_u32_field_bounds_tests.rs`, one test per site
+(`*_above_u32_max_is_refused_not_truncated`), each RED on the pre-fix code;
+a total drives the count of entries read after it, so its `u32::MAX` is shown
+accepted by the reader going on to the first entry.
+
 ### Notes: cross-SDK parity
 
 TypeScript's `Reader.readVarIntNum` (`ts-sdk@9e3ede6`
@@ -102,6 +123,19 @@ index no transaction has. Go's `ReadVarInt32` (go-sdk v1.7.2
 `internalize_action.go:72` and `list_actions.go:281`) casts to `uint32` and
 truncates as this crate did. Both are the references' own gap, not followed
 here (rule 1: the divergence stated, the keeper's reading the reason).
+
+The nine fields of #122 the same: TypeScript's unbounded `readVarIntNum` reads
+them at `WalletWireProcessor.ts:398` (the spend's `sequenceNumber`) and
+`:1407` (`height`), and `WalletWireTransceiver.ts:603` (`totalActions`),
+`:699-700` (`version`, `lockTime`), `:738` (the input's `sequenceNumber`),
+`:987` (`totalOutputs`), `:1675` and `:1822` (`totalCertificates`); Go's
+truncating `ReadVarInt32` (go-sdk v1.7.2 `util/reader.go:123-126`) reads
+`totalActions` at `wallet/serializer/list_actions.go:199`, version and lock
+time at `:235-236`, the input's sequence number at `:259`, `totalOutputs` at
+`list_outputs.go:134` and `height` at `get_header.go:20`, and the two
+`totalCertificates` cast `uint32(r.ReadVarInt())` at
+`list_certificates.go:132` and `discover_certificates_result.go:37`. The
+references' own gap, not followed.
 
 ## [0.8.2] - 2026-10-23
 
