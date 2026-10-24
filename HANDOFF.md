@@ -12,7 +12,7 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - `release/0.8.2`: the keeper's (captain-bsv-stack-lean). PR #102 (release/0.8.2 into main) is open and green on every job. Nothing here touches it, the tag `v0.8.2`, the `lane/*` branches or the `[Unreleased]` heading until the tag exists.
 - `beta`: this captain's line (#75). CUT 2026-10-23 22:1xZ from `main` at `v0.8.2` (`efe12e6`); protection copied from `main` (the four contexts, strict, admins, linear history, no force push or delete; read back with `gh api repos/Calhooon/bsv-rs/branches/beta/protection`); CI on `[main, beta]` by PR #103; every programme PR targets `beta`; `vX.Y.Z-beta.N` publishes a prerelease (the owner's word); `beta` merges into `main` at a phase exit as the next minor after the toolbox's and the CLI's betas built against a prerelease and the CLI's gate ran.
 
-## Where it stands (2026-10-23, 23:1xZ)
+## Where it stands (2026-10-24, 00:4xZ)
 
 - Landed on main: 0.8.2 (`efe12e6`, PR #102 merged 21:59Z, tagged `v0.8.2`, on crates.io 22:10Z, the Release run green).
 - `beta` cut and protected (above). PR #103 merged 22:4xZ (rebase; `beta` at `77fe502`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. #75's exit test held: the PR ran every check. Merged on the four required checks with the captain's own review (the captain's work).
@@ -37,14 +37,14 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 | lane | issue | status | PR | review |
 |---|---|---|---|---|
 | beta-line | #75 | merged | #103 | captain's own |
-| oracle-ratchet | #78 | running (Studio) | | |
-| oracle-deny | #79 | committed `62dd795`; review running | | oracle-deny-review (Fable, Studio) |
-| oracle-arch | #80 | running (Studio) | | |
-| oracle-fixtures | #76 | committed `28d0c6f`; review running | | oracle-fixtures-review (Studio) |
+| oracle-ratchet | #78 | committed `826a041`, `d1a3cbb`; review brief ready (`tasks/review-oracle-ratchet.txt` in the captain's scratchpad); launch at the reset | | |
+| oracle-deny | #79 | MERGED `64c7013`, #79 closed; `deny` a required check on beta | #113 | Fable: merge, no edits |
+| oracle-arch | #80 | committed `33ee129`; review blocked on the pool; relaunch with `--reuse` | | |
+| oracle-fixtures | #76 | committed `28d0c6f`; review launch blocked twice (Fable points out on the Studio); relaunch with `--reuse` at the reset | | |
 | oracle-benches | #77 | STOPPED 23:0xZ (load 255; two commits kept in its worktree); relaunch on a quiet machine with `--worktree oracle-benches` | | |
-| oracle-fuzz | #82 | done on the box (Opus 5.5) `box/lane/oracle-fuzz` `f0b92d5`, five commits (its origin push removed, see the lessons); filed #108 (a panic on input in `Certificate::from_binary`), #109, #110, a comment on #105; review running | | oracle-fuzz-review (box) |
-| oracle-nightly | #81 | running (Studio) | | |
-| oracle-dependents | #83 | committed `d313d5e`; review running | | oracle-dependents-review (Fable, Studio) |
+| oracle-fuzz | #82 | done on the box (Opus 5.5) `box/lane/oracle-fuzz` `f0b92d5`, five commits (its origin push removed, see the lessons); filed #108, #109, #110, a comment on #105; review blocked on the box's pool; relaunch `--host box --reuse`; the review brief carries the `.gitleaks.toml` fold | | |
+| oracle-nightly | #81 | committed `14fb672`; review brief ready; launch at the reset (coordinate with the fuzz lane's `nightly.yml`) | | |
+| oracle-dependents | #83 | MERGED, #83 closed; `dependents` and `semver` jobs live, not required yet | #114 | Fable: fold (messagebox's version guard excluded; private rows skipped without the token); the captain cut the private app trees' repository paths and SHAs from the public lock pending the owner's word |
 | oracle-northstar | #84 | MERGED `a3a8446`, #84 closed | #107 | Fable: fold, three edits applied |
 | fix-108-certificate-reader | #108 | briefed 23:1xZ; the box had no Claude login with room, relaunch pending (brief `docs/lanes/fix-108-certificate-reader.md`) | | |
 
@@ -54,6 +54,10 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - The Studio reached a load of 255 on 10 cores with every captain's lanes on it (22:5xZ to 23:1xZ). The CLI captain's ask, honoured: no new Studio launch for an hour, benches never measured on a loaded machine (the brief's Linux baseline on the runner is the one that counts). New launches go `--host box` (the box needs a Claude login with room). The `--host box` launch pushes the checkout's HEAD as the lane's base: detach the checkout at the wanted commit before launching, then return to `main`.
 - Issues on `beta` do not auto-close from a PR's "Closes": close them by hand with the landing note.
 - A lane's worktree keeps its commits when stopped; relaunch with the same `--worktree` to continue.
+- The Studio's internal disk fell under cca's 20 GB launch floor (19.2 GB) at 23:4xZ: Claude Code scratch under /private/tmp (the LOW captain's 6.7 GB, cleared at my ask) and the owner's app caches; `cca disk` reads it. Every launch anywhere refuses until it clears.
+- A blocked launch leaves its worktree folder behind; the relaunch needs `--reuse` or a new name.
+- Reviews default to Fable; when every Studio account's Fable points are out, review launches block until the reset (`cca status`); the owner has not named Opus for reviews.
+- The dependents job's first hosted run caught #115: a function dead under every slice without `script`, fatal for a consumer on `block` alone under `-Dwarnings`. The fix carries a clippy step per published slice (#116). #80's `cargo hack --each-feature` is the general gate.
 - Lanes never push (the stack's rule; the first briefs said only "not to main or beta"). The fuzz lane pushed `lane/oracle-fuzz` to origin; the `secrets` job (gitleaks over every fetched branch) then failed on EVERY PR with 17 generic-api-key findings in the fuzz seed corpus (identity-key hex in `fuzz/corpus/fuzz_auth_messages/*` and one string in `fuzz/corpus-gen/src/main.rs`, none a secret). The captain removed the origin copy (the commits are on the box and in the captain's local `lane/oracle-fuzz`); the fix is a `.gitleaks.toml` allowlisting `fuzz/corpus/` and the generator's literal, folded into the fuzz review. The README now says: never push; the captain pushes and opens the PR.
 
 ## What the dependents' captains asked (captain-bsv-wallet-cli, 2026-10-23)
@@ -64,6 +68,12 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - A beta prerelease is announced to the toolbox's captain (captain-bsv-wallet-toolbox-rs, epic Calhooon/bsv-wallet-toolbox-rs#80) and the CLI's captain (epic Calhooon/bsv-wallet-cli#106) with the fixtures' diff before it publishes.
 - The script oracle's captain is captain-bsv-script-lean; its `harness/run --impl bsv-rs --corpus seed` is the before-and-after on every change under `src/script/` or `src/transaction/`; #97 makes it a PR check.
 - The picture of the layers and the loop: http://127.0.0.1:8790/ on this machine.
+
+## Rulings received 2026-10-24 00:1xZ (the keeper, relaying the owner)
+
+- #117: internalizeAction refuses `insertionRemittance.customInstructions` over 1,000 UTF-8 bytes (BRC-100 at `5119a9b`:867; no bound at `ed1b015`:860); lands in the coordinated beta with the CLI and the toolbox after the CLI captain's reading of today's app traffic; queued behind #87.
+- BRC-56: bsv-rs holds the 32-byte X with leading zeros (as Go, Python, rs-sdk); ts-sdk at `edf6e03` drops them, one key in 256 differs. Nothing of ours emits the wrong tag; an acceptance window waits for the owner's word.
+- The deny.toml departures from the stack's seed are the record (stricter, by design); take the seed's new words the same way when it is re-stamped.
 
 ## What the keeper said (captain-bsv-stack-lean, 2026-10-23 22:3xZ)
 
