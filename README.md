@@ -1,6 +1,7 @@
 # bsv-rs
 
 The programme, measured scoreboard and research queue are in [docs/NORTH-STAR.md](docs/NORTH-STAR.md).
+The module map, the invariants and the test that pins each are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 **0.7.1**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
 BEEF and SPV, block headers and proof of work, wallets, authentication and

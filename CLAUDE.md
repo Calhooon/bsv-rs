@@ -39,6 +39,7 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 | `benches/` | Criterion: `hash_bench`, `primitives_bench`, `script_bench`, `memory_bench`, `beef_stream`, `merkle_path`, `transaction_sign_verify`, `wire_codec`, `script_spend`; `baseline.json` (p50/p99 per machine), gated by `tools/bench-compare` (p99 past 5 percent fails; `benches/README.md`) |
 | `fuzz/` | `fuzz_script_parser`, `fuzz_transaction_parser`, `fuzz_wire_protocol`, `fuzz_base58` |
 | `.github/workflows/ci.yml` | The matrix, clippy, fmt, docs |
+| `docs/ARCHITECTURE.md` | The picture: the module map, the invariants with the test that pins each, the lines and the gates, the numbers (#88) |
 
 ## Features
 
