@@ -9,8 +9,10 @@ use crate::primitives::hash::sha256_hmac;
 use crate::primitives::BigNumber;
 use k256::ecdsa::signature::hazmat::PrehashSigner;
 use k256::ecdsa::SigningKey;
-use k256::elliptic_curve::rand_core::OsRng;
+use k256::elliptic_curve::zeroize::Zeroizing;
 use k256::SecretKey;
+use rand::rngs::OsRng;
+use rand::RngCore;
 
 use super::{PublicKey, Signature};
 
@@ -41,8 +43,15 @@ impl PrivateKey {
     /// assert_eq!(key.to_bytes().len(), 32);
     /// ```
     pub fn random() -> Self {
-        let inner = SecretKey::random(&mut OsRng);
-        Self { inner }
+        // Rejection sampling over the OS CSPRNG, as k256 0.13's `SecretKey::random`
+        // sampled: 32 uniform bytes are a key unless they are zero or at least n.
+        loop {
+            let mut bytes = Zeroizing::new([0u8; 32]);
+            OsRng.fill_bytes(&mut bytes[..]);
+            if let Ok(inner) = SecretKey::from_slice(&bytes[..]) {
+                return Self { inner };
+            }
+        }
     }
 
     /// Creates a private key from raw 32-byte secret.
