@@ -281,11 +281,11 @@ fn canned(total: u64, rest: &[u8]) -> WalletWireTransceiver<CannedWire> {
 }
 
 /// The reader reads as many entries as the total names, so `u32::MAX` with no
-/// entry after it passes the bound and stops at the first entry's read.
+/// entry after it passes the bound and stops at the read of the entry after it.
 fn assert_read_past_total(err: Error) {
     assert!(
         matches!(err, Error::ReaderUnderflow { .. }),
-        "the total accepted, the first entry short: {err:?}"
+        "the total accepted, the entry after it short: {err:?}"
     );
 }
 
