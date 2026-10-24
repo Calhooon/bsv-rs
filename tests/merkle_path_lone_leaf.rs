@@ -165,7 +165,14 @@ fn beef_and_merkle_path_agree_on_both_owned_bodies() {
                 }
             ));
             assert_eq!(whole.verify_structure(), Err(Kind::MissingSibling));
-            assert_eq!(Beef::from_binary(&bytes).unwrap_err(), missing(1));
+            // The parse is the stream's decoder (#86): its refusal, in its
+            // words, at the leaf's offset varint.
+            assert_eq!(
+                Beef::from_binary(&bytes).unwrap_err(),
+                Error::BeefError(
+                    "invalid BEEF at byte 12: MissingSibling { level: 0, offset: 0 }".to_string()
+                )
+            );
             assert_eq!(MerklePath::from_hex(bump).unwrap_err(), missing(1));
         }
     }
