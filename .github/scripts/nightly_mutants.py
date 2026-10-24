@@ -47,7 +47,24 @@ def test_skips(surface):
 
     root = {"script": "script", "beef": "transaction", "merkle": "transaction",
             "wire": "wallet", "substrates": "wallet"}[surface]
-    skip = [f"{name}::" for name in modules("src/lib.rs") if name != root]
+    # libtest's --skip matches anywhere in a test's name, so a crate-root module's
+    # name must not be a substring of a kept module's path: `transaction::` would
+    # also skip `script::transaction::tests`, and `error::` the script evaluation
+    # error's tests. A root module whose name occurs inside the kept root's module
+    # tree is expanded to its own submodules instead; a root module without tests
+    # that collides is dropped. `skips_never_match_inside_the_kept_root` pins it.
+    kept_tree = {f"{root}::{name}::" for name in modules(f"src/{root}/mod.rs")}
+    skip = []
+    for name in modules("src/lib.rs"):
+        if name == root:
+            continue
+        if any(f"{name}::" in kept for kept in kept_tree):
+            sub_path = Path(f"src/{name}/mod.rs")
+            if sub_path.exists():
+                skip += [f"{name}::{sub}::" for sub in modules(str(sub_path))
+                         if not any(f"{name}::{sub}::" in kept for kept in kept_tree)]
+            continue
+        skip.append(f"{name}::")
     if surface in ("wire", "substrates", "merkle"):
         keep = {"wire": "wire", "substrates": "substrates", "merkle": "merkle_path"}[surface]
         skip += [f"{root}::{name}::" for name in modules(f"src/{root}/mod.rs") if name != keep]

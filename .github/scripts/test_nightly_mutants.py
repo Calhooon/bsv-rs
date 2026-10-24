@@ -195,3 +195,17 @@ class ScoreTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SkipsNeverMatchInsideTheKeptRoot(unittest.TestCase):
+    def test_skips_never_match_inside_the_kept_root(self):
+        import re
+        from pathlib import Path
+        for surface, root in (("script", "script"), ("beef", "transaction"), ("merkle", "transaction"), ("wire", "wallet"), ("substrates", "wallet")):
+            kept = [f"{root}::{m}::" for m in re.findall(r"^(?:pub(?:\([^)]*\))? )?mod (\w+)\s*[;{]", Path(f"src/{root}/mod.rs").read_text(), re.MULTILINE) if m != "tests"]
+            for skip in nightly.test_skips(surface):
+                if skip.startswith(f"{root}::"):
+                    continue
+                for path in kept:
+                    self.assertNotIn(skip, path, f"{surface}: skip {skip!r} matches inside kept {path!r}")
+

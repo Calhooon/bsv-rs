@@ -134,16 +134,16 @@ jobs:
         run: |
           python3 .github/scripts/nightly_mutants.py report \
             --input "$RUNNER_TEMP/mutation-results" --expected-shards 4 \
-            --output "$RUNNER_TEMP/mutation-scores.json"
+            --output "$RUNNER_TEMP/mutation-summary.json"
 
       - name: Upload the scoreboard
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: mutation-scores
+          name: mutation-summary
           path: |
-            ${{ runner.temp }}/mutation-scores.json
-            ${{ runner.temp }}/mutation-scores.md
+            ${{ runner.temp }}/mutation-summary.json
+            ${{ runner.temp }}/mutation-summary.md
           if-no-files-found: error
           retention-days: 30
 

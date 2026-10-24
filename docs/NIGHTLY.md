@@ -78,8 +78,8 @@ The sibling script harness remains the other oracle; production edits under
 ## Score and evidence
 
 The **Mutation score floor** job writes the per-file table to the job summary.
-The `mutation-scores` artifact holds the same table as Markdown and
-`mutation-scores.json`. The `mutants-SURFACE-SHARD` artifacts hold the generated
+The `mutation-summary` artifact holds the same table as Markdown and
+`mutation-summary.json`. The `mutants-SURFACE-SHARD` artifacts hold the generated
 candidate list, source commit, exact command, outcomes and diffs. Retention is
 30 days. They omit `lock.json`, debug logs and arbitrary test output, which can
 carry host metadata or test values. Download evidence before retention expires;
