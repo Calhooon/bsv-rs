@@ -235,6 +235,7 @@ fn options(repo: &Path) -> Result<Options> {
                     --record replaces only this platform's baseline; use in a PR explicitly requesting a baseline update.\n\
                     --from-run compares saved evidence without rerunning; cannot be used with --record.\n\
                     --skip BENCH (repeatable) does not run BENCH; it is reported as skipped, never as a pass or a regression.\n\
+                    Exit 0 pass, 1 regression, 2 setup error, 3 no baseline entry for this platform/CPU/cores.\n\
                     Set CARGO_TARGET_DIR outside the checkout and BSV_SCRIPT_CORPUS to corpus/seed.");
                 std::process::exit(0);
             }
@@ -627,6 +628,43 @@ fn summary(passed: bool, run: &Run) -> String {
     text
 }
 
+#[derive(Debug, PartialEq)]
+enum Outcome {
+    Pass,
+    Regression,
+    /// No entry for this platform, CPU model and core count: exit 3, which CI
+    /// reads as a warning to record one, never as a pass or a failure.
+    NoBaseline,
+}
+
+impl Outcome {
+    fn code(&self) -> i32 {
+        match self {
+            Outcome::Pass => 0,
+            Outcome::Regression => 1,
+            Outcome::NoBaseline => 3,
+        }
+    }
+}
+
+/// Compare a validated run with its machine's entry in the baseline.
+fn gate(baseline: &Baseline, measured: &Run) -> Result<Outcome> {
+    let platform = machine_key(measured);
+    let Some(base) = baseline.platforms.get(&platform) else {
+        let recorded: Vec<_> = baseline.platforms.keys().map(String::as_str).collect();
+        println!("Recorded baseline entries: {recorded:?}");
+        println!("NO BASELINE ENTRY: {platform}");
+        return Ok(Outcome::NoBaseline);
+    };
+    let passed = compare(base, measured)?;
+    println!("{}", summary(passed, measured));
+    Ok(if passed {
+        Outcome::Pass
+    } else {
+        Outcome::Regression
+    })
+}
+
 /// One baseline entry per platform, CPU model and core count: hosted runners
 /// draw from several CPUs, and a p99 is only compared on the hardware it came from.
 fn machine_key(run: &Run) -> String {
@@ -636,7 +674,7 @@ fn machine_key(run: &Run) -> String {
     )
 }
 
-fn run() -> Result<bool> {
+fn run() -> Result<Outcome> {
     let repo = repository()?;
     let opts = options(&repo)?;
     let measured: Run = if let Some(path) = &opts.from_run {
@@ -693,22 +731,15 @@ fn run() -> Result<bool> {
         // Write only after the complete run validates. No scratch file in the checkout.
         fs::write(&opts.baseline, serde_json::to_vec_pretty(&baseline)?)?;
         println!("RECORDED {} (explicit --record)", opts.baseline.display());
-        Ok(true)
+        Ok(Outcome::Pass)
     } else {
-        let base = baseline.platforms.get(&platform).ok_or_else(|| {
-            let recorded: Vec<_> = baseline.platforms.keys().map(String::as_str).collect();
-            format!("no baseline for {platform} (recorded: {recorded:?}); run --record on this hardware in an explicit baseline PR and commit its artifact")
-        })?;
-        let passed = compare(base, &measured)?;
-        println!("{}", summary(passed, &measured));
-        Ok(passed)
+        gate(&baseline, &measured)
     }
 }
 
 fn main() {
     match run() {
-        Ok(true) => {}
-        Ok(false) => std::process::exit(1),
+        Ok(outcome) => std::process::exit(outcome.code()),
         Err(error) => {
             eprintln!("bench-compare: {error}");
             std::process::exit(2);

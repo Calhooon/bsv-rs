@@ -722,6 +722,8 @@ jobs:
 
       # Record mode is explicit in the PR's description. Its artifact must be
       # reviewed and committed, then the marker removed for the comparison run.
+      # Exit 3 is a runner whose platform/CPU/cores key has no baseline entry
+      # yet: a warning naming the key, not a failure.
       - name: Compare p99, or record an explicitly requested baseline
         env:
           RECORD_BASELINE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.body, '[bench-baseline-record]') }}
@@ -734,8 +736,17 @@ jobs:
             cp benches/baseline.json "$RUNNER_TEMP/linux-baseline.json"
             args+=(--record --baseline "$RUNNER_TEMP/linux-baseline.json")
           fi
+          set +e
           cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- \
-            "${args[@]}" --output "$RUNNER_TEMP/bench-results"
+            "${args[@]}" --output "$RUNNER_TEMP/bench-results" | tee "$RUNNER_TEMP/bench-compare.out"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 3 ]; then
+            key=$(sed -n 's/^NO BASELINE ENTRY: //p' "$RUNNER_TEMP/bench-compare.out")
+            echo "::warning::no baseline entry for $key: record one with [bench-baseline-record]"
+            exit 0
+          fi
+          exit "$status"
 
       - name: Retain measurements and any proposed baseline
         if: always()
