@@ -184,7 +184,7 @@ impl Certificate {
         // All-zeros TXID with index 0 is treated as "no outpoint"
         let mut txid = [0u8; 32];
         txid.copy_from_slice(reader.read_bytes(32)?);
-        let vout = reader.read_varint()? as u32;
+        let vout = reader.read_varint_index("revocation outpoint index")?;
 
         // Treat all-zeros TXID with index 0 as "no outpoint"
         let revocation_outpoint = if txid == [0u8; 32] && vout == 0 {
@@ -383,6 +383,20 @@ impl<'a> BinaryReader<'a> {
         remaining
     }
 
+    /// Reads a varint carrying an output index; above `u32::MAX` is refused
+    /// with the field named, never truncated to another index.
+    fn read_varint_index(&mut self, field: &str) -> Result<u32> {
+        let value = self.read_varint()?;
+        u32::try_from(value).map_err(|_| {
+            Error::CertificateValidationError(format!(
+                "invalid {}: expected at most {}, got {}",
+                field,
+                u32::MAX,
+                value
+            ))
+        })
+    }
+
     fn read_varint(&mut self) -> Result<u64> {
         let first = self.read_u8()?;
         match first {
@@ -529,5 +543,40 @@ mod tests {
             Certificate::get_field_encryption_key_id_verifiable("email", &serial);
         assert!(verifiable_key_id.contains("email"));
         assert!(verifiable_key_id.contains(&crate::primitives::to_base64(&serial)));
+    }
+
+    #[test]
+    fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated() {
+        let certifier = PrivateKey::random();
+        let subject = PrivateKey::random().public_key();
+        let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
+        cert.revocation_outpoint = Some(Outpoint::new([3u8; 32], u32::MAX));
+        cert.sign(&certifier).unwrap();
+        let binary = cert.to_binary(true);
+
+        let parsed = Certificate::from_binary(&binary).unwrap();
+        assert_eq!(
+            parsed.revocation_outpoint,
+            Some(Outpoint::new([3u8; 32], u32::MAX))
+        );
+        assert!(parsed.verify().unwrap());
+
+        // type(32) serial(32) subject(33) certifier(33) txid(32), then the index
+        let at = 32 + 32 + 33 + 33 + 32;
+        let mut max = Vec::new();
+        write_varint(&mut max, u32::MAX as u64);
+        assert_eq!(&binary[at..at + 5], &max[..]);
+        let mut over = binary[..at].to_vec();
+        write_varint(&mut over, u32::MAX as u64 + 1);
+        over.extend_from_slice(&binary[at + 5..]);
+
+        let err = Certificate::from_binary(&over).unwrap_err();
+        assert_eq!(
+            err,
+            Error::CertificateValidationError(
+                "invalid revocation outpoint index: expected at most 4294967295, got 4294967296"
+                    .to_string()
+            )
+        );
     }
 }

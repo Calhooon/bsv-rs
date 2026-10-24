@@ -94,6 +94,23 @@ impl<'a> WireReader<'a> {
         self.inner.read_var_int()
     }
 
+    /// Reads an unsigned varint carrying an output or input index.
+    ///
+    /// An index is a `u32` by the transaction format, so a value above
+    /// `u32::MAX` is refused with the field named, never truncated to another
+    /// index.
+    pub(crate) fn read_var_int_index(&mut self, field: &str) -> Result<u32, Error> {
+        let value = self.inner.read_var_int()?;
+        u32::try_from(value).map_err(|_| {
+            Error::WalletError(format!(
+                "invalid {}: expected at most {}, got {}",
+                field,
+                u32::MAX,
+                value
+            ))
+        })
+    }
+
     // =========================================================================
     // Signed varint (for optional values)
     // =========================================================================
@@ -194,7 +211,7 @@ impl<'a> WireReader<'a> {
         let txid_bytes = self.read_bytes(32)?;
         let mut txid = [0u8; 32];
         txid.copy_from_slice(txid_bytes);
-        let vout = self.read_var_int()? as u32;
+        let vout = self.read_var_int_index("outpoint index")?;
         Ok(Outpoint::new(txid, vout))
     }
 
@@ -436,7 +453,7 @@ impl<'a> WireReader<'a> {
         let mut spends =
             HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 1));
         for _ in 0..count {
-            let index = self.read_var_int()? as u32;
+            let index = self.read_var_int_index("sign action spend input index")?;
             let spend = self.read_sign_action_spend()?;
             spends.insert(index, spend);
         }
@@ -600,7 +617,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads an InternalizeOutput.
     pub fn read_internalize_output(&mut self) -> Result<InternalizeOutput, Error> {
-        let output_index = self.read_var_int()? as u32;
+        let output_index = self.read_var_int_index("internalize output index")?;
         let protocol = self.read_string()?;
         let payment_remittance = self.read_optional_wallet_payment()?;
         let insertion_remittance = self.read_optional_basket_insertion()?;
@@ -638,7 +655,7 @@ impl<'a> WireReader<'a> {
     /// Go order: OutputIndex → Satoshis → LockingScript → Spendable
     ///          → OutputDescription → Basket → Tags → CustomInstructions
     pub fn read_wallet_action_output(&mut self) -> Result<WalletActionOutput, Error> {
-        let output_index = self.read_var_int()? as u32;
+        let output_index = self.read_var_int_index("action output index")?;
         let satoshis = self.read_var_int()?;
         let locking_script = self.read_optional_bytes()?;
         let spendable = self.read_optional_bool()?.unwrap_or(false);
@@ -2556,5 +2573,123 @@ mod tests {
             let read = reader.read_wallet_action().unwrap();
             assert_eq!(read.status, status);
         }
+    }
+
+    // =========================================================================
+    // Index bounds (bsv-rs#120): a varint index above u32::MAX is refused
+    // =========================================================================
+
+    /// Replaces the writer's 5-byte varint for `u32::MAX` at `at` with the
+    /// writer's 9-byte varint for `u32::MAX + 1`, leaving every other byte.
+    fn widen_index_past_u32(frame: &[u8], at: usize) -> Vec<u8> {
+        let mut max = WireWriter::new();
+        max.write_var_int(u32::MAX as u64);
+        assert_eq!(&frame[at..at + 5], max.as_bytes());
+        let mut over = WireWriter::new();
+        over.write_var_int(u32::MAX as u64 + 1);
+        let mut out = frame[..at].to_vec();
+        out.extend_from_slice(over.as_bytes());
+        out.extend_from_slice(&frame[at + 5..]);
+        out
+    }
+
+    fn assert_index_refused(err: Error, field: &str) {
+        assert_eq!(
+            err,
+            Error::WalletError(format!(
+                "invalid {}: expected at most 4294967295, got 4294967296",
+                field
+            ))
+        );
+    }
+
+    #[test]
+    fn an_outpoint_index_above_u32_max_is_refused_not_truncated() {
+        let mut writer = WireWriter::new();
+        writer.write_outpoint(&Outpoint::new([7u8; 32], u32::MAX));
+        let frame = writer.into_bytes();
+
+        let outpoint = WireReader::new(&frame).read_outpoint().unwrap();
+        assert_eq!(outpoint, Outpoint::new([7u8; 32], u32::MAX));
+
+        let over = widen_index_past_u32(&frame, 32);
+        let err = WireReader::new(&over).read_outpoint().unwrap_err();
+        assert_index_refused(err, "outpoint index");
+    }
+
+    #[test]
+    fn a_sign_action_spend_index_above_u32_max_is_refused_not_truncated() {
+        let mut spends = HashMap::new();
+        spends.insert(
+            u32::MAX,
+            SignActionSpend {
+                unlocking_script: vec![0x51],
+                sequence_number: None,
+            },
+        );
+        let mut writer = WireWriter::new();
+        writer.write_sign_action_spends(&spends);
+        let frame = writer.into_bytes();
+
+        let read = WireReader::new(&frame).read_sign_action_spends().unwrap();
+        assert_eq!(read.keys().copied().collect::<Vec<_>>(), vec![u32::MAX]);
+        assert_eq!(read[&u32::MAX].unlocking_script, vec![0x51]);
+
+        // [count: varint 1][index: varint][spend]
+        let over = widen_index_past_u32(&frame, 1);
+        let err = WireReader::new(&over)
+            .read_sign_action_spends()
+            .unwrap_err();
+        assert_index_refused(err, "sign action spend input index");
+    }
+
+    #[test]
+    fn an_internalize_output_index_above_u32_max_is_refused_not_truncated() {
+        let output = InternalizeOutput {
+            output_index: u32::MAX,
+            protocol: "basket insertion".to_string(),
+            payment_remittance: None,
+            insertion_remittance: None,
+        };
+        let mut writer = WireWriter::new();
+        writer.write_internalize_output(&output);
+        let frame = writer.into_bytes();
+
+        let read = WireReader::new(&frame).read_internalize_output().unwrap();
+        assert_eq!(read.output_index, u32::MAX);
+        assert_eq!(read.protocol, "basket insertion");
+
+        let over = widen_index_past_u32(&frame, 0);
+        let err = WireReader::new(&over)
+            .read_internalize_output()
+            .unwrap_err();
+        assert_index_refused(err, "internalize output index");
+    }
+
+    #[test]
+    fn a_wallet_action_output_index_above_u32_max_is_refused_not_truncated() {
+        let output = WalletActionOutput {
+            satoshis: 1000,
+            locking_script: Some(vec![0x51]),
+            spendable: true,
+            custom_instructions: None,
+            tags: vec![],
+            output_index: u32::MAX,
+            output_description: "out".to_string(),
+            basket: "default".to_string(),
+        };
+        let mut writer = WireWriter::new();
+        writer.write_wallet_action_output(&output);
+        let frame = writer.into_bytes();
+
+        let read = WireReader::new(&frame).read_wallet_action_output().unwrap();
+        assert_eq!(read.output_index, u32::MAX);
+        assert_eq!(read.satoshis, 1000);
+
+        let over = widen_index_past_u32(&frame, 0);
+        let err = WireReader::new(&over)
+            .read_wallet_action_output()
+            .unwrap_err();
+        assert_index_refused(err, "action output index");
     }
 }
