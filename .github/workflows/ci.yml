@@ -196,37 +196,13 @@ jobs:
       - name: Run unit tests
         run: cargo test --lib --all-features --verbose
 
-      - name: Run integration tests
-        run: cargo test --test integration_tests --all-features --verbose
+      # Every integration binary, on the feature set the lanes' gates and
+      # CLAUDE.md's numbers use (dhat-profiling stays out: its global
+      # allocator is why memory_profiling runs alone below). An enumerated
+      # list of binaries drifted to 34 of 73 files (#146).
+      - name: Run every integration test
+        run: cargo test --features "full,http,websocket" --tests --no-fail-fast --verbose
 
-      - name: Run cross-SDK tests
-        run: cargo test --test cross_sdk_tests --all-features --verbose
-
-      - name: Run sighash tests
-        run: cargo test --test sighash_tests --all-features --verbose
-
-      - name: Run EC tests
-        run: cargo test --test ec_tests --all-features --verbose
-
-      # the consensus witness files: every rule the differential against bitcoin-sv found, pinned on its
-      # witness transaction; never run in CI before this step (0.3.25 to 0.3.28 relied on local runs).
-      # script_stack_memory_witness holds about 100 MB at its peak (its large rows run one at a time);
-      # resource_limits pins the default mode's local budget, unchanged since 0.3.23
-      - name: Run the consensus witness tests
-        run: cargo test --test script_flags_witnesses --test script_residual_witnesses --test script_low_s_order_witness --test script_num_length_witness --test script_int64_operand_witness --test script_int64_fold_witness --test script_shift_count_witness --test script_sighash_dispatch_witness --test script_undefined_hashtype_witness --test script_stack_memory_witness --test resource_limits --all-features --verbose
-
-      # R404-H1: a LOCAL work bound within one input, never a script verdict.
-      - name: Run the local work budget witness
-        run: cargo test --test script_work_budget --all-features --verbose
-
-      # the streaming BEEF reader: the rows of the Lean definition with their offsets and kinds, the
-      # deep chain at 100,000 links on a 1 MiB stack, the wide BUMP at 16,384 leaves, the limits
-      # without a verdict
-      - name: Run the streaming BEEF witnesses
-        run: cargo test --test beef_stream --test beef_stream_deep --test beef_stream_linear_spend --test beef_stream_pause --test beef_limits --all-features --verbose
-
-      # the dhat heap measurements: one profiler per process, so each test holds the file's lock and
-      # one harness thread also keeps slow-test diagnostics out of the active global profile
       - name: Run the memory profiling tests
         run: cargo test --test memory_profiling --all-features --verbose -- --test-threads=1
 
