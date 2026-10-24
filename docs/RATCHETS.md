@@ -138,7 +138,8 @@ cargo +1.95.0 fmt --manifest-path tools/ratchet/Cargo.toml -- --check
 The compiler counters build a scratch copy of the library with
 `tools/ratchet/library.Cargo.lock` in place, so two runs resolve the same
 crates. A PR that adds, removes or bumps a dependency in the root
-`Cargo.toml` makes that lock stale, and `--check` stops with
+`Cargo.toml`, or moves the crate's own `version` (the lock records it too),
+makes that lock stale, and `--check` stops with
 `cargo clippy ... failed ...; the library lock is stale: refresh
 tools/ratchet/library.Cargo.lock (docs/RATCHETS.md, "When a dependency
 changes")` and records nothing. The refresh, tested on 2026-10-24 with a
