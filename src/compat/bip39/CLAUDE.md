@@ -13,16 +13,8 @@ The `bip39` submodule implements [BIP-39](https://github.com/bitcoin/bips/blob/m
 |------|---------|
 | `mod.rs` | Module declaration, documentation, and public re-exports |
 | `mnemonic.rs` | `Mnemonic`, `WordCount`, `Language`, `NfkdNormalize` trait, and `Display` impl (~963 lines) |
-| `wordlists/mod.rs` | Wordlist module declaration, re-exports, and `verify_english_wordlist()` |
-| `wordlists/english.rs` | English BIP-39 wordlist (2048 words as `[&str; 2048]`) |
-| `wordlists/chinese_simplified.rs` | Chinese Simplified wordlist |
-| `wordlists/chinese_traditional.rs` | Chinese Traditional wordlist |
-| `wordlists/czech.rs` | Czech wordlist |
-| `wordlists/french.rs` | French wordlist |
-| `wordlists/italian.rs` | Italian wordlist |
-| `wordlists/japanese.rs` | Japanese wordlist |
-| `wordlists/korean.rs` | Korean wordlist |
-| `wordlists/spanish.rs` | Spanish wordlist |
+| `wordlists/mod.rs` | The compile-time parser, the nine `pub static` arrays, and `verify_english_wordlist()` |
+| `wordlists/<language>.txt` | The nine wordlists as text (one word per line, 2048 lines), parsed into `pub static [&str; 2048]` arrays at compile time (#89) |
 | `wordlists/CLAUDE.md` | Wordlist submodule documentation |
 
 ## Key Exports
@@ -369,7 +361,7 @@ cargo test --features compat bip39
 cargo test --features compat
 ```
 
-27 unit tests (23 in `mnemonic.rs`, 4 in `wordlists/mod.rs`) plus 29 integration tests in `compat_bip39_tests.rs`.
+27 unit tests (23 in `mnemonic.rs`, 4 in `wordlists/mod.rs`) plus 29 integration tests in `compat_bip39_tests.rs` and 10 in `compat_bip39_wordlist_files.rs` (each file's sha256 and its equality to the array, #89).
 
 Test coverage includes:
 - All word counts (12, 15, 18, 21, 24 words)

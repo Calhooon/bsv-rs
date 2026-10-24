@@ -1,30 +1,20 @@
 # BIP-39 Wordlists
-> Static wordlist data for BIP-39 mnemonic phrase generation in 9 languages
+> The nine BIP-39 wordlists as text files, parsed into `pub static` arrays at compile time
 
 ## Overview
 
-This module provides the official BIP-39 wordlists used for encoding entropy as human-readable mnemonic phrases. Each wordlist contains exactly 2048 words, allowing 11 bits of entropy to be encoded per word. Nine languages are supported: Chinese Simplified, Chinese Traditional, Czech, English, French, Italian, Japanese, Korean, and Spanish.
+The official BIP-39 wordlists for encoding entropy as mnemonic phrases, 2048 words each (11 bits per word), in nine languages: Chinese Simplified, Chinese Traditional, Czech, English, French, Italian, Japanese, Korean and Spanish. Since #89 the words are data, not code: each language is a text file, and `mod.rs` turns each file into its array in the `static`'s initializer.
 
 ## Files
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `mod.rs` | 121 | Module declarations, re-exports, `verify_english_wordlist()`, and tests |
-| `english.rs` | 224 | Official BIP-39 English wordlist (2048 words, ~9 words/line) |
-| `chinese_simplified.rs` | 141 | Official BIP-39 Chinese Simplified wordlist (2048 words, 16 chars/line) |
-| `chinese_traditional.rs` | 141 | Official BIP-39 Chinese Traditional wordlist (2048 words, 16 chars/line) |
-| `czech.rs` | 244 | Official BIP-39 Czech wordlist (2048 words, ~9 words/line) |
-| `french.rs` | 2061 | Official BIP-39 French wordlist (2048 words, 1 word/line) |
-| `italian.rs` | 2061 | Official BIP-39 Italian wordlist (2048 words, 1 word/line) |
-| `japanese.rs` | 2061 | Official BIP-39 Japanese wordlist (2048 words, 1 word/line) |
-| `korean.rs` | 2061 | Official BIP-39 Korean wordlist (2048 words, 1 word/line) |
-| `spanish.rs` | 2061 | Official BIP-39 Spanish wordlist (2048 words, 1 word/line) |
+| File | Purpose |
+|------|---------|
+| `mod.rs` | `const fn parse`, the nine `pub static` arrays (`include_str!` of each file), `verify_english_wordlist()`, 4 unit tests |
+| `<language>.txt` (nine) | One word per line, 2048 lines, LF, UTF-8, a final LF; no other byte |
 
-## Key Exports
+`.gitattributes` marks `src/compat/bip39/wordlists/*.txt -text`: a CRLF checkout would put a CR in every line, and the parser refuses it at compile time.
 
-### Wordlist Constants
-
-Each language file exports a single `pub static` array of 2048 words:
+## The public items (unchanged by #89)
 
 ```rust
 pub static ENGLISH: [&str; 2048]
@@ -36,13 +26,45 @@ pub static ITALIAN: [&str; 2048]
 pub static JAPANESE: [&str; 2048]
 pub static KOREAN: [&str; 2048]
 pub static SPANISH: [&str; 2048]
+pub fn verify_english_wordlist() -> bool
 ```
 
-All nine are re-exported from `mod.rs`.
+A downstream can name these with their types (`bsv_rs::compat::bip39::wordlists::ENGLISH`), so the shape is a semver contract: name, `static`, `[&str; 2048]`. `parse` is private.
 
-### Boundary Words
+## How a file becomes an array
 
-Each wordlist's first and last words (verified by tests):
+`pub static ENGLISH: [&str; 2048] = parse(include_str!("english.txt"));`
+
+`parse` is a `const fn` that walks the bytes, cuts at each `\n`, and checks each word with `core::str::from_utf8` (const since 1.63; `split_at` since 1.71; MSRV 1.88 builds it). It runs in the static's initializer, i.e. in the compiler, so a bad file is a build error (`error[E0080]: evaluation panicked: ...`), never a runtime panic and never a lazy initialization:
+
+| File fault | Build error |
+|------------|-------------|
+| fewer than 2048 lines, or no final LF | `a wordlist has fewer than 2048 LF-terminated lines` |
+| more than 2048 lines | `a wordlist has more than 2048 lines` |
+| an empty line | `a wordlist line is empty` |
+| a CR anywhere (a CRLF checkout) | `a wordlist line carries a CR` |
+
+No build script, no `OUT_DIR`, no runtime cost: the arrays are in the binary's read-only data exactly as the old `.rs` tables put them. `include_str!` resolves at compile time on every target, wasm32 included. The `.txt` files ship in the crates.io package (nothing in `Cargo.toml`'s `exclude` names them).
+
+## Provenance and normalization
+
+Upstream is `bitcoin/bips` `bip-0039/<language>.txt`, read at `100ba872c808946155b1eeb8c4568058f2eea0a7` (2026-10-24). Five files are byte-identical to upstream: English, Chinese Simplified, Chinese Traditional, Czech, Italian. Upstream stores French, Japanese, Korean and Spanish in Unicode NFD; this crate's arrays have always carried their NFC form, and the files keep it (the words did not change in #89). The seed is unaffected either way (`to_seed` NFKD-normalizes the phrase); the phrase a `Mnemonic` prints is NFC.
+
+| File | sha256 (the file, 64 hex) | Upstream at `100ba872` |
+|------|--------|--------|
+| `english.txt` | `2f5eed53a4727b4bf8880d8f3f199efc90e58503646d9ff8eff3a2ed3b24dbda` | same |
+| `chinese_simplified.txt` | `5c5942792bd8340cb8b27cd592f1015edf56a8c5b26276ee18a482428e7c5726` | same |
+| `chinese_traditional.txt` | `417b26b3d8500a4ae3d59717d7011952db6fc2fb84b807f3f94ac734e89c1b5f` | same |
+| `czech.txt` | `7e80e161c3e93d9554c2efb78d4e3cebf8fc727e9c52e03b83b94406bdcc95fc` | same |
+| `italian.txt` | `d392c49fdb700a24cd1fceb237c1f65dcc128f6b34a8aacb58b59384b5c648c2` | same |
+| `french.txt` | `431c1d074225d2b7e82db857d7c3ea58051df546e7c8b74c1f6dcab36351fd56` | `ebc3959ab7801a1df6bac4fa7d970652f1df76b683cd2f4003c941c63d517e59` (NFD) |
+| `japanese.txt` | `c58cb719f782910cfcedb6ab64dc506322bd7ce4f7cede5a0563ac06d3d5c884` | `2eed0aef492291e061633d7ad8117f1a2b03eb80a29d0e4e3117ac2528d05ffd` (NFD) |
+| `korean.txt` | `4e9e6759fceb0235d6c46f0364c1c2ce541521001a9add34049aa47500872ddf` | `9e95f86c167de88f450f0aaf89e87f6624a57f973c67b516e338e8e8b8897f60` (NFD) |
+| `spanish.txt` | `0c639b0d58b6e56c18dcf418017ff341418a129e45fbf303361e8569edb02efe` | `46846a5a0139d1e3cb77293e521c2865f7bcdb82c44e8d0a06a2cd0ecba48c0b` (NFD) |
+
+The file digests are pinned in `tests/compat_bip39_wordlist_files.rs`. To check a file against upstream: `shasum -a 256` for the five; for the four, NFC-normalize each upstream line (Python's `unicodedata.normalize('NFC', line)`) and compare bytes.
+
+## Boundary Words
 
 | Wordlist | First Word | Last Word |
 |----------|-----------|-----------|
@@ -56,147 +78,27 @@ Each wordlist's first and last words (verified by tests):
 | `KOREAN` | 가격 | 힘껏 |
 | `SPANISH` | ábaco | zurdo |
 
-### `verify_english_wordlist()`
-
-```rust
-#[inline]
-pub fn verify_english_wordlist() -> bool
-```
-
-Runtime verification function that checks the English wordlist matches the BIP-39 specification. Returns `true` if:
-- Array contains exactly 2048 words (also enforced at compile-time by the type)
-- First word is "abandon"
-- Last word is "zoo"
-
-## Wordlist Integrity
-
-The wordlist integrity is verified at two levels:
-
-1. **Compile-time**: The array type `[&str; 2048]` enforces exactly 2048 words per language
-2. **Runtime**: `verify_english_wordlist()` checks English boundary words; tests verify all 9 languages
-
-## Wordlist Properties
-
-BIP-39 wordlists have specific properties for mnemonic generation:
-
-- **Alphabetical sorting**: Words are sorted (enabling efficient lookup)
-- **Unique prefixes**: Each word is uniquely identifiable by its first 4 characters (Latin-script languages)
-- **Common words**: Words are chosen to be easy to spell and recognize
-- **No similar words**: Avoids confusing word pairs (e.g., "build" vs "built")
-
-Wordlist files use different line formatting depending on the language:
-- **English, Czech**: ~9 comma-separated words per line (compact, 224/244 lines)
-- **Chinese Simplified, Chinese Traditional**: 16 characters per line (141 lines each)
-- **French, Italian, Japanese, Korean, Spanish**: 1 word per line (2061 lines each)
-
 ## Language Integration
 
-The wordlists are consumed by the `Language` enum in `mnemonic.rs`:
-
-```rust
-pub enum Language {
-    ChineseSimplified,
-    ChineseTraditional,
-    Czech,
-    #[default]
-    English,
-    French,
-    Italian,
-    Japanese,
-    Korean,
-    Spanish,
-}
-```
-
-`Language::wordlist()` returns the corresponding `&'static [&'static str; 2048]`.
-
-Japanese uses ideographic space (U+3000) as the word separator per BIP-39 spec; all other languages use ASCII space.
-
-## Usage
-
-The wordlist is typically accessed indirectly through the `Mnemonic` struct:
-
-```rust
-use bsv_rs::compat::bip39::{Mnemonic, Language, WordCount};
-
-// Default language (English)
-let mnemonic = Mnemonic::new(WordCount::Words12)?;
-
-// Specific language
-let entropy = [0u8; 16];
-let mnemonic = Mnemonic::from_entropy_with_language(&entropy, Language::Japanese)?;
-
-// Parse a phrase in a specific language
-let mnemonic = Mnemonic::from_phrase_with_language(phrase, Language::French)?;
-```
-
-Direct access to wordlists:
-
-```rust
-use bsv_rs::compat::bip39::wordlists::{ENGLISH, JAPANESE, SPANISH};
-
-// Look up word at specific index
-let word = ENGLISH[0];      // "abandon"
-let word = JAPANESE[0];     // "あいこくしん"
-let word = SPANISH[2047];   // "zurdo"
-
-// Find index of a word
-let index = ENGLISH.iter().position(|&w| w == "abandon");
-assert_eq!(index, Some(0));
-```
-
-## Index to Word Mapping
-
-The array index maps directly to the 11-bit value during mnemonic encoding:
-
-| Index | English | 11-bit Value |
-|-------|---------|--------------|
-| 0 | abandon | 00000000000 |
-| 1 | ability | 00000000001 |
-| 2 | able | 00000000010 |
-| ... | ... | ... |
-| 2046 | zone | 11111111110 |
-| 2047 | zoo | 11111111111 |
-
-## File Format
-
-Each wordlist file follows the same pattern:
-
-```rust
-//! {Language} BIP-39 wordlist.
-//! Source: <https://github.com/bitcoin/bips/blob/master/bip-0039/{language}.txt>
-
-/// The BIP-39 {Language} wordlist (2048 words).
-pub static {LANGUAGE}: [&str; 2048] = [
-    "word1", "word2", ...
-];
-```
-
-English and Czech format ~9 words per line. Chinese formats 16 characters per line. French, Italian, Japanese, Korean, and Spanish format 1 word per line.
+`Language::wordlist()` in `../mnemonic.rs` returns `&'static [&'static str; 2048]` (`&wordlists::ENGLISH`, ...); the index of a word is its 11-bit value (`ENGLISH[0]` "abandon" is `00000000000`, `ENGLISH[2047]` "zoo" is `11111111111`). Japanese joins words with the ideographic space U+3000; every other language with an ASCII space.
 
 ## Tests
 
-The module includes 4 tests in `mod.rs`:
+- `mod.rs` (4 unit tests): English integrity at indices 0, 1, 2046, 2047; English ordering; all nine have 2048 words; every list's first and last words.
+- `tests/compat_bip39_wordlist_files.rs` (10): per language, the file's sha256, the file's lines equal to the `static` element for element, and the first and last words; `verify_english_wordlist()`.
+- `tests/compat_bip39_tests.rs` (29): the TREZOR vectors and the cross-SDK cases through `Mnemonic`.
 
-| Test | Purpose |
-|------|---------|
-| `test_english_wordlist_integrity` | Verifies English word count (2048) and boundary words at indices 0, 1, 2046, 2047 |
-| `test_wordlist_is_sorted_first_chars` | Confirms English alphabetical ordering (`ENGLISH[0]` < `ENGLISH[2047]`) |
-| `test_all_wordlists_have_2048_words` | Asserts all 9 wordlists contain exactly 2048 words |
-| `test_wordlist_first_last_words` | Verifies first and last words for all 8 non-English wordlists match BIP-39 spec |
+Never edit a `.txt` to make a test pass: a changed word is a changed mnemonic for every user of that language.
 
-## Adding New Languages
+## Adding a Language
 
-To add support for an additional BIP-39 language:
-
-1. Create `{language}.rs` with `pub static {LANGUAGE}: [&str; 2048] = [...]`
-2. Add `mod {language};` and `pub use {language}::{LANGUAGE};` in `mod.rs`
-3. Add boundary word checks to `test_wordlist_first_last_words` and a length check to `test_all_wordlists_have_2048_words`
-4. Add a variant to the `Language` enum in `mnemonic.rs`
-5. Update `Language::wordlist()` and `Language::separator()` in `mnemonic.rs`
+1. Add `<language>.txt` (one word per line, 2048 lines, LF, a final LF), from upstream, in NFC.
+2. In `mod.rs`: `pub static <LANGUAGE>: [&str; 2048] = parse(include_str!("<language>.txt"));` with a doc line, and the unit tests' length and boundary checks.
+3. A `pin!` line in `tests/compat_bip39_wordlist_files.rs` with the file's sha256.
+4. A `Language` variant and its `wordlist()` and `separator()` arms in `../mnemonic.rs`.
 
 ## Related Documentation
 
-- `../CLAUDE.md` - Parent BIP-39 module documentation
-- `../../CLAUDE.md` - Compat module overview
-- `../mnemonic.rs` - `Mnemonic` struct and `Language` enum that consume wordlists
+- `../CLAUDE.md`: the BIP-39 module
+- `../../CLAUDE.md`: the compat module
+- `docs/RATCHETS.md`: the census reads `.rs` files only; nothing here is exempt

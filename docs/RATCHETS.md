@@ -67,9 +67,9 @@ The bootstrap baseline is measured from `origin/beta` at
 #116's `script` gate in `sighash.rs` and the k256 0.14 move of #125, which
 between them add two lines to `sighash.rs`, nine to `p256.rs`, five duplicate
 windows and two pedantic warnings against the v0.8.2 tree, and remove one
-function over 60 lines), not inferred from the issue's earlier summary. In that tree five wordlist files have 2,061
-lines; the other four data files are shorter. The exemptions below name all
-nine data files. The source commit is provenance, not a number to minimize.
+function over 60 lines), not inferred from the issue's earlier summary. In that tree five wordlist files had 2,061
+lines and the other four data files were shorter; the bootstrap exempted all
+nine by name, and #89 replaced them with text files the census does not read. The source commit is provenance, not a number to minimize.
 The issue's unwrap/expect total is a seed figure, not an expected fixture for
 this scanner: comments and documentation examples are not executable calls
 and do not contribute to the token census. Keep the measured output when it
@@ -86,7 +86,7 @@ those still contribute to the size of a file a reader must navigate.
 
 | JSON counter | Measurement | Why it may only fall; the work that removes it |
 | --- | --- | --- |
-| `files_over_800` | Number of files with more than 800 physical lines, with a sorted `{path, lines}` inventory. A final line without a newline counts. The nine named wordlist data files are exempt from this counter only; `wordlists/mod.rs` and future files are not exempt. | Large files obscure ownership and review. [#85](https://github.com/Calhooon/bsv-rs/issues/85) and [#86](https://github.com/Calhooon/bsv-rs/issues/86) split the interpreter and BEEF/transaction surfaces. The other entries remain visible for follow-up lanes. |
+| `files_over_800` | Number of files with more than 800 physical lines, with a sorted `{path, lines}` inventory. A final line without a newline counts. No path is exempt: the BIP-39 wordlists are `.txt` data since #89 and outside the census. | Large files obscure ownership and review. [#85](https://github.com/Calhooon/bsv-rs/issues/85) and [#86](https://github.com/Calhooon/bsv-rs/issues/86) split the interpreter and BEEF/transaction surfaces. The other entries remain visible for follow-up lanes. |
 | `unwrap_expect` | Spelled `.unwrap(...)`, `.expect(...)`, `Type::unwrap(...)` and `Type::expect(...)` calls, including turbofish calls and calls inside macro token bodies. Rust tokens distinguish calls from comments, strings, fields and `unwrap_or`. | A panic cannot be recovered on the wasm host. [#80](https://github.com/Calhooon/bsv-rs/issues/80)'s allowlist classifies the surviving sites; an allow in source never discounts this lexical count. |
 | `functions_over_60` | Parsed free functions, impl methods and trait default methods whose body spans more than 60 physical lines, including its braces. Signatures and attributes are excluded. Closures and macro-generated functions are not counted as function declarations. | Shorter functions expose control flow and make tests more focused. The extraction lanes #85 and #86 reduce these alongside their file inventories. |
 | `cognitive_complexity_over_25` | Distinct root-library Clippy `cognitive_complexity` warnings, with `cognitive-complexity-threshold = 25`. | Excess branching makes the rules harder to review. Control-flow extractions should reduce this without changing evaluator behavior; #85 and #86 carry the relevant witnesses. |
@@ -94,10 +94,11 @@ those still contribute to the size of a file a reader must navigate.
 | `duplicate_windows_40` | Excess occurrences of identical sliding windows of 40 production Rust tokens, summed across files. For a window seen N times, count N minus 1; overlapping windows count and no window crosses a file boundary. FNV-1a hashes length-delimited UTF-8 token spellings into 64 bits; exact interned-token comparisons settle hash collisions. Identifiers and literal values are retained; whitespace, comments and doc attributes are omitted. | Repeated implementation drifts when a rule changes. Extract shared logic in a behavior-preserving lane with witnesses; #85 and #86 can reduce their repeated blocks. This is a duplication signal, not a count of independent refactor opportunities. |
 | `pedantic_warnings` | Distinct root-library Clippy warnings emitted with `--cap-lints allow --force-warn clippy::pedantic --force-warn clippy::cognitive_complexity`, excluding the separately counted cognitive lint. | New code should not expand the review backlog. Reduce warnings in focused lanes; no blanket allow is a substitute for review. |
 
-The exact data exemption paths are `src/compat/bip39/wordlists/` plus
-`chinese_simplified.rs`, `chinese_traditional.rs`, `czech.rs`, `english.rs`,
-`french.rs`, `italian.rs`, `japanese.rs`, `korean.rs` and `spanish.rs`.
-[#89](https://github.com/Calhooon/bsv-rs/issues/89) moves this data to text.
+No file is exempt by path. Until [#89](https://github.com/Calhooon/bsv-rs/issues/89)
+the nine `src/compat/bip39/wordlists/<language>.rs` tables were; they are
+`<language>.txt` files now, read by `include_str!`, and the census counts
+`.rs` files only. The exemption went with them, so a future `.rs` file under
+`wordlists/` counts like any other.
 
 The token and function counters omit items with `#[test]` and code whose
 `#[cfg(...)]` cannot hold with `test = false`. This includes nested test

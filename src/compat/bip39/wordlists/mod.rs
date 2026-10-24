@@ -14,31 +14,83 @@
 //! - Korean
 //! - Spanish
 //!
+//! ## Wordlist Data
+//!
+//! Each list is a text file beside this module, `<language>.txt`: one word per
+//! line, 2048 lines, LF, UTF-8. The files are the `bitcoin/bips` `bip-0039`
+//! lists; French, Japanese, Korean and Spanish are stored in NFC (upstream
+//! stores them in NFD), the form these arrays have always carried.
+//!
 //! ## Wordlist Integrity
 //!
 //! The wordlist integrity is verified by:
-//! 1. Compile-time: Array type `[&str; 2048]` enforces exact word count
-//! 2. Runtime: `verify_wordlist()` checks first/last words match BIP-39 spec
+//! 1. Compile-time: each `static` is built by the `const fn` `parse` from its
+//!    file, so a file with another line count, an empty line, a CR or no final
+//!    LF fails the build; the type `[&str; 2048]` is unchanged
+//! 2. Runtime: `verify_english_wordlist()` checks first/last words match BIP-39 spec
 
-mod chinese_simplified;
-mod chinese_traditional;
-mod czech;
-mod english;
-mod french;
-mod italian;
-mod japanese;
-mod korean;
-mod spanish;
+/// Splits a wordlist file into its 2048 words, one per LF-terminated line.
+///
+/// Evaluated in each `static`'s initializer, so every `panic!` here is a
+/// compile error on the data, never a runtime one.
+const fn parse(text: &'static str) -> [&'static str; 2048] {
+    let mut words = [""; 2048];
+    let mut rest = text.as_bytes();
+    let mut i = 0;
+    while i < 2048 {
+        let mut end = 0;
+        while end < rest.len() && rest[end] != b'\n' {
+            if rest[end] == b'\r' {
+                panic!("a wordlist line carries a CR");
+            }
+            end += 1;
+        }
+        if end == rest.len() {
+            panic!("a wordlist has fewer than 2048 LF-terminated lines");
+        }
+        if end == 0 {
+            panic!("a wordlist line is empty");
+        }
+        let (word, tail) = rest.split_at(end);
+        words[i] = match core::str::from_utf8(word) {
+            Ok(word) => word,
+            Err(_) => panic!("a wordlist line is not UTF-8"),
+        };
+        rest = tail.split_at(1).1;
+        i += 1;
+    }
+    if !rest.is_empty() {
+        panic!("a wordlist has more than 2048 lines");
+    }
+    words
+}
 
-pub use chinese_simplified::CHINESE_SIMPLIFIED;
-pub use chinese_traditional::CHINESE_TRADITIONAL;
-pub use czech::CZECH;
-pub use english::ENGLISH;
-pub use french::FRENCH;
-pub use italian::ITALIAN;
-pub use japanese::JAPANESE;
-pub use korean::KOREAN;
-pub use spanish::SPANISH;
+/// The BIP-39 Chinese Simplified wordlist (2048 words), from `chinese_simplified.txt`.
+pub static CHINESE_SIMPLIFIED: [&str; 2048] = parse(include_str!("chinese_simplified.txt"));
+
+/// The BIP-39 Chinese Traditional wordlist (2048 words), from `chinese_traditional.txt`.
+pub static CHINESE_TRADITIONAL: [&str; 2048] = parse(include_str!("chinese_traditional.txt"));
+
+/// The BIP-39 Czech wordlist (2048 words), from `czech.txt`.
+pub static CZECH: [&str; 2048] = parse(include_str!("czech.txt"));
+
+/// The BIP-39 English wordlist (2048 words), from `english.txt`.
+pub static ENGLISH: [&str; 2048] = parse(include_str!("english.txt"));
+
+/// The BIP-39 French wordlist (2048 words), from `french.txt`.
+pub static FRENCH: [&str; 2048] = parse(include_str!("french.txt"));
+
+/// The BIP-39 Italian wordlist (2048 words), from `italian.txt`.
+pub static ITALIAN: [&str; 2048] = parse(include_str!("italian.txt"));
+
+/// The BIP-39 Japanese wordlist (2048 words), from `japanese.txt`.
+pub static JAPANESE: [&str; 2048] = parse(include_str!("japanese.txt"));
+
+/// The BIP-39 Korean wordlist (2048 words), from `korean.txt`.
+pub static KOREAN: [&str; 2048] = parse(include_str!("korean.txt"));
+
+/// The BIP-39 Spanish wordlist (2048 words), from `spanish.txt`.
+pub static SPANISH: [&str; 2048] = parse(include_str!("spanish.txt"));
 
 /// Verifies the English wordlist integrity.
 ///

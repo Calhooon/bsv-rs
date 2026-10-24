@@ -12,18 +12,6 @@ use syn::{Attribute, Expr, Item, Meta, Token};
 type Position = (usize, usize);
 type Range = (Position, Position);
 
-const WORDLISTS: &[&str] = &[
-    "chinese_simplified",
-    "chinese_traditional",
-    "czech",
-    "english",
-    "french",
-    "italian",
-    "japanese",
-    "korean",
-    "spanish",
-];
-
 pub fn rust_files(root: &Path) -> Result<Vec<PathBuf>> {
     fn walk(dir: &Path, files: &mut Vec<PathBuf>) -> Result<()> {
         for entry in std::fs::read_dir(dir)? {
@@ -46,12 +34,6 @@ pub fn rust_files(root: &Path) -> Result<Vec<PathBuf>> {
     walk(&root.join("src"), &mut files)?;
     files.sort();
     Ok(files)
-}
-
-fn wordlist(path: &str) -> bool {
-    WORDLISTS
-        .iter()
-        .any(|name| path == format!("src/compat/bip39/wordlists/{name}.rs"))
 }
 
 fn test_path(path: &Path) -> bool {
@@ -439,7 +421,7 @@ pub fn measure(root: &Path, commit: &str) -> Result<Snapshot> {
         let path = relative.to_string_lossy().replace('\\', "/");
         let text = std::fs::read_to_string(&file)?;
         let lines = text.lines().count();
-        if lines > 800 && !wordlist(&path) {
+        if lines > 800 {
             snapshot.files_over_800.push(LargeFile {
                 path: path.clone(),
                 lines,
@@ -497,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn physical_file_threshold_includes_tests_but_exempts_only_named_data() -> Result<()> {
+    fn physical_file_threshold_includes_tests_and_exempts_no_path() -> Result<()> {
         let fixture = crate::test_support::fixture()?;
         let src = fixture.path.join("src");
         std::fs::write(src.join("lib.rs"), "#[cfg(test)] mod checks;\n")?;
@@ -508,10 +490,14 @@ mod tests {
         std::fs::write(wordlists.join("english.rs"), "// data\n".repeat(801))?;
         std::fs::write(wordlists.join("new_code.rs"), "// code\n".repeat(801))?;
         let snapshot = measure(&fixture.path, &fixture.commit)?;
-        assert_eq!(snapshot.metrics.files_over_800, 2);
+        assert_eq!(snapshot.metrics.files_over_800, 3);
         assert_eq!(snapshot.files_over_800[0].path, "src/checks.rs");
         assert_eq!(
             snapshot.files_over_800[1].path,
+            "src/compat/bip39/wordlists/english.rs"
+        );
+        assert_eq!(
+            snapshot.files_over_800[2].path,
             "src/compat/bip39/wordlists/new_code.rs"
         );
         Ok(())
@@ -586,10 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn only_named_wordlist_data_paths_are_exempt() {
-        assert!(wordlist("src/compat/bip39/wordlists/english.rs"));
-        assert!(!wordlist("src/compat/bip39/wordlists/mod.rs"));
-        assert!(!wordlist("src/compat/bip39/wordlists/new_code.rs"));
+    fn only_paths_under_a_tests_component_are_test_paths() {
         assert!(test_path(Path::new("src/example/tests/check.rs")));
         assert!(!test_path(Path::new("src/contest.rs")));
     }
