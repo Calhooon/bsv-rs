@@ -25,6 +25,8 @@ Each target's assertion is "returns, never panics"; the column says where a targ
 | `fuzz_script_spend` | an unlocking and locking script pair through `Spend` under the block and the standard word (byte 0: the word, the era, the version; bytes 1-2 the unlocking length), a work budget of 50,000 and a memory budget of 1 MiB | a counting allocator: no single allocation over twice the budget and no more than four times it live, plus a term linear in the input; never a verdict | the sibling harness's seed rows (`bsv-script-lean/corpus/seed/seed.jsonl`), one per family in git (75), the rest under `/Volumes/Lanes/out/bsv-rs/oracle-fuzz/corpus/`; `script_valid.json`, `spend_valid.json` |
 | `fuzz_auth_messages` | `AuthMessage` from JSON (as the HTTP and WebSocket transports read it, and as the Socket.IO transport reads an event's second argument), `validate`, `signing_data`, key ids; the Engine.IO and Socket.IO frames; the General message's `HttpRequest`/`HttpResponse` payloads; `Certificate` from bytes and JSON; `RequestedCertificateSet`; the auth headers; a nonce's format | payload, certificate and frame encodings reparse to themselves (one frame class skipped for #110) | messages of each type, certificates from `auth_certificate.json`, frames, payloads, written by this crate |
 
+The stated gap: five readers have no target yet, `messages::signed::verify`, `messages::encrypted::decrypt`, `compat::bsm`, `compat::bip39` and `KeyShares::from_backup_format`; their targets are #140.
+
 `support/mod.rs` holds the arguments of each wallet call (the serde-shaped ones read from the Go vectors, reshaped to this crate's serde form until #105 is ruled) and `call_shared!`, which both response-decoder targets use.
 
 ## Target Details
