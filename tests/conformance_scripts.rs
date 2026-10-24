@@ -419,7 +419,7 @@ fn is_p2sh_hex(script_pubkey_hex: &str) -> bool {
 ///
 /// *** BUG 1 (15 vectors): bsv-rs OP_CHECKMULTISIG validates the DER/pubkey
 /// encoding of EVERY signature and public key up front
-/// (src/script/spend.rs::op_checkmultisig), while the node and ts-sdk only
+/// (src/script/spend/crypto.rs::op_checkmultisig), while the node and ts-sdk only
 /// check encodings for (sig, key) pairs actually evaluated — empty sigs and
 /// keys skipped after an early exit are never encoding-checked. Fixtures with
 /// e.g. 20 empty sigs against garbage pubkeys wrapped in NOT are consensus-
@@ -1444,12 +1444,12 @@ fn shift_via_interpreter(value: &[u8], shift_bits: i64, shift_op: u8, want: &[u8
 /// `BigNumber::mul(1<<n)` + `to_bytes_be(buf.len())`, and `to_bytes_be`
 /// PANICS ("BigNumber requires N bytes, but only M requested") whenever the
 /// shifted value overflows the original width, instead of dropping the high
-/// bits like the node and the fixed ts-sdk/go-sdk do. src/script/spend.rs
-/// (OP_LSHIFT arm) + src/primitives/bignum.rs::to_bytes_be. ***
+/// bits like the node and the fixed ts-sdk/go-sdk do. src/script/spend/bitwise.rs
+/// (`shifted`) + src/primitives/bignum.rs::to_bytes_be. ***
 const REGRESSION_KNOWN_FAILURES: &[(&str, &str)] = &[
     // (lshift-truncation.0001/.0003 FIXED 2026-07-08: OP_LSHIFT/OP_RSHIFT are
     // now width-preserving bitwise byte shifts — no BigNumber, no panic, no
-    // 63-bit clamp. src/script/spend.rs.)
+    // 63-bit clamp. src/script/spend/bitwise.rs, `shifted`.)
     // *** BUG (ASM parity): ScriptChunk::to_asm renders OP_0 as "0" (and
     // OP_1NEGATE as "-1"), while ts-sdk renders "OP_0"/"OP_1NEGATE". Scripts
     // round-tripped through ASM across the two SDKs disagree.

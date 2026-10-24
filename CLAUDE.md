@@ -28,7 +28,7 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 | `src/util/` | wasm32-safe time helpers (`pub(crate)`) |
 | `src/primitives/` | hash, EC (secp256k1, P-256, Shamir, ECDH), symmetric (AES-256-GCM), `BigNumber`, DRBG, encoding, `bsv/` (sighash, `SighashCache`) |
 | `src/block/` | `BlockHeader`, `CompactTarget`, `check_proof_of_work`, `ChainWork`, merkle roots; `ChainParams` and `next_work_required` (the node's `GetNextWorkRequired`, `difficulty.rs`) |
-| `src/script/` | `Script`/chunks/opcodes, `spend.rs` (the interpreter), `flags.rs` (the node's flag words: `ScriptFlags`, `ProtocolEra`), `templates/` (P2PKH, P2PK, Multisig, RPuzzle, PushDrop) |
+| `src/script/` | `Script`/chunks/opcodes, `spend/` (the interpreter, one module per opcode group; the map is `src/script/CLAUDE.md`), `flags.rs` (the node's flag words: `ScriptFlags`, `ProtocolEra`), `templates/` (P2PKH, P2PK, Multisig, RPuzzle, PushDrop) |
 | `src/transaction/` | `Transaction`, inputs/outputs, `beef.rs`, `merkle_path.rs`, fee models, broadcasters (ARC, WoC, Teranode), chain trackers |
 | `src/wallet/` | `KeyDeriver`, `ProtoWallet`, `WalletClient`, `substrates/` (HTTP JSON), `wire/` (the BRC-100 binary protocol), validation |
 | `src/auth/` | `Peer`, sessions, certificates (BRC-52/53), `transports/` (HTTP, WebSocket, Socket.IO), utils (nonces, validation) |
