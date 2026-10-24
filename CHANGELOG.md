@@ -71,6 +71,32 @@ the three certificate tests RED on the pre-fix tree; the HTTP sites RED on
 wasm32 only, a length near `u32::MAX`, which no 64-bit run can show; the 535
 crash inputs of the class replay with no panic.
 
+### Fixed: a varint index above `u32::MAX` is refused, never cast (#120)
+
+Five readers took an output or input index as a varint and cast it with
+`as u32`, so `u32::MAX + 1` read as index 0 and a frame named a different
+outpoint in silence: the wallet wire's outpoint, its `signAction` spend
+index, `internalizeAction`'s output index and an action output's index
+(`wallet/wire/encoding.rs`), and a certificate's revocation outpoint index
+(`auth/certificates/certificate.rs`). The keeper's reading: an index is a
+`u32` by the transaction format, so a larger value is not one the wire can
+mean, and invalid bytes get a typed refusal naming the field, never a
+reinterpretation. The wire reader refuses with its own malformed-field
+error, `Error::WalletError("invalid <field>: expected at most 4294967295,
+got <n>")`, and the certificate reader with
+`Error::CertificateValidationError` in the same words; no valid byte reads
+differently. Pinned by one test per site, `u32::MAX` read back exactly and
+`u32::MAX + 1` refused, each RED on the pre-fix code
+(`*_index_above_u32_max_is_refused_not_truncated`).
+
+### Notes: cross-SDK parity
+
+TypeScript's `Reader.readVarIntNum` (`ts-sdk@9e3ede6`
+`src/primitives/utils.ts:743-763`, called for these indexes in
+`Certificate.ts:169` and `WalletWireProcessor.ts:20`) returns any number up
+to 2^53 with no `u32` bound, so it reads the same frames as an index no
+transaction has; that is the reference's own gap, not followed here.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added: the wallet's transport fault (Calhooon/bsv-rs#73)
