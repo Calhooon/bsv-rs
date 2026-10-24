@@ -12,7 +12,15 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - `release/0.8.2`: the keeper's (captain-bsv-stack-lean). PR #102 (release/0.8.2 into main) is open and green on every job. Nothing here touches it, the tag `v0.8.2`, the `lane/*` branches or the `[Unreleased]` heading until the tag exists.
 - `beta`: this captain's line (#75). CUT 2026-10-23 22:1xZ from `main` at `v0.8.2` (`efe12e6`); protection copied from `main` (the four contexts, strict, admins, linear history, no force push or delete; read back with `gh api repos/Calhooon/bsv-rs/branches/beta/protection`); CI on `[main, beta]` by PR #103; every programme PR targets `beta`; `vX.Y.Z-beta.N` publishes a prerelease (the owner's word); `beta` merges into `main` at a phase exit as the next minor after the toolbox's and the CLI's betas built against a prerelease and the CLI's gate ran.
 
-## Where it stands (2026-10-24, 04:3xZ)
+## Where it stands (2026-10-24, 06:3xZ)
+
+- `beta` at `4e4b40c` (ratchet #132 pending, see the table). Landed since `32e8ad5` (PR #128): #129 the interim deny ignore entry (`f2f1676`); #134 `.gitleaks.toml` allowlisting `tests/fixtures/` and `fuzz/corpus/` (`88b25a9`; a planted key still fires); #130 fixtures (`86c0517`, #76 closed); #127 the RUSTSEC-2026-0387 move (`98499b9`, #125 closed; `deny` green with an empty ignore list); #133 nightly mutants (`baafa5e`, #81 closed); #131 arch rules and the feature matrix (`4e4b40c`, #80 closed). Each merged on its five required checks after a cold review; the merges ran as one background loop that rebased the rest after each landing.
+- PR #135 into `main`: the advisory fix cherry-picked (`-x`) onto `main` for the 0.8.3 patch, without the `deny.toml` edit or the #115 section; the version bump and the tag are the owner's word. The keeper has `98499b9` and waits for #135's number green, then the owner's tag before the template's entry leaves.
+- Ratchet #132 (`lane/oracle-ratchet`): the `ratchet` job refused the v0.8.2 bootstrap baseline against beta's tree (#116's gate and the k256 move moved four counters). The captain refreshed `library.Cargo.lock` by the documented procedure and re-recorded the baseline at `4e4b40c` (`--record --revision`), RATCHETS.md naming what moved; `--check` passes locally; a background loop merges it on green. #78 closes by hand then.
+- The review model: John's word via the CLI captain (Fable from the soonest-expiring weeks, then Opus) applied to the Codex-written branches: fixtures, arch, nightly and ratchet were reviewed on Opus, each came back fold, folds applied. #127 (Opus-written) had the captain's own Fable review (no Fable pool account; John may overrule). Still waiting for Fable or John's word that Opus may review Opus: fuzz, benches #124, fix-108 #119, fix-120 #121 (the queue below).
+- Cross-CLI comparison of the HTTP JSON substrate at the CLI's `d93e077` fixtures: findings recorded on #105 as items 5 to 8 (protocolID/keyID casing, byte arrays against hex); the owner's and the keeper's word before any shape moves.
+
+## Where it stood (2026-10-24, 04:3xZ)
 
 - Landed on main: 0.8.2 (`efe12e6`, PR #102 merged 21:59Z, tagged `v0.8.2`, on crates.io 22:10Z, the Release run green).
 - `beta` cut and protected (above). PR #103 merged 22:4xZ (rebase; `beta` at `77fe502`): ci.yml on both lines, release.yml's tag-shape check, RELEASING steps 11 to 16, `docs/lanes/`, this file. #75's exit test held: the PR ran every check. Merged on the four required checks with the captain's own review (the captain's work).
@@ -37,16 +45,18 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 | lane | issue | status | PR | review |
 |---|---|---|---|---|
 | beta-line | #75 | merged | #103 | captain's own |
-| oracle-ratchet | #78 | committed `826a041`, `d1a3cbb`; review brief ready (`tasks/review-oracle-ratchet.txt` in the captain's scratchpad); launch at the reset | | |
+| oracle-ratchet | #78 | rebased on beta, lock refreshed and baseline re-recorded at `4e4b40c` (`8e09288`); merge loop armed | #132 | Opus: fold (the lock-refresh procedure documented and tested), applied |
 | oracle-deny | #79 | MERGED `64c7013`, #79 closed; `deny` a required check on beta | #113 | Fable: merge, no edits |
-| oracle-arch | #80 | committed `33ee129`; review blocked on the pool; relaunch with `--reuse` | | |
-| oracle-fixtures | #76 | committed `28d0c6f`; review launch blocked twice (Fable points out on the Studio); relaunch with `--reuse` at the reset | | |
+| oracle-arch | #80 | MERGED `4e4b40c`, #80 closed; `features` and `wasm32` jobs live | #131 | Opus: fold (baseline paragraph names #115's fix; duplicate step dropped), applied |
+| oracle-fixtures | #76 | MERGED `86c0517`, #76 closed; `fixtures` job live; the `.gitleaks.toml` allowlist (#134) went in ahead of it | #130 | Opus: fold (pin `ed1b015`, 67 commit lines re-recorded; FIXTURES.md), applied |
 | oracle-benches | #77 | done (third pass, Opus, foreground) `05da1ad`: five benches, bench-compare, the macOS baseline (207 rows, Apple M1 Max, load 12 to 34); the first recording's abort was the capture pipe closing | #124 DRAFT | review queued; fold item: the benchmarks job fails closed without `BSV_SCRIPT_CORPUS_TOKEN` (skip script_spend with a warning instead) |
 | oracle-fuzz | #82 | done on the box (Opus 5.5) `box/lane/oracle-fuzz` `f0b92d5`, five commits (its origin push removed, see the lessons); filed #108, #109, #110, a comment on #105; review blocked on the box's pool; relaunch `--host box --reuse`; the review brief carries the `.gitleaks.toml` fold | | |
-| oracle-nightly | #81 | committed `14fb672`; review brief ready; launch at the reset (coordinate with the fuzz lane's `nightly.yml`) | | |
+| oracle-nightly | #81 | MERGED `baafa5e`, #81 closed; `mutation-summary.json` is the scoreboard's file; the fuzz lane's `nightly.yml` reconciles with this one | #133 | Opus: fold (a skip never matches inside the kept root, pinned by the checker's test), applied |
 | oracle-dependents | #83 | MERGED, #83 closed; `dependents` and `semver` jobs live, not required yet | #114 | Fable: fold (messagebox's version guard excluded; private rows skipped without the token); the captain cut the private app trees' repository paths and SHAs from the public lock pending the owner's word |
 | oracle-northstar | #84 | MERGED `a3a8446`, #84 closed | #107 | Fable: fold, three edits applied |
-| fix-108-certificate-reader | #108 | briefed 23:1xZ; the box had no Claude login with room, relaunch pending (brief `docs/lanes/fix-108-certificate-reader.md`) | | |
+| fix-108-certificate-reader | #108 | done (Opus) `afe0f83`; review waits (Opus-written) | #119 DRAFT | |
+| fix-120-index-varint | #120 | done (Opus) `7638e00`; review waits (Opus-written); #122 queued behind it | #121 DRAFT | |
+| fix-0387-k256-0.14 | #125 | MERGED `98499b9`, #125 closed; the main patch is #135 | #127 | the captain's own (Fable); fold applied (`bdc0642`) |
 
 ## Lessons of the night (2026-10-23, late)
 
@@ -58,6 +68,9 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - A blocked launch leaves its worktree folder behind; the relaunch needs `--reuse` or a new name.
 - Reviews default to Fable; when every Studio account's Fable points are out, review launches block until the reset (`cca status`); the owner has not named Opus for reviews.
 - The dependents job's first hosted run caught #115: a function dead under every slice without `script`, fatal for a consumer on `block` alone under `-Dwarnings`. The fix carries a clippy step per published slice (#116). #80's `cargo hack --each-feature` is the general gate.
+- The ratchet's bootstrap baseline is the line's tree at the moment the ratchet lands, not the tag's: recorded at v0.8.2, it refused the four landings between. Re-record with `--record --revision <beta tip>` after a rebase, with the lock refresh when a dependency moved, and say in RATCHETS.md what moved and from which PRs. Any later red ratchet is a real increase.
+- gitleaks runs over every fetched branch and reads identity-key hex in fixtures as generic API keys: `.gitleaks.toml` allowlists `tests/fixtures/` and `fuzz/corpus/` by path (#134); a planted key outside them still fires. A fixture lane's branch trips it until the allowlist is on the base.
+- A PR to `main` is prepared, never merged, without the owner's word: `main` is the stable line and the patch's merge is the step before the tag.
 - Lanes never push (the stack's rule; the first briefs said only "not to main or beta"). The fuzz lane pushed `lane/oracle-fuzz` to origin; the `secrets` job (gitleaks over every fetched branch) then failed on EVERY PR with 17 generic-api-key findings in the fuzz seed corpus (identity-key hex in `fuzz/corpus/fuzz_auth_messages/*` and one string in `fuzz/corpus-gen/src/main.rs`, none a secret). The captain removed the origin copy (the commits are on the box and in the captain's local `lane/oracle-fuzz`); the fix is a `.gitleaks.toml` allowlisting `fuzz/corpus/` and the generator's literal, folded into the fuzz review. The README now says: never push; the captain pushes and opens the PR.
 
 ## What the dependents' captains asked (captain-bsv-wallet-cli, 2026-10-23)
@@ -69,11 +82,13 @@ The programme runs continuously: brief a lane, launch it, land it, launch the ne
 - The script oracle's captain is captain-bsv-script-lean; its `harness/run --impl bsv-rs --corpus seed` is the before-and-after on every change under `src/script/` or `src/transaction/`; #97 makes it a PR check.
 - The picture of the layers and the loop: http://127.0.0.1:8790/ on this machine.
 
-## The review queue (blocked 2026-10-24 00:4xZ onward)
+## The review queue (2026-10-24 06:3xZ)
 
-Nine branches await a cold review on a model other than their lane's: fix-0387 `ef7dac6` (Opus, PR #127 draft; FIRST), benches `05da1ad` (Opus, PR #124 draft), fixtures `28d0c6f` (Codex), arch `33ee129` (Codex), nightly `14fb672` (Codex), ratchet `d1a3cbb` (Codex), fuzz `box/lane/oracle-fuzz` `f0b92d5` (Opus; its review brief carries the `.gitleaks.toml` fold), fix-108 `afe0f83` (Opus, PR #119 draft), fix-120 `7638e00` (Opus, PR #121 draft). Review lanes default to Fable; every POOL account's Fable is at 0 until its week resets (the soonest about 13:00Z on 2026-10-24); the accounts holding Fable are captains' own (rule 4). The owner has been asked (01:0xZ) whether reviews may run on Opus meanwhile (`--model opus`; for the Opus-written branches that is the same model, so those three need Fable or Codex, and Codex's week is at 0%). The box has no Claude login with room (`cca login` there is the owner's). The task files are in the captain's scratchpad `tasks/review-*.txt`; relaunch with `--reuse` where a worktree folder exists.
+Four branches await a cold review on a model other than their lane's, all Opus-written: benches `05da1ad` (PR #124 draft; fold item: skip `script_spend` with a warning when `BSV_SCRIPT_CORPUS_TOKEN` is absent), fuzz `box/lane/oracle-fuzz` `f0b92d5` (the review brief carries the `.gitleaks.toml` fold, one hit left in `fuzz/corpus-gen/src/main.rs`, and the `nightly.yml` reconciliation with #133's), fix-108 `afe0f83` (PR #119 draft), fix-120 `7638e00` (PR #121 draft). They need Fable (the POOL accounts' Fable resets about 14:00Z; the timer `bdrmdz2mz` re-reads the pool at 12:30Z) or John's word that Opus may review Opus. The box still has no Claude login with room (`cca login` there is the owner's). Task files: the captain's scratchpad `tasks/review-*.txt`; relaunch with `--reuse` where a worktree folder exists.
 
-Open issues filed tonight, in queue order: #125 (RUSTSEC-2026-0387; the fix on #127; the keeper's template carries an ignore entry citing it until the 0.8.3 tag), #126 (P-256 verify 2x slower after p256 0.14), #117 (the 1,000-byte customInstructions cap, the owner's ruling; the coordinated beta, behind #87), #122 (nine more varint-to-u32 casts, after #121 lands), #109 and #110 (the fuzz lane's divergences, rulings pending), #105 (the JSON substrate's two shapes, the owner's and the keeper's word), #104 (duplicate dependency versions). #120 and #115 are fixed on branches or beta.
+Open issues, in queue order: #126 (P-256 verify 2x slower after p256 0.14), #117 (the 1,000-byte customInstructions cap; the coordinated beta, behind #87), #122 (nine more varint-to-u32 casts, after #121), #109 and #110 (the fuzz lane's divergences, rulings pending), #105 items 1 to 8 (the JSON substrate's shapes; the owner's and the keeper's word), #104 (duplicate dependency versions). Owner decisions outstanding: Opus for reviews of Opus branches; the box login; whether the private app trees' repository paths may be public in `docs/dependents.lock`; `DEPENDENTS_READ_TOKEN` and `BSV_SCRIPT_CORPUS_TOKEN`; the 0.8.3 tag after #135.
+
+Wave 2 after #132 and the four reviews: #87 ahead of the rest (the CLI and the toolbox wait on it), then #89, #85, #86, #88.
 
 ## Rulings received 2026-10-24 00:1xZ (the keeper, relaying the owner)
 
