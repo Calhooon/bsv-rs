@@ -11,6 +11,9 @@ on:
       DEPENDENTS_READ_TOKEN:
         description: Read-only access to the private consumers in docs/dependents.lock
         required: false
+      BSV_SCRIPT_CORPUS_TOKEN:
+        description: Read-only access to the private seed corpus the benchmarks job reads (a tag's call skips that job)
+        required: false
 
 permissions:
   contents: read
@@ -692,6 +695,11 @@ jobs:
             > "$BSV_SCRIPT_CORPUS/seed.jsonl"
           test -s "$BSV_SCRIPT_CORPUS/seed.jsonl"
 
+      # This library does not commit Cargo.lock (the deny job's rule): resolve
+      # once so the gate's `cargo bench --locked` measures one graph.
+      - name: Resolve the benchmark lockfile
+        run: cargo generate-lockfile
+
       - name: Cache cargo registry
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -730,6 +738,7 @@ jobs:
           name: benchmark-evidence-${{ runner.os }}
           path: |
             ${{ runner.temp }}/bench-results/run.json
+            ${{ runner.temp }}/bench-results/baseline.json
             ${{ runner.temp }}/bench-results/bench.log
             ${{ runner.temp }}/linux-baseline.json
           if-no-files-found: warn
@@ -761,7 +770,9 @@ jobs:
       - name: Build benchmarks
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}/bsv-rs-bench-build
-        run: cargo bench --no-run --all-features --locked
+        run: |
+          cargo generate-lockfile
+          cargo bench --no-run --all-features --locked
 
   # Add each new producer job to needs when it lands (#77, #78, #80).
   # Missing producers are reported by name; this job never invents measurements.

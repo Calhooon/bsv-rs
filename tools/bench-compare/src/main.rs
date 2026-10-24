@@ -495,6 +495,16 @@ fn fresh_run(repo: &Path, output: &Path) -> Result<Run> {
     };
     validate_run(&run)?;
     fs::write(output.join("run.json"), serde_json::to_vec_pretty(&run)?)?;
+    // This run alone, in the baseline's shape: the scoreboard's input (#84),
+    // never written over benches/baseline.json.
+    let proposed = Baseline {
+        schema_version: 1,
+        platforms: BTreeMap::from([(machine_key(&run), run.clone())]),
+    };
+    fs::write(
+        output.join("baseline.json"),
+        serde_json::to_vec_pretty(&proposed)?,
+    )?;
     println!("Evidence: {}", output.join("run.json").display());
     Ok(run)
 }
