@@ -174,6 +174,7 @@ The `validation` module (`validation.rs`) provides 40+ validation functions for 
 | Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string`, `validate_optional_outpoint_string` |
 | Descriptions | `validate_description_5_2000`, `validate_description_5_50` |
 | Actions | `validate_create_action_args`, `validate_create_action_input`, `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend` |
+| Internalize | `validate_internalize_action_args` (`validation/internalize.rs`): each output's `insertionRemittance.customInstructions` at most 1,000 UTF-8 bytes (BRC-100 at `5119a9b`, TS's `validateBasketInsertion`; #117), called by `ProtoWallet`, `WalletClient`, `HttpWalletJson` and `WalletWireTransceiver` before they act or send; the createAction output's copy stays unbounded |
 | Certificates | `validate_certificate_fields` (1-50 byte field names), `validate_keyring_revealer` ("certifier" or 66-char hex pubkey) |
 | Protocol | `validate_protocol_tuple`, `validate_query_mode` |
 

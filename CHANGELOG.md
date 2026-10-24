@@ -293,6 +293,35 @@ reason and step (`memory_profiling`, alone under `dhat-profiling`); and any
 list had drifted to 34 of 73 files; the guard keeps it from drifting again
 (`docs/ARCH-RULES.md` section 6).
 
+### Added: internalizeAction refuses a basket insertion's `customInstructions` over 1,000 UTF-8 bytes (#117)
+
+BRC-100 bounds the field since `5119a9b` (`wallet/0100.md:867`, upstream,
+not on the line): "at most 1000 UTF-8 bytes unless a supported module
+explicitly defines a scoped exception, such as BRC-207. Strings exceeding the
+applicable limit must be rejected." At the line's pin `ed1b015`
+(`wallet/0100.md:860`) it carries no bound. The TypeScript SDK already refuses
+it: `validateBasketInsertion` calls `validateOptionalStringLength(...,
+'customInstructions', 0, 1000)` (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/validationHelpers.ts:942-946`), which counts UTF-8
+bytes (`utf8Bytes(s).length`, `:348-356`). This crate had no internalize
+validator at all. By the owner's word of 2026-10-24 (conform), the new
+`validation::validate_internalize_action_args` refuses one with
+`Error::WalletError("Invalid outputs[i].insertionRemittance.customInstructions:
+must be no more than 1000 bytes, got N")`, the shape of every other length
+refusal in `validation.rs` (bytes by `str::len`, not characters), and
+`ProtoWallet`, `WalletClient`, `HttpWalletJson` and `WalletWireTransceiver`
+call it before they act or send. The wire processor's handler does not read
+its arguments yet and is unchanged. The scoped exception is not modelled: no
+module defines one here. The createAction output's `customInstructions` stays
+unbounded, as BRC-100 and TS leave it (`validationHelpers.ts:638`). The
+stack's scenario is `2026-10-24-wallet-internalize-custom-instructions-bound`.
+Pinned by `tests/wallet_internalize_validation_tests.rs` (1,000 bytes
+accepted, 1,001 refused with the field and the count, 250 four-byte
+characters accepted and 251 refused, an absent field accepted, a second
+output named by its index, the createAction copy unbounded, the ProtoWallet
+and HTTP JSON doors refusing before acting or sending), RED on the tree
+without the bound. No wire byte or JSON shape changed.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added: the wallet's transport fault (Calhooon/bsv-rs#73)

@@ -769,8 +769,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         args: InternalizeActionArgs,
         originator: &str,
     ) -> Result<InternalizeActionResult, Error> {
+        crate::wallet::validation::validate_internalize_action_args(&args)?;
         let mut writer = WireWriter::new();
-
         // Transaction
         writer.write_var_int(args.tx.len() as u64);
         writer.write_bytes(&args.tx);
