@@ -17,7 +17,9 @@ fn bench(c: &mut Criterion) {
         .collect()];
     for depth in 0..20 {
         let parents = levels[depth]
-            .chunks_exact(2)
+            .as_chunks::<2>()
+            .0
+            .iter()
             .map(|pair| {
                 let mut data = [0; 64];
                 data[..32].copy_from_slice(&pair[0]);
