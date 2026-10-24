@@ -1,4 +1,4 @@
-//! The binary's verdicts on saved evidence (`--from-run`): no bench runs.
+//! The binary's verdicts and exit codes on saved evidence (`--from-run`): no bench runs.
 #![allow(clippy::unwrap_used, clippy::expect_used)] // checked fixtures for the gate itself
 
 use std::path::{Path, PathBuf};
@@ -43,6 +43,24 @@ fn compare(name: &str, run: &Value, platforms: Value) -> Output {
         .unwrap();
     std::fs::remove_dir_all(&dir).unwrap();
     out
+}
+
+#[test]
+fn a_platform_with_no_baseline_entry_exits_three_and_names_its_key() {
+    let run = recorded();
+    let out = compare("no-entry", &run, json!({}));
+    assert_eq!(out.status.code(), Some(3));
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    let key = format!(
+        "{} / {} / {} cores",
+        run["platform"].as_str().unwrap(),
+        run["machine"]["model"].as_str().unwrap(),
+        run["machine"]["cores"]
+    );
+    assert!(
+        stdout.contains(&format!("NO BASELINE ENTRY: {key}")),
+        "{stdout}"
+    );
 }
 
 #[test]

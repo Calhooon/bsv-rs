@@ -169,3 +169,20 @@ fn skipping_beef_stream_drops_its_rss_rows_too() {
     run.memory.clear();
     assert!(compare(&base, &run).unwrap());
 }
+
+#[test]
+fn a_platform_with_no_baseline_entry_exits_three() {
+    let run = fixture();
+    let mut baseline = Baseline {
+        schema_version: 1,
+        ..Baseline::default()
+    };
+    let outcome = gate(&baseline, &run).unwrap();
+    assert_eq!(outcome, Outcome::NoBaseline);
+    assert_eq!(outcome.code(), 3);
+    baseline.platforms.insert(machine_key(&run), run.clone());
+    assert_eq!(gate(&baseline, &run).unwrap().code(), 0);
+    let mut slower = run.clone();
+    slower.benchmarks.get_mut("sha256").unwrap().p99_ns = 200.0;
+    assert_eq!(gate(&baseline, &slower).unwrap().code(), 1);
+}
