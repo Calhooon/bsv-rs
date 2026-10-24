@@ -52,6 +52,24 @@ The function is gated on `script`; the `clippy` job now checks each published
 slice alone with `-D warnings`, which was RED on the pre-fix tree for the four
 slices and is the pin.
 
+### Fixed: a certificate length that wrapped the reader's bounds check (#108)
+
+`Certificate::from_binary` panicked on a field length near `usize::MAX`: its
+reader checked `pos + n > len`, the sum wrapped, the check passed and the
+slice panicked (an abort on wasm32, and a peer's certificate bytes reach this
+reader). The reader now compares a length to the bytes remaining, slices
+through `get`, and refuses a varint length that does not fit `usize` rather
+than truncating it; the refusal is `Error::ReaderUnderflow`, as for any short
+read. `HttpRequest::from_payload` and `HttpResponse::from_payload` had the same
+sum, which wrapped on a 32-bit target (a length near `u32::MAX` on wasm32), and
+cast an `i64` length to `usize`; they now take each field the same way, with
+their error texts unchanged. A valid certificate or payload parses as before.
+Found by #82's fuzz lane (`fuzz_auth_messages`); pinned by
+`tests/auth_reader_bounds.rs` (`a_certificate_length_that_wraps_the_bounds_check_is_refused`
+on the issue's 189 bytes, a constructed `usize::MAX - k`, the HTTP fields),
+RED on the pre-fix tree; the 535 crash inputs of the class replay with no
+panic.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added: the wallet's transport fault (Calhooon/bsv-rs#73)
