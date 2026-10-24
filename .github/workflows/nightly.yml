@@ -262,6 +262,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TARGET: ${{ matrix.target }}
+          # The commit the job checked out; on a schedule $GITHUB_SHA is the
+          # default branch's, not beta's.
+          SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           shopt -s nullglob
@@ -273,6 +276,9 @@ jobs:
             kind="$(basename "$input" | cut -d- -f1)"
             tail="$("$bin" "$input" 2>&1 | grep -A4 -E 'panicked at|ERROR: libFuzzer|SUMMARY' | head -n 12 || true)"
             site="$(printf '%s\n' "$tail" | grep -oE 'panicked at [^ ]+' | head -n 1 | sed 's/^panicked at //; s/:$//')"
+            # A site in the crate is printed under the checkout; the title
+            # carries its repository-relative path.
+            site="${site#"$GITHUB_WORKSPACE"/}"
             [ -n "$site" ] || site="$kind"
             title="fuzz: $TARGET: $site"
             [ -z "${filed[$title]:-}" ] || continue
@@ -280,6 +286,8 @@ jobs:
             body="$RUNNER_TEMP/body.md"
             {
               echo "Found by the nightly fuzz job: $RUN_URL (artifact \`crashes-$TARGET\`, file \`$(basename "$input")\`)."
+              echo
+              echo "Source $SOURCE_COMMIT, $FUZZ_TOOLCHAIN, cargo-fuzz $CARGO_FUZZ_VERSION"
               echo
               echo "## The panic's tail"
               echo
