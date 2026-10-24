@@ -75,7 +75,9 @@ fn run(mut command: Command, label: &str) -> Result<BTreeSet<(String, String)>> 
     if !output.status.success() {
         // Do not print compiler excerpts, which can contain literal input data.
         return Err(format!(
-            "{label} failed ({}); no measurement was recorded",
+            "{label} failed ({}); no measurement was recorded. If the root Cargo.toml's \
+             dependencies changed, the library lock is stale: refresh \
+             tools/ratchet/library.Cargo.lock (docs/RATCHETS.md, \"When a dependency changes\")",
             output.status
         )
         .into());

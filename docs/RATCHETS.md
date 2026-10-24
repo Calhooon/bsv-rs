@@ -130,6 +130,31 @@ cargo +1.95.0 clippy --locked --manifest-path tools/ratchet/Cargo.toml --all-tar
 cargo +1.95.0 fmt --manifest-path tools/ratchet/Cargo.toml -- --check
 ```
 
+### When a dependency changes
+
+The compiler counters build a scratch copy of the library with
+`tools/ratchet/library.Cargo.lock` in place, so two runs resolve the same
+crates. A PR that adds, removes or bumps a dependency in the root
+`Cargo.toml` makes that lock stale, and `--check` stops with
+`cargo clippy ... failed ...; the library lock is stale: refresh
+tools/ratchet/library.Cargo.lock (docs/RATCHETS.md, "When a dependency
+changes")` and records nothing. The refresh, tested on 2026-10-24 with a
+planted `semver = "1"` (one entry gained, nothing else moved):
+
+```sh
+S="$(mktemp -d "${TMPDIR:-/tmp}/ratchet-lock-XXXX")"
+git archive HEAD | tar -x -C "$S"
+cp tools/ratchet/library.Cargo.lock "$S/Cargo.lock"
+(cd "$S" && cargo +1.95.0 metadata --format-version 1 >/dev/null)   # updates the lock minimally
+cp "$S/Cargo.lock" tools/ratchet/library.Cargo.lock
+rm -rf "$S"
+```
+
+Commit the refreshed lock on its own, in the PR that moved the dependency;
+then `tools/ratchet/run --check` again. A lock refresh moves no counter by
+itself (the counters read the library's source, not its dependencies); if one
+moves, the PR changed code too and the number stands on its own.
+
 The stack's [gate-leg shape](https://github.com/Calhooon/bsv-stack-lean)
 is a named job with its executable proof and recorded result. For these
 measurement choices: T1 measures the source tree rather than chain history;
