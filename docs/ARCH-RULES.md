@@ -159,13 +159,12 @@ from collapsing to an empty module with no exported application functions.
 These are unoptimized diagnostic library sizes, not deployable Worker sizes.
 [#96](https://github.com/Calhooon/bsv-rs/issues/96) owns the size budget.
 
-Baseline finding at `efe12e6`: with the workflow's `RUSTFLAGS=-Dwarnings`,
-the native `block`, `compat`, `primitives` and `totp` feature checks and the
-wasm `block` slice fail because
-`src/primitives/bsv/sighash.rs:1106` defines `after_last_code_separator`, whose
-caller is in the disabled `script` module. The compiler reports that the
-function is never used. These jobs keep the warning policy; resolving the
-source finding is a separate change. This lane does not suppress the check.
+Baseline finding at `efe12e6`, fixed before this landed: with the workflow's
+`RUSTFLAGS=-Dwarnings`, the native `block`, `compat`, `primitives` and `totp`
+checks and the wasm `block` slice failed on `after_last_code_separator` being
+unused without `script`; #115 gated it (beta `b8dd6cb`), and the dependents
+check (#83) had found the same on chaintracks-cloudflare's `block` slice. Every
+feature builds alone since.
 
 ## Verification and review
 
