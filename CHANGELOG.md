@@ -66,9 +66,10 @@ cast an `i64` length to `usize`; they now take each field the same way, with
 their error texts unchanged. A valid certificate or payload parses as before.
 Found by #82's fuzz lane (`fuzz_auth_messages`); pinned by
 `tests/auth_reader_bounds.rs` (`a_certificate_length_that_wraps_the_bounds_check_is_refused`
-on the issue's 189 bytes, a constructed `usize::MAX - k`, the HTTP fields),
-RED on the pre-fix tree; the 535 crash inputs of the class replay with no
-panic.
+on the issue's 189 bytes, a constructed `usize::MAX - k`, the HTTP fields):
+the three certificate tests RED on the pre-fix tree; the HTTP sites RED on
+wasm32 only, a length near `u32::MAX`, which no 64-bit run can show; the 535
+crash inputs of the class replay with no panic.
 
 ## [0.8.2] - 2026-10-23
 
