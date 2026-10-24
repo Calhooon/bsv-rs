@@ -2166,7 +2166,7 @@ mod response_roundtrips {
         writer.write_bytes(&tx_bytes);
 
         // no_send_change (1 outpoint)
-        writer.write_signed_var_int(1);
+        writer.write_signed_var_int("noSendChange", 1).unwrap();
         writer.write_outpoint(&Outpoint::new(sample_txid(), 0));
 
         // send_with_results (None)
@@ -2318,7 +2318,9 @@ mod response_roundtrips {
 
         // beef (present)
         let beef_data = vec![0xBE, 0xEF, 0x00, 0x01];
-        writer.write_signed_var_int(beef_data.len() as i64);
+        writer
+            .write_signed_var_int("beef", beef_data.len() as i64)
+            .unwrap();
         writer.write_bytes(&beef_data);
 
         // 1 WalletOutput

@@ -75,6 +75,9 @@ dhat-profiling = ["dep:dhat"]
 - Varint readers are canonical from 0.6.0, as node and TS strict readers are;
   go-sdk@v1.7.1 `util/varint.go:71-105` remains lenient. Legacy callers can
   use `read_var_int_lenient`; node size bounds use the CompactSize methods.
+- The wallet wire's optional varints are TS's and Go's plain form (0.9, #149);
+  a listOutputs `offset` below `-1`, which TS writes in two's complement and
+  its own processor reads as absent, is refused at this crate's writer.
 
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
 - BRC-56 HMAC key (`5119a9b` `wallet/0056.md:66,73`): this crate keys the HMAC with the shared X coordinate as 32 bytes, as Go (`primitives/ec/symmetric.go:82-90`), Python and rs-sdk; ts-sdk drops its leading zero bytes (`ts-stack@edf6e03` `packages/sdk/src/wallet/KeyDeriver.ts:270`), a different tag for one key in 256. `verify_hmac` accepts the 32-byte tag only and refuses the minimal-length one as `Error::HmacMinimalLengthKey` (#148).

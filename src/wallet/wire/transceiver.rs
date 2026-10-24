@@ -856,7 +856,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         writer.write_optional_bool(args.include_labels);
 
         writer.write_optional_var_int(args.limit.map(|v| v as u64));
-        writer.write_optional_var_int(args.offset.map(|v| v as u64));
+        writer.write_signed_var_int("offset", args.offset.map_or(-1, i64::from))?;
         writer.write_optional_bool(args.seek_permission);
 
         let response = self

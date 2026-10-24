@@ -1034,25 +1034,26 @@ mod wire_protocol_tests {
 
     #[test]
     fn test_signed_varint_roundtrip() {
+        // The plain varint, -1 (absent) as nine 0xFF (#149).
         let mut writer = WireWriter::new();
-        writer.write_signed_var_int(0);
-        writer.write_signed_var_int(-1); // Sentinel for None
-        writer.write_signed_var_int(1);
-        writer.write_signed_var_int(-128);
-        writer.write_signed_var_int(127);
-        writer.write_signed_var_int(i64::MAX);
-        writer.write_signed_var_int(i64::MIN);
+        for val in [0, -1, 1, 127, i64::MAX] {
+            writer.write_signed_var_int("v", val).unwrap();
+        }
 
         let bytes = writer.into_bytes();
+        assert_eq!(&bytes[..2], &[0x00, 0xFF]);
         let mut reader = WireReader::new(&bytes);
 
         assert_eq!(reader.read_signed_var_int().unwrap(), 0);
         assert_eq!(reader.read_signed_var_int().unwrap(), -1);
         assert_eq!(reader.read_signed_var_int().unwrap(), 1);
-        assert_eq!(reader.read_signed_var_int().unwrap(), -128);
         assert_eq!(reader.read_signed_var_int().unwrap(), 127);
         assert_eq!(reader.read_signed_var_int().unwrap(), i64::MAX);
-        assert_eq!(reader.read_signed_var_int().unwrap(), i64::MIN);
+
+        // No other negative has a form on the wire.
+        for val in [-2, -128, i64::MIN] {
+            assert!(WireWriter::new().write_signed_var_int("v", val).is_err());
+        }
     }
 
     #[test]
