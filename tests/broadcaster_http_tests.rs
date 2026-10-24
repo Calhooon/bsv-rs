@@ -273,7 +273,8 @@ async fn test_arc_broadcast_with_config_timeout() {
         result
     );
     let failure = result.unwrap_err();
-    assert_eq!(failure.code, "NETWORK_ERROR");
+    // The request was written before the timeout: #65, Calhooon/bsv-rs#87
+    assert_eq!(failure.code, "MAY_HAVE_BEEN_RECEIVED");
 }
 
 #[tokio::test]
@@ -663,7 +664,8 @@ async fn test_teranode_broadcast_timeout() {
         result
     );
     let failure = result.unwrap_err();
-    assert_eq!(failure.code, "NETWORK_ERROR");
+    // The request was written before the timeout: #65, Calhooon/bsv-rs#87
+    assert_eq!(failure.code, "MAY_HAVE_BEEN_RECEIVED");
 }
 
 #[tokio::test]
