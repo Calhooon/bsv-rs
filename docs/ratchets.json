@@ -1,15 +1,15 @@
 {
   "schema": 1,
-  "source_commit": "4e4b40c6ad3c71359384580347be888a699f6f8b",
+  "source_commit": "4f61a67af098c2eb33f42a8c56e0812aed0e8a7c",
   "toolchain": "1.95.0",
   "metrics": {
-    "files_over_800": 40,
+    "files_over_800": 39,
     "unwrap_expect": 40,
-    "functions_over_60": 95,
-    "cognitive_complexity_over_25": 2,
+    "functions_over_60": 93,
+    "cognitive_complexity_over_25": 1,
     "missing_docs": 0,
-    "duplicate_windows_40": 8831,
-    "pedantic_warnings": 2722
+    "duplicate_windows_40": 8723,
+    "pedantic_warnings": 2676
   },
   "files_over_800": [
     {
@@ -18,7 +18,7 @@
     },
     {
       "path": "src/auth/transports/http.rs",
-      "lines": 1255
+      "lines": 1252
     },
     {
       "path": "src/auth/utils/validation.rs",
@@ -117,10 +117,6 @@
       "lines": 1297
     },
     {
-      "path": "src/script/spend.rs",
-      "lines": 4419
-    },
-    {
       "path": "src/script/templates/pushdrop.rs",
       "lines": 825
     },
@@ -142,15 +138,15 @@
     },
     {
       "path": "src/transaction/transaction.rs",
-      "lines": 3000
+      "lines": 2998
     },
     {
       "path": "src/wallet/proto_wallet.rs",
-      "lines": 1411
+      "lines": 1403
     },
     {
       "path": "src/wallet/substrates/http_json.rs",
-      "lines": 1212
+      "lines": 1205
     },
     {
       "path": "src/wallet/types.rs",
