@@ -164,7 +164,10 @@ jobs:
           git clone --quiet --shared "$GITHUB_WORKSPACE" "$RUNNER_TEMP/semver-source"
           cd "$RUNNER_TEMP/semver-source"
           # A 0.x minor or a beta suffix must not waive breaking API changes.
-          "$RUNNER_TEMP/tools/bin/cargo-semver-checks" check-release --baseline-rev "$baseline" --release-type minor --all-features
+          # The release type is inferred from the version change between the baseline tag and
+          # Cargo.toml (a 0.x minor bump is semver's major): a breaking change passes only when the
+          # version says so, an additive one only when it says at least minor (#87's 0.9.0).
+          "$RUNNER_TEMP/tools/bin/cargo-semver-checks" check-release --baseline-rev "$baseline" --all-features
 
   test:
     name: Test Suite
