@@ -1,6 +1,7 @@
 {
   "schema": 1,
   "source_commit": "4f61a67af098c2eb33f42a8c56e0812aed0e8a7c",
+  "source_commit": "29c153482382f43f0547a5ca891eeb8ef5103f54",
   "toolchain": "1.95.0",
   "metrics": {
     "files_over_800": 39,
@@ -10,6 +11,11 @@
     "missing_docs": 0,
     "duplicate_windows_40": 8723,
     "pedantic_warnings": 2676
+    "functions_over_60": 92,
+    "cognitive_complexity_over_25": 2,
+    "missing_docs": 0,
+    "duplicate_windows_40": 8669,
+    "pedantic_warnings": 2677
   },
   "files_over_800": [
     {
@@ -126,11 +132,11 @@
     },
     {
       "path": "src/transaction/beef.rs",
-      "lines": 3214
+      "lines": 3087
     },
     {
       "path": "src/transaction/beef_stream.rs",
-      "lines": 3652
+      "lines": 3617
     },
     {
       "path": "src/transaction/merkle_path.rs",
