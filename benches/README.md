@@ -44,7 +44,9 @@ For the script, proof and signing batches the unit is the entire batch. Original
 
 An increase strictly greater than 5% in any sample p99 exits 1. Setup errors,
 missing/invalid samples, absent corpus, changed benchmark inventory, a changed
-corpus digest, or a different CPU model/core count exit 2. A run must include
+corpus digest, or a different CPU model/core count exit 2. A platform, CPU
+model and core count with no baseline entry exits 3 and prints
+`NO BASELINE ENTRY: <key>`. A run must include
 all four codec operations for all 28 calls and all added workloads. No result
 can pass merely because a benchmark stopped being registered. The machine
 line contains only the CPU model and available logical core count. The run
@@ -102,7 +104,12 @@ requires updating this benchmark fixture.
 
 `BSV_SCRIPT_CORPUS` accepts `corpus/seed` or its `seed.jsonl`. Absence prints
 `SKIP script_spend` when that bench is run alone; the comparison tool requires
-it and fails closed. Bad paths and malformed/empty input fail. The adapter
+it and fails closed unless given `--skip script_spend`. `--skip <bench>`
+(repeatable; one of `beef_stream`, `merkle_path`, `transaction_sign_verify`,
+`wire_codec`, `script_spend`, whose ids carry the bench's name) does not run
+that bench, records it as `skipped` in `run.json`, leaves its rows out of the
+table and names it in the summary as `SKIPPED`: not measured, never a pass
+and never a regression. `--record` refuses `--skip`. Bad paths and malformed/empty input fail. The adapter
 follows `harness/src/engine.rs` at sibling commit
 `8840488cc7922fa908ebcaa6333e885a49c6ca7c`: each input's spend height chooses
 the block word, and the UTXO height chooses its Chronicle marker. The
@@ -122,7 +129,7 @@ This replaces only the measured machine's entry in `benches/baseline.json`,
 keyed by platform, CPU model and core count.
 Use it only in a PR whose description requests a baseline update. The table
 and retained run show exactly what changed. Ordinary comparisons never write
-the baseline. A run on a CPU model or core count with no entry exits 2 and names
+the baseline. A run on a CPU model or core count with no entry exits 3 and names
 the recorded entries; hosted runners draw from several CPUs, so each one the
 job lands on needs its own reviewed entry.
 
@@ -131,7 +138,13 @@ The CI `benchmarks` job runs on every PR and on pushes to `beta`.
 The seed repository `Calgooon/bsv-script-lean` is private. The captain must
 provision `BSV_SCRIPT_CORPUS_TOKEN` with read access; CI downloads only
 `corpus/seed/seed.jsonl` at the named commit. No wallet or network request is
-made by a benchmark.
+made by a benchmark. Where the token is absent (a fork, a PR from outside, a
+repository without the secret) the job warns
+`script_spend skipped: BSV_SCRIPT_CORPUS_TOKEN not set (the script corpus is private)`
+and compares the other eight benches with `--skip script_spend`. Where the
+runner's platform/CPU/cores key has no entry (exit 3) the job warns
+`no baseline entry for <key>: record one with [bench-baseline-record]` and
+does not fail.
 
 The lane can record the local machine only. To record Linux in the second CI
 run, the captain adds `[bench-baseline-record]` to the baseline PR's description
