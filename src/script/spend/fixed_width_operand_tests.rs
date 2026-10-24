@@ -1,5 +1,6 @@
 use super::*;
 use crate::script::ProtocolEra;
+use crate::script::Script;
 
 fn spend(standard: bool) -> Spend {
     spend_with_lock(standard, LockingScript::new())

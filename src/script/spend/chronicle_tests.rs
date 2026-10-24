@@ -1,5 +1,7 @@
+use super::crypto::has_forkid_bit;
 use super::*;
 use crate::script::flags::ProtocolEra;
+use crate::script::Script;
 
 fn spend(lock_asm: &str, unlock_asm: &str, version: i32) -> Spend {
     Spend::new(SpendParams {
