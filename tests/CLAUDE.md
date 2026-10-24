@@ -11,6 +11,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 
 | File | Tests | Feature Gate | Description |
 |------|------:|-------------|-------------|
+| `arch_ci_runs_every_test.rs` | 6 | none | Every top-level `tests/*.rs` is run by a whole-suite `cargo test --tests` step of `.github/workflows/ci.yml` on a feature set its `#![cfg]` gate compiles under, or allowlisted with its reason and the `--test` step that runs it (`memory_profiling` alone); every `--test <name>` in ci.yml names an existing file its step compiles (`docs/ARCH-RULES.md` section 6, #146) |
 | `auth_cross_sdk_tests.rs` | 13 | `auth` | Certificate serialization cross-SDK vectors |
 | `auth_integration_tests.rs` | 70 | `auth` | Session manager, AuthMessage, certificates, HTTP payloads, nonce handling |
 | `auth_reader_bounds.rs` | 7 | `auth` | A length the bytes remaining cannot hold is refused, never wrapped past the check: the #108 input and `usize::MAX - k` through `Certificate::from_binary` (`ReaderUnderflow`), the HTTP payload fields at lengths that wrap or truncate on a 32-bit target, valid inputs unchanged (Calhooon/bsv-rs#108) |
