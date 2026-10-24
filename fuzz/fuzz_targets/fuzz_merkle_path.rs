@@ -44,7 +44,7 @@ fuzz_target!(|data: &[u8]| {
     let mut trimmed = path.clone();
     trimmed.trim();
     let _ = trimmed.to_binary();
-    if let Some(txid) = txids.first() {
+    if let [txid, ..] = &txids[..] {
         let mut marked = path.clone();
         let _ = marked.contains_and_mark(txid);
         let _ = marked.compute_root(Some(txid));

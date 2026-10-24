@@ -216,7 +216,7 @@ jobs:
           cargo fuzz build -O "${{ matrix.target }}"
 
       # One hour from the checked-in corpus. New entries are written to
-      # $RUNNER_TEMP/new (the first corpus directory); a crash's input to
+      # $RUNNER_TEMP/new (the leading corpus directory); a crash's input to
       # $RUNNER_TEMP/artifacts, and the run goes on (-ignore_crashes).
       - name: Fuzz for an hour
         run: |
