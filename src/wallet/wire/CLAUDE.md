@@ -95,13 +95,9 @@ Optional strings, bytes, string arrays, and string maps use `VarInt(u64::MAX)` (
 
 Empty optional strings and empty optional bytes are treated the same as `None` — both write the nil sentinel. This matches Go SDK behavior.
 
-### Signed VarInt (ZigZag Encoding)
+### Optional and Signed VarInt (#149)
 
-Used for optional numeric values and signed counts (e.g., optional input/output arrays). ZigZag encoding maps signed integers to unsigned:
-- Non-negative `n` is encoded as `2n`
-- Negative `n` is encoded as `2|n| - 1`
-
-This allows -1 (representing `null`/`None`) to be encoded as a single byte (0x01).
+Optional numeric fields (sequence numbers, lockTime, version, every `limit` and `offset`) are the plain varint when present and `VarInt(u64::MAX)` (nine `0xFF`, BRC-100's `-1`) when absent, as TS `writeVarIntNum` and Go `WriteOptionalUint32` write them; `10` is `0x0A`. `write_signed_var_int(field, v)` writes `-1` as nine `0xFF` and refuses any other negative naming the field; `read_signed_var_int` reads nine `0xFF` as `-1` and refuses a value above `i64::MAX`. listOutputs' `offset` is an `i32`: `-1` (the newest output) leaves as absence's bytes, as TS's does, and below `-1` the transceiver refuses. A `u32` field's reader refuses above `u32::MAX` (`read_optional_var_int_u32`, `mod.rs`). Until 0.8.x this was ZigZag (`10` as `0x14`, absence as `0x01`).
 
 ### Type Encoding
 
@@ -110,7 +106,7 @@ This allows -1 (representing `null`/`None`) to be encoded as a single byte (0x01
 | `u8`, `i8` | 1 byte |
 | `u16`, `u32`, `u64` | Little-endian |
 | `varint` | Variable (1-9 bytes) |
-| `signed_varint` | ZigZag encoded |
+| `signed_varint` | Plain varint; `-1` as `u64::MAX` (nine `0xFF`) |
 | UTF-8 string | `varint(len) + bytes` |
 | Optional string | `varint(len or MaxUint64) + bytes` (Go-compat nil sentinel) |
 | Optional bytes | `varint(len or MaxUint64) + bytes` (Go-compat nil sentinel) |

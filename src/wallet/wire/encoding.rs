@@ -98,31 +98,26 @@ impl<'a> WireReader<'a> {
     // Signed varint (for optional values)
     // =========================================================================
 
-    /// Reads a signed varint.
-    ///
-    /// The WalletWire protocol uses signed varints to encode optional values,
-    /// where -1 indicates null/undefined.
-    ///
-    /// The encoding uses ZigZag encoding to efficiently store negative numbers:
-    /// - Non-negative n is encoded as 2n
-    /// - Negative n is encoded as 2|n| - 1
+    /// Reads a signed varint: nine `0xFF` (`u64::MAX`) is `-1`, BRC-100's
+    /// absent value, any other the plain varint (TS `readVarIntNum`, Go
+    /// `ReadOptionalUint32`; #149). Refused above `i64::MAX`.
     pub fn read_signed_var_int(&mut self) -> Result<i64, Error> {
-        let unsigned = self.inner.read_var_int()?;
-        // ZigZag decode: (n >> 1) ^ -(n & 1)
-        let signed = ((unsigned >> 1) as i64) ^ (-((unsigned & 1) as i64));
-        Ok(signed)
+        match self.inner.read_var_int()? {
+            u64::MAX => Ok(-1),
+            value => i64::try_from(value).map_err(|_| {
+                Error::WalletError(format!(
+                    "invalid signed varint: expected at most {} or -1, got {}",
+                    i64::MAX,
+                    value
+                ))
+            }),
+        }
     }
 
-    /// Reads an optional value encoded as a signed varint.
-    ///
-    /// Returns `None` if the value is negative (representing null/undefined).
+    /// Reads an optional varint: `None` for nine `0xFF` (`-1`), else the value.
     pub fn read_optional_var_int(&mut self) -> Result<Option<u64>, Error> {
-        let signed = self.read_signed_var_int()?;
-        if signed < 0 {
-            Ok(None)
-        } else {
-            Ok(Some(signed as u64))
-        }
+        let value = self.inner.read_var_int()?;
+        Ok((value != u64::MAX).then_some(value))
     }
 
     // =========================================================================
@@ -850,25 +845,24 @@ impl WireWriter {
     // Signed varint (for optional values)
     // =========================================================================
 
-    /// Writes a signed varint using ZigZag encoding.
-    ///
-    /// ZigZag encoding maps signed integers to unsigned integers:
-    /// - Non-negative n is encoded as 2n
-    /// - Negative n is encoded as 2|n| - 1
-    pub fn write_signed_var_int(&mut self, val: i64) -> &mut Self {
-        // ZigZag encode: (n << 1) ^ (n >> 63)
-        let unsigned = ((val << 1) ^ (val >> 63)) as u64;
-        self.write_var_int(unsigned)
+    /// Writes a signed varint: a non-negative value as the plain varint, `-1`
+    /// (absent) as nine `0xFF`, as TS `writeVarIntNum` and Go
+    /// `WriteNegativeOne` do (#149). Any other negative is refused, the
+    /// field named: no reader of the wire keeps it.
+    pub fn write_signed_var_int(&mut self, field: &str, val: i64) -> Result<&mut Self, Error> {
+        if val < -1 {
+            return Err(Error::WalletError(format!(
+                "invalid {}: expected at least -1, got {}",
+                field, val
+            )));
+        }
+        Ok(self.write_var_int(u64::try_from(val).unwrap_or(u64::MAX)))
     }
 
-    /// Writes an optional value as a signed varint.
-    ///
-    /// `None` is encoded as -1.
+    /// Writes an optional varint: `None` as nine `0xFF` (`-1`), `Some(v)` as
+    /// the plain varint (`Some(u64::MAX)` is the same bytes as `None`).
     pub fn write_optional_var_int(&mut self, val: Option<u64>) -> &mut Self {
-        match val {
-            Some(v) => self.write_signed_var_int(v as i64),
-            None => self.write_signed_var_int(-1),
-        }
+        self.write_var_int(val.unwrap_or(u64::MAX))
     }
 
     // =========================================================================
@@ -1435,30 +1429,14 @@ mod tests {
 
     #[test]
     fn test_signed_var_int_roundtrip() {
-        let test_values: &[i64] = &[
-            0,
-            1,
-            -1,
-            127,
-            -127,
-            128,
-            -128,
-            255,
-            -255,
-            1000,
-            -1000,
-            i64::MAX,
-            i64::MIN,
-        ];
-
-        for &val in test_values {
+        for val in [0, 1, -1, 127, 128, 252, 253, 1000, i64::MAX] {
             let mut writer = WireWriter::new();
-            writer.write_signed_var_int(val);
-
+            writer.write_signed_var_int("v", val).unwrap();
             let mut reader = WireReader::new(writer.as_bytes());
-            let read_val = reader.read_signed_var_int().unwrap();
-
-            assert_eq!(read_val, val, "roundtrip failed for {}", val);
+            assert_eq!(reader.read_signed_var_int().unwrap(), val);
+        }
+        for val in [-2, i64::MIN] {
+            assert!(WireWriter::new().write_signed_var_int("v", val).is_err());
         }
     }
 
@@ -2339,7 +2317,7 @@ mod tests {
         let mut writer = WireWriter::new();
 
         writer.write_u8(42);
-        writer.write_signed_var_int(-100);
+        writer.write_signed_var_int("v", 100).unwrap();
         writer.write_string("hello");
         writer.write_optional_string(None);
         writer.write_optional_bool(Some(true));
@@ -2353,7 +2331,7 @@ mod tests {
         let mut reader = WireReader::new(writer.as_bytes());
 
         assert_eq!(reader.read_u8().unwrap(), 42);
-        assert_eq!(reader.read_signed_var_int().unwrap(), -100);
+        assert_eq!(reader.read_signed_var_int().unwrap(), 100);
         assert_eq!(reader.read_string().unwrap(), "hello");
         assert_eq!(reader.read_optional_string().unwrap(), None);
         assert_eq!(reader.read_optional_bool().unwrap(), Some(true));
