@@ -282,6 +282,17 @@ time at `:235-236`, the input's sequence number at `:259`, `totalOutputs` at
 `list_certificates.go:132` and `discover_certificates_result.go:37`. The
 references' own gap, not followed.
 
+### Added: a guard that CI runs every integration test binary (#146)
+
+`tests/arch_ci_runs_every_test.rs` reads `.github/workflows/ci.yml`,
+`Cargo.toml`'s features and every top-level `tests/*.rs`, and refuses, naming
+the file, any binary no whole-suite `cargo test --tests` step compiles (its
+`#![cfg]` gate read against the step's features), unless allowlisted with its
+reason and step (`memory_profiling`, alone under `dhat-profiling`); and any
+`--test <name>` in ci.yml with no file behind it. The Test Suite's enumerated
+list had drifted to 34 of 73 files; the guard keeps it from drifting again
+(`docs/ARCH-RULES.md` section 6).
+
 ## [0.8.2] - 2026-10-23
 
 ### Added: the wallet's transport fault (Calhooon/bsv-rs#73)

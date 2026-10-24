@@ -143,6 +143,47 @@ The util module is the existing portability boundary. A native cfg applies
 only to its item or block, not to the rest of the file. No cleanup issue is
 needed for this empty baseline.
 
+## 6. CI runs every integration test binary
+
+`tests/arch_ci_runs_every_test.rs` implements step 2 of
+[#146](https://github.com/Calhooon/bsv-rs/issues/146). The Test Suite once
+enumerated its binaries by hand and drifted to 34 of 73 files; the arch
+tests, the wallet wire suites and `readme_examples` never ran on a PR. Unlike
+sections 1 to 5, this rule reads no library source. It reads
+`.github/workflows/ci.yml`, the `[features]` table of `Cargo.toml`, and every
+top-level `tests/*.rs` (each an integration binary; `support/`,
+`arch_support/` and the other directories are modules, not binaries).
+
+Each `cargo test` line of ci.yml is a step (a `--manifest-path` run tests
+another crate and is skipped). A step is a whole-suite step when it carries
+`--tests` or `--all-targets`, or no target selector at all, and names no
+`--test`. Its feature set is its flags closed over the table (`--all-features`
+is every feature). A file's gate is its file-level `#![cfg(...)]` attributes,
+evaluated on `feature`, `all`, `any` and `not`; any other predicate (a target,
+an OS) is a finding, never a pass. The guard refuses, naming the file:
+
+- a file no whole-suite step compiles, unless it is allowlisted below;
+- an allowlisted file a whole-suite step already runs, or one no
+  `--test <name>` step runs on features that compile it;
+- a `--test <name>` anywhere in ci.yml with no `tests/<name>.rs` (a renamed
+  file leaves a dead step), or one whose features compile its file to no tests;
+- a `[[test]]` or `autotests` in `Cargo.toml` (the file list would no longer
+  be the binary list).
+
+**Allowlist: one entry.**
+
+| File | Step | Reason |
+| --- | --- | --- |
+| `tests/memory_profiling.rs` | `--test memory_profiling --all-features -- --test-threads=1` | `dhat-profiling` installs a global allocator; it runs alone, single-threaded |
+
+To add a test file: nothing. The `cargo test --features "full,http,websocket"
+--tests` step runs every file that feature set compiles, this guard included.
+A file gated on a feature outside that set is refused until a step covers it.
+To run a file apart as well (the `vectors` job's `--nocapture` runs, the
+`fixtures` job): name it in that step AND leave it covered by the whole suite.
+Only a file that cannot run in the whole suite belongs in the allowlist, with
+its reason and its step.
+
 ## Feature and wasm builds
 
 CI's `features` job builds cargo-hack **0.6.45** from source using its release
@@ -181,7 +222,7 @@ feature builds alone since.
 
 ## Verification and review
 
-Run the five `arch_*` integration tests with `cargo test --test <name>`.
+Run the six `arch_*` integration tests with `cargo test --test <name>`.
 Their scanner regression cases cover comments, raw strings, compound cfgs,
 production code after test modules, aliases, and native block boundaries.
 A source violation planted in a scratch copy must fail the corresponding
