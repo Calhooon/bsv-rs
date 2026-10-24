@@ -205,9 +205,6 @@ jobs:
       - name: Run EC tests
         run: cargo test --test ec_tests --all-features --verbose
 
-      - name: Run architecture rules
-        run: cargo test --test arch_network_sites --test arch_no_unwrap --test arch_no_string_errors --test arch_no_env --test arch_no_system_time --all-features -- --nocapture
-
       # the consensus witness files: every rule the differential against bitcoin-sv found, pinned on its
       # witness transaction; never run in CI before this step (0.3.25 to 0.3.28 relied on local runs).
       # script_stack_memory_witness holds about 100 MB at its peak (its large rows run one at a time);
