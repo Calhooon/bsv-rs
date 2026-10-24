@@ -165,11 +165,9 @@ impl PrivateKey {
     ///
     /// Digest-domain note: for a `msg_hash` >= n (the secp256k1 group order;
     /// P ≈ 2⁻¹²⁸ for any real hash output), k256 seeds the RFC 6979 nonce
-    /// DRBG with `bits2octets(msg_hash)` per the RFC, whereas libsecp256k1
-    /// and the TypeScript `@bsv/sdk` seed it with the raw digest bytes — the
-    /// deterministic signature BYTES then differ across stacks, though all
-    /// are valid low-S signatures over the same reduced message. In-range
-    /// digests (< n) are signed byte-identically across all three stacks.
+    /// DRBG with `bits2octets(msg_hash)` (the digest reduced mod n) per the
+    /// RFC, as libsecp256k1, the TypeScript `@bsv/sdk` and the Go SDK do, so
+    /// every digest signs byte-identically across the stacks.
     /// Pinned by the `rfc6979_*_der_is_pinned` tests in `tests/ec_tests.rs`;
     /// see also the digest-handling note in
     /// [`crate::primitives::bsv::sighash`].
