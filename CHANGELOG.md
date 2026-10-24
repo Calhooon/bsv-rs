@@ -57,7 +57,8 @@ classifies by text. Busy stays the body's word. What each directory answers:
   `WalletError`); a 429 without a busy code is `Error::TransportFault` with
   `RateLimited` and its wait (was `WalletError`). A 503 with `Retry-After`
   and no busy code stays `WalletTransport { status: Some(503) }` at both
-  substrates, the one place the rule's "a 503 with `Retry-After` is
+  substrates (a 503 whose body carries a numeric wallet code stays
+  `WalletError`, as in 0.8.2), the one place the rule's "a 503 with `Retry-After` is
   `RATE_LIMITED`" is set aside, to keep the shape 0.8.2's `HttpWalletJson`
   answered and pinned (`an_html_503_from_a_proxy_is_a_transport_fault`); its
   wait is not carried there. `Error::transport_fault()` reads the class of either variant
