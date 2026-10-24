@@ -5,6 +5,19 @@ All notable changes to `bsv-rs` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed: a dead function under every slice without `script` (#115)
+
+`after_last_code_separator` (`primitives/bsv/sighash.rs`) has one caller, the
+script templates' signing path, but compiled under `primitives`, so a consumer
+building `block`, `primitives`, `compat` or `totp` alone with warnings denied
+(the Cloudflare workers' CI) could not build the crate. Found by the dependents
+check (#83) on its first hosted run, on chaintracks-cloudflare's `block` slice.
+The function is gated on `script`; the `clippy` job now checks each published
+slice alone with `-D warnings`, which was RED on the pre-fix tree for the four
+slices and is the pin.
+
 ## [0.8.2] - 2026-10-23
 
 ### Added: the wallet's transport fault (Calhooon/bsv-rs#73)
