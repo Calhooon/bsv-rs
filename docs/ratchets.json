@@ -1,15 +1,15 @@
 {
   "schema": 1,
-  "source_commit": "efe12e63c6f27cc4d4c888f12a5b7897e492f073",
+  "source_commit": "4e4b40c6ad3c71359384580347be888a699f6f8b",
   "toolchain": "1.95.0",
   "metrics": {
     "files_over_800": 40,
     "unwrap_expect": 40,
-    "functions_over_60": 96,
+    "functions_over_60": 95,
     "cognitive_complexity_over_25": 2,
     "missing_docs": 0,
-    "duplicate_windows_40": 8826,
-    "pedantic_warnings": 2720
+    "duplicate_windows_40": 8831,
+    "pedantic_warnings": 2722
   },
   "files_over_800": [
     {
@@ -78,7 +78,7 @@
     },
     {
       "path": "src/primitives/bsv/sighash.rs",
-      "lines": 1718
+      "lines": 1720
     },
     {
       "path": "src/primitives/encoding.rs",
@@ -86,11 +86,11 @@
     },
     {
       "path": "src/primitives/hash.rs",
-      "lines": 1389
+      "lines": 1386
     },
     {
       "path": "src/primitives/p256.rs",
-      "lines": 916
+      "lines": 925
     },
     {
       "path": "src/primitives/symmetric.rs",

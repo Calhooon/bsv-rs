@@ -63,8 +63,11 @@ also needs an explicit review of the changed census; do not refresh a
 baseline just to turn a red check green.
 
 The bootstrap baseline is measured from `origin/beta` at
-`efe12e63c6f27cc4d4c888f12a5b7897e492f073` (v0.8.2), not inferred from
-the issue's earlier summary. In that tree five wordlist files have 2,061
+`4e4b40c6ad3c71359384580347be888a699f6f8b` (the tip at landing: v0.8.2 plus
+#116's `script` gate in `sighash.rs` and the k256 0.14 move of #125, which
+between them add two lines to `sighash.rs`, nine to `p256.rs`, five duplicate
+windows and two pedantic warnings against the v0.8.2 tree, and remove one
+function over 60 lines), not inferred from the issue's earlier summary. In that tree five wordlist files have 2,061
 lines; the other four data files are shorter. The exemptions below name all
 nine data files. The source commit is provenance, not a number to minimize.
 The issue's unwrap/expect total is a seed figure, not an expected fixture for
