@@ -969,13 +969,12 @@ fn rfc6979_in_range_digest_der_is_pinned() {
     assert!(private_key.public_key().verify(&digest, &signature));
 }
 
-/// For a digest >= n, k256 0.14 seeds the RFC 6979 nonce DRBG with the digest
-/// reduced mod n (the RFC's bits2octets), as libsecp256k1 (bitcoin-sv v1.2.3
-/// `secp256k1.c:489-501`), @bsv/sdk 2.0.16 and the Go SDK do: these bytes are
-/// the three references' (#125). k256 0.13 seeded it with the raw digest and
-/// signed `30440220270c...0aaa` here. Unreachable through the sighash path in
-/// practice (P ≈ 2⁻¹²⁸ for sha256d output). Pinned so a dependency bump that
-/// changes it is noticed.
+/// For a digest >= n, k256 0.14 signs with the bytes @bsv/sdk 2.0.16
+/// (`ECDSA.sign`) and the Go SDK (`signRFC6979`) produce: derived with both on
+/// 2026-10-24 for this key and digest, byte for byte (#125). k256 0.13 signed
+/// `30440220270c...0aaa` here, pinned then as a divergence. Unreachable through
+/// the sighash path in practice (P ≈ 2⁻¹²⁸ for sha256d output). Pinned so a
+/// dependency bump that changes it is noticed.
 #[test]
 fn rfc6979_digest_ge_n_der_is_pinned() {
     let key = {
