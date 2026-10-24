@@ -86,7 +86,6 @@ use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError, MockChainTracker};
-use super::merkle_path::{MerklePath, MerklePathLeaf};
 
 /// A 32-byte digest in the order the wire carries it (a txid or a merkle
 /// node; its display form is the bytes reversed, in hex).
@@ -399,7 +398,7 @@ fn is_coinbase(inputs: &[InputRef]) -> bool {
     matches!(inputs, [i] if i.prev == [0; 32] && i.vout == u32::MAX)
 }
 
-fn check_transaction(
+pub(crate) fn check_transaction(
     offset: u64,
     inputs: &[InputRef],
     outputs: &[OutputRef],
@@ -485,36 +484,6 @@ impl Bump {
                 None
             }
         })
-    }
-
-    /// The BUMP as the in-memory [`MerklePath`] (hashes as display hex). A
-    /// block height above `u32::MAX` has no in-memory form.
-    pub fn to_merkle_path(&self) -> crate::Result<MerklePath> {
-        let block_height = u32::try_from(self.block_height).map_err(|_| {
-            crate::Error::MerklePathError(format!(
-                "block height {} has no in-memory form",
-                self.block_height
-            ))
-        })?;
-        let path = self
-            .levels
-            .iter()
-            .map(|level| {
-                level
-                    .iter()
-                    .map(|l| match &l.node {
-                        Node::Hash(h) => MerklePathLeaf {
-                            offset: l.offset,
-                            hash: Some(display_hex(h)),
-                            txid: l.client,
-                            duplicate: false,
-                        },
-                        Node::Duplicate => MerklePathLeaf::new_duplicate(l.offset),
-                    })
-                    .collect()
-            })
-            .collect();
-        Ok(MerklePath { block_height, path })
     }
 }
 
@@ -758,45 +727,6 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
     }
 }
 
-/// The root of an in-memory BUMP by the same walk ([`bump_root`]): the one
-/// walker under the stream and under [`Beef::verify_valid`](super::beef::Beef::verify_valid)
-/// (0.4.2; at 0.4.1 the whole path walked the BUMP once per leaf, NL-8 W1).
-/// The levels keep their in-memory order; a hash that is not 32 bytes of hex
-/// (only a BUMP built by hand holds one) is a node the BUMP does not carry.
-/// A refusal names the kind; its offset is 0, there being no stream.
-pub(crate) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
-    let levels: Vec<Vec<Leaf>> = path
-        .path
-        .iter()
-        .map(|level| {
-            level
-                .iter()
-                .filter_map(|l| {
-                    let node = if l.duplicate {
-                        Node::Duplicate
-                    } else {
-                        Node::Hash(wire_hash(l.hash.as_deref()?)?)
-                    };
-                    Some(Leaf {
-                        at: 0,
-                        offset: l.offset,
-                        node,
-                        client: l.txid,
-                    })
-                })
-                .collect()
-        })
-        .collect();
-    bump_root(0, &levels)
-}
-
-/// A display-hex hash in wire order, if it is 32 bytes of hex.
-pub(crate) fn wire_hash(display: &str) -> Option<Hash32> {
-    let mut h: Hash32 = crate::primitives::from_hex(display).ok()?.try_into().ok()?;
-    h.reverse();
-    Some(h)
-}
-
 // ---------------------------------------------------------------------------
 // The decoder
 // ---------------------------------------------------------------------------
@@ -985,6 +915,10 @@ pub struct BeefDecoder {
     run_left: u64,
     bump: Option<BumpBuilder>,
     tx: Option<TxBuilder>,
+    /// Collecting (the whole-BEEF reader, bsv-rs#86): a transaction whose
+    /// content is refused is yielded, its refusal kept here.
+    collect: bool,
+    deferred: Option<Refusal>,
 }
 
 impl Default for BeefDecoder {
@@ -1015,6 +949,36 @@ impl BeefDecoder {
             run_left: 0,
             bump: None,
             tx: None,
+            collect: false,
+            deferred: None,
+        }
+    }
+
+    /// A decoder for the whole-BEEF reader: the frame and each BUMP refused
+    /// as the stream refuses them, each transaction yielded whatever its
+    /// content (the node's rules, [`check_transaction`]), the refusal of its
+    /// content kept for [`take_deferred`](Self::take_deferred).
+    pub(crate) fn collecting() -> Self {
+        Self {
+            collect: true,
+            ..Self::new()
+        }
+    }
+
+    /// The refusal of the content of the transaction just yielded, when
+    /// collecting.
+    pub(crate) fn take_deferred(&mut self) -> Option<Refusal> {
+        self.deferred.take()
+    }
+
+    /// A transaction's content refused: the error, or, collecting, kept.
+    fn judged(&mut self, judged: Result<(), Refusal>) -> Result<(), Refusal> {
+        match judged {
+            Err(r) if self.collect => {
+                self.deferred = Some(r);
+                Ok(())
+            }
+            judged => judged,
         }
     }
 
@@ -1538,7 +1502,8 @@ impl BeefDecoder {
     #[allow(clippy::expect_used)] // #134: each state holds what it reads by the machine's invariant; a Reason for a broken one is a public enum change
     fn tx_done(&mut self) -> Result<Element, Refusal> {
         let tx = self.tx.take().expect("a transaction is in hand");
-        check_transaction(tx.offset, &tx.inputs, &tx.outputs, tx.bump_index)?;
+        let judged = check_transaction(tx.offset, &tx.inputs, &tx.outputs, tx.bump_index);
+        self.judged(judged)?;
         self.frame.txs_left -= 1;
         Ok(Element::Tx {
             offset: tx.offset,

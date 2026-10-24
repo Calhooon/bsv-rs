@@ -95,6 +95,21 @@ impl BeefTx {
         btx
     }
 
+    /// A raw transaction read from a BEEF: its bytes and their parse, both
+    /// in hand, read once (the whole-BEEF reader's collect, bsv-rs#86).
+    pub(crate) fn from_parts(tx: Transaction, raw_tx: Vec<u8>, bump_index: Option<usize>) -> Self {
+        let mut btx = Self {
+            bump_index,
+            tx: Some(tx),
+            raw_tx: Some(raw_tx),
+            txid: None,
+            input_txids: Vec::new(),
+            is_valid: None,
+        };
+        btx.update_input_txids();
+        btx
+    }
+
     /// Creates a BeefTx from just a transaction ID.
     pub fn from_txid(txid: String) -> Self {
         Self {
@@ -159,15 +174,18 @@ impl BeefTx {
 
     /// Returns a mutable reference to the parsed transaction.
     pub fn tx_mut(&mut self) -> Option<&mut Transaction> {
-        // Ensure we have a parsed transaction
-        if self.tx.is_none() && self.raw_tx.is_some() {
-            if let Some(ref raw_tx) = self.raw_tx {
-                if let Ok(tx) = Transaction::from_binary(raw_tx) {
-                    self.tx = Some(tx);
-                }
+        self.parse_raw();
+        self.tx.as_mut()
+    }
+
+    /// Parses the raw bytes into the transaction, when only the bytes are
+    /// held and they parse.
+    fn parse_raw(&mut self) {
+        if self.tx.is_none() {
+            if let Some(Ok(tx)) = self.raw_tx.as_deref().map(Transaction::from_binary) {
+                self.tx = Some(tx);
             }
         }
-        self.tx.as_mut()
     }
 
     /// Returns the raw transaction bytes.
@@ -252,14 +270,7 @@ impl BeefTx {
             return;
         }
 
-        // Parse transaction if we have raw bytes but not parsed
-        if self.tx.is_none() && self.raw_tx.is_some() {
-            if let Some(ref raw_tx) = self.raw_tx {
-                if let Ok(tx) = Transaction::from_binary(raw_tx) {
-                    self.tx = Some(tx);
-                }
-            }
-        }
+        self.parse_raw();
 
         if let Some(ref tx) = self.tx {
             let mut seen = std::collections::HashSet::new();
@@ -336,41 +347,33 @@ impl BeefTx {
                 }
                 Some(TxDataFormat::RawTxAndBumpIndex) => {
                     let bump_index = reader.read_var_int_num()?;
-                    let tx_start = reader.position();
-                    let tx = Transaction::from_reader_internal(reader)?;
-                    let raw_tx = reader.consumed_since(tx_start).to_vec();
-                    let mut btx = Self::from_raw_tx(raw_tx, Some(bump_index));
-                    btx.tx = Some(tx);
-                    btx.update_input_txids();
-                    Ok(btx)
+                    let (tx, raw_tx) = read_tx(reader)?;
+                    Ok(Self::from_parts(tx, raw_tx, Some(bump_index)))
                 }
                 Some(TxDataFormat::RawTx) | None => {
-                    let tx_start = reader.position();
-                    let tx = Transaction::from_reader_internal(reader)?;
-                    let raw_tx = reader.consumed_since(tx_start).to_vec();
-                    let mut btx = Self::from_raw_tx(raw_tx, None);
-                    btx.tx = Some(tx);
-                    btx.update_input_txids();
-                    Ok(btx)
+                    let (tx, raw_tx) = read_tx(reader)?;
+                    Ok(Self::from_parts(tx, raw_tx, None))
                 }
             }
         } else {
             // V1 format
-            let tx_start = reader.position();
-            let tx = Transaction::from_reader_internal(reader)?;
-            let raw_tx = reader.consumed_since(tx_start).to_vec();
+            let (tx, raw_tx) = read_tx(reader)?;
             let has_bump = reader.read_u8()? != 0;
             let bump_index = if has_bump {
                 Some(reader.read_var_int_num()?)
             } else {
                 None
             };
-            let mut btx = Self::from_raw_tx(raw_tx, bump_index);
-            btx.tx = Some(tx);
-            btx.update_input_txids();
-            Ok(btx)
+            Ok(Self::from_parts(tx, raw_tx, bump_index))
         }
     }
+}
+
+/// A raw transaction at the reader: its parse and the bytes it took.
+fn read_tx(reader: &mut Reader) -> Result<(Transaction, Vec<u8>)> {
+    let tx_start = reader.position();
+    let tx = Transaction::from_reader_internal(reader)?;
+    Ok((tx, reader.consumed_since(tx_start).to_vec()))
 }
 
 #[cfg(test)]
