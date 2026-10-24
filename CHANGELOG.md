@@ -27,9 +27,13 @@ left: a connection never made, a request that could not be built),
 `MayHaveBeenReceived` (a timeout, a reset or a body cut after the request was
 written, a 502, 503 or 504), `RateLimited { retry_after_ms }` (a 429, or a 503
 with `Retry-After`, whatever the body; delta seconds or an HTTP date,
-saturating, `None` when absent or unreadable). On wasm32 the fetch API does
-not say whether a connection was made, so a send failure there is never
-`NeverSent`. Every HTTP site of the four transport directories asks it; none
+saturating, `None` when absent or unreadable). A body cut is a body read
+that fails on the way: reqwest gives every failure of `bytes`, `text` and
+`json` the decode kind, so the classifier reads the error's source by type,
+a decode error whose source is not a `serde_json::Error` a cut, one whose
+source is the parse failure it is (`PARSE_ERROR`, `InvalidResponse`,
+`WalletError`). On wasm32 the fetch API does not say whether a connection
+was made, so a send failure there is never `NeverSent`. Every HTTP site of the four transport directories asks it; none
 classifies by text. Busy stays the body's word. What each directory answers:
 
 - **Broadcasters** (ARC, Teranode, WhatsOnChain): `BroadcastFailure.code` is
@@ -49,16 +53,17 @@ classifies by text. Busy stays the body's word. What each directory answers:
   `TransportError` (below).
 - **Wallet substrates**: `Error::WalletTransport` as in 0.8.2, now from both
   `HttpWalletJson` and `HttpWalletWire` (which answered `WalletError` for a
-  connection error, a timeout and a 502, 503 or 504), and for a body cut; a
-  429 without a busy code is `Error::TransportFault` with `RateLimited` and
-  its wait (was `WalletError`). `Error::transport_fault()` reads the class of
+  connection error, a timeout and a 502, 503 or 504), and for a body cut (was
+  `WalletError`); a 429 without a busy code is `Error::TransportFault` with
+  `RateLimited` and its wait (was `WalletError`). `Error::transport_fault()` reads the class of
   either variant (`WalletTransport` as `MayHaveBeenReceived`; busy is `None`).
 - **Chain trackers**: `ChainTrackerError` is exhaustive, so no typed class:
   a send fault stays `NetworkError` with ` (NEVER_SENT)` or
   ` (MAY_HAVE_BEEN_RECEIVED)` after the detail; a fault status stays
   `InvalidResponse` with the class, `HTTP 429 Too Many Requests
-  (RATE_LIMITED, retry_after_ms 5000)`; a body cut is `NetworkError` (was
-  `InvalidResponse`). A fault is never `Ok(false)`.
+  (RATE_LIMITED, retry_after_ms 5000)`; a body cut is `NetworkError` with
+  ` (MAY_HAVE_BEEN_RECEIVED)` (was `InvalidResponse`). A fault is never
+  `Ok(false)`.
 
 **Migration.** A caller that matched `code == "NETWORK_ERROR"` matches
 `failure.transport_fault().is_some()` (or the three words); one that read a
@@ -71,11 +76,18 @@ failed...")` matches `Error::WalletTransport { .. }`. A `match` on `Error`
 already has a wildcard arm (`#[non_exhaustive]`).
 
 Tests, RED on the pre-fix sites (the type present, the sites unchanged) and
-GREEN after: `tests/transport_fault_broadcasters.rs` (8; #65's and #66's
+GREEN after: `tests/transport_fault_broadcasters.rs` (9; #65's and #66's
 witnesses as `a_timeout_after_the_body_was_written_may_have_been_received`
 and `a_429_with_retry_after_and_a_text_body_is_rate_limited_with_its_wait`),
-`transport_fault_trackers.rs` (5), `transport_fault_wallet.rs` (5),
-`transport_fault_auth.rs` (8). Two existing tests,
+`transport_fault_trackers.rs` (6), `transport_fault_wallet.rs` (7),
+`transport_fault_auth.rs` (9). The cold review found the body cut read as a
+parse failure (the classifier asked `is_body()`, which reqwest 0.12.28 never
+sets for a body read): each file's `body_cut` test answers 200 with
+`Content-Length: 200`, twelve body bytes and a close from a raw
+`tokio::net::TcpListener` (wiremock cannot cut a body), RED on the classifier
+before the fold (`PARSE_ERROR`, `InvalidResponse`, `WalletError`,
+`AuthError`) and GREEN after;
+`a_success_body_that_is_not_json_stays_the_wallet_error` pins the other half. Two existing tests,
 `test_arc_broadcast_with_config_timeout` and `test_teranode_broadcast_timeout`,
 pinned `NETWORK_ERROR` for a timeout after the request was written, which is
 #65's defect; they now read `MAY_HAVE_BEEN_RECEIVED` (their own commit).

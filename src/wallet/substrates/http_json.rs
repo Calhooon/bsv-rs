@@ -1070,7 +1070,8 @@ fn counterparty_to_string(counterparty: &Counterparty) -> String {
 }
 
 /// Creates the error for a failed send or body read: a transport fault of
-/// the one classifier (a connection error, a timeout, a body cut) is
+/// the one classifier (a connection error, a timeout, a body cut: a decode
+/// error whose source is not `serde_json`'s) is
 /// [`Error::WalletTransport`] with no status; a request that could not be
 /// built, a redirect refused and a success body that is not the expected
 /// JSON stay [`Error::WalletError`].

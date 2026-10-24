@@ -158,3 +158,83 @@ async fn store_busy_on_a_503_is_wallet_busy_where_the_substrate_reads_one() {
     );
     assert_eq!(err.transport_fault(), None, "busy is not a transport fault");
 }
+
+/// A body cut after the request was written (the reviewer's probe on #87):
+/// reqwest reads it as a decode error whose source is not `serde_json`'s.
+#[cfg(not(target_arch = "wasm32"))]
+mod body_cut {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    /// A stub that reads each whole request, answers `200` with
+    /// `Content-Length: 200`, sends twelve bytes of the body and closes: the
+    /// body cut after the request was written. wiremock cannot cut a body.
+    async fn cut_body_stub() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            loop {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut request = Vec::new();
+                let mut buf = [0u8; 4096];
+                while !request_read(&request) {
+                    let n = stream.read(&mut buf).await.unwrap();
+                    if n == 0 {
+                        break;
+                    }
+                    request.extend_from_slice(&buf[..n]);
+                }
+                stream
+                    .write_all(
+                        b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\
+                          Content-Length: 200\r\n\r\n0123456789ab",
+                    )
+                    .await
+                    .unwrap();
+                stream.shutdown().await.unwrap();
+            }
+        });
+        format!("http://{addr}")
+    }
+
+    /// Whether `request` holds its head and the body its `Content-Length`
+    /// names.
+    fn request_read(request: &[u8]) -> bool {
+        let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") else {
+            return false;
+        };
+        let head = String::from_utf8_lossy(&request[..end]).to_ascii_lowercase();
+        let length = head
+            .lines()
+            .find_map(|line| line.strip_prefix("content-length:"))
+            .and_then(|value| value.trim().parse::<usize>().ok())
+            .unwrap_or(0);
+        request.len() >= end + 4 + length
+    }
+
+    #[tokio::test]
+    async fn a_body_cut_after_the_request_was_written_is_a_wallet_transport_fault() {
+        let url = cut_body_stub().await;
+        for (name, err) in both_at(&url, Duration::from_secs(30)).await {
+            assert_transport(name, &err, None);
+        }
+    }
+
+    /// The other half of the rule: a success body that is not the expected
+    /// JSON is a decode error from `serde_json`, the wallet's answer.
+    #[tokio::test]
+    async fn a_success_body_that_is_not_json_stays_the_wallet_error() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/createAction"))
+            .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
+            .mount(&server)
+            .await;
+        let err = HttpWalletJson::new(None, Some(server.uri()))
+            .create_action(create_action_args(), "app.example.com")
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::WalletError(_)), "{err:?}");
+        assert_eq!(err.transport_fault(), None);
+    }
+}
