@@ -108,6 +108,7 @@ mod limits;
 mod num;
 mod splice;
 mod stack;
+mod stack_ops;
 mod word;
 
 use limits::MAX_SCRIPT_ELEMENT_SIZE;
@@ -830,219 +831,24 @@ impl Spend {
             // ================================================================
             // Stack Operations (0x6b-0x7d)
             // ================================================================
-            OP_TOALTSTACK => {
-                if self.stack.is_empty() {
-                    return Err(
-                        self.error("OP_TOALTSTACK requires at least one item to be on the stack.")
-                    );
-                }
-                let item = self.pop_stack()?;
-                self.push_alt_stack(item)?;
-            }
-            OP_FROMALTSTACK => {
-                if self.alt_stack.is_empty() {
-                    return Err(self.error(
-                        "OP_FROMALTSTACK requires at least one item to be on the alt stack.",
-                    ));
-                }
-                let item = self.pop_alt_stack()?;
-                self.push_stack(item)?;
-            }
-            OP_2DROP => {
-                if self.stack.len() < 2 {
-                    return Err(
-                        self.error("OP_2DROP requires at least two items to be on the stack.")
-                    );
-                }
-                self.pop_stack()?;
-                self.pop_stack()?;
-            }
-            OP_2DUP => {
-                if self.stack.len() < 2 {
-                    return Err(
-                        self.error("OP_2DUP requires at least two items to be on the stack.")
-                    );
-                }
-                let buf1 = self.stack_top_n(2)?.to_vec();
-                let buf2 = self.stack_top()?.to_vec();
-                self.push_stack(buf1)?;
-                self.push_stack(buf2)?;
-            }
-            OP_3DUP => {
-                if self.stack.len() < 3 {
-                    return Err(
-                        self.error("OP_3DUP requires at least three items to be on the stack.")
-                    );
-                }
-                let buf1 = self.stack_top_n(3)?.to_vec();
-                let buf2 = self.stack_top_n(2)?.to_vec();
-                let buf3 = self.stack_top()?.to_vec();
-                self.push_stack(buf1)?;
-                self.push_stack(buf2)?;
-                self.push_stack(buf3)?;
-            }
-            OP_2OVER => {
-                if self.stack.len() < 4 {
-                    return Err(
-                        self.error("OP_2OVER requires at least four items to be on the stack.")
-                    );
-                }
-                let buf1 = self.stack_top_n(4)?.to_vec();
-                let buf2 = self.stack_top_n(3)?.to_vec();
-                self.push_stack(buf1)?;
-                self.push_stack(buf2)?;
-            }
-            OP_2ROT => {
-                if self.stack.len() < 6 {
-                    return Err(
-                        self.error("OP_2ROT requires at least six items to be on the stack.")
-                    );
-                }
-                let x6 = self.pop_stack()?;
-                let x5 = self.pop_stack()?;
-                let x4 = self.pop_stack()?;
-                let x3 = self.pop_stack()?;
-                let x2 = self.pop_stack()?;
-                let x1 = self.pop_stack()?;
-                self.push_stack(x3)?;
-                self.push_stack(x4)?;
-                self.push_stack(x5)?;
-                self.push_stack(x6)?;
-                self.push_stack(x1)?;
-                self.push_stack(x2)?;
-            }
-            OP_2SWAP => {
-                if self.stack.len() < 4 {
-                    return Err(
-                        self.error("OP_2SWAP requires at least four items to be on the stack.")
-                    );
-                }
-                let x4 = self.pop_stack()?;
-                let x3 = self.pop_stack()?;
-                let x2 = self.pop_stack()?;
-                let x1 = self.pop_stack()?;
-                self.push_stack(x3)?;
-                self.push_stack(x4)?;
-                self.push_stack(x1)?;
-                self.push_stack(x2)?;
-            }
-            OP_IFDUP => {
-                if self.stack.is_empty() {
-                    return Err(
-                        self.error("OP_IFDUP requires at least one item to be on the stack.")
-                    );
-                }
-                let top = self.stack_top()?.to_vec();
-                if ScriptNum::cast_to_bool(&top) {
-                    self.push_stack(top)?;
-                }
-            }
-            OP_DEPTH => {
-                let depth = BigNumber::from_u64(self.stack.len() as u64);
-                self.push_stack(ScriptNum::to_bytes(&depth))?;
-            }
-            OP_DROP => {
-                if self.stack.is_empty() {
-                    return Err(
-                        self.error("OP_DROP requires at least one item to be on the stack.")
-                    );
-                }
-                self.pop_stack()?;
-            }
-            OP_DUP => {
-                if self.stack.is_empty() {
-                    return Err(self.error("OP_DUP requires at least one item to be on the stack."));
-                }
-                let top = self.stack_top()?.to_vec();
-                self.push_stack(top)?;
-            }
-            OP_NIP => {
-                if self.stack.len() < 2 {
-                    return Err(
-                        self.error("OP_NIP requires at least two items to be on the stack.")
-                    );
-                }
-                let top = self.pop_stack()?;
-                self.pop_stack()?;
-                self.push_stack(top)?;
-            }
-            OP_OVER => {
-                if self.stack.len() < 2 {
-                    return Err(
-                        self.error("OP_OVER requires at least two items to be on the stack.")
-                    );
-                }
-                let second = self.stack_top_n(2)?.to_vec();
-                self.push_stack(second)?;
-            }
-            OP_PICK | OP_ROLL => {
-                if self.stack.len() < 2 {
-                    return Err(self.error(&format!(
-                        "{} requires at least two items to be on the stack.",
-                        opcode_to_name(opcode).unwrap_or("OP_PICK/ROLL")
-                    )));
-                }
-                let n_bytes = self.pop_stack()?;
-                let bn = self.read_number(&n_bytes)?;
-
-                let n = bn.to_i64().unwrap_or(i64::MAX);
-                if n < 0 || n >= self.stack.len() as i64 {
-                    return Err(self.error(&format!(
-                        "{} requires the top stack element to be 0 or a positive number less than the current size of the stack.",
-                        opcode_to_name(opcode).unwrap_or("OP_PICK/ROLL")
-                    )));
-                }
-
-                let n_idx = n as usize;
-                let item = self.stack[self.stack.len() - 1 - n_idx].clone();
-
-                if opcode == OP_ROLL {
-                    let remove_idx = self.stack.len() - 1 - n_idx;
-                    let removed = self.stack.remove(remove_idx);
-                    self.stack_mem -= removed.len();
-                    self.release(removed.len());
-                    self.push_stack(item)?;
-                } else {
-                    // OP_PICK
-                    self.push_stack(item)?;
-                }
-            }
-            OP_ROT => {
-                if self.stack.len() < 3 {
-                    return Err(
-                        self.error("OP_ROT requires at least three items to be on the stack.")
-                    );
-                }
-                let x3 = self.pop_stack()?;
-                let x2 = self.pop_stack()?;
-                let x1 = self.pop_stack()?;
-                self.push_stack(x2)?;
-                self.push_stack(x3)?;
-                self.push_stack(x1)?;
-            }
-            OP_SWAP => {
-                if self.stack.len() < 2 {
-                    return Err(
-                        self.error("OP_SWAP requires at least two items to be on the stack.")
-                    );
-                }
-                let x2 = self.pop_stack()?;
-                let x1 = self.pop_stack()?;
-                self.push_stack(x2)?;
-                self.push_stack(x1)?;
-            }
-            OP_TUCK => {
-                if self.stack.len() < 2 {
-                    return Err(
-                        self.error("OP_TUCK requires at least two items to be on the stack.")
-                    );
-                }
-                let top = self.stack_top()?.to_vec();
-                self.reserve_stack(top.len())?;
-                let insert_idx = self.stack.len() - 2;
-                self.stack.insert(insert_idx, top.clone());
-                self.stack_mem += top.len();
-            }
+            OP_TOALTSTACK => self.op_toaltstack()?,
+            OP_FROMALTSTACK => self.op_fromaltstack()?,
+            OP_2DROP => self.op_2drop()?,
+            OP_2DUP => self.op_2dup()?,
+            OP_3DUP => self.op_3dup()?,
+            OP_2OVER => self.op_2over()?,
+            OP_2ROT => self.op_2rot()?,
+            OP_2SWAP => self.op_2swap()?,
+            OP_IFDUP => self.op_ifdup()?,
+            OP_DEPTH => self.op_depth()?,
+            OP_DROP => self.op_drop()?,
+            OP_DUP => self.op_dup()?,
+            OP_NIP => self.op_nip()?,
+            OP_OVER => self.op_over()?,
+            OP_PICK | OP_ROLL => self.op_pick_roll(opcode)?,
+            OP_ROT => self.op_rot()?,
+            OP_SWAP => self.op_swap()?,
+            OP_TUCK => self.op_tuck()?,
             OP_SIZE => self.op_size()?,
 
             // ================================================================
