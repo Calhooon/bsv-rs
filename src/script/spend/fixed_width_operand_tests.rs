@@ -1,4 +1,5 @@
 use super::*;
+use crate::primitives::BigNumber;
 use crate::script::ProtocolEra;
 use crate::script::Script;
 

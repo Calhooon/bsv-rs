@@ -98,7 +98,7 @@ use super::op::*;
 use super::script_num::ScriptNum;
 use super::{LockingScript, ScriptChunk, UnlockingScript};
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
-use crate::primitives::{to_hex, BigNumber};
+use crate::primitives::to_hex;
 use std::sync::Arc;
 
 mod arithmetic;
@@ -107,6 +107,7 @@ mod crypto;
 mod flow;
 mod limits;
 mod num;
+mod push;
 mod splice;
 mod stack;
 mod stack_ops;
@@ -114,6 +115,7 @@ mod word;
 
 use flow::is_opcode_disabled;
 use limits::MAX_SCRIPT_ELEMENT_SIZE;
+use push::is_chunk_minimal_push;
 
 // ============================================================================
 // Configuration Constants
@@ -130,20 +132,6 @@ const REQUIRE_LOW_S_SIGNATURES: bool = true;
 
 /// Require clean stack after execution
 const REQUIRE_CLEAN_STACK: bool = true;
-
-// ============================================================================
-// Pre-computed Script Numbers
-// ============================================================================
-
-lazy_static::lazy_static! {
-    /// Pre-computed script number for -1
-    static ref SCRIPTNUM_NEG_1: Vec<u8> = ScriptNum::to_bytes(&BigNumber::from_i64(-1));
-
-    /// Pre-computed script numbers for 0-16
-    static ref SCRIPTNUMS_0_TO_16: Vec<Vec<u8>> = (0..=16)
-        .map(|i| ScriptNum::to_bytes(&BigNumber::from_i64(i)))
-        .collect();
-}
 
 // ============================================================================
 // Spend Parameters
@@ -657,16 +645,9 @@ impl Spend {
             // ================================================================
             // Push Operations (0x00-0x60)
             // ================================================================
-            OP_1NEGATE => {
-                self.push_stack_copy(&SCRIPTNUM_NEG_1)?;
-            }
-            OP_0 => {
-                self.push_stack_copy(&SCRIPTNUMS_0_TO_16[0])?;
-            }
-            OP_1..=OP_16 => {
-                let n = (opcode - OP_1 + 1) as usize;
-                self.push_stack_copy(&SCRIPTNUMS_0_TO_16[n])?;
-            }
+            OP_1NEGATE => self.op_1negate()?,
+            OP_0 => self.op_0()?,
+            OP_1..=OP_16 => self.op_small_integer(opcode)?,
 
             // ================================================================
             // NOPs (do nothing)
@@ -766,15 +747,8 @@ impl Spend {
             // ================================================================
             // Data Push (handled above, but catch any missed)
             // ================================================================
-            0x01..=0x4b => {
-                // Direct push opcodes - should have data
-                let data = chunk.data.clone().unwrap_or_default();
-                self.push_stack(data)?;
-            }
-            OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => {
-                let data = chunk.data.clone().unwrap_or_default();
-                self.push_stack(data)?;
-            }
+            0x01..=0x4b => self.op_push_data(chunk)?,
+            OP_PUSHDATA1 | OP_PUSHDATA2 | OP_PUSHDATA4 => self.op_push_data(chunk)?,
 
             // ================================================================
             // Unknown/Invalid Opcode
@@ -817,41 +791,6 @@ impl Spend {
 // ============================================================================
 // Helper Functions
 // ============================================================================
-
-/// Checks if a chunk uses minimal push encoding.
-fn is_chunk_minimal_push(chunk: &ScriptChunk) -> bool {
-    let data = match &chunk.data {
-        Some(d) => d,
-        None => return true,
-    };
-    let op = chunk.op;
-
-    if data.is_empty() {
-        return op == OP_0;
-    }
-
-    if data.len() == 1 && data[0] >= 1 && data[0] <= 16 {
-        return op == OP_1 + (data[0] - 1);
-    }
-
-    if data.len() == 1 && data[0] == 0x81 {
-        return op == OP_1NEGATE;
-    }
-
-    if data.len() <= 75 {
-        return op as usize == data.len();
-    }
-
-    if data.len() <= 255 {
-        return op == OP_PUSHDATA1;
-    }
-
-    if data.len() <= 65535 {
-        return op == OP_PUSHDATA2;
-    }
-
-    true
-}
 
 #[cfg(test)]
 mod tests;
