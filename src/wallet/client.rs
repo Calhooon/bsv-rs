@@ -428,6 +428,7 @@ impl WalletClient {
         &mut self,
         args: InternalizeActionArgs,
     ) -> Result<InternalizeActionResult, Error> {
+        crate::wallet::validation::validate_internalize_action_args(&args)?;
         let originator = self.effective_originator().to_string();
         let substrate = self.connect().await?;
 

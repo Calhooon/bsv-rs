@@ -913,12 +913,12 @@ impl WalletInterface for ProtoWallet {
 
     async fn internalize_action(
         &self,
-        _args: InternalizeActionArgs,
+        args: InternalizeActionArgs,
         _originator: &str,
     ) -> Result<InternalizeActionResult> {
+        crate::wallet::validation::validate_internalize_action_args(&args)?;
         Err(Error::WalletError(
-            "internalizeAction requires a full wallet implementation with UTXO management"
-                .to_string(),
+            "internalizeAction requires a full wallet implementation with UTXO management".into(),
         ))
     }
 

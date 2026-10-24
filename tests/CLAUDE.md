@@ -66,6 +66,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `template_tests.rs` | 22 | default | P2PKH, P2PK, Multisig, RPuzzle script templates |
 | `transaction_tests.rs` | 104 | `transaction` | BEEF, MerklePath, fee models, construction, ancestry, SPV verify |
 | `wallet_tests.rs` | 56 | `wallet` | KeyDeriver, CachedKeyDeriver, ProtoWallet, wire protocol |
+| `wallet_internalize_validation_tests.rs` | 8 | `wallet` (`http` for one) | internalizeAction's basket insertion `customInstructions` bound: 1,000 UTF-8 bytes accepted, 1,001 refused with the field and the count, four-byte characters at the boundary, absence, the second output's index, the createAction copy unbounded, the ProtoWallet and HTTP JSON doors (Calhooon/bsv-rs#117) |
 | `wallet_wire_cross_sdk_tests.rs` | 42 | `wallet` | Cross-SDK wire protocol vectors from Go SDK (54 vectors) |
 | `wire_method_roundtrip_tests.rs` | 90 | `wallet` | Wire protocol roundtrips for all 28 WalletInterface methods |
 | `transaction/` | — | — | Transaction test vector constants module |

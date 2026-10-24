@@ -484,6 +484,7 @@ impl HttpWalletJson {
         args: InternalizeActionArgs,
         originator: &str,
     ) -> Result<InternalizeActionResult, Error> {
+        crate::wallet::validation::validate_internalize_action_args(&args)?;
         self.request("internalizeAction", &args, originator).await
     }
 

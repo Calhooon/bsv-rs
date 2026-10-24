@@ -30,6 +30,8 @@
 
 use crate::error::{Error, Result};
 use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TxId, MAX_SATOSHIS};
+mod internalize;
+pub use internalize::validate_internalize_action_args;
 
 // =============================================================================
 // Basic Validation Functions
@@ -1020,8 +1022,6 @@ pub fn validate_protocol_tuple(tuple: (u8, &str)) -> Result<Protocol> {
             tuple.0
         ))
     })?;
-
-    // Validate protocol name
     let protocol_name = crate::wallet::types::validate_protocol_name(tuple.1)?;
 
     Ok(Protocol::new(security_level, protocol_name))
