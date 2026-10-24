@@ -1,3 +1,5 @@
+#![cfg(test)]
+
 use super::*;
 use crate::primitives::to_hex;
 use crate::primitives::BigNumber;
