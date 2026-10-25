@@ -85,6 +85,7 @@ pub use processor::WalletWireProcessor;
 pub use transceiver::WalletWireTransceiver;
 
 use crate::primitives::PublicKey;
+use crate::wallet::types::{Counterparty, Protocol};
 use crate::Error;
 use std::collections::HashMap;
 
@@ -420,6 +421,52 @@ pub(crate) fn write_data_or_hash(
         }
     }
     Ok(())
+}
+
+/// The privileged flag and reason (`#encodePrivilegedParams`,
+/// `WalletWireTransceiver.ts:1448-1462` at `ts-stack@edf6e03`): the flag an
+/// `i8` (-1 absent), the reason's length an `i8` (-1 absent) and its UTF-8
+/// bytes; a reason past 127 bytes, which the frame cannot carry, is refused
+/// before a byte is written (#193).
+pub(crate) fn write_privileged_params(
+    writer: &mut WireWriter,
+    privileged: Option<bool>,
+    reason: Option<&str>,
+) -> Result<(), Error> {
+    writer.write_optional_bool(privileged);
+    match reason.map(str::as_bytes) {
+        None => {
+            writer.write_i8(-1);
+        }
+        Some(bytes) => {
+            let length = i8::try_from(bytes.len()).map_err(|_| {
+                refused(format!(
+                    "Invalid privilegedReason length: expected 0 to 127 bytes, got {}",
+                    bytes.len()
+                ))
+            })?;
+            writer.write_i8(length);
+            writer.write_bytes(bytes);
+        }
+    }
+    Ok(())
+}
+
+/// The key-related parameters (`#encodeKeyRelatedParams`,
+/// `WalletWireTransceiver.ts:1351-1376`): the protocol, the key ID, the
+/// counterparty, then the privileged flag and reason (#193).
+pub(crate) fn write_key_related_params(
+    writer: &mut WireWriter,
+    protocol: &Protocol,
+    key_id: &str,
+    counterparty: Option<&Counterparty>,
+    privileged: Option<bool>,
+    reason: Option<&str>,
+) -> Result<(), Error> {
+    writer.write_protocol_id(protocol);
+    writer.write_string(key_id);
+    writer.write_counterparty(counterparty);
+    write_privileged_params(writer, privileged, reason)
 }
 
 /// Transport abstraction for wallet wire protocol.

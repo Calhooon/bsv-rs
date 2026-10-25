@@ -1114,6 +1114,7 @@ async fn test_ts_style_server_no_nonce_field() {
             protocol_id: Protocol::new(SecurityLevel::Counterparty, "auth message signature"),
             key_id,
             counterparty: Some(Counterparty::Other(alice_key.public_key())),
+            ..Default::default()
         })
         .unwrap();
 

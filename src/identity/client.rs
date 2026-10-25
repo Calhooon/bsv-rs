@@ -355,7 +355,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                     protocol_id: None,
                     key_id: None,
                     counterparty: None,
-                    for_self: None,
+                    ..Default::default()
                 },
                 originator,
             )
@@ -478,11 +478,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .wallet
             .get_public_key(
                 crate::wallet::GetPublicKeyArgs {
-                    identity_key: false,
                     protocol_id: Some(protocol),
                     key_id: Some(self.config.key_id.clone()),
                     counterparty: Some(crate::wallet::Counterparty::Anyone),
                     for_self: Some(false),
+                    ..Default::default()
                 },
                 originator,
             )
@@ -760,11 +760,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .wallet
             .create_signature(
                 CreateSignatureArgs {
-                    data: None,
                     hash_to_directly_sign: Some(preimage_hash),
                     protocol_id: protocol,
                     key_id: self.config.key_id.clone(),
                     counterparty: Some(Counterparty::Anyone),
+                    ..Default::default()
                 },
                 originator,
             )

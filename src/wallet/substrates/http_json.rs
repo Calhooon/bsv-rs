@@ -30,9 +30,9 @@ use serde::{Deserialize, Serialize};
 
 mod key_requests;
 use key_requests::{
-    JsonCreateHmacRequest, JsonCreateHmacResponse, JsonCreateSignatureRequest,
+    permission, JsonCreateHmacRequest, JsonCreateHmacResponse, JsonCreateSignatureRequest,
     JsonCreateSignatureResponse, JsonDecryptRequest, JsonDecryptResponse, JsonEncryptRequest,
-    JsonEncryptResponse, JsonGetPublicKeyRequest, JsonGetPublicKeyResponse,
+    JsonEncryptResponse, JsonGetPublicKeyRequest, JsonGetPublicKeyResponse, JsonPermission,
     JsonRevealCounterpartyRequest, JsonRevealSpecificRequest, JsonVerifyHmacRequest,
     JsonVerifyHmacResponse, JsonVerifySignatureRequest, JsonVerifySignatureResponse,
 };
@@ -69,6 +69,7 @@ use key_requests::{
 ///         key_id: None,
 ///         counterparty: None,
 ///         for_self: None,
+///         ..Default::default()
 ///     },
 ///     "myapp.example.com",
 /// ).await?;
@@ -219,6 +220,7 @@ impl HttpWalletJson {
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             for_self: args.for_self,
+            permission: permission!(args),
         };
 
         let response: JsonGetPublicKeyResponse =
@@ -240,6 +242,7 @@ impl HttpWalletJson {
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             plaintext: args.plaintext,
+            permission: permission!(args),
         };
 
         let response: JsonEncryptResponse = self.request("encrypt", &request, originator).await?;
@@ -260,6 +263,7 @@ impl HttpWalletJson {
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             ciphertext: args.ciphertext,
+            permission: permission!(args),
         };
 
         let response: JsonDecryptResponse = self.request("decrypt", &request, originator).await?;
@@ -280,6 +284,7 @@ impl HttpWalletJson {
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             data: args.data,
+            permission: permission!(args),
         };
 
         let response: JsonCreateHmacResponse =
@@ -310,6 +315,7 @@ impl HttpWalletJson {
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             data: args.data,
             hmac: args.hmac.to_vec(),
+            permission: permission!(args),
         };
 
         let response: JsonVerifyHmacResponse =
@@ -334,6 +340,7 @@ impl HttpWalletJson {
             hash_to_directly_sign: args
                 .hash_to_directly_sign
                 .map(|h| crate::primitives::to_hex(&h)),
+            permission: permission!(args),
         };
 
         let response: JsonCreateSignatureResponse = self
@@ -361,6 +368,7 @@ impl HttpWalletJson {
                 .hash_to_directly_verify
                 .map(|h| crate::primitives::to_hex(&h)),
             signature: args.signature,
+            permission: permission!(args),
         };
 
         let response: JsonVerifySignatureResponse = self

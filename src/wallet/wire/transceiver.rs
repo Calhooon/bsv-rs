@@ -7,6 +7,7 @@ use super::encoding::{WireReader, WireWriter};
 use super::{WalletCall, WalletWire};
 use crate::primitives::bounded_capacity;
 use crate::primitives::{from_base64, from_hex, to_base64, to_hex};
+use crate::wallet::key_args::default_protocol;
 use crate::wallet::types::Network;
 use crate::wallet::{
     AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AcquisitionProtocol,
@@ -22,6 +23,21 @@ use crate::wallet::{
     VerifySignatureArgs, VerifySignatureResult, WalletCertificate,
 };
 use crate::Error;
+
+/// The key-related parameters of an args value with a protocol and a key ID
+/// (`super::write_key_related_params`, #193).
+macro_rules! write_key_related {
+    ($writer:ident, $args:ident) => {
+        super::write_key_related_params(
+            &mut $writer,
+            &$args.protocol_id,
+            &$args.key_id,
+            $args.counterparty.as_ref(),
+            $args.privileged,
+            $args.privileged_reason.as_deref(),
+        )
+    };
+}
 
 /// Client-side wallet wire protocol implementation.
 ///
@@ -40,10 +56,10 @@ use crate::Error;
 ///
 /// // Make wallet calls
 /// let result = transceiver.get_public_key(GetPublicKeyArgs {
-///     protocol_id: Protocol::new(SecurityLevel::App, "my app"),
-///     key_id: "key-1".to_string(),
-///     counterparty: None,
+///     protocol_id: Some(Protocol::new(SecurityLevel::App, "my app")),
+///     key_id: Some("key-1".to_string()),
 ///     for_self: Some(true),
+///     ..Default::default()
 /// }, "originator").await?;
 /// ```
 pub struct WalletWireTransceiver<T: WalletWire> {
@@ -119,20 +135,30 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<GetPublicKeyResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Identity key flag
-        writer.write_optional_bool(Some(args.identity_key));
-
-        // Protocol ID (optional)
-        writer.write_optional_protocol_id(args.protocol_id.as_ref());
-
-        // Key ID (optional)
-        writer.write_optional_string(args.key_id.as_deref());
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
-
-        // for_self
-        writer.write_optional_bool(args.for_self);
+        // The identityKey flag; for the identity key the privileged pair, else
+        // the key-related parameters (the reference's defaults for an absent
+        // protocol and key ID) and forSelf; then seekPermission
+        // (`WalletWireTransceiver.ts:756-779`; #193)
+        writer.write_u8(u8::from(args.identity_key));
+        if args.identity_key {
+            super::write_privileged_params(
+                &mut writer,
+                args.privileged,
+                args.privileged_reason.as_deref(),
+            )?;
+        } else {
+            let protocol = args.protocol_id.unwrap_or_else(default_protocol);
+            super::write_key_related_params(
+                &mut writer,
+                &protocol,
+                args.key_id.as_deref().unwrap_or_default(),
+                args.counterparty.as_ref(),
+                args.privileged,
+                args.privileged_reason.as_deref(),
+            )?;
+            writer.write_optional_bool(args.for_self);
+        }
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::GetPublicKey, originator, writer.as_bytes())
@@ -154,18 +180,16 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<EncryptResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Protocol ID
-        writer.write_protocol_id(&args.protocol_id);
-
-        // Key ID
-        writer.write_string(&args.key_id);
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
+        // The key-related parameters, the privileged pair last
+        // (`#encodeKeyRelatedParams`; #193)
+        write_key_related!(writer, args)?;
 
         // Plaintext
         writer.write_var_int(args.plaintext.len() as u64);
         writer.write_bytes(&args.plaintext);
+
+        // seekPermission last (#193)
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::Encrypt, originator, writer.as_bytes())
@@ -185,18 +209,16 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<DecryptResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Protocol ID
-        writer.write_protocol_id(&args.protocol_id);
-
-        // Key ID
-        writer.write_string(&args.key_id);
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
+        // The key-related parameters, the privileged pair last
+        // (`#encodeKeyRelatedParams`; #193)
+        write_key_related!(writer, args)?;
 
         // Ciphertext
         writer.write_var_int(args.ciphertext.len() as u64);
         writer.write_bytes(&args.ciphertext);
+
+        // seekPermission last (#193)
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::Decrypt, originator, writer.as_bytes())
@@ -216,18 +238,16 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<CreateHmacResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Protocol ID
-        writer.write_protocol_id(&args.protocol_id);
-
-        // Key ID
-        writer.write_string(&args.key_id);
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
+        // The key-related parameters, the privileged pair last
+        // (`#encodeKeyRelatedParams`; #193)
+        write_key_related!(writer, args)?;
 
         // Data
         writer.write_var_int(args.data.len() as u64);
         writer.write_bytes(&args.data);
+
+        // seekPermission last (#193)
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::CreateHmac, originator, writer.as_bytes())
@@ -249,14 +269,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<VerifyHmacResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Protocol ID
-        writer.write_protocol_id(&args.protocol_id);
-
-        // Key ID
-        writer.write_string(&args.key_id);
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
+        // The key-related parameters, the privileged pair last
+        // (`#encodeKeyRelatedParams`; #193)
+        write_key_related!(writer, args)?;
 
         // The 32 bytes of the HMAC, then the data behind its length
         // (`WalletWireTransceiver.ts:1048-1050`; BRC-100 `wallet/0100.md:2149-2151`
@@ -265,6 +280,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         writer.write_bytes(&args.hmac);
         writer.write_var_int(args.data.len() as u64);
         writer.write_bytes(&args.data);
+
+        // seekPermission last (#193)
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::VerifyHmac, originator, writer.as_bytes())
@@ -284,14 +302,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<CreateSignatureResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Protocol ID
-        writer.write_protocol_id(&args.protocol_id);
-
-        // Key ID
-        writer.write_string(&args.key_id);
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
+        // The key-related parameters, the privileged pair last
+        // (`#encodeKeyRelatedParams`; #193)
+        write_key_related!(writer, args)?;
 
         // The data-type flag and the data or the hash (#199)
         super::write_data_or_hash(
@@ -300,6 +313,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             args.data.as_deref(),
             args.hash_to_directly_sign.as_ref(),
         )?;
+
+        // seekPermission last (#193)
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::CreateSignature, originator, writer.as_bytes())
@@ -319,14 +335,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<VerifySignatureResult, Error> {
         let mut writer = WireWriter::new();
 
-        // Protocol ID
-        writer.write_protocol_id(&args.protocol_id);
-
-        // Key ID
-        writer.write_string(&args.key_id);
-
-        // Counterparty
-        writer.write_counterparty(args.counterparty.as_ref());
+        // The key-related parameters, the privileged pair last
+        // (`#encodeKeyRelatedParams`; #193)
+        write_key_related!(writer, args)?;
 
         // for_self
         writer.write_optional_bool(args.for_self);
@@ -343,6 +354,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             args.data.as_deref(),
             args.hash_to_directly_verify.as_ref(),
         )?;
+
+        // seekPermission last (#193)
+        writer.write_optional_bool(args.seek_permission);
 
         let response = self
             .transmit(WalletCall::VerifySignature, originator, writer.as_bytes())
@@ -1442,6 +1456,7 @@ mod tests {
                     key_id: Some("test-key".to_string()),
                     counterparty: Some(Counterparty::Self_),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test.example.com",
             )
@@ -1466,6 +1481,7 @@ mod tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "encryption test"),
                     key_id: "enc-key".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -1480,6 +1496,7 @@ mod tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "encryption test"),
                     key_id: "enc-key".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -1502,6 +1519,7 @@ mod tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "hmac test"),
                     key_id: "hmac-key".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -1517,6 +1535,7 @@ mod tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "hmac test"),
                     key_id: "hmac-key".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -1540,6 +1559,7 @@ mod tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "signature test"),
                     key_id: "sig-key".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -1557,6 +1577,7 @@ mod tests {
                     key_id: "sig-key".to_string(),
                     counterparty: Some(Counterparty::Anyone),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test",
             )

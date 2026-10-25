@@ -50,6 +50,7 @@ fn main() {
             protocol_id: protocol.clone(),
             key_id: "msg-1".to_string(),
             counterparty: Some(Counterparty::Other(bob_wallet.identity_key())),
+            ..Default::default()
         })
         .unwrap();
     let verified = bob_wallet
@@ -61,6 +62,7 @@ fn main() {
             key_id: "msg-1".to_string(),
             counterparty: Some(Counterparty::Other(alice_wallet.identity_key())),
             for_self: None,
+            ..Default::default()
         })
         .unwrap();
     assert!(verified.valid);

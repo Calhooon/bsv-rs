@@ -133,6 +133,7 @@ fn verify(wallet: &ProtoWallet, row: &Row, hmac: [u8; 32]) -> bsv_rs::Result<boo
             protocol_id: protocol(),
             key_id: row.key_id.to_string(),
             counterparty: Some(counterparty(row)),
+            ..Default::default()
         })
         .map(|r| r.valid)
 }
@@ -169,6 +170,7 @@ fn create_hmac_reproduces_the_six_brc56_tags() {
                 protocol_id: protocol(),
                 key_id: row.key_id.to_string(),
                 counterparty: Some(counterparty(row)),
+                ..Default::default()
             })
             .unwrap();
         assert_eq!(to_hex(&created.hmac), row.tag, "line {}", row.line);
@@ -197,6 +199,7 @@ fn verify_hmac_accepts_the_six_32_byte_key_tags() {
                 protocol_id: protocol(),
                 key_id: row.key_id.to_string(),
                 counterparty: Some(Counterparty::Other(root_key().public_key())),
+                ..Default::default()
             })
             .map(|r| r.valid);
         assert_eq!(valid, Ok(true), "line {}", row.line);
@@ -237,6 +240,7 @@ fn a_minimal_length_key_tag_is_refused_through_the_async_interface() {
         protocol_id: protocol(),
         key_id: row.key_id.to_string(),
         counterparty: Some(counterparty(row)),
+        ..Default::default()
     };
     let result =
         futures::executor::block_on(WalletInterface::verify_hmac(&wallet, args, "brc56.test"));

@@ -167,7 +167,7 @@ impl<W: WalletInterface> RegistryClient<W> {
                     protocol_id: None,
                     key_id: None,
                     counterparty: None,
-                    for_self: None,
+                    ..Default::default()
                 },
                 self.originator(),
             )

@@ -413,8 +413,11 @@ pub fn error_layout() -> Vec<Layout> {
     vec![Layout::U8, Layout::Str, Layout::Blob]
 }
 
+/// The key-related parameters: the protocol, the key ID, the counterparty,
+/// the privileged flag and reason (#193).
 fn common() -> Vec<Layout> {
-    vec![Layout::Protocol, Layout::Str, Layout::Counterparty]
+    use Layout::*;
+    vec![Protocol, Str, Counterparty, OptBool, Reason]
 }
 
 /// The certificate as `prove_certificate`'s request writes it:
@@ -491,29 +494,39 @@ fn request_args(call: WalletCall) -> Vec<Layout> {
             Str, Strs, I8, I8, OptBool, OptBool, OptBool, OptVar, OptVar, OptBool,
         ],
         C::RelinquishOutput => vec![Str, Outpoint],
-        C::GetPublicKey => vec![OptBool, OptProtocol, OptStr, Counterparty, OptBool],
+        // #193: the identityKey flag, then the privileged pair alone (1) or the
+        // key-related parameters and forSelf (0); seekPermission last.
+        C::GetPublicKey => {
+            let mut keyed = common();
+            keyed.push(OptBool);
+            vec![
+                Branch(vec![(1, vec![OptBool, Reason]), (0, keyed)], Vec::new()),
+                OptBool,
+            ]
+        }
         C::RevealCounterpartyKeyLinkage => vec![OptBool, Reason, Raw(33), Raw(33)],
         C::RevealSpecificKeyLinkage => vec![Protocol, Str, Counterparty, OptBool, Reason, Raw(33)],
         C::Encrypt | C::Decrypt | C::CreateHmac => {
             let mut fields = common();
-            fields.push(Blob);
+            fields.extend([Blob, OptBool]);
             fields
         }
         // #199: the HMAC's 32 raw bytes ahead of the data; the signature
-        // calls' data-type flag, 1 then the data, 2 then the hash.
+        // calls' data-type flag, 1 then the data, 2 then the hash; #193:
+        // seekPermission last.
         C::VerifyHmac => {
             let mut fields = common();
-            fields.extend([Raw(32), Blob]);
+            fields.extend([Raw(32), Blob, OptBool]);
             fields
         }
         C::CreateSignature => {
             let mut fields = common();
-            fields.push(data_or_hash());
+            fields.extend([data_or_hash(), OptBool]);
             fields
         }
         C::VerifySignature => {
             let mut fields = common();
-            fields.extend([OptBool, Blob, data_or_hash()]);
+            fields.extend([OptBool, Blob, data_or_hash(), OptBool]);
             fields
         }
         C::AcquireCertificate => vec![

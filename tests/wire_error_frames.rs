@@ -244,6 +244,7 @@ async fn the_three_false_verdicts_are_framed_in_the_references_words() {
                 protocol_id: protocol(),
                 key_id: "frame-1".into(),
                 counterparty: Some(Counterparty::Self_),
+                ..Default::default()
             },
             "test",
         )
@@ -262,6 +263,7 @@ async fn the_three_false_verdicts_are_framed_in_the_references_words() {
                 key_id: "frame-2".into(),
                 counterparty: Some(Counterparty::Self_),
                 for_self: None,
+                ..Default::default()
             },
             "test",
         )

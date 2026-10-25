@@ -175,7 +175,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     protocol_id: None,
                     key_id: None,
                     counterparty: None,
-                    for_self: None,
+                    ..Default::default()
                 },
                 self.originator(),
             )
@@ -539,7 +539,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                     protocol_id: None,
                     key_id: None,
                     counterparty: None,
-                    for_self: None,
+                    ..Default::default()
                 },
                 self.originator(),
             )
@@ -747,16 +747,15 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     }
 
     async fn encrypt_value(&self, key: &str, plaintext: &[u8]) -> Result<Vec<u8>> {
-        let protocol = self.get_protocol(key);
-
         let result = self
             .wallet
             .encrypt(
                 EncryptArgs {
                     plaintext: plaintext.to_vec(),
-                    protocol_id: protocol,
+                    protocol_id: self.get_protocol(key),
                     key_id: key.to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 self.originator(),
             )
@@ -766,16 +765,15 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
     }
 
     async fn decrypt_value(&self, key: &str, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        let protocol = self.get_protocol(key);
-
         let result = self
             .wallet
             .decrypt(
                 DecryptArgs {
                     ciphertext: ciphertext.to_vec(),
-                    protocol_id: protocol,
+                    protocol_id: self.get_protocol(key),
                     key_id: key.to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 self.originator(),
             )
@@ -790,11 +788,11 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
             .wallet
             .get_public_key(
                 GetPublicKeyArgs {
-                    identity_key: false,
                     protocol_id: Some(self.get_protocol(key)),
                     key_id: Some(key.to_string()),
                     counterparty: Some(Counterparty::Self_),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 self.originator(),
             )

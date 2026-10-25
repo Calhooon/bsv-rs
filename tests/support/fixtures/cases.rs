@@ -136,7 +136,8 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
         ),
         GetPublicKey => (
             if full {
-                json!({"identityKey": false, "protocolID": [2, "fixture keys"], "keyID": "fixture", "counterparty": VERIFIER, "forSelf": true})
+                json!({"identityKey": false, "protocolID": [2, "fixture keys"], "keyID": "fixture", "counterparty": VERIFIER, "forSelf": true,
+                    "privileged": true, "privilegedReason": "fixture reason", "seekPermission": false})
             } else {
                 json!({"identityKey": true, "protocolID": null, "keyID": null, "counterparty": null, "forSelf": null})
             },
@@ -161,6 +162,11 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
         }
         Encrypt | Decrypt | CreateHmac | VerifyHmac | CreateSignature | VerifySignature => {
             let mut input = json!({"protocolID": [1, "fixture keys"], "keyID": "fixture", "counterparty": if full {json!(VERIFIER)} else {Value::Null}});
+            if full {
+                input["privileged"] = json!(true);
+                input["privilegedReason"] = json!("fixture reason");
+                input["seekPermission"] = json!(false);
+            }
             let result = match call {
                 Encrypt => {
                     input["plaintext"] = json!(blob);

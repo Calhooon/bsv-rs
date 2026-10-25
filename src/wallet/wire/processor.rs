@@ -25,7 +25,9 @@
 
 use super::encoding::{WireReader, WireWriter};
 use super::requests::{
-    read_reveal_counterparty_key_linkage_args, read_reveal_specific_key_linkage_args,
+    assert_request_consumed, read_create_hmac_args, read_create_signature_args, read_decrypt_args,
+    read_encrypt_args, read_get_public_key_args, read_reveal_counterparty_key_linkage_args,
+    read_reveal_specific_key_linkage_args, read_verify_hmac_args, read_verify_signature_args,
 };
 use super::results::{
     write_create_hmac_result, write_create_signature_result, write_decrypt_result,
@@ -37,7 +39,6 @@ use super::WalletCall;
 use crate::primitives::from_hex;
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::types::Network;
-use crate::wallet::{CreateHmacArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs};
 use crate::Error;
 use std::marker::PhantomData;
 
@@ -166,6 +167,20 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let originator_bytes = reader.read_bytes(originator_len)?;
         let originator = String::from_utf8(originator_bytes.to_vec())
             .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?;
+
+        // The calls with no parameters read none (`#assertRequestConsumed`,
+        // `WalletWireProcessor.ts:1610-1719`); every other call this
+        // processor reads asserts after its last field (#193)
+        if matches!(
+            call,
+            WalletCall::IsAuthenticated
+                | WalletCall::WaitForAuthentication
+                | WalletCall::GetHeight
+                | WalletCall::GetNetwork
+                | WalletCall::GetVersion
+        ) {
+            assert_request_consumed(&reader, call.method_name())?;
+        }
 
         // Dispatch based on call type
         match call {
@@ -321,21 +336,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments (matching transceiver serialization order)
-        let identity_key = reader.read_optional_bool()?.unwrap_or(false);
-        let protocol_id = reader.read_optional_protocol_id()?;
-        let key_id = reader.read_optional_string()?;
-        let counterparty = reader.read_counterparty()?;
-        let for_self = reader.read_optional_bool()?;
-
-        // Call wallet method
-        let args = GetPublicKeyArgs {
-            identity_key,
-            protocol_id,
-            key_id,
-            counterparty,
-            for_self,
-        };
+        let args = read_get_public_key_args(reader)?;
+        assert_request_consumed(reader, "getPublicKey")?;
         let result = self
             .invoke_wallet(
                 WalletCall::GetPublicKey,
@@ -355,20 +357,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-        let counterparty = reader.read_counterparty()?;
-        let plaintext_len = reader.read_var_int()? as usize;
-        let plaintext = reader.read_bytes(plaintext_len)?.to_vec();
-
-        // Call wallet method
-        let args = EncryptArgs {
-            plaintext,
-            protocol_id,
-            key_id,
-            counterparty,
-        };
+        let args = read_encrypt_args(reader)?;
+        assert_request_consumed(reader, "encrypt")?;
         let result = self
             .invoke_wallet(WalletCall::Encrypt, self.wallet.encrypt(args, originator))
             .await?;
@@ -381,20 +371,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-        let counterparty = reader.read_counterparty()?;
-        let ciphertext_len = reader.read_var_int()? as usize;
-        let ciphertext = reader.read_bytes(ciphertext_len)?.to_vec();
-
-        // Call wallet method
-        let args = DecryptArgs {
-            ciphertext,
-            protocol_id,
-            key_id,
-            counterparty,
-        };
+        let args = read_decrypt_args(reader)?;
+        assert_request_consumed(reader, "decrypt")?;
         let result = self
             .invoke_wallet(WalletCall::Decrypt, self.wallet.decrypt(args, originator))
             .await?;
@@ -407,20 +385,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-        let counterparty = reader.read_counterparty()?;
-        let data_len = reader.read_var_int()? as usize;
-        let data = reader.read_bytes(data_len)?.to_vec();
-
-        // Call wallet method
-        let args = CreateHmacArgs {
-            data,
-            protocol_id,
-            key_id,
-            counterparty,
-        };
+        let args = read_create_hmac_args(reader)?;
+        assert_request_consumed(reader, "createHmac")?;
         let result = self
             .invoke_wallet(
                 WalletCall::CreateHmac,
@@ -436,7 +402,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        let args = super::requests::read_verify_hmac_args(reader)?;
+        let args = read_verify_hmac_args(reader)?;
+        assert_request_consumed(reader, "verifyHmac")?;
         let result = self
             .invoke_wallet(
                 WalletCall::VerifyHmac,
@@ -452,7 +419,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        let args = super::requests::read_create_signature_args(reader)?;
+        let args = read_create_signature_args(reader)?;
+        assert_request_consumed(reader, "createSignature")?;
         let result = self
             .invoke_wallet(
                 WalletCall::CreateSignature,
@@ -468,7 +436,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        let args = super::requests::read_verify_signature_args(reader)?;
+        let args = read_verify_signature_args(reader)?;
+        assert_request_consumed(reader, "verifySignature")?;
         let result = self
             .invoke_wallet(
                 WalletCall::VerifySignature,
@@ -485,6 +454,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
         let args = read_reveal_counterparty_key_linkage_args(reader)?;
+        assert_request_consumed(reader, "revealCounterpartyKeyLinkage")?;
         let result = self
             .invoke_wallet(
                 WalletCall::RevealCounterpartyKeyLinkage,
@@ -502,6 +472,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
         let args = read_reveal_specific_key_linkage_args(reader)?;
+        assert_request_consumed(reader, "revealSpecificKeyLinkage")?;
         let result = self
             .invoke_wallet(
                 WalletCall::RevealSpecificKeyLinkage,
@@ -554,6 +525,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         // Read height argument
         let height = reader.read_var_int_u32("height")?;
+        assert_request_consumed(reader, "getHeaderForHeight")?;
 
         let args = crate::wallet::GetHeaderArgs { height };
         let result = self
