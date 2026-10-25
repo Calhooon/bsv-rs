@@ -216,6 +216,17 @@ pub fn split_private_key(
     threshold: usize,  // Minimum shares needed (2..=255)
     total: usize,      // Total shares to generate (>= threshold)
 ) -> Result<KeyShares>
+
+/// The same split with the coefficients a_1..a_{t-1} given, not drawn
+/// (`split_private_key` draws them and calls this; bsv-rs#180): each 32 bytes
+/// big-endian, reduced mod p; a count other than threshold - 1 is
+/// InvalidDataLength (in bytes), a coefficient 0 mod p CryptoError
+pub fn split_private_key_with(
+    key: &PrivateKey,
+    threshold: usize,
+    total: usize,
+    coefficients: &[[u8; 32]],
+) -> Result<KeyShares>
 ```
 
 **Parameter constraints**:

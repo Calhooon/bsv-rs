@@ -40,7 +40,36 @@ use super::SIGNED_VERSION;
 pub fn sign(message: &[u8], signer: &PrivateKey, verifier: Option<&PublicKey>) -> Result<Vec<u8>> {
     // Generate random 32-byte key ID
     let key_id: [u8; 32] = rand::random();
+    sign_with(message, signer, verifier, key_id)
+}
 
+/// Signs a message using BRC-77 protocol with a caller-supplied key ID.
+///
+/// [`sign`] draws the 32-byte key ID at random and calls this; given the same
+/// key ID the two write the same bytes (the signature is RFC 6979). The key
+/// ID is the only value `sign` draws, so a fixed one makes the output
+/// reproducible (a seed corpus, a pinned vector). This form is this crate's
+/// addition: the TypeScript SDK draws the key ID inside `sign`
+/// (`SignedMessage.ts:31`). Production code uses [`sign`]: a key ID reused
+/// for the same signer and verifier reuses the derived signing key.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::messages::{sign_with, verify};
+///
+/// let sender = PrivateKey::from_bytes(&[6; 32]).unwrap();
+/// let sig = sign_with(b"Hello", &sender, None, [1; 32]).unwrap();
+/// assert_eq!(sig, sign_with(b"Hello", &sender, None, [1; 32]).unwrap());
+/// assert!(verify(b"Hello", &sig, None).unwrap());
+/// ```
+pub fn sign_with(
+    message: &[u8],
+    signer: &PrivateKey,
+    verifier: Option<&PublicKey>,
+    key_id: [u8; 32],
+) -> Result<Vec<u8>> {
     // Create invoice number for BRC-42 key derivation
     let key_id_base64 = to_base64(&key_id);
     let invoice_number = format!("2-message signing-{}", key_id_base64);

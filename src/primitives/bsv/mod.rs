@@ -66,7 +66,7 @@ pub mod tx_signature;
 // Re-export commonly used items
 pub use polynomial::{PointInFiniteField, Polynomial};
 pub use schnorr::{Schnorr, SchnorrProof};
-pub use shamir::{split_private_key, KeyShares};
+pub use shamir::{split_private_key, split_private_key_with, KeyShares};
 pub use sighash::{
     build_sighash_preimage, compute_sighash, compute_sighash_for_signing, compute_sighash_from_raw,
     parse_transaction, RawTransaction, SighashCache, SighashParams, TxInput, TxOutput, SIGHASH_ALL,

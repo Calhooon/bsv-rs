@@ -286,6 +286,66 @@ impl KeyShares {
 /// - Lower threshold = easier to recover = less secure
 /// - Typical values: 2-of-3, 3-of-5, etc.
 pub fn split_private_key(key: &PrivateKey, threshold: usize, total: usize) -> Result<KeyShares> {
+    // Generate random polynomial coefficients a_1, a_2, ..., a_{t-1}, each a
+    // random 32-byte scalar (never zero); the count is checked by the `_with`
+    // form. A threshold past 255 draws nothing and is refused there.
+    let draws = if (2..=255).contains(&threshold) {
+        threshold - 1
+    } else {
+        0
+    };
+    let coefficients: Vec<[u8; 32]> = (0..draws)
+        .map(|_| {
+            let mut bytes = [0u8; 32];
+            bytes.copy_from_slice(&PrivateKey::random().to_bytes());
+            bytes
+        })
+        .collect();
+    split_private_key_with(key, threshold, total, &coefficients)
+}
+
+/// Splits a private key into shares with caller-supplied polynomial
+/// coefficients.
+///
+/// [`split_private_key`] draws the `threshold - 1` coefficients a_1 to
+/// a_{t-1} (each a random 32-byte scalar) and calls this; given the same
+/// coefficients the two return the same shares. They are the only values
+/// `split_private_key` draws, so fixed ones make the output reproducible (a
+/// seed corpus, a pinned vector). Each is read big-endian and reduced modulo
+/// the field prime p. This form is this crate's addition; the TypeScript
+/// SDK draws its polynomial inside `toKeyShares` (`Polynomial.fromPrivateKey`).
+///
+/// # Errors
+///
+/// The parameter checks of [`split_private_key`]; `InvalidDataLength` (in
+/// bytes, 32 per coefficient) when `coefficients` is not `threshold - 1`
+/// long; `CryptoError` for a coefficient that is 0 modulo p (a zero top
+/// coefficient would lower the polynomial's degree, so fewer shares than the
+/// threshold would recover the key).
+///
+/// # Security
+///
+/// Production code uses [`split_private_key`]: anyone who knows the
+/// coefficients and one share recovers the key.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::bsv::shamir::{split_private_key_with, KeyShares};
+/// use bsv_rs::primitives::ec::PrivateKey;
+///
+/// let key = PrivateKey::from_bytes(&[5; 32]).unwrap();
+/// let shares = split_private_key_with(&key, 2, 3, &[[1; 32]]).unwrap();
+/// let backup = shares.to_backup_format();
+/// let subset = KeyShares::from_backup_format(&backup[1..]).unwrap();
+/// assert_eq!(subset.recover_private_key().unwrap().to_bytes(), key.to_bytes());
+/// ```
+pub fn split_private_key_with(
+    key: &PrivateKey,
+    threshold: usize,
+    total: usize,
+    coefficients: &[[u8; 32]],
+) -> Result<KeyShares> {
     // Validate parameters
     if threshold < 2 {
         return Err(Error::CryptoError(
@@ -309,16 +369,24 @@ pub fn split_private_key(key: &PrivateKey, threshold: usize, total: usize) -> Re
     // The secret is the private key as a BigNumber
     let secret = BigNumber::from_bytes_be(&key.to_bytes());
 
-    // Generate random polynomial coefficients a_1, a_2, ..., a_{t-1}
-    // The constant term a_0 is the secret
-    let mut coefficients = Vec::with_capacity(threshold);
-    coefficients.push(secret);
+    if coefficients.len() != threshold - 1 {
+        return Err(Error::InvalidDataLength {
+            expected: 32 * (threshold - 1),
+            actual: 32 * coefficients.len(),
+        });
+    }
 
-    for _ in 1..threshold {
-        // Generate random 32-byte coefficient
-        let random_key = PrivateKey::random();
-        let coeff = BigNumber::from_bytes_be(&random_key.to_bytes()).modulo(&p);
-        coefficients.push(coeff);
+    // The constant term a_0 is the secret; a_1, ..., a_{t-1} the coefficients
+    let mut terms = Vec::with_capacity(threshold);
+    terms.push(secret);
+    for bytes in coefficients {
+        let coeff = BigNumber::from_bytes_be(bytes).modulo(&p);
+        if coeff.is_zero() {
+            return Err(Error::CryptoError(
+                "Shamir coefficient is zero modulo p".to_string(),
+            ));
+        }
+        terms.push(coeff);
     }
 
     // Generate shares by evaluating polynomial at x = 1, 2, ..., total
@@ -326,7 +394,7 @@ pub fn split_private_key(key: &PrivateKey, threshold: usize, total: usize) -> Re
 
     for i in 1..=total {
         let x = BigNumber::from_u64(i as u64);
-        let y = evaluate_polynomial(&coefficients, &x, &p);
+        let y = evaluate_polynomial(&terms, &x, &p);
         points.push(PointInFiniteField::new(x, y));
     }
 

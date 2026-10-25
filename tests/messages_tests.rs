@@ -5,7 +5,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "messages")]
 
-use bsv_rs::messages::{decrypt, encrypt, sign, verify, ENCRYPTED_VERSION, SIGNED_VERSION};
+use bsv_rs::messages::{
+    decrypt, encrypt, encrypt_with, sign, sign_with, verify, ENCRYPTED_VERSION, SIGNED_VERSION,
+};
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::Error;
 
@@ -797,4 +799,65 @@ fn a_valid_signature_at_either_form_still_verifies_after_the_length_check() {
     assert!(verify(b"m", &named, Some(&recipient)).unwrap());
     let anyone = sign(b"m", &sender, None).unwrap();
     assert!(verify(b"m", &anyone, None).unwrap());
+}
+
+// =================
+// The `_with` forms (#180 item 1): the plain form's drawn values, read back
+// from its output and fed to the `_with` form, write the same bytes.
+// =================
+
+#[test]
+fn sign_with_writes_what_sign_writes_given_its_key_id() {
+    let sender = key_from_scalar(6);
+    let recipient = key_from_scalar(7);
+    for verifier in [Some(recipient.public_key()), None] {
+        let sig = sign(b"fuzz_messages_signed", &sender, verifier.as_ref()).unwrap();
+        // version 4, sender 33, the recipient 33 or the anyone byte, then the key id
+        let at = 4 + 33 + if verifier.is_some() { 33 } else { 1 };
+        let key_id: [u8; 32] = sig[at..at + 32].try_into().unwrap();
+        let again = sign_with(b"fuzz_messages_signed", &sender, verifier.as_ref(), key_id).unwrap();
+        assert_eq!(again, sig);
+        assert!(verify(b"fuzz_messages_signed", &again, Some(&recipient)).unwrap());
+    }
+}
+
+#[test]
+fn sign_with_a_fixed_key_id_is_reproducible() {
+    let sender = key_from_scalar(6);
+    let a = sign_with(b"m", &sender, None, [3; 32]).unwrap();
+    assert_eq!(a, sign_with(b"m", &sender, None, [3; 32]).unwrap());
+    assert_ne!(a, sign_with(b"m", &sender, None, [4; 32]).unwrap());
+    assert_eq!(&a[4 + 33 + 1..4 + 33 + 1 + 32], &[3; 32]);
+}
+
+#[test]
+fn encrypt_with_writes_what_encrypt_writes_given_its_key_id_and_iv() {
+    let sender = key_from_scalar(6);
+    let recipient = key_from_scalar(7);
+    for plaintext in [&b""[..], b"Secret", &[0x42; 64]] {
+        let sealed = encrypt(plaintext, &sender, &recipient.public_key()).unwrap();
+        // version 4, sender 33, recipient 33, the key id 32, then the IV 32
+        let key_id: [u8; 32] = sealed[70..102].try_into().unwrap();
+        let iv: [u8; 32] = sealed[102..134].try_into().unwrap();
+        let again = encrypt_with(plaintext, &sender, &recipient.public_key(), key_id, iv).unwrap();
+        assert_eq!(again, sealed);
+        assert_eq!(decrypt(&again, &recipient).unwrap(), plaintext);
+    }
+}
+
+#[test]
+fn encrypt_with_fixed_values_is_reproducible() {
+    let sender = key_from_scalar(6);
+    let to = key_from_scalar(7).public_key();
+    let a = encrypt_with(b"Secret", &sender, &to, [1; 32], [2; 32]).unwrap();
+    assert_eq!(
+        a,
+        encrypt_with(b"Secret", &sender, &to, [1; 32], [2; 32]).unwrap()
+    );
+    assert_ne!(
+        a,
+        encrypt_with(b"Secret", &sender, &to, [1; 32], [5; 32]).unwrap()
+    );
+    assert_eq!(&a[70..102], &[1; 32]);
+    assert_eq!(&a[102..134], &[2; 32]);
 }

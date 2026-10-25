@@ -7,7 +7,7 @@ This directory contains `libfuzzer`-based fuzz targets that feed arbitrary byte 
 
 ## Files
 
-Each target's assertion is "returns, never panics"; the column says where a target also checks a round trip or a bound. Its seeds are `fuzz/corpus/<target>/`, written by `fuzz/corpus-gen` from the tree's vectors (a rerun moves the signed and encrypted messages' seeds and the Shamir shares', whose writers draw a key id, an IV and coefficients; the committed bytes are the writer's); the nightly runs each for an hour (`docs/NIGHTLY.md`).
+Each target's assertion is "returns, never panics"; the column says where a target also checks a round trip or a bound. Its seeds are `fuzz/corpus/<target>/`, written by `fuzz/corpus-gen` from the tree's vectors (byte for byte on a rerun: the signed and encrypted messages' seeds and the Shamir shares' take a fixed key id, IV and coefficients through `sign_with`, `encrypt_with` and `split_private_key_with`, bsv-rs#180); the nightly runs each for an hour (`docs/NIGHTLY.md`).
 
 | Target | What it reads | Also checks | Seeds |
 |---|---|---|---|
