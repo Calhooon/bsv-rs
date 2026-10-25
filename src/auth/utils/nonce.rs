@@ -134,9 +134,9 @@ pub async fn verify_nonce<W: WalletInterface>(
     let protocol = Protocol::new(SecurityLevel::App, NONCE_PROTOCOL);
     let key_id = to_base64(random_bytes);
 
-    // Recompute the HMAC. Compare as many bytes as the stored portion has —
+    // Recompute the HMAC. Compare as many bytes as the stored portion has :
     // canonical nonces carry all 32 HMAC bytes; legacy nonces only kept the
-    // first 16.
+    // leading 16.
     let hmac_result = wallet
         .create_hmac(
             CreateHmacArgs {
