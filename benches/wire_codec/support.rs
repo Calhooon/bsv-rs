@@ -559,7 +559,8 @@ fn request_args(call: WalletCall) -> Vec<Layout> {
 fn result_fields(call: WalletCall) -> Vec<Layout> {
     use Layout::*;
     use WalletCall as C;
-    let linkage = || vec![Blob, Blob, Raw(33), Raw(33), Raw(33)];
+    // The three keys open both linkage results (#194).
+    let keys = || vec![Raw(33), Raw(33), Raw(33)];
     match call {
         C::CreateAction => vec![
             Flag(vec![Raw(32)]),
@@ -573,13 +574,13 @@ fn result_fields(call: WalletCall) -> Vec<Layout> {
         C::ListOutputs => vec![Outputs],
         C::GetPublicKey => vec![Raw(33)],
         C::RevealCounterpartyKeyLinkage => {
-            let mut fields = linkage();
-            fields.push(Str);
+            let mut fields = keys();
+            fields.extend([Str, Blob, Blob]);
             fields
         }
         C::RevealSpecificKeyLinkage => {
-            let mut fields = linkage();
-            fields.extend([Protocol, Str, U8]);
+            let mut fields = keys();
+            fields.extend([Protocol, Str, Blob, Blob, U8]);
             fields
         }
         C::Encrypt | C::Decrypt | C::CreateHmac | C::CreateSignature => vec![Blob],
