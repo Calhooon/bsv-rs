@@ -213,9 +213,12 @@ an English phrase with an ASCII passphrase (every TREZOR vector,
 `tests/compat_bip39_tests.rs`, 29 green before and after) seeds the same
 bytes. **A French, Japanese, Korean or Spanish phrase with a character NFKD
 changes, or a passphrase NFKD changes, seeds different bytes from 0.9.0 on:
-BIP-39's, as every other BIP-39 wallet derives them.** A key derived from such
-a seed by an earlier `bsv-rs` is not the key the phrase names elsewhere; re-derive
-from the phrase. `unicode-normalization` 0.1 (MIT OR Apache-2.0, pure Rust)
+BIP-39's, as every other BIP-39 wallet derives them.** A key an earlier `bsv-rs` derived from such a phrase is a different key from
+the one 0.9.0 derives, and 0.9.0 has no call that reproduces it. To reach it,
+compute the earlier seed outside this crate (PBKDF2-HMAC-SHA512, 2048 rounds,
+64 bytes, the password the phrase's bytes as `phrase()` printed them, the salt
+`mnemonic` + the passphrase's bytes as given), or pin 0.8.x to sweep it, then
+re-derive from the phrase. `unicode-normalization` 0.1 (MIT OR Apache-2.0, pure Rust)
 joins the `compat` feature. Pinned by `tests/compat_bip39_nfkd.rs` (8 tests:
 the NFD French, Spanish and Korean phrases accepted with BIP-39's seed computed
 outside this crate, the 24 Japanese vectors read and seeded with their
