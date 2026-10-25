@@ -623,23 +623,27 @@ mod key_linkage_tests {
             "expected success for counterparty key linkage"
         );
 
-        // Parse response: encrypted_linkage_len + bytes, encrypted_proof_len + bytes,
-        // prover(33), verifier(33), counterparty(33), revelation_time(string)
-        let linkage_len = reader.read_var_int().unwrap() as usize;
-        let _linkage = reader.read_bytes(linkage_len).unwrap();
-        let proof_len = reader.read_var_int().unwrap() as usize;
-        let _proof = reader.read_bytes(proof_len).unwrap();
+        // Parse response in the reference's order (`WalletWireTransceiver.ts:818-836`;
+        // #194): prover(33), verifier(33), counterparty(33), revelation_time(string),
+        // encrypted_linkage_len + bytes, encrypted_proof_len + bytes
         let prover_bytes = reader.read_bytes(33).unwrap();
-        let _verifier_bytes = reader.read_bytes(33).unwrap();
+        let verifier_bytes = reader.read_bytes(33).unwrap();
         let counterparty_bytes = reader.read_bytes(33).unwrap();
         let revelation_time = reader.read_string().unwrap();
+        let linkage_len = reader.read_var_int().unwrap() as usize;
+        let linkage = reader.read_bytes(linkage_len).unwrap();
+        let proof_len = reader.read_var_int().unwrap() as usize;
+        let _proof = reader.read_bytes(proof_len).unwrap();
+        assert_eq!(reader.remaining(), 0, "the response is read to its end");
 
         // Verify the prover key is valid
         let _prover = PublicKey::from_bytes(prover_bytes).unwrap();
-        // Verify the counterparty matches bob
+        // The verifier and the counterparty are the request's
+        assert_eq!(verifier_bytes, verifier_key.to_compressed());
         assert_eq!(counterparty_bytes, bob.identity_key().to_compressed());
         // Revelation time should be a non-empty ISO timestamp
         assert!(!revelation_time.is_empty());
+        assert!(!linkage.is_empty());
     }
 
     /// The reason's length is an `i8`, -1 absent or 0 to 127; another negative
@@ -692,18 +696,24 @@ mod key_linkage_tests {
         let error_byte = reader.read_u8().unwrap();
         assert_eq!(error_byte, 0, "expected success for specific key linkage");
 
-        // Parse response
-        let linkage_len = reader.read_var_int().unwrap() as usize;
-        let _linkage = reader.read_bytes(linkage_len).unwrap();
-        let proof_len = reader.read_var_int().unwrap() as usize;
-        let _proof = reader.read_bytes(proof_len).unwrap();
+        // Parse response in the reference's order (`WalletWireTransceiver.ts:890-908`;
+        // #194): the three keys, the protocol, the key ID, the linkage, the proof,
+        // the proof type
         let _prover = reader.read_bytes(33).unwrap();
-        let _verifier = reader.read_bytes(33).unwrap();
-        let _counterparty = reader.read_bytes(33).unwrap();
+        let verifier = reader.read_bytes(33).unwrap();
+        let counterparty = reader.read_bytes(33).unwrap();
         let protocol = reader.read_protocol_id().unwrap();
         let key_id = reader.read_string().unwrap();
+        let linkage_len = reader.read_var_int().unwrap() as usize;
+        let linkage = reader.read_bytes(linkage_len).unwrap();
+        let proof_len = reader.read_var_int().unwrap() as usize;
+        let _proof = reader.read_bytes(proof_len).unwrap();
         let proof_type = reader.read_u8().unwrap();
+        assert_eq!(reader.remaining(), 0, "the response is read to its end");
 
+        assert_eq!(verifier, verifier_key.to_compressed());
+        assert_eq!(counterparty, bob_pub.to_compressed());
+        assert!(!linkage.is_empty());
         assert_eq!(protocol.security_level, SecurityLevel::App);
         assert_eq!(protocol.protocol_name, "linkage test app");
         assert_eq!(key_id, "link-key-1");
