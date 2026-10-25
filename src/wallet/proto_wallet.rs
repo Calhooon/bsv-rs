@@ -386,18 +386,11 @@ impl ProtoWallet {
         let revelation_time = get_iso_timestamp();
 
         // Encrypt linkage for verifier
-        let encrypted_linkage = self
-            .encrypt(EncryptArgs {
-                plaintext: linkage.to_compressed().to_vec(),
-                protocol_id: Protocol::new(
-                    SecurityLevel::Counterparty,
-                    "counterparty linkage revelation",
-                ),
-                key_id: revelation_time.clone(),
-                counterparty: Some(Counterparty::Other(args.verifier.clone())),
-                ..Default::default()
-            })?
-            .ciphertext;
+        let encrypted_linkage = self.encrypt_for_verifier(
+            linkage.to_compressed().to_vec(),
+            &revelation_time,
+            &args.verifier,
+        )?;
 
         // Generate Schnorr ZK proof demonstrating knowledge of private key
         // and correct computation of the ECDH shared secret (linkage)
@@ -414,18 +407,8 @@ impl ProtoWallet {
         proof_bin.extend_from_slice(&proof.s_prime.to_compressed());
         proof_bin.extend_from_slice(&proof.z.to_bytes_be(32));
 
-        let encrypted_linkage_proof = self
-            .encrypt(EncryptArgs {
-                plaintext: proof_bin,
-                protocol_id: Protocol::new(
-                    SecurityLevel::Counterparty,
-                    "counterparty linkage revelation",
-                ),
-                key_id: revelation_time.clone(),
-                counterparty: Some(Counterparty::Other(args.verifier.clone())),
-                ..Default::default()
-            })?
-            .ciphertext;
+        let encrypted_linkage_proof =
+            self.encrypt_for_verifier(proof_bin, &revelation_time, &args.verifier)?;
 
         Ok(RevealCounterpartyKeyLinkageResult {
             prover: identity_key.to_hex(),
@@ -435,6 +418,28 @@ impl ProtoWallet {
             encrypted_linkage,
             encrypted_linkage_proof,
         })
+    }
+
+    /// Encrypts a linkage revelation for the verifier under the counterparty
+    /// linkage revelation protocol, keyed by the revelation time.
+    fn encrypt_for_verifier(
+        &self,
+        plaintext: Vec<u8>,
+        revelation_time: &str,
+        verifier: &PublicKey,
+    ) -> Result<Vec<u8>> {
+        Ok(self
+            .encrypt(EncryptArgs {
+                plaintext,
+                protocol_id: Protocol::new(
+                    SecurityLevel::Counterparty,
+                    "counterparty linkage revelation",
+                ),
+                key_id: revelation_time.to_string(),
+                counterparty: Some(Counterparty::Other(verifier.clone())),
+                ..Default::default()
+            })?
+            .ciphertext)
     }
 
     /// Reveals specific key linkage for a protocol and key ID.
