@@ -24,6 +24,57 @@ ratchet and bench-compare tools.
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
+### Fixed: the linkage requests carry the privileged parameters ahead of the keys (#191)
+
+`WalletWireProcessor` read revealCounterpartyKeyLinkage's two keys at the
+first parameter byte and handed the wallet `privileged: None`: a privileged
+request's flag and reason were read as the start of the counterparty's key (Go's
+vector, `09 00 01 0b "test-reason" 0294c4...`, was refused as an invalid point),
+and the flag of a well-formed request was dropped. The reference writes and
+reads the privileged flag (`i8`, -1 absent) and the reason (an `i8` length, -1
+absent, then UTF-8) ahead of the counterparty and the verifier
+(`ts-stack@edf6e03` `WalletWireTransceiver.ts:809-811`, `#encodePrivilegedParams`
+`:1448-1462`; `WalletWireProcessor.ts:1739-1747`, `#decodePrivilegedParams`
+`:2465-2476`), as Go does (`go-sdk@2ca481c`
+`wallet/serializer/reveal_counterparty_key_linkage.go:15-27`, `:37-47`) and
+BRC-100 section 9 lists them (`wallet/0100.md:2016-2019` at `ed1b015`,
+`:2039-2042` at `5119a9b`). The processor reads that order now and passes the
+flag and the reason through into `RevealCounterpartyKeyLinkageArgs` (`None`
+for an absent one, as the reference's `undefined`); a reason length below -1 is
+refused, as `#readOptionalInt8Length` refuses it (`:54-61`).
+
+revealSpecificKeyLinkage had the same defect: the processor read counterparty,
+verifier, protocol, key ID, and no privileged parameters; the reference reads
+the key-related parameters (protocol, key ID, counterparty, privileged flag,
+reason) then the verifier (`WalletWireProcessor.ts:1790-1797`, `:2564-2583`;
+`WalletWireTransceiver.ts:874-883`; BRC-100 `wallet/0100.md:2045-2055` at
+`ed1b015`). It reads that order now, the same way. The transceiver has no
+method for either call (docs/FIXTURES.md F2), so it wrote no frame to move.
+
+The tests that pin it: `tests/wallet_wire_cross_sdk_tests.rs`
+`the_go_counterparty_linkage_request_reads_its_privileged_params_ahead_of_the_keys`,
+`the_go_specific_linkage_request_reads_the_key_related_params_then_the_verifier`
+and `every_go_args_vector_decodes_through_the_processor_to_its_json` (the 27
+args vectors sent through the processor to a recording wallet and compared to
+their json: 6 pass, 21 are an enumerated allowlist with reasons, 14 refusal
+stubs and the 7 key-related calls whose privileged parameters the processor
+does not read; the count is pinned), `tests/wire_method_roundtrip_tests.rs`
+`test_roundtrip_reveal_counterparty_key_linkage_privileged`,
+`test_roundtrip_reveal_specific_key_linkage_privileged` and
+`a_linkage_privileged_reason_length_below_minus_one_is_refused`. RED on
+`f39fddc`. The recordings `tests/fixtures/wire/revealCounterpartyKeyLinkage.json`
+and `revealSpecificKeyLinkage.json` are re-recorded in their own commits (the
+request bytes and the observed args move; the responses do not).
+
+Migration: a consumer of this crate's processor that spoke only to this
+crate's code (the fixtures, a hand-built frame) must now write the reference's
+order; no transceiver of this crate wrote either frame. One that spoke to the
+reference's or Go's transceiver now reads the request as they write it, where
+before a privileged counterparty request was refused and a specific one was
+misread. The responses of both calls still put the encrypted linkage ahead of
+the keys, where the reference and BRC-100 put the keys first (F2): a finding,
+not changed here.
+
 ### Fixed: the wallet wire's readers refuse what the reference's readers refuse (#183)
 
 The transceiver and `WireReader::read_wallet_certificate` read frames that the
