@@ -1455,7 +1455,7 @@ async fn processor_writes_the_vector_wire(filename: &str) -> Result<(), String> 
     .unwrap();
     // The call's own Go args vector where there is one, so the result answers
     // the request it was made for (the processor checks a linkage result
-    // against its request, bsv-rs#216); else the recording's first request
+    // against its request, bsv-rs#216); else the recording's case 0 request
     let args_vector = format!("{}-simple-args.json", call);
     let request = if vector_exists(&args_vector) {
         load_vector(&args_vector).1

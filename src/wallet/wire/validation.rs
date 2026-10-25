@@ -280,11 +280,11 @@ pub(super) fn is_canonical_der_signature(bytes: &[u8]) -> bool {
 
 /// A big-endian scalar in 1 to n - 1.
 fn scalar_in_range(scalar: &[u8]) -> bool {
-    let first = scalar.iter().position(|&b| b != 0);
-    let Some(first) = first else {
+    let leading = scalar.iter().position(|&b| b != 0);
+    let Some(leading) = leading else {
         return false;
     };
-    let digits = &scalar[first..];
+    let digits = &scalar[leading..];
     if digits.len() > 32 {
         return false;
     }
