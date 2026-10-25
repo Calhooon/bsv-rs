@@ -16,7 +16,7 @@ This module contains Criterion-based benchmarks for measuring the performance of
 | `beef_stream.rs` | 1 MB and 10 MB file-backed streams, script/structure timing and fresh-process RSS |
 | `merkle_path.rs` | 10,000 depth-20 proofs into one synthetic block |
 | `transaction_sign_verify.rs` | Sign and verify a transaction with 100 P2PKH inputs |
-| `wire_codec.rs` | Four field codec operations for each of the 28 wallet calls |
+| `wire_codec.rs` | Four field codec operations for each of the 28 wallet calls, on #76's recorded frames (`tests/fixtures/wire/`); the layouts in `wire_codec/support.rs`, pinned by `tests/wire_codec_bench_bytes.rs` (#138) |
 | `script_spend.rs` | External seed corpus through Spend under the block word |
 
 All nine are declared as `[[bench]]` in `Cargo.toml` with `harness = false` (Criterion provides its own main).

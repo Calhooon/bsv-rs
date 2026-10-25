@@ -72,6 +72,23 @@ target's 30-second run found `verify` slicing past a short signature that names
 the given recipient (`src/messages/signed.rs:188:22`), filed as bsv-rs#173 and
 not skipped, so the nightly's job for it is red until the fix.
 
+### Changed: the wire_codec bench measures the recorded frames (#138)
+
+Benches and tests only; nothing under `src/` moved. `benches/wire_codec` built
+its 28 calls' frames from a schema and values of its own, which no test held
+to the transceiver: against #76's recordings, 99 of its 112 frames (28 calls,
+request and result, two cases) differed, and the old layout could not read 13
+of the 56 `full` frames (the certificate results' order and the identity
+certifier's flag, the privileged reason's length byte, the wallet payment arm
+of internalizeAction, the bool waitForAuthentication returns, the length
+prefix of getHeaderForHeight's header). It now decodes and re-encodes the
+recordings' `full` frames through per-call layouts in
+`benches/wire_codec/support.rs`, which `tests/wire_codec_bench_bytes.rs` pins
+to both recorded cases byte for byte. The 112 result ids are unchanged; their
+numbers move with the bytes (a recorded counterparty is a real key, so a
+request decode now pays its point decompression), and the macOS baseline's
+wire_codec rows want re-recording on a quiet machine.
+
 ### Added: a BEEF whose source links form a cycle is pinned (#160)
 
 Tests only; no reader moved. `tests/beef_cycle.rs` (five tests) builds rings of
