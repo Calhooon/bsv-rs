@@ -1181,7 +1181,7 @@ const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 21] = [
     ),
     (
         "createSignature-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and CreateSignatureArgs has no field for them: the flag 01 is read as the data's, the reason as a length past the end",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and CreateSignatureArgs has no field for them (#193): the privileged flag 01 is read as the data-type flag and the reason as the data; the frame after the pair is the reference's (#199: the_go_hmac_and_signature_requests_read_as_their_json)",
     ),
     (
         "decrypt-simple-args.json",
@@ -1237,11 +1237,11 @@ const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 21] = [
     ),
     (
         "verifyHmac-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifyHmacArgs has no field for them: the reason is read as the HMAC, a length past the end",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifyHmacArgs has no field for them (#193): the pair is read as the head of the 32 HMAC bytes and the data's length from inside the HMAC, past the end; the frame after the pair is the reference's (#199)",
     ),
     (
         "verifySignature-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifySignatureArgs has no field for them: the reason is read as the signature, a length past the end",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifySignatureArgs has no field for them (#193): the pair is read as forSelf and the signature, and forSelf's ff as the data-type flag, refused; the frame after the pair is the reference's (#199)",
     ),
 ];
 
