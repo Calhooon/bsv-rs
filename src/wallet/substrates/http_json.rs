@@ -28,6 +28,15 @@ use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 
+mod key_requests;
+use key_requests::{
+    JsonCreateHmacRequest, JsonCreateHmacResponse, JsonCreateSignatureRequest,
+    JsonCreateSignatureResponse, JsonDecryptRequest, JsonDecryptResponse, JsonEncryptRequest,
+    JsonEncryptResponse, JsonGetPublicKeyRequest, JsonGetPublicKeyResponse,
+    JsonRevealCounterpartyRequest, JsonRevealSpecificRequest, JsonVerifyHmacRequest,
+    JsonVerifyHmacResponse, JsonVerifySignatureRequest, JsonVerifySignatureResponse,
+};
+
 /// HTTP substrate using JSON payloads.
 ///
 /// `HttpWalletJson` provides a simpler, more debuggable alternative to the
@@ -888,156 +897,6 @@ struct JsonBusyResponse {
     message: Option<String>,
     #[serde(default)]
     description: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonGetPublicKeyRequest {
-    identity_key: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    protocol_id: Option<(u8, String)>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    key_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    for_self: Option<bool>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonGetPublicKeyResponse {
-    public_key: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonEncryptRequest {
-    protocol_id: (u8, String),
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    plaintext: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonEncryptResponse {
-    ciphertext: Vec<u8>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonDecryptRequest {
-    protocol_id: (u8, String),
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    ciphertext: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonDecryptResponse {
-    plaintext: Vec<u8>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonCreateHmacRequest {
-    protocol_id: (u8, String),
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    data: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonCreateHmacResponse {
-    hmac: Vec<u8>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonVerifyHmacRequest {
-    protocol_id: (u8, String),
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    data: Vec<u8>,
-    hmac: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonVerifyHmacResponse {
-    valid: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonCreateSignatureRequest {
-    protocol_id: (u8, String),
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<Vec<u8>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    hash_to_directly_sign: Option<String>, // hex
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonCreateSignatureResponse {
-    signature: Vec<u8>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonVerifySignatureRequest {
-    protocol_id: (u8, String),
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    counterparty: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    for_self: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<Vec<u8>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    hash_to_directly_verify: Option<String>, // hex
-    signature: Vec<u8>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonVerifySignatureResponse {
-    valid: bool,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonRevealCounterpartyRequest {
-    counterparty: String, // hex pubkey
-    verifier: String,     // hex pubkey
-    #[serde(skip_serializing_if = "Option::is_none")]
-    privileged: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    privileged_reason: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct JsonRevealSpecificRequest {
-    counterparty: String,      // "self", "anyone", or hex pubkey
-    verifier: String,          // hex pubkey
-    protocol_id: (u8, String), // (security_level, protocol_name)
-    key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    privileged: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    privileged_reason: Option<String>,
 }
 
 // =============================================================================
