@@ -55,6 +55,8 @@ jobs:
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read
+    secrets:
+      DEPENDENTS_READ_TOKEN: ${{ secrets.DEPENDENTS_READ_TOKEN }}
 
   publish:
     name: Publish to crates.io

@@ -1,0 +1,49 @@
+# Adapted from bsv-stack-lean's paved-road policy for bsv-rs 0.8.2.
+# cargo-deny 0.20.2; check normal, build and development dependencies.
+
+# https://embarkstudios.github.io/cargo-deny/checks/advisories/cfg.html
+[advisories]
+db-urls = ["https://github.com/RustSec/advisory-db"]
+yanked = "deny"
+unmaintained = "all"
+unsound = "all"
+# Findings need their own dependency fix, never an exemption here.
+ignore = []
+
+# https://embarkstudios.github.io/cargo-deny/checks/bans/cfg.html
+[bans]
+# Report duplicates while ecosystem major versions coexist; do not skip them.
+multiple-versions = "warn"
+multiple-versions-include-dev = true
+wildcards = "deny"
+# Only bsv-rs and the immediate parents in its graph may use these primitives.
+# Re-read these parents when the dependency graph changes. No consumer-specific
+# wrappers from the stack template belong in this crate's policy.
+deny = [
+    # bsv-rs 0.8.2 on the k256 0.14 line (#125): bsv-rs, k256 0.14.0 and p256 0.14.0.
+    { name = "sha2", wrappers = ["bsv-rs", "k256", "p256"], reason = "Use bsv-rs hashing" },
+    # bsv-rs 0.8.2: bsv-rs alone; secp256k1 is absent.
+    { name = "ripemd", wrappers = ["bsv-rs"], reason = "Use bsv-rs hashing" },
+    { name = "secp256k1", wrappers = ["bsv-rs"], reason = "Use bsv-rs keys and signatures" },
+    { name = "k256", wrappers = ["bsv-rs"], reason = "Use bsv-rs keys and signatures" },
+    { name = "bs58", wrappers = ["bsv-rs"], reason = "Use bsv-rs base58check" },
+    # bsv-rs 0.8.2 on the k256 0.14 line (#125): bsv-rs, pbkdf2 0.13.0 and rfc6979 0.6.0.
+    { name = "hmac", wrappers = ["bsv-rs", "pbkdf2", "rfc6979"], reason = "Use bsv-rs HMAC" },
+    # bsv-rs 0.8.2: bsv-rs alone.
+    { name = "p256", wrappers = ["bsv-rs"], reason = "Use bsv-rs keys and signatures" },
+]
+
+# https://embarkstudios.github.io/cargo-deny/checks/licenses/cfg.html
+[licenses]
+# Satisfies the resolved graph, including compound SPDX expressions.
+allow = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0"]
+confidence-threshold = 0.9
+include-dev = true
+include-build = true
+
+# https://embarkstudios.github.io/cargo-deny/checks/sources/cfg.html
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
