@@ -792,8 +792,15 @@ mod tests {
         // Counterparty (self)
         writer.write_u8(11);
 
+        // The privileged flag and reason, absent (#193)
+        writer.write_i8(-1);
+        writer.write_i8(-1);
+
         // for_self
         writer.write_i8(1);
+
+        // seekPermission, absent (#193)
+        writer.write_i8(-1);
 
         writer.into_bytes()
     }
