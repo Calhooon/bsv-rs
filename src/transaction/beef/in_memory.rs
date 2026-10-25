@@ -153,7 +153,7 @@ impl MerklePath {
 /// The levels keep their in-memory order; a hash that is not 32 bytes of hex
 /// (only a BUMP built by hand holds one) is a node the BUMP does not carry.
 /// A second leaf at an offset of a level is refused ahead of the walk, as
-/// the decoder refuses it on the wire (`MismatchedNode`, bsv-rs#86), and a
+/// the decoder refuses it on the wire (`DuplicateOffset`, bsv-rs#86), and a
 /// duplicate at an even offset, a left node, as the decoder refuses its flag
 /// (`BadFlag`, bsv-rs#167). A refusal names the kind; its offset is 0, there
 /// being no stream.
@@ -162,7 +162,7 @@ pub(super) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
         let mut seen = HashSet::with_capacity(leaves.len());
         if let Some(repeated) = leaves.iter().find(|l| !seen.insert(l.offset)) {
             let level = u8::try_from(level).unwrap_or(u8::MAX);
-            let reason = Reason::MismatchedNode {
+            let reason = Reason::DuplicateOffset {
                 level,
                 offset: repeated.offset,
             };

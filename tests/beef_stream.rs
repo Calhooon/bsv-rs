@@ -297,10 +297,11 @@ fn chain(n: usize, atomic: bool) -> Chain {
 }
 
 #[test]
-fn the_twenty_four_kinds_are_twenty_four_and_distinct() {
+fn the_twenty_five_kinds_are_twenty_five_and_distinct() {
     let all: std::collections::HashSet<Kind> = Kind::ALL.into_iter().collect();
-    assert_eq!(Kind::ALL.len(), 24);
-    assert_eq!(all.len(), 24);
+    assert_eq!(Kind::ALL.len(), 25);
+    assert_eq!(all.len(), 25);
+    assert!(all.contains(&Kind::DuplicateOffset));
 }
 
 #[test]
