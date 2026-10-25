@@ -114,8 +114,8 @@ what the stream said:
 - **A repeated leaf offset, refused on both paths**: a BUMP level that
   carries a second leaf at an offset, agreeing with the earlier one or not,
   is `MismatchedNode { level, offset }` at the second leaf's offset varint
-  (the decoder refuses it as it reads the offset; `bump_root` refuses one
-  held in memory ahead of its walk). Through 0.9.0 the whole reader refused
+  (the decoder refuses it as it reads the offset; `merkle_path_root`
+  refuses one held in memory ahead of the walk). Through 0.9.0 the whole reader refused
   it as `MerklePath::new_unchecked`'s "Duplicate offset", naming no byte, and
   the stream let the earlier leaf stand, accepting a repeat its walk accepted
   (the same hash, a flag-`01` leaf after a hash, a higher level's sibling);
