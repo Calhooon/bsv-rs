@@ -1119,12 +1119,20 @@ mod status_tests {
         assert!(result);
     }
 
-    /// Tests getHeight roundtrip (ProtoWallet returns 0).
+    /// Tests getHeight roundtrip: ProtoWallet answers 0, a height the
+    /// reference's result check refuses (`WalletResultValidation.ts:2293-2295`,
+    /// bsv-rs#216), so the client reads the processor's refusal.
     #[tokio::test]
     async fn test_roundtrip_get_height() {
         let transceiver = create_loopback();
-        let result = transceiver.get_height("test").await.unwrap();
-        assert_eq!(result, 0);
+        let error = transceiver.get_height("test").await.unwrap_err();
+        assert_eq!(
+            error,
+            Error::WalletError(
+                "wallet error (code 1): Invalid getHeight result height: expected an integer from 1 to 4294967295"
+                    .into()
+            )
+        );
     }
 
     /// Tests getNetwork roundtrip (processor returns configured network).

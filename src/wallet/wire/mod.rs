@@ -78,6 +78,7 @@ mod processor;
 mod requests;
 mod results;
 mod transceiver;
+mod validation;
 
 pub use calls::WalletCall;
 pub use encoding::{WireReader, WireWriter};

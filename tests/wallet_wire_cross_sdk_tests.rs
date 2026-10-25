@@ -19,6 +19,16 @@
 use serde_json::Value;
 
 /// Load a vector file and return (json_value, wire_bytes).
+/// Whether the shared vector `filename` exists.
+fn vector_exists(filename: &str) -> bool {
+    std::path::Path::new(&format!(
+        "{}/tests/vectors/wallet_wire/{}",
+        env!("CARGO_MANIFEST_DIR"),
+        filename
+    ))
+    .exists()
+}
+
 fn load_vector(filename: &str) -> (Value, Vec<u8>) {
     let path = format!(
         "{}/tests/vectors/wallet_wire/{}",
@@ -1015,12 +1025,14 @@ async fn test_process_go_get_height_request() {
     // Process Go-encoded request through Rust processor
     let response = processor.process_message(&wire).await.unwrap();
 
-    // Should get a valid response (error byte 0 + varint height)
-    assert_eq!(response[0], 0x00, "should be success");
-    let mut reader = WireReader::new(&response[1..]);
-    let height = reader.read_var_int().unwrap();
-    // ProtoWallet returns 0 for height
-    assert_eq!(height, 0);
+    // ProtoWallet answers height 0, a result the reference refuses
+    // (`WalletResultValidation.ts:2293-2295`, bsv-rs#216): the Go request is
+    // read and the wallet's answer framed as the refusal, code 1
+    let words = b"Invalid getHeight result height: expected an integer from 1 to 4294967295";
+    let mut expected = vec![1, words.len() as u8];
+    expected.extend(words);
+    expected.push(0);
+    assert_eq!(response, expected);
 }
 
 #[tokio::test]
@@ -1441,12 +1453,20 @@ async fn processor_writes_the_vector_wire(filename: &str) -> Result<(), String> 
         .unwrap(),
     )
     .unwrap();
-    let request = hex::decode(
-        recording["cases"][0]["expected"]["request_hex"]
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap();
+    // The call's own Go args vector where there is one, so the result answers
+    // the request it was made for (the processor checks a linkage result
+    // against its request, bsv-rs#216); else the recording's first request
+    let args_vector = format!("{}-simple-args.json", call);
+    let request = if vector_exists(&args_vector) {
+        load_vector(&args_vector).1
+    } else {
+        hex::decode(
+            recording["cases"][0]["expected"]["request_hex"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap()
+    };
     let network = if json["network"] == "testnet" {
         Network::Testnet
     } else {

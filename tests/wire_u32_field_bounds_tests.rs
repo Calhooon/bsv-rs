@@ -252,11 +252,12 @@ async fn a_header_height_above_u32_max_is_refused_not_truncated() {
         .unwrap();
     let mut reader = WireReader::new(&answer);
     assert_eq!(reader.read_u8().unwrap(), 1, "unknownError");
-    // The frame carries the refusal's bare words, not its `Display` (#202).
-    let Error::WalletError(words) = refusal("height") else {
-        unreachable!()
-    };
-    assert_eq!(reader.read_string().unwrap(), words);
+    // The reference's words (`#requireInteger`, `WalletWireProcessor.ts:1670-1675`,
+    // bsv-rs#216), bare as every frame's are (#202).
+    assert_eq!(
+        reader.read_string().unwrap(),
+        format!("Invalid getHeaderForHeight height: expected an integer from 1 to 4294967295, received {OVER}")
+    );
     assert_eq!(*processor.wallet().asked.lock().unwrap(), Some(u32::MAX));
 }
 
