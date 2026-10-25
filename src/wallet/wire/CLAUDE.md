@@ -9,9 +9,9 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~456 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~478 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2486 |
 | `processor.rs` | Generic server-side processor over WalletInterface | ~920 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191) | ~77 |
 | `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1597 |
