@@ -123,7 +123,8 @@ the keys, where the reference and BRC-100 put the keys ahead of it (F2): a findi
 not changed here.
 
 misread. The responses of both calls put the encrypted linkage ahead of the
-keys, where the reference and BRC-100 put the keys first: fixed by #194, above.
+keys, where the reference and BRC-100 put the keys ahead of the encrypted data:
+fixed by #194, above.
 
 ### Fixed: the wallet wire's readers refuse what the reference's readers refuse (#183)
 

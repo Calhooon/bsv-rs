@@ -1447,7 +1447,7 @@ const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 19] = [
     ),
     (
         "waitForAuthentication-simple-result.json",
-        "the processor writes a authenticated byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1641-1644 at ts-stack@edf6e03)",
+        "the processor writes an authenticated byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1641-1644 at ts-stack@edf6e03)",
     ),
 ];
 
