@@ -89,9 +89,8 @@ Across every module: one `Error` enum ([`src/error.rs`](../src/error.rs),
 variant is additive); `TransportFault` re-exported at the crate root; the
 `http` feature for reqwest (ARC, WhatsOnChain, the headers service, the HTTP
 substrates, the overlay hosts), `websocket` opt-in and outside `full`, `wasm`
-for the JS RNG and timers; the 13 fuzz targets of
-[`fuzz/fuzz_targets/CLAUDE.md`](../fuzz/fuzz_targets/CLAUDE.md) (five readers
-still without one, #140).
+for the JS RNG and timers; the 18 fuzz targets of
+[`fuzz/fuzz_targets/CLAUDE.md`](../fuzz/fuzz_targets/CLAUDE.md).
 
 ## 3. The invariants
 
@@ -215,7 +214,7 @@ for f in tests/vectors/*.json; do python3 -c "import json; d=json.load(open('$f'
 ls tests/vectors/wallet_wire | wc -l                            # 54
 ls tests/vectors/beef_of_any_size | wc -l                       # 49
 find tests/fixtures -name '*.json' | wc -l                      # 65
-ls fuzz/fuzz_targets/*.rs | wc -l                               # 13
+ls fuzz/fuzz_targets/*.rs | wc -l                               # 18
 ls examples | wc -l                                             # 6
 find src -name CLAUDE.md | wc -l                                # 27 (28 from #161)
 ```
