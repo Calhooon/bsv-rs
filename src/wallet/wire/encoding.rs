@@ -493,63 +493,61 @@ impl<'a> WireReader<'a> {
         self.read_wallet_certificate().map(Some)
     }
 
-    /// Reads an IdentityCertifier.
+    /// Reads an IdentityCertifier as a discovery entry carries it
+    /// (`WalletWireTransceiver.ts:1704-1710` at `ts-stack@edf6e03`; go-sdk@2ca481c
+    /// `wallet/serializer/identity_certificate.go:63-66`): name, iconUrl and
+    /// description as plain varint-length strings, trust a byte. An empty
+    /// iconUrl or description is `Some("")`, as the transceiver reads it; trust
+    /// is not bounded here (TS refuses one outside 1 to 10, `:1710`).
     pub fn read_identity_certifier(&mut self) -> Result<IdentityCertifier, Error> {
-        let name = self.read_string()?;
-        let icon_url = self.read_optional_string()?;
-        let description = self.read_optional_string()?;
-        let trust = self.read_u8()?;
-
         Ok(IdentityCertifier {
-            name,
-            icon_url,
-            description,
-            trust,
+            name: self.read_string()?,
+            icon_url: Some(self.read_string()?),
+            description: Some(self.read_string()?),
+            trust: self.read_u8()?,
         })
     }
 
-    /// Reads an optional IdentityCertifier in the layout this crate's writer
-    /// wrote before #182 (a present flag, NIL sentinels for the optional
-    /// strings), not the reference's; the transceiver's discovery reader reads
-    /// the reference's. The follow-up is #184.
+    /// Reads a discovery entry's certifier info: no present flag, the reference
+    /// having no absent case. Go's zero value, which `write_identity_certificate`
+    /// writes for `None`, reads as `Some` with empty strings and trust 0, as the
+    /// transceiver reads it, never as `None` (bsv-rs#184).
     pub fn read_optional_identity_certifier(&mut self) -> Result<Option<IdentityCertifier>, Error> {
-        let flag = self.read_i8()?;
-        if flag < 0 {
-            return Ok(None);
-        }
-        let name = self.read_string()?;
-        let icon_url = self.read_optional_string()?;
-        let description = self.read_optional_string()?;
-        let trust = self.read_u8()?;
-
-        Ok(Some(IdentityCertifier {
-            name,
-            icon_url,
-            description,
-            trust,
-        }))
+        self.read_identity_certifier().map(Some)
     }
 
-    /// Reads an IdentityCertificate in the layout this crate's writer wrote
-    /// before #182 (present flag, NIL sentinels, keyring values as text), not
-    /// the reference's; the transceiver's discovery reader reads the
-    /// reference's. The follow-up is #184.
+    /// Reads an IdentityCertificate as `write_identity_certificate` writes it and
+    /// the reference reads one discovery entry (`WalletWireTransceiver.ts:1702-1745`
+    /// at `ts-stack@edf6e03`; go-sdk@2ca481c `identity_certificate.go:51-100`):
+    /// the certificate behind a varint length, the certifier info, the public
+    /// keyring as varint-length keys and raw-byte values (base64 in the struct),
+    /// the decrypted fields as string pairs. An empty map is `None` (bsv-rs#184).
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
-        // The old layout: VarInt(cert_len) + cert_bytes, then certifier_info fields, keyring, decrypted_fields
-        let cert_len = self.read_var_int()? as usize;
-        let cert_bytes = self.read_bytes(cert_len)?;
-        let mut cert_reader = WireReader::new(cert_bytes);
-        let certificate = cert_reader.read_wallet_certificate()?;
-
+        let cert_len = self.inner.read_var_int_num()?;
+        let certificate = WireReader::new(self.read_bytes(cert_len)?).read_wallet_certificate()?;
         let certifier_info = self.read_optional_identity_certifier()?;
-        let publicly_revealed_keyring = self.read_optional_string_map()?;
-        let decrypted_fields = self.read_optional_string_map()?;
+
+        let count = self.read_var_int()?;
+        let mut keyring =
+            HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
+        for _ in 0..count {
+            let key = self.read_string()?;
+            let len = self.inner.read_var_int_num()?;
+            keyring.insert(key, to_base64(self.read_bytes(len)?));
+        }
+        let count = self.read_var_int()?;
+        let mut fields =
+            HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
+        for _ in 0..count {
+            let key = self.read_string()?;
+            fields.insert(key, self.read_string()?);
+        }
 
         Ok(IdentityCertificate {
             certificate,
             certifier_info,
-            publicly_revealed_keyring,
-            decrypted_fields,
+            publicly_revealed_keyring: (!keyring.is_empty()).then_some(keyring),
+            decrypted_fields: (!fields.is_empty()).then_some(fields),
         })
     }
 
@@ -1941,66 +1939,6 @@ mod tests {
         writer.write_optional_wallet_certificate(None).unwrap();
         let mut reader = WireReader::new(writer.as_bytes());
         assert!(reader.read_optional_wallet_certificate().unwrap().is_none());
-    }
-
-    #[test]
-    fn test_identity_certifier_roundtrip() {
-        // Full certifier
-        let certifier = IdentityCertifier {
-            name: "Test CA".to_string(),
-            icon_url: Some("https://example.com/icon.png".to_string()),
-            description: Some("A test certificate authority".to_string()),
-            trust: 3,
-        };
-
-        let mut writer = WireWriter::new();
-        writer.write_identity_certifier(&certifier);
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_identity_certifier().unwrap();
-        assert_eq!(read.name, certifier.name);
-        assert_eq!(read.icon_url, certifier.icon_url);
-        assert_eq!(read.description, certifier.description);
-        assert_eq!(read.trust, certifier.trust);
-
-        // Minimal certifier (no optional fields)
-        let minimal = IdentityCertifier {
-            name: "Minimal CA".to_string(),
-            icon_url: None,
-            description: None,
-            trust: 1,
-        };
-
-        let mut writer = WireWriter::new();
-        writer.write_identity_certifier(&minimal);
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_identity_certifier().unwrap();
-        assert_eq!(read.name, minimal.name);
-        assert_eq!(read.icon_url, None);
-        assert_eq!(read.description, None);
-        assert_eq!(read.trust, minimal.trust);
-    }
-
-    #[test]
-    fn test_optional_identity_certifier_roundtrip() {
-        // Some
-        let certifier = IdentityCertifier {
-            name: "Some CA".to_string(),
-            icon_url: None,
-            description: None,
-            trust: 5,
-        };
-        let mut writer = WireWriter::new();
-        writer.write_optional_identity_certifier(Some(&certifier));
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_optional_identity_certifier().unwrap().unwrap();
-        assert_eq!(read.name, certifier.name);
-        assert_eq!(read.trust, certifier.trust);
-
-        // None
-        let mut writer = WireWriter::new();
-        writer.write_optional_identity_certifier(None);
-        let mut reader = WireReader::new(writer.as_bytes());
-        assert!(reader.read_optional_identity_certifier().unwrap().is_none());
     }
 
     #[test]

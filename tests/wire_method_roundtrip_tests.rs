@@ -1460,27 +1460,26 @@ mod complex_type_roundtrips {
         assert_eq!(read.trust, certifier.trust);
     }
 
-    /// Tests optional IdentityCertifier roundtrip (Some with None fields).
+    /// Tests the optional IdentityCertifier read of a minimal entry: the
+    /// reference's layout has no present flag, an empty iconUrl or description
+    /// is length 0 and reads as `Some("")`, as the transceiver reads it (#184).
     #[test]
     fn test_optional_identity_certifier_minimal_roundtrip() {
-        let certifier = IdentityCertifier {
-            name: "Minimal".to_string(),
-            icon_url: None,
-            description: None,
-            trust: 1,
-        };
-
         let mut writer = WireWriter::new();
-        writer.write_optional_identity_certifier(Some(&certifier));
+        writer.write_string("Minimal");
+        writer.write_string("");
+        writer.write_string("");
+        writer.write_u8(1);
 
         let mut reader = WireReader::new(writer.as_bytes());
         let read = reader.read_optional_identity_certifier().unwrap();
         assert!(read.is_some());
         let read = read.unwrap();
         assert_eq!(read.name, "Minimal");
-        assert_eq!(read.icon_url, None);
-        assert_eq!(read.description, None);
+        assert_eq!(read.icon_url, Some(String::new()));
+        assert_eq!(read.description, Some(String::new()));
         assert_eq!(read.trust, 1);
+        assert_eq!(reader.remaining(), 0);
     }
 
     /// Tests WalletPayment write/read roundtrip.
