@@ -17,6 +17,7 @@ This directory contains the crate root (`lib.rs`) and the shared error types (`e
 | Directory | Feature Flag | Description |
 |-----------|--------------|-------------|
 | `primitives/` | `primitives` | Cryptographic primitives (hash, EC, encoding, AES-256-GCM) |
+| `block/` | `block` | Block headers, compact targets, proof of work, chain work, merkle roots and the node's difficulty rule |
 | `script/` | `script` | Script parsing, execution, and templates (P2PKH, RPuzzle, PushDrop) |
 | `transaction/` | `transaction` | Transaction construction, signing, BEEF/MerklePath SPV proofs |
 | `wallet/` | `wallet` | BRC-42 key derivation, ProtoWallet, WalletClient |
@@ -140,7 +141,8 @@ Features follow a dependency hierarchy:
 full
  ├── primitives (no dependencies)
  ├── script → primitives
- ├── transaction → script
+ ├── block → primitives
+ ├── transaction → script + block
  ├── wallet → transaction
  ├── messages → wallet
  ├── compat → primitives
@@ -194,6 +196,7 @@ thiserror = "1.0"
 
 - `primitives/CLAUDE.md` - Cryptographic primitives module
 - `script/CLAUDE.md` - Script module
+- `block/CLAUDE.md` - Block module
 - `transaction/CLAUDE.md` - Transaction module
 - `wallet/CLAUDE.md` - Wallet module
 - `messages/CLAUDE.md` - Messages module
