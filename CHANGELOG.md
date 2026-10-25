@@ -19,7 +19,11 @@ its own thread (the slowest of 199 calls measured 4.3 ms), never a panic.
 unlinked, as it does not judge the graph, and the subject does not verify. In
 memory a ring is real (an entry keeps the txid it was read with, and
 `BeefTx::tx_mut` can point its input at its descendant): the linker links each
-entry once and stops, as `to_binary_atomic` and `sort_txs` do. With the memo in
+entry once and stops, as `to_binary_atomic` does; `sort_txs`, given the ring in
+the entry's cached `input_txids` as well (`tx_mut` leaves that list as it was
+read), finds no input missing and holds every link not valid. The writer emits
+the bytes each entry was read with, so the wire carries the chain, not the
+ring. With the memo in
 `Beef::add_input_proof` inserted after the descent, the in-memory ring of one
 loops and the test fails at the bound. `docs/ARCHITECTURE.md`'s gap line names
 the tests.
