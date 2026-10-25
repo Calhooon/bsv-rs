@@ -225,6 +225,7 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
 /// varint that the keyring's NIL sentinel completes as a length of `u64::MAX`.
 /// Other contents can misread rather than refuse; none reads as written.
 #[test]
+#[allow(deprecated)]
 fn the_layout_before_182_is_refused() {
     let cert = identity_certificate();
     let old = |certifier: Option<&IdentityCertifier>| -> Vec<u8> {
@@ -252,6 +253,7 @@ fn the_layout_before_182_is_refused() {
 /// description are present, and a NIL sentinel for an absent one, which is now
 /// a length past the bytes, refused.
 #[test]
+#[allow(deprecated)]
 fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
     let info = identity_certificate().certifier_info.unwrap();
     let mut w = WireWriter::new();
