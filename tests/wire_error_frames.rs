@@ -161,6 +161,7 @@ async fn a_wallet_erring_on_a_verdict_call_is_the_constant() {
                 protocol_id: protocol(),
                 key_id: "frame-0".into(),
                 counterparty: Some(Counterparty::Self_),
+                ..Default::default()
             },
             "test",
         )
