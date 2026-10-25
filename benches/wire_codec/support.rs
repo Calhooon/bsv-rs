@@ -439,6 +439,14 @@ fn writer_certificate() -> Vec<Layout> {
     vec![Raw(32), Raw(32), Raw(33), Raw(33), Outpoint, Map, Rest]
 }
 
+/// The signature calls' data-type flag and the data or the hash (#199).
+fn data_or_hash() -> Layout {
+    Layout::Branch(
+        vec![(1, vec![Layout::Blob]), (2, vec![Layout::Raw(32)])],
+        Vec::new(),
+    )
+}
+
 fn keyring() -> Layout {
     Layout::Array(vec![Layout::Str, Layout::Blob])
 }
@@ -498,19 +506,21 @@ fn request_args(call: WalletCall) -> Vec<Layout> {
             fields.push(Blob);
             fields
         }
+        // #199: the HMAC's 32 raw bytes ahead of the data; the signature
+        // calls' data-type flag, 1 then the data, 2 then the hash.
         C::VerifyHmac => {
             let mut fields = common();
-            fields.extend([Blob, Blob]);
+            fields.extend([Raw(32), Blob]);
             fields
         }
         C::CreateSignature => {
             let mut fields = common();
-            fields.extend([OptBlob, OptBlob]);
+            fields.push(data_or_hash());
             fields
         }
         C::VerifySignature => {
             let mut fields = common();
-            fields.extend([OptBool, OptBlob, OptBlob, Blob]);
+            fields.extend([OptBool, Blob, data_or_hash()]);
             fields
         }
         C::AcquireCertificate => vec![
