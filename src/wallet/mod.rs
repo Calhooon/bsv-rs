@@ -110,6 +110,7 @@ mod cached_key_deriver;
 #[cfg(feature = "http")]
 mod client;
 pub mod interface;
+mod key_args;
 mod key_deriver;
 mod proto_wallet;
 pub mod substrates;
@@ -123,29 +124,17 @@ pub use interface::{
     CryptoWallet, FullWallet, RevealCounterpartyKeyLinkageArgs as WalletRevealCounterpartyArgs,
     RevealSpecificKeyLinkageArgs as WalletRevealSpecificArgs, WalletInterface,
 };
+pub use key_args::{
+    CreateHmacArgs, CreateHmacResult, CreateSignatureArgs, CreateSignatureResult, DecryptArgs,
+    DecryptResult, EncryptArgs, EncryptResult, GetPublicKeyArgs, GetPublicKeyResult,
+    VerifyHmacArgs, VerifyHmacResult, VerifySignatureArgs, VerifySignatureResult,
+};
 pub use key_deriver::{KeyDeriver, KeyDeriverApi};
 pub use proto_wallet::{
-    // Argument types
-    CreateHmacArgs,
-    CreateHmacResult,
-    CreateSignatureArgs,
-    CreateSignatureResult,
-    DecryptArgs,
-    DecryptResult,
-    EncryptArgs,
-    EncryptResult,
-    GetPublicKeyArgs,
-    GetPublicKeyResult,
-    // ProtoWallet
-    ProtoWallet,
-    RevealCounterpartyKeyLinkageArgs,
+    ProtoWallet, RevealCounterpartyKeyLinkageArgs,
     RevealCounterpartyKeyLinkageResult as ProtoWalletRevealCounterpartyResult,
     RevealSpecificKeyLinkageArgs,
     RevealSpecificKeyLinkageResult as ProtoWalletRevealSpecificResult,
-    VerifyHmacArgs,
-    VerifyHmacResult,
-    VerifySignatureArgs,
-    VerifySignatureResult,
 };
 pub use types::{
     // Validation helpers
