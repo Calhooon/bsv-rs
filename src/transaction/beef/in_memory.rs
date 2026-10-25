@@ -7,11 +7,11 @@
 //! alone.
 
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::super::beef_stream::{
     bump_root, check_transaction, display_hex, AtomicNode, Bump, Hash32, InputRef, Kind, Leaf,
-    Node, OutputRef, Refusal,
+    Node, OutputRef, Reason, Refusal,
 };
 use super::super::beef_tx::BeefTx;
 use super::super::merkle_path::{MerklePath, MerklePathLeaf};
@@ -54,8 +54,21 @@ impl Bump {
 /// (0.4.2; at 0.4.1 the whole path walked the BUMP once per leaf, NL-8 W1).
 /// The levels keep their in-memory order; a hash that is not 32 bytes of hex
 /// (only a BUMP built by hand holds one) is a node the BUMP does not carry.
-/// A refusal names the kind; its offset is 0, there being no stream.
+/// A second leaf at an offset of a level is refused ahead of the walk, as
+/// the decoder refuses it on the wire (`MismatchedNode`, bsv-rs#86). A
+/// refusal names the kind; its offset is 0, there being no stream.
 pub(super) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
+    for (level, leaves) in path.path.iter().enumerate() {
+        let mut seen = HashSet::with_capacity(leaves.len());
+        if let Some(repeated) = leaves.iter().find(|l| !seen.insert(l.offset)) {
+            let level = u8::try_from(level).unwrap_or(u8::MAX);
+            let reason = Reason::MismatchedNode {
+                level,
+                offset: repeated.offset,
+            };
+            return Err(Refusal { offset: 0, reason });
+        }
+    }
     let levels: Vec<Vec<Leaf>> = path
         .path
         .iter()
