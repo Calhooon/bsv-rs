@@ -9,7 +9,7 @@ to the sibling evaluator and this crate's witness tests.
 | `beef_stream` | Read an entire 1,000,000-byte or 10,000,000-byte BEEF from a file, with script checks or with `verify_stream_structure` |
 | `merkle_path` | Compute and check 10,000 distinct depth-20 paths against one synthetic block root |
 | `transaction_sign_verify` | `Transaction::sign` or `Transaction::verify` for all 100 P2PKH inputs |
-| `wire_codec` | Encode or decode the request or successful result fields for one wallet call, including the envelope |
+| `wire_codec` | Encode or decode the recorded request or successful result frame of one wallet call (#76's `full` case), including the envelope |
 | `script_spend` | Visit every seed row's inputs in corpus order through `Spend::validate` under the block word |
 
 Build output and measurements must be outside this checkout:
@@ -90,17 +90,28 @@ funding proof against a local `MockChainTracker`.
 The proof and signing benches print their prepared workload observations
 outside timing; they do not assert an acceptance verdict.
 
-The wire fixture uses the public `WireWriter` and `WireReader` helpers with a
-small typed field walker. It covers nonempty inputs, outputs, maps, lists and
-certificates. It measures field serialization and decoding, including walker
+The wire bench's bytes are #76's recordings, not a schema of its own (#138):
+for each of the 28 calls it reads the `full` case of
+`tests/fixtures/wire/<method>.json`, the request frame the transceiver wrote
+(`request_hex`) and the result frame the wallet side wrote (`response_hex`:
+the processor's, or `WireWriter`'s type writers for the 13 calls the processor
+does not answer), outside timing. A per-call layout (`wire_codec/support.rs`)
+names the public `WireReader`/`WireWriter` call of each field and carries no
+value: the decode op reads the recorded frame through it, the encode op writes
+the values read back to the same bytes, and the bench asserts that before it
+times. It measures field serialization and decoding, including walker
 overhead; it does not measure asynchronous dispatch or a wallet operation.
-Layouts follow this checkout's transceiver, except the two linkage calls use
-the processor layouts because the transceiver has no linkage methods. The
-certificate layout is the transceiver's (type, subject, serial, certifier),
-which differs from the `write_wallet_certificate` helper's layout. Opaque
-signature/encryption payloads are synthetic zero bytes. Public keys are
-generated in memory, never recorded. Adding or changing a wire layout also
-requires updating this benchmark fixture.
+`tests/wire_codec_bench_bytes.rs` pins every layout to both recorded cases
+(the frame consumed exactly, re-encoded byte for byte), and `fixtures_replay`
+pins the recordings to the crate's writers, so a wire change that re-records
+the fixtures turns the test red until the layout follows. The layouts follow
+the recorded bytes where the transceiver reads them otherwise: the
+certificate results carry `write_wallet_certificate`'s order (type, serial,
+subject, certifier, outpoint, fields, the signature unprefixed), which the
+transceiver's parser does not read (the recordings pin its underflow), and
+getHeaderForHeight's result carries the processor's length prefix, which the
+transceiver keeps as the header's first byte. The recordings' keys are fixed
+public curve points.
 
 `BSV_SCRIPT_CORPUS` accepts `corpus/seed` or its `seed.jsonl`. Absence prints
 `SKIP script_spend` when that bench is run alone; the comparison tool requires

@@ -72,6 +72,7 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `wallet_internalize_validation_tests.rs` | 8 | `wallet` (`http` for one) | internalizeAction's basket insertion `customInstructions` bound: 1,000 UTF-8 bytes accepted, 1,001 refused with the field and the count, four-byte characters at the boundary, absence, the second output's index, the createAction copy unbounded, the ProtoWallet and HTTP JSON doors (Calhooon/bsv-rs#117) |
 | `wallet_brc56_hmac_tests.rs` | 8 | `wallet` | BRC-56's six HMAC key vectors (`5119a9b` `wallet/0056.md:81-96`): the inputs from their labels, the six 32-byte keys and tags reproduced, the six accepted, the four minimal-length-key tags refused as `HmacMinimalLengthKey` (sync and async), the two keys with no leading zero byte with no refusal path, any other tag `HMAC is not valid` (#148) |
 | `wallet_wire_cross_sdk_tests.rs` | 42 | `wallet` | Cross-SDK wire protocol vectors from Go SDK (54 vectors) |
+| `wire_codec_bench_bytes.rs` | 2 | `wallet` | The wire_codec bench's frames are #76's recordings: every call's request and result layout (`benches/wire_codec/support.rs`) reads both recorded cases exactly and re-encodes them byte for byte; the bench measures the `full` case of all 28 calls (#138) |
 | `wire_method_roundtrip_tests.rs` | 90 | `wallet` | Wire protocol roundtrips for all 28 WalletInterface methods |
 | `transaction/` | — | — | Transaction test vector constants module |
 
