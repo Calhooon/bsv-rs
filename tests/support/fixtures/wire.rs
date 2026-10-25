@@ -2,7 +2,7 @@ use super::cases::{self, Case};
 use super::wallet::{calls, invoke, outcome, Stub, WireWallet};
 use super::wallet_json::FixtureJson;
 use super::Suite;
-use bsv_rs::primitives::{from_base64, PublicKey};
+use bsv_rs::primitives::{from_base64, from_hex, PublicKey};
 use bsv_rs::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
 use bsv_rs::wallet::wire::{
     WalletCall, WalletWire, WalletWireProcessor, WalletWireTransceiver, WireReader, WireWriter,
@@ -198,8 +198,12 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
                 } else {
                     w.write_i8(0);
                 }
-                let verifier = entry.verifier.unwrap_or_default();
-                w.write_string(&verifier);
+                // The verifier's 33 bytes behind their length, or 0
+                // (`WalletWireTransceiver.ts:1533-1542` at `ts-stack@edf6e03`).
+                let verifier = entry.verifier.map(|v| from_hex(&v).unwrap());
+                let verifier = verifier.unwrap_or_default();
+                w.write_var_int(verifier.len() as u64)
+                    .write_bytes(&verifier);
             }
         }
         ProveCertificate => {
@@ -209,8 +213,23 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
         DiscoverByIdentityKey | DiscoverByAttributes => {
             let r = DiscoverCertificatesResult::from_fixture(value.clone());
             w.write_var_int(r.total_certificates.into());
-            for certificate in r.certificates {
-                w.write_identity_certificate(&certificate).unwrap();
+            // `#serializeDiscoveryResult` (`WalletWireProcessor.ts:2478-2560` at
+            // `ts-stack@edf6e03`, Go's `SerializeIdentityCertificate`):
+            // `write_identity_certificate` departs from both (bsv-rs#177's report).
+            for entry in r.certificates {
+                let mut certificate = WireWriter::new();
+                certificate
+                    .write_wallet_certificate(&entry.certificate)
+                    .unwrap();
+                w.write_var_int(certificate.len() as u64)
+                    .write_bytes(certificate.as_bytes());
+                let info = entry.certifier_info.unwrap();
+                w.write_string(&info.name)
+                    .write_string(info.icon_url.as_deref().unwrap_or_default())
+                    .write_string(info.description.as_deref().unwrap_or_default())
+                    .write_u8(info.trust);
+                keyring_bytes(&mut w, &entry.publicly_revealed_keyring.unwrap_or_default());
+                w.write_string_map(&entry.decrypted_fields.unwrap_or_default());
             }
         }
         _ => return None,
