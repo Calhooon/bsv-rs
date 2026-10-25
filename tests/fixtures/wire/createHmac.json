@@ -56,10 +56,10 @@
           "method": "create_hmac",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "00200d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+        "processor_response_hex": "000d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
         "request_hex": "0d1066697874757265732e696e76616c6964010c66697874757265206b6579730766697874757265000100",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "00200d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
+        "response_hex": "000d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
       },
       "input": {
         "args": {
@@ -174,10 +174,10 @@
           "method": "create_hmac",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "00200d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
+        "processor_response_hex": "000d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
         "request_hex": "0d1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50600017f80feff",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "00200d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
+        "response_hex": "000d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
       },
       "input": {
         "args": {
