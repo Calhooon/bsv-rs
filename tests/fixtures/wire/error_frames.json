@@ -3949,10 +3949,10 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 1): fixture refusal",
-          "error": "WalletError(\"wallet error (code 1): fixture refusal\")"
+          "display": "wallet error: wallet error (code 1): Wallet operation failed",
+          "error": "WalletError(\"wallet error (code 1): Wallet operation failed\")"
         },
-        "response_hex": "010f66697874757265207265667573616c00"
+        "response_hex": "011757616c6c6574206f7065726174696f6e206661696c656400"
       },
       "input": {
         "processor_error": "WalletError(\"fixture refusal\")"
@@ -3962,10 +3962,10 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 1): invalid parameter: fixture",
-          "error": "WalletError(\"wallet error (code 1): invalid parameter: fixture\")"
+          "display": "wallet error: wallet error (code 1): Wallet operation failed",
+          "error": "WalletError(\"wallet error (code 1): Wallet operation failed\")"
         },
-        "response_hex": "011a696e76616c696420706172616d657465723a206669787475726500"
+        "response_hex": "011757616c6c6574206f7065726174696f6e206661696c656400"
       },
       "input": {
         "processor_error": "WalletError(\"invalid parameter: fixture\")"
@@ -3975,10 +3975,10 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 1): insufficient funds: fixture",
-          "error": "WalletError(\"wallet error (code 1): insufficient funds: fixture\")"
+          "display": "wallet error: wallet error (code 1): Wallet operation failed",
+          "error": "WalletError(\"wallet error (code 1): Wallet operation failed\")"
         },
-        "response_hex": "011b696e73756666696369656e742066756e64733a206669787475726500"
+        "response_hex": "011757616c6c6574206f7065726174696f6e206661696c656400"
       },
       "input": {
         "processor_error": "WalletError(\"insufficient funds: fixture\")"
