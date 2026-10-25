@@ -9,11 +9,11 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~173 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~456 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2496 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~949 |
-| `transceiver.rs` | Client-side message serialization and full wallet interface (all 28 methods) | ~1628 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~948 |
+| `transceiver.rs` | Client-side message serialization and full wallet interface (all 28 methods) | ~1597 |
 
 ## Architecture
 
@@ -89,7 +89,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 ### Go-Compatible Nil Sentinel
 
-Optional strings, bytes, string arrays, and string maps use `VarInt(u64::MAX)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil/absent sentinel, matching the Go SDK's `VarInt(math.MaxUint64)` encoding. This is used in `read/write_optional_string`, `read/write_optional_bytes`, `read/write_string_array`, `read/write_string_map`, and `read/write_optional_string_map`.
+Optional strings, bytes, string arrays, and string maps use `VarInt(u64::MAX)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil/absent sentinel, matching the Go SDK's `VarInt(math.MaxUint64)` encoding. This is used in `read/write_optional_string`, `read/write_optional_bytes`, `read/write_string_array`, `read/write_string_map`, and `read/write_optional_string_map`. No frame the reference reads strictly is read through a sentinel reader (#183): a certificate's fields, the listCertificates keyring and the discovery maps are `readVarIntNumStrict` counts, nine 0xFF refused; `read_string_map` has no caller in the crate, `read_optional_string_map` one (`read_identity_certificate`, the pre-#182 layout, #184).
 
 Empty optional strings and empty optional bytes are treated the same as `None` — both write the nil sentinel. This matches Go SDK behavior.
 
@@ -180,9 +180,9 @@ pub mod status_codes {
 
 `WireWriter` implements `Default`.
 
-**WalletCertificate wire format (Go-compatible):** `type(32 raw bytes, base64) -> serial(32 raw bytes, base64) -> subject(33 pubkey) -> certifier(33 pubkey) -> revocation outpoint -> fields(sorted map) -> signature(remaining bytes, no length prefix)`.
+**WalletCertificate wire format (Go-compatible):** `type(32 raw bytes, base64) -> serial(32 raw bytes, base64) -> subject(33 pubkey) -> certifier(33 pubkey) -> revocation outpoint -> fields(sorted map) -> signature(remaining bytes, no length prefix)`. `read_wallet_certificate` reads it as `Certificate.fromBinary` does (`ts-stack@edf6e03` `Certificate.ts:329-408`, #183): the keys 33 bytes that decompress to a point (`:342`, `:347`), the field count strict, at most 100,000 and a third of the bytes remaining (`:357-363`), each name 1 to 50 bytes, safe, unique (`:367-374`), each value at most 1 MiB, the signature at most 72 bytes through `Signature.fromDER`'s checks and kept as `toDER` re-encodes it (`:390-397`); the checks are `mod.rs`'s (`read_compressed_key`, `read_certificate_fields`, `read_certificate_signature`).
 
-**IdentityCertificate wire format (the writer's, the reference's `#serializeDiscoveryResult` and Go's `SerializeIdentityCertificate`, bsv-rs#182):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> name, iconUrl, description (plain varint-length strings, an absent one empty) -> trust (u8) -> keyring (varint count + sorted (varint-length key, varint-length raw bytes of the base64 value)) -> decrypted fields (string map)`; no present-flag byte, no NIL sentinel, an absent certifier info or map Go's zero value. `read_identity_certificate` and `read_optional_identity_certifier` read the same bytes as the transceiver's discovery reader does (bsv-rs#184): an empty iconUrl or description is `Some("")`, Go's zero value is `Some` with empty strings and trust 0 (never `None`), an empty map is `None`; the old layout's bytes are refused. `write_identity_certifier` writes these bytes only when iconUrl and description are present; it, `write_optional_identity_certifier` and `write_optional_string_map` have no caller in the crate and are `#[deprecated]` since 0.9.0 (bsv-rs#184, the keeper's reading): no reference frame carries a present flag or a NIL-sentinel map; their removal is the owner's word.
+**IdentityCertificate wire format (the writer's, the reference's `#serializeDiscoveryResult` and Go's `SerializeIdentityCertificate`, bsv-rs#182):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> name, iconUrl, description (plain varint-length strings, an absent one empty) -> trust (u8) -> keyring (varint count + sorted (varint-length key, varint-length raw bytes of the base64 value)) -> decrypted fields (string map)`; no present-flag byte, no NIL sentinel, an absent map a count of 0; an absent certifier info or a trust outside 1 to 10 refused before a byte is written (the reference's reader refuses the frame, `WalletWireTransceiver.ts:1710`; bsv-rs#183). `read_identity_certificate` and `read_optional_identity_certifier` read the same bytes as the transceiver's discovery reader does (bsv-rs#184): an empty iconUrl or description is `Some("")`, Go's zero value is `Some` with empty strings and trust 0 (never `None`), an empty map is `None`; the old layout's bytes are refused. `write_identity_certifier` writes these bytes only when iconUrl and description are present; it, `write_optional_identity_certifier` and `write_optional_string_map` have no caller in the crate and are `#[deprecated]` since 0.9.0 (bsv-rs#184, the keeper's reading): no reference frame carries a present flag or a NIL-sentinel map; their removal is the owner's word.
 
 **WalletAction wire format (Go-compatible):** `txid(32) -> satoshis(unsigned VarInt) -> status(i8) -> isOutgoing(optional bool) -> description(string) -> labels(string array) -> version(VarInt) -> lockTime(VarInt) -> inputs(VarInt count or MaxUint64) -> outputs(VarInt count or MaxUint64)`.
 
@@ -243,9 +243,9 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 
 **Helper methods:** `parse_certificate_from_binary`, `parse_discovery_result` (internal).
 
-**Certificate binary format in transceiver response parsing:** the reference's `Certificate.toBinary` (`ts-stack@edf6e03` `Certificate.ts:229-321`), Go's and `WireWriter::write_wallet_certificate`'s: `type(32) -> serial(32) -> subject(33) -> certifier(33) -> outpoint (txid 32 + varint index) -> fields map (sorted) -> signature (the bytes remaining, no length prefix)` (bsv-rs#177; BRC-100 section 19's table, subject before serial and a length-prefixed signature before the fields, departs from these bytes). listCertificates' verifier is `varint(0)` or `varint(33)` + 33 raw bytes, read as hex, any other length refused; discovery's certifierInfo is three plain varint-length strings (an empty one length 0) and the trust byte, no present flag.
+**Certificate binary format in transceiver response parsing:** the reference's `Certificate.toBinary` (`ts-stack@edf6e03` `Certificate.ts:229-321`), Go's and `WireWriter::write_wallet_certificate`'s: `type(32) -> serial(32) -> subject(33) -> certifier(33) -> outpoint (txid 32 + varint index) -> fields map (sorted) -> signature (the bytes remaining, no length prefix)` (bsv-rs#177; BRC-100 section 19's table, subject before serial and a length-prefixed signature before the fields, departs from these bytes). listCertificates' verifier is `varint(0)` or `varint(33)` + 33 bytes that decompress to a point, read as hex, any other length refused; its keyring flag 0 or 1; discovery's certifierInfo is three plain varint-length strings (an empty one length 0) and the trust byte (1 to 10, `:1710`), no present flag. Every record (the listCertificates keyring, the discovery keyring and decrypted fields) is a strict collection count bounded by the bytes remaining, keys 1 to 50 bytes, safe and unique (`#readRecordKey`, `#setUniqueWireRecordEntry`, `:1955-2002`; #183).
 
-**getHeaderForHeight result:** the error byte, then the header's 80 raw bytes with no length prefix, on both sides (`WalletWireProcessor.ts:1687-1690`, `WalletWireTransceiver.ts:1903`; BRC-100 `0100.md:2478` at `5119a9b`; bsv-rs#178).
+**getHeaderForHeight result:** the error byte, then the header's 80 raw bytes with no length prefix, on both sides (`WalletWireProcessor.ts:1687-1690`, `WalletWireTransceiver.ts:1903`; BRC-100 `0100.md:2478` at `5119a9b`; bsv-rs#178); another length refused by the transceiver (`#requireResponseLength`) and by the processor for a wallet's header (`WalletResultValidation.ts:2297`; #183).
 
 ## Public Exports
 

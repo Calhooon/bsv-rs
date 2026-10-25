@@ -24,6 +24,108 @@ ratchet and bench-compare tools.
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
+### Fixed: the wallet wire's readers refuse what the reference's readers refuse (#183)
+
+The transceiver and `WireReader::read_wallet_certificate` read frames that the
+reference's `WalletWireTransceiver` and `Certificate.fromBinary` refuse
+(`ts-stack@edf6e03`). The keeper's reading (2026-10-25) is that the reader
+refuses what the reference's reader refuses, at each cited line, as a typed
+refusal, and that the writer never makes a frame the reference's reader
+refuses. Every refusal below is an `Error::WalletError` in the reference's
+words, and each is pinned by a test in `tests/wire_reader_strictness.rs`
+(18 tests, 16 RED on the old readers):
+
+- getHeaderForHeight: the transceiver refuses a result that is not exactly 80
+  bytes after the error byte (`WalletWireTransceiver.ts:1903`,
+  `#requireResponseLength` `:2027-2031`;
+  `a_header_that_is_not_80_bytes_is_refused`). The processor refuses a
+  wallet's header of another length, as the reference processor's
+  `validateWalletResult` does (`WalletResultValidation.ts:2296-2297`;
+  `the_processor_refuses_a_wallets_header_that_is_not_80_bytes`). Before
+  this, it wrote whatever the wallet gave it.
+- The certificate (one reader now: the transceiver's
+  `parse_certificate_from_binary` calls `read_wallet_certificate`):
+  - The subject and the certifier are 33 bytes that decompress to a point
+    (`Certificate.ts:342`, `:347`, `assertCompressedPublicKey` `:135-142`;
+    `a_certificate_subject_or_certifier_that_is_not_a_compressed_key_is_refused`).
+  - The field count is a strict varint, at most 100,000 and at most a third of
+    the bytes remaining, refused before a field is read (`:357-363`). Nine 0xFF
+    are refused ("number too large to retain precision"), not read as an empty
+    map (`a_certificate_field_count_past_the_maximum_or_the_bytes_is_refused`).
+  - A field name is 1 to 50 bytes (`:367-370`;
+    `a_certificate_field_name_outside_1_to_50_bytes_or_unsafe_is_refused`), is
+    not `__proto__`, `constructor` or `prototype` (`:373`), and is never
+    repeated (`:374`; `a_repeated_certificate_field_name_is_refused`).
+  - A field value is at most 1 MiB (`:378-382`;
+    `a_certificate_field_value_past_a_mebibyte_is_refused`).
+  - The signature is at most 72 bytes and is parsed by the reference's
+    `Signature.fromDER` checks (`:390-397`;
+    `a_certificate_signature_that_is_not_der_is_refused`). It is kept as
+    `toDER` re-encodes it (`:396`; `a_der_signature_is_kept_as_the_reference_re_encodes_it`):
+    an R or S whose high bit is set and has no zero byte before it is read
+    and kept padded.
+- listCertificates:
+  - The verifier's 33 bytes are a compressed point (`:1533-1542`,
+    `#readCompressedPublicKey` `:2004-2008`;
+    `a_list_certificates_verifier_that_is_not_a_compressed_key_is_refused`).
+    The 0-or-33 length check of #177 is pinned there from the outside.
+  - The keyring's present flag is 0 or 1 (`:1513`, `#readBooleanFlag`;
+    `a_list_certificates_keyring_flag_other_than_0_or_1_is_refused`).
+  - The keyring's count is a strict collection count, and its keys are 1 to
+    50 bytes, safe and unique (`:1514-1531`, `#readRecordKey`,
+    `#setUniqueWireRecordEntry`;
+    `a_list_certificates_keyring_key_out_of_bounds_or_repeated_is_refused`).
+- Discovery:
+  - The trust byte is 1 to 10 (`:1710`;
+    `a_discovery_trust_outside_1_to_10_is_refused`).
+  - The public keyring and decrypted-field counts are `readVarIntNumStrict`
+    counts bounded by the bytes remaining (`:1712-1717`, `:1730-1735`). Nine
+    0xFF are refused, with no NIL sentinel
+    (`a_nil_sentinel_or_overlong_discovery_count_is_refused`).
+  - Both maps' keys are record keys (`:1718-1752`;
+    `a_discovery_record_key_out_of_bounds_or_repeated_is_refused`). Before
+    this, a repeated key overwrote the earlier one.
+- The writer: `write_identity_certificate` refuses an identity certificate
+  whose `certifier_info` is `None` or whose trust is outside 1 to 10, before
+  any byte is written
+  (`an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_before_a_byte`).
+  The reference's writer writes the trust byte unchecked
+  (`WalletWireProcessor.ts:2520`), and its own reader then refuses the frame.
+  This replaces #182's Go zero value for an absent certifier info (below).
+  `wire_identity_certificate_writer.rs`'s
+  `an_identity_certificate_with_nothing_optional_writes_empty_strings_and_counts`
+  now pins the refusal, and the absent iconUrl, description and maps written
+  as empty strings and counts under a trust of 1.
+
+`read_string_map` and `read_optional_string_map` keep their NIL sentinel, and
+neither now has a caller that reads a frame the reference reads strictly. The
+certificate fields read through `read_certificate_fields`.
+`read_optional_string_map`'s one caller, `read_identity_certificate`, reads
+the pre-#182 layout and is #184's. Two of the crate's own test certificates
+carried a signature that is not DER (`deadbeef`, `[0xdd; 72]`) and now carry
+`3006020101020101`. The shared vectors and #76's recordings are unchanged and
+still read (`fixtures_replay`, `wallet_wire_cross_sdk_tests`). The processor's
+proveCertificate and relinquishCertificate handlers read nothing; they are
+stubs. Its linkage keys are read with `PublicKey::from_bytes`, which already
+checks the point (pinned by
+`the_processor_refuses_a_linkage_key_that_is_not_a_compressed_point`).
+Migration: none. No public signature moved. A caller that wrote an identity
+certificate with no certifier info or a trust of 0 now gets an `Err`, where
+it used to get a frame the reference client refuses.
+
+### Notes: cross-SDK parity (#183)
+
+Go's `DeserializeIdentityCertificate` reads the trust byte unchecked
+(`go-sdk@2ca481c` `wallet/serializer/identity_certificate.go:66`). This crate
+follows the reference's reader (`WalletWireTransceiver.ts:1710`) and refuses
+a trust outside 1 to 10. Go's reader also keeps a repeated map key and takes
+a field count as a plain varint (`:68-87`). There is also one known gap with
+TS on keys. TS's `Point.fromX` reduces an x at or above the field prime
+modulo p before it solves for y (`Point.ts:365-367`). So a 33-byte key whose x
+is p + k, for a k that is on the curve, is accepted there, while
+`PublicKey::from_bytes` (k256) refuses it. Such a key is not the encoding of
+any point that this crate or TS writes.
+
 ### Fixed: the transceiver reads certificate results as the reference writes them (#177)
 
 A client on this crate's transceiver could not read a certificate that this
