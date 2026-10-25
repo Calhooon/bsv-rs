@@ -34,7 +34,7 @@ fn the_bench_frames_are_the_recordings_byte_for_byte() {
                                 .position(|(a, b)| a != b)
                                 .unwrap_or(written.len().min(bytes.len()));
                             drift.push(format!(
-                                "{call} {case} {side}: re-encoded {} bytes, recorded {}, first difference at {at}",
+                                "{call} {case} {side}: re-encoded {} bytes, recorded {}, the bytes differ from offset {at}",
                                 written.len(),
                                 bytes.len()
                             ));
