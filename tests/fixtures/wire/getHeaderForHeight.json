@@ -5,7 +5,7 @@
       "expected": {
         "client_result": {
           "ok": {
-            "header": "500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+            "header": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
           }
         },
         "processor_observed": {
@@ -15,10 +15,10 @@
           "method": "get_header_for_height",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "00500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "processor_response_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
         "request_hex": "1a1066697874757265732e696e76616c696400",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "00500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+        "response_hex": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
       },
       "input": {
         "args": {
@@ -36,7 +36,7 @@
       "expected": {
         "client_result": {
           "ok": {
-            "header": "50abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+            "header": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
           }
         },
         "processor_observed": {
@@ -46,10 +46,10 @@
           "method": "get_header_for_height",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "0050abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
+        "processor_response_hex": "00abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab",
         "request_hex": "1a1066697874757265732e696e76616c6964fe00350c00",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "0050abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+        "response_hex": "00abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
       },
       "input": {
         "args": {
