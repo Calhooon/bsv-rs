@@ -38,6 +38,36 @@ feature: tracing`); with the plumbing and no `warn!`, the two event tests
 fail at `left: 0, right: 1`. CI runs the file in its own step (`--features
 "full,http,tracing"`, with `wire_error_frames` and `fixtures_replay`), allowlisted
 in `tests/arch_ci_runs_every_test.rs`'s `RUN_APART` with that reason.
+### Changed: `MockChainTracker` answers a synthetic mainnet mining tip at its height (#218)
+
+The mock answered `mining_tip` with the trait's default `None`, so every
+dependent whose tests verify a BEEF against it saw the streaming reader decline
+the checks that need the tip (`Verdict::Unverifiable`, `CoinbaseMaturity` or
+`Finality`; the toolbox's internalize door words it "the header service
+supplied no mining tip"): nine of `bsv-wallet-cli`'s tests failed for that one
+reason. Both `ChainTracker::mining_tip` and the streaming reader's
+`Headers::mining_tip` now answer the same `ChainTip`, read at call time:
+`height` the mock's `height`, `median_time_past` 1,700,000,000,
+`genesis_height` `ProtocolEra::MAINNET_GENESIS_HEIGHT` (620,538),
+`csv_height` 419,328 (bitcoin-sv@879fc8b `src/chainparams.cpp:1046`; the
+crate had no constant, a private one is kept beside the mock),
+`next_block_time` `None`. The door judges against it as against a real tip: a
+coinbase spent 99 blocks deep is `PrematureCoinbase`, a lock time at the next
+height `NonFinal`.
+
+Added (additive): `MockChainTracker::with_mining_tip(Option<ChainTip>)` sets
+the tip both methods answer. Migration: a host test that asserted the hold on
+the default mock builds it with `MockChainTracker::new(h).with_mining_tip(None)`.
+The struct gains a private field, so a struct literal
+`MockChainTracker { height, roots }` outside the crate no longer compiles; use
+`MockChainTracker::new(height)` and `add_root` (none of the known downstreams
+builds one). Pinned by `the_mock_answers_a_synthetic_mainnet_tip_at_its_height`,
+`the_mock_with_a_mining_tip_answers_it_on_both_traits` (unit),
+`the_mock_tracker_s_tip_lets_a_proven_spend_through_the_door`,
+`the_mock_tracker_s_tip_is_judged_at_its_height` and
+`the_mock_tracker_set_to_no_tip_holds_at_the_door` (`tests/beef_stream.rs`);
+`mining_async_and_two_pass_enforce_coinbase_maturity` asserts its hold on the
+mock with the explicit `None`.
 
 ### Added: a guard that CI runs every integration test binary (#146)
 

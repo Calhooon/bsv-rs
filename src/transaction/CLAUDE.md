@@ -46,7 +46,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
 | `broadcaster.rs` | `Broadcaster` trait, response/failure types, helper functions |
 | `broadcasters/` | `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster` |
-| `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker`, `AlwaysValidChainTracker` |
+| `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker` (a synthetic mainnet mining tip at its height, `with_mining_tip`; #218), `AlwaysValidChainTracker` |
 | `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, `BlockHeadersServiceConfig` |
 
 ## Core Types
@@ -268,15 +268,18 @@ ARC/Teranode have `new(url, api_key)` and `with_config(config)` constructors. Wo
 pub trait ChainTracker: Send + Sync {
     async fn is_valid_root_for_height(&self, root: &str, height: u32) -> Result<bool, ChainTrackerError>;
     async fn current_height(&self) -> Result<u32, ChainTrackerError>;
+    async fn mining_tip(&self) -> Result<Option<ChainTip>, ChainTrackerError> { Ok(None) } // default
 }
 
 #[non_exhaustive]
 pub enum ChainTrackerError { NetworkError(String), TransportFault { fault: TransportFault, status: Option<u16>, detail: String }, InvalidResponse(String), BlockNotFound(u32), Other(String) }
 
 // Test mocks
-pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String> }
+pub struct MockChainTracker { pub height: u32, pub roots: HashMap<u32, String>, /* private: the tip set */ }
 pub struct AlwaysValidChainTracker { pub height: u32 }
-// MockChainTracker: new(height), add_root(height, root), always_valid(height) -> AlwaysValidChainTracker
+// MockChainTracker: new(height), add_root(height, root), always_valid(height) -> AlwaysValidChainTracker,
+//   with_mining_tip(Option<ChainTip>); mining_tip (ChainTracker and Headers alike) is a synthetic mainnet
+//   tip at `height` (MTP 1_700_000_000, Genesis 620_538, CSV 419_328, no next block time) unless set (#218)
 // AlwaysValidChainTracker: new(height) - always returns true for any root
 ```
 

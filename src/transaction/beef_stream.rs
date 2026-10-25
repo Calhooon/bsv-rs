@@ -85,7 +85,7 @@ use crate::primitives::{to_hex, Reader, Writer};
 use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
-use super::chain_tracker::{ChainTracker, ChainTrackerError, MockChainTracker};
+use super::chain_tracker::{ChainTracker, ChainTrackerError};
 
 /// A 32-byte digest in the order the wire carries it (a txid or a merkle
 /// node; its display form is the bytes reversed, in hex).
@@ -1457,16 +1457,6 @@ impl<H: Headers + ?Sized> Headers for &H {
 impl Headers for HashMap<u64, Hash32> {
     fn carries(&self, height: u64, root: &Hash32) -> bool {
         self.get(&height) == Some(root)
-    }
-}
-
-/// The mock tracker's roots (display hex by height).
-impl Headers for MockChainTracker {
-    fn carries(&self, height: u64, root: &Hash32) -> bool {
-        u32::try_from(height)
-            .ok()
-            .and_then(|h| self.roots.get(&h))
-            .is_some_and(|carried| carried.eq_ignore_ascii_case(&display_hex(root)))
     }
 }
 

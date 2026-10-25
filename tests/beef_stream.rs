@@ -2730,7 +2730,7 @@ async fn mining_async_and_two_pass_enforce_coinbase_maturity() {
         verify_stream_two_pass(std::io::Cursor::new(&bytes), &headers, None).unwrap(),
         expected
     );
-    let mut tracker = MockChainTracker::new(800_099);
+    let mut tracker = MockChainTracker::new(800_099).with_mining_tip(None);
     for (height, root) in &headers.roots {
         tracker.add_root(*height as u32, display_hex(root));
     }
@@ -2748,6 +2748,80 @@ async fn mining_async_and_two_pass_enforce_coinbase_maturity() {
             ..
         }
     ));
+}
+// The mock's synthetic mainnet tip (#218): the door reads its height.
+
+fn mock_with(roots: &HashMap<u64, Hash32>, height: u32) -> MockChainTracker {
+    let mut tracker = MockChainTracker::new(height);
+    for (h, root) in roots {
+        tracker.add_root(*h as u32, display_hex(root));
+    }
+    tracker
+}
+/// The row 8f spend: sequence 0, lock time the block height 800,001.
+fn mining_lock_time_spend() -> (Vec<u8>, Vec<u64>, HashMap<u64, Hash32>) {
+    let (p, bump, headers) = funded(&[(1000, OP_TRUE)]);
+    let mut c = tx_with(&[(txid(&p), 0, &[])], &[(1, OP_TRUE)]);
+    c[42..46].copy_from_slice(&0u32.to_le_bytes());
+    let end = c.len();
+    c[end - 4..].copy_from_slice(&800_001u32.to_le_bytes());
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(p, Some(0)), Entry::Raw(c, None)],
+    );
+    (bytes, offsets, headers)
+}
+async fn mock_both_paths(bytes: &[u8], tracker: &MockChainTracker) -> (Verdict, Verdict) {
+    let mut chunks = Chunks {
+        bytes: bytes.to_vec(),
+        at: 0,
+        size: 5,
+    };
+    (
+        verify_stream(bytes, tracker, None).unwrap(),
+        verify_stream_async(&mut chunks, tracker, None)
+            .await
+            .unwrap(),
+    )
+}
+#[tokio::test]
+async fn the_mock_tracker_s_tip_lets_a_proven_spend_through_the_door() {
+    let (bytes, _, roots) = mining_coinbase_spend();
+    let (sync, asynchronous) = mock_both_paths(&bytes, &mock_with(&roots, 800_099)).await;
+    assert!(sync.is_valid(), "{sync:?}");
+    assert!(asynchronous.is_valid(), "{asynchronous:?}");
+    let (bytes, _, roots) = mining_lock_time_spend();
+    let (sync, asynchronous) = mock_both_paths(&bytes, &mock_with(&roots, 800_001)).await;
+    assert!(sync.is_valid(), "{sync:?}");
+    assert!(asynchronous.is_valid(), "{asynchronous:?}");
+}
+#[tokio::test]
+async fn the_mock_tracker_s_tip_is_judged_at_its_height() {
+    let (bytes, offsets, roots) = mining_coinbase_spend();
+    let (sync, asynchronous) = mock_both_paths(&bytes, &mock_with(&roots, 800_098)).await;
+    for answer in [sync, asynchronous] {
+        mining_spend(
+            answer,
+            offsets[1] + 5,
+            "PrematureCoinbase { height: 800000 }",
+        );
+    }
+    let (bytes, offsets, roots) = mining_lock_time_spend();
+    let (sync, asynchronous) = mock_both_paths(&bytes, &mock_with(&roots, 800_000)).await;
+    for answer in [sync, asynchronous] {
+        mining_spend(answer, offsets[1], "NonFinal { lock_time: 800001 }");
+    }
+}
+#[tokio::test]
+async fn the_mock_tracker_set_to_no_tip_holds_at_the_door() {
+    let (bytes, offsets, roots) = mining_lock_time_spend();
+    let tracker = mock_with(&roots, 800_001).with_mining_tip(None);
+    let (sync, asynchronous) = mock_both_paths(&bytes, &tracker).await;
+    for answer in [sync, asynchronous] {
+        mining_spend(answer, offsets[1], "Unverifiable { check: Finality }");
+    }
 }
 #[test]
 fn mining_lean_rows_have_the_same_wire_offsets() {
