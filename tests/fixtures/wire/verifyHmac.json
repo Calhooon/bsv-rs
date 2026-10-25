@@ -4,9 +4,8 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "ok": {
-            "valid": false
-          }
+          "display": "wallet error: wallet error (code 1): wallet error: HMAC is not valid",
+          "error": "WalletError(\"wallet error (code 1): wallet error: HMAC is not valid\")"
         },
         "processor_observed": {
           "args": {
@@ -57,10 +56,10 @@
           "method": "verify_hmac",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "0000",
+        "processor_response_hex": "011f77616c6c6574206572726f723a20484d4143206973206e6f742076616c696400",
         "request_hex": "0e1066697874757265732e696e76616c6964010c66697874757265206b6579730766697874757265000100200d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "0000"
+        "response_hex": "011f77616c6c6574206572726f723a20484d4143206973206e6f742076616c696400"
       },
       "input": {
         "args": {
@@ -177,10 +176,10 @@
           "method": "verify_hmac",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "0001",
+        "processor_response_hex": "00",
         "request_hex": "0e1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50600017f80feff200d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "0001"
+        "response_hex": "00"
       },
       "input": {
         "args": {
