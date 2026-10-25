@@ -37,10 +37,7 @@ use super::WalletCall;
 use crate::primitives::from_hex;
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::types::Network;
-use crate::wallet::{
-    CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
-    VerifyHmacArgs, VerifySignatureArgs,
-};
+use crate::wallet::{CreateHmacArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs};
 use crate::Error;
 use std::marker::PhantomData;
 
@@ -367,33 +364,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-        let counterparty = reader.read_counterparty()?;
-        let data_len = reader.read_var_int()? as usize;
-        let data = reader.read_bytes(data_len)?.to_vec();
-        let hmac_len = reader.read_var_int()? as usize;
-        let hmac_bytes = reader.read_bytes(hmac_len)?;
-
-        // Convert to [u8; 32]
-        if hmac_bytes.len() != 32 {
-            return Err(Error::WalletError(format!(
-                "invalid HMAC length: expected 32, got {}",
-                hmac_bytes.len()
-            )));
-        }
-        let mut hmac = [0u8; 32];
-        hmac.copy_from_slice(hmac_bytes);
-
-        // Call wallet method
-        let args = VerifyHmacArgs {
-            data,
-            hmac,
-            protocol_id,
-            key_id,
-            counterparty,
-        };
+        let args = super::requests::read_verify_hmac_args(reader)?;
         let result = self.wallet.verify_hmac(args, originator).await?;
 
         write_verify_hmac_result(&result)
@@ -404,31 +375,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-        let counterparty = reader.read_counterparty()?;
-
-        // Read data or hash
-        let data = reader.read_optional_bytes()?;
-        let hash_to_directly_sign = reader.read_optional_bytes()?.and_then(|b| {
-            if b.len() == 32 {
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&b);
-                Some(arr)
-            } else {
-                None
-            }
-        });
-
-        // Call wallet method
-        let args = CreateSignatureArgs {
-            data,
-            hash_to_directly_sign,
-            protocol_id,
-            key_id,
-            counterparty,
-        };
+        let args = super::requests::read_create_signature_args(reader)?;
         let result = self.wallet.create_signature(args, originator).await?;
 
         Ok(write_create_signature_result(&result))
@@ -439,38 +386,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-        let counterparty = reader.read_counterparty()?;
-        let for_self = reader.read_optional_bool()?;
-
-        // Read data or hash
-        let data = reader.read_optional_bytes()?;
-        let hash_to_directly_verify = reader.read_optional_bytes()?.and_then(|b| {
-            if b.len() == 32 {
-                let mut arr = [0u8; 32];
-                arr.copy_from_slice(&b);
-                Some(arr)
-            } else {
-                None
-            }
-        });
-
-        // Read signature (DER encoded)
-        let sig_len = reader.read_var_int()? as usize;
-        let signature = reader.read_bytes(sig_len)?.to_vec();
-
-        // Call wallet method
-        let args = VerifySignatureArgs {
-            data,
-            hash_to_directly_verify,
-            signature,
-            protocol_id,
-            key_id,
-            counterparty,
-            for_self,
-        };
+        let args = super::requests::read_verify_signature_args(reader)?;
         let result = self.wallet.verify_signature(args, originator).await?;
 
         write_verify_signature_result(&result)

@@ -391,6 +391,37 @@ pub(crate) fn require_discovery_trust(trust: u8) -> Result<u8, Error> {
     Ok(trust)
 }
 
+/// The signature calls' data or hash (bsv-rs#199): the data-type flag `1`
+/// then the data behind its varint length, or `2` then the 32 bytes of the
+/// hash (`WalletWireTransceiver.ts:1082-1090` createSignature, `:1137-1144`
+/// verifySignature; BRC-100 `wallet/0100.md:2168-2170`, `:2194-2196` at
+/// `ed1b015`). Exactly one of the two is given, as `validateWalletArgs`
+/// refuses otherwise before the reference writes (`validationHelpers.ts:1777-1787`).
+pub(crate) fn write_data_or_hash(
+    writer: &mut WireWriter,
+    hash_field: &str,
+    data: Option<&[u8]>,
+    hash: Option<&[u8; 32]>,
+) -> Result<(), Error> {
+    match (data, hash) {
+        (Some(data), None) => {
+            writer.write_u8(1);
+            writer.write_var_int(data.len() as u64);
+            writer.write_bytes(data);
+        }
+        (None, Some(hash)) => {
+            writer.write_u8(2);
+            writer.write_bytes(hash);
+        }
+        _ => {
+            return Err(refused(format!(
+                "The data, {hash_field} parameter must be exactly one value"
+            )))
+        }
+    }
+    Ok(())
+}
+
 /// Transport abstraction for wallet wire protocol.
 ///
 /// Implementations of this trait handle the actual transmission of binary

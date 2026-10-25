@@ -1787,3 +1787,239 @@ async fn a_false_verdict_is_answered_with_an_error_frame() {
         );
     }
 }
+
+// ============================================================================
+// verifyHmac's raw HMAC ahead of the data, the signature calls' data-type flag (#199)
+// ============================================================================
+
+/// The privileged pair of Go's three key-related vectors below (`01`, then
+/// `0b` and "test reason"): bytes this crate's transceiver does not write and
+/// its processor does not read, the args types having no field for them (#193).
+#[cfg(feature = "http")]
+const GO_PRIVILEGED_PAIR: &[u8] = b"\x01\x0btest reason";
+
+/// A Go args vector's wire without its privileged pair: the frame this
+/// crate's two sides speak while #193 is open.
+#[cfg(feature = "http")]
+fn without_privileged_pair(wire: &[u8]) -> Vec<u8> {
+    let at: Vec<usize> = wire
+        .windows(GO_PRIVILEGED_PAIR.len())
+        .enumerate()
+        .filter(|(_, w)| *w == GO_PRIVILEGED_PAIR)
+        .map(|(i, _)| i)
+        .collect();
+    assert_eq!(at.len(), 1, "one privileged pair in the vector");
+    [&wire[..at[0]], &wire[at[0] + GO_PRIVILEGED_PAIR.len()..]].concat()
+}
+
+/// The vector's json without the fields this crate does not carry (#193).
+#[cfg(feature = "http")]
+fn without_unread_fields(json: &Value) -> Value {
+    let mut json = json.clone();
+    for name in ["privileged", "privilegedReason", "seekPermission"] {
+        json.as_object_mut().unwrap().remove(name);
+    }
+    json
+}
+
+/// Sends a frame through `WalletWireProcessor` to the recording stub and
+/// compares the args it hands the wallet to `want`, a field absent on one
+/// side read as null (`processor_decodes_to_json` over a given frame).
+#[cfg(feature = "http")]
+async fn processor_reads_frame_as(wire: &[u8], want: &Value) -> Result<(), String> {
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    let mut stub = fixtures::wallet::Stub::new(Value::Null);
+    stub.error = Some(bsv_rs::Error::WalletError("observed".into()));
+    let observed = stub.observed.clone();
+    let response = WalletWireProcessor::new(stub)
+        .process_message(wire)
+        .await
+        .map_err(|e| format!("no response: {e}"))?;
+    let Some(seen) = observed.lock().unwrap().take() else {
+        let mut reader = WireReader::new(&response[1..]);
+        return Err(format!(
+            "the wallet was not called: {}",
+            reader.read_string().unwrap_or_default()
+        ));
+    };
+    let seen = &seen["args"];
+    let mut names: Vec<&String> = want.as_object().unwrap().keys().collect();
+    names.extend(seen.as_object().into_iter().flat_map(|args| args.keys()));
+    names.sort();
+    names.dedup();
+    for name in names {
+        let (got, expected) = (&seen[name.as_str()], &want[name.as_str()]);
+        if got != expected {
+            return Err(format!("{name}: read {got}, the vector says {expected}"));
+        }
+    }
+    Ok(())
+}
+
+/// #199: Go's verifyHmac, createSignature and verifySignature requests, their
+/// privileged pair taken out (#193), reach the wallet with every field this
+/// crate reads equal to the vector's json: verifyHmac's 32 raw HMAC bytes
+/// ahead of the data (`WalletWireProcessor.ts:1502-1509` at `ts-stack@edf6e03`),
+/// the signature calls' flag `01` then the data (`:1533-1543`, `:1566-1586`).
+/// seekPermission, the last byte, is read by neither side here (#193).
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_go_hmac_and_signature_requests_read_as_their_json() {
+    for filename in [
+        "verifyHmac-simple-args.json",
+        "createSignature-simple-args.json",
+        "verifySignature-simple-args.json",
+    ] {
+        let (json, wire) = load_vector(filename);
+        processor_reads_frame_as(
+            &without_privileged_pair(&wire),
+            &without_unread_fields(&json),
+        )
+        .await
+        .unwrap_or_else(|why| panic!("{filename}: {why}"));
+    }
+}
+
+/// #199: a data-type flag other than 1 or 2 is refused in the reference's
+/// words (`WalletWireProcessor.ts:1540-1542`, `:1583-1585`), the wallet never
+/// called.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn a_signature_data_type_flag_of_three_is_refused() {
+    for (filename, call) in [
+        ("createSignature-simple-args.json", "createSignature"),
+        ("verifySignature-simple-args.json", "verifySignature"),
+    ] {
+        let (_, wire) = load_vector(filename);
+        let mut frame = without_privileged_pair(&wire);
+        // The flag sits ahead of the data's length and its four bytes and
+        // seekPermission: `01 04 0b16212c 01`.
+        let flag = frame.len() - 7;
+        assert_eq!(&frame[flag..flag + 2], &[1, 4], "{filename}");
+        frame[flag] = 3;
+        let why = processor_reads_frame_as(&frame, &Value::Null)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            why,
+            format!(
+                "the wallet was not called: wallet error: Invalid {call} data type flag: expected 1 or 2, received 3"
+            ),
+            "{filename}"
+        );
+    }
+}
+
+/// Records the transceiver's request and answers with one frame.
+#[cfg(feature = "http")]
+struct RequestWire {
+    reply: Vec<u8>,
+    sent: std::sync::Mutex<Vec<u8>>,
+}
+
+#[cfg(feature = "http")]
+#[async_trait::async_trait]
+impl bsv_rs::wallet::wire::WalletWire for RequestWire {
+    async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, bsv_rs::Error> {
+        *self.sent.lock().unwrap() = message.to_vec();
+        Ok(self.reply.clone())
+    }
+}
+
+/// #199, the writer's side: this crate's transceiver, handed each Go vector's
+/// json, writes the vector's wire save the bytes it has no field for (#193):
+/// the privileged pair after the counterparty (`01 0b` "test reason") and
+/// seekPermission, the frame's last byte (`01`). Everything else is the
+/// vector's, byte for byte: verifyHmac's HMAC raw ahead of the data
+/// (`WalletWireTransceiver.ts:1048-1050`), the signature calls' flag `01`, the
+/// data behind its length (`:1082-1085`), verifySignature's signature ahead of
+/// the flag (`:1135-1140`).
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_transceiver_writes_the_go_hmac_and_signature_requests() {
+    use bsv_rs::wallet::wire::WalletWireTransceiver;
+    use bsv_rs::wallet::{
+        Counterparty, CreateSignatureArgs, Protocol, SecurityLevel, VerifyHmacArgs,
+        VerifySignatureArgs,
+    };
+    let (_, signature_reply) = load_vector("createSignature-simple-result.json");
+    for filename in [
+        "verifyHmac-simple-args.json",
+        "createSignature-simple-args.json",
+        "verifySignature-simple-args.json",
+    ] {
+        let (json, wire) = load_vector(filename);
+        assert_eq!(json["protocolID"], serde_json::json!([1, "test-protocol"]));
+        assert_eq!(json["counterparty"], "self");
+        let protocol_id = Protocol::new(SecurityLevel::App, "test-protocol");
+        let key_id = json["keyID"].as_str().unwrap().to_string();
+        let counterparty = Some(Counterparty::Self_);
+        let data = json_to_bytes(&json["data"]);
+        let call = filename.split('-').next().unwrap();
+        let reply = if call == "createSignature" {
+            signature_reply.clone()
+        } else {
+            vec![0]
+        };
+        let client = WalletWireTransceiver::new(RequestWire {
+            reply,
+            sent: Default::default(),
+        });
+        match call {
+            "verifyHmac" => {
+                client
+                    .verify_hmac(
+                        VerifyHmacArgs {
+                            data,
+                            hmac: json_to_bytes(&json["hmac"]).try_into().unwrap(),
+                            protocol_id,
+                            key_id,
+                            counterparty,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+            }
+            "createSignature" => {
+                client
+                    .create_signature(
+                        CreateSignatureArgs {
+                            data: Some(data),
+                            hash_to_directly_sign: None,
+                            protocol_id,
+                            key_id,
+                            counterparty,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+            }
+            _ => {
+                client
+                    .verify_signature(
+                        VerifySignatureArgs {
+                            data: Some(data),
+                            hash_to_directly_verify: None,
+                            signature: json_to_bytes(&json["signature"]),
+                            protocol_id,
+                            key_id,
+                            counterparty,
+                            for_self: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+            }
+        }
+        let expected = without_privileged_pair(&wire);
+        assert_eq!(expected.last(), Some(&1), "{filename}: seekPermission");
+        assert_eq!(
+            hex::encode(&*client.wire().sent.lock().unwrap()),
+            hex::encode(&expected[..expected.len() - 1]),
+            "{filename}"
+        );
+    }
+}

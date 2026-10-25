@@ -4,6 +4,7 @@
 use super::encoding::WireReader;
 use crate::primitives::PublicKey;
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
+use crate::wallet::{CreateSignatureArgs, VerifyHmacArgs, VerifySignatureArgs};
 use crate::Error;
 
 /// Reads the privileged flag and reason as the reference's
@@ -73,5 +74,103 @@ pub(super) fn read_reveal_specific_key_linkage_args(
         key_id,
         privileged,
         privileged_reason,
+    })
+}
+
+/// The bytes behind a varint length, the length read as the reference's
+/// `readVarIntNumStrict(false)` reads it.
+fn read_length_prefixed(reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
+    let length = reader.read_var_int_num_strict()?;
+    Ok(reader.read_bytes(length)?.to_vec())
+}
+
+/// Reads 32 raw bytes (the reference's `paramsReader.read(32)`).
+fn read_32(reader: &mut WireReader<'_>) -> Result<[u8; 32], Error> {
+    let mut bytes = [0u8; 32];
+    bytes.copy_from_slice(reader.read_bytes(32)?);
+    Ok(bytes)
+}
+
+/// The data, or the 32-byte hash, a signature call carries.
+type DataOrHash = (Option<Vec<u8>>, Option<[u8; 32]>);
+
+/// The signature calls' data-type flag (bsv-rs#199): `1` then the data behind
+/// its length, `2` then the 32 bytes of the hash, any other value refused in
+/// the reference's words (`WalletWireProcessor.ts:1533-1543` createSignature,
+/// `:1576-1586` verifySignature; BRC-100 `wallet/0100.md:2168-2170`,
+/// `:2194-2196` at `ed1b015`).
+fn read_data_or_hash(reader: &mut WireReader<'_>, call: &str) -> Result<DataOrHash, Error> {
+    match reader.read_u8()? {
+        1 => Ok((Some(read_length_prefixed(reader)?), None)),
+        2 => Ok((None, Some(read_32(reader)?))),
+        flag => Err(Error::WalletError(format!(
+            "Invalid {call} data type flag: expected 1 or 2, received {flag}"
+        ))),
+    }
+}
+
+/// Reads verifyHmac's parameters in the reference's order
+/// (`WalletWireProcessor.ts:1502-1509`, `WalletWireTransceiver.ts:1048-1050`;
+/// BRC-100 `wallet/0100.md:2149-2151` at `ed1b015`): the protocol, the key ID,
+/// the counterparty, then the 32 raw bytes of the HMAC, then the data behind
+/// its length (#199). The privileged pair and seekPermission are not read:
+/// `VerifyHmacArgs` has no field for them (#193).
+pub(super) fn read_verify_hmac_args(reader: &mut WireReader<'_>) -> Result<VerifyHmacArgs, Error> {
+    let protocol_id = reader.read_protocol_id()?;
+    let key_id = reader.read_string()?;
+    let counterparty = reader.read_counterparty()?;
+    let hmac = read_32(reader)?;
+    let data = read_length_prefixed(reader)?;
+    Ok(VerifyHmacArgs {
+        data,
+        hmac,
+        protocol_id,
+        key_id,
+        counterparty,
+    })
+}
+
+/// Reads createSignature's parameters in the reference's order
+/// (`WalletWireProcessor.ts:1530-1543`): the protocol, the key ID, the
+/// counterparty, then the data-type flag and the data or the hash (#199).
+/// The privileged pair and seekPermission are not read (#193).
+pub(super) fn read_create_signature_args(
+    reader: &mut WireReader<'_>,
+) -> Result<CreateSignatureArgs, Error> {
+    let protocol_id = reader.read_protocol_id()?;
+    let key_id = reader.read_string()?;
+    let counterparty = reader.read_counterparty()?;
+    let (data, hash_to_directly_sign) = read_data_or_hash(reader, "createSignature")?;
+    Ok(CreateSignatureArgs {
+        data,
+        hash_to_directly_sign,
+        protocol_id,
+        key_id,
+        counterparty,
+    })
+}
+
+/// Reads verifySignature's parameters in the reference's order
+/// (`WalletWireProcessor.ts:1566-1586`; BRC-100 `wallet/0100.md:2192-2196`
+/// at `ed1b015`): the protocol, the key ID, the counterparty, forSelf, the
+/// signature behind its length, then the data-type flag and the data or the
+/// hash (#199). The privileged pair and seekPermission are not read (#193).
+pub(super) fn read_verify_signature_args(
+    reader: &mut WireReader<'_>,
+) -> Result<VerifySignatureArgs, Error> {
+    let protocol_id = reader.read_protocol_id()?;
+    let key_id = reader.read_string()?;
+    let counterparty = reader.read_counterparty()?;
+    let for_self = reader.read_optional_bool()?;
+    let signature = read_length_prefixed(reader)?;
+    let (data, hash_to_directly_verify) = read_data_or_hash(reader, "verifySignature")?;
+    Ok(VerifySignatureArgs {
+        data,
+        hash_to_directly_verify,
+        signature,
+        protocol_id,
+        key_id,
+        counterparty,
+        for_self,
     })
 }
