@@ -18,6 +18,26 @@ list had drifted to 34 of 73 files; the guard keeps it from drifting again
 (`docs/ARCH-RULES.md` section 6).
 
 
+### Changed: beta carries everything main carries, main nothing beta did not bear, checked by CI (the owner's word, 2026-10-25)
+
+CI only; nothing under `src/` moves. A commit is on a line by sha, by patch
+(`git cherry`), or by a cherry-pick link in either direction (a
+`(cherry picked from commit <sha>)` line naming a commit of the other line).
+`ci.yml` gains `main-in-beta`: on every PR into `beta`, every push to `beta`
+and a dispatch on the sync branch it fails naming each commit of `origin/main`
+the tree lacks that way; and `beta-born`: on every PR into `main` it fails
+naming each commit of the PR `origin/beta` lacks that way, a release commit
+(`Cargo.toml`'s version and `CHANGELOG.md`'s headings alone) let through and
+said in the log. The new `sync-main-into-beta.yml` opens, on every push to
+`main`, one PR from `sync/main-into-beta` into `beta`: each missing commit
+`git cherry-pick -x`'d in main's order, landed by rebase merge (both lines
+keep linear history; the link lives in the message). A conflicting pick is
+aborted, the picks before it kept, the PR labelled `needs-hand` with the
+commit and its files; a rerun picks onto a branch that holds beta's tip, so a
+hand resolution survives main moving again. `ci.yml` gains `workflow_dispatch`
+so the sync starts the suite on its branch. `RELEASING.md` steps 17 to 20
+write the rule; `tests/arch_ci_lines.rs` pins the three jobs.
+
 ### Changed: the fuzz crates are formatted and checked (#180)
 
 The root has no `[workspace]`, so the fmt job's `cargo fmt --all -- --check`
