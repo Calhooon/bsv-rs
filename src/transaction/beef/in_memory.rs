@@ -47,6 +47,25 @@ impl Bump {
             .collect();
         Ok(MerklePath { block_height, path })
     }
+
+    /// The in-memory form both readers keep, each level's leaves by offset.
+    /// The in-memory height is a `u32` (go-sdk's too): a BUMP that claims a
+    /// block above it claims a block no chain's headers carry, and is
+    /// refused as the stream refuses it under them, `RootNotCarried` at the
+    /// BUMP (bsv-rs#86 for the whole BEEF, #167 for a BUMP read alone).
+    pub(crate) fn in_memory(&self) -> Result<MerklePath, Refusal> {
+        let mut path = self.to_merkle_path().map_err(|_| Refusal {
+            offset: self.offset,
+            reason: Reason::RootNotCarried {
+                height: self.block_height,
+                root: self.root,
+            },
+        })?;
+        for level in &mut path.path {
+            level.sort_by_key(|leaf| leaf.offset);
+        }
+        Ok(path)
+    }
 }
 
 /// The root of an in-memory BUMP by the same walk ([`bump_root`]): the one
