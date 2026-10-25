@@ -6,7 +6,7 @@
 //! signature check. The assertion is that each returns. The reader decodes no
 //! value to write again; the writer's round trip is the input as a message:
 //! `sign` for the recipient and for anyone, each verified as true by its
-//! verifier and as the sender's, version first.
+//! verifier and as the sender's, the version at the head.
 use bsv_rs::messages::{sign, verify, SIGNED_VERSION};
 use bsv_rs::primitives::PrivateKey;
 use libfuzzer_sys::fuzz_target;
