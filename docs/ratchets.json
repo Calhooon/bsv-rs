@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "3044b7974350c22fe5432a0b7ddbf05857306c27",
+  "source_commit": "2a552eba473aec31fc1c79169fb6fcb643189972",
   "toolchain": "1.95.0",
   "metrics": {
     "files_over_800": 39,
@@ -134,7 +134,7 @@
     },
     {
       "path": "src/transaction/merkle_path.rs",
-      "lines": 1469
+      "lines": 1465
     },
     {
       "path": "src/transaction/transaction.rs",
