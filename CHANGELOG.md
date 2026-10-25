@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the transceiver reads certificate results as the reference writes them (#177)
+
+A client on this crate's transceiver could not read a certificate that this
+crate's writer wrote. `parse_certificate_from_binary` read BRC-100 section 19's
+table order: type, subject, serial, certifier, outpoint, a length-prefixed
+signature, then the fields. `WireWriter::write_wallet_certificate` writes the
+order of the reference's `Certificate.toBinary` (`ts-stack@edf6e03`
+`Certificate.ts:229-321`) and Go's: type, serial, subject, certifier, the
+revocation txid and a varint index, the fields (sorted by name, varint count,
+each a varint-length name and value), then the signature as the bytes
+remaining. Fed the writer's frames, the reader answered `reader underflow:
+need 97 bytes` for acquireCertificate, listCertificates and both discovery
+calls. The keeper's ruling: the writer stays and the transceiver moves to those
+bytes. Two more of its readers moved with it. listCertificates' verifier is a
+varint length, 0 or 33, then 33 raw bytes rendered as hex, any other length
+refused (`WalletWireTransceiver.ts:1533-1542`); the reader took it as a UTF-8
+string. Discovery's certifierInfo name, iconUrl and description are plain
+varint-length strings, an empty one length 0 (`WalletWireProcessor.ts:2507-2518`);
+the reader took them as NIL-flagged strings. `tests/wire_certificate_frames.rs`
+(eight tests) feeds each call the writer's frame, hand-assembled reference
+bytes and the shared vectors, and checks that `Certificate::from_binary` reads
+the certificate bytes the same way. Found by #138's lane. Migration: none. The
+public types are unchanged, and a discovered certifier's `icon_url` and
+`description` are now always `Some`, the string on the wire.
+
+The fixture recorder's helper wrote listCertificates' verifier as text and the
+discovery entries through `WireWriter::write_identity_certificate`. It now
+writes the reference's bytes, and the four certificate recordings were
+re-recorded in their own commit. `write_identity_certificate` itself departs
+from the reference and from Go (`identity_certificate.go:12-49`): it writes a
+present-flag byte before certifierInfo, NIL-sentinel optional strings, and the
+keyring values as strings. It is left as it is (a writer, outside this fix),
+and the follow-up is the captain's to file.
+
+### Fixed: getHeaderForHeight's processor writes the header with no length prefix (#178)
+
+`WalletWireProcessor`'s getHeaderForHeight wrote a varint length (`0x50`)
+before the 80 header bytes. This crate's transceiver read that byte as the
+start of the header, so a client got an 81-byte header beginning `50` for every
+height. The reference's processor writes the error byte and then the raw bytes
+(`ts-stack@edf6e03` `WalletWireProcessor.ts:1687-1690`). Its transceiver
+requires 80 bytes (`WalletWireTransceiver.ts:1903`), and BRC-100 reads "Byte
+Array (80 bytes)" (`5119a9b` `wallet/0100.md:2478`). So the processor moved and
+the transceiver stayed. `tests/wire_header_frame.rs` checks the processor's
+frame against the shared vector's bytes byte for byte, and checks that the
+transceiver reads both as the header, starting with the version.
+`tests/fixtures/wire/getHeaderForHeight.json` was re-recorded in its own commit.
+Found by #138's lane.
+
+### Notes: cross-SDK parity (#177, #178)
+
+BRC-100 section 19's certificate table (`5119a9b`) disagrees with the bytes
+that the reference and Go exchange on two points: it puts the subject before
+the serialNumber, and it puts a length-prefixed signature before the fields.
+This crate follows the bytes, as `Certificate::to_binary` always did. Filing
+the erratum on `bsv-blockchain/BRCs` is the owner's call. On getHeaderForHeight
+the text and the bytes agree.
+
 ### Added: `verify_nonce` on a wallet's short HMAC is pinned (#139)
 
 Tests only; nothing was wrong. #139 (found by #108's cold review) read the

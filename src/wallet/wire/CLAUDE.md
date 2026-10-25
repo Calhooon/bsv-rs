@@ -182,7 +182,7 @@ pub mod status_codes {
 
 **WalletCertificate wire format (Go-compatible):** `type(32 raw bytes, base64) -> serial(32 raw bytes, base64) -> subject(33 pubkey) -> certifier(33 pubkey) -> revocation outpoint -> fields(sorted map) -> signature(remaining bytes, no length prefix)`.
 
-**IdentityCertificate wire format (Go-compatible):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> optional certifier_info -> optional publicly_revealed_keyring -> optional decrypted_fields`.
+**IdentityCertificate wire format (the writer's):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> optional certifier_info -> optional publicly_revealed_keyring -> optional decrypted_fields`. This departs from the reference's `#serializeDiscoveryResult` and Go's `SerializeIdentityCertificate` (no present-flag byte, plain strings, keyring values as raw bytes), which the transceiver reads (bsv-rs#177's report; the writer is not yet moved).
 
 **WalletAction wire format (Go-compatible):** `txid(32) -> satoshis(unsigned VarInt) -> status(i8) -> isOutgoing(optional bool) -> description(string) -> labels(string array) -> version(VarInt) -> lockTime(VarInt) -> inputs(VarInt count or MaxUint64) -> outputs(VarInt count or MaxUint64)`.
 
@@ -243,7 +243,9 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 
 **Helper methods:** `parse_certificate_from_binary`, `parse_discovery_result` (internal).
 
-**Certificate binary format in transceiver response parsing:** `type(32 bytes) -> subject(33 bytes) -> serial(32 bytes) -> certifier(33 bytes) -> outpoint -> varint(sig_len) + sig -> fields map`. Note: this order differs from the `WireWriter::write_wallet_certificate` Go-compatible format (which puts serial before subject).
+**Certificate binary format in transceiver response parsing:** the reference's `Certificate.toBinary` (`ts-stack@edf6e03` `Certificate.ts:229-321`), Go's and `WireWriter::write_wallet_certificate`'s: `type(32) -> serial(32) -> subject(33) -> certifier(33) -> outpoint (txid 32 + varint index) -> fields map (sorted) -> signature (the bytes remaining, no length prefix)` (bsv-rs#177; BRC-100 section 19's table, subject before serial and a length-prefixed signature before the fields, departs from these bytes). listCertificates' verifier is `varint(0)` or `varint(33)` + 33 raw bytes, read as hex, any other length refused; discovery's certifierInfo is three plain varint-length strings (an empty one length 0) and the trust byte, no present flag.
+
+**getHeaderForHeight result:** the error byte, then the header's 80 raw bytes with no length prefix, on both sides (`WalletWireProcessor.ts:1687-1690`, `WalletWireTransceiver.ts:1903`; BRC-100 `0100.md:2478` at `5119a9b`; bsv-rs#178).
 
 ## Public Exports
 
