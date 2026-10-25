@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: a BEEF whose source links form a cycle is pinned (#160)
+
+Tests only; no reader moved. `tests/beef_cycle.rs` (five tests) builds rings of
+one, two and three transactions with the crate's writer. On the wire a raw
+entry is named by its bytes' hash, so a ring is writable only by its input
+fields; every reader refuses it `InputNamesNoElement` in every order, with and
+without an unrelated BUMP, V1 and V2 and atomic, each call under a 5 s bound on
+its own thread (the slowest of 199 calls measured 4.3 ms), never a panic.
+`Transaction::from_atomic_beef` returns the subject with the named input
+unlinked, as it does not judge the graph, and the subject does not verify. In
+memory a ring is real (an entry keeps the txid it was read with, and
+`BeefTx::tx_mut` can point its input at its descendant): the linker links each
+entry once and stops, as `to_binary_atomic` and `sort_txs` do. With the memo in
+`Beef::add_input_proof` inserted after the descent, the in-memory ring of one
+loops and the test fails at the bound. `docs/ARCHITECTURE.md`'s gap line names
+the tests.
+
 ### Changed: the interpreter is split by opcode group (#85)
 
 `src/script/spend.rs` (4,419 lines) is the directory `src/script/spend/`:
