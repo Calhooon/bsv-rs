@@ -443,34 +443,19 @@ impl<'a> WireReader<'a> {
         Ok(spends)
     }
 
-    /// Reads a WalletCertificate (Go-compatible field order).
-    ///
-    /// Go format: type(32 raw) → serial(32 raw) → subject(33 pubkey) → certifier(33 pubkey)
-    ///           → outpoint → fields(sorted map) → signature(remaining bytes, no length prefix)
+    /// Reads a WalletCertificate as `Certificate.fromBinary` reads it
+    /// (`ts-stack@edf6e03` `Certificate.ts:329-408`; bsv-rs#183): type(32),
+    /// serial(32), subject and certifier (33-byte compressed points), the
+    /// outpoint, the fields (a strict count, bounded, unique 1-50 byte names),
+    /// then the bytes remaining as a DER signature, kept as `toDER` writes it.
     pub fn read_wallet_certificate(&mut self) -> Result<WalletCertificate, Error> {
-        // Type: 32 raw bytes, stored as base64 string
-        let type_bytes = self.read_bytes(32)?;
-        let certificate_type = to_base64(type_bytes);
-
-        // Serial number: 32 raw bytes, stored as base64 string
-        let serial_bytes = self.read_bytes(32)?;
-        let serial_number = to_base64(serial_bytes);
-
-        // Subject: 33-byte compressed pubkey as hex
-        let subject = self.read_pubkey_hex()?;
-
-        // Certifier: 33-byte compressed pubkey as hex
-        let certifier = self.read_pubkey_hex()?;
-
-        // Revocation outpoint
+        let certificate_type = to_base64(self.read_bytes(32)?);
+        let serial_number = to_base64(self.read_bytes(32)?);
+        let subject = self.read_compressed_key("certificate subject")?;
+        let certifier = self.read_compressed_key("certificate certifier")?;
         let revocation_outpoint = self.read_outpoint_string()?;
-
-        // Fields: sorted string map (varint count + key/value pairs)
-        let fields = self.read_string_map()?;
-
-        // Signature: remaining bytes (no length prefix, raw DER)
-        let sig_bytes = self.read_remaining();
-        let signature = to_hex(sig_bytes);
+        let fields = self.read_certificate_fields()?;
+        let signature = self.read_certificate_signature()?;
 
         Ok(WalletCertificate {
             certificate_type,
@@ -1267,17 +1252,22 @@ impl WireWriter {
         &mut self,
         cert: &IdentityCertificate,
     ) -> Result<&mut Self, Error> {
+        // The reference's reader refuses a trust outside 1 to 10 (bsv-rs#183):
+        // no frame is written that it refuses.
+        let info = cert.certifier_info.as_ref().ok_or_else(|| {
+            Error::WalletError("an identity certificate needs its certifierInfo".into())
+        })?;
+        super::require_discovery_trust(info.trust)?;
         let mut cert_writer = WireWriter::new();
         cert_writer.write_wallet_certificate(&cert.certificate)?;
         let cert_bytes = cert_writer.into_bytes();
         self.write_var_int(cert_bytes.len() as u64);
         self.write_bytes(&cert_bytes);
 
-        let info = cert.certifier_info.as_ref();
-        self.write_string(info.map_or("", |c| &c.name));
-        self.write_string(info.and_then(|c| c.icon_url.as_deref()).unwrap_or(""));
-        self.write_string(info.and_then(|c| c.description.as_deref()).unwrap_or(""));
-        self.write_u8(info.map_or(0, |c| c.trust));
+        self.write_string(&info.name);
+        self.write_string(info.icon_url.as_deref().unwrap_or(""));
+        self.write_string(info.description.as_deref().unwrap_or(""));
+        self.write_u8(info.trust);
 
         let empty = HashMap::new();
         let keyring = cert.publicly_revealed_keyring.as_ref().unwrap_or(&empty);

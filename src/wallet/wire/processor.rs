@@ -611,8 +611,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let result = self.wallet.get_header_for_height(args, originator).await?;
 
         // The 80 bytes raw, no length prefix (`WalletWireProcessor.ts:1687-1690`
-        // at `ts-stack@edf6e03`; BRC-100 `0100.md:2478` at `5119a9b`)
-        from_hex(&result.header)
+        // at `ts-stack@edf6e03`; BRC-100 `0100.md:2478` at `5119a9b`), another
+        // length refused (`WalletResultValidation.ts:2297`, bsv-rs#183)
+        super::header_result(&result.header)
     }
 
     async fn handle_get_network(&self, _originator: &str) -> Result<Vec<u8>, Error> {

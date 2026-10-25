@@ -180,19 +180,34 @@ fn the_shared_discovery_vector_entry_is_the_writers_bytes() {
     assert_eq!(written(&cert), &wire[2..]);
 }
 
-/// An absent iconUrl or description is the empty string, an absent
-/// certifierInfo or map Go's zero value (`identity_certificate.go:23-46` reads
-/// the struct's fields; TS's type has no absent case and its reader refuses
-/// trust 0, `WalletWireTransceiver.ts:1710`): three empty strings, trust 0,
-/// a count of 0. The transceiver reads them back as it reads the reference's.
+/// An absent certifierInfo is refused before a byte is written: the
+/// reference's writer would write a trust byte of Go's zero value unchecked
+/// (`WalletWireProcessor.ts:2520`) and its reader refuses it
+/// (`WalletWireTransceiver.ts:1710`, trust 1 to 10; bsv-rs#183). An absent
+/// iconUrl or description is the empty string, an absent map a count of 0,
+/// and the transceiver reads them back as it reads the reference's.
 #[tokio::test]
 async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_counts() {
-    let cert = IdentityCertificate {
+    let mut cert = IdentityCertificate {
         certificate: certificate(),
         certifier_info: None,
         publicly_revealed_keyring: None,
         decrypted_fields: None,
     };
+    let mut w = WireWriter::new();
+    assert!(matches!(
+        w.write_identity_certificate(&cert),
+        Err(Error::WalletError(m)) if m == "an identity certificate needs its certifierInfo"
+    ));
+    assert!(w.is_empty(), "no byte written");
+
+    let certifier = IdentityCertifier {
+        name: String::new(),
+        icon_url: None,
+        description: None,
+        trust: 1,
+    };
+    cert.certifier_info = Some(certifier);
     let bytes = written(&cert);
     let mut certificate_bytes = WireWriter::new();
     certificate_bytes
@@ -200,7 +215,7 @@ async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_
         .unwrap();
     let mut reference = Vec::new();
     var_bytes(&mut reference, certificate_bytes.as_bytes());
-    reference.extend_from_slice(&[0, 0, 0, 0, 0, 0]);
+    reference.extend_from_slice(&[0, 0, 0, 1, 0, 0]);
     assert_eq!(bytes, reference);
 
     let read = discovered(discovery_frame(&cert)).await;
@@ -209,7 +224,7 @@ async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_
         name: String::new(),
         icon_url: Some(String::new()),
         description: Some(String::new()),
-        trust: 0,
+        trust: 1,
     };
     assert_eq!(json(&entry.certifier_info), json(&Some(certifier)));
     assert_eq!(entry.publicly_revealed_keyring, None);

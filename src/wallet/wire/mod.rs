@@ -82,7 +82,9 @@ pub use encoding::{WireReader, WireWriter};
 pub use processor::WalletWireProcessor;
 pub use transceiver::WalletWireTransceiver;
 
+use crate::primitives::PublicKey;
 use crate::Error;
+use std::collections::HashMap;
 
 // The u32 field readers live here, not in encoding.rs: that file is held at
 // its recorded line limit by the ratchet (docs/RATCHETS.md).
@@ -116,6 +118,269 @@ fn var_int_u32(field: &str, value: u64) -> Result<u32, Error> {
             value
         ))
     })
+}
+
+// The reference's readers of a certificate and its records (bsv-rs#183):
+// `Certificate.fromBinary` (`ts-stack@edf6e03` `Certificate.ts:329-408`) and
+// the transceiver's record readers (`WalletWireTransceiver.ts:1955-2008`),
+// each refusal in the reference's words.
+
+/// `Certificate.ts:25-28`, `WalletWireTransceiver.ts:67`.
+const MAX_CERTIFICATE_BINARY_BYTES: usize = 16 * 1024 * 1024;
+const MAX_CERTIFICATE_FIELDS: usize = 100_000;
+const MAX_CERTIFICATE_FIELD_VALUE_BYTES: usize = 1024 * 1024;
+const MAX_CERTIFICATE_SIGNATURE_BYTES: usize = 72;
+const MAX_WIRE_RESPONSE_COLLECTION_ITEMS: usize = 100_000;
+/// `Number.MAX_SAFE_INTEGER`, the strict varint reader's bound.
+const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
+
+fn refused(words: impl Into<String>) -> Error {
+    Error::WalletError(words.into())
+}
+
+impl WireReader<'_> {
+    /// `readVarIntNumStrict(false)` (`readVarIntNumStrict.ts`): a canonical
+    /// varint, refused past `2^53 - 1` (nine 0xFF included: no NIL sentinel).
+    pub(crate) fn read_var_int_num_strict(&mut self) -> Result<usize, Error> {
+        let value = self.read_var_int()?;
+        if value > MAX_SAFE_INTEGER {
+            return Err(refused(
+                "number too large to retain precision - use readVarIntBn",
+            ));
+        }
+        usize::try_from(value).map_err(|_| refused("Wallet Wire count exceeds the platform"))
+    }
+
+    /// A count, then `#requireResponseCollectionLength` (`:1955-1969`) with a
+    /// byte per item.
+    pub(crate) fn read_collection_count(&mut self, name: &str) -> Result<usize, Error> {
+        let count = self.read_var_int_num_strict()?;
+        if count > MAX_WIRE_RESPONSE_COLLECTION_ITEMS {
+            return Err(refused(format!(
+                "Wallet Wire {name} exceeds the maximum collection size of {MAX_WIRE_RESPONSE_COLLECTION_ITEMS}"
+            )));
+        }
+        if count > self.remaining() {
+            return Err(refused(format!(
+                "Wallet Wire {name} count exceeds the remaining response data"
+            )));
+        }
+        Ok(count)
+    }
+
+    /// `#readBooleanFlag` (`:1971-1977`).
+    pub(crate) fn read_boolean_flag(&mut self, name: &str) -> Result<bool, Error> {
+        match self.read_i8()? {
+            0 => Ok(false),
+            1 => Ok(true),
+            flag => Err(refused(format!(
+                "Invalid {name} flag: expected 0 or 1, received {flag}"
+            ))),
+        }
+    }
+
+    /// 33 bytes that decompress to a point, as hex (`assertCompressedPublicKey`,
+    /// `Certificate.ts:135-142`; `#readCompressedPublicKey`, `:2004-2008`).
+    pub(crate) fn read_compressed_key(&mut self, what: &str) -> Result<String, Error> {
+        let bytes = self.read_bytes(33)?;
+        if !matches!(bytes[0], 0x02 | 0x03) || PublicKey::from_bytes(bytes).is_err() {
+            return Err(refused(format!(
+                "Invalid {what}: expected a compressed secp256k1 public key"
+            )));
+        }
+        Ok(crate::primitives::to_hex(bytes))
+    }
+
+    /// A record of `count` entries (`#readRecordKey`, `:1979-1990`;
+    /// `#setUniqueWireRecordEntry`, `:1992-2002`), each value read by `value`.
+    pub(crate) fn read_wire_record(
+        &mut self,
+        name: &str,
+        count: usize,
+        mut value: impl FnMut(&mut Self) -> Result<String, Error>,
+    ) -> Result<HashMap<String, String>, Error> {
+        let mut record = HashMap::with_capacity(count);
+        for _ in 0..count {
+            let length = self.read_var_int_num_strict()?;
+            if !(1..=50).contains(&length) {
+                return Err(refused(format!(
+                    "Invalid {name} key length: expected 1\u{2013}50 bytes, received {length}"
+                )));
+            }
+            let key = utf8(self.read_bytes(length)?)?;
+            if is_unsafe_record_key(&key) {
+                return Err(refused(format!("Unsafe {name} key: {key}")));
+            }
+            let entry = value(self)?;
+            if record.contains_key(&key) {
+                return Err(refused(format!("Duplicate {name} key: {key}")));
+            }
+            record.insert(key, entry);
+        }
+        Ok(record)
+    }
+
+    /// A varint-length value as UTF-8 (`toUTF8Strict`).
+    pub(crate) fn read_utf8_value(&mut self) -> Result<String, Error> {
+        let length = self.read_var_int_num_strict()?;
+        utf8(self.read_bytes(length)?)
+    }
+
+    /// A varint-length value as the base64 of its bytes.
+    pub(crate) fn read_base64_value(&mut self) -> Result<String, Error> {
+        let length = self.read_var_int_num_strict()?;
+        Ok(crate::primitives::to_base64(self.read_bytes(length)?))
+    }
+
+    /// The certificate's fields (`Certificate.ts:356-387`).
+    pub(crate) fn read_certificate_fields(&mut self) -> Result<HashMap<String, String>, Error> {
+        if self.remaining() > MAX_CERTIFICATE_BINARY_BYTES {
+            return Err(refused(format!(
+                "Certificate binary must be a byte array of at most {MAX_CERTIFICATE_BINARY_BYTES} bytes"
+            )));
+        }
+        let count = self.read_var_int_num_strict()?;
+        if count > MAX_CERTIFICATE_FIELDS {
+            return Err(refused(format!(
+                "Certificate field count exceeds the maximum of {MAX_CERTIFICATE_FIELDS}"
+            )));
+        }
+        if count > self.remaining() / 3 {
+            return Err(refused(
+                "Certificate field count exceeds the available data",
+            ));
+        }
+        let mut fields = HashMap::with_capacity(count);
+        for _ in 0..count {
+            let length = self.read_var_int_num_strict()?;
+            if !(1..=50).contains(&length) {
+                return Err(refused(format!(
+                    "Invalid certificate field name length: received {length}"
+                )));
+            }
+            let name = utf8(self.read_bytes(length)?)?;
+            if is_unsafe_record_key(&name) {
+                return Err(refused(format!("Unsafe certificate field name: {name}")));
+            }
+            if fields.contains_key(&name) {
+                return Err(refused(format!("Duplicate certificate field name: {name}")));
+            }
+            let length = self.read_var_int_num_strict()?;
+            if length > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+                return Err(refused(format!(
+                    "Certificate field {name} exceeds the maximum of {MAX_CERTIFICATE_FIELD_VALUE_BYTES} bytes"
+                )));
+            }
+            let value = utf8(self.read_bytes(length)?)?;
+            fields.insert(name, value);
+        }
+        Ok(fields)
+    }
+
+    /// The bytes remaining as the certificate's signature (`Certificate.ts:390-397`):
+    /// at most 72, parsed by `Signature.fromDER` and kept as `toDER` writes it.
+    pub(crate) fn read_certificate_signature(&mut self) -> Result<String, Error> {
+        let bytes = self.read_remaining();
+        if bytes.is_empty() {
+            return Ok(String::new());
+        }
+        if bytes.len() > MAX_CERTIFICATE_SIGNATURE_BYTES {
+            return Err(refused("Certificate signature exceeds the DER size limit"));
+        }
+        reference_der(bytes).map(|der| crate::primitives::to_hex(&der))
+    }
+}
+
+/// `isUnsafeRecordKey` (`SafeRecord.ts`).
+fn is_unsafe_record_key(key: &str) -> bool {
+    matches!(key, "__proto__" | "constructor" | "prototype")
+}
+
+fn utf8(bytes: &[u8]) -> Result<String, Error> {
+    String::from_utf8(bytes.to_vec()).map_err(|e| refused(format!("invalid UTF-8: {e}")))
+}
+
+/// `Signature.fromDER` (`Signature.ts:44-97`) then `toDER` (`:201-250`): the
+/// reference's checks, in its order and words, and its re-encoding (an
+/// integer minimal, a zero byte before a high bit).
+fn reference_der(der: &[u8]) -> Result<Vec<u8>, Error> {
+    let invalid = || refused("Signature DER invalid");
+    // `getLength`: a short-form length; a missing byte fails the next check.
+    let length = |at: usize| match der.get(at) {
+        Some(b) if b & 0x80 == 0 => Ok(*b as usize),
+        Some(_) => Err(refused("Invalid DER entity length")),
+        None => Err(invalid()),
+    };
+    if der.first() != Some(&0x30) {
+        return Err(refused("Signature DER must start with 0x30"));
+    }
+    if length(1)? + 2 != der.len() || der.get(2) != Some(&0x02) {
+        return Err(invalid());
+    }
+    let r_end = 4 + length(3)?;
+    if der.get(r_end) != Some(&0x02) {
+        return Err(invalid());
+    }
+    let s_len = length(r_end + 1)?;
+    if der.len() != r_end + 2 + s_len {
+        return Err(refused("Invalid R-length in signature DER"));
+    }
+    let integer = |bytes: &[u8], which: &str| -> Result<Vec<u8>, Error> {
+        if bytes.first() == Some(&0) && bytes.get(1).map_or(0, |b| b & 0x80) == 0 {
+            return Err(refused(format!("Invalid {which}-value in signature DER")));
+        }
+        let start = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
+        let mut minimal = bytes[start..].to_vec();
+        if minimal.first().is_none_or(|b| b & 0x80 != 0) {
+            minimal.insert(0, 0);
+        }
+        Ok(minimal)
+    };
+    let r = integer(&der[4..r_end], "R")?;
+    let s = integer(&der[r_end + 2..], "S")?;
+    let mut out = vec![0x30, (4 + r.len() + s.len()) as u8, 0x02, r.len() as u8];
+    out.extend_from_slice(&r);
+    out.extend_from_slice(&[0x02, s.len() as u8]);
+    out.extend_from_slice(&s);
+    Ok(out)
+}
+
+/// `#requireResponseLength` (`WalletWireTransceiver.ts:2027-2031`).
+pub(crate) fn require_response_length(
+    result: &[u8],
+    length: usize,
+    call: &str,
+) -> Result<(), Error> {
+    if result.len() != length {
+        return Err(refused(format!(
+            "Wallet Wire {call} response has an invalid length"
+        )));
+    }
+    Ok(())
+}
+
+/// The processor's getHeaderForHeight result: the wallet's header as its 80
+/// bytes, another length refused as `validateWalletResult` refuses it
+/// (`WalletResultValidation.ts:2296-2297`, `hex(result.header, call, 'header', 80)`).
+pub(crate) fn header_result(header: &str) -> Result<Vec<u8>, Error> {
+    let bytes = crate::primitives::from_hex(header)?;
+    if bytes.len() != 80 {
+        return Err(refused(
+            "Invalid getHeaderForHeight result header: expected 80 hexadecimal bytes",
+        ));
+    }
+    Ok(bytes)
+}
+
+/// `#requireInteger(value, 'discovery trust', 1, 10)` (`WalletWireTransceiver.ts:1710`,
+/// `:2018-2025`), the reader's check and the writer's.
+pub(crate) fn require_discovery_trust(trust: u8) -> Result<u8, Error> {
+    if !(1..=10).contains(&trust) {
+        return Err(refused(format!(
+            "Invalid discovery trust: expected an integer from 1 to 10, received {trust}"
+        )));
+    }
+    Ok(trust)
 }
 
 /// Transport abstraction for wallet wire protocol.
