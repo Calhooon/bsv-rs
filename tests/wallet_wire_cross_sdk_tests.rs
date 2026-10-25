@@ -1478,7 +1478,7 @@ fn stub_reply(call: &str, json: &Value) -> Value {
 }
 
 /// Sends the call's recorded request (`tests/fixtures/wire/<call>.json`, its
-/// first case: a frame the processor reads) to a wallet that answers with the
+/// case 0: a frame the processor reads) to a wallet that answers with the
 /// Go result vector's json, and compares the processor's whole response, the
 /// error byte included, to the vector's wire.
 #[cfg(feature = "http")]
