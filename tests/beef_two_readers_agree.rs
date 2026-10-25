@@ -587,7 +587,7 @@ fn a_higher_level_leaf_repeated_is_refused_on_both_paths() {
 }
 
 /// A BUMP held in memory with a second leaf at an offset: `verify_structure`
-/// walks it with the stream's walk and refuses it.
+/// refuses it in `merkle_path_root`'s pre-pass ahead of the walk.
 #[test]
 fn a_repeated_leaf_offset_in_a_bump_held_in_memory_is_refused_by_verify_structure() {
     let txid = beef_chain::funding_root();
