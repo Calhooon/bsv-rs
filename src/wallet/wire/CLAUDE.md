@@ -11,9 +11,10 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~456 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~    2486 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~     948 |
-| `transceiver.rs` | Client-side message serialization and full wallet interface (all 28 methods) | ~    1597 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~920 |
+| `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191) | ~77 |
+| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1597 |
 
 ## Architecture
 
@@ -208,7 +209,7 @@ pub mod status_codes {
 **Fully implemented handlers (delegated to wallet):**
 - getPublicKey, encrypt, decrypt, createHmac, verifyHmac
 - createSignature, verifySignature
-- revealCounterpartyKeyLinkage, revealSpecificKeyLinkage
+- revealCounterpartyKeyLinkage, revealSpecificKeyLinkage: the request in the reference's order (`requests.rs`, #191): counterparty linkage the privileged flag (`i8`) and reason (`i8` length, -1 absent) then the two keys (`WalletWireProcessor.ts:1739-1747`); specific linkage the protocol, key ID, counterparty, privileged flag and reason, then the verifier (`:1790-1797`, `:2564-2583`); both passed through into the args. The responses still write the encrypted linkage ahead of the keys (docs/FIXTURES.md F2)
 - isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight
 
 **Processor-local handlers:**
@@ -227,14 +228,13 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 
 ## Transceiver (Client-Side)
 
-`WalletWireTransceiver<T: WalletWire>` serializes all 28 wallet methods into binary messages and deserializes responses.
+`WalletWireTransceiver<T: WalletWire>` serializes 26 of the 28 wallet methods into binary messages and deserializes responses; it has no revealCounterpartyKeyLinkage or revealSpecificKeyLinkage method (docs/FIXTURES.md F2).
 
 - `new(wire)` - creates transceiver with wire transport
 - `wire()` - access underlying transport
 
-**All 28 methods fully implemented:**
+**The 26 methods:**
 - **Key ops:** get_public_key, encrypt, decrypt, create_hmac, verify_hmac, create_signature, verify_signature
-- **Key linkage:** reveal_counterparty_key_linkage, reveal_specific_key_linkage
 - **Action ops:** create_action (with full options: sign_and_process, trust_self, known_txids, no_send, no_send_change, send_with, randomize_outputs), sign_action, abort_action, list_actions, internalize_action
 - **Output ops:** list_outputs, relinquish_output
 - **Certificate ops:** acquire_certificate (both Direct and Issuance protocols), list_certificates, prove_certificate, relinquish_certificate
@@ -309,7 +309,7 @@ Messages serialized by one SDK can be deserialized by another. Key compatibility
 - **String maps**: Keys sorted lexicographically before writing
 - **Empty optional strings/bytes**: Treated same as None (both write nil sentinel)
 
-54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 42 cross-SDK roundtrip tests.
+54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 45 cross-SDK tests, among them every args vector decoded through the processor to its json (#191).
 
 ## Dependencies
 
