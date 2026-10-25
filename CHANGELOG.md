@@ -125,7 +125,7 @@ its level, and a new `Reason` is a change to an exhaustive public enum, the
 owner's word); `merkle_path_root`'s pre-pass refuses it in a BUMP held in
 memory (`Beef::verify_structure`, `verify_valid`: `Kind::BadFlag`);
 `MerklePath::new` and `new_unchecked` refuse it ahead of the walk
-(`Duplicate at an even offset: N, at height: N`); and `RootWalker` computes no
+(`Duplicate at an even offset: N, at height: N`), a path accepted through 0.9.0 and refused now, additive within 0.x (a path built by hand puts the duplicate at the odd offset, the working hash's right, as every writer does; no corpus BUMP and no writer emits the even shape); and `RootWalker` computes no
 node from a duplicate on the left (`Missing hash at height N, offset N`,
 where the reference gives up), so `compute_root` on a struct built by hand
 gives one root or a refusal, never two. The 468 are refusals on both paths,
@@ -198,7 +198,7 @@ working hash's sibling (`:60`); Go's reader accepts the bytes and
 met as a sibling (`:399-400`); this crate refuses the parse on both paths.
 BRC-74's own walk (`transactions/0074.md:326-345`) synthesizes no node and
 throws for one the level does not carry (`:335`): it is silent on a computed
-node, it does not rule it. The stack's Lean has the self-pair today (`climb`,
+node, it does not rule it. The refusal is a tightening past the BRC's silence consistent with the reference. The stack's Lean has the self-pair today (`climb`,
 `BeefOfAnySize.lean:509-520`) and corrects it in its own lane, with the
 `duplicateOffset` row. Go keeps the later of two leaves at one offset
 (`go-sdk@2ca481c` `transaction/merklepath.go:87-90`); this crate refuses the
@@ -206,7 +206,7 @@ second, on both of its readers. TS's `fromBinary` and Go's
 `NewMerklePathFromBinary` (`merklepath.go:189-194`, a reader over the bytes)
 read a prefix of the bytes they are handed; this
 crate's `from_binary` refuses a byte after the frame and its `from_reader`
-reads the prefix.
+reads the prefix. The slice's refusal is a tightening past every reference, taken from the charter's one bound and its `trailingBytes` refusal, with the reader form as the parity path.
 
 ### Changed: the interpreter is split by opcode group (#85)
 
