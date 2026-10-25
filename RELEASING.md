@@ -10,3 +10,17 @@
 8. A failed release job publishes nothing; fix through a PR, then delete and re-push the tag, or tag the next patch.
 9. A published version is never re-published; a bad release is yanked on crates.io and superseded by the next patch.
 10. Without the trusted-publishing setting on crates.io the publish step fails closed.
+
+## The direction rule (2026-10-25, the owner's word)
+
+Every fix is born on `beta`. `main` accepts a quick fix of four classes only:
+
+- a security advisory (a RustSec entry against this crate or a dependency);
+- a panic on input;
+- a wrong consensus or BEEF verdict;
+- a break in a live dependent (`docs/DEPENDENTS.md`).
+
+11. Every main commit is `git cherry-pick -x` of a beta commit with its test. The `-x` line, `(cherry picked from commit <sha>)`, is the link both guards read; a pick made without it (a hand-resolved one whose patch differs) fails them until the line is added with `git commit --amend`. The one main-born commit is the release commit (step 3): `Cargo.toml`'s `version` and `CHANGELOG.md`'s headings, nothing else.
+12. `main-in-beta` (`.github/workflows/ci.yml`) runs on every PR into `beta` (on the PR's merge commit: after this lands, does beta carry main), every push to `beta`, and a dispatch on `sync/main-into-beta`. A commit of `origin/main` is on the tree by sha, by patch (`git cherry`), or by a cherry-pick link in either direction: main's commit names a beta source on the tree, or a commit of the tree names main's. It fails naming each commit that is none of these. `beta-born`, on every PR into `main`, asks the same of each commit of the PR against `origin/beta`, and lets a release commit through, saying so in its log.
+13. `.github/workflows/sync-main-into-beta.yml` runs on every push to `main`. When `main-in-beta`'s filter finds commits of main beta lacks, it opens, or updates in place, one PR from `sync/main-into-beta` into `beta`, titled `sync: main into beta at <sha>`: each such commit `git cherry-pick -x`'d onto beta's tip in main's order. **Land it by rebase merge**: both lines keep linear history, and each pick's `-x` line lives in its message, so the link survives the new sha. A pick that conflicts is aborted; the branch keeps beta's tip and the picks before it, the PR names the commit and its conflicted files and carries the label `needs-hand` (the workflow creates the label; it holds `issues: write` for that). Resolve on the branch by `git cherry-pick -x <sha>`, push, and run `gh workflow run sync-main-into-beta.yml`: a branch that holds beta's tip is picked onto, never rebuilt, so a hand resolution survives main moving again; when beta moves, the branch's own commits are carried onto its tip. A release commit that picks cleanly is labelled `needs-hand` too: its pick moves beta's `[Unreleased]` under main's heading, so a person amends it to what beta should say before it lands. A conflicting commit with no pick before it opens no PR (GitHub opens none without a commit): the run fails with the hand's steps in its summary.
+14. A PR or a push made with the `GITHUB_TOKEN` starts no workflow, so the sync workflow starts `ci.yml` on its branch by a `workflow_dispatch`; the required checks report on the branch's tip from that run. The protection the captain adds: `main-in-beta` a required check on `beta`, `beta-born` on `main`; linear history stays on both lines.

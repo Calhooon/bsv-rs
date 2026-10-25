@@ -18,6 +18,31 @@ The function is gated on `script`; the `clippy` job now checks each published
 slice alone with `-D warnings`, which was RED on the pre-fix tree for the four
 slices and is the pin.
 
+### Changed: beta carries everything main carries, main nothing beta did not bear, checked by CI (the owner's word, 2026-10-25)
+
+CI only; nothing under `src/` moves. A commit is on a line by sha, by patch
+(`git cherry`), or by a cherry-pick link in either direction (a
+`(cherry picked from commit <sha>)` line naming a commit of the other line).
+`ci.yml` gains `main-in-beta`: on every PR into `beta`, every push to `beta`
+and a dispatch on the sync branch it fails naming each commit of `origin/main`
+the tree lacks that way; and `beta-born`: on every PR into `main` it fails
+naming each commit of the PR `origin/beta` lacks that way, a release commit
+(`Cargo.toml`'s version and `CHANGELOG.md`'s headings alone) let through and
+said in the log. The new `sync-main-into-beta.yml` opens, on every push to
+`main`, one PR from `sync/main-into-beta` into `beta`: each missing commit
+`git cherry-pick -x`'d in main's order, landed by rebase merge (both lines
+keep linear history; the link lives in the message). A conflicting pick is
+aborted, the picks before it kept, the PR labelled `needs-hand` with the
+commit and its files; a rerun picks onto a branch that holds beta's tip, so a
+hand resolution survives main moving again. `ci.yml` gains `workflow_dispatch`
+so the sync starts the suite on its branch. `RELEASING.md` steps 11 to 14
+(beta's 17 to 20) write the rule; `tests/arch_ci_lines.rs` pins the three jobs.
+On main this is PR #205's three commits by `git cherry-pick -x`: main's
+`ci.yml` takes beta's `on:` (`[main, beta]` and `workflow_dispatch`), which
+changes nothing a main event runs, since a beta event reads beta's file, and
+keeps `main-in-beta`, which runs on nothing here, so the two files and the
+test read the same on both lines.
+
 ### Changed
 
 - main's gate takes beta's `deny`, `dependents` (plan, one check per consumer, the summary), `semver`, `ratchet` (its baseline measured on main), `fixtures` (skipping with a warning while the recordings are beta's), `features`, `wasm32` slices and `scoreboard` jobs; `semver` checks a PR against the last release tag held to a patch, and a release tag against the release before it (#214).

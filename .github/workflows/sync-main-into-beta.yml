@@ -1,0 +1,222 @@
+name: Sync main into beta
+
+# Nothing sits on main that beta lacks (RELEASING.md, "The direction rule"). Every push to main
+# finds main's commits that beta lacks by sha, by patch and by a cherry-pick link (ci.yml's
+# main-in-beta reads the same) and, when there are any, opens or updates in place one PR from
+# sync/main-into-beta into beta: each commit cherry-picked with -x in main's order, so each pick
+# carries the "(cherry picked from commit <sha>)" line main-in-beta reads. The PR lands by rebase
+# merge (both lines keep linear history); the line lives in the message, so it survives the new
+# sha. A pick that conflicts is aborted: the branch keeps beta's tip and the picks before it, the
+# PR names the commit and its files and is labelled needs-hand. A branch that already holds beta's
+# tip (a hand resolution not yet landed) is picked onto, never rebuilt. This file lives on main
+# and on beta; it fires from main.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-main-into-beta
+  cancel-in-progress: false
+
+env:
+  SYNC_BRANCH: sync/main-into-beta
+
+jobs:
+  sync:
+    name: Sync main into beta
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # gh label create: the needs-hand label is made on its use (labels are an issues scope)
+      issues: write
+      # the PR's CI is started by a dispatch: the GITHUB_TOKEN's push and PR start no workflow
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Cherry-pick main's commits onto beta
+        id: pick
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git fetch --no-tags origin main beta
+          old=""
+          if git fetch --no-tags origin "+refs/heads/${SYNC_BRANCH}:refs/remotes/origin/${SYNC_BRANCH}" 2>/dev/null; then
+            old="$(git rev-parse "origin/${SYNC_BRANCH}")"
+          fi
+          # main-in-beta's filter: the commits of origin/main that $1 lacks by sha, by patch and
+          # by a cherry-pick link in either direction, in main's order
+          unlinked() {
+            local tip="$1" base linked mark sha src
+            base="$(git merge-base origin/main "$tip")"
+            linked="$(git log --format=%B "$base..$tip")"
+            while read -r mark sha _; do
+              [ "$mark" = "+" ] || continue
+              src="$(git log -1 --format=%B "$sha" | sed -n 's/.*(cherry picked from commit \([0-9a-f]\{40\}\)).*/\1/p')"
+              src="${src%%$'\n'*}"
+              if [ -n "$src" ] && git merge-base --is-ancestor "$src" "$tip"; then continue; fi
+              if grep -qF "(cherry picked from commit ${sha})" <<< "$linked"; then continue; fi
+              echo "$sha"
+            done < <(git cherry "$tip" origin/main)
+          }
+          # a release commit (Cargo.toml's version and CHANGELOG.md's headings alone): its pick
+          # moves beta's own [Unreleased] under main's heading, so a person reads it before landing
+          release_commit() {
+            local files changed
+            files="$(git diff-tree --no-commit-id --name-only -r "$1")"
+            [ -n "$files" ] || return 1
+            while IFS= read -r file; do
+              case "$file" in Cargo.toml | CHANGELOG.md) ;; *) return 1 ;; esac
+            done <<< "$files"
+            changed="$(git diff -U0 "$1^" "$1" | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' || true)"
+            grep -qE '^\+version = "' <<< "$changed" || return 1
+            ! grep -qvE '^[-+](version = "[^"]*"|## \[.*)$' <<< "$changed"
+          }
+          short="$(git rev-parse --short origin/main)"
+          body="$RUNNER_TEMP/sync-body.md"
+          {
+            echo "title=sync: main into beta at ${short}"
+            echo "body=${body}"
+          } >> "$GITHUB_OUTPUT"
+          missing=()
+          while IFS= read -r sha; do missing+=("$sha"); done < <(unlinked origin/beta)
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "every commit of origin/main ${short} is on origin/beta by sha, patch or cherry-pick link; nothing to sync"
+            echo "state=synced" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          note=""
+          if [ -n "$old" ] && git merge-base --is-ancestor origin/beta "$old"; then
+            # the branch holds beta's tip: pick the new commits onto it, a hand resolution kept
+            git checkout --quiet -B "$SYNC_BRANCH" "$old"
+          else
+            git checkout --quiet -B "$SYNC_BRANCH" origin/beta
+            if [ -n "$old" ]; then
+              # beta moved: carry the branch's own commits beta lacks by patch (a hand resolution
+              # among them) onto beta's tip, each keeping its message and its cherry-pick line
+              while read -r mark sha _; do
+                [ "$mark" = "+" ] || continue
+                if ! git cherry-pick --keep-redundant-commits "$sha" > /dev/null; then
+                  git cherry-pick --abort
+                  git checkout --quiet -B "$SYNC_BRANCH" origin/beta
+                  note="Beta moved and the branch's earlier commits do not carry onto its tip cleanly; the branch is rebuilt from beta. The earlier tip is \`${old}\` (\`git log origin/beta..${old}\`): a hand resolution there is not lost."
+                  break
+                fi
+              done < <(git cherry origin/beta "$old")
+            fi
+          fi
+          todo=()
+          while IFS= read -r sha; do todo+=("$sha"); done < <(unlinked HEAD)
+          state=clean
+          conflict=""
+          files=""
+          releases=()
+          for i in "${!todo[@]}"; do
+            sha="${todo[$i]}"
+            if git cherry-pick -x --keep-redundant-commits "$sha" > /dev/null; then
+              if release_commit "$sha"; then releases+=("$sha"); fi
+              continue
+            fi
+            files="$(git diff --name-only --diff-filter=U)"
+            git cherry-pick --abort
+            state=conflict
+            conflict="$sha"
+            todo=("${todo[@]:$i}")
+            break
+          done
+          if [ "${#releases[@]}" -gt 0 ]; then state=release; fi
+          if [ -n "$conflict" ]; then state=conflict; fi
+          {
+            echo "Cherry-picks onto \`beta\`, with \`-x\`, the commits of \`main\` at \`${short}\` that beta lacks by sha, by patch and by a cherry-pick link (RELEASING.md, \"The direction rule\"). **Land it by rebase merge**: both lines keep linear history, and each pick's \`(cherry picked from commit <sha>)\` line, the link \`main-in-beta\` reads, survives the new sha."
+            echo
+            if [ -n "$(git rev-list origin/beta..HEAD)" ]; then
+              echo "The commits of this branch over beta:"
+              echo
+              echo '```'
+              git log --oneline origin/beta..HEAD
+              echo '```'
+            fi
+            if [ -n "$note" ]; then
+              echo
+              echo "$note"
+            fi
+            if [ "${#releases[@]}" -gt 0 ]; then
+              echo
+              echo "**A release commit picked cleanly** and is labelled \`needs-hand\`: it moves beta's own \`[Unreleased]\` entries under main's heading and sets beta's version to main's. Amend the pick on this branch to what beta should say (keeping its \`(cherry picked from commit <sha>)\` line), push, then remove the label:"
+              echo
+              for sha in "${releases[@]}"; do echo "- \`$(git log -1 --oneline "$sha")\`"; done
+            fi
+            if [ -n "$conflict" ]; then
+              echo
+              from="origin/${SYNC_BRANCH}"
+              if [ -z "$(git rev-list origin/beta..HEAD)" ]; then from=origin/beta; fi
+              echo "**\`$(git log -1 --oneline "$conflict")\` does not pick cleanly** onto ${from}; the picks before it are kept. Its conflicted files:"
+              echo
+              while IFS= read -r file; do echo "- \`${file}\`"; done <<< "$files"
+              echo
+              echo "Resolve by hand: \`git fetch origin && git checkout -B ${SYNC_BRANCH} ${from} && git cherry-pick -x ${conflict}\`, fix the files, \`git cherry-pick --continue\`, push to \`${SYNC_BRANCH}\` (and open its PR into \`beta\` if none is open), then \`gh workflow run sync-main-into-beta.yml\`: the rerun picks the rest onto your branch. Not yet picked, in main's order:"
+              echo
+              for sha in "${todo[@]}"; do echo "- \`$(git log -1 --oneline "$sha")\`"; done
+            fi
+          } > "$body"
+          echo "state=${state}" >> "$GITHUB_OUTPUT"
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/beta)" ]; then
+            # no pick landed: GitHub opens no PR without a commit; the run fails with the body
+            cat "$body" >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::$(git log -1 --oneline "$conflict") does not pick cleanly onto beta and no pick precedes it; open the sync PR by hand as the run's summary says"
+            exit 1
+          fi
+          if [ "$(git rev-parse HEAD)" = "$old" ]; then
+            echo "origin/${SYNC_BRANCH} is unchanged; the PR's body is rewritten"
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "lease=refs/heads/${SYNC_BRANCH}:${old}" >> "$GITHUB_OUTPUT"
+          cat "$body"
+
+      # the lease: a branch a person pushed to since the fetch is never overwritten
+      - name: Push the branch
+        if: steps.pick.outputs.push == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LEASE: ${{ steps.pick.outputs.lease }}
+        run: git push --force-with-lease="$LEASE" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${SYNC_BRANCH}"
+
+      - name: Open or update the PR
+        if: steps.pick.outputs.state != 'synced'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATE: ${{ steps.pick.outputs.state }}
+          TITLE: ${{ steps.pick.outputs.title }}
+          BODY: ${{ steps.pick.outputs.body }}
+        run: |
+          number="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base beta --state open --json number --jq '.[0].number // empty')"
+          if [ -z "$number" ]; then
+            gh pr create --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base beta --title "$TITLE" --body-file "$BODY"
+            number="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$SYNC_BRANCH" --base beta --state open --json number --jq '.[0].number')"
+          else
+            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file "$BODY"
+          fi
+          if [ "$STATE" = conflict ] || [ "$STATE" = release ]; then
+            gh label create needs-hand --repo "$GITHUB_REPOSITORY" --color B60205 --description 'a sync PR a person resolves before it lands' --force
+            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --add-label needs-hand
+          else
+            gh pr edit "$number" --repo "$GITHUB_REPOSITORY" --remove-label needs-hand || true
+          fi
+          echo "PR #${number}: ${TITLE} (${STATE})"
+
+      - name: Start the PR's CI
+        if: steps.pick.outputs.push == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$SYNC_BRANCH"

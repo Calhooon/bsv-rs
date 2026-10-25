@@ -2,9 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, beta]
   pull_request:
-    branches: [main]
+    branches: [main, beta]
+  # sync-main-into-beta.yml starts the suite on its PR's branch: a PR or a push made with the
+  # GITHUB_TOKEN starts no workflow, a workflow_dispatch does
+  workflow_dispatch:
   # release.yml runs these same jobs on a version tag before it publishes
   workflow_call:
     secrets:
@@ -506,6 +509,108 @@ jobs:
 
       - name: Scan the history
         run: '"$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner --exit-code 1 .'
+
+  # nothing sits on main that beta lacks (RELEASING.md, "The direction rule"): every commit of
+  # origin/main is on the tree (the PR's merge commit, beta's tip after a push, the sync branch on
+  # a dispatch) by sha, by patch (git cherry), or by a cherry-pick link in either direction: main's
+  # commit names a beta source on the tree, or a commit of the tree names main's. Main's commits
+  # come back by sync-main-into-beta.yml's cherry-pick -x, landed by rebase merge (linear history)
+  main-in-beta:
+    name: main-in-beta
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'beta') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/beta') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/sync/main-into-beta')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      # the cold review's guard (PR #205); the logs are read into a variable, never piped into
+      # grep -q: under pipefail a grep that stops early fails its writer with SIGPIPE (141)
+      - name: Every commit of origin/main is on HEAD by sha, patch or cherry-pick link
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          base="$(git merge-base origin/main HEAD)"
+          linked="$(git log --format=%B "$base..HEAD")"
+          missing=()
+          while read -r mark sha _; do
+            [ "$mark" = "+" ] || continue                       # "-": a patch-equivalent commit is on HEAD
+            src="$(git log -1 --format=%B "$sha" | sed -n 's/.*(cherry picked from commit \([0-9a-f]\{40\}\)).*/\1/p')"
+            src="${src%%$'\n'*}"
+            if [ -n "$src" ] && git merge-base --is-ancestor "$src" HEAD; then continue; fi   # main's commit names its beta source
+            if grep -qF "(cherry picked from commit ${sha})" <<< "$linked"; then continue; fi   # a beta commit names it
+            missing+=("$sha")
+          done < <(git cherry HEAD origin/main)
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "every commit of origin/main $(git rev-parse --short origin/main) is on $(git rev-parse --short HEAD) by sha, patch or cherry-pick link"
+            exit 0
+          fi
+          echo "The commits main has that this tree lacks (no patch-equivalent, no cherry-pick link):"
+          for sha in "${missing[@]}"; do git log -1 --oneline "$sha"; done
+          echo "::error::main has ${#missing[@]} commit(s) beta lacks; cherry-pick each onto beta with -x through a PR (sync-main-into-beta.yml opens it from sync/main-into-beta) before this lands"
+          exit 1
+
+  # every fix is born on beta (RELEASING.md, "The direction rule"): each commit of a PR into main
+  # is on origin/beta by sha, by patch, or by a cherry-pick link in either direction. A release
+  # commit (Cargo.toml's version and CHANGELOG.md's headings, nothing else) is main-born by nature
+  # and passes, said in the log
+  beta-born:
+    name: beta-born
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Every commit of the PR is on origin/beta by sha, patch or cherry-pick link
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin beta
+          # a release commit: Cargo.toml and CHANGELOG.md alone, every changed line a package
+          # version or a changelog heading, and a version among them
+          release_commit() {
+            local files changed
+            files="$(git diff-tree --no-commit-id --name-only -r "$1")"
+            [ -n "$files" ] || return 1
+            while IFS= read -r file; do
+              case "$file" in Cargo.toml | CHANGELOG.md) ;; *) return 1 ;; esac
+            done <<< "$files"
+            changed="$(git diff -U0 "$1^" "$1" | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' || true)"
+            grep -qE '^\+version = "' <<< "$changed" || return 1
+            ! grep -qvE '^[-+](version = "[^"]*"|## \[.*)$' <<< "$changed"
+          }
+          base="$(git merge-base "$PR_BASE" "$PR_HEAD")"
+          linked="$(git log --format=%B "$(git merge-base origin/beta "$PR_HEAD")..origin/beta")"
+          missing=()
+          while read -r mark sha _; do
+            [ "$mark" = "+" ] || continue                       # "-": a patch-equivalent commit is on beta
+            src="$(git log -1 --format=%B "$sha" | sed -n 's/.*(cherry picked from commit \([0-9a-f]\{40\}\)).*/\1/p')"
+            src="${src%%$'\n'*}"
+            if [ -n "$src" ] && git merge-base --is-ancestor "$src" origin/beta; then continue; fi   # the PR's commit names its beta source
+            if grep -qF "(cherry picked from commit ${sha})" <<< "$linked"; then continue; fi   # a beta commit names it
+            if release_commit "$sha"; then
+              echo "a release commit, main-born by nature (Cargo.toml's version and CHANGELOG.md's headings alone): $(git log -1 --oneline "$sha")"
+              continue
+            fi
+            missing+=("$sha")
+          done < <(git cherry origin/beta "$PR_HEAD" "$base")
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "every commit of the PR ($(git rev-parse --short "$base")..$(git rev-parse --short "$PR_HEAD")) is on origin/beta $(git rev-parse --short origin/beta) by sha, patch or cherry-pick link, or a release commit"
+            exit 0
+          fi
+          echo "The commits of this PR beta lacks (no patch-equivalent, no cherry-pick link, not a release commit):"
+          for sha in "${missing[@]}"; do git log -1 --oneline "$sha"; done
+          echo "::error::${#missing[@]} commit(s) of this PR were not born on beta; land each on beta through a PR, then cherry-pick it here with -x"
+          exit 1
 
   # the declared rust-version (bsv-stack-lean #139): the library with every feature, native and
   # wasm32, on that toolchain, the dependencies resolved to versions it supports
