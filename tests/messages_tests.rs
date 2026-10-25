@@ -757,7 +757,7 @@ fn a_signature_too_short_for_its_recipient_form_is_refused() {
 #[test]
 fn a_named_recipient_form_short_of_its_key_id_or_der_is_refused() {
     let recipient = issue_173_recipient();
-    // 78: past the first check; 101: one byte short of the key ID; 102: the
+    // 78: past the 78-byte check; 101: one byte short of the key ID; 102: the
     // key ID and an empty DER;
     // 109: a DER of 7 bytes.
     for len in [78, 101, 102, 109] {
