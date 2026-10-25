@@ -66,7 +66,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 └─────────┴────────────────┴────────────────┴──────────┘
 ```
 
-The processor writes the reference's error frame (`WalletWireProcessor.ts:2370-2396` at `ts-stack@edf6e03`, #202): the code unknownError (1), this crate's `Error` carrying no wallet code for the reference's 2 to 8; the message the error's own words, never the crate's `Display` prefix (a `WalletError` its words, `WalletBusy`, `WalletTransport` and `TransportFault` their `detail`, any other variant its `Display` sentence), cut at 4096 bytes at the byte; the stack an empty string, a varint 0. The transceiver reads a frame as `WalletError("wallet error (code N): <message>")`.
+The processor writes the reference's error frame (`WalletWireProcessor.ts:2370-2418` at `ts-stack@edf6e03`, #202). Every wallet call goes through `invoke_wallet`, the reference's `#invokeWallet` (`:2402-2418`): a wallet error with a code 2 to 8 (`explicit_wallet_code`; none today, this crate's `Error` carrying no code, #137) keeps its words and code; every other is replaced by `Wallet operation failed`, code 1 (`:2417`), so a wallet's words never reach the wire. The processor's own errors (its reading of the request, the three false verdicts raised after the wallet answers, the thirteen full-wallet stubs) keep their words: a `WalletError` its words, any other variant its `Display` sentence, never the crate's `Display` prefix. The message is cut at 4096 bytes at the byte; the stack an empty string, a varint 0. The wallet's words are not logged (the crate has no logging facility). The transceiver reads a frame as `WalletError("wallet error (code N): <message>")`.
 
 ## Call Codes
 
@@ -224,7 +224,7 @@ pub mod status_codes {
 
 All 28 call codes are dispatched in the match statement. Stub handlers return descriptive errors indicating a full wallet implementation is required.
 
-**Error codes:** 0=success; every error frame 1 (unknownError): the reference takes 2 to 8 from a typed error's `code`, which this crate's `Error` does not carry; the words no longer choose 6 or 7 (#202).
+**Error codes:** 0=success; every error frame 1 (unknownError): the reference takes 2 to 8 from an explicit wallet error's `code`, which this crate's `Error` does not carry (#137); the words no longer choose 6 or 7; a wallet's un-coded error is `Wallet operation failed` (#202).
 
 ## Transceiver (Client-Side)
 
