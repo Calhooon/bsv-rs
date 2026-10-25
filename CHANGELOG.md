@@ -166,8 +166,8 @@ Nat)` after `mismatchedNode` (`BeefOfAnySize.lean:169`), its `Kind`,
 `Reason.kind` and `Kind.all` (`:213-251`) the same, and `levelMap` (`:481`,
 the earliest leaf standing) the refusal: the keeper's, told. The types moved
 to `src/transaction/beef_stream/reason.rs` (a move in its own commit,
-re-exported where they stood: `beef_stream.rs` sits at its recorded 3,617
-lines). Pinned by `a_repeated_leaf_offset_is_duplicate_offset_on_both_readers`
+re-exported where they stood: `beef_stream.rs` is 3,376 lines, under its recorded bound of 3,617;
+`reason.rs` 319. Pinned by `a_repeated_leaf_offset_is_duplicate_offset_on_both_readers`
 (`tests/merkle_path_two_readers_agree.rs`, the standalone reader and the BEEF
 reader on three repeats), the four repeated-offset tests of
 `tests/beef_two_readers_agree.rs` (`a_level_0_leaf_repeated_with_the_same_hash_..`,
