@@ -24,6 +24,79 @@ ratchet and bench-compare tools.
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
+### Fixed: seven result writers write the reference's bytes: the byte arrays alone, the verdicts as the error byte alone (#197)
+
+`WalletWireProcessor` wrote encrypt's ciphertext, decrypt's plaintext,
+createHmac's 32 bytes and createSignature's DER signature behind a varint
+length, and verifyHmac's, verifySignature's and waitForAuthentication's verdict
+as one byte after the error byte (`00 01`; `00 00` for a false verdict). The
+reference writes the error byte then the bytes alone to the end of the frame
+(`ts-stack@edf6e03` `WalletWireProcessor.ts:1443-1444`, `:1470-1471`,
+`:1495-1496`, `:1559-1560`), and for the three verdicts the error byte and
+nothing after it, answering a verdict other than true with an error frame
+(`HMAC is not valid`, `:1520-1525`; `Signature is not valid`, `:1597-1602`;
+`Wallet did not affirmatively authenticate`, `:1636-1643`). Its transceiver
+reads the rest of the frame as the bytes (`WalletWireTransceiver.ts:953-957`,
+`:988`, `:1093-1101`), createHmac's as exactly 32 (`:1019-1021`), and an empty
+result as a true verdict, refusing a byte after the error byte
+(`#requireEmptyResponse`, `:1053-1055`, `:1147-1149`, `:1870-1872`,
+`:2027-2035`). BRC-100 gives the four results as a bare Byte Array where the
+requests carry a VarInt length, and the two verifications "Nothing extra"
+(`wallet/0100.md:2094`, `:2116`, `:2138`, `:2181`, `:2157`, `:2203` at
+`ed1b015`; the same text at `:2117`, `:2139`, `:2161`, `:2204`, `:2180`,
+`:2226` at `5119a9b`), waitForAuthentication's response data "None"
+(`:2418-2420`, `:2441-2443`). Go's result vectors are the same bytes (`encrypt`
+`00 0102030405060708`, `createHmac` `00 323c46...`, the three verdicts `00`).
+The seven writers (now in `src/wallet/wire/results.rs`, beside #194's) write
+those bytes; no field of the seven result types moves.
+
+This crate's transceiver read the old bytes (a length ahead of the four, the
+verdict from the byte after the error byte; waitForAuthentication alone read
+nothing after the error byte and ignored the `01`), so it moves in the same
+commit to the reference's reading: a reference processor's encrypt answer
+was read with its leading ciphertext byte taken as a length, and its verdicts
+refused on a missing byte.
+
+The tests that pin it: `tests/wallet_wire_cross_sdk_tests.rs`
+`the_seven_result_writers_write_the_vectors_wire_byte_for_byte` (the
+processor's response to a wallet answering with each Go result vector's json is
+the vector's wire, the error byte included),
+`the_transceiver_reads_the_seven_vectors_wire_as_their_json`,
+`a_false_verdict_is_answered_with_an_error_frame`, and
+`every_go_result_vector_is_the_processors_wire_for_its_json` (15 of 27 pass;
+the allowlist falls from 19 to 12, the refusal stubs of docs/FIXTURES.md F1;
+the count is pinned); `tests/wire_method_roundtrip_tests.rs` `result_frame_tests`
+(the loopback frames read to their last byte; the error byte alone a true
+verdict, an error frame the error, `00 00`, `00 01` and a length-prefixed
+HMAC refused). RED on `1661ce2` (11 of the 12 new tests; the error-frame
+reader already held). The seven recordings under `tests/fixtures/wire/` are
+re-recorded in their own commits (the response bytes move; the request bytes
+do not; the `minimal` cases of verifyHmac and verifySignature, whose stub
+answers `valid: false`, now record the error frame and the client's error;
+docs/FIXTURES.md F13); the wire_codec bench's layouts follow.
+
+Migration: a consumer of this crate's processor answering the reference's or
+Go's transceiver read these seven responses wrong before and reads them right
+now. This crate's own transceiver and processor agreed with each other on the
+old bytes and now agree on the reference's: one side from this release against
+the other side from bsv-rs 0.9.0 or older does not. A 0.9.0 processor's four
+byte results reach this transceiver with the length byte at their head
+(and createHmac's 33 bytes are refused), its verdicts (`00 01`, `00 00`) are
+refused as `Wallet Wire <call> response has an invalid length`, never read as
+true; a 0.9.0 transceiver reads this processor's byte results with their leading
+byte as a length and refuses its verdicts on a missing byte. Upgrade both sides
+together. `verify_hmac` and `verify_signature` over the wire no longer return
+`Ok` with `valid: false`: a false verdict is the error (this crate's
+`ProtoWallet` already answered one with an error).
+
+### Notes: cross-SDK parity (#197)
+
+go-sdk@2ca481c writes nothing for a false verdict as for a true one
+(`wallet/serializer/verify_hmac.go:71-73`, `verify_signature.go:102-104`,
+`authenticated.go:36-38`) and reads any result as true (`:75-77`, `:106-110`,
+`:40-44`); this crate follows the TypeScript reference, an error frame for a
+false verdict and a byte after the error byte refused.
+
 ### Fixed: both linkage responses put the three keys ahead of everything (#194)
 
 `WalletWireProcessor` wrote revealCounterpartyKeyLinkage's result as
@@ -56,7 +129,7 @@ finding not changed here: encrypt, decrypt, createHmac and createSignature
 write a length ahead of the bytes, `WalletWireProcessor.ts:1444`, `:1471`,
 `:1496`, `:1560` write the bytes alone; verifyHmac, verifySignature and
 waitForAuthentication write a byte `01` the reference does not, `:1522-1525`,
-`:1600-1603`, `:1641-1644`; the count is pinned);
+`:1600-1603`, `:1641-1644`; the count is pinned; fixed by #197, above);
 `tests/wire_method_roundtrip_tests.rs`
 `test_roundtrip_reveal_counterparty_key_linkage_privileged` and
 `test_roundtrip_reveal_specific_key_linkage_privileged` read both responses in

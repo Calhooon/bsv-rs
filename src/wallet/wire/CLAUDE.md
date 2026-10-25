@@ -11,11 +11,11 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~479 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2486 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~897 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~876 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191) | ~77 |
-| `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194) | ~58 |
-| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1597 |
+| `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194); for encrypt, decrypt, createHmac and createSignature, the bytes alone, and for verifyHmac, verifySignature and waitForAuthentication, nothing after the error byte, a false verdict an error frame (#197) | ~128 |
+| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1584 |
 
 ## Architecture
 
@@ -209,9 +209,9 @@ pub mod status_codes {
 
 **Fully implemented handlers (delegated to wallet):**
 - getPublicKey, encrypt, decrypt, createHmac, verifyHmac
-- createSignature, verifySignature
+- createSignature, verifySignature: the results as the reference writes them (`results.rs`, #197): encrypt, decrypt, createHmac and createSignature the error byte then the ciphertext, plaintext, 32 HMAC bytes or DER alone, no length (`WalletWireProcessor.ts:1443-1444`, `:1470-1471`, `:1495-1496`, `:1559-1560`); verifyHmac and verifySignature the error byte alone, a false verdict the reference's error frame (`HMAC is not valid`, `Signature is not valid`; `:1520-1525`, `:1597-1602`)
 - revealCounterpartyKeyLinkage, revealSpecificKeyLinkage: the request in the reference's order (`requests.rs`, #191): counterparty linkage the privileged flag (`i8`) and reason (`i8` length, -1 absent) then the two keys (`WalletWireProcessor.ts:1739-1747`); specific linkage the protocol, key ID, counterparty, privileged flag and reason, then the verifier (`:1790-1797`, `:2564-2583`); both passed through into the args. The responses in the reference's order (`results.rs`, #194): the prover, verifier and counterparty, then revelationTime, encryptedLinkage, encryptedLinkageProof (`WalletWireProcessor.ts:1761-1781`); or the protocol, keyID, encryptedLinkage, encryptedLinkageProof, proofType (`:1811-1841`)
-- isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight
+- isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight: waitForAuthentication's result the error byte alone, a false verdict an error frame (`Wallet did not affirmatively authenticate`, `:1636-1643`, #197); isAuthenticated keeps its verdict byte (`:1618-1622`)
 
 **Processor-local handlers:**
 - getNetwork (uses processor's configured network, single byte: 0x00=mainnet, 0x01=testnet)
@@ -243,6 +243,8 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 - **Chain ops:** get_height, get_network, get_version, get_header, wait_for_authentication, is_authenticated
 
 **Helper methods:** `parse_certificate_from_binary`, `parse_discovery_result` (internal).
+
+**The seven results of #197:** encrypt, decrypt and createSignature read the rest of the frame as the bytes, createHmac exactly 32 bytes; verifyHmac, verifySignature and waitForAuthentication read an empty result as true and refuse a byte after the error byte (`Wallet Wire <call> response has an invalid length`, the reference's `#requireEmptyResponse`, `WalletWireTransceiver.ts:953-957`, `:988`, `:1019-1021`, `:1093-1101`, `:1053-1055`, `:1147-1149`, `:1870-1872`), so a bsv-rs 0.9.0 processor's `00 00` (its false verdict) is never read as true.
 
 **Certificate binary format in transceiver response parsing:** the reference's `Certificate.toBinary` (`ts-stack@edf6e03` `Certificate.ts:229-321`), Go's and `WireWriter::write_wallet_certificate`'s: `type(32) -> serial(32) -> subject(33) -> certifier(33) -> outpoint (txid 32 + varint index) -> fields map (sorted) -> signature (the bytes remaining, no length prefix)` (bsv-rs#177; BRC-100 section 19's table, subject before serial and a length-prefixed signature before the fields, departs from these bytes). listCertificates' verifier is `varint(0)` or `varint(33)` + 33 bytes that decompress to a point, read as hex, any other length refused; its keyring flag 0 or 1; discovery's certifierInfo is three plain varint-length strings (an empty one length 0) and the trust byte (1 to 10, `:1710`), no present flag. Every record (the listCertificates keyring, the discovery keyring and decrypted fields) is a strict collection count bounded by the bytes remaining, keys 1 to 50 bytes, safe and unique (`#readRecordKey`, `#setUniqueWireRecordEntry`, `:1955-2002`; #183).
 
