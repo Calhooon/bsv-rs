@@ -5,7 +5,7 @@
 //! (2 to 8), else unknownError (1, `WalletError.ts:72`; `:2379-2384`); the
 //! message is `error.message`, cut at `MAX_WIRE_ERROR_MESSAGE_BYTES` = 4096
 //! (`:25`, `:2387-2393`); the stack an empty string, a varint 0 (`:2395-2396`).
-//! A wallet's error passes through `#invokeWallet` first (`:2402-2418`): an
+//! A wallet's error passes through `#invokeWallet` ahead of the catch (`:2402-2418`): an
 //! explicit wallet error with a code 2 to 8 keeps its words and code, every
 //! other is replaced by `Wallet operation failed`, code 1 (`:2417`). This
 //! crate's `Error` carries no wallet code (#137), so every frame is 1 and
