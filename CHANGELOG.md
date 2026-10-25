@@ -196,7 +196,10 @@ recordings' `full` frames through per-call layouts in
 to both recorded cases byte for byte. The 112 result ids are unchanged; their
 numbers move with the bytes (a recorded counterparty is a real key, so a
 request decode now pays its point decompression), and the macOS baseline's
-wire_codec rows want re-recording on a quiet machine.
+wire_codec rows want re-recording on a quiet machine. Five of the layouts moved
+with #177, #178 and #182's re-recordings (the listCertificates verifier's raw
+bytes, the discovery entry's plain strings and raw keyring values, the header's
+80 raw bytes); the pin holds byte for byte on the re-recorded frames.
 
 ### Added: a BEEF whose source links form a cycle is pinned (#160)
 

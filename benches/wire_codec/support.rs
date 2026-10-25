@@ -417,14 +417,15 @@ fn common() -> Vec<Layout> {
     vec![Layout::Protocol, Layout::Str, Layout::Counterparty]
 }
 
-/// The transceiver's certificate order (`prove_certificate`, `parse_certificate_from_binary`):
+/// The certificate as `prove_certificate`'s request writes it:
 /// type, subject, serial, certifier, outpoint, a prefixed signature, the fields.
 fn transceiver_certificate() -> Vec<Layout> {
     use Layout::*;
     vec![Raw(32), Raw(33), Raw(32), Raw(33), Outpoint, Blob, Map]
 }
 
-/// `WireWriter::write_wallet_certificate`'s order, the one the recorded results carry:
+/// `WireWriter::write_wallet_certificate`'s order, the one the recorded results carry
+/// and the transceiver reads since #177 (`parse_certificate_from_binary`):
 /// type, serial, subject, certifier, outpoint, the fields, the signature unprefixed.
 fn writer_certificate() -> Vec<Layout> {
     use Layout::*;
@@ -588,19 +589,25 @@ fn result_fields(call: WalletCall) -> Vec<Layout> {
         C::ListCertificates => vec![Array(vec![
             Framed(writer_certificate()),
             Flag(vec![keyring()]),
-            Str,
+            // The verifier: length 0, or 33 raw bytes (#177).
+            Blob,
         ])],
         C::ProveCertificate => vec![keyring()],
+        // The reference's discovery entry (#177, #182): the certifier's name, iconUrl
+        // and description as plain strings and trust a byte, the keyring a count of
+        // key and raw-byte value, the decrypted fields a count of string pairs.
         C::DiscoverByIdentityKey | C::DiscoverByAttributes => vec![Array(vec![
             Framed(writer_certificate()),
-            Flag(vec![Str, OptStr, OptStr, U8]),
-            OptMap,
-            OptMap,
+            Str,
+            Str,
+            Str,
+            U8,
+            keyring(),
+            Map,
         ])],
         C::GetHeight => vec![Var],
-        // The processor prefixes the header with its length; the transceiver keeps
-        // the prefix as the header's leading byte (recorded as such by #76).
-        C::GetHeaderForHeight => vec![Blob],
+        // The header's 80 raw bytes, no length prefix (#178).
+        C::GetHeaderForHeight => vec![Raw(80)],
         C::GetNetwork => vec![U8],
         C::GetVersion => vec![Rest],
         C::AbortAction | C::InternalizeAction | C::RelinquishOutput | C::RelinquishCertificate => {
