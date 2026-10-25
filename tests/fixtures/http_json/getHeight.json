@@ -4,7 +4,7 @@
       "expected": {
         "client_result": {
           "ok": {
-            "height": 0
+            "height": 1
           }
         },
         "request": {
@@ -17,12 +17,12 @@
           "path": "/getHeight"
         },
         "request_body_hex": "7b7d",
-        "response_body_hex": "7b22686569676874223a307d"
+        "response_body_hex": "7b22686569676874223a317d"
       },
       "input": {
         "args": {},
         "response_body": {
-          "height": 0
+          "height": 1
         },
         "response_status": 200
       },

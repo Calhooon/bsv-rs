@@ -272,9 +272,9 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
         }
         IsAuthenticated => (json!({}), json!({"authenticated": full})),
         WaitForAuthentication => (json!({}), json!({"authenticated": true})),
-        GetHeight => (json!({}), json!({"height": if full {800000} else {0}})),
+        GetHeight => (json!({}), json!({"height": if full {800000} else {1}})),
         GetHeaderForHeight => (
-            json!({"height": if full {800000} else {0}}),
+            json!({"height": if full {800000} else {1}}),
             json!({"header": if full {"ab".repeat(80)} else {"00".repeat(80)}}),
         ),
         GetNetwork => (
