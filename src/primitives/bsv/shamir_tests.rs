@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The unit tests of `shamir.rs`, in their own file (the file-size ratchet).
 
 use super::*;
