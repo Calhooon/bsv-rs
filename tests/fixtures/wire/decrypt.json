@@ -72,10 +72,10 @@
           "method": "decrypt",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "000100",
+        "processor_response_hex": "0000",
         "request_hex": "0c1066697874757265732e696e76616c6964010c66697874757265206b65797307666978747572650030000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "000100"
+        "response_hex": "0000"
       },
       "input": {
         "args": {
@@ -222,10 +222,10 @@
           "method": "decrypt",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "000600017f80feff",
+        "processor_response_hex": "0000017f80feff",
         "request_hex": "0c1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee530000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "000600017f80feff"
+        "response_hex": "0000017f80feff"
       },
       "input": {
         "args": {
