@@ -47,17 +47,28 @@ const UNKNOWN_ERROR: u8 = 1;
 /// `MAX_WIRE_ERROR_MESSAGE_BYTES` (`WalletWireProcessor.ts:25`).
 const MAX_WIRE_ERROR_MESSAGE_BYTES: usize = 4096;
 
+/// The words of the reference's replacement (`WalletWireProcessor.ts:2417`
+/// at `ts-stack@edf6e03`): every wallet error that is not an explicit one is
+/// framed as `new WalletError('Wallet operation failed', unknownError)`.
+const WALLET_OPERATION_FAILED: &str = "Wallet operation failed";
+
+/// The code of an explicit wallet error, 2 to 8 (`WalletWireProcessor.ts:2405-2416`:
+/// a `WalletError`, or a `WERR_` error, whose `code` lies in unsupportedAction
+/// to abortRefused). This crate's `Error` carries no wallet code (#137), so no
+/// error is explicit today; a coded variant, when one exists, answers here and
+/// keeps its words and its code on the wire.
+fn explicit_wallet_code(_error: &Error) -> Option<u8> {
+    None
+}
+
 /// The words an error frame carries: the reference writes `error.message`
 /// (`WalletWireProcessor.ts:2387`), never this crate's `Display` prefix. A
-/// wallet's refusal is its own words (`WalletError`), a busy or transport
-/// answer its detail; every other variant is this crate's own sentence,
-/// written as its `Display` reads.
+/// `WalletError` is its own words (the replacement's constant, a stub's
+/// refusal); every other variant, the processor's own reading of the request,
+/// is this crate's own sentence, written as its `Display` reads.
 fn wire_message(error: &Error) -> String {
     match error {
         Error::WalletError(words) => words.clone(),
-        Error::WalletBusy { detail, .. }
-        | Error::WalletTransport { detail, .. }
-        | Error::TransportFault { detail, .. } => detail.clone(),
         other => other.to_string(),
     }
 }
@@ -239,6 +250,26 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         }
     }
 
+    /// The reference's `#invokeWallet` (`WalletWireProcessor.ts:2402-2418` at
+    /// `ts-stack@edf6e03`, bsv-rs#202): a wallet's explicit error keeps its
+    /// words and code; every other error the wallet returns is replaced by
+    /// `Wallet operation failed`, so a wallet's words (which can carry paths
+    /// or internal state) never reach the wire. The processor's own errors
+    /// (its reading of the request, a false verdict, a stub) are raised
+    /// outside this call and framed in their own words, as the reference's
+    /// throws outside the wrapper are.
+    async fn invoke_wallet<T>(
+        &self,
+        operation: impl std::future::Future<Output = Result<T, Error>>,
+    ) -> Result<T, Error> {
+        operation
+            .await
+            .map_err(|error| match explicit_wallet_code(&error) {
+                Some(_) => error,
+                None => Error::WalletError(WALLET_OPERATION_FAILED.to_string()),
+            })
+    }
+
     /// Encodes a response (success or error) into wire format.
     fn encode_response(&self, result: Result<Vec<u8>, Error>) -> Result<Vec<u8>, Error> {
         let mut writer = WireWriter::new();
@@ -252,10 +283,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
                 // The reference's outer catch (`WalletWireProcessor.ts:2370-2396`
                 // at `ts-stack@edf6e03`, bsv-rs#202): the error's own code when
                 // it lies in 2 to 8, else unknownError (1); this crate's `Error`
-                // carries no code, so every frame is 1. The message is the
-                // error's own words, cut at 4096 bytes; the stack an empty
-                // string.
-                writer.write_u8(UNKNOWN_ERROR);
+                // carries no code (#137), so every frame is 1 today. The message
+                // is the error's own words, cut at 4096 bytes; the stack an
+                // empty string.
+                writer.write_u8(explicit_wallet_code(&e).unwrap_or(UNKNOWN_ERROR));
                 let message = wire_message(&e);
                 let bytes = message.as_bytes();
                 let bytes = &bytes[..bytes.len().min(MAX_WIRE_ERROR_MESSAGE_BYTES)];
@@ -292,7 +323,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             counterparty,
             for_self,
         };
-        let result = self.wallet.get_public_key(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.get_public_key(args, originator))
+            .await?;
 
         // Serialize response - result.public_key is a hex string
         let mut writer = WireWriter::new();
@@ -320,7 +353,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             key_id,
             counterparty,
         };
-        let result = self.wallet.encrypt(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.encrypt(args, originator))
+            .await?;
 
         Ok(write_encrypt_result(&result))
     }
@@ -344,7 +379,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             key_id,
             counterparty,
         };
-        let result = self.wallet.decrypt(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.decrypt(args, originator))
+            .await?;
 
         Ok(write_decrypt_result(&result))
     }
@@ -368,7 +405,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             key_id,
             counterparty,
         };
-        let result = self.wallet.create_hmac(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.create_hmac(args, originator))
+            .await?;
 
         Ok(write_create_hmac_result(&result))
     }
@@ -379,7 +418,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
         let args = super::requests::read_verify_hmac_args(reader)?;
-        let result = self.wallet.verify_hmac(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.verify_hmac(args, originator))
+            .await?;
 
         write_verify_hmac_result(&result)
     }
@@ -390,7 +431,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
         let args = super::requests::read_create_signature_args(reader)?;
-        let result = self.wallet.create_signature(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.create_signature(args, originator))
+            .await?;
 
         Ok(write_create_signature_result(&result))
     }
@@ -401,7 +444,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
         let args = super::requests::read_verify_signature_args(reader)?;
-        let result = self.wallet.verify_signature(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.verify_signature(args, originator))
+            .await?;
 
         write_verify_signature_result(&result)
     }
@@ -413,8 +458,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         let args = read_reveal_counterparty_key_linkage_args(reader)?;
         let result = self
-            .wallet
-            .reveal_counterparty_key_linkage(args, originator)
+            .invoke_wallet(
+                self.wallet
+                    .reveal_counterparty_key_linkage(args, originator),
+            )
             .await?;
 
         Ok(write_reveal_counterparty_key_linkage_result(&result))
@@ -427,8 +474,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         let args = read_reveal_specific_key_linkage_args(reader)?;
         let result = self
-            .wallet
-            .reveal_specific_key_linkage(args, originator)
+            .invoke_wallet(self.wallet.reveal_specific_key_linkage(args, originator))
             .await?;
 
         Ok(write_reveal_specific_key_linkage_result(&result))
@@ -439,19 +485,25 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // =========================================================================
 
     async fn handle_is_authenticated(&self, originator: &str) -> Result<Vec<u8>, Error> {
-        let result = self.wallet.is_authenticated(originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.is_authenticated(originator))
+            .await?;
         let mut writer = WireWriter::new();
         writer.write_optional_bool(Some(result.authenticated));
         Ok(writer.into_bytes())
     }
 
     async fn handle_wait_for_authentication(&self, originator: &str) -> Result<Vec<u8>, Error> {
-        let result = self.wallet.wait_for_authentication(originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.wait_for_authentication(originator))
+            .await?;
         write_wait_for_authentication_result(&result)
     }
 
     async fn handle_get_height(&self, originator: &str) -> Result<Vec<u8>, Error> {
-        let result = self.wallet.get_height(originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.get_height(originator))
+            .await?;
         let mut writer = WireWriter::new();
         writer.write_var_int(result.height as u64);
         Ok(writer.into_bytes())
@@ -466,7 +518,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let height = reader.read_var_int_u32("height")?;
 
         let args = crate::wallet::GetHeaderArgs { height };
-        let result = self.wallet.get_header_for_height(args, originator).await?;
+        let result = self
+            .invoke_wallet(self.wallet.get_header_for_height(args, originator))
+            .await?;
 
         // The 80 bytes raw, no length prefix (`WalletWireProcessor.ts:1687-1690`
         // at `ts-stack@edf6e03`; BRC-100 `0100.md:2478` at `5119a9b`), another
@@ -647,6 +701,54 @@ mod tests {
     use super::*;
     use crate::primitives::PrivateKey;
     use crate::wallet::{ProtoWallet, SecurityLevel};
+
+    /// The frame `encode_response` writes for an error: since #202's division
+    /// a wallet's words never reach it, so the cut is pinned on the writer.
+    fn error_frame(error: Error) -> Vec<u8> {
+        create_test_processor().encode_response(Err(error)).unwrap()
+    }
+
+    /// #202: a message past 4096 bytes is cut at 4096 (`:2388-2391`), its
+    /// length `fd 00 10`.
+    #[test]
+    fn a_message_past_4096_bytes_is_cut_at_4096() {
+        let long = "a".repeat(5000);
+        let frame = error_frame(Error::WalletError(long.clone()));
+        let mut expected = vec![1, 0xfd, 0x00, 0x10];
+        expected.extend(&long.as_bytes()[..4096]);
+        expected.push(0);
+        assert_eq!(frame, expected);
+    }
+
+    /// #202: the cut is at the byte, as the reference's `subarray` cuts it,
+    /// even inside a character: `é` at bytes 4095-4096 leaves `c3` last.
+    #[test]
+    fn the_cut_is_at_the_byte_inside_a_character() {
+        let long = format!("{}é", "a".repeat(4095));
+        let frame = error_frame(Error::WalletError(long.clone()));
+        assert_eq!(frame.len(), 4 + 4096 + 1);
+        assert_eq!(&frame[4..frame.len() - 1], &long.as_bytes()[..4096]);
+        assert_eq!(frame[frame.len() - 2..], [0xc3, 0]);
+    }
+
+    /// #202: the stack field is an empty string, a varint 0 and nothing after
+    /// it (`:2395-2396`): an empty message is framed `01 00 00`.
+    #[test]
+    fn the_stack_field_is_a_varint_zero() {
+        assert_eq!(error_frame(Error::WalletError(String::new())), [1, 0, 0]);
+    }
+
+    /// #202: the processor's own error that is not a `WalletError` is its
+    /// `Display`, with no wallet replacement (`:2387`).
+    #[test]
+    fn a_processor_error_is_framed_as_its_display() {
+        let frame = error_frame(Error::InvalidHex("zz".into()));
+        let words = b"invalid hex string: zz";
+        let mut expected = vec![1, words.len() as u8];
+        expected.extend(words);
+        expected.push(0);
+        assert_eq!(frame, expected);
+    }
 
     fn create_test_processor() -> WalletWireProcessor<ProtoWallet> {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));

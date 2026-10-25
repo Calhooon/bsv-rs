@@ -5,8 +5,13 @@
 //! (2 to 8), else unknownError (1, `WalletError.ts:72`; `:2379-2384`); the
 //! message is `error.message`, cut at `MAX_WIRE_ERROR_MESSAGE_BYTES` = 4096
 //! (`:25`, `:2387-2393`); the stack an empty string, a varint 0 (`:2395-2396`).
-//! This crate's `Error` carries no wallet code, so every frame is 1. Every
-//! frame below is hand-assembled to those lines.
+//! A wallet's error passes through `#invokeWallet` first (`:2402-2418`): an
+//! explicit wallet error with a code 2 to 8 keeps its words and code, every
+//! other is replaced by `Wallet operation failed`, code 1 (`:2417`). This
+//! crate's `Error` carries no wallet code (#137), so every frame is 1 and
+//! every wallet error the constant; the processor's own errors (its reading,
+//! the three false verdicts, raised outside the wrapper) keep their words.
+//! Every frame below is hand-assembled to those lines.
 #![cfg(all(feature = "wallet", feature = "http"))]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -72,85 +77,105 @@ async fn read_back(frame: Vec<u8>) -> Result<u64, Error> {
         .await
 }
 
-/// #202: a wallet's plain refusal is framed with unknownError (1) and its
-/// bare words, never `wallet error: ` ahead of them; the transceiver reads
-/// it back as the code and the words.
+/// The reference's frame for every un-coded wallet error (`:2417`, framed
+/// by `:2379-2396`): `01`, `0x17`, `Wallet operation failed`, `00`.
+const WALLET_OPERATION_FAILED_FRAME: &str = "011757616c6c6574206f7065726174696f6e206661696c656400";
+
+/// #202, the keeper's division: an un-coded wallet error is the reference's
+/// constant, `Wallet operation failed`, code 1 (`#invokeWallet`, `:2417`);
+/// the wallet's own words never reach the wire. The transceiver reads it back
+/// as the code and the constant.
 #[tokio::test]
-async fn a_wallet_refusal_is_framed_with_code_one_and_its_bare_words() {
-    let frame = refusal_frame(Error::WalletError("fixture refusal".into())).await;
+async fn an_uncoded_wallet_error_is_framed_as_wallet_operation_failed() {
     assert_eq!(
-        hex::encode(&frame),
-        hex::encode(reference_frame(1, b"fixture refusal"))
+        hex::encode(reference_frame(1, b"Wallet operation failed")),
+        WALLET_OPERATION_FAILED_FRAME
     );
+    let frame = refusal_frame(Error::WalletError("anything".into())).await;
+    assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
     assert_eq!(
         read_back(frame).await,
         Err(Error::WalletError(
-            "wallet error (code 1): fixture refusal".into()
+            "wallet error (code 1): Wallet operation failed".into()
         ))
     );
 }
 
-/// #202: this crate's `Error` carries no wallet code, so no refusal is framed
-/// 2 to 8: the words that once chose 6 and 7 (`invalid parameter`,
-/// `insufficient funds`) are a plain Error's words to the reference, framed 1.
-/// A busy or transport answer writes its detail; another variant is this
-/// crate's own sentence, its `Display`.
+/// #202: every variant a wallet returns is the same constant: the words that
+/// once chose 6 and 7, a busy or transport answer, a crate sentence, a
+/// validation refusal raised inside the wallet, a 5000-byte message. None
+/// carries a code 2 to 8 (#137), so none is explicit.
 #[tokio::test]
-async fn every_wallet_error_is_framed_as_unknown_error_in_its_own_words() {
-    for (error, words) in [
-        (
-            Error::WalletError("invalid parameter: fixture".into()),
-            "invalid parameter: fixture",
-        ),
-        (
-            Error::WalletError("insufficient funds: fixture".into()),
-            "insufficient funds: fixture",
-        ),
-        (
-            Error::WalletBusy {
-                detail: "store held".into(),
-                retry_after_ms: Some(5),
-            },
-            "store held",
-        ),
-        (
-            Error::WalletTransport {
-                status: Some(503),
-                detail: "no answer".into(),
-            },
-            "no answer",
-        ),
-        (
-            Error::TransportFault {
-                fault: TransportFault::NeverSent,
-                status: None,
-                detail: "connection refused".into(),
-            },
-            "connection refused",
-        ),
-        (
-            Error::InvalidHex("zz".into()),
-            "invalid hex string: zz",
-        ),
-        (
-            Error::HmacMinimalLengthKey {
-                leading_zero_bytes: 1,
-            },
-            "HMAC is not valid: the tag was made under a minimal-length key (the sender drops the 1 leading zero byte(s) of the 32-byte X coordinate; BRC-56)",
-        ),
+async fn every_wallet_error_variant_is_framed_as_the_same_constant() {
+    for error in [
+        Error::WalletError("invalid parameter: fixture".into()),
+        Error::WalletError("insufficient funds: fixture".into()),
+        Error::WalletError("a".repeat(5000)),
+        Error::WalletError(String::new()),
+        Error::WalletBusy {
+            detail: "store held".into(),
+            retry_after_ms: Some(5),
+        },
+        Error::WalletTransport {
+            status: Some(503),
+            detail: "no answer".into(),
+        },
+        Error::TransportFault {
+            fault: TransportFault::NeverSent,
+            status: None,
+            detail: "connection refused".into(),
+        },
+        Error::InvalidHex("zz".into()),
+        Error::ProtocolValidationError("/home/wallet/keys.db".into()),
+        Error::InvalidCounterparty("fixture".into()),
+        Error::HmacMinimalLengthKey {
+            leading_zero_bytes: 1,
+        },
     ] {
         let frame = refusal_frame(error.clone()).await;
         assert_eq!(
             hex::encode(&frame),
-            hex::encode(reference_frame(1, words.as_bytes())),
-            "{error:?}"
-        );
-        assert_eq!(
-            read_back(frame).await,
-            Err(Error::WalletError(format!("wallet error (code 1): {words}"))),
+            WALLET_OPERATION_FAILED_FRAME,
             "{error:?}"
         );
     }
+}
+
+/// #202: a wallet erring on verifyHmac (an `Err`, not a false verdict) is
+/// inside the wrapper (`:1517-1519`): the constant, where its false verdict
+/// below is the processor's own throw.
+#[tokio::test]
+async fn a_wallet_erring_on_a_verdict_call_is_the_constant() {
+    let mut stub = Stub::new(json!({}));
+    stub.error = Some(Error::WalletError("key store locked".into()));
+    let client = WalletWireTransceiver::new(TapeWire {
+        processor: WalletWireProcessor::new(stub),
+        tape: Arc::default(),
+    });
+    let tape = Arc::clone(&client.wire().tape);
+    let result = client
+        .verify_hmac(
+            VerifyHmacArgs {
+                data: vec![1, 2, 3],
+                hmac: [7; 32],
+                protocol_id: protocol(),
+                key_id: "frame-0".into(),
+                counterparty: Some(Counterparty::Self_),
+            },
+            "test",
+        )
+        .await
+        .map(|r| r.valid);
+    assert_eq!(
+        hex::encode(&*tape.lock().unwrap()),
+        WALLET_OPERATION_FAILED_FRAME
+    );
+    assert_eq!(
+        result,
+        Err(Error::WalletError(
+            "wallet error (code 1): Wallet operation failed".into()
+        ))
+    );
 }
 
 /// #202: the processor's own refusal of a request (a truncated frame) is its
@@ -204,7 +229,10 @@ fn protocol() -> Protocol {
 /// #202: the three false verdicts are the reference's throws, bare: `HMAC is
 /// not valid` (`WalletWireProcessor.ts:1520`), `Signature is not valid`
 /// (`:1597`), `Wallet did not affirmatively authenticate` (`:1637`), plain
-/// Errors framed 1; the transceiver reads each back as the code and the words.
+/// Errors framed 1. Each is thrown after `#invokeWallet` has returned the
+/// wallet's answer (`:1517-1519`, `:1594-1596`, `:1633-1635`), outside the
+/// wrapper, so the words are the processor's and stay; the transceiver reads
+/// each back as the code and the words.
 #[tokio::test]
 async fn the_three_false_verdicts_are_framed_in_the_references_words() {
     let (client, tape) = taped(json!({"valid": false}));
@@ -267,52 +295,4 @@ async fn the_three_false_verdicts_are_framed_in_the_references_words() {
             "{words}"
         );
     }
-}
-
-/// #202: a message past 4096 bytes is cut at 4096 (`:2388-2391`), its length
-/// `fd 00 10`; the transceiver reads the 4096 bytes back.
-#[tokio::test]
-async fn a_message_past_4096_bytes_is_cut_at_4096() {
-    let long = "a".repeat(5000);
-    let frame = refusal_frame(Error::WalletError(long.clone())).await;
-    assert_eq!(&frame[..4], &[1, 0xfd, 0x00, 0x10]);
-    assert_eq!(
-        hex::encode(&frame),
-        hex::encode(reference_frame(1, &long.as_bytes()[..4096]))
-    );
-    assert_eq!(
-        read_back(frame).await,
-        Err(Error::WalletError(format!(
-            "wallet error (code 1): {}",
-            &long[..4096]
-        )))
-    );
-}
-
-/// #202: the cut is at the byte, as the reference's `subarray` cuts it, even
-/// inside a character: `é` at bytes 4095-4096 leaves `c3` last, and the
-/// transceiver refuses the frame's invalid UTF-8 as the reference's client
-/// does (`toUTF8Strict`, `WalletWireTransceiver.ts:143`).
-#[tokio::test]
-async fn the_cut_is_at_the_byte_inside_a_character() {
-    let long = format!("{}é", "a".repeat(4095));
-    let frame = refusal_frame(Error::WalletError(long.clone())).await;
-    assert_eq!(
-        hex::encode(&frame),
-        hex::encode(reference_frame(1, &long.as_bytes()[..4096]))
-    );
-    assert_eq!(frame[frame.len() - 2..], [0xc3, 0]);
-    assert!(read_back(frame).await.is_err());
-}
-
-/// #202: the stack field is an empty string, a varint 0 and nothing after it
-/// (`:2395-2396`): an empty message is framed `01 00 00`.
-#[tokio::test]
-async fn the_stack_field_is_a_varint_zero() {
-    let frame = refusal_frame(Error::WalletError(String::new())).await;
-    assert_eq!(frame, [1, 0, 0]);
-    assert_eq!(
-        read_back(frame).await,
-        Err(Error::WalletError("wallet error (code 1): ".into()))
-    );
 }
