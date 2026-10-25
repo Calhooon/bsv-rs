@@ -24,6 +24,53 @@ ratchet and bench-compare tools.
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
+### Fixed: both linkage responses put the three keys ahead of everything (#194)
+
+`WalletWireProcessor` wrote revealCounterpartyKeyLinkage's result as
+encryptedLinkage, encryptedLinkageProof, the prover, verifier and counterparty,
+then revelationTime, and revealSpecificKeyLinkage's as the two byte strings,
+the three keys, the protocol, keyID and proofType. The reference writes the
+three keys (33 bytes each) ahead of everything: then revelationTime behind its varint
+length, encryptedLinkage and encryptedLinkageProof behind theirs
+(`ts-stack@edf6e03` `WalletWireProcessor.ts:1761-1781`, read at
+`WalletWireTransceiver.ts:818-836`); or the security level and the protocol
+string behind its length, keyID behind its length, the two byte strings and
+proofType as one byte (`WalletWireProcessor.ts:1811-1841`, read at
+`WalletWireTransceiver.ts:890-908`). Go writes the same bytes
+(`go-sdk@2ca481c` `wallet/serializer/reveal_counterparty_key_linkage.go:68-89`,
+`reveal_specific_key_linkage.go:73-92`), and BRC-100 sections 9 and 10 list the
+fields in that order (`wallet/0100.md:2052-2057`, `:2088-2095` at `5119a9b`).
+Both writers (now `src/wallet/wire/results.rs`) write that order; no field of
+`RevealCounterpartyKeyLinkageResult` or `RevealSpecificKeyLinkageResult`
+moves.
+
+The tests that pin it: `tests/wallet_wire_cross_sdk_tests.rs`
+`the_counterparty_linkage_response_writes_the_three_keys_ahead_of_everything`
+and `the_specific_linkage_response_writes_the_three_keys_ahead_of_everything`
+(the processor's response to a wallet answering with Go's result vector's json
+is the vector's wire byte for byte, the error byte included), and
+`every_go_result_vector_is_the_processors_wire_for_its_json` (the 27 result
+vectors the same way: 8 pass, 19 are an enumerated allowlist with reasons, 12
+refusal stubs and 7 calls whose result writers differ from the reference's, a
+finding not changed here: encrypt, decrypt, createHmac and createSignature
+write a length ahead of the bytes, `WalletWireProcessor.ts:1444`, `:1471`,
+`:1496`, `:1560` write the bytes alone; verifyHmac, verifySignature and
+waitForAuthentication write a byte `01` the reference does not, `:1522-1525`,
+`:1600-1603`, `:1641-1644`; the count is pinned);
+`tests/wire_method_roundtrip_tests.rs`
+`test_roundtrip_reveal_counterparty_key_linkage_privileged` and
+`test_roundtrip_reveal_specific_key_linkage_privileged` read both responses in
+the reference's order to their end. RED on `164e0c3`. The recordings
+`tests/fixtures/wire/revealCounterpartyKeyLinkage.json` and
+`revealSpecificKeyLinkage.json` are re-recorded in their own commits (the
+response bytes move; the request bytes stay as #191 left them).
+
+Migration: a consumer of this crate's processor answering the reference's or
+Go's transceiver read the response wrong before (the linkage's length and bytes
+taken as the prover's key) and reads it right now. One speaking to this crate's
+own side: none; this crate has no linkage reader (docs/FIXTURES.md F2), and a
+hand-built reader of the old order must read the keys ahead of the rest.
+
 ### Fixed: the linkage requests carry the privileged parameters ahead of the keys (#191)
 
 `WalletWireProcessor` read revealCounterpartyKeyLinkage's two keys at the
@@ -74,6 +121,9 @@ before a privileged counterparty request was refused and a specific one was
 misread. The responses of both calls still put the encrypted linkage ahead of
 the keys, where the reference and BRC-100 put the keys ahead of it (F2): a finding,
 not changed here.
+
+misread. The responses of both calls put the encrypted linkage ahead of the
+keys, where the reference and BRC-100 put the keys first: fixed by #194, above.
 
 ### Fixed: the wallet wire's readers refuse what the reference's readers refuse (#183)
 

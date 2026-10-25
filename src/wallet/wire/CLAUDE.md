@@ -11,9 +11,10 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~478 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2486 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~920 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~897 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191) | ~77 |
+| `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194) | ~58 |
 | `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1597 |
 
 ## Architecture
@@ -209,7 +210,7 @@ pub mod status_codes {
 **Fully implemented handlers (delegated to wallet):**
 - getPublicKey, encrypt, decrypt, createHmac, verifyHmac
 - createSignature, verifySignature
-- revealCounterpartyKeyLinkage, revealSpecificKeyLinkage: the request in the reference's order (`requests.rs`, #191): counterparty linkage the privileged flag (`i8`) and reason (`i8` length, -1 absent) then the two keys (`WalletWireProcessor.ts:1739-1747`); specific linkage the protocol, key ID, counterparty, privileged flag and reason, then the verifier (`:1790-1797`, `:2564-2583`); both passed through into the args. The responses still write the encrypted linkage ahead of the keys (docs/FIXTURES.md F2)
+- revealCounterpartyKeyLinkage, revealSpecificKeyLinkage: the request in the reference's order (`requests.rs`, #191): counterparty linkage the privileged flag (`i8`) and reason (`i8` length, -1 absent) then the two keys (`WalletWireProcessor.ts:1739-1747`); specific linkage the protocol, key ID, counterparty, privileged flag and reason, then the verifier (`:1790-1797`, `:2564-2583`); both passed through into the args. The responses in the reference's order (`results.rs`, #194): the prover, verifier and counterparty, then revelationTime, encryptedLinkage, encryptedLinkageProof (`WalletWireProcessor.ts:1761-1781`); or the protocol, keyID, encryptedLinkage, encryptedLinkageProof, proofType (`:1811-1841`)
 - isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight
 
 **Processor-local handlers:**
@@ -309,7 +310,7 @@ Messages serialized by one SDK can be deserialized by another. Key compatibility
 - **String maps**: Keys sorted lexicographically before writing
 - **Empty optional strings/bytes**: Treated same as None (both write nil sentinel)
 
-54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 45 cross-SDK tests, among them every args vector decoded through the processor to its json (#191).
+54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 48 cross-SDK tests, among them every args vector decoded through the processor to its json (#191) and every result vector written through it to its wire (#194).
 
 ## Dependencies
 
