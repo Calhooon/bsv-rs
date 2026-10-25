@@ -226,6 +226,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tokio-tungstenite",
+ "tracing",
  "urlencoding",
  "wiremock",
 ]
