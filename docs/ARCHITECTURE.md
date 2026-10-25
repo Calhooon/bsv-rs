@@ -38,7 +38,7 @@ A BRC citation is `<path>:<line>` at `5119a9b`.
 Fourteen feature-gated modules: twelve in one dependency chain and two at
 the side (`compat`, `totp`) that stand on `primitives` alone. `block` sits in
 the chain, under `transaction` since 0.6.0 (`Cargo.toml`'s `[features]` table
-is the source; `CLAUDE.md`'s "thirteen" predates it). The wasm32 line runs
+is the source). The wasm32 line runs
 through `primitives`, `script`, `block`, `transaction`, `wallet`, `messages`,
 `auth` and `overlay`: the six consumer slices CI builds on
 `wasm32-unknown-unknown` ([ARCH-RULES.md](ARCH-RULES.md), "Feature and wasm
@@ -71,7 +71,7 @@ Paths under "reference" are `src/` of `ts-sdk@9e3ede6` unless marked
 |---|---|---|---|---|
 | `primitives` | `primitives` | Hashes, secp256k1 and P-256, AES-256-GCM, `BigNumber`, HMAC-DRBG, the encodings, the sighash digests and `SighashCache`; byte-for-byte the reference's on the shared vectors | `primitives/` (`Hash.ts`, `ECDSA.ts`, `PrivateKey.ts`, `AESGCM.ts`, `DRBG.ts`, `BigNumber.ts`); go-sdk `primitives/` | [`src/primitives/CLAUDE.md`](../src/primitives/CLAUDE.md), [`ec/`](../src/primitives/ec/CLAUDE.md), [`bsv/`](../src/primitives/bsv/CLAUDE.md) |
 | `script` | `script` | `Script` and its chunks, the templates, and `Spend`: the reference's default mode without a word, the node's block or standard word with one; a budget is its own error class | `script/Spend.ts`, `Script.ts`, `templates/`; go-sdk `script/`; the node at the pin `CLAUDE.md` names for the flag words | [`src/script/CLAUDE.md`](../src/script/CLAUDE.md), [`templates/`](../src/script/templates/CLAUDE.md) |
-| `block` | `block` | `BlockHeader`, `CompactTarget`, proof of work, `ChainWork`, merkle roots, `next_work_required` as the node computes it | go-sdk `block/`; the node's difficulty rule (`tests/chain_difficulty.rs` names its tables); `@bsv/sdk` has no block module | none of its own: `CLAUDE.md`'s layout row (a gap, noted below) |
+| `block` | `block` | `BlockHeader`, `CompactTarget`, proof of work, `ChainWork`, merkle roots, `next_work_required` as the node computes it | go-sdk `block/`; the node's difficulty rule (`tests/chain_difficulty.rs` names its tables); `@bsv/sdk` has no block module | [`src/block/CLAUDE.md`](../src/block/CLAUDE.md) |
 | `transaction` | `transaction` | `Transaction` and its parts, signing through the templates, fee models, BEEF (whole and streaming), `MerklePath`, `verify` by txid, the broadcaster and chain tracker traits with the typed transport fault | `transaction/` (`Transaction.ts`, `Beef.ts`, `MerklePath.ts`, `broadcasters/`, `chaintrackers/`, `fee-models/`); ts-stack `packages/sdk` for BEEF 3.x; go-sdk `transaction/`, `spv/` | [`src/transaction/CLAUDE.md`](../src/transaction/CLAUDE.md), [`broadcasters/`](../src/transaction/broadcasters/CLAUDE.md), [`chain_trackers/`](../src/transaction/chain_trackers/CLAUDE.md), [`fee_models/`](../src/transaction/fee_models/CLAUDE.md) |
 | `wallet` | `wallet` | BRC-42/43 derivation (`KeyDeriver`, cached), `ProtoWallet`, the 28-method `WalletInterface`, the BRC-100 binary wire (`wire/`) and the two HTTP substrates (`substrates/`): the frame and the body as BRC-100 reads them at the pin | `wallet/` (`KeyDeriver.ts`, `ProtoWallet.ts`, `WalletClient.ts`, `substrates/`); go-sdk `wallet/` (its `substrates/testdata/` are the 54 wire vectors) | [`src/wallet/CLAUDE.md`](../src/wallet/CLAUDE.md), [`wire/`](../src/wallet/wire/CLAUDE.md), [`substrates/`](../src/wallet/substrates/CLAUDE.md) |
 | `messages` | `messages` | BRC-77 signed and BRC-78 encrypted messages over BRC-42 keys | `messages/` (`SignedMessage.ts`, `EncryptedMessage.ts`); go-sdk `message/` | [`src/messages/CLAUDE.md`](../src/messages/CLAUDE.md) |
@@ -116,16 +116,17 @@ A rule whose test is missing says so: that is a finding, never an invention.
 - **Consensus and policy are different words.** `ScriptFlags::block(era)` and `ScriptFlags::standard(era)` ([`src/script/flags.rs`](../src/script/flags.rs), every rule at the node's site under its version gate); a rule that is policy is never enforced under the block word; `the_standard_word_refuses_what_the_block_word_accepts_only_by_a_standard_only_rule`, `flags_policy_as_consensus_a_version_1_spend_leaving_two_stack_elements_is_valid_under_the_block_word`, `the_default_mode_changes_exactly_one_recorded_verdict_the_nulldummy_version_gate` (`script_flags_witnesses`); the node at the pin `CLAUDE.md` names; the sibling's harness is the oracle (`bsv-script-lean/harness/README.md`, lanes README rule 4).
 - **The sighash the node dispatches.** `SigningContext::compute_sighash` signs `compute_sighash_dispatched_for_signing`'s digest ([`src/primitives/bsv/sighash.rs`](../src/primitives/bsv/sighash.rs)): BIP143 for FORKID without CHRONICLE, the original digest otherwise, the SINGLE sentinel `one` kept; `the_default_signing_digest_is_the_dispatchers_for_every_hash_type`, `a_single_beyond_the_outputs_under_the_original_digest_signs_the_constant_one`, `test_sighash_vectors` (`sighash_tests`), `every_row_of_the_class_agrees_with_the_reference_under_the_block_word` (`script_sighash_dispatch_witness`); the node's `SignatureHash` (CLAUDE.md's contracts, 0.7.0).
 - **RFC 6979's digest-at-or-above-n pin.** k256 0.14 signs a digest at or above the order with the bytes `@bsv/sdk` and go-sdk produce ([`src/primitives/ec/private_key.rs`](../src/primitives/ec/private_key.rs), #125); `rfc6979_digest_ge_n_der_is_pinned` (`ec_tests`), so a dependency move that changes it is noticed.
-- **HMAC keys are the 32-byte X coordinate; a minimal-length tag is refused by name (BRC-56).** `KeyDeriver` and `ProtoWallet::verify_hmac` ([`src/wallet/proto_wallet.rs`](../src/wallet/proto_wallet.rs)); `test_brc2_hmac_compliance` (`wallet_tests`) checks agreement with the reference on one TypeScript vector, whose X coordinate is not shown to start with a zero byte; a leading-zero key and the refusal by name are unpinned until #148 (`tests/wallet_brc56_hmac_tests.rs`, PR #150, not on this base): a gap, recorded below. BRC-56 `wallet/0056.md:56` (the X coordinate as exactly 32 big-endian bytes), `:66` (the recipient's), `:73` (the minimal-length divergence); BRC-42 `key-derivation/0042.md:25` (Key Derivation).
+- **HMAC keys are the 32-byte X coordinate; a minimal-length tag is refused by name (BRC-56).** `KeyDeriver` and `ProtoWallet::verify_hmac` ([`src/wallet/proto_wallet.rs`](../src/wallet/proto_wallet.rs)); `test_brc2_hmac_compliance` (`wallet_tests`) checks agreement with the reference on one TypeScript vector, whose X coordinate is not shown to start with a zero byte; the leading-zero keys and the refusal by name are pinned by `the_six_hmac_keys_are_the_32_byte_x_coordinate_with_its_leading_zeros`, `create_hmac_reproduces_the_six_brc56_tags`, `verify_hmac_accepts_the_six_32_byte_key_tags`, `a_minimal_length_key_tag_is_refused_naming_the_senders_encoding`, `a_minimal_length_key_tag_is_refused_through_the_async_interface` (`wallet_brc56_hmac_tests`, #148). BRC-56 `wallet/0056.md:56` (the X coordinate as exactly 32 big-endian bytes), `:66` (the recipient's), `:73` (the minimal-length divergence); BRC-42 `key-derivation/0042.md:25` (Key Derivation).
 - **Tests are hermetic.** No test depends on the network being present or absent (CLAUDE.md rule 4): every HTTP answer is `wiremock`'s, every overlay failure an injected resolver's; `test_global_get_by_tags_overlay_error` (`kvstore_global_tests`, `hermetic_store`: a resolver with no host), `library_never_reads_the_environment` (`arch_no_env`), `network_clients_stay_in_their_homes` (`arch_network_sites`); lanes README rule 3; `docs/charters/messaging-auth.md:37` (The rules).
 - **Every public behavior is pinned by a test.** CLAUDE.md rule 2 (a fix lands with a test that was RED before it); `fixtures_replay` (`fixtures_replay`: a wire byte, a body byte or a JSON value that moves fails with the file, case and path), `every_readme_snippet_is_an_example_file_and_every_example_is_in_the_readme` (`readme_examples`); [FIXTURES.md](FIXTURES.md).
 - **The whole suite runs in CI; a file CI does not run is refused.** The `test` job's "Run every integration test" step runs `cargo test --features "full,http,websocket" --tests --no-fail-fast`, so cargo's own enumeration runs every `tests/*.rs` (an enumerated list had drifted to 34 of 73 files, #146); `memory_profiling` runs alone behind `dhat-profiling`. The guard is the step itself ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)); no test under `tests/` restates it.
 - **The census only falls.** `tools/ratchet/run --check` against [ratchets.json](ratchets.json) (seven counters, a limit per oversized file); `unwrap_and_expect_counts_never_rise` (`arch_no_unwrap`), `every_counter_and_each_file_has_an_independent_limit` (`tools/ratchet/src/model.rs`), `conformance_scripts_evaluation` (`conformance_scripts`: the corpus total pinned, every mismatch in an enumerated class with its count); [RATCHETS.md](RATCHETS.md), CLAUDE.md rule 3.
 - **The dependents build against every PR.** The `dependents-plan`, `dependent-check`, `dependents` and `semver` jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) build every admitted consumer of [dependents.lock](dependents.lock) against the PR tree and refuse a breaking change against the last tag; `test_alias_resolves_to_the_pr_tree`, `test_unused_patch_cannot_report_success` ([`.github/scripts/test_dependents.py`](../.github/scripts/test_dependents.py), Python); [DEPENDENTS.md](DEPENDENTS.md).
 
-Two gaps the exit test found, each a finding for its own issue (a third, a BEEF
-whose source links form a cycle, is pinned by `tests/beef_cycle.rs`, #160):
-BRC-56's leading-zero key and refusal by name wait on #148; `src/block/` has no `CLAUDE.md`.
+The exit test's three gaps are closed: BRC-56's refusal by name is pinned by
+`tests/wallet_brc56_hmac_tests.rs` (#148), a BEEF whose source links form a
+cycle by `tests/beef_cycle.rs` (#160), and `src/block/` has its `CLAUDE.md`
+(#161); every invariant above names its test.
 
 ## 4. The lines and the gates
 
@@ -216,7 +217,7 @@ ls tests/vectors/beef_of_any_size | wc -l                       # 49
 find tests/fixtures -name '*.json' | wc -l                      # 65
 ls fuzz/fuzz_targets/*.rs | wc -l                               # 13
 ls examples | wc -l                                             # 6
-find src -name CLAUDE.md | wc -l                                # 27
+find src -name CLAUDE.md | wc -l                                # 27 (28 from #161)
 ```
 
 | Vector file | Entries |
@@ -239,4 +240,4 @@ find src -name CLAUDE.md | wc -l                                # 27
 
 Lines under `src/`: 102,200. Fixture files under `tests/fixtures/`: 65.
 Fuzz targets: 13. README examples: 6. Module `CLAUDE.md` files under `src/`:
-27 (none for `block/`).
+27 at that commit, 28 with `src/block/CLAUDE.md` (#161).

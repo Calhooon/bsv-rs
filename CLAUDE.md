@@ -1,10 +1,10 @@
 # CLAUDE.md: bsv-rs
 
-The working rules for this crate. `README.md` is the guide for users (what it is, the examples, the contracts, the numbers); this file is for whoever changes it. Read both, then the module's own `CLAUDE.md` (27 of them under `src/`, `tests/`, `benches/`) before touching that module.
+The working rules for this crate. `README.md` is the guide for users (what it is, the examples, the contracts, the numbers); this file is for whoever changes it. Read both, then the module's own `CLAUDE.md` (28 of them under `src/`, 31 with `tests/` and `benches/`) before touching that module.
 
 ## What this crate is, in one paragraph
 
-A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-stack` monorepo at `~/bsv/ts-stack` carries the newer packages and the conformance corpus), cross-checked against the Go SDK (`~/bsv/go-sdk`). Thirteen feature-gated modules in dependency order (`primitives → script → transaction → wallet → {messages, auth, overlay} → {storage, registry, kvstore, identity}`; `compat` and `totp` stand on `primitives`), one `Error` enum (`src/error.rs`, `Clone + PartialEq + Eq` so tests assert on it), and every public behavior pinned by a test that fails when the behavior changes. It ships to crates.io as `bsv-rs` and runs on native and `wasm32-unknown-unknown` (Cloudflare Workers are the production target: the LOW stack's overlay engine, watchtower, relay, app-layer and monitor).
+A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-stack` monorepo at `~/bsv/ts-stack` carries the newer packages and the conformance corpus), cross-checked against the Go SDK (`~/bsv/go-sdk`). Fourteen feature-gated modules in dependency order (`primitives → {script, block} → transaction → wallet → {messages, auth, overlay} → {storage, registry, kvstore, identity}`; `compat` and `totp` stand on `primitives`), one `Error` enum (`src/error.rs`, `Clone + PartialEq + Eq` so tests assert on it), and every public behavior pinned by a test that fails when the behavior changes. It ships to crates.io as `bsv-rs` and runs on native and `wasm32-unknown-unknown` (Cloudflare Workers are the production target: the LOW stack's overlay engine, watchtower, relay, app-layer and monitor).
 
 ## Rules
 
