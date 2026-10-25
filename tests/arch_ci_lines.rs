@@ -240,7 +240,7 @@ fn beta_born(ci: &str) -> Vec<String> {
                 "a release commit touches Cargo.toml and CHANGELOG.md alone",
             ),
             (
-                "^[-+](version = \"[^\"]*\"|## \\[.*)$",
+                "^[-+](version = \"[^\"]*\"|## \\[(Unreleased|[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?)\\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?)?$",
                 "a release commit changes a version and the headings alone",
             ),
             (
