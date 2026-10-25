@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: `verify_nonce` on a wallet's short HMAC is pinned (#139)
+
+Tests only; nothing was wrong. #139 (found by #108's cold review) read the
+comparison `hmac_result.hmac[..stored_len]` as a slice past the end when a
+wallet answers fewer bytes than the nonce's stored tail. It cannot be: the
+answer's type is `CreateHmacResult { hmac: [u8; 32] }` (since `dc51a43`), the
+stored tail is 32 bytes (canonical) or 16 (legacy), and both substrates refuse
+a short body before `verify_nonce` sees it, `WalletError("invalid HMAC length:
+expected 32, got n")` (`HttpWalletJson::create_hmac`, `WalletWireTransceiver`).
+`auth::utils::nonce::tests::a_wallet_answering_a_short_hmac_is_refused_and_verify_nonce_never_panics`
+drives 0, 1, 15 and 31 bytes over a `wiremock` substrate for a canonical and
+a legacy nonce: that error each time, no panic. TS's `verifyNonce` asks the
+wallet's `verifyHmac`, whose `constantTimeEquals` reads a length difference as
+a miss; Go's `VerifyNonce` copies the tail into a `[32]byte`. The stale nonce
+row of `src/auth/CLAUDE.md` (it said 16 + 16 bytes) and `create_nonce`'s doc
+name the canonical 48-byte form.
+
 ### Added: a BEEF whose source links form a cycle is pinned (#160)
 
 Tests only; no reader moved. `tests/beef_cycle.rs` (five tests) builds rings of

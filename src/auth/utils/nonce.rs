@@ -42,7 +42,7 @@ const NONCE_LEGACY_SIZE: usize = NONCE_RANDOM_SIZE + NONCE_RANDOM_SIZE;
 
 /// Creates a cryptographic nonce.
 ///
-/// The nonce format is: base64(random_16_bytes || hmac_16_bytes) = 32 bytes total.
+/// The nonce format is: base64(random_16_bytes || hmac_32_bytes) = 48 bytes total.
 ///
 /// The HMAC is computed using BRC-42 key derivation with the `"server hmac"` protocol,
 /// making the nonce verifiable by the wallet.
@@ -281,5 +281,60 @@ mod tests {
         assert!(verify_nonce(&nonce, &wallet, None, "test.app")
             .await
             .unwrap());
+    }
+
+    // #139: a wallet whose `createHmac` answers fewer bytes than the nonce's
+    // stored tail cannot reach the comparison. `CreateHmacResult.hmac` is a
+    // `[u8; 32]` and the stored tail is 32 or 16 bytes, so the slice is in
+    // bounds; a substrate decoding a short body refuses it before
+    // `verify_nonce` sees it. The pin: 0, 1, 15 and 31 bytes over HTTP, for a
+    // canonical and a legacy nonce, are the substrate's error and no panic.
+    #[cfg(feature = "http")]
+    #[tokio::test]
+    async fn a_wallet_answering_a_short_hmac_is_refused_and_verify_nonce_never_panics() {
+        use crate::wallet::substrates::HttpWalletJson;
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let random = [7u8; NONCE_RANDOM_SIZE];
+        let canonical = to_base64(
+            &[
+                [7u8; NONCE_RANDOM_SIZE],
+                [9u8; NONCE_RANDOM_SIZE],
+                [9u8; NONCE_RANDOM_SIZE],
+            ]
+            .concat(),
+        );
+        let legacy = to_base64(&[random, [9u8; NONCE_RANDOM_SIZE]].concat());
+
+        for short in [0usize, 1, NONCE_RANDOM_SIZE - 1, NONCE_HMAC_SIZE - 1] {
+            let server = MockServer::start().await;
+            Mock::given(method("POST"))
+                .and(path("/createHmac"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(serde_json::json!({ "hmac": vec![9u8; short] })),
+                )
+                .mount(&server)
+                .await;
+
+            for nonce in [canonical.clone(), legacy.clone()] {
+                let wallet = HttpWalletJson::new(None, Some(server.uri()));
+                let answer =
+                    tokio::spawn(
+                        async move { verify_nonce(&nonce, &wallet, None, "test.app").await },
+                    )
+                    .await;
+                let answer = answer.unwrap_or_else(|e| {
+                    panic!("verify_nonce panicked on a {short}-byte HMAC: {e}")
+                });
+                assert_eq!(
+                    answer,
+                    Err(Error::WalletError(format!(
+                        "invalid HMAC length: expected 32, got {short}"
+                    )))
+                );
+            }
+        }
     }
 }
