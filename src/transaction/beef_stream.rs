@@ -2,7 +2,7 @@
 //!
 //! A valid BEEF is never refused for its size or its counts. A refusal is for
 //! invalid bytes only, and names them: the offset of the byte and one of
-//! twenty-four kinds, none of which is a size or a count.
+//! twenty-five kinds, none of which is a size or a count.
 //!
 //! The specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean
 //! (`lean/BeefOfAnySize.lean`, its report `docs/p0/nl-1.md`), which states six
@@ -46,13 +46,13 @@
 //!
 //! # What is and is not the Lean's
 //!
-//! The twenty-four [`Kind`]s, the offsets and the order of the checks inside one
+//! The twenty-five [`Kind`]s, the offsets and the order of the checks inside one
 //! element are the Lean's. Two things are outside it and say so in the type:
 //!
 //! - Script execution and the value rule are the interpreter's verdict on a
 //!   spend, not a rule about the BEEF's bytes (the Lean leaves them to the
 //!   node). A spend that fails is [`Verdict::SpendRefused`], never one of the
-//!   twenty-four kinds. [`StreamVerifier::structure_only`] turns the spend
+//!   twenty-five kinds. [`StreamVerifier::structure_only`] turns the spend
 //!   checks off and leaves exactly the Lean's validity.
 //! - Next-block mining context: P2SH's Genesis era, finality and coinbase
 //!   maturity are spend checks. Missing finality or maturity context yields
@@ -396,7 +396,7 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
 
     for (level, leaves) in levels.iter().enumerate() {
         let level = level as u8;
-        // The level's leaves by offset, one at each (a second is refused before).
+        // The level's leaves by offset, one at each (a second is refused before, `DuplicateOffset`).
         let mut given: HashMap<u64, Node> = HashMap::with_capacity(leaves.len());
         for l in leaves {
             given.entry(l.offset).or_insert(l.node);
@@ -1141,7 +1141,7 @@ impl BeefDecoder {
                 }
                 // A second leaf at an offset, agreeing or not (`MerklePath.ts:221`).
                 if !bump.offsets_seen.insert((level, offset)) {
-                    return Err(Refusal::new(at, Reason::MismatchedNode { level, offset }));
+                    return Err(Refusal::new(at, Reason::DuplicateOffset { level, offset }));
                 }
                 bump.leaf_at = at;
                 bump.leaf_offset = offset;
@@ -1523,7 +1523,7 @@ fn live_of(outputs: &Option<Box<[Option<Retained>]>>) -> usize {
 
 /// Why a spend was refused. This is the interpreter's verdict on a
 /// transaction, not a rule about the BEEF's bytes, and it is not one of the
-/// twenty-four [`Kind`]s.
+/// twenty-five [`Kind`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpendRefusal {
     /// The parent is a txid-only entry: its output is not in the BEEF.
@@ -2349,7 +2349,7 @@ pub enum Verdict {
         /// order).
         roots: Vec<(u64, Hash32)>,
     },
-    /// The bytes are invalid: the offset of the byte and one of the twenty-four
+    /// The bytes are invalid: the offset of the byte and one of the twenty-five
     /// kinds.
     Invalid {
         /// The stream offset of the byte the refusal names.
@@ -2360,7 +2360,7 @@ pub enum Verdict {
         reason: Reason,
     },
     /// The BEEF's bytes are well formed up to here and the interpreter
-    /// refused a spend. Not one of the twenty-four kinds: the verdict is the
+    /// refused a spend. Not one of the twenty-five kinds: the verdict is the
     /// script's, on a transaction. `SpendRefusal::Resource` is a LOCAL
     /// evaluator decline: this spend was not judged invalid.
     SpendRefused {

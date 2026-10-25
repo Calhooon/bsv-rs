@@ -3,9 +3,42 @@
 
 use super::Hash32;
 
-/// The twenty-four kinds of refusal, the Lean's `Kind`. None is a size or a
+/// The twenty-five kinds of refusal, the Lean's `Kind`. None is a size or a
 /// count: no byte is wrong by being one of many.
+///
+/// Non-exhaustive (bsv-rs#86, #167, the owner's word of 2026-10-25): a
+/// later kind is not a break, so a `match` outside this crate ends in a
+/// wildcard arm. One without it does not compile:
+///
+/// ```compile_fail,E0004
+/// use bsv_rs::transaction::Kind;
+/// fn name(kind: Kind) -> &'static str {
+///     match kind {
+///         Kind::BadVersion | Kind::BadVarint | Kind::Truncated | Kind::BadFlag => "frame",
+///         Kind::TreeHeightOver64 | Kind::TreeHeightZero | Kind::OffsetOutsideTree => "bump",
+///         Kind::NoTxidAtLevelZero | Kind::MissingSibling | Kind::MismatchedNode => "bump",
+///         Kind::DuplicateOffset | Kind::RootNotCarried => "bump",
+///         Kind::BumpIndexNamesNoBump | Kind::TxidNotInBump => "index",
+///         Kind::InputNamesNoElement | Kind::StubNotProven | Kind::TrailingBytes => "entry",
+///         Kind::SubjectMissing | Kind::UnrelatedTransaction => "atomic",
+///         Kind::NoInputs | Kind::NoOutputs | Kind::UnprovenCoinbase => "transaction",
+///         Kind::NullOutpoint | Kind::DuplicateInput | Kind::ValueOutOfRange => "transaction",
+///     }
+/// }
+/// ```
+///
+/// ```
+/// use bsv_rs::transaction::Kind;
+/// fn is_bump(kind: Kind) -> bool {
+///     match kind {
+///         Kind::MismatchedNode | Kind::DuplicateOffset | Kind::MissingSibling => true,
+///         _ => false,
+///     }
+/// }
+/// assert!(is_bump(Kind::DuplicateOffset));
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Kind {
     /// The version word is neither `0100BEEF` nor `0200BEEF`.
     BadVersion,
@@ -25,8 +58,10 @@ pub enum Kind {
     NoTxidAtLevelZero,
     /// A path needs a node the BUMP neither carries nor determines.
     MissingSibling,
-    /// A node the level below determines differs from the one carried, or a repeated offset.
+    /// A node the level below determines differs from the one carried.
     MismatchedNode,
+    /// A second leaf at an offset its level already carries, agreeing or not.
+    DuplicateOffset,
     /// A BUMP's root is not the root the headers carry at its height.
     RootNotCarried,
     /// A transaction's BUMP index names no BUMP.
@@ -66,8 +101,8 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The twenty-four kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 24] = [
+    /// The twenty-five kinds, each once, in the Lean's order (`Kind.all`).
+    pub const ALL: [Kind; 25] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -78,6 +113,7 @@ impl Kind {
         Kind::NoTxidAtLevelZero,
         Kind::MissingSibling,
         Kind::MismatchedNode,
+        Kind::DuplicateOffset,
         Kind::RootNotCarried,
         Kind::BumpIndexNamesNoBump,
         Kind::TxidNotInBump,
@@ -95,8 +131,31 @@ impl Kind {
     ];
 }
 
-/// A refusal's reason with its data, the Lean's `Reason`.
+/// A refusal's reason with its data, the Lean's `Reason`. Non-exhaustive as
+/// [`Kind`] is (bsv-rs#86, #167): a `match` outside this crate ends in a
+/// wildcard arm.
+///
+/// ```compile_fail,E0004
+/// use bsv_rs::transaction::Reason;
+/// fn is_bump(reason: &Reason) -> bool {
+///     match reason {
+///         Reason::BadFlag { .. } | Reason::TreeHeightOver64 { .. } => true,
+///         Reason::TreeHeightZero | Reason::OffsetOutsideTree { .. } => true,
+///         Reason::NoTxidAtLevelZero | Reason::MissingSibling { .. } => true,
+///         Reason::MismatchedNode { .. } | Reason::DuplicateOffset { .. } => true,
+///         Reason::RootNotCarried { .. } => true,
+///         Reason::BadVersion { .. } | Reason::BadVarint | Reason::Truncated { .. } => false,
+///         Reason::BumpIndexNamesNoBump { .. } | Reason::TxidNotInBump { .. } => false,
+///         Reason::InputNamesNoElement { .. } | Reason::StubNotProven { .. } => false,
+///         Reason::TrailingBytes | Reason::SubjectMissing { .. } => false,
+///         Reason::UnrelatedTransaction { .. } | Reason::NoInputs | Reason::NoOutputs => false,
+///         Reason::UnprovenCoinbase | Reason::NullOutpoint | Reason::DuplicateInput => false,
+///         Reason::ValueOutOfRange => false,
+///     }
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Reason {
     /// The version word read.
     BadVersion {
@@ -139,11 +198,22 @@ pub enum Reason {
         /// The node's offset at that level.
         offset: u64,
     },
-    /// The node that disagrees, or a second leaf at an offset, at its offset varint.
+    /// The node that disagrees, at the offset varint of the level-0 leaf
+    /// whose path computed it.
     MismatchedNode {
         /// The level.
         level: u8,
         /// The node's offset at that level.
+        offset: u64,
+    },
+    /// A second leaf at an offset its level already carries, agreeing or not
+    /// (the reference's `Duplicate offset`, `ts-stack@edf6e03`
+    /// `MerklePath.ts:221`), at the second leaf's offset varint (bsv-rs#86,
+    /// #167).
+    DuplicateOffset {
+        /// The level.
+        level: u8,
+        /// The offset repeated.
         offset: u64,
     },
     /// The root computed and the height the BUMP claims.
@@ -229,6 +299,7 @@ impl Reason {
             Reason::NoTxidAtLevelZero => Kind::NoTxidAtLevelZero,
             Reason::MissingSibling { .. } => Kind::MissingSibling,
             Reason::MismatchedNode { .. } => Kind::MismatchedNode,
+            Reason::DuplicateOffset { .. } => Kind::DuplicateOffset,
             Reason::RootNotCarried { .. } => Kind::RootNotCarried,
             Reason::BumpIndexNamesNoBump { .. } => Kind::BumpIndexNamesNoBump,
             Reason::TxidNotInBump { .. } => Kind::TxidNotInBump,

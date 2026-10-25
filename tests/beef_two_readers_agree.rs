@@ -512,22 +512,25 @@ fn bump_beef(levels: &[Vec<HandLeaf>]) -> (Vec<u8>, Vec<Vec<u64>>) {
 const SIBLING: Hash32 = [0x5a; 32];
 const OTHER: Hash32 = [0xa5; 32];
 
-/// Both paths refuse `bytes` as `MismatchedNode { level, offset }` at
-/// `at`, the second leaf's offset varint.
+/// Both paths refuse `bytes` as `DuplicateOffset { level, offset }` at
+/// `at`, the second leaf's offset varint (its own kind by the owner's word
+/// of 2026-10-25, bsv-rs#86 and #167; the branch that brought the refusal
+/// named it `MismatchedNode`, the walk's kind for a node the level below
+/// contradicts).
 fn refused_at_the_second_leaf(bytes: &[u8], level: u8, offset: u64, at: u64) {
     let text = Beef::from_binary(bytes)
         .expect_err("the parse refuses")
         .to_string();
     assert_eq!(
         text,
-        format!("BEEF error: invalid BEEF at byte {at}: MismatchedNode {{ level: {level}, offset: {offset} }}")
+        format!("BEEF error: invalid BEEF at byte {at}: DuplicateOffset {{ level: {level}, offset: {offset} }}")
     );
     assert_eq!(
         stream(bytes),
         Answer::Refused {
-            kind: Some(Kind::MismatchedNode),
+            kind: Some(Kind::DuplicateOffset),
             offset: Some(at),
-            text: format!("MismatchedNode {{ level: {level}, offset: {offset} }}"),
+            text: format!("DuplicateOffset {{ level: {level}, offset: {offset} }}"),
         }
     );
     assert_eq!(disagreement(&whole(bytes), &stream(bytes)), None);
@@ -591,7 +594,8 @@ fn a_higher_level_leaf_repeated_is_refused_on_both_paths() {
 }
 
 /// A BUMP held in memory with a second leaf at an offset: `verify_structure`
-/// refuses it in `merkle_path_root`'s pre-pass ahead of the walk.
+/// refuses it in `merkle_path_root`'s pre-pass ahead of the walk, the kind
+/// the decoder names on the wire (`DuplicateOffset`).
 #[test]
 fn a_repeated_leaf_offset_in_a_bump_held_in_memory_is_refused_by_verify_structure() {
     let txid = beef_chain::funding_root();
@@ -601,7 +605,7 @@ fn a_repeated_leaf_offset_in_a_bump_held_in_memory_is_refused_by_verify_structur
     let mut changed = leaf.clone();
     changed.hash = Some(display(&SIBLING));
     beef.bumps[0].path[1].push(changed);
-    assert_eq!(beef.verify_structure(), Err(Kind::MismatchedNode));
+    assert_eq!(beef.verify_structure(), Err(Kind::DuplicateOffset));
     beef.bumps[0].path[1][1] = leaf;
-    assert_eq!(beef.verify_structure(), Err(Kind::MismatchedNode));
+    assert_eq!(beef.verify_structure(), Err(Kind::DuplicateOffset));
 }

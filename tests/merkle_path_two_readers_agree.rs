@@ -446,6 +446,24 @@ fn with_sibling_flag(flag: u8) -> Vec<u8> {
     bytes
 }
 
+/// [`with_sibling_flag`]'s BUMP with a third leaf at level 0 repeating the
+/// sibling's offset 1, carried with `flag` (the sibling's own hash for `00`,
+/// another for `02`, none for `01`), and the byte of its offset varint.
+fn repeated_sibling(flag: u8) -> (Vec<u8>, u64) {
+    let mut bytes = vec![0x01, 0x01, 0x03, 0x00, 0x02];
+    bytes.extend_from_slice(&leaf_hash(0));
+    bytes.extend_from_slice(&[0x01, 0x00]);
+    bytes.extend_from_slice(&leaf_hash(1));
+    let at = bytes.len() as u64;
+    bytes.extend_from_slice(&[0x01, flag]);
+    match flag {
+        0 => bytes.extend_from_slice(&leaf_hash(1)),
+        2 => bytes.extend_from_slice(&leaf_hash(2)),
+        _ => {}
+    }
+    (bytes, at)
+}
+
 /// A BUMP of four levels and two paths (txids at 4 and 8) whose level 2
 /// carries a duplicate at offset 0, the left sibling of the node on the path
 /// from the txid at 4, and level 3 nothing: the path from the txid at 8
@@ -510,6 +528,12 @@ fn hand_built(seeds: &mut Vec<(String, Vec<u8>)>) {
         "an even-offset duplicate, a computed node's left child".into(),
         even_offset_duplicate(),
     ));
+    for flag in 0..=2 {
+        seeds.push((
+            format!("the sibling's offset repeated, flag {flag}"),
+            repeated_sibling(flag).0,
+        ));
+    }
     // A lone leaf at height 2^32: through 0.9.0 the standalone reader cut
     // the height to its low 32 bits.
     let mut above = bsv_rs::primitives::to_var_int(1 << 32);
@@ -618,6 +642,37 @@ fn an_even_offset_duplicate_is_refused_by_both_readers_at_its_flag() {
         assert_eq!(
             MerklePath::from_binary(&bytes).unwrap_err().to_string(),
             format!("merkle path error: invalid BUMP at byte {at}: BadFlag {{ byte: 1 }}")
+        );
+    }
+}
+
+/// A second leaf at an offset is refused by both readers as
+/// `DuplicateOffset` at its offset varint, whatever it carries (bsv-rs#86,
+/// #167): the reference's `Duplicate offset` (`ts-stack@edf6e03`
+/// `MerklePath.ts:221`), named on its own, never the walk's `MismatchedNode`.
+#[test]
+fn a_repeated_leaf_offset_is_duplicate_offset_on_both_readers() {
+    for flag in 0..=2 {
+        let (bytes, at) = repeated_sibling(flag);
+        for answer in [standalone(&bytes), beef_reader(&bytes)] {
+            assert!(
+                matches!(
+                    answer,
+                    Answer::Refused {
+                        kind: Some(Kind::DuplicateOffset),
+                        offset: Some(o),
+                        ..
+                    } if o == at
+                ),
+                "flag {flag}: {answer:?}"
+            );
+        }
+        assert_eq!(
+            MerklePath::from_binary(&bytes).unwrap_err().to_string(),
+            format!(
+                "merkle path error: invalid BUMP at byte {at}: \
+                 DuplicateOffset {{ level: 0, offset: 1 }}"
+            )
         );
     }
 }
