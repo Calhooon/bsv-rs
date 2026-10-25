@@ -248,11 +248,15 @@ fn json_beefs(dir: &Path, label: &str, seeds: &mut Vec<(String, Vec<u8>)>) {
         };
         let mut found = Vec::new();
         hex_in_json(&value, &mut found);
+        // The seed's name reads the same on every OS: the whole-suite run on
+        // Windows (#146) looked for `fixtures/beef/v1.json#0` and found a
+        // backslash.
         let name = path
             .strip_prefix(dir)
             .unwrap_or(&path)
             .display()
-            .to_string();
+            .to_string()
+            .replace('\\', "/");
         for (i, bytes) in found.into_iter().enumerate() {
             seeds.push((format!("{label}/{name}#{i}"), bytes));
         }
