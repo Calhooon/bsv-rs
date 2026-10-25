@@ -4,8 +4,8 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 1): wallet error: Signature is not valid",
-          "error": "WalletError(\"wallet error (code 1): wallet error: Signature is not valid\")"
+          "display": "wallet error: wallet error (code 1): Signature is not valid",
+          "error": "WalletError(\"wallet error (code 1): Signature is not valid\")"
         },
         "processor_observed": {
           "args": {
@@ -34,10 +34,10 @@
           "method": "verify_signature",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "012477616c6c6574206572726f723a205369676e6174757265206973206e6f742076616c696400",
+        "processor_response_hex": "01165369676e6174757265206973206e6f742076616c696400",
         "request_hex": "101066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726500ff083006020101020101010100",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "012477616c6c6574206572726f723a205369676e6174757265206973206e6f742076616c696400"
+        "response_hex": "01165369676e6174757265206973206e6f742076616c696400"
       },
       "input": {
         "args": {
