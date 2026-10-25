@@ -219,11 +219,13 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
 
 /// The layout this crate wrote before #182 (a present-flag byte, NIL-sentinel
 /// strings and maps, keyring values as base64 text) is refused, here as
-/// `ReaderUnderflow`: the flag `1` is read as the name's length, the name's own
-/// length byte as the name, its first character as iconUrl's length, and the
-/// lengths run past the bytes; an absent certifier's `-1` flag opens a 9-byte
-/// varint that the keyring's NIL sentinel completes as a length of `u64::MAX`.
-/// Other contents can misread rather than refuse; none reads as written.
+/// `ReaderUnderflow`: with a certifier present, the flag `1` is read as the
+/// name's length, the name's own length byte as the name, the name's opening
+/// byte as iconUrl's length, and the lengths run past the bytes; with the
+/// certifier absent, the `-1` flag (`0xff`) opens a 9-byte varint that the
+/// keyring's count and the opening bytes of its key complete, a length far past
+/// the bytes left. Other contents can misread rather than refuse; none reads as
+/// written.
 #[test]
 #[allow(deprecated)]
 fn the_layout_before_182_is_refused() {
