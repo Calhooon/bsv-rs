@@ -24,6 +24,63 @@ ratchet and bench-compare tools.
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
+### Fixed: verifyHmac's request carries the raw hmac ahead of the data; the signature calls carry the reference's data-type flag (#199)
+
+`WalletWireTransceiver` wrote, and `WalletWireProcessor` read, verifyHmac's
+request as the key-related parameters, the data behind a varint length, then
+the hmac behind a varint length; createSignature's as the data and the hash as
+two optional byte fields (the nil sentinel for the absent one); and
+verifySignature's as forSelf, the same two optional fields, then the signature.
+The reference writes and reads verifyHmac's as the key-related parameters, the
+32 raw bytes of the hmac with no length, then the data behind its varint length
+(`ts-stack@edf6e03` `WalletWireTransceiver.ts:1048-1050`,
+`WalletWireProcessor.ts:1502-1509`); the signature calls' as a data-type flag
+byte, `1` then the data behind its length or `2` then the 32-byte hash, any
+other value refused (`Invalid createSignature data type flag: expected 1 or 2,
+received N`; `WalletWireTransceiver.ts:1082-1090`, `:1137-1144`;
+`WalletWireProcessor.ts:1533-1543`, `:1576-1586`), verifySignature's signature
+behind its length ahead of the flag (`:1135-1136`, `:1572-1573`). BRC-100 reads
+the same (`wallet/0100.md:2149-2151`, `:2168-2170`, `:2192-2196` at `ed1b015`;
+`:2172-2174`, `:2191-2193`, `:2215-2219` at `5119a9b`), and so does Go
+(`go-sdk@2ca481c` `wallet/serializer/verify_hmac.go:28-31`, `:55-58`;
+`create_signature.go:29-36`, `:60-71`; `verify_signature.go:36-47`, `:74-89`). Go's args vectors are the
+witness: `verifyHmac-simple-args.json` carries the 32 bytes `323c46...` then
+`04 0a141e28`, `createSignature-simple-args.json` ends `01 04 0b16212c 01`.
+Both sides move together (the readers in `src/wallet/wire/requests.rs`); no
+field of the three args types moves. The transceiver refuses both or neither of
+`data` and the hash before it writes (`The data, hashToDirectlySign parameter
+must be exactly one value`), as the reference's `validateWalletArgs` does
+(`validationHelpers.ts:1777-1787`); `VerifyHmacArgs::hmac` is 32 bytes by its
+type, the length the reference asks (`:1774`). The privileged pair and
+seekPermission stay unwritten and unread: the args types have no field for
+them (#193).
+
+The tests that pin it: `tests/wallet_wire_cross_sdk_tests.rs`
+`the_go_hmac_and_signature_requests_read_as_their_json` (the three Go args
+vectors, their privileged pair taken out, reach the wallet with every field
+this crate reads equal to the vector's json),
+`the_transceiver_writes_the_go_hmac_and_signature_requests` (the
+transceiver's request over each vector's json is the vector's wire save the
+privileged pair and the last byte, seekPermission), and
+`a_signature_data_type_flag_of_three_is_refused`;
+`tests/wire_method_roundtrip_tests.rs` `reference_request_frames` (the
+loopback frames of both data-type forms and verifyHmac's, and the
+both-or-neither refusal). RED on `9a57561` (all six). The three vectors stay in
+the every-args-vector allowlist (21 of 27, the count unchanged), each reason
+narrowed to the privileged pair of #193. The three recordings under
+`tests/fixtures/wire/` are re-recorded in their own commits (the request bytes
+move; the responses are as #197 left them; docs/FIXTURES.md F14); the
+wire_codec bench's layouts follow.
+
+Migration: this crate's own transceiver and processor agreed with each other
+on the old bytes and now agree on the reference's: one side from this release
+against the other from bsv-rs 0.9.0 or older does not (an old processor reads
+the new verifyHmac frame's hmac as the data's length; the new processor refuses
+an old signature frame's first byte as a data-type flag, or reads its data
+from the wrong place). Upgrade both sides together. A caller that passed both
+`data` and the hash through the wire (the old frame sent both, `ProtoWallet`
+signing the hash) is now refused before a byte is sent; pass one.
+
 ### Fixed: seven result writers write the reference's bytes: the byte arrays alone, the verdicts as the error byte alone (#197)
 
 `WalletWireProcessor` wrote encrypt's ciphertext, decrypt's plaintext,

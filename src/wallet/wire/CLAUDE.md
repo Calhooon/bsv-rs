@@ -9,13 +9,13 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183) | ~479 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183), the signature calls' data-type flag writer (#199) | ~504 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2486 |
-| `processor.rs` | Generic server-side processor over WalletInterface | ~876 |
-| `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191) | ~77 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `processor.rs` | Generic server-side processor over WalletInterface | ~792 |
+| `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191); for verifyHmac, the 32 raw HMAC bytes ahead of the data, and for createSignature and verifySignature, the data-type flag (`1` the data, `2` the hash, another refused), verifySignature's signature ahead of it (#199) | ~176 |
 | `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194); for encrypt, decrypt, createHmac and createSignature, the bytes alone, and for verifyHmac, verifySignature and waitForAuthentication, nothing after the error byte, a false verdict an error frame (#197) | ~128 |
-| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1584 |
+| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2) | ~1589 |
 
 ## Architecture
 
@@ -205,6 +205,7 @@ pub mod status_codes {
 
 **Fully implemented handlers (delegated to wallet):**
 - getPublicKey, encrypt, decrypt, createHmac, verifyHmac
+- verifyHmac, createSignature, verifySignature: the requests in the reference's order (`requests.rs`, #199): verifyHmac the key-related parameters, the HMAC's 32 raw bytes, then the data behind its length (`WalletWireProcessor.ts:1502-1509`); the signature calls a data-type flag, `1` then the data behind its length or `2` then the 32-byte hash, another value refused as `Invalid <call> data type flag: expected 1 or 2, received N` (`:1533-1543`, `:1576-1586`), verifySignature's forSelf and signature ahead of it (`:1569-1573`); the privileged pair and seekPermission unread (#193)
 - createSignature, verifySignature: the results as the reference writes them (`results.rs`, #197): encrypt, decrypt, createHmac and createSignature the error byte then the ciphertext, plaintext, 32 HMAC bytes or DER alone, no length (`WalletWireProcessor.ts:1443-1444`, `:1470-1471`, `:1495-1496`, `:1559-1560`); verifyHmac and verifySignature the error byte alone, a false verdict the reference's error frame (`HMAC is not valid`, `Signature is not valid`; `:1520-1525`, `:1597-1602`)
 - revealCounterpartyKeyLinkage, revealSpecificKeyLinkage: the request in the reference's order (`requests.rs`, #191): counterparty linkage the privileged flag (`i8`) and reason (`i8` length, -1 absent) then the two keys (`WalletWireProcessor.ts:1739-1747`); specific linkage the protocol, key ID, counterparty, privileged flag and reason, then the verifier (`:1790-1797`, `:2564-2583`); both passed through into the args. The responses in the reference's order (`results.rs`, #194): the prover, verifier and counterparty, then revelationTime, encryptedLinkage, encryptedLinkageProof (`WalletWireProcessor.ts:1761-1781`); or the protocol, keyID, encryptedLinkage, encryptedLinkageProof, proofType (`:1811-1841`)
 - isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight: waitForAuthentication's result the error byte alone, a false verdict an error frame (`Wallet did not affirmatively authenticate`, `:1636-1643`, #197); isAuthenticated keeps its verdict byte (`:1618-1622`)
@@ -239,6 +240,8 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 - **Chain ops:** get_height, get_network, get_version, get_header, wait_for_authentication, is_authenticated
 
 **Helper methods:** `parse_certificate_from_binary`, `parse_discovery_result` (internal).
+
+**The three requests of #199:** verify_hmac writes the HMAC's 32 raw bytes then the data behind its length (`WalletWireTransceiver.ts:1048-1050`); create_signature and verify_signature the data-type flag, `1` and the data or `2` and the hash (`:1082-1090`, `:1137-1144`, `write_data_or_hash` in `mod.rs`), verify_signature's signature ahead of it (`:1135-1136`); both or neither of the data and the hash refused before a byte is written (`The data, hashToDirectlySign parameter must be exactly one value`, `validationHelpers.ts:1777-1787`); no privileged pair or seekPermission written (#193).
 
 **The seven results of #197:** encrypt, decrypt and createSignature read the rest of the frame as the bytes, createHmac exactly 32 bytes; verifyHmac, verifySignature and waitForAuthentication read an empty result as true and refuse a byte after the error byte (`Wallet Wire <call> response has an invalid length`, the reference's `#requireEmptyResponse`, `WalletWireTransceiver.ts:953-957`, `:988`, `:1019-1021`, `:1093-1101`, `:1053-1055`, `:1147-1149`, `:1870-1872`), so a bsv-rs 0.9.0 processor's `00 00` (its false verdict) is never read as true.
 
@@ -308,7 +311,7 @@ Messages serialized by one SDK can be deserialized by another. Key compatibility
 - **String maps**: Keys sorted lexicographically before writing
 - **Empty optional strings/bytes**: Treated same as None (both write nil sentinel)
 
-54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 48 cross-SDK tests, among them every args vector decoded through the processor to its json (#191) and every result vector written through it to its wire (#194).
+54 Go wire test vectors in `tests/vectors/wallet_wire/` validate cross-SDK compatibility. See `tests/wallet_wire_cross_sdk_tests.rs` for the 54 cross-SDK tests, among them every args vector decoded through the processor to its json (#191), every result vector written through it to its wire (#194), and the verifyHmac and signature requests read and written as Go's vectors, the privileged pair aside (#199).
 
 ## Dependencies
 
