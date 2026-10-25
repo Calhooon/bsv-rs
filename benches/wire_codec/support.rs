@@ -485,8 +485,8 @@ fn request_args(call: WalletCall) -> Vec<Layout> {
         ],
         C::RelinquishOutput => vec![Str, Outpoint],
         C::GetPublicKey => vec![OptBool, OptProtocol, OptStr, Counterparty, OptBool],
-        C::RevealCounterpartyKeyLinkage => vec![Raw(33), Raw(33)],
-        C::RevealSpecificKeyLinkage => vec![Counterparty, Raw(33), Protocol, Str],
+        C::RevealCounterpartyKeyLinkage => vec![OptBool, Reason, Raw(33), Raw(33)],
+        C::RevealSpecificKeyLinkage => vec![Protocol, Str, Counterparty, OptBool, Reason, Raw(33)],
         C::Encrypt | C::Decrypt | C::CreateHmac => {
             let mut fields = common();
             fields.push(Blob);
