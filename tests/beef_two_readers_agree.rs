@@ -21,15 +21,12 @@
 //! `RootNotCarried`, and so is a BUMP above a `u32` height). The whole path's verdict on a BEEF it holds in memory
 //! names no offset; an offset is compared where both name one.
 //!
-//! One difference is stated, not a disagreement: a transaction written ahead
-//! of the parent it spends. The stream reads the order written and refuses
-//! the input (`InputNamesNoElement` at its offset, BRC-62's dependency
-//! order); the whole path sorts first and does not, as `@bsv/sdk`'s
-//! `Beef.verifyValid` does not (`ts-stack@4d0ea63`
-//! `packages/sdk/src/transaction/Beef.ts:1054-1088`): it accepts, or names
-//! the next fault the BEEF holds. Each input of that class is checked to be
-//! exactly that: the stream's refusal names a txid the BEEF holds after the
-//! input.
+//! No difference is stated. A transaction written ahead of the parent it
+//! spends is refused by both, `InputNamesNoElement` (BRC-62's dependency
+//! order, the charter's validity clause): through 0.9.0 the whole
+//! path sorted ahead of judging, as `@bsv/sdk`'s `Beef.verifyValid` does
+//! (`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:1065`), and
+//! accepted what the stream refused.
 //!
 //! `BEEF_TWO_READERS_TABLE=<path>` writes the table of disagreements there.
 #![cfg(feature = "transaction")]
@@ -40,9 +37,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use bsv_rs::primitives::{from_hex, Writer};
-use bsv_rs::transaction::{
-    verify_stream_structure, Beef, BeefStream, Element, Kind, Reason, Verdict,
-};
+use bsv_rs::transaction::{verify_stream_structure, Beef, BeefStream, Element, Kind, Verdict};
 
 #[path = "support/beef_chain.rs"]
 mod beef_chain;
@@ -160,22 +155,6 @@ fn stream(bytes: &[u8]) -> Answer {
             text: format!("{other:?}"),
         },
     }
-}
-
-/// The stream's refusal names, as the input's parent, a txid the BEEF holds
-/// after the input: the order, the one stated difference.
-fn written_ahead_of_parent(bytes: &[u8]) -> bool {
-    let headers = leading_roots(bytes);
-    let Ok(Verdict::Invalid {
-        reason: Reason::InputNamesNoElement { txid },
-        ..
-    }) = verify_stream_structure(bytes, &headers, None)
-    else {
-        return false;
-    };
-    // Not held before the input (the stream's refusal), held in the BEEF:
-    // held after it (a txid is a hash; no transaction spends itself).
-    Beef::from_binary(bytes).is_ok_and(|beef| beef.find_txid(&display(&txid)).is_some())
 }
 
 /// How two answers differ, if they do.
@@ -409,14 +388,9 @@ fn the_whole_path_and_the_stream_agree_on_every_beef_the_tree_holds() {
     let inputs = inputs();
     let mut table: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut count = 0usize;
-    let mut ahead = Vec::new();
     for (name, bytes) in &inputs {
         let w = whole(bytes);
         let s = stream(bytes);
-        if disagreement(&w, &s).is_some() && written_ahead_of_parent(bytes) {
-            ahead.push(name.clone());
-            continue;
-        }
         if let Some(class) = disagreement(&w, &s) {
             count += 1;
             let key = format!(
@@ -432,12 +406,10 @@ fn the_whole_path_and_the_stream_agree_on_every_beef_the_tree_holds() {
         }
     }
     let mut report = format!(
-        "{} inputs read by both entry points, {} disagreements in {} classes; \
-         {} written ahead of a parent (the stated difference)\n",
+        "{} inputs read by both entry points, {} disagreements in {} classes\n",
         inputs.len(),
         count,
-        table.len(),
-        ahead.len()
+        table.len()
     );
     for (class, rows) in &table {
         report.push_str(&format!("\n{class}: {} inputs\n", rows.len()));
@@ -457,13 +429,31 @@ fn the_whole_path_and_the_stream_agree_on_every_beef_the_tree_holds() {
         std::fs::write(path, full).unwrap();
     }
     assert_eq!(count, 0, "the two readers disagree:\n{report}");
-    // The class is reached: the reversed fixtures are in it.
-    assert!(
-        ahead
-            .iter()
-            .any(|n| n == "fixtures/beef/v1.json#0 reversed"),
-        "the reversed v1 fixture is the stated difference: {ahead:?}"
-    );
+}
+
+/// The reversed v1 fixture: its unproven transaction written ahead of the
+/// parent it spends. Through 0.9.0 the whole path sorted ahead of
+/// judging and accepted it; the stream refused it. Both refuse it now, the
+/// stream at the input's previous txid.
+#[test]
+fn a_transaction_written_ahead_of_its_parent_is_refused_on_the_whole_path() {
+    let (_, v1) = seeds()
+        .into_iter()
+        .find(|(name, _)| name == "fixtures/beef/v1.json#0")
+        .expect("the v1 fixture");
+    let bytes = reversed(&v1).expect("two transactions");
+    let mut beef = Beef::from_binary(&bytes).expect("the frame parses");
+    assert_eq!(beef.verify_structure(), Err(Kind::InputNamesNoElement));
+    assert!(!beef.verify_valid(false).valid);
+    let Answer::Refused {
+        kind: Some(Kind::InputNamesNoElement),
+        offset: Some(_),
+        ..
+    } = stream(&bytes)
+    else {
+        panic!("the stream refuses the input: {:?}", stream(&bytes));
+    };
+    assert_eq!(disagreement(&whole(&bytes), &stream(&bytes)), None);
 }
 
 /// The class of an answer for the table: valid, or the kind refused.
