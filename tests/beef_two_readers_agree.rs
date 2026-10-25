@@ -468,3 +468,136 @@ fn short_kind(a: &Answer) -> String {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// A repeated leaf offset (bsv-rs#86, the keeper's reading)
+// ---------------------------------------------------------------------------
+
+/// One leaf of a hand-built BUMP: its offset, its flag, its hash (none for
+/// flag `01`).
+type HandLeaf = (u64, u8, Hash32);
+
+/// A V1 BEEF of one BUMP with `levels` at the chain's height and the
+/// funding transaction under it, and the stream offset of each leaf's offset
+/// varint, by level.
+fn bump_beef(levels: &[Vec<HandLeaf>]) -> (Vec<u8>, Vec<Vec<u64>>) {
+    let mut bytes = 0xEFBE_0001u32.to_le_bytes().to_vec();
+    bytes.push(1);
+    bytes.extend(beef_chain::varint(beef_chain::HEIGHT));
+    bytes.push(levels.len() as u8);
+    let mut at = Vec::new();
+    for level in levels {
+        bytes.extend(beef_chain::varint(level.len() as u64));
+        let mut here = Vec::new();
+        for (offset, flag, hash) in level {
+            here.push(bytes.len() as u64);
+            bytes.extend(beef_chain::varint(*offset));
+            bytes.push(*flag);
+            if *flag != 1 {
+                bytes.extend_from_slice(hash);
+            }
+        }
+        at.push(here);
+    }
+    bytes.push(1);
+    bytes.extend(beef_chain::funding());
+    bytes.extend_from_slice(&[1, 0]);
+    (bytes, at)
+}
+
+const SIBLING: Hash32 = [0x5a; 32];
+const OTHER: Hash32 = [0xa5; 32];
+
+/// Both paths refuse `bytes` as `MismatchedNode { level, offset }` at
+/// `at`, the second leaf's offset varint.
+fn refused_at_the_second_leaf(bytes: &[u8], level: u8, offset: u64, at: u64) {
+    let text = Beef::from_binary(bytes)
+        .expect_err("the parse refuses")
+        .to_string();
+    assert_eq!(
+        text,
+        format!("BEEF error: invalid BEEF at byte {at}: MismatchedNode {{ level: {level}, offset: {offset} }}")
+    );
+    assert_eq!(
+        stream(bytes),
+        Answer::Refused {
+            kind: Some(Kind::MismatchedNode),
+            offset: Some(at),
+            text: format!("MismatchedNode {{ level: {level}, offset: {offset} }}"),
+        }
+    );
+    assert_eq!(disagreement(&whole(bytes), &stream(bytes)), None);
+}
+
+/// The BUMP the repeats are built on is valid on both paths.
+#[test]
+fn the_bump_the_repeats_are_built_on_is_valid_on_both_paths() {
+    let txid = beef_chain::funding_root();
+    let (one, _) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING)]]);
+    let (two, _) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING)], vec![(1, 0, OTHER)]]);
+    for bytes in [one, two] {
+        assert!(
+            matches!(whole(&bytes), Answer::Valid(_)),
+            "{:?}",
+            whole(&bytes)
+        );
+        assert_eq!(disagreement(&whole(&bytes), &stream(&bytes)), None);
+    }
+}
+
+/// Level 0 carries the txid's sibling twice, the same hash: through the
+/// lane's draft both paths read the earlier leaf and accepted it (0.9.0's
+/// whole reader refused it, `Duplicate offset`; so does the reference,
+/// `MerklePath.ts:221`).
+#[test]
+fn a_level_0_leaf_repeated_with_the_same_hash_is_refused_on_both_paths() {
+    let txid = beef_chain::funding_root();
+    let (bytes, at) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING), (1, 0, SIBLING)]]);
+    refused_at_the_second_leaf(&bytes, 0, 1, at[0][2]);
+}
+
+/// Level 0 carries a node at the sibling's offset twice, different: a
+/// flag-`01` leaf after the hash (through the lane's draft the earlier leaf
+/// stood and the BEEF was accepted), and a second hash (refused before, as a
+/// path node the level contradicts, at the same byte).
+#[test]
+fn a_level_0_leaf_repeated_with_a_different_node_is_refused_on_both_paths() {
+    let txid = beef_chain::funding_root();
+    let (bytes, at) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING), (1, 1, [0; 32])]]);
+    refused_at_the_second_leaf(&bytes, 0, 1, at[0][2]);
+    let (bytes, at) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING), (1, 0, OTHER)]]);
+    refused_at_the_second_leaf(&bytes, 0, 1, at[0][2]);
+}
+
+/// Level 1 carries the path's sibling twice, the second different: through
+/// the lane's draft the earlier leaf stood and the root was its.
+#[test]
+fn a_higher_level_leaf_repeated_is_refused_on_both_paths() {
+    let txid = beef_chain::funding_root();
+    let (bytes, at) = bump_beef(&[
+        vec![(0, 2, txid), (1, 0, SIBLING)],
+        vec![(1, 0, OTHER), (1, 0, SIBLING)],
+    ]);
+    refused_at_the_second_leaf(&bytes, 1, 1, at[1][1]);
+    let (bytes, at) = bump_beef(&[
+        vec![(0, 2, txid), (1, 0, SIBLING)],
+        vec![(1, 0, OTHER), (1, 0, OTHER)],
+    ]);
+    refused_at_the_second_leaf(&bytes, 1, 1, at[1][1]);
+}
+
+/// A BUMP held in memory with a second leaf at an offset: `verify_structure`
+/// walks it with the stream's walk and refuses it.
+#[test]
+fn a_repeated_leaf_offset_in_a_bump_held_in_memory_is_refused_by_verify_structure() {
+    let txid = beef_chain::funding_root();
+    let (bytes, _) = bump_beef(&[vec![(0, 2, txid), (1, 0, SIBLING)], vec![(1, 0, OTHER)]]);
+    let mut beef = Beef::from_binary(&bytes).expect("the BEEF parses");
+    let leaf = beef.bumps[0].path[1][0].clone();
+    let mut changed = leaf.clone();
+    changed.hash = Some(display(&SIBLING));
+    beef.bumps[0].path[1].push(changed);
+    assert_eq!(beef.verify_structure(), Err(Kind::MismatchedNode));
+    beef.bumps[0].path[1][1] = leaf;
+    assert_eq!(beef.verify_structure(), Err(Kind::MismatchedNode));
+}
