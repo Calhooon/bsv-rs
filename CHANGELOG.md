@@ -35,8 +35,6 @@ ratchet and bench-compare tools.
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
-### Fixed: the processor's error frame carries the wallet's bare words, unknownError and the empty stack (#202)
-
 ### Fixed: the processor's error frame is the reference's: unknownError, `Wallet operation failed` for a wallet's error, the processor's own words for its own, the empty stack (#202)
 
 `WalletWireProcessor` wrote an error frame's message as `e.to_string()`, this
@@ -96,7 +94,7 @@ sentence; the three false verdicts through the processor over a stub wallet,
 byte for byte. The frame writer's unit tests in `processor.rs`: a 5,000-byte
 message cut at 4096 (`fd 00 10`), the cut inside `é`, the stack field 0 (`01
 00 00` for an empty message), a processor error that is not a `WalletError`
-its `Display`. RED on `02da747` (the wallet's words framed): the three
+its `Display`. RED on `02da747` (the branch's pre-fold tip, `95707ac` after the rebase) (the wallet's words framed): the three
 wallet-error tests; the processor's refusal and the verdicts passed there as
 here. `tests/wire_method_roundtrip_tests.rs` `test_error_response_format`
 asserts a stub's bare frame; `tests/wallet_wire_cross_sdk_tests.rs`
