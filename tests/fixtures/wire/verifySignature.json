@@ -16,10 +16,13 @@
             "forSelf": null,
             "hashToDirectlyVerify": null,
             "keyID": "fixture",
+            "privileged": null,
+            "privilegedReason": null,
             "protocolID": [
               1,
               "fixture keys"
             ],
+            "seekPermission": null,
             "signature": [
               48,
               6,
@@ -35,7 +38,7 @@
           "originator": "fixtures.invalid"
         },
         "processor_response_hex": "01165369676e6174757265206973206e6f742076616c696400",
-        "request_hex": "101066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726500ff083006020101020101010100",
+        "request_hex": "101066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726500ffffff083006020101020101010100ff",
         "response_encoder": "WalletWireProcessor",
         "response_hex": "01165369676e6174757265206973206e6f742076616c696400"
       },
@@ -118,10 +121,13 @@
               17
             ],
             "keyID": "fixture",
+            "privileged": true,
+            "privilegedReason": "fixture reason",
             "protocolID": [
               1,
               "fixture keys"
             ],
+            "seekPermission": false,
             "signature": [
               48,
               6,
@@ -137,7 +143,7 @@
           "originator": "fixtures.invalid"
         },
         "processor_response_hex": "00",
-        "request_hex": "101066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee501083006020101020101021111111111111111111111111111111111111111111111111111111111111111",
+        "request_hex": "101066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5010e6669787475726520726561736f6e0108300602010102010102111111111111111111111111111111111111111111111111111111111111111100",
         "response_encoder": "WalletWireProcessor",
         "response_hex": "00"
       },
@@ -181,10 +187,13 @@
             17
           ],
           "keyID": "fixture",
+          "privileged": true,
+          "privilegedReason": "fixture reason",
           "protocolID": [
             1,
             "fixture keys"
           ],
+          "seekPermission": false,
           "signature": [
             48,
             6,
