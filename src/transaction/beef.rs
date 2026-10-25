@@ -755,8 +755,8 @@ impl Beef {
     }
 
     /// The entries in the order held, each judged as the streaming reader's
-    /// decoder and fold judge it, so the first refused is the one the stream
-    /// refuses first: a raw entry's content (the stream's
+    /// decoder and fold judge it, so the entry refused is the one the stream
+    /// refuses earliest: a raw entry's content (the stream's
     /// `check_transaction`: an unproven coinbase, no input, no output, a
     /// value outside `MoneyRange`, a null or repeated outpoint), a txid-only
     /// entry no BUMP proves, a BUMP index that names no BUMP or a BUMP that

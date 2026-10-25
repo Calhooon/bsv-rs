@@ -43,9 +43,11 @@ fixtures, the vectors, the Lean's 49 rows, the fuzz seeds, the ts-stack
 corpus when `BSV_CONFORMANCE_DIR` is set, a deep chain, and from each of
 them every prefix, three single-byte changes at every byte and the
 transactions in reverse order) to `Beef::from_binary` then
-`Beef::verify_structure`, and to `verify_stream_structure`. On 0.9.0's tree:
-64,370 inputs, 29,726 disagreements in 85 classes. Now: 0, and no stated
-difference.
+`Beef::verify_structure`, and to `verify_stream_structure`. On 0.9.0's tree,
+with the corpus (`BSV_CONFORMANCE_DIR` set, as the gate requires): 64,828
+inputs, 30,153 disagreements in 90 classes, beside 31 inputs of the order
+class the draft's differential set aside. Now, on the same inputs: 0, and no
+stated difference.
 
 The whole reader is the streaming reader's decoder in a collect mode
 (`BeefDecoder::collecting`, crate-private): `src/transaction/beef/collect.rs`
@@ -84,19 +86,24 @@ what the stream said:
   stream's in their own commit:
   `a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing`
   (`beef_limits`: `ReaderUnderflow`, now `Truncated { needed: 1 }` at the
-  byte the first entry was due), `beef_and_merkle_path_agree_on_both_owned_bodies`
+  byte the entry that was due), `beef_and_merkle_path_agree_on_both_owned_bodies`
   (`merkle_path_lone_leaf`: `MerklePathError("MissingSibling ...")`, now at
   byte 12), `the_whole_path_refuses_a_lone_leaf_at_an_offset_other_than_0`
   (`beef_stream`).
 - **Refused by the parse, read before**: a V2 format byte other than 0, 1
   or 2 (read as a raw transaction), a V1 has-BUMP byte other than 0 or 1
-  (read as an index), a BUMP leaf flag other than `00`, `01` or `02` (read
-  by its bits): `BadFlag`; a leaf offset outside its level:
-  `OffsetOutsideTree`; a BUMP above a `u32` height, which was cut to its low
-  32 bits and its root keyed there: `RootNotCarried` at the BUMP, the
-  stream's refusal under a chain's headers (the in-memory height is a `u32`;
+  (read as "a BUMP index follows", the index the next varint), a BUMP leaf
+  flag other than `00`, `01` or `02` (read by its bits): `BadFlag`; a leaf
+  offset outside its level: `OffsetOutsideTree`; a BUMP above a `u32`
+  height, which was cut to its low 32 bits and its root keyed there:
+  `RootNotCarried` at the BUMP, the stream's refusal under a chain's headers
+  (the in-memory height is a `u32`;
   `a_bump_above_a_u32_height_is_refused_not_cut_to_its_low_bits`, red on
-  0.9.0).
+  0.9.0). Under a `Headers` implementation that answers for a height above
+  `u32` (the fuzz target's `EveryRoot`), the stream accepts a BUMP the whole
+  path refuses; no chain has such a height, and the differential and the
+  fuzz target mask it with `leading_roots`, which keeps a chain's heights
+  only.
 - **Refused by `verify_structure`, accepted before**: the node's rules on a
   transaction's content, which the stream applies since 0.5.0 (bsv-stack-lean
   #68) and the
@@ -138,7 +145,7 @@ what the stream said:
   `a_transaction_written_ahead_of_its_parent_is_refused_on_the_whole_path`
   (`beef_two_readers_agree`), red before the fold.
 - **The kind named when a BEEF holds two faults** is the one the stream
-  meets first: the parse's for an earlier element's content or fold, and
+  meets earliest: the parse's for an earlier element's content or fold, and
   `verify_structure`'s in the order held (through 0.9.0: no input before any
   BUMP index, every stub before any BUMP index, every BUMP index before any
   input).
@@ -178,7 +185,8 @@ not (CLAUDE.md's divergence list, 0.4.2); the merge adds the stream's
 existing rules to it where TS reads otherwise (`ts-stack@4d0ea63`): TS
 reads any V2 format byte other than 2 as a raw transaction
 (`packages/sdk/src/transaction/BeefTx.ts:293-301`), any nonzero V1 has-BUMP
-byte as an index (`:306`), and a leaf flag by its bits
+byte as "a BUMP index follows" and the index from the next varint (`:306`,
+at `edf6e03` and `4d0ea63`), and a leaf flag by its bits
 (`MerklePath.ts:133-140`), where both readers here refuse `BadFlag`; TS's
 `verifyValid` does not apply the node's transaction rules. A repeated leaf
 offset: TS refuses it as it builds the `MerklePath` (`MerklePath.ts:221`,

@@ -356,7 +356,7 @@ fn a_deep_chain_history_builds_on_a_small_stack() {
 /// refused: through 0.9.0 `verify_valid` sorted ahead of judging and accepted
 /// it; since bsv-rs#86 the newest link, held ahead of its parent, is
 /// `InputNamesNoElement` on the whole path, as on the stream, and the sort of
-/// the chain held newest first stays linear.
+/// the chain held newest to oldest stays linear.
 #[test]
 fn a_reversed_deep_chain_is_refused_and_sorts_in_linear_time_on_a_small_stack() {
     let n = depth(DEFAULT_DEPTH);
