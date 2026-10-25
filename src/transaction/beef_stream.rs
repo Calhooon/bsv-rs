@@ -124,7 +124,8 @@ pub enum Kind {
     NoTxidAtLevelZero,
     /// A path needs a node the BUMP neither carries nor determines.
     MissingSibling,
-    /// A node the level below determines differs from the one carried.
+    /// A node the level below determines differs from the one carried, or a
+    /// level carries a second leaf at one offset (bsv-rs#86).
     MismatchedNode,
     /// A BUMP's root is not the root the headers carry at its height.
     RootNotCarried,
@@ -238,7 +239,8 @@ pub enum Reason {
         /// The node's offset at that level.
         offset: u64,
     },
-    /// The node that disagrees.
+    /// The node that disagrees, or the second leaf a level carries at an
+    /// offset, named at its offset varint (bsv-rs#86).
     MismatchedNode {
         /// The level.
         level: u8,
@@ -635,13 +637,28 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
         }
     }
 
+    // Each level's leaves by offset, one leaf at each: a second leaf at an
+    // offset is refused at it, the earliest such leaf in the order carried,
+    // before the walk (the decoder refuses it as it reads it).
+    let mut givens: Vec<HashMap<u64, Node>> = Vec::with_capacity(levels.len());
     for (level, leaves) in levels.iter().enumerate() {
-        let level = level as u8;
-        // The level's leaves by offset, the earliest leaf at an offset standing.
         let mut given: HashMap<u64, Node> = HashMap::with_capacity(leaves.len());
         for l in leaves {
-            given.entry(l.offset).or_insert(l.node);
+            if given.insert(l.offset, l.node).is_some() {
+                return Err(Refusal::new(
+                    l.at,
+                    Reason::MismatchedNode {
+                        level: level as u8,
+                        offset: l.offset,
+                    },
+                ));
+            }
         }
+        givens.push(given);
+    }
+
+    for (level, given) in givens.iter().enumerate() {
+        let level = level as u8;
         // The path nodes of this level by offset.
         let mut computed: HashMap<u64, Hash32> = HashMap::with_capacity(needed.len());
         for n in &needed {
@@ -862,6 +879,9 @@ struct BumpBuilder {
     leaf_at: u64,
     leaf_offset: u64,
     leaf_client: bool,
+    /// The offsets the level in hand has carried (BRC-74's level is its
+    /// leaves by offset: one leaf at each).
+    level_offsets: HashSet<u64>,
 }
 
 /// The transaction under construction.
@@ -1135,6 +1155,7 @@ impl BeefDecoder {
                     leaf_at: 0,
                     leaf_offset: 0,
                     leaf_client: false,
+                    level_offsets: HashSet::new(),
                 });
                 St::BumpHeight
             }
@@ -1365,6 +1386,7 @@ impl BeefDecoder {
             St::NLeaves => {
                 let bump = self.bump.as_mut().expect("a BUMP is in hand");
                 bump.levels.push(Vec::new());
+                bump.level_offsets.clear();
                 bump.leaves_left = value;
                 return self.next_leaf();
             }
@@ -1379,6 +1401,20 @@ impl BeefDecoder {
                     return Err(Refusal::new(
                         at,
                         Reason::OffsetOutsideTree {
+                            level,
+                            offset: value,
+                        },
+                    ));
+                }
+                // A second leaf at an offset the level carries: refused at
+                // its offset varint, whether or not it agrees with the
+                // earlier one (the reference's `Duplicate offset`,
+                // `MerklePath.ts:221`). Named `MismatchedNode`: the Lean's
+                // `duplicateOffset` is no variant of the public `Reason`.
+                if !bump.level_offsets.insert(value) {
+                    return Err(Refusal::new(
+                        at,
+                        Reason::MismatchedNode {
                             level,
                             offset: value,
                         },
