@@ -110,7 +110,7 @@ certificate results carry `write_wallet_certificate`'s order (type, serial,
 subject, certifier, outpoint, fields, the signature unprefixed), which the
 transceiver's parser does not read (the recordings pin its underflow), and
 getHeaderForHeight's result carries the processor's length prefix, which the
-transceiver keeps as the header's first byte. The recordings' keys are fixed
+transceiver keeps as the header's leading byte. The recordings' keys are fixed
 public curve points.
 
 `BSV_SCRIPT_CORPUS` accepts `corpus/seed` or its `seed.jsonl`. Absence prints

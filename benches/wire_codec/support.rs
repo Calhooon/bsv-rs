@@ -599,7 +599,7 @@ fn result_fields(call: WalletCall) -> Vec<Layout> {
         ])],
         C::GetHeight => vec![Var],
         // The processor prefixes the header with its length; the transceiver keeps
-        // the prefix as the header's first byte (recorded as such by #76).
+        // the prefix as the header's leading byte (recorded as such by #76).
         C::GetHeaderForHeight => vec![Blob],
         C::GetNetwork => vec![U8],
         C::GetVersion => vec![Rest],
