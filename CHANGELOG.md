@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-25
+
+### Changed: the Test Suite runs every integration binary; vectors, fixtures and corpora check out byte for byte (#146, #147)
+
+CI's Test Suite ran an enumerated 34 of the 73 integration binaries; it now runs
+`cargo test --features "full,http,websocket" --tests --no-fail-fast`, every
+binary, on the three operating systems, with `tests/arch_ci_runs_every_test.rs`
+pinning the command. `.gitattributes` keeps `tests/vectors/**`,
+`tests/fixtures/**`, `fuzz/corpus/**` and the BIP-39 wordlists free of
+line-ending conversion, so a sha-pinned vector reads the same on Windows
+(`hkdf_wycheproof` was red there under the whole suite). The secrets job's
+allowlist lets the six published BRC-56 HMAC key vectors through by literal,
+never the file (#148, #153). CI only; no library change.
+
 ### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
 
 RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time
