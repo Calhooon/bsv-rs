@@ -48,7 +48,7 @@ No build script, no `OUT_DIR`, no runtime cost: the arrays are in the binary's r
 
 ## Provenance and normalization
 
-Upstream is `bitcoin/bips` `bip-0039/<language>.txt`, read at `100ba872c808946155b1eeb8c4568058f2eea0a7` (2026-10-24). Five files are byte-identical to upstream: English, Chinese Simplified, Chinese Traditional, Czech, Italian. Upstream stores French, Japanese, Korean and Spanish in Unicode NFD; this crate's arrays have always carried their NFC form, and the files keep it (the words did not change in #89). The seed is unaffected either way (`to_seed` NFKD-normalizes the phrase); the phrase a `Mnemonic` prints is NFC.
+Upstream is `bitcoin/bips` `bip-0039/<language>.txt`, read at `100ba872c808946155b1eeb8c4568058f2eea0a7` (2026-10-24). Five files are byte-identical to upstream: English, Chinese Simplified, Chinese Traditional, Czech, Italian. Upstream stores French, Japanese, Korean and Spanish in Unicode NFD; this crate's arrays have always carried their NFC form, and the files keep it (the words did not change in #89). Since #163 the form does not matter to a reader: the lookup compares both sides in NFKD and `to_seed` hashes the NFKD phrase (before #163 both used the bytes as given); the phrase a `Mnemonic` prints is NFC, the form of the files.
 
 | File | sha256 (the file, 64 hex) | Upstream at `100ba872` |
 |------|--------|--------|

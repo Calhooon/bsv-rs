@@ -229,7 +229,7 @@ pub fn verify_english_wordlist() -> bool
 
 9 languages are supported, each with a 2048-word wordlist per BIP-39 spec. Japanese uses ideographic space (U+3000) as word separator; all others use ASCII space.
 
-**NFKD normalization**: The implementation passes through strings unchanged (matching Go SDK). For maximum cross-SDK compatibility, use only ASCII characters in passphrases.
+**NFKD normalization**: The phrase is NFKD-normalized before its words are looked up (compared with the lists in NFKD), and the phrase and passphrase are NFKD for the seed, as BIP-39 says (#163; `unicode-normalization`, in the `compat` feature). The Go SDK normalizes nothing, so a non-NFKD passphrase seeds otherwise there.
 
 ### Usage Example
 
