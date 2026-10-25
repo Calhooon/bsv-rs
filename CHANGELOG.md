@@ -74,9 +74,9 @@ wire_codec bench's layouts follow.
 
 Migration: this crate's own transceiver and processor agreed with each other
 on the old bytes and now agree on the reference's: one side from this release
-against the other from bsv-rs 0.9.0 or older does not (an old processor reads
+against the other from bsv-rs 0.8.2 or older does not (an old processor reads
 the new verifyHmac frame's hmac as the data's length; the new processor refuses
-an old signature frame's first byte as a data-type flag, or reads its data
+an old signature frame's opening byte as a data-type flag, or reads its data
 from the wrong place). Upgrade both sides together. A caller that passed both
 `data` and the hash through the wire (the old frame sent both, `ProtoWallet`
 signing the hash) is now refused before a byte is sent; pass one.
@@ -136,7 +136,7 @@ Migration: a consumer of this crate's processor answering the reference's or
 Go's transceiver read these seven responses wrong before and reads them right
 now. This crate's own transceiver and processor agreed with each other on the
 old bytes and now agree on the reference's: one side from this release against
-the other side from bsv-rs 0.9.0 or older does not. A 0.9.0 processor's four
+the other side from bsv-rs 0.8.2 or older does not. A 0.9.0 processor's four
 byte results reach this transceiver with the length byte at their head
 (and createHmac's 33 bytes are refused), its verdicts (`00 01`, `00 00`) are
 refused as `Wallet Wire <call> response has an invalid length`, never read as
