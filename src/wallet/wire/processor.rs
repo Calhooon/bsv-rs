@@ -27,6 +27,9 @@ use super::encoding::{WireReader, WireWriter};
 use super::requests::{
     read_reveal_counterparty_key_linkage_args, read_reveal_specific_key_linkage_args,
 };
+use super::results::{
+    write_reveal_counterparty_key_linkage_result, write_reveal_specific_key_linkage_result,
+};
 use super::WalletCall;
 use crate::primitives::from_hex;
 use crate::wallet::interface::WalletInterface;
@@ -503,19 +506,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             .reveal_counterparty_key_linkage(args, originator)
             .await?;
 
-        // Serialize response
-        let mut writer = WireWriter::new();
-        writer.write_var_int(result.linkage.encrypted_linkage.len() as u64);
-        writer.write_bytes(&result.linkage.encrypted_linkage);
-        writer.write_var_int(result.linkage.encrypted_linkage_proof.len() as u64);
-        writer.write_bytes(&result.linkage.encrypted_linkage_proof);
-
-        // Public keys are PublicKey types, convert to compressed bytes
-        writer.write_bytes(&result.linkage.prover.to_compressed());
-        writer.write_bytes(&result.linkage.verifier.to_compressed());
-        writer.write_bytes(&result.linkage.counterparty.to_compressed());
-        writer.write_string(&result.revelation_time);
-        Ok(writer.into_bytes())
+        Ok(write_reveal_counterparty_key_linkage_result(&result))
     }
 
     async fn handle_reveal_specific_key_linkage(
@@ -529,21 +520,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             .reveal_specific_key_linkage(args, originator)
             .await?;
 
-        // Serialize response
-        let mut writer = WireWriter::new();
-        writer.write_var_int(result.linkage.encrypted_linkage.len() as u64);
-        writer.write_bytes(&result.linkage.encrypted_linkage);
-        writer.write_var_int(result.linkage.encrypted_linkage_proof.len() as u64);
-        writer.write_bytes(&result.linkage.encrypted_linkage_proof);
-
-        // Public keys are PublicKey types, convert to compressed bytes
-        writer.write_bytes(&result.linkage.prover.to_compressed());
-        writer.write_bytes(&result.linkage.verifier.to_compressed());
-        writer.write_bytes(&result.linkage.counterparty.to_compressed());
-        writer.write_protocol_id(&result.protocol);
-        writer.write_string(&result.key_id);
-        writer.write_u8(result.proof_type);
-        Ok(writer.into_bytes())
+        Ok(write_reveal_specific_key_linkage_result(&result))
     }
 
     // =========================================================================
