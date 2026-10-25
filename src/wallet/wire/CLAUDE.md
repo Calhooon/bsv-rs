@@ -93,7 +93,7 @@ The processor writes the reference's error frame (`WalletWireProcessor.ts:2370-2
 
 ### Go-Compatible Nil Sentinel
 
-Optional strings, bytes, string arrays, and string maps use `VarInt(u64::MAX)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil/absent sentinel, matching the Go SDK's `VarInt(math.MaxUint64)` encoding. This is used in `read/write_optional_string`, `read/write_optional_bytes`, `read/write_string_array`, `read/write_string_map`, and `read_optional_string_map` (its writer removed in 0.9.0, bsv-rs#184). No frame the reference reads strictly is read through a sentinel reader (#183): a certificate's fields, the listCertificates keyring and the discovery maps are `readVarIntNumStrict` counts, nine 0xFF refused; `read_string_map` has no caller in the crate, `read_optional_string_map` one (`read_identity_certificate`, the pre-#182 layout, #184).
+Optional strings, bytes, string arrays, and string maps use `VarInt(u64::MAX)` (9 bytes: `FF FF FF FF FF FF FF FF FF`) as a nil/absent sentinel, matching the Go SDK's `VarInt(math.MaxUint64)` encoding. This is used in `read/write_optional_string`, `read/write_optional_bytes`, `read/write_string_array`, `read/write_string_map`, and `read_optional_string_map` (its writer removed in 0.9.0, bsv-rs#184). No frame the reference reads strictly is read through a sentinel reader (#183): a certificate's fields, the listCertificates keyring and the discovery maps are `readVarIntNumStrict` counts, nine 0xFF refused; `read_string_map` has no caller in the crate, `read_optional_string_map` has no caller in the crate; its writer was removed (bsv-rs#184).
 
 Empty optional strings and empty optional bytes are treated the same as `None` — both write the nil sentinel. This matches Go SDK behavior.
 
