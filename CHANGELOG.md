@@ -146,8 +146,14 @@ signatures are unchanged. TS's reader refuses trust 0 (the parity note under
 #182 above); these readers, like the transceiver and Go's, accept it.
 `write_identity_certifier` (whose bytes are the reference's only when iconUrl
 and description are present), `write_optional_identity_certifier` and
-`write_optional_string_map` stay public and untouched, with no caller in the
-crate; their removal or deprecation is the owner's word, still open on #184.
+`write_optional_string_map` have no caller in the crate and no frame of the
+reference's wire to write: they are `#[deprecated]` since 0.9.0, each naming
+its replacement (`write_identity_certificate` for the two certifier writers,
+`write_string_map` with a count of 0 for an absent map), the keeper's reading
+on #184 (2026-10-25). Their removal is the owner's word, in the window beside
+the 0.9.0-beta.1 prerelease; a downstream building with `-D warnings` that
+calls one sees the deprecation now (the dependents job builds the toolbox and
+the CLI against beta on every PR: neither calls them).
 
 ### Fixed: getHeaderForHeight's processor writes the header with no length prefix (#178)
 

@@ -1078,6 +1078,14 @@ impl WireWriter {
     }
 
     /// Writes an optional string map (Go-compatible: VarInt(MaxUint64) for None).
+    ///
+    /// Deprecated since 0.9.0 (bsv-rs#184, the keeper's reading): no frame of the
+    /// reference's wire carries a NIL-sentinel map; write a count with
+    /// [`write_string_map`](Self::write_string_map), 0 for an empty or absent map.
+    #[deprecated(
+        since = "0.9.0",
+        note = "no reference frame carries a NIL-sentinel map; use write_string_map (a count, 0 when absent); bsv-rs#184"
+    )]
     pub fn write_optional_string_map(
         &mut self,
         map: Option<&HashMap<String, String>>,
@@ -1209,7 +1217,15 @@ impl WireWriter {
         }
     }
 
-    /// Writes an IdentityCertifier.
+    /// Writes an IdentityCertifier in the layout before #182 (NIL sentinels for an
+    /// absent iconUrl or description), the reference's only when both are present.
+    ///
+    /// Deprecated since 0.9.0 (bsv-rs#184): the certifier is written inside
+    /// [`write_identity_certificate`](Self::write_identity_certificate) as the reference writes it.
+    #[deprecated(
+        since = "0.9.0",
+        note = "the certifier is written by write_identity_certificate in the reference's layout; bsv-rs#184"
+    )]
     pub fn write_identity_certifier(&mut self, certifier: &IdentityCertifier) -> &mut Self {
         self.write_string(&certifier.name);
         self.write_optional_string(certifier.icon_url.as_deref());
@@ -1217,7 +1233,17 @@ impl WireWriter {
         self.write_u8(certifier.trust)
     }
 
-    /// Writes an optional IdentityCertifier.
+    /// Writes an optional IdentityCertifier with a present-flag byte, the layout
+    /// before #182; the reference has no absent certifier.
+    ///
+    /// Deprecated since 0.9.0 (bsv-rs#184): use
+    /// [`write_identity_certificate`](Self::write_identity_certificate), which writes Go's
+    /// zero value for `None`.
+    #[deprecated(
+        since = "0.9.0",
+        note = "the reference has no present flag; write_identity_certificate writes the certifier; bsv-rs#184"
+    )]
+    #[allow(deprecated)]
     pub fn write_optional_identity_certifier(
         &mut self,
         certifier: Option<&IdentityCertifier>,
@@ -1729,6 +1755,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_optional_string_map_roundtrip() {
         // Some map
         let mut map = HashMap::new();

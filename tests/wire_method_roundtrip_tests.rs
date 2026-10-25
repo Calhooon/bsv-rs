@@ -1440,6 +1440,7 @@ mod complex_type_roundtrips {
 
     /// Tests IdentityCertifier write/read roundtrip.
     #[test]
+    #[allow(deprecated)]
     fn test_identity_certifier_roundtrip() {
         let certifier = IdentityCertifier {
             name: "BSV Authority".to_string(),
@@ -1921,6 +1922,7 @@ mod complex_type_roundtrips {
 
     /// Tests optional string map roundtrip.
     #[test]
+    #[allow(deprecated)]
     fn test_optional_string_map_roundtrip() {
         let mut map = HashMap::new();
         map.insert("key1".to_string(), "value1".to_string());

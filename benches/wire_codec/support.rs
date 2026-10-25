@@ -246,6 +246,7 @@ fn write_all(values: &[Value], w: &mut WireWriter) {
     }
 }
 
+#[allow(deprecated)]
 fn write(value: &Value, w: &mut WireWriter) {
     match value {
         Value::U8(v) => {

@@ -1289,6 +1289,7 @@ mod wire_protocol_tests {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_string_map_roundtrip() {
         use std::collections::HashMap;
 
