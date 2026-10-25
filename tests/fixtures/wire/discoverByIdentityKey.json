@@ -31,14 +31,44 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 97 bytes, only 18 available",
-          "error": "ReaderUnderflow { needed: 97, available: 18 }"
+          "ok": {
+            "certificates": [
+              {
+                "certificate": {
+                  "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+                  "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+                  "fields": {
+                    "name": "Fixture"
+                  },
+                  "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+                  "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+                  "signature": "3006020101020101",
+                  "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+                },
+                "certifierInfo": {
+                  "description": "fixture only",
+                  "iconUrl": "https://certifier.invalid/icon",
+                  "name": "Fixture Certifier",
+                  "trust": 5
+                },
+                "decryptedFields": {
+                  "name": "Fixture",
+                  "role": "reader"
+                },
+                "publiclyRevealedKeyring": {
+                  "name": "Zml4dHVyZQ==",
+                  "role": "cmVhZGVy"
+                }
+              }
+            ],
+            "totalCertificates": 1
+          }
         },
         "processor_observed": null,
         "processor_response_hex": "014977616c6c6574206572726f723a20646973636f76657242794964656e746974794b657920726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
         "request_hex": "151066697874757265732e696e76616c69640279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798140600",
         "response_encoder": "WireWriter",
-        "response_hex": "0001b9111111111111111111111111111111111111111111111111111111111111111122222222222222222222222222222222222222222222222222222222222222220279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee533333333333333333333333333333333333333333333333333333333333333330101046e616d6507466978747572653006020101020101011146697874757265204365727469666965721e68747470733a2f2f6365727469666965722e696e76616c69642f69636f6e0c66697874757265206f6e6c790502046e616d650c5a6d6c34644856795a513d3d04726f6c6508636d56685a47567902046e616d65074669787475726504726f6c6506726561646572"
+        "response_hex": "0001b9111111111111111111111111111111111111111111111111111111111111111122222222222222222222222222222222222222222222222222222222222222220279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179802c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee533333333333333333333333333333333333333333333333333333333333333330101046e616d65074669787475726530060201010201011146697874757265204365727469666965721e68747470733a2f2f6365727469666965722e696e76616c69642f69636f6e0c66697874757265206f6e6c790502046e616d65076669787475726504726f6c650672656164657202046e616d65074669787475726504726f6c6506726561646572"
       },
       "input": {
         "args": {
