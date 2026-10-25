@@ -258,13 +258,13 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Counterparty
         writer.write_counterparty(args.counterparty.as_ref());
 
-        // Data
+        // The 32 bytes of the HMAC, then the data behind its length
+        // (`WalletWireTransceiver.ts:1048-1050`; BRC-100 `wallet/0100.md:2149-2151`
+        // at `ed1b015`; #199). `VerifyHmacArgs::hmac` is 32 bytes by its type,
+        // the length `validateVerifyHmacArgs` asks (`validationHelpers.ts:1774`).
+        writer.write_bytes(&args.hmac);
         writer.write_var_int(args.data.len() as u64);
         writer.write_bytes(&args.data);
-
-        // HMAC
-        writer.write_var_int(args.hmac.len() as u64);
-        writer.write_bytes(&args.hmac);
 
         let response = self
             .transmit(WalletCall::VerifyHmac, originator, writer.as_bytes())
@@ -293,11 +293,13 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Counterparty
         writer.write_counterparty(args.counterparty.as_ref());
 
-        // Data
-        writer.write_optional_bytes(args.data.as_deref());
-
-        // Hash to directly sign
-        writer.write_optional_bytes(args.hash_to_directly_sign.as_ref().map(|h| &h[..]));
+        // The data-type flag and the data or the hash (#199)
+        super::write_data_or_hash(
+            &mut writer,
+            "hashToDirectlySign",
+            args.data.as_deref(),
+            args.hash_to_directly_sign.as_ref(),
+        )?;
 
         let response = self
             .transmit(WalletCall::CreateSignature, originator, writer.as_bytes())
@@ -329,15 +331,18 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // for_self
         writer.write_optional_bool(args.for_self);
 
-        // Data
-        writer.write_optional_bytes(args.data.as_deref());
-
-        // Hash to directly verify
-        writer.write_optional_bytes(args.hash_to_directly_verify.as_ref().map(|h| &h[..]));
-
-        // Signature (already DER-encoded)
+        // Signature (already DER-encoded), ahead of the data
+        // (`WalletWireTransceiver.ts:1135-1136`; #199)
         writer.write_var_int(args.signature.len() as u64);
         writer.write_bytes(&args.signature);
+
+        // The data-type flag and the data or the hash (#199)
+        super::write_data_or_hash(
+            &mut writer,
+            "hashToDirectlyVerify",
+            args.data.as_deref(),
+            args.hash_to_directly_verify.as_ref(),
+        )?;
 
         let response = self
             .transmit(WalletCall::VerifySignature, originator, writer.as_bytes())

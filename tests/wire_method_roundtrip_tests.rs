@@ -579,6 +579,194 @@ mod signature_tests {
     }
 }
 
+/// #199: the frames the hmac and signature roundtrips carry are the
+/// reference's: verifyHmac's 32 raw HMAC bytes ahead of the data
+/// (`ts-stack@edf6e03` `WalletWireTransceiver.ts:1048-1050`), the signature
+/// calls' data-type flag, `01` then the data behind its length or `02` then
+/// the 32 bytes of the hash (`:1082-1090`, `:1137-1144`), verifySignature's
+/// signature ahead of the flag (`:1135-1136`). This crate writes no privileged
+/// pair or seekPermission yet (#193), so each frame ends with these bytes.
+mod reference_request_frames {
+    use super::*;
+    use std::sync::Mutex;
+
+    /// A loopback that keeps the last request it carried.
+    struct RecordingLoopback {
+        inner: LoopbackWire,
+        sent: Mutex<Vec<u8>>,
+    }
+
+    #[async_trait::async_trait]
+    impl WalletWire for RecordingLoopback {
+        async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+            *self
+                .sent
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = message.to_vec();
+            self.inner.transmit_to_wallet(message).await
+        }
+    }
+
+    fn recording_loopback() -> WalletWireTransceiver<RecordingLoopback> {
+        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
+        let inner = LoopbackWire {
+            processor: Arc::new(WalletWireProcessor::new(wallet)),
+        };
+        WalletWireTransceiver::new(RecordingLoopback {
+            inner,
+            sent: Mutex::new(Vec::new()),
+        })
+    }
+
+    fn last_request(client: &WalletWireTransceiver<RecordingLoopback>) -> Vec<u8> {
+        client
+            .wire()
+            .sent
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone()
+    }
+
+    fn protocol() -> Protocol {
+        Protocol::new(SecurityLevel::App, "request frames")
+    }
+
+    #[tokio::test]
+    async fn verify_hmac_carries_the_raw_hmac_ahead_of_the_data() {
+        let client = recording_loopback();
+        let data = b"hmac frame".to_vec();
+        let hmac = client
+            .create_hmac(
+                CreateHmacArgs {
+                    data: data.clone(),
+                    protocol_id: protocol(),
+                    key_id: "k".to_string(),
+                    counterparty: None,
+                },
+                "",
+            )
+            .await
+            .unwrap()
+            .hmac;
+        let result = client
+            .verify_hmac(
+                VerifyHmacArgs {
+                    data: data.clone(),
+                    hmac,
+                    protocol_id: protocol(),
+                    key_id: "k".to_string(),
+                    counterparty: None,
+                },
+                "",
+            )
+            .await
+            .unwrap();
+        assert!(result.valid);
+        let tail = [&hmac[..], &[data.len() as u8], &data].concat();
+        assert!(last_request(&client).ends_with(&tail));
+    }
+
+    #[tokio::test]
+    async fn the_signature_calls_carry_the_data_type_flag_in_both_forms() {
+        let client = recording_loopback();
+        let data = b"signature frame".to_vec();
+        let hash = bsv_rs::primitives::sha256(&data);
+        // Flag 1 and flag 2 sign the same digest: SHA-256 of the data.
+        for (sign_data, sign_hash, flag_tail) in [
+            (
+                Some(data.clone()),
+                None,
+                [&[1u8, data.len() as u8][..], &data].concat(),
+            ),
+            (None, Some(hash), [&[2u8][..], &hash].concat()),
+        ] {
+            let signature = client
+                .create_signature(
+                    CreateSignatureArgs {
+                        data: sign_data.clone(),
+                        hash_to_directly_sign: sign_hash,
+                        protocol_id: protocol(),
+                        key_id: "k".to_string(),
+                        counterparty: None,
+                    },
+                    "",
+                )
+                .await
+                .unwrap()
+                .signature;
+            assert!(last_request(&client).ends_with(&flag_tail));
+
+            let result = client
+                .verify_signature(
+                    VerifySignatureArgs {
+                        data: sign_data,
+                        hash_to_directly_verify: sign_hash,
+                        signature: signature.clone(),
+                        protocol_id: protocol(),
+                        key_id: "k".to_string(),
+                        counterparty: Some(Counterparty::Anyone),
+                        for_self: Some(true),
+                    },
+                    "",
+                )
+                .await
+                .unwrap();
+            assert!(result.valid);
+            let tail = [&[signature.len() as u8][..], &signature, &flag_tail].concat();
+            assert!(last_request(&client).ends_with(&tail));
+        }
+    }
+
+    /// The reference refuses both or neither of the data and the hash before
+    /// it writes (`validationHelpers.ts:1777-1787`); so does this transceiver,
+    /// nothing sent.
+    #[tokio::test]
+    async fn the_signature_calls_refuse_both_or_neither_of_the_data_and_the_hash() {
+        let client = recording_loopback();
+        for (data, hash) in [(Some(vec![1]), Some([0u8; 32])), (None, None)] {
+            let signed = client
+                .create_signature(
+                    CreateSignatureArgs {
+                        data: data.clone(),
+                        hash_to_directly_sign: hash,
+                        protocol_id: protocol(),
+                        key_id: "k".to_string(),
+                        counterparty: None,
+                    },
+                    "",
+                )
+                .await;
+            assert_eq!(
+                signed.unwrap_err(),
+                Error::WalletError(
+                    "The data, hashToDirectlySign parameter must be exactly one value".into()
+                )
+            );
+            let verified = client
+                .verify_signature(
+                    VerifySignatureArgs {
+                        data,
+                        hash_to_directly_verify: hash,
+                        signature: vec![0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01],
+                        protocol_id: protocol(),
+                        key_id: "k".to_string(),
+                        counterparty: None,
+                        for_self: None,
+                    },
+                    "",
+                )
+                .await;
+            assert_eq!(
+                verified.unwrap_err(),
+                Error::WalletError(
+                    "The data, hashToDirectlyVerify parameter must be exactly one value".into()
+                )
+            );
+        }
+        assert!(last_request(&client).is_empty());
+    }
+}
+
 mod key_linkage_tests {
     use super::*;
 
