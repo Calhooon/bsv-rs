@@ -108,7 +108,7 @@ fn sample_wallet_certificate() -> WalletCertificate {
         serial_number: to_base64(&[0xbb; 32]),
         certifier: sample_pubkey_hex(),
         revocation_outpoint: sample_outpoint_string(),
-        signature: "deadbeef".to_string(),
+        signature: "3006020101020101".to_string(),
         fields: {
             let mut m = HashMap::new();
             m.insert("name".to_string(), "Alice".to_string());

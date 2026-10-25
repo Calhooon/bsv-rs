@@ -1926,7 +1926,7 @@ mod tests {
             serial_number: crate::primitives::to_base64(&serial_bytes),
             certifier: certifier.to_hex(),
             revocation_outpoint: format!("{}.0", crate::primitives::to_hex(&[0xcc; 32])),
-            signature: crate::primitives::to_hex(&[0xdd; 72]),
+            signature: "3006020101020101".to_string(),
             fields,
         }
     }
