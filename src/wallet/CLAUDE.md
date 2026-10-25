@@ -14,7 +14,8 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `interface.rs` | WalletInterface async trait (28 methods) + marker traits | ~297 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
-| `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl | ~1414 |
+| `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
+| `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl; reads neither `privileged` nor `seek_permission`, as the reference's ProtoWallet does not | ~1284 |
 | `validation.rs` | 40+ input validation helpers + validated structs | ~1170 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
@@ -261,6 +262,7 @@ let signed = wallet.create_signature(CreateSignatureArgs {
     protocol_id: Protocol::new(SecurityLevel::App, "signing app"),
     key_id: "sig-1".to_string(),
     counterparty: None, // defaults to Anyone
+    ..Default::default() // privileged, privileged_reason, seek_permission (#193)
 }).unwrap();
 ```
 
@@ -276,6 +278,7 @@ let encrypted = alice.encrypt(EncryptArgs {
     protocol_id: protocol.clone(),
     key_id: "msg-1".to_string(),
     counterparty: Some(Counterparty::Other(bob.identity_key())),
+    ..Default::default()
 }).unwrap();
 
 let decrypted = bob.decrypt(DecryptArgs {
@@ -283,6 +286,7 @@ let decrypted = bob.decrypt(DecryptArgs {
     protocol_id: protocol,
     key_id: "msg-1".to_string(),
     counterparty: Some(Counterparty::Other(alice.identity_key())),
+    ..Default::default()
 }).unwrap();
 ```
 

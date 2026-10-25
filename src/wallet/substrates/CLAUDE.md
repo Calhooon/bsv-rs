@@ -11,7 +11,8 @@ This module provides transport substrates for communicating with BSV wallets ove
 |------|---------|-------|
 | `mod.rs` | Module root, constants, re-exports | ~64 |
 | `http_wire.rs` | Binary wire protocol over HTTP | ~238 |
-| `http_json.rs` | JSON API over HTTP | ~811 |
+| `http_json.rs` | JSON API over HTTP | ~1072 |
+| `http_json/key_requests.rs` | The nine key-related calls' JSON bodies; the seven key-related requests carry `privileged`, `privilegedReason` and `seekPermission` in the reference's names, an absent one omitted (`JsonPermission`, flattened; bsv-rs#193) | ~246 |
 | `CLAUDE.md` | This documentation | ~260 |
 
 ## Available Substrates
