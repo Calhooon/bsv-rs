@@ -49,6 +49,115 @@ the tests.
 
 Documentation only: `src/block/CLAUDE.md` (the public surface with the node's lines at bitcoin-sv v1.2.2 `879fc8b` and the test that pins each, the rules, the wasm32 note, the downstreams); the root `CLAUDE.md` counts fourteen modules with `block` in the dependency line and 28 module `CLAUDE.md` files under `src/`; `docs/ARCHITECTURE.md`'s HMAC invariant names the `wallet_brc56_hmac_tests` that pin it (#148) and its gaps lose those two items. No code, test or public item changed.
 
+### Changed: a BUMP read alone is read by the BEEF reader's BUMP decoder (#167)
+
+`MerklePath::from_binary`, `from_reader` and `from_hex` were a second BUMP
+parser: they read a leaf flag by its bits, so a flag of 3 or 4 parsed where
+the BEEF reader refuses `BadFlag`; they accepted an offset outside its level,
+a carried node its children contradict and a level 0 with no hash; they cut a
+height above a `u32` to its low 32 bits; and they named every refusal in
+words of their own. They are now the decoder that reads a BUMP in a BEEF
+(`Bump::read_alone`, crate-private, in `src/transaction/beef/in_memory.rs`:
+the public `BeefDecoder` behind the header of a BEEF of one BUMP), with the
+in-memory form the whole-BEEF reader keeps (`Bump::in_memory`, crate-private:
+each level by offset, a height above a `u32` refused `RootNotCarried` at the
+BUMP). The same flag reading, the same offset rule (a repeated offset is
+`MismatchedNode` at the second leaf's offset varint), the same tree-height
+bounds, the same walk, and the stream's `Reason`s with their offsets counted
+from the BUMP's leading byte: `merkle path error: invalid BEEF at byte N:
+Reason`, the variant `Error::MerklePathError` as before. `from_binary` still
+reads a prefix and leaves the bytes after the BUMP, as `@bsv/sdk`'s
+`fromBinary` does (`ts-stack@edf6e03` `MerklePath.ts:161-168`). No public item
+was renamed, retyped or moved: a scratch crate naming every public item of
+`transaction::merkle_path` (each fn at its exact signature, both structs by
+literal and by pattern, the derives) compiles against 0.9.0 and this tree.
+
+The differential `tests/merkle_path_two_readers_agree.rs` reads every BUMP
+the tree holds (the fixtures' BUMPs and those of every BEEF in the fixtures,
+vectors and Rust vector constants, the ts-stack corpus when
+`BSV_CONFORMANCE_DIR` is set, the seeds of `fuzz_merkle_path` and the BUMPs of
+`fuzz_beef_parser`'s, the lone-leaf and cost tests' hand-built BUMPs, flags 0
+to 4, a lone leaf at height 2^32, and from each every prefix, three
+single-byte changes at every byte and a byte appended) through the standalone
+reader and through the BEEF reader on the bytes wrapped as a one-BUMP BEEF,
+and compares the verdict, the kind and offset of a refusal, the bytes taken,
+the height, the levels and the root from every hash of level 0. On 0.9.0's
+tree, with the corpus: 53,875 inputs, 35,747 disagreements in 30 classes, of
+which 34,825 are refusals in the standalone reader's own words (24 classes);
+the rest are 332 inputs it accepted with a flag the BEEF reader refuses
+(`BadFlag`), 34 with an offset outside its level (`OffsetOutsideTree`), 4
+with a carried node its children contradict (`MismatchedNode`), 1 with no
+hash at level 0 (`NoTxidAtLevelZero`), 83 above a `u32` height
+(`RootNotCarried`), and 468 it refused (`Mismatched roots`) that the BEEF
+reader accepts. Now, on the same inputs: 0. `fuzz_merkle_path` asserts the
+same agreement on every input (60 seconds, 298,316 runs, no disagreement and
+no crash).
+
+The 468 are one shape: a duplicate leaf at an even offset (the left sibling)
+that a walk meets as a child of a node it computes from the level below. The
+BEEF reader's walk reads a duplicate as the working hash paired with itself
+wherever it meets one (BRC-74 at `5119a9b`, `transactions/0074.md:71,76`:
+"duplicate working hash"); `RootWalker` hashed an empty left hash there, so
+the txids of one path could climb to two roots and the parse refused it.
+`MerklePath::compute_root` (and `new`, `new_unchecked`, `combine`) now compute
+that node as the right child paired with itself: a different root on that
+shape only, the one the BEEF reader computes, the same verdict
+(`an_even_offset_duplicate_reads_as_the_beef_reader_reads_it`, red on
+0.9.0). The in-memory differentials of `merkle_path.rs` carry the ruling in
+their 0.3.34 rescan, as they carry the lone-leaf one.
+
+The refusals that moved, by test:
+
+- `tests/merkle_path_lone_leaf.rs`: `lone_at_one_parsers_refuse_missing_sibling`
+  and `beef_and_merkle_path_agree_on_both_owned_bodies` read the parse's
+  refusal of a lone leaf at offset 1 as `invalid BEEF at byte 7:
+  MissingSibling { level: 0, offset: 0 }` (it was `MissingSibling { level:
+  0, offset: 0 }` alone); `lone_compute_root_refuses_every_nonzero_offset_class`
+  reads a lone leaf at offset 2 and above as `OffsetOutsideTree { level: 0,
+  offset }` at byte 7 (it was `MissingSibling` with the sibling's offset).
+  `MerklePath::new`, `new_unchecked`, `compute_root` and `combine` keep
+  their texts.
+- `merkle_path.rs`'s `the_parse_matches_the_rescan_except_the_ruled_lone_leaf`
+  asserts that what the parse accepts the 0.3.34 parse accepted, to the same
+  roots and bytes, and that every refusal is the decoder's (587 parsed, 87
+  refused that 0.3.34 parsed); through 0.9.0 it asserted the same verdict.
+- Every other refusal named in the list above moved from the standalone
+  reader's words (`Path cannot be empty`, `Invalid tree height: N, over the
+  maximum height 64`, `Duplicate offset: N, at height: N`, `Missing hash at
+  height N, offset N`, `Mismatched roots`, `reader underflow: ...`,
+  `non-canonical varint: ...`) to the stream's; no test asserted one, and
+  `a_tree_height_over_64_is_refused_naming_it` passes on
+  `TreeHeightOver64 { height }`.
+
+The harness (`bsv-script-lean` at `8840488`, a scratch copy whose
+`harness/Cargo.toml` names the tree by path): the seed corpus GREEN before
+(0.9.0's tree) and after, 10,000 of 10,000 agreeing and 0 witnesses on both.
+`run_wire` on `corpus/wire/bump.jsonl` (35 rows) against the spec's column
+(`docs/records/20261015-110609-s7-86-wire-views-s1-spec.jsonl`): `bump-027`
+(flag 03) and `bump-028` (flag 04) are now refused, as the spec's codec
+refuses them, and close. `bump-031` (a height of 2^32 plus 900,000, which the
+spec's codec reads) moves from an `objects` witness (the height cut to
+900,000) to a `codec` one: the in-memory height is a `u32`, and the parse
+refuses the BUMP as the BEEF reader has since #86. `bump-032` (a byte after
+the BUMP) stays a `codec` witness, as it is for go-sdk and ts-sdk: the
+standalone reader is a prefix reader. The census (`tools/ratchet/run`):
+`src/transaction/merkle_path.rs` 1,470 to 1,469 lines, `beef_stream.rs`
+3,617 unchanged, every counter unchanged (`duplicate_windows_40` holds at
+8,666: the old flag reader was not a window of the decoder's).
+
+### Notes: cross-SDK parity (#167)
+
+TS has one BUMP reader, the `MerklePath` constructor behind `fromReader`
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/MerklePath.ts`): it reads a
+leaf flag by its bits (`:133-140`), refuses a repeated offset as `Duplicate
+offset` (`:221`), and by default refuses a leaf above level 0 at an offset no
+txid's path needs (`legalOffsetsOnly = true`, `:161-168`), which neither of
+this crate's readers refuses. Its `findOrComputeLeaf` gives up on a node whose
+left child is a duplicate (`:437`), where this crate pairs the right child
+with itself. Go keeps the later of two leaves at one offset (`go-sdk@2ca481c`
+`transaction/merklepath.go:87-90`); this crate refuses the second, on both of
+its readers.
+
 ### Changed: the interpreter is split by opcode group (#85)
 
 `src/script/spend.rs` (4,419 lines) is the directory `src/script/spend/`:

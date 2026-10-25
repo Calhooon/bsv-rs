@@ -35,10 +35,10 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
-| `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs |
+| `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |
 | `beef.rs` | `Beef` (BRC-62/95/96): the type, the public readers (over `beef/collect.rs`), `verify_structure`, sorting, merging, the writers (`to_binary`, the atomic closure), logging |
 | `beef/collect.rs` | The whole-BEEF reader: the streaming decoder's collect mode collected into a `Beef`, with the stream's judge beside it (#86) |
-| `beef/in_memory.rs` | The stream's rules on the in-memory forms: `Bump::to_merkle_path`, the walk on a `MerklePath`, `check_transaction` on a `BeefTx`, the atomic table (#86) |
+| `beef/in_memory.rs` | The stream's rules on the in-memory forms: `Bump::to_merkle_path`, `Bump::in_memory` (each level by offset, the `u32` height bound) and `Bump::read_alone` (one BUMP by the decoder, #167), the walk on a `MerklePath`, `check_transaction` on a `BeefTx`, the atomic table (#86) |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants; `BeefTx::from_reader` reads one entry (no BEEF reader calls it since #86) |
 | `beef_stream.rs` | The streaming reader: `BeefDecoder` (and its collect mode, the whole reader's parser), `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`; the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
@@ -302,7 +302,7 @@ pub struct MerklePathLeaf {
 impl MerklePath {
     pub fn new(block_height: u32, path: Vec<Vec<MerklePathLeaf>>) -> Result<Self>  // Full validation
     pub fn new_unchecked(block_height, path) -> Result<Self>    // Skips offset validation
-    pub fn from_hex/from_binary/from_reader(...)                // Parsing
+    pub fn from_hex/from_binary/from_reader(...)                // Parsing: the BEEF reader's BUMP decoder (#167)
     pub fn from_coinbase_txid(txid: &str, height: u32) -> Self  // Single-tx block
     pub fn to_hex/to_binary/to_writer(...)                      // Serialization
     pub fn compute_root(&self, txid: Option<&str>) -> Result<String>  // One cached walk (RootWalker)
@@ -313,7 +313,9 @@ impl MerklePath {
 }
 ```
 
-Validation in `new()`: level 0 non-empty, no duplicate offsets, legal higher-level offsets, all txids compute same root. A one-level lone hashed leaf is valid only at offset 0; parsing and `compute_root` share this rule in `RootWalker`, refusing other offsets with `MissingSibling` and the missing sibling's level and offset. TS returns the txid at any offset (`ts-stack@edf6e03 MerklePath.ts:345,390-391`); this divergence follows the BEEF reader and the owner's offset-0 ruling.
+One decoder (bsv-rs#167): `from_binary`, `from_hex` and `from_reader` read a BUMP by the decoder that reads one in a BEEF (`Bump::read_alone`, then `Bump::in_memory`), so a BUMP means one thing wherever this crate reads it: a leaf flag `00`, `01` or `02` (`BadFlag` otherwise), an offset within its level (`OffsetOutsideTree`) and once there (`MismatchedNode` at the second leaf's offset varint), a tree height of 1 to 64, every hashed leaf of level 0 climbing to one root by the stream's walk (`MissingSibling`, `MismatchedNode`, `NoTxidAtLevelZero`), a block height that fits the `u32` (`RootNotCarried` at the BUMP); a refusal is `MerklePathError("invalid BEEF at byte N: Reason")`, `N` counted from the BUMP's leading byte. `from_binary` reads a prefix (the bytes after the BUMP are left, as TS's `fromBinary` leaves them). `tests/merkle_path_two_readers_agree.rs` (every BUMP the tree holds and its prefixes and single-byte changes: 0 disagreements) and `fuzz_merkle_path` pin it. A duplicate at an even offset is the working hash paired with itself wherever a walk meets it, `RootWalker`'s computed nodes included (#167; TS's `findOrComputeLeaf` gives up there).
+
+Validation in `new()`: level 0 non-empty, no duplicate offsets, legal higher-level offsets, all txids compute same root. A one-level lone hashed leaf is valid only at offset 0; the parse (the decoder's walk) and `compute_root` (`RootWalker`) share this rule, refusing other offsets with `MissingSibling` and the missing sibling's level and offset (the parse refuses a lone leaf at 2 or above earlier, `OffsetOutsideTree`). TS returns the txid at any offset (`ts-stack@edf6e03 MerklePath.ts:345,390-391`); this divergence follows the BEEF reader and the owner's offset-0 ruling.
 
 ## BEEF Format (BRC-62/95/96)
 
@@ -413,7 +415,7 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **BEEF ancestry**: `to_beef()` and `to_beef_v1()` walk the `source_transaction` chain depth first with an explicit stack via `collect_ancestors()`, stop at txs with `merkle_path`, and store each ancestor without its own ancestry
 - **BEEF V1 vs V2**: Use `to_beef_v1()` for ARC compatibility (BRC-62), `to_beef()` for V2 with TXID-only support (BRC-96)
 - **BEEF indexing**: Beef maintains an internal `txid_index` HashMap for O(1) transaction lookup by txid
-- **MerklePath root check**: the parse checks every level-0 leaf's root with one `RootWalker` that indexes each level by offset and computes each node once, shared across the walks (the reference's `computeRootCached`; linear in the leaves since 0.3.35, bsv-stack-lean #57 P0-5c). A tree height over 64 is refused before any shift
+- **MerklePath root check**: `new` and `new_unchecked` check every level-0 leaf's root with one `RootWalker` (the parse, since #167, by the decoder's walk) that indexes each level by offset and computes each node once, shared across the walks (the reference's `computeRootCached`; linear in the leaves since 0.3.35, bsv-stack-lean #57 P0-5c). A tree height over 64 is refused before any shift
 - **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by `"height:root"` key; combines proofs at same height/root
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
