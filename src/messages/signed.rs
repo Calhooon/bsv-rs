@@ -184,6 +184,17 @@ pub fn verify(message: &[u8], sig: &[u8], recipient: Option<&PrivateKey>) -> Res
         }
     }
 
+    // The recipient form is read: the key ID and a DER of at least 8 bytes
+    // must follow (78 bytes for the anyone form, 110 for a named recipient)
+    let min_len = offset + 32 + 8;
+    if sig.len() < min_len {
+        return Err(Error::MessageError(format!(
+            "signature too short: expected at least {} bytes, got {}",
+            min_len,
+            sig.len()
+        )));
+    }
+
     // Parse key ID (32 bytes)
     let key_id = &sig[offset..offset + 32];
     offset += 32;

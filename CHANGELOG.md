@@ -24,6 +24,36 @@ a miss; Go's `VerifyNonce` copies the tail into a `[32]byte`. The stale nonce
 row of `src/auth/CLAUDE.md` (it said 16 + 16 bytes) and `create_nonce`'s doc
 name the canonical 48-byte form.
 
+### Fixed: a signed message too short for its recipient form is refused (#173)
+
+`messages::verify` checked only that a signature was at least 78 bytes, the
+length of the anyone form (version 4, sender 33, marker 1, key ID 32, a DER of
+at least 8). A signature naming a recipient key needs 110 (the recipient 33,
+not 1): given the private key of the key it names, an 88-byte one sliced the
+key ID past its end and panicked (`signed.rs:188`, `range end index 102 out of
+range for slice of length 88`), an abort on wasm32. Once the recipient field is
+read, the reader asks for the key ID and 8 bytes of DER behind it and refuses a
+shorter signature with the error of the anyone form's check,
+`MessageError("signature too short: expected at least 110 bytes, got N")`. A
+named-recipient signature of 102 to 109 bytes, refused before by the DER
+reader (`InvalidSignature("DER too short")`), is now refused by the length
+check; every valid signature verifies as before (the vectors and
+`a_valid_signature_at_either_form_still_verifies_after_the_length_check`).
+Found by #140's target `fuzz_messages_signed`; pinned by
+`a_signature_too_short_for_its_recipient_form_is_refused` (the issue's input),
+`a_named_recipient_form_short_of_its_key_id_or_der_is_refused` (78, 101, 102,
+109 and 110 bytes) and `an_anyone_form_short_of_its_key_id_or_der_is_refused`
+(70, 77 and 78) in `tests/messages_tests.rs`.
+
+### Notes: cross-SDK parity (#173)
+
+TypeScript (`ts-sdk/src/messages/SignedMessage.ts`, `verify`) reads through a
+`Reader` whose `read` returns what remains, so the short key ID is read short
+and the empty DER throws in `Signature.fromDER`: a refusal with another text.
+Go (`go-sdk@2ca481c` `message/signed.go`, `Verify`) slices `sig[counter :
+counter+32]` with no bound and panics on the same input (and on any input under
+70 bytes). This crate refuses it by length, as it refuses a short anyone form.
+
 ### Added: a BEEF whose source links form a cycle is pinned (#160)
 
 Tests only; no reader moved. `tests/beef_cycle.rs` (five tests) builds rings of

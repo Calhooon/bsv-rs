@@ -685,3 +685,116 @@ fn test_cross_communication() {
         decrypt(&bob_encrypted, &alice).unwrap()
     );
 }
+
+// =================
+// #173: a signature too short for its recipient form
+// =================
+
+/// The 88-byte input of bsv-rs#173, found by `fuzz_messages_signed` (#140):
+/// the version, a sender, the public key of the target's third fixed key
+/// (`other`, 32 bytes of 8), then 18 bytes where the key ID's 32 belong.
+const ISSUE_173_INPUT_BASE64: &str = "QkIzAQPwBlaNoVPEOfL1H+06YfA/+D0jfogO5hGHuZ83mgKOCgP5kflE0eGVSn/Iub9i4NePAV9MB3YtUF4g5sRSYKNmGwW47fqmsWIs20JCM6sD8Aahbg==";
+
+/// The key the input's recipient field names: `fuzz_messages_signed`'s
+/// `other` (its `keys()`), found by comparing the field with each key.
+fn issue_173_recipient() -> PrivateKey {
+    PrivateKey::from_bytes(&[8u8; 32]).unwrap()
+}
+
+/// `verify` under `catch_unwind`: the outer `Err` is a panic.
+fn verify_unwound(
+    sig: &[u8],
+    recipient: Option<&PrivateKey>,
+) -> std::thread::Result<bsv_rs::Result<bool>> {
+    std::panic::catch_unwind(|| verify(b"fuzz_messages_signed", sig, recipient))
+}
+
+fn assert_too_short(
+    result: std::thread::Result<bsv_rs::Result<bool>>,
+    expected: usize,
+    got: usize,
+) {
+    match result {
+        Ok(Err(Error::MessageError(msg))) => assert_eq!(
+            msg,
+            format!("signature too short: expected at least {expected} bytes, got {got}")
+        ),
+        other => panic!("expected a too-short refusal, got {other:?}"),
+    }
+}
+
+/// A signature of `len` bytes in the named-recipient form: the version, a
+/// real sender, the recipient's own key, then zero bytes.
+fn recipient_form(recipient: &PrivateKey, len: usize) -> Vec<u8> {
+    let mut sig = SIGNED_VERSION.to_vec();
+    sig.extend_from_slice(&key_from_scalar(1).public_key().to_compressed());
+    sig.extend_from_slice(&recipient.public_key().to_compressed());
+    sig.resize(len, 0);
+    sig
+}
+
+/// The anyone form of `len` bytes: the version, a real sender, the marker,
+/// then zero bytes.
+fn anyone_form(len: usize) -> Vec<u8> {
+    let mut sig = SIGNED_VERSION.to_vec();
+    sig.extend_from_slice(&key_from_scalar(1).public_key().to_compressed());
+    sig.push(0x00);
+    sig.resize(len, 0);
+    sig
+}
+
+#[test]
+fn a_signature_too_short_for_its_recipient_form_is_refused() {
+    let sig = bsv_rs::primitives::from_base64(ISSUE_173_INPUT_BASE64).unwrap();
+    assert_eq!(sig.len(), 88);
+    let recipient = issue_173_recipient();
+    // The recipient field names the given key, so the reader passes the
+    // recipient check and reaches the key ID.
+    assert_eq!(&sig[37..70], &recipient.public_key().to_compressed()[..]);
+    assert_too_short(verify_unwound(&sig, Some(&recipient)), 110, 88);
+}
+
+#[test]
+fn a_named_recipient_form_short_of_its_key_id_or_der_is_refused() {
+    let recipient = issue_173_recipient();
+    // 78: past the first check; 101: one byte short of the key ID; 102: the
+    // key ID and an empty DER;
+    // 109: a DER of 7 bytes.
+    for len in [78, 101, 102, 109] {
+        assert_too_short(
+            verify_unwound(&recipient_form(&recipient, len), Some(&recipient)),
+            110,
+            len,
+        );
+    }
+    // 110: the length is enough; the zero DER is refused by the DER reader.
+    match verify_unwound(&recipient_form(&recipient, 110), Some(&recipient)) {
+        Ok(Err(Error::InvalidSignature(_))) => {}
+        other => panic!("expected InvalidSignature, got {other:?}"),
+    }
+}
+
+#[test]
+fn an_anyone_form_short_of_its_key_id_or_der_is_refused() {
+    // 70: the key ID and an empty DER; 77: a DER of 7 bytes.
+    for len in [70, 77] {
+        assert_too_short(verify_unwound(&anyone_form(len), None), 78, len);
+    }
+    // 78: the shortest the reader takes; the zero DER is refused by the DER
+    // reader.
+    match verify_unwound(&anyone_form(78), None) {
+        Ok(Err(Error::InvalidSignature(_))) => {}
+        other => panic!("expected InvalidSignature, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_valid_signature_at_either_form_still_verifies_after_the_length_check() {
+    let sender = key_from_scalar(15);
+    let recipient = issue_173_recipient();
+    let named = sign(b"m", &sender, Some(&recipient.public_key())).unwrap();
+    assert!(named.len() >= 110);
+    assert!(verify(b"m", &named, Some(&recipient)).unwrap());
+    let anyone = sign(b"m", &sender, None).unwrap();
+    assert!(verify(b"m", &anyone, None).unwrap());
+}
