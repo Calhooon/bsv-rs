@@ -582,7 +582,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                     protocol_id: None,
                     key_id: None,
                     counterparty: None,
-                    for_self: None,
+                    ..Default::default()
                 },
                 self.originator(),
             )
@@ -607,10 +607,10 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             .create_signature(
                 crate::wallet::CreateSignatureArgs {
                     data: Some(data),
-                    hash_to_directly_sign: None,
                     protocol_id: protocol,
                     key_id: "kvstore-token".to_string(),
                     counterparty: Some(Counterparty::Anyone),
+                    ..Default::default()
                 },
                 self.originator(),
             )

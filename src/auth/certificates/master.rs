@@ -76,6 +76,7 @@ impl MasterCertificate {
                         protocol_id: protocol.clone(),
                         key_id: key_id.clone(),
                         counterparty: Some(Counterparty::Other(subject.clone())),
+                        ..Default::default()
                     },
                     originator,
                 )
@@ -137,6 +138,7 @@ impl MasterCertificate {
                         protocol_id: protocol.clone(),
                         key_id: master_key_id,
                         counterparty: Some(Counterparty::Other(certifier.clone())),
+                        ..Default::default()
                     },
                     originator,
                 )
@@ -152,6 +154,7 @@ impl MasterCertificate {
                         protocol_id: protocol.clone(),
                         key_id: verifiable_key_id,
                         counterparty: Some(Counterparty::Other(verifier.clone())),
+                        ..Default::default()
                     },
                     originator,
                 )
@@ -249,6 +252,7 @@ impl MasterCertificate {
                     protocol_id: protocol,
                     key_id,
                     counterparty: Some(Counterparty::Other(certifier.clone())),
+                    ..Default::default()
                 },
                 originator,
             )

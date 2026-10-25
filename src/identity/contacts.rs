@@ -153,6 +153,7 @@ impl<W: WalletInterface> ContactsManager<W> {
                     protocol_id: protocol.clone(),
                     key_id: key_id.clone(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 originator,
             )
@@ -163,11 +164,11 @@ impl<W: WalletInterface> ContactsManager<W> {
             .wallet
             .get_public_key(
                 crate::wallet::GetPublicKeyArgs {
-                    identity_key: false,
                     protocol_id: Some(protocol.clone()),
                     key_id: Some(key_id.clone()),
                     counterparty: Some(Counterparty::Self_),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 originator,
             )
@@ -411,11 +412,11 @@ impl<W: WalletInterface> ContactsManager<W> {
                         .wallet
                         .create_signature(
                             CreateSignatureArgs {
-                                data: None,
                                 hash_to_directly_sign: Some(preimage_hash),
                                 protocol_id: protocol.clone(),
                                 key_id: stored_key_id,
                                 counterparty: Some(Counterparty::Self_),
+                                ..Default::default()
                             },
                             originator,
                         )
@@ -696,11 +697,11 @@ impl<W: WalletInterface> ContactsManager<W> {
                         .wallet
                         .create_signature(
                             CreateSignatureArgs {
-                                data: None,
                                 hash_to_directly_sign: Some(preimage_hash),
                                 protocol_id: protocol.clone(),
                                 key_id: stored_key_id,
                                 counterparty: Some(Counterparty::Self_),
+                                ..Default::default()
                             },
                             originator,
                         )
@@ -870,6 +871,7 @@ impl<W: WalletInterface> ContactsManager<W> {
                         protocol_id: protocol.clone(),
                         key_id,
                         counterparty: Some(Counterparty::Self_),
+                        ..Default::default()
                     },
                     originator,
                 )
@@ -984,10 +986,7 @@ impl<W: WalletInterface> ContactsManager<W> {
     /// without revealing the actual identity key in the tag.
     #[allow(dead_code)]
     async fn create_identity_tag(&self, identity_key: &str) -> Result<String> {
-        let protocol = crate::wallet::Protocol::new(
-            crate::wallet::SecurityLevel::App,
-            &self.config.protocol_id.1,
-        );
+        let protocol = Protocol::new(SecurityLevel::App, &self.config.protocol_id.1);
 
         let result = self
             .wallet
@@ -997,6 +996,7 @@ impl<W: WalletInterface> ContactsManager<W> {
                     protocol_id: protocol,
                     key_id: identity_key.to_string(),
                     counterparty: Some(crate::wallet::Counterparty::Self_),
+                    ..Default::default()
                 },
                 self.originator(),
             )

@@ -2,7 +2,7 @@ mod binary;
 mod cases;
 mod http;
 pub mod wallet;
-mod wallet_json;
+pub mod wallet_json;
 mod wire;
 
 use serde_json::{json, Value};

@@ -186,6 +186,7 @@ impl KVStoreInterpreter {
             key_id: "kvstore-token".to_string(),
             counterparty: Some(Counterparty::Other(controller_pubkey)),
             for_self: Some(false), // Verify counterparty's signature
+            ..Default::default()
         };
 
         // Use the "anyone" wallet for verification

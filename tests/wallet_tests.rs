@@ -491,6 +491,7 @@ mod proto_wallet_tests {
                 key_id: None,
                 counterparty: None,
                 for_self: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -509,6 +510,7 @@ mod proto_wallet_tests {
                 key_id: Some("derived-1".to_string()),
                 counterparty: Some(Counterparty::Self_),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
 
@@ -528,6 +530,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "msg-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -540,6 +543,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol,
                 key_id: "msg-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -560,6 +564,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "msg-1".to_string(),
                 counterparty: Some(Counterparty::Other(bob.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -570,6 +575,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol,
                 key_id: "msg-1".to_string(),
                 counterparty: Some(Counterparty::Other(alice.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -590,6 +596,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol1,
                 key_id: "msg-1".to_string(),
                 counterparty: Some(Counterparty::Other(bob.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -599,6 +606,7 @@ mod proto_wallet_tests {
             protocol_id: protocol2,
             key_id: "msg-1".to_string(),
             counterparty: Some(Counterparty::Other(alice.identity_key())),
+            ..Default::default()
         });
 
         assert!(result.is_err());
@@ -616,6 +624,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "hmac-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -628,6 +637,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol,
                 key_id: "hmac-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -645,6 +655,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "hmac-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -654,6 +665,7 @@ mod proto_wallet_tests {
             protocol_id: protocol,
             key_id: "hmac-1".to_string(),
             counterparty: None,
+            ..Default::default()
         });
 
         assert!(result.is_err());
@@ -672,6 +684,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "hmac-1".to_string(),
                 counterparty: Some(Counterparty::Other(bob.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -682,6 +695,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol,
                 key_id: "hmac-1".to_string(),
                 counterparty: Some(Counterparty::Other(alice.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -701,6 +715,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "sig-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -716,6 +731,7 @@ mod proto_wallet_tests {
                 key_id: "sig-1".to_string(),
                 counterparty: Some(Counterparty::Anyone),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
 
@@ -735,6 +751,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "hash-sig-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -747,6 +764,7 @@ mod proto_wallet_tests {
                 key_id: "hash-sig-1".to_string(),
                 counterparty: Some(Counterparty::Anyone),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
 
@@ -765,6 +783,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "sig-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -776,6 +795,7 @@ mod proto_wallet_tests {
             key_id: "sig-1".to_string(),
             counterparty: Some(Counterparty::Anyone),
             for_self: Some(true),
+            ..Default::default()
         });
 
         assert!(result.is_err());
@@ -796,6 +816,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "sig-1".to_string(),
                 counterparty: Some(Counterparty::Other(bob.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -809,6 +830,7 @@ mod proto_wallet_tests {
                 key_id: "sig-1".to_string(),
                 counterparty: Some(Counterparty::Other(alice.identity_key())),
                 for_self: Some(false),
+                ..Default::default()
             })
             .unwrap();
 
@@ -829,6 +851,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "self-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -838,6 +861,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "self-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -850,6 +874,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol.clone(),
                 key_id: "hmac-self".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -860,6 +885,7 @@ mod proto_wallet_tests {
                 protocol_id: protocol,
                 key_id: "hmac-self".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -897,6 +923,7 @@ mod cross_sdk_tests {
             key_id: "42".to_string(),
             counterparty: Some(Counterparty::Other(counterparty_pub)),
             for_self: None,
+            ..Default::default()
         });
 
         assert!(result.is_ok());
@@ -925,6 +952,7 @@ mod cross_sdk_tests {
             protocol_id: Protocol::new(SecurityLevel::Counterparty, "brc2 test"),
             key_id: "42".to_string(),
             counterparty: Some(Counterparty::Other(counterparty_pub)),
+            ..Default::default()
         });
 
         assert!(result.is_ok());
@@ -954,6 +982,7 @@ mod cross_sdk_tests {
             protocol_id: Protocol::new(SecurityLevel::Counterparty, "brc2 test"),
             key_id: "42".to_string(),
             counterparty: Some(Counterparty::Other(counterparty_pub)),
+            ..Default::default()
         });
 
         assert!(result.is_ok());

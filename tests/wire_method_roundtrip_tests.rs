@@ -137,6 +137,7 @@ mod get_public_key_tests {
                     key_id: None,
                     counterparty: None,
                     for_self: None,
+                    ..Default::default()
                 },
                 "test.app",
             )
@@ -160,6 +161,7 @@ mod get_public_key_tests {
                     key_id: Some("key-42".to_string()),
                     counterparty: Some(Counterparty::Self_),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "originator.example.com",
             )
@@ -182,6 +184,7 @@ mod get_public_key_tests {
                     key_id: Some("pub-1".to_string()),
                     counterparty: Some(Counterparty::Anyone),
                     for_self: Some(false),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -207,6 +210,7 @@ mod get_public_key_tests {
                     key_id: Some("cp-key-1".to_string()),
                     counterparty: Some(Counterparty::Other(other_key)),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -228,6 +232,7 @@ mod get_public_key_tests {
                     key_id: None,
                     counterparty: None,
                     for_self: None,
+                    ..Default::default()
                 },
                 "",
             )
@@ -254,6 +259,7 @@ mod encrypt_decrypt_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "encryption roundtrip"),
                     key_id: "enc-1".to_string(),
                     counterparty: None, // defaults to Self_
+                    ..Default::default()
                 },
                 "test",
             )
@@ -270,6 +276,7 @@ mod encrypt_decrypt_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "encryption roundtrip"),
                     key_id: "enc-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -292,6 +299,7 @@ mod encrypt_decrypt_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "empty encryption"),
                     key_id: "emp-1".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -305,6 +313,7 @@ mod encrypt_decrypt_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "empty encryption"),
                     key_id: "emp-1".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -327,6 +336,7 @@ mod encrypt_decrypt_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "large encryption"),
                     key_id: "lg-1".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -340,6 +350,7 @@ mod encrypt_decrypt_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "large encryption"),
                     key_id: "lg-1".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -366,6 +377,7 @@ mod hmac_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "hmac roundtrip"),
                     key_id: "hmac-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -383,6 +395,7 @@ mod hmac_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "hmac roundtrip"),
                     key_id: "hmac-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -404,6 +417,7 @@ mod hmac_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "hmac verify invalid"),
                     key_id: "hmac-2".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -418,6 +432,7 @@ mod hmac_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "hmac verify invalid"),
                     key_id: "hmac-2".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -461,6 +476,7 @@ mod signature_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "signature roundtrip"),
                     key_id: "sig-1".to_string(),
                     counterparty: None, // defaults to Anyone for create_signature
+                    ..Default::default()
                 },
                 "test",
             )
@@ -486,6 +502,7 @@ mod signature_tests {
                     key_id: "sig-1".to_string(),
                     counterparty: Some(Counterparty::Anyone),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -509,6 +526,7 @@ mod signature_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "direct hash signature"),
                     key_id: "sig-hash-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -527,6 +545,7 @@ mod signature_tests {
                     key_id: "sig-hash-1".to_string(),
                     counterparty: Some(Counterparty::Anyone),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -549,6 +568,7 @@ mod signature_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "invalid sig test"),
                     key_id: "sig-bad-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -566,6 +586,7 @@ mod signature_tests {
                     key_id: "sig-bad-1".to_string(),
                     counterparty: Some(Counterparty::Anyone),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -642,6 +663,7 @@ mod reference_request_frames {
                     protocol_id: protocol(),
                     key_id: "k".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "",
             )
@@ -656,13 +678,15 @@ mod reference_request_frames {
                     protocol_id: protocol(),
                     key_id: "k".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "",
             )
             .await
             .unwrap();
         assert!(result.valid);
-        let tail = [&hmac[..], &[data.len() as u8], &data].concat();
+        // seekPermission absent (`ff`) last (#193)
+        let tail = [&hmac[..], &[data.len() as u8], &data, &[0xff]].concat();
         assert!(last_request(&client).ends_with(&tail));
     }
 
@@ -688,13 +712,15 @@ mod reference_request_frames {
                         protocol_id: protocol(),
                         key_id: "k".to_string(),
                         counterparty: None,
+                        ..Default::default()
                     },
                     "",
                 )
                 .await
                 .unwrap()
                 .signature;
-            assert!(last_request(&client).ends_with(&flag_tail));
+            // seekPermission absent (`ff`) last (#193)
+            assert!(last_request(&client).ends_with(&[&flag_tail[..], &[0xff]].concat()));
 
             let result = client
                 .verify_signature(
@@ -706,13 +732,20 @@ mod reference_request_frames {
                         key_id: "k".to_string(),
                         counterparty: Some(Counterparty::Anyone),
                         for_self: Some(true),
+                        ..Default::default()
                     },
                     "",
                 )
                 .await
                 .unwrap();
             assert!(result.valid);
-            let tail = [&[signature.len() as u8][..], &signature, &flag_tail].concat();
+            let tail = [
+                &[signature.len() as u8][..],
+                &signature,
+                &flag_tail,
+                &[0xff],
+            ]
+            .concat();
             assert!(last_request(&client).ends_with(&tail));
         }
     }
@@ -732,6 +765,7 @@ mod reference_request_frames {
                         protocol_id: protocol(),
                         key_id: "k".to_string(),
                         counterparty: None,
+                        ..Default::default()
                     },
                     "",
                 )
@@ -752,6 +786,7 @@ mod reference_request_frames {
                         key_id: "k".to_string(),
                         counterparty: None,
                         for_self: None,
+                        ..Default::default()
                     },
                     "",
                 )
@@ -764,6 +799,157 @@ mod reference_request_frames {
             );
         }
         assert!(last_request(&client).is_empty());
+    }
+}
+
+// =============================================================================
+// The seven key-related calls with their permission fields (#193)
+// =============================================================================
+
+mod permission_field_tests {
+    use super::*;
+
+    /// The three fields set, each the value the reference's default is not.
+    fn privileged<T>(mut args: T, set: impl FnOnce(&mut T)) -> T {
+        set(&mut args);
+        args
+    }
+
+    macro_rules! with_fields {
+        ($args:expr) => {
+            privileged($args, |a| {
+                a.privileged = Some(true);
+                a.privileged_reason = Some("roundtrip reason".to_string());
+                a.seek_permission = Some(false);
+            })
+        };
+    }
+
+    fn protocol() -> Protocol {
+        Protocol::new(SecurityLevel::App, "permission fields")
+    }
+
+    /// #193: each of the seven calls crosses the wire with the privileged
+    /// pair and seekPermission present and absent, and the ProtoWallet,
+    /// which reads neither (as the reference's ProtoWallet does not), answers
+    /// both alike: a field the processor misread would shift every byte after
+    /// it, as the privileged flag once became the plaintext's length.
+    #[tokio::test]
+    async fn the_seven_key_related_calls_roundtrip_with_and_without_the_permission_fields() {
+        let client = create_loopback();
+        let key = |for_self| GetPublicKeyArgs {
+            protocol_id: Some(protocol()),
+            key_id: Some("k".to_string()),
+            for_self,
+            ..Default::default()
+        };
+        let identity = GetPublicKeyArgs {
+            identity_key: true,
+            ..Default::default()
+        };
+        for args in [key(Some(true)), identity] {
+            let plain = client.get_public_key(args.clone(), "").await.unwrap();
+            let with = client.get_public_key(with_fields!(args), "").await.unwrap();
+            assert_eq!(plain.public_key, with.public_key);
+        }
+
+        let data = b"permission fields".to_vec();
+        let encrypt = EncryptArgs {
+            plaintext: data.clone(),
+            protocol_id: protocol(),
+            key_id: "k".to_string(),
+            ..Default::default()
+        };
+        for args in [encrypt.clone(), with_fields!(encrypt)] {
+            let ciphertext = client.encrypt(args, "").await.unwrap().ciphertext;
+            let decrypt = DecryptArgs {
+                ciphertext,
+                protocol_id: protocol(),
+                key_id: "k".to_string(),
+                ..Default::default()
+            };
+            for args in [decrypt.clone(), with_fields!(decrypt)] {
+                assert_eq!(client.decrypt(args, "").await.unwrap().plaintext, data);
+            }
+        }
+
+        let hmac_args = CreateHmacArgs {
+            data: data.clone(),
+            protocol_id: protocol(),
+            key_id: "k".to_string(),
+            ..Default::default()
+        };
+        let hmac = client
+            .create_hmac(hmac_args.clone(), "")
+            .await
+            .unwrap()
+            .hmac;
+        let with = client
+            .create_hmac(with_fields!(hmac_args), "")
+            .await
+            .unwrap();
+        assert_eq!(hmac, with.hmac);
+        let verify = VerifyHmacArgs {
+            data: data.clone(),
+            hmac,
+            protocol_id: protocol(),
+            key_id: "k".to_string(),
+            ..Default::default()
+        };
+        for args in [verify.clone(), with_fields!(verify)] {
+            assert!(client.verify_hmac(args, "").await.unwrap().valid);
+        }
+
+        let sign = CreateSignatureArgs {
+            data: Some(data.clone()),
+            protocol_id: protocol(),
+            key_id: "k".to_string(),
+            ..Default::default()
+        };
+        let signature = client.create_signature(sign.clone(), "").await.unwrap();
+        let with = client
+            .create_signature(with_fields!(sign), "")
+            .await
+            .unwrap();
+        assert_eq!(signature.signature, with.signature);
+        let verify = VerifySignatureArgs {
+            data: Some(data),
+            signature: signature.signature,
+            protocol_id: protocol(),
+            key_id: "k".to_string(),
+            counterparty: Some(Counterparty::Anyone),
+            for_self: Some(true),
+            ..Default::default()
+        };
+        for args in [verify.clone(), with_fields!(verify)] {
+            assert!(client.verify_signature(args, "").await.unwrap().valid);
+        }
+    }
+
+    /// A privileged reason the frame cannot carry (past 127 bytes, an `i8`
+    /// length) is refused before a byte is sent.
+    #[tokio::test]
+    async fn a_privileged_reason_past_127_bytes_is_refused_before_it_is_sent() {
+        let client = create_loopback();
+        let error = client
+            .encrypt(
+                EncryptArgs {
+                    plaintext: vec![1],
+                    protocol_id: protocol(),
+                    key_id: "k".to_string(),
+                    privileged_reason: Some("r".repeat(128)),
+                    ..Default::default()
+                },
+                "",
+            )
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error,
+            Error::WalletError(
+                "Invalid privilegedReason length: expected 0 to 127 bytes, got 128".to_string()
+            )
+        );
     }
 }
 
@@ -2765,6 +2951,7 @@ mod counterparty_variant_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "counterparty test"),
                     key_id: "cp-self".to_string(),
                     counterparty: Some(Counterparty::Self_),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -2779,6 +2966,7 @@ mod counterparty_variant_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "counterparty test"),
                     key_id: "cp-anyone".to_string(),
                     counterparty: Some(Counterparty::Anyone),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -2793,6 +2981,7 @@ mod counterparty_variant_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "counterparty test"),
                     key_id: "cp-none".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -2808,6 +2997,7 @@ mod counterparty_variant_tests {
                     protocol_id: Protocol::new(SecurityLevel::App, "counterparty test"),
                     key_id: "cp-other".to_string(),
                     counterparty: Some(Counterparty::Other(other_key)),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3013,6 +3203,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3026,6 +3217,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-1".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3047,6 +3239,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-2".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3062,6 +3255,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-2".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3084,6 +3278,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-3".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3101,6 +3296,7 @@ mod result_frame_tests {
                     key_id: "frame-3".to_string(),
                     counterparty: Some(Counterparty::Anyone),
                     for_self: Some(true),
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3129,6 +3325,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-4".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3144,6 +3341,7 @@ mod result_frame_tests {
                     key_id: "frame-4".to_string(),
                     counterparty: None,
                     for_self: None,
+                    ..Default::default()
                 },
                 "test",
             )
@@ -3217,6 +3415,7 @@ mod result_frame_tests {
                     protocol_id: protocol(),
                     key_id: "frame-5".to_string(),
                     counterparty: None,
+                    ..Default::default()
                 },
                 "test",
             )

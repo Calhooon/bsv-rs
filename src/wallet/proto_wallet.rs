@@ -121,6 +121,12 @@ pub struct RevealSpecificKeyLinkageResult {
 /// ProtoWallet provides cryptographic operations without blockchain interaction.
 /// It uses [`CachedKeyDeriver`] internally for efficient key derivation.
 ///
+/// It reads no `privileged`, `privileged_reason` or `seek_permission`: it has
+/// one keyring and asks no one, as the reference's ProtoWallet "is also not
+/// concerned with privileged keys" (`ProtoWallet.ts:147` at `ts-stack@edf6e03`)
+/// and never reads seekPermission; the two linkage calls drop their pair the
+/// same way (#193).
+///
 /// # Example
 ///
 /// ```rust
@@ -136,6 +142,7 @@ pub struct RevealSpecificKeyLinkageResult {
 ///     protocol_id: Protocol::new(SecurityLevel::App, "my application"),
 ///     key_id: "signature-1".to_string(),
 ///     counterparty: None,
+///     ..Default::default()
 /// }).unwrap();
 /// ```
 #[derive(Clone)]
@@ -388,6 +395,7 @@ impl ProtoWallet {
                 ),
                 key_id: revelation_time.clone(),
                 counterparty: Some(Counterparty::Other(args.verifier.clone())),
+                ..Default::default()
             })?
             .ciphertext;
 
@@ -415,6 +423,7 @@ impl ProtoWallet {
                 ),
                 key_id: revelation_time.clone(),
                 counterparty: Some(Counterparty::Other(args.verifier.clone())),
+                ..Default::default()
             })?
             .ciphertext;
 
@@ -459,6 +468,7 @@ impl ProtoWallet {
                 protocol_id: Protocol::new(SecurityLevel::Counterparty, &protocol_name),
                 key_id: args.key_id.clone(),
                 counterparty: Some(Counterparty::Other(args.verifier.clone())),
+                ..Default::default()
             })?
             .ciphertext;
 
@@ -469,6 +479,7 @@ impl ProtoWallet {
                 protocol_id: Protocol::new(SecurityLevel::Counterparty, &protocol_name),
                 key_id: args.key_id.clone(),
                 counterparty: Some(Counterparty::Other(args.verifier.clone())),
+                ..Default::default()
             })?
             .ciphertext;
 
@@ -947,6 +958,7 @@ mod tests {
                 key_id: None,
                 counterparty: None,
                 for_self: None,
+                ..Default::default()
             })
             .unwrap();
         assert_eq!(result.public_key, wallet.identity_key_hex());
@@ -964,6 +976,7 @@ mod tests {
                 key_id: Some("key-1".to_string()),
                 counterparty: Some(Counterparty::Self_),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
 
@@ -978,6 +991,7 @@ mod tests {
                 key_id: Some("key-1".to_string()),
                 counterparty: Some(Counterparty::Self_),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
         assert_eq!(result.public_key, result2.public_key);
@@ -995,6 +1009,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: "enc-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -1004,6 +1019,7 @@ mod tests {
                 protocol_id: protocol,
                 key_id: "enc-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -1022,6 +1038,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: "hmac-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -1033,6 +1050,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: "hmac-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
         assert!(verified.valid);
@@ -1044,6 +1062,7 @@ mod tests {
             protocol_id: protocol,
             key_id: "hmac-1".to_string(),
             counterparty: None,
+            ..Default::default()
         });
         assert!(bad_result.is_err());
     }
@@ -1061,6 +1080,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: "sig-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -1074,6 +1094,7 @@ mod tests {
                 key_id: "sig-1".to_string(),
                 counterparty: Some(Counterparty::Anyone),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
         assert!(verified.valid);
@@ -1087,6 +1108,7 @@ mod tests {
             key_id: "sig-1".to_string(),
             counterparty: Some(Counterparty::Anyone),
             for_self: Some(true),
+            ..Default::default()
         });
         assert!(bad_result.is_err());
     }
@@ -1104,6 +1126,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: "hash-sig-1".to_string(),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
 
@@ -1116,6 +1139,7 @@ mod tests {
                 key_id: "hash-sig-1".to_string(),
                 counterparty: Some(Counterparty::Anyone),
                 for_self: Some(true),
+                ..Default::default()
             })
             .unwrap();
         assert!(verified.valid);
@@ -1179,6 +1203,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: result.revelation_time.clone(),
                 counterparty: Some(Counterparty::Other(wallet.identity_key())),
+                ..Default::default()
             })
             .unwrap();
         let linkage_point = PublicKey::from_bytes(&decrypted_linkage.plaintext).unwrap();
@@ -1190,6 +1215,7 @@ mod tests {
                 protocol_id: protocol,
                 key_id: result.revelation_time,
                 counterparty: Some(Counterparty::Other(wallet.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -1229,6 +1255,7 @@ mod tests {
                 protocol_id: protocol.clone(),
                 key_id: "message-1".to_string(),
                 counterparty: Some(Counterparty::Other(bob.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 
@@ -1239,6 +1266,7 @@ mod tests {
                 protocol_id: protocol,
                 key_id: "message-1".to_string(),
                 counterparty: Some(Counterparty::Other(alice.identity_key())),
+                ..Default::default()
             })
             .unwrap();
 

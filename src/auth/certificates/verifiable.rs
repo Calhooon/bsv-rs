@@ -98,6 +98,7 @@ impl VerifiableCertificate {
                     protocol_id: protocol,
                     key_id,
                     counterparty: Some(Counterparty::Other(subject.clone())),
+                    ..Default::default()
                 },
                 originator,
             )

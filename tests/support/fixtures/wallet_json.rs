@@ -107,7 +107,7 @@ macro_rules! codec {
 codec!(
     GetPublicKeyArgs,
     |v| Self {
-        identity_key: field(&v, "identityKey"),
+        identity_key: v["identityKey"].as_bool().unwrap_or(false),
         protocol_id: if v["protocolID"].is_null() {
             None
         } else {
@@ -116,19 +116,28 @@ codec!(
         key_id: field(&v, "keyID"),
         counterparty: counterparty(&v["counterparty"]),
         for_self: field(&v, "forSelf"),
+        privileged: field(&v, "privileged"),
+        privileged_reason: field(&v, "privilegedReason"),
+        seek_permission: field(&v, "seekPermission"),
     },
-    |self| json!({"identityKey": self.identity_key,
+    |self| json!({"identityKey": self.identity_key.then_some(true),
     "protocolID": self.protocol_id.as_ref().map(protocol_json), "keyID": self.key_id,
-    "counterparty": counterparty_json(self.counterparty.as_ref()), "forSelf": self.for_self})
+    "counterparty": counterparty_json(self.counterparty.as_ref()), "forSelf": self.for_self,
+    "privileged": self.privileged, "privilegedReason": self.privileged_reason,
+    "seekPermission": self.seek_permission})
 );
 
 macro_rules! data_args {
     ($ty:ty, $field:ident, $name:literal) => {
         codec!($ty, |v| Self {
             $field: field(&v, $name), protocol_id: protocol(&v), key_id: field(&v, "keyID"),
-            counterparty: counterparty(&v["counterparty"]),
+            counterparty: counterparty(&v["counterparty"]), privileged: field(&v, "privileged"),
+            privileged_reason: field(&v, "privilegedReason"),
+            seek_permission: field(&v, "seekPermission"),
         }, |self| json!({$name: self.$field, "protocolID": protocol_json(&self.protocol_id),
-            "keyID": self.key_id, "counterparty": counterparty_json(self.counterparty.as_ref())}));
+            "keyID": self.key_id, "counterparty": counterparty_json(self.counterparty.as_ref()),
+            "privileged": self.privileged, "privilegedReason": self.privileged_reason,
+            "seekPermission": self.seek_permission}));
     };
 }
 data_args!(EncryptArgs, plaintext, "plaintext");
@@ -143,9 +152,14 @@ codec!(
         protocol_id: protocol(&v),
         key_id: field(&v, "keyID"),
         counterparty: counterparty(&v["counterparty"]),
+        privileged: field(&v, "privileged"),
+        privileged_reason: field(&v, "privilegedReason"),
+        seek_permission: field(&v, "seekPermission"),
     },
     |self| json!({"data": self.data, "hmac": self.hmac, "protocolID": protocol_json(&self.protocol_id),
-    "keyID": self.key_id, "counterparty": counterparty_json(self.counterparty.as_ref())})
+    "keyID": self.key_id, "counterparty": counterparty_json(self.counterparty.as_ref()),
+    "privileged": self.privileged, "privilegedReason": self.privileged_reason,
+    "seekPermission": self.seek_permission})
 );
 
 codec!(
@@ -156,10 +170,15 @@ codec!(
         protocol_id: protocol(&v),
         key_id: field(&v, "keyID"),
         counterparty: counterparty(&v["counterparty"]),
+        privileged: field(&v, "privileged"),
+        privileged_reason: field(&v, "privilegedReason"),
+        seek_permission: field(&v, "seekPermission"),
     },
     |self| json!({"data": self.data, "hashToDirectlySign": self.hash_to_directly_sign,
     "protocolID": protocol_json(&self.protocol_id), "keyID": self.key_id,
-    "counterparty": counterparty_json(self.counterparty.as_ref())})
+    "counterparty": counterparty_json(self.counterparty.as_ref()),
+    "privileged": self.privileged, "privilegedReason": self.privileged_reason,
+    "seekPermission": self.seek_permission})
 );
 
 codec!(
@@ -172,10 +191,15 @@ codec!(
         key_id: field(&v, "keyID"),
         counterparty: counterparty(&v["counterparty"]),
         for_self: field(&v, "forSelf"),
+        privileged: field(&v, "privileged"),
+        privileged_reason: field(&v, "privilegedReason"),
+        seek_permission: field(&v, "seekPermission"),
     },
     |self| json!({"data": self.data, "hashToDirectlyVerify": self.hash_to_directly_verify,
     "signature": self.signature, "protocolID": protocol_json(&self.protocol_id), "keyID": self.key_id,
-    "counterparty": counterparty_json(self.counterparty.as_ref()), "forSelf": self.for_self})
+    "counterparty": counterparty_json(self.counterparty.as_ref()), "forSelf": self.for_self,
+    "privileged": self.privileged, "privilegedReason": self.privileged_reason,
+    "seekPermission": self.seek_permission})
 );
 
 codec!(

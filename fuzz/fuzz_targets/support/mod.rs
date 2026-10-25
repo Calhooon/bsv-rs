@@ -93,6 +93,7 @@ pub fn get_public_key() -> GetPublicKeyArgs {
         key_id: Some("1".into()),
         counterparty: Some(Counterparty::Self_),
         for_self: Some(true),
+        ..Default::default()
     }
 }
 
@@ -102,6 +103,7 @@ pub fn encrypt() -> EncryptArgs {
         protocol_id: protocol(),
         key_id: "1".into(),
         counterparty: None,
+        ..Default::default()
     }
 }
 
@@ -111,6 +113,7 @@ pub fn decrypt() -> DecryptArgs {
         protocol_id: protocol(),
         key_id: "1".into(),
         counterparty: None,
+        ..Default::default()
     }
 }
 
@@ -120,6 +123,7 @@ pub fn create_hmac() -> CreateHmacArgs {
         protocol_id: protocol(),
         key_id: "1".into(),
         counterparty: None,
+        ..Default::default()
     }
 }
 
@@ -130,6 +134,7 @@ pub fn verify_hmac() -> VerifyHmacArgs {
         protocol_id: protocol(),
         key_id: "1".into(),
         counterparty: None,
+        ..Default::default()
     }
 }
 
@@ -140,6 +145,7 @@ pub fn create_signature() -> CreateSignatureArgs {
         protocol_id: protocol(),
         key_id: "1".into(),
         counterparty: None,
+        ..Default::default()
     }
 }
 
@@ -152,6 +158,7 @@ pub fn verify_signature() -> VerifySignatureArgs {
         key_id: "1".into(),
         counterparty: None,
         for_self: None,
+        ..Default::default()
     }
 }
 

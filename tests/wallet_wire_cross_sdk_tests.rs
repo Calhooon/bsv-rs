@@ -1156,9 +1156,10 @@ const ARGS_VECTORS: [&str; 27] = [
 ];
 
 /// The args vectors the processor cannot decode to their json, with the
-/// reason. A vector that leaves this list, or joins it, moves the count.
+/// reason. A vector that leaves this list, or joins it, moves the count (21
+/// at #191; the seven key-related requests of #193 left it).
 #[cfg(feature = "http")]
-const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 21] = [
+const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 14] = [
     (
         "abortAction-simple-args.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
@@ -1176,32 +1177,12 @@ const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 21] = [
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
     ),
     (
-        "createHmac-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and CreateHmacArgs has no field for them: the flag 01 is read as the data's length",
-    ),
-    (
-        "createSignature-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and CreateSignatureArgs has no field for them (#193): the privileged flag 01 is read as the data-type flag and the reason as the data; the frame after the pair is the reference's (#199: the_go_hmac_and_signature_requests_read_as_their_json)",
-    ),
-    (
-        "decrypt-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and DecryptArgs has no field for them: the flag 01 is read as the ciphertext's length",
-    ),
-    (
         "discoverByAttributes-simple-args.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
     ),
     (
         "discoverByIdentityKey-simple-args.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
-    ),
-    (
-        "encrypt-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and EncryptArgs has no field for them: the flag 01 is read as the plaintext's length",
-    ),
-    (
-        "getPublicKey-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and GetPublicKeyArgs has no field for them: the flag 01 is read as forSelf",
     ),
     (
         "internalizeAction-simple-args.json",
@@ -1234,14 +1215,6 @@ const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 21] = [
     (
         "signAction-simple-args.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
-    ),
-    (
-        "verifyHmac-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifyHmacArgs has no field for them (#193): the pair is read as the head of the 32 HMAC bytes and the data's length from inside the HMAC, past the end; the frame after the pair is the reference's (#199)",
-    ),
-    (
-        "verifySignature-simple-args.json",
-        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifySignatureArgs has no field for them (#193): the pair is read as forSelf and the signature, and forSelf's ff as the data-type flag, refused; the frame after the pair is the reference's (#199)",
     ),
 ];
 
@@ -1305,7 +1278,7 @@ async fn every_go_args_vector_decodes_through_the_processor_to_its_json() {
     }
     let allowed: Vec<&str> = PROCESSOR_ARGS_UNSUPPORTED.iter().map(|(f, _)| *f).collect();
     assert_eq!(failing, allowed, "the vectors the processor cannot decode");
-    assert_eq!(ARGS_VECTORS.len() - failing.len(), 6, "passing rows");
+    assert_eq!(ARGS_VECTORS.len() - failing.len(), 13, "passing rows");
 }
 
 /// #191: Go's privileged revealCounterpartyKeyLinkage request (`09 00 01 0b
@@ -1631,6 +1604,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             protocol_id: protocol(),
                             key_id: key(),
                             counterparty: None,
+                            ..Default::default()
                         },
                         "",
                     )
@@ -1646,6 +1620,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             protocol_id: protocol(),
                             key_id: key(),
                             counterparty: None,
+                            ..Default::default()
                         },
                         "",
                     )
@@ -1661,6 +1636,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             protocol_id: protocol(),
                             key_id: key(),
                             counterparty: None,
+                            ..Default::default()
                         },
                         "",
                     )
@@ -1677,6 +1653,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             protocol_id: protocol(),
                             key_id: key(),
                             counterparty: None,
+                            ..Default::default()
                         },
                         "",
                     )
@@ -1693,6 +1670,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             protocol_id: protocol(),
                             key_id: key(),
                             counterparty: None,
+                            ..Default::default()
                         },
                         "",
                     )
@@ -1711,6 +1689,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             key_id: key(),
                             counterparty: None,
                             for_self: None,
+                            ..Default::default()
                         },
                         "",
                     )
@@ -1792,36 +1771,6 @@ async fn a_false_verdict_is_answered_with_an_error_frame() {
 // verifyHmac's raw HMAC ahead of the data, the signature calls' data-type flag (#199)
 // ============================================================================
 
-/// The privileged pair of Go's three key-related vectors below (`01`, then
-/// `0b` and "test reason"): bytes this crate's transceiver does not write and
-/// its processor does not read, the args types having no field for them (#193).
-#[cfg(feature = "http")]
-const GO_PRIVILEGED_PAIR: &[u8] = b"\x01\x0btest reason";
-
-/// A Go args vector's wire without its privileged pair: the frame this
-/// crate's two sides speak while #193 is open.
-#[cfg(feature = "http")]
-fn without_privileged_pair(wire: &[u8]) -> Vec<u8> {
-    let at: Vec<usize> = wire
-        .windows(GO_PRIVILEGED_PAIR.len())
-        .enumerate()
-        .filter(|(_, w)| *w == GO_PRIVILEGED_PAIR)
-        .map(|(i, _)| i)
-        .collect();
-    assert_eq!(at.len(), 1, "one privileged pair in the vector");
-    [&wire[..at[0]], &wire[at[0] + GO_PRIVILEGED_PAIR.len()..]].concat()
-}
-
-/// The vector's json without the fields this crate does not carry (#193).
-#[cfg(feature = "http")]
-fn without_unread_fields(json: &Value) -> Value {
-    let mut json = json.clone();
-    for name in ["privileged", "privilegedReason", "seekPermission"] {
-        json.as_object_mut().unwrap().remove(name);
-    }
-    json
-}
-
 /// Sends a frame through `WalletWireProcessor` to the recording stub and
 /// compares the args it hands the wallet to `want`, a field absent on one
 /// side read as null (`processor_decodes_to_json` over a given frame).
@@ -1856,12 +1805,12 @@ async fn processor_reads_frame_as(wire: &[u8], want: &Value) -> Result<(), Strin
     Ok(())
 }
 
-/// #199: Go's verifyHmac, createSignature and verifySignature requests, their
-/// privileged pair taken out (#193), reach the wallet with every field this
-/// crate reads equal to the vector's json: verifyHmac's 32 raw HMAC bytes
-/// ahead of the data (`WalletWireProcessor.ts:1502-1509` at `ts-stack@edf6e03`),
-/// the signature calls' flag `01` then the data (`:1533-1543`, `:1566-1586`).
-/// seekPermission, the last byte, is read by neither side here (#193).
+/// #199: Go's verifyHmac, createSignature and verifySignature requests reach
+/// the wallet with every field equal to the vector's json: verifyHmac's 32 raw
+/// HMAC bytes ahead of the data (`WalletWireProcessor.ts:1502-1509` at
+/// `ts-stack@edf6e03`), the signature calls' flag `01` then the data
+/// (`:1533-1543`, `:1566-1586`); the privileged pair and seekPermission read
+/// as the reference reads them (#193).
 #[cfg(feature = "http")]
 #[tokio::test]
 async fn the_go_hmac_and_signature_requests_read_as_their_json() {
@@ -1871,12 +1820,9 @@ async fn the_go_hmac_and_signature_requests_read_as_their_json() {
         "verifySignature-simple-args.json",
     ] {
         let (json, wire) = load_vector(filename);
-        processor_reads_frame_as(
-            &without_privileged_pair(&wire),
-            &without_unread_fields(&json),
-        )
-        .await
-        .unwrap_or_else(|why| panic!("{filename}: {why}"));
+        processor_reads_frame_as(&wire, &json)
+            .await
+            .unwrap_or_else(|why| panic!("{filename}: {why}"));
     }
 }
 
@@ -1891,7 +1837,7 @@ async fn a_signature_data_type_flag_of_three_is_refused() {
         ("verifySignature-simple-args.json", "verifySignature"),
     ] {
         let (_, wire) = load_vector(filename);
-        let mut frame = without_privileged_pair(&wire);
+        let mut frame = wire;
         // The flag sits ahead of the data's length and its four bytes and
         // seekPermission: `01 04 0b16212c 01`.
         let flag = frame.len() - 7;
@@ -1926,100 +1872,123 @@ impl bsv_rs::wallet::wire::WalletWire for RequestWire {
     }
 }
 
-/// #199, the writer's side: this crate's transceiver, handed each Go vector's
-/// json, writes the vector's wire save the bytes it has no field for (#193):
-/// the privileged pair after the counterparty (`01 0b` "test reason") and
-/// seekPermission, the frame's last byte (`01`). Everything else is the
-/// vector's, byte for byte: verifyHmac's HMAC raw ahead of the data
-/// (`WalletWireTransceiver.ts:1048-1050`), the signature calls' flag `01`, the
-/// data behind its length (`:1082-1085`), verifySignature's signature ahead of
-/// the flag (`:1135-1140`).
+/// #199 and #193, the writer's side: this crate's transceiver, handed each of
+/// the seven key-related Go vectors' json, writes the vector's wire whole, byte
+/// for byte: the privileged pair after the counterparty
+/// (`#encodeKeyRelatedParams`, `WalletWireTransceiver.ts:1351-1376` at
+/// `ts-stack@edf6e03`), seekPermission last (`:780`, `:951`, `:983`, `:1016`,
+/// `:1051`, `:1092`, `:1146`), getPublicKey's identityKey flag ahead and forSelf
+/// after (`:756-779`); verifyHmac's HMAC raw ahead of the data (`:1048-1050`),
+/// the signature calls' flag `01` and the data behind its length
+/// (`:1082-1085`), verifySignature's signature ahead of the flag (`:1135-1140`).
 #[cfg(feature = "http")]
 #[tokio::test]
-async fn the_transceiver_writes_the_go_hmac_and_signature_requests() {
+async fn the_transceiver_writes_the_seven_key_related_go_requests_whole() {
     use bsv_rs::wallet::wire::WalletWireTransceiver;
-    use bsv_rs::wallet::{
-        Counterparty, CreateSignatureArgs, Protocol, SecurityLevel, VerifyHmacArgs,
-        VerifySignatureArgs,
-    };
-    let (_, signature_reply) = load_vector("createSignature-simple-result.json");
-    for filename in [
-        "verifyHmac-simple-args.json",
-        "createSignature-simple-args.json",
-        "verifySignature-simple-args.json",
-    ] {
-        let (json, wire) = load_vector(filename);
-        assert_eq!(json["protocolID"], serde_json::json!([1, "test-protocol"]));
-        assert_eq!(json["counterparty"], "self");
-        let protocol_id = Protocol::new(SecurityLevel::App, "test-protocol");
-        let key_id = json["keyID"].as_str().unwrap().to_string();
-        let counterparty = Some(Counterparty::Self_);
-        let data = json_to_bytes(&json["data"]);
-        let call = filename.split('-').next().unwrap();
-        let reply = if call == "createSignature" {
-            signature_reply.clone()
-        } else {
-            vec![0]
-        };
+    use bsv_rs::wallet::*;
+    use fixtures::wallet_json::FixtureJson;
+    for call in KEY_RELATED_CALLS {
+        let (json, wire) = load_vector(&format!("{call}-simple-args.json"));
+        let (_, reply) = load_vector(&format!("{call}-simple-result.json"));
         let client = WalletWireTransceiver::new(RequestWire {
             reply,
             sent: Default::default(),
         });
-        match call {
-            "verifyHmac" => {
-                client
-                    .verify_hmac(
-                        VerifyHmacArgs {
-                            data,
-                            hmac: json_to_bytes(&json["hmac"]).try_into().unwrap(),
-                            protocol_id,
-                            key_id,
-                            counterparty,
-                        },
-                        "",
-                    )
-                    .await
-                    .unwrap();
-            }
-            "createSignature" => {
-                client
-                    .create_signature(
-                        CreateSignatureArgs {
-                            data: Some(data),
-                            hash_to_directly_sign: None,
-                            protocol_id,
-                            key_id,
-                            counterparty,
-                        },
-                        "",
-                    )
-                    .await
-                    .unwrap();
-            }
-            _ => {
-                client
-                    .verify_signature(
-                        VerifySignatureArgs {
-                            data: Some(data),
-                            hash_to_directly_verify: None,
-                            signature: json_to_bytes(&json["signature"]),
-                            protocol_id,
-                            key_id,
-                            counterparty,
-                            for_self: None,
-                        },
-                        "",
-                    )
-                    .await
-                    .unwrap();
-            }
-        }
-        let expected = without_privileged_pair(&wire);
-        assert_eq!(expected.last(), Some(&1), "{filename}: seekPermission");
+        let sent = match call {
+            "getPublicKey" => client
+                .get_public_key(GetPublicKeyArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+            "encrypt" => client
+                .encrypt(EncryptArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+            "decrypt" => client
+                .decrypt(DecryptArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+            "createHmac" => client
+                .create_hmac(CreateHmacArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+            "verifyHmac" => client
+                .verify_hmac(VerifyHmacArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+            "createSignature" => client
+                .create_signature(CreateSignatureArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+            _ => client
+                .verify_signature(VerifySignatureArgs::from_fixture(json), "")
+                .await
+                .map(drop),
+        };
+        sent.unwrap_or_else(|e| panic!("{call}: {e}"));
         assert_eq!(
             hex::encode(&*client.wire().sent.lock().unwrap()),
-            hex::encode(&expected[..expected.len() - 1]),
-            "{filename}"
+            hex::encode(&wire),
+            "{call}"
+        );
+    }
+}
+
+/// The seven calls whose requests carry the key-related parameters (#193).
+#[cfg(feature = "http")]
+const KEY_RELATED_CALLS: [&str; 7] = [
+    "getPublicKey",
+    "encrypt",
+    "decrypt",
+    "createHmac",
+    "verifyHmac",
+    "createSignature",
+    "verifySignature",
+];
+
+/// #193: a request with a byte after its last field is refused in the
+/// reference's words (`#assertRequestConsumed`, `WalletWireProcessor.ts:2433-2437`
+/// at `ts-stack@edf6e03`), the wallet never called: the seven key-related
+/// calls, the two linkage calls, getHeaderForHeight and the five calls with no
+/// parameters. Each vector unchanged reaches the wallet.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn a_request_with_a_byte_after_its_last_field_is_refused() {
+    let mut calls: Vec<&str> = KEY_RELATED_CALLS.to_vec();
+    calls.extend([
+        "revealCounterpartyKeyLinkage",
+        "revealSpecificKeyLinkage",
+        "getHeaderForHeight",
+        "getHeight",
+        "isAuthenticated",
+        "waitForAuthentication",
+    ]);
+    for call in calls {
+        let (_, wire) = load_vector(&format!("{call}-simple-args.json"));
+        if let Err(why) = processor_reads_frame_as(&wire, &serde_json::json!({})).await {
+            assert!(
+                !why.starts_with("the wallet was not called"),
+                "{call}: {why}"
+            );
+        }
+        let frame = [wire.as_slice(), &[0]].concat();
+        let why = processor_reads_frame_as(&frame, &serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            why,
+            format!("the wallet was not called: Wallet Wire {call} request contains trailing data"),
+            "{call}"
+        );
+    }
+    // getNetwork and getVersion have no args vector: their bare frames
+    for (code, call) in [(27u8, "getNetwork"), (28, "getVersion")] {
+        let why = processor_reads_frame_as(&[code, 0, 0], &serde_json::json!({}))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            why,
+            format!("the wallet was not called: Wallet Wire {call} request contains trailing data"),
+            "{call}"
         );
     }
 }

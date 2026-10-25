@@ -76,6 +76,7 @@ pub async fn create_nonce<W: WalletInterface>(
                 protocol_id: protocol,
                 key_id,
                 counterparty: counterparty.map(|pk| Counterparty::Other(pk.clone())),
+                ..Default::default()
             },
             originator,
         )
@@ -144,6 +145,7 @@ pub async fn verify_nonce<W: WalletInterface>(
                 protocol_id: protocol,
                 key_id,
                 counterparty: counterparty.map(|pk| Counterparty::Other(pk.clone())),
+                ..Default::default()
             },
             originator,
         )
@@ -271,6 +273,7 @@ mod tests {
                 protocol_id: Protocol::new(SecurityLevel::App, NONCE_PROTOCOL),
                 key_id: to_base64(&random),
                 counterparty: None,
+                ..Default::default()
             })
             .unwrap();
         let mut legacy = Vec::with_capacity(NONCE_LEGACY_SIZE);

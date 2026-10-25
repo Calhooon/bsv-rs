@@ -84,6 +84,7 @@ pub enum SubstrateType {
 ///     key_id: None,
 ///     counterparty: None,
 ///     for_self: None,
+///     ..Default::default()
 /// }).await?;
 /// ```
 pub struct WalletClient {

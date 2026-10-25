@@ -103,6 +103,7 @@ impl TokenWallet {
                 key_id: Some(key_id.to_string()),
                 counterparty: Some(who),
                 for_self: Some(true),
+                ..Default::default()
             },
             "test",
         )

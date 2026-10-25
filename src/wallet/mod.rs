@@ -68,6 +68,7 @@
 //!     protocol_id: Protocol::new(SecurityLevel::App, "signing app"),
 //!     key_id: "sig-1".to_string(),
 //!     counterparty: None,
+//!     ..Default::default()
 //! }).unwrap();
 //! ```
 //!

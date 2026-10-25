@@ -583,7 +583,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     protocol_id: None,
                     key_id: None,
                     counterparty: None,
-                    for_self: None,
+                    ..Default::default()
                 },
                 &self.originator,
             )
@@ -634,10 +634,10 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             .create_signature(
                 CreateSignatureArgs {
                     data: Some(data.clone()),
-                    hash_to_directly_sign: None,
                     protocol_id: protocol,
                     key_id: key_id.clone(),
                     counterparty,
+                    ..Default::default()
                 },
                 &self.originator,
             )
@@ -672,7 +672,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     protocol_id: protocol,
                     key_id,
                     counterparty: Some(Counterparty::Other(message.identity_key.clone())),
-                    for_self: None,
+                    ..Default::default()
                 },
                 &self.originator,
             )
