@@ -2716,7 +2716,9 @@ mod request_frame_tests {
         assert_eq!(network_byte, 0x00); // mainnet
     }
 
-    /// Tests error response format when an error occurs.
+    /// Tests error response format when an error occurs: unknownError (1),
+    /// the refusal's bare words, an empty stack (bsv-rs#202,
+    /// `WalletWireProcessor.ts:2379-2396` at `ts-stack@edf6e03`).
     #[tokio::test]
     async fn test_error_response_format() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
@@ -2731,14 +2733,13 @@ mod request_frame_tests {
         let response = processor.process_message(writer.as_bytes()).await.unwrap();
 
         let mut reader = WireReader::new(&response);
-        let error_byte = reader.read_u8().unwrap();
-        // Should be non-zero (error)
-        assert_ne!(error_byte, 0);
-        // Should have error message
-        let message = reader.read_string().unwrap();
-        assert!(!message.is_empty());
-        // Should have stack trace length
-        let _stack = reader.read_signed_var_int().unwrap();
+        assert_eq!(reader.read_u8().unwrap(), 1);
+        assert_eq!(
+            reader.read_string().unwrap(),
+            "createAction requires a full wallet implementation"
+        );
+        assert_eq!(reader.read_var_int().unwrap(), 0);
+        assert_eq!(reader.remaining(), 0);
     }
 }
 

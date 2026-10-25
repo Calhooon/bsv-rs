@@ -41,6 +41,27 @@ use crate::wallet::{CreateHmacArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs};
 use crate::Error;
 use std::marker::PhantomData;
 
+/// `walletErrors.unknownError` (`WalletError.ts:72` at `ts-stack@edf6e03`).
+const UNKNOWN_ERROR: u8 = 1;
+
+/// `MAX_WIRE_ERROR_MESSAGE_BYTES` (`WalletWireProcessor.ts:25`).
+const MAX_WIRE_ERROR_MESSAGE_BYTES: usize = 4096;
+
+/// The words an error frame carries: the reference writes `error.message`
+/// (`WalletWireProcessor.ts:2387`), never this crate's `Display` prefix. A
+/// wallet's refusal is its own words (`WalletError`), a busy or transport
+/// answer its detail; every other variant is this crate's own sentence,
+/// written as its `Display` reads.
+fn wire_message(error: &Error) -> String {
+    match error {
+        Error::WalletError(words) => words.clone(),
+        Error::WalletBusy { detail, .. }
+        | Error::WalletTransport { detail, .. }
+        | Error::TransportFault { detail, .. } => detail.clone(),
+        other => other.to_string(),
+    }
+}
+
 /// Server-side processor for WalletWire messages.
 ///
 /// This processor handles incoming binary messages from clients, deserializes the
@@ -228,30 +249,23 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
                 writer.write_bytes(&response_bytes);
             }
             Err(e) => {
-                // Map error to code
-                let code = self.error_to_code(&e);
-                writer.write_u8(code);
-
-                // Write error message
-                let message = e.to_string();
-                writer.write_string(&message);
-
-                // Write empty stack trace (Go uses VarInt(len) + bytes)
+                // The reference's outer catch (`WalletWireProcessor.ts:2370-2396`
+                // at `ts-stack@edf6e03`, bsv-rs#202): the error's own code when
+                // it lies in 2 to 8, else unknownError (1); this crate's `Error`
+                // carries no code, so every frame is 1. The message is the
+                // error's own words, cut at 4096 bytes; the stack an empty
+                // string.
+                writer.write_u8(UNKNOWN_ERROR);
+                let message = wire_message(&e);
+                let bytes = message.as_bytes();
+                let bytes = &bytes[..bytes.len().min(MAX_WIRE_ERROR_MESSAGE_BYTES)];
+                writer.write_var_int(bytes.len() as u64);
+                writer.write_bytes(bytes);
                 writer.write_var_int(0);
             }
         }
 
         Ok(writer.into_bytes())
-    }
-
-    /// Maps an error to a wire protocol error code.
-    fn error_to_code(&self, error: &Error) -> u8 {
-        match error {
-            Error::WalletError(msg) if msg.contains("invalid parameter") => 6,
-            Error::WalletError(msg) if msg.contains("insufficient funds") => 7,
-            Error::InvalidSignature(_) => 1,
-            _ => 1, // Generic error
-        }
     }
 
     // =========================================================================

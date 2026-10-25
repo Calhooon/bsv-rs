@@ -251,8 +251,12 @@ async fn a_header_height_above_u32_max_is_refused_not_truncated() {
         .await
         .unwrap();
     let mut reader = WireReader::new(&answer);
-    assert_ne!(reader.read_u8().unwrap(), 0, "an error byte");
-    assert_eq!(reader.read_string().unwrap(), refusal("height").to_string());
+    assert_eq!(reader.read_u8().unwrap(), 1, "unknownError");
+    // The frame carries the refusal's bare words, not its `Display` (#202).
+    let Error::WalletError(words) = refusal("height") else {
+        unreachable!()
+    };
+    assert_eq!(reader.read_string().unwrap(), words);
     assert_eq!(*processor.wallet().asked.lock().unwrap(), Some(u32::MAX));
 }
 
