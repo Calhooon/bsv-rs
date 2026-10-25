@@ -91,6 +91,11 @@ js-sys = { version = "0.3", optional = true }
 # URL encoding (for storage module)
 urlencoding = "2.1"
 
+# Diagnostics sink (optional, off by default, not in `full`): one `warn` event
+# at the wallet wire processor's wrapper carrying the call and the wallet's
+# words of an error the frame replaces (bsv-rs#212). No `std`, no attributes.
+tracing = { version = "0.1", default-features = false, optional = true }
+
 # The lint bar (bsv-stack-lean #134, #135): the levels the gate holds on every target. unwrap,
 # expect and panic are denied where money moves, the library; a test function takes them
 # by clippy.toml, a test, bench or example file by its own allow naming #134, and a
@@ -114,6 +119,8 @@ criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros", "net"] }
 memory-stats = "1.2"
 wiremock = "=0.6.2"
+# `tests/wire_tracing_sink.rs` scopes its collector with `with_default` (`std`).
+tracing = { version = "0.1", default-features = false, features = ["std"] }
 
 [dependencies.dhat]
 version = "0.3"
@@ -151,6 +158,8 @@ websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
 # `auth` build.
 socketio = ["auth"]
 dhat-profiling = ["dep:dhat"]
+# A diagnostics sink, not a module, so not in `full`: `full` builds are unchanged.
+tracing = ["dep:tracing"]
 
 [[bench]]
 name = "hash_bench"

@@ -14,11 +14,18 @@ use std::path::PathBuf;
 /// The step is the `--test` name that must run it on a feature set that
 /// compiles it. Nothing else belongs here: a file CI does not run is a
 /// finding, not an entry.
-const RUN_APART: &[(&str, &str, &str)] = &[(
-    "memory_profiling",
-    "dhat-profiling installs a global allocator; it runs alone, single-threaded",
-    "memory_profiling",
-)];
+const RUN_APART: &[(&str, &str, &str)] = &[
+    (
+        "memory_profiling",
+        "dhat-profiling installs a global allocator; it runs alone, single-threaded",
+        "memory_profiling",
+    ),
+    (
+        "wire_tracing_sink",
+        "the `tracing` feature is a diagnostics sink outside `full` (#212); its step adds it",
+        "wire_tracing_sink",
+    ),
+];
 
 /// The feature set CLAUDE.md's numbers and the lanes' gates use.
 const HOUSE_FEATURES: &str = "full,http,websocket";
@@ -403,16 +410,18 @@ wallet = ["primitives", "dep:tokio"]
 full = ["primitives", "wallet"]
 http = ["dep:reqwest"]
 dhat-profiling = ["dep:dhat"]
+tracing = ["dep:tracing"]
 [dependencies]
 "#;
 
 #[test]
 fn an_enumerated_suite_refuses_each_file_it_leaves_out() {
-    let ci = "run: cargo test --test a --all-features\nrun: cargo test --test memory_profiling --all-features";
+    let ci = "run: cargo test --test a --all-features\nrun: cargo test --test memory_profiling --all-features\nrun: cargo test --test wire_tracing_sink --features \"full,tracing\"";
     let files = [
         file("a", ""),
         file("b", "#![cfg(feature = \"wallet\")]"),
         file("memory_profiling", "#![cfg(feature = \"dhat-profiling\")]"),
+        file("wire_tracing_sink", "#![cfg(feature = \"tracing\")]"),
     ];
     let errors = refusals(ci, MANIFEST, &files);
     assert_eq!(errors.len(), 2, "{errors:?}");
@@ -422,7 +431,7 @@ fn an_enumerated_suite_refuses_each_file_it_leaves_out() {
 
 #[test]
 fn the_whole_suite_step_covers_every_file_its_features_compile() {
-    let ci = "        run: cargo test --features \"full,http\" --tests --no-fail-fast --verbose\n        run: cargo test --test memory_profiling --all-features -- --test-threads=1";
+    let ci = "        run: cargo test --features \"full,http\" --tests --no-fail-fast --verbose\n        run: cargo test --test memory_profiling --all-features -- --test-threads=1\n        run: cargo test --features \"full,http,tracing\" --test wire_tracing_sink";
     let files = [
         file("a", ""),
         file(
@@ -430,6 +439,7 @@ fn the_whole_suite_step_covers_every_file_its_features_compile() {
             "#![cfg(all(feature = \"wallet\", feature = \"http\"))]",
         ),
         file("memory_profiling", "#![cfg(feature = \"dhat-profiling\")]"),
+        file("wire_tracing_sink", "#![cfg(feature = \"tracing\")]"),
     ];
     assert_eq!(refusals(ci, MANIFEST, &files), Vec::<String>::new());
 }

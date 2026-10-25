@@ -23,8 +23,10 @@ Defaults enable `primitives` and `script`. [Cargo.toml](Cargo.toml) lists the
 module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
 `totp`, `auth`, `overlay`, `storage`, `registry`, `kvstore`, `identity`,
 `socketio`), `full` (all of those), the native transports `http` and
-`websocket` (neither in `full`), `wasm`, and `dhat-profiling` for the heap
-profiling tests. `transaction` enables `block`. A Worker should select the
+`websocket` (neither in `full`), `wasm`, `tracing` (not in `full`: one `warn`
+event at the wallet wire processor carrying a wallet's error words that the
+frame replaces with `Wallet operation failed`), and `dhat-profiling` for the
+heap profiling tests. `transaction` enables `block`. A Worker should select the
 features it needs and enable `wasm`; native HTTP transports are separate. The
 declared minimum Rust is 1.88 (`rust-version`).
 
