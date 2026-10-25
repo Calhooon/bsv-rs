@@ -86,7 +86,9 @@ refused as `Wallet Wire <call> response has an invalid length`, never read as
 true; a 0.9.0 transceiver reads this processor's byte results with their leading
 byte as a length and refuses its verdicts on a missing byte. Upgrade both sides
 together. `verify_hmac` and `verify_signature` over the wire no longer return
-`Ok` with `valid: false`: a false verdict is the error (this crate's
+`Ok` with `valid: false`: a false verdict over the wire is that error,
+`Error::WalletError` carrying the reference's words, as the reference's client
+throws it (`WalletWireTransceiver.ts:1053-1055`, `:1147-1149`; this crate's
 `ProtoWallet` already answered one with an error).
 
 ### Notes: cross-SDK parity (#197)
