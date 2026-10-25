@@ -325,19 +325,25 @@ fn reference_der(der: &[u8]) -> Result<Vec<u8>, Error> {
     if der.len() != r_end + 2 + s_len {
         return Err(refused("Invalid R-length in signature DER"));
     }
-    let integer = |bytes: &[u8], which: &str| -> Result<Vec<u8>, Error> {
+    // `toDER` (`Signature.ts:225-239`): R is written through `toArray`, which
+    // gives a zero one byte `00`; S's leading zeros are dropped by a trailing
+    // `while` loop that leaves a zero S empty, `02 00`.
+    let integer = |bytes: &[u8], which: &str, zero_is_empty: bool| -> Result<Vec<u8>, Error> {
         if bytes.first() == Some(&0) && bytes.get(1).map_or(0, |b| b & 0x80) == 0 {
             return Err(refused(format!("Invalid {which}-value in signature DER")));
         }
         let start = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
         let mut minimal = bytes[start..].to_vec();
+        if minimal.is_empty() && zero_is_empty {
+            return Ok(minimal);
+        }
         if minimal.first().is_none_or(|b| b & 0x80 != 0) {
             minimal.insert(0, 0);
         }
         Ok(minimal)
     };
-    let r = integer(&der[4..r_end], "R")?;
-    let s = integer(&der[r_end + 2..], "S")?;
+    let r = integer(&der[4..r_end], "R", false)?;
+    let s = integer(&der[r_end + 2..], "S", true)?;
     let mut out = vec![0x30, (4 + r.len() + s.len()) as u8, 0x02, r.len() as u8];
     out.extend_from_slice(&r);
     out.extend_from_slice(&[0x02, s.len() as u8]);
