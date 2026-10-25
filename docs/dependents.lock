@@ -1,0 +1,220 @@
+# Remote default-branch snapshots read 2026-10-23. Pin-move PRs refresh these records.
+# Version requirements belong to the consumers; this lock never widens one.
+schema = 1
+# The private app trees (the agents, Zanaadu, Teragun, the-composer) are not rows here: their
+# repository paths and commits stay out of this public file until the owner says otherwise;
+# docs/DEPENDENTS.md names them as the epic does. A private row, when admitted, is skipped
+# with a warning unless DEPENDENTS_READ_TOKEN is present.
+
+
+[[consumer]]
+id = "bsv-wallet-cli"
+repository = "Calhooon/bsv-wallet-cli"
+branch = "main"
+rev = "5e0dbb06ccfa5c237bce22a445fce3613db4da92"
+private = false
+requirement = "=0.8.1"
+sdk_features = ["full"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["native"]
+features = []
+check_args = ["--workspace", "--all-targets"]
+test_args = ["--workspace", "--tests"]
+
+[[consumer]]
+id = "bsv-wallet-toolbox-rs"
+repository = "Calhooon/bsv-wallet-toolbox-rs"
+branch = "main"
+rev = "e9857b8b7494b56c6b44abce7bdff1de9f952d1b"
+private = false
+requirement = "0.8.0"
+sdk_features = ["full", "http"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["native"]
+features = ["sqlite"]
+check_args = ["--workspace", "--all-targets"]
+test_args = ["--workspace", "--lib", "--tests"]
+
+[[consumer]]
+id = "bsv-tracker"
+repository = "Calhooon/bsv-tracker"
+branch = "main"
+rev = "c127bccd983a1f4c32f92c1ef637c1ac0d24c838"
+private = false
+requirement = "0.8.0"
+sdk_features = ["transaction"]
+sdk_default_features = false
+manifests = ["Cargo.toml"]
+targets = ["native", "wasm32-unknown-unknown"]
+features = []
+check_args = ["--workspace", "--all-targets"]
+test_args = ["--workspace", "--lib", "--tests"]
+wasm_features = ["wasm"]
+wasm_check_args = ["--workspace", "--lib"]
+
+[[consumer]]
+id = "bsv-wallet-infra-cloudflare"
+repository = "Calhooon/bsv-wallet-infra-cloudflare"
+branch = "main"
+rev = "d0dba8d2ef4d956614a7cf99787dec951dadb813"
+private = false
+requirement = "0.8.1"
+sdk_features = ["auth", "wallet", "transaction", "wasm"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--workspace", "--lib"]
+test_args = ["--workspace", "--lib", "--tests"]
+
+[[consumer]]
+id = "chaintracks-cloudflare"
+repository = "Calhooon/chaintracks-cloudflare"
+branch = "main"
+rev = "dcfa491a33d21e7acfa800327c3850bc047a6211"
+private = false
+requirement = "0.8.1"
+sdk_features = ["block"]
+sdk_default_features = false
+manifests = ["Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--workspace", "--lib"]
+test_args = ["--workspace", "--lib", "--tests"]
+
+[[consumer]]
+id = "bsv-messagebox-cloudflare"
+repository = "Calhooon/bsv-messagebox-cloudflare"
+branch = "main"
+rev = "190a8a78f99733af47b3c789e88112257f13c8ed"
+private = false
+requirement = "0.8.1"
+sdk_features = ["auth", "wallet", "transaction", "wasm"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--workspace", "--lib"]
+test_args = ["--workspace", "--lib"]  # its integration suite's version guard pins bsv-rs 0.8.1 in the lock; excluded until the row re-pins
+
+[[consumer]]
+id = "bsv-middleware-rs"
+repository = "Calhooon/bsv-middleware-rs"
+branch = "main"
+rev = "5a1fd275e0fc5cb2fc3982aa157769d44f0729bf"
+private = false
+requirement = "0.8.0"
+sdk_features = ["auth", "wallet", "transaction"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["native"]
+features = ["axum"]
+check_args = ["--workspace", "--all-targets"]
+test_args = ["--workspace", "--lib", "--tests"]
+
+[[consumer]]
+id = "bsv-middleware-cloudflare"
+repository = "Calhooon/bsv-middleware-cloudflare"
+branch = "main"
+rev = "d7ccb6c1a56708687c6d044989f9ff06ea024823"
+private = false
+requirement = "0.8"
+sdk_features = ["auth", "wallet", "transaction", "wasm"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = ["refund", "d1-claims"]
+check_args = ["--workspace", "--lib"]
+test_args = ["--workspace", "--lib", "--tests"]
+
+[[consumer]]
+id = "bsv-overlay-cloudflare"
+repository = "Calhooon/bsv-overlay-cloudflare"
+branch = "main"
+rev = "a10ada00a00c6d8f0333010c6231b216951e03c7"
+private = false
+requirement = "=0.7.2"
+sdk_features = ["overlay"]
+sdk_default_features = true
+manifests = ["crates/overlay-engine/Cargo.toml"]
+targets = ["native"]
+features = []
+check_args = ["--workspace", "--lib"]
+test_args = []
+
+[[consumer]]
+id = "bsv-agent-template"
+repository = "Calhooon/bsv-agent-template"
+branch = "main"
+rev = "b1dcbdbfa9d8beab6783dc515789f5690968f462"
+private = false
+requirement = "0.6.0"
+sdk_features = ["auth", "wallet", "transaction", "wasm"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--lib"]
+test_args = []
+
+[[consumer]]
+id = "bsv-storage-cloudflare"
+repository = "Calhooon/bsv-storage-cloudflare"
+branch = "main"
+rev = "2563293557849a29007fa1c1b5d2001a3fc8a17d"
+private = false
+requirement = "=0.4.5"
+sdk_features = ["auth", "wallet", "transaction", "script", "wasm"]
+sdk_default_features = true
+manifests = ["Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--lib"]
+test_args = []
+
+[[consumer]]
+id = "bsv-storage-parity"
+repository = "Calhooon/bsv-storage-cloudflare"
+branch = "main"
+rev = "2563293557849a29007fa1c1b5d2001a3fc8a17d"
+private = false
+requirement = "=0.4.5"
+sdk_features = ["auth", "http", "overlay"]
+sdk_default_features = true
+manifests = ["tests/parity/Cargo.toml"]
+targets = ["native"]
+features = []
+check_args = ["--all-targets"]
+test_args = []
+
+[[consumer]]
+id = "bsv-overlay-worker"
+repository = "Calhooon/bsv-overlay-cloudflare"
+branch = "main"
+rev = "a10ada00a00c6d8f0333010c6231b216951e03c7"
+private = false
+requirement = "=0.7.2"
+sdk_features = ["overlay", "wasm"]
+sdk_default_features = true
+manifests = ["crates/overlay-cloudflare/Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--lib"]
+test_args = []
+
+[[consumer]]
+id = "bsv-overlay-app-layer"
+repository = "Calhooon/bsv-overlay-cloudflare"
+branch = "main"
+rev = "a10ada00a00c6d8f0333010c6231b216951e03c7"
+private = false
+requirement = "=0.7.2"
+sdk_features = ["overlay"]
+sdk_default_features = true
+manifests = ["crates/low-app-layer/Cargo.toml"]
+targets = ["wasm32-unknown-unknown"]
+features = []
+check_args = ["--lib"]
+test_args = []
