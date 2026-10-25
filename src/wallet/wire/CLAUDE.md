@@ -9,9 +9,9 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183), the signature calls' data-type flag writer (#199) | ~504 |
+| `mod.rs` | Module root, WalletWire trait, status/counterparty codes, the u32 field readers, the reference's strict certificate and record readers (#183), the signature calls' data-type flag writer (#199) | ~510 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2521 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2486 |
 | `processor.rs` | Generic server-side processor over WalletInterface | ~792 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191); for verifyHmac, the 32 raw HMAC bytes ahead of the data, and for createSignature and verifySignature, the data-type flag (`1` the data, `2` the hash, another refused), verifySignature's signature ahead of it (#199) | ~176 |
 | `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194); for encrypt, decrypt, createHmac and createSignature, the bytes alone, and for verifyHmac, verifySignature and waitForAuthentication, nothing after the error byte, a false verdict an error frame (#197) | ~128 |
