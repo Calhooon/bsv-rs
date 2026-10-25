@@ -68,8 +68,8 @@
 mod encrypted;
 mod signed;
 
-pub use encrypted::{decrypt, encrypt};
-pub use signed::{sign, verify};
+pub use encrypted::{decrypt, encrypt, encrypt_with};
+pub use signed::{sign, sign_with, verify};
 
 /// Version bytes for signed messages (BRC-77): 0x42423301
 pub const SIGNED_VERSION: [u8; 4] = [0x42, 0x42, 0x33, 0x01];

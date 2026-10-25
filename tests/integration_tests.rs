@@ -4,7 +4,7 @@
 //! testing complete workflows from key generation to transaction signing.
 
 use bsv_rs::primitives::bsv::schnorr::Schnorr;
-use bsv_rs::primitives::bsv::shamir::{split_private_key, KeyShares};
+use bsv_rs::primitives::bsv::shamir::{split_private_key, split_private_key_with, KeyShares};
 use bsv_rs::primitives::bsv::sighash::{
     compute_sighash, SighashParams, TxInput, TxOutput, SIGHASH_ALL, SIGHASH_FORKID,
 };
@@ -622,4 +622,76 @@ fn test_multi_party_schnorr_verification() {
         &bob_shared,
         &bob_proof
     ));
+}
+
+// The Shamir `_with` form (#180 item 1): the plain form's coefficients, solved
+// from its shares at x = 1, 2, 3 and fed to `split_private_key_with`, give the
+// same shares.
+#[test]
+fn split_private_key_with_returns_what_split_private_key_returns_given_its_coefficients() {
+    use bsv_rs::primitives::BigNumber;
+    let p = BigNumber::secp256k1_prime();
+    let bytes = |n: &BigNumber| -> [u8; 32] { n.to_bytes_be(32).try_into().unwrap() };
+    let key = PrivateKey::from_bytes(&[5; 32]).unwrap();
+    let a0 = BigNumber::from_bytes_be(&key.to_bytes());
+    let two_p = p.add(&p);
+
+    // 2 of 3: y1 = a0 + a1
+    let shares = split_private_key(&key, 2, 3).unwrap();
+    let y1 = &shares.points[0].y;
+    let a1 = y1.add(&p).sub(&a0).modulo(&p);
+    let again = split_private_key_with(&key, 2, 3, &[bytes(&a1)]).unwrap();
+    assert_eq!(again.to_backup_format(), shares.to_backup_format());
+
+    // 3 of 5: y1 = a0 + a1 + a2, y2 = a0 + 2 a1 + 4 a2
+    let shares = split_private_key(&key, 3, 5).unwrap();
+    let (y1, y2) = (&shares.points[0].y, &shares.points[1].y);
+    let inv2 = BigNumber::from_u64(2).mod_inverse(&p).unwrap();
+    let a2 = y2
+        .add(&a0)
+        .add(&two_p)
+        .sub(&y1.add(y1))
+        .modulo(&p)
+        .mul(&inv2)
+        .modulo(&p);
+    let a1 = y1.add(&two_p).sub(&a0).sub(&a2).modulo(&p);
+    let again = split_private_key_with(&key, 3, 5, &[bytes(&a1), bytes(&a2)]).unwrap();
+    assert_eq!(again.to_backup_format(), shares.to_backup_format());
+    let subset = KeyShares::from_backup_format(&again.to_backup_format()[2..]).unwrap();
+    assert_eq!(
+        subset.recover_private_key().unwrap().to_bytes(),
+        key.to_bytes()
+    );
+}
+
+#[test]
+fn split_private_key_with_refuses_a_coefficient_count_other_than_threshold_less_one() {
+    let key = PrivateKey::from_bytes(&[5; 32]).unwrap();
+    for given in [0usize, 1, 3] {
+        assert_eq!(
+            split_private_key_with(&key, 3, 5, &vec![[1; 32]; given]).unwrap_err(),
+            bsv_rs::Error::InvalidDataLength {
+                expected: 64,
+                actual: 32 * given
+            }
+        );
+    }
+    let fixed = split_private_key_with(&key, 3, 5, &[[1; 32], [2; 32]]).unwrap();
+    let again = split_private_key_with(&key, 3, 5, &[[1; 32], [2; 32]]).unwrap();
+    assert_eq!(fixed.to_backup_format(), again.to_backup_format());
+}
+
+#[test]
+fn split_private_key_with_refuses_a_coefficient_zero_modulo_p() {
+    let key = PrivateKey::from_bytes(&[5; 32]).unwrap();
+    let p: [u8; 32] = bsv_rs::primitives::BigNumber::secp256k1_prime()
+        .to_bytes_be(32)
+        .try_into()
+        .unwrap();
+    for zero in [[0; 32], p] {
+        assert!(matches!(
+            split_private_key_with(&key, 2, 3, &[zero]),
+            Err(bsv_rs::Error::CryptoError(_))
+        ));
+    }
 }

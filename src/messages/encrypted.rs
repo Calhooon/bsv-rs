@@ -35,9 +35,48 @@ use super::ENCRYPTED_VERSION;
 /// let ciphertext = encrypt(b"Secret message", &sender, &recipient.public_key()).unwrap();
 /// ```
 pub fn encrypt(message: &[u8], sender: &PrivateKey, recipient: &PublicKey) -> Result<Vec<u8>> {
-    // Generate random 32-byte key ID
+    // Generate random 32-byte key ID and IV
     let key_id: [u8; 32] = rand::random();
+    let mut iv = [0u8; 32];
+    getrandom::getrandom(&mut iv)
+        .map_err(|e| Error::CryptoError(format!("Failed to generate IV: {}", e)))?;
+    encrypt_with(message, sender, recipient, key_id, iv)
+}
 
+/// Encrypts a message using BRC-78 protocol with a caller-supplied key ID and
+/// AES-GCM IV.
+///
+/// [`encrypt`] draws the 32-byte key ID and the 32-byte IV at random and calls
+/// this; given the same two values the two write the same bytes. They are the
+/// only values `encrypt` draws, so fixed ones make the output reproducible (a
+/// seed corpus, a pinned vector). This form is this crate's addition: the
+/// TypeScript SDK draws the key ID inside `encrypt` (`EncryptedMessage.ts:41`)
+/// and the IV inside `SymmetricKey.encrypt`.
+///
+/// # Security
+///
+/// Production code uses [`encrypt`]. The same key ID for the same sender and
+/// recipient derives the same AES key, and reusing an IV under one key leaks
+/// the GCM authentication subkey: never reuse a `(key_id, iv)` pair.
+///
+/// # Example
+///
+/// ```rust
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::messages::{decrypt, encrypt_with};
+///
+/// let sender = PrivateKey::from_bytes(&[6; 32]).unwrap();
+/// let recipient = PrivateKey::from_bytes(&[7; 32]).unwrap();
+/// let sealed = encrypt_with(b"Secret", &sender, &recipient.public_key(), [1; 32], [2; 32]).unwrap();
+/// assert_eq!(decrypt(&sealed, &recipient).unwrap(), b"Secret");
+/// ```
+pub fn encrypt_with(
+    message: &[u8],
+    sender: &PrivateKey,
+    recipient: &PublicKey,
+    key_id: [u8; 32],
+    iv: [u8; 32],
+) -> Result<Vec<u8>> {
     // Create invoice number for BRC-42 key derivation
     let key_id_base64 = to_base64(&key_id);
     let invoice_number = format!("2-message encryption-{}", key_id_base64);
@@ -57,7 +96,7 @@ pub fn encrypt(message: &[u8], sender: &PrivateKey, recipient: &PublicKey) -> Re
     let symmetric_key = SymmetricKey::from_bytes(&shared_secret_bytes[1..])?;
 
     // Encrypt the message
-    let encrypted = symmetric_key.encrypt(message)?;
+    let encrypted = symmetric_key.encrypt_with_iv(&iv, message)?;
 
     // Build wire format
     let mut result = Vec::with_capacity(4 + 33 + 33 + 32 + encrypted.len());

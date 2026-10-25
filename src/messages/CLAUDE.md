@@ -22,6 +22,8 @@ This module implements BRC-77 (signed messages) and BRC-78 (encrypted messages) 
 | `sign` | `(message: &[u8], signer: &PrivateKey, verifier: Option<&PublicKey>) -> Result<Vec<u8>>` | Sign a message using BRC-77 protocol |
 | `verify` | `(message: &[u8], sig: &[u8], recipient: Option<&PrivateKey>) -> Result<bool>` | Verify a BRC-77 signed message |
 | `encrypt` | `(message: &[u8], sender: &PrivateKey, recipient: &PublicKey) -> Result<Vec<u8>>` | Encrypt a message using BRC-78 protocol |
+| `sign_with` | `(message: &[u8], signer: &PrivateKey, verifier: Option<&PublicKey>, key_id: [u8; 32]) -> Result<Vec<u8>>` | `sign` with the key ID given, not drawn (`sign` draws it and calls this; bsv-rs#180): reproducible bytes for a seed corpus or a vector |
+| `encrypt_with` | `(message: &[u8], sender: &PrivateKey, recipient: &PublicKey, key_id: [u8; 32], iv: [u8; 32]) -> Result<Vec<u8>>` | `encrypt` with the key ID and the AES-GCM IV given (`encrypt` draws both and calls this; bsv-rs#180); never reuse a `(key_id, iv)` pair |
 | `decrypt` | `(ciphertext: &[u8], recipient: &PrivateKey) -> Result<Vec<u8>>` | Decrypt a BRC-78 encrypted message |
 
 ### Constants

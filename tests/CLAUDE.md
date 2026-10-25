@@ -38,12 +38,12 @@ This directory contains integration tests that verify the BSV Rust SDK works cor
 | `hash_stream.rs` | 3 | default | `Sha256` and `Sha256d` equal `sha256` and `sha256d` for every row of bsv-stack-lean's BEEF-of-any-size corpus (`vectors/beef_of_any_size/`, 47 committed rows, the 5 generated ones from `$BSV_RS_BEEF_ROWS_DIR`) in chunks of 1, 7, 64 KiB, whole and seeded random, and for generated buffers of 0 to 300,000 bytes |
 | `identity_tests.rs` | 69 | `identity` | Certificates, contacts, queries, broadcast results |
 | `identity_spend_witness.rs` | 3 | `identity` | The identity token signatures (the revocation, the contact update and removal) through `Spend` under the Chronicle block word: each path signs the dispatcher's digest, not one SHA-256 of the preimage (0.7.0's review) |
-| `integration_tests.rs` | 22 | default | Full workflows: key derivation, Schnorr, Shamir, P-256 |
+| `integration_tests.rs` | 25 | default | Full workflows: key derivation, Schnorr, Shamir, P-256; `split_private_key_with` returns the plain form's shares given its coefficients, refuses a count other than threshold less one and a coefficient 0 modulo p (bsv-rs#180) |
 | `kvstore_global_tests.rs` | 85 | `kvstore` | GlobalKVStore: construction, CRUD, batch, interpreter |
 | `kvstore_integration_tests.rs` | 93 | `kvstore` | LocalKVStore: config, entries, queries, batch ops |
 | `live_policy_http_tests.rs` | 20 | `transaction`+`http` | LivePolicy dynamic fee model with wiremock |
 | `memory_profiling.rs` | 7 | `dhat-profiling` | Heap allocation profiling for crypto operations; the streaming BEEF reader's peak heap at 1,000, 10,000 and 100,000 links, and on 100 proven transactions of 1,000 inputs with and without a subject (the edges, 0.8.1) |
-| `messages_tests.rs` | 33 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors |
+| `messages_tests.rs` | 41 | `messages` | BRC-77 signing, BRC-78 encryption, cross-SDK vectors; `sign_with` and `encrypt_with` write the plain forms' bytes given the key id and IV read back from them, and the same bytes for fixed values (bsv-rs#180) |
 | `overlay_admin_token_ts_parity_tests.rs` | 2 | `overlay` | Byte-exact parity of `create_signed_overlay_admin_token` with `@bsv/sdk 1.10.1`'s `pushdrop.lock` output (`overlay_admin_token_ts_parity.json`, 5 cases) |
 | `overlay_cross_sdk_tests.rs` | 13 | `overlay` | Admin token and overlay type cross-SDK vectors |
 | `overlay_http_tests.rs` | 49 | `overlay`+`http` | SHIP broadcast and SLAP lookup facilitators with wiremock |
@@ -130,7 +130,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`cross_sdk_tests.rs`** — BRC-42 key derivation, symmetric encryption, WIF/address vectors, DRBG verification, edge cases (unicode, empty, large messages)
 - **`drbg_tests.rs`** — NIST vector tests, SHA-512 variant, reseed, output length, determinism
 - **`ec_tests.rs`** — BRC-42 derivation consistency, WIF/pubkey/address known vectors, sign/verify, ECDH, PublicKey::is_valid(), get_public_key from P2PK scripts, key serialization
-- **`integration_tests.rs`** — Full workflows: key derivation, symmetric encryption, Schnorr proofs, Shamir secret sharing (3-of-5, subset recovery), P-256, hash chains, sighash+signing, complete payment workflow
+- **`integration_tests.rs`** — Full workflows: key derivation, symmetric encryption, Schnorr proofs, Shamir secret sharing (3-of-5, subset recovery, the `_with` form given the plain form's coefficients), P-256, hash chains, sighash+signing, complete payment workflow
 
 ### Script (default features)
 - **`script_vectors_tests.rs`** — 458 spend valid vectors, 598 script parsing vectors, 432 invalid script vectors, individual opcode tests (OP_CAT, OP_SPLIT, OP_MUL, OP_DIV)
@@ -159,7 +159,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`wallet_wire_cross_sdk_tests.rs`**: Cross-SDK wire protocol compatibility with Go SDK (54 tests; 12 need `http`, the recording wallet of `support/fixtures`). Loads 54 JSON vector files from Go SDK testdata. Tests request decoding (params extraction after call_code + originator) and response decoding (result extraction after error byte) for all 28 WalletInterface methods. Validates byte-level interoperability between Rust and Go wire encoders.
 
 ### Messages (`messages` feature)
-- **`messages_tests.rs`** — BRC-77 signed messages (8 tests: specific/anyone recipient, empty/large, tampering), BRC-78 encrypted messages (9 tests: roundtrip, wrong key, GCM auth), cross-SDK vectors (8 tests: error format compatibility), unicode/binary data, multi-party
+- **`messages_tests.rs`** — BRC-77 signed messages (8 tests: specific/anyone recipient, empty/large, tampering), BRC-78 encrypted messages (9 tests: roundtrip, wrong key, GCM auth), cross-SDK vectors (8 tests: error format compatibility), unicode/binary data, multi-party, the `_with` forms (4 tests: the plain forms' bytes given their drawn key id and IV, fixed values reproducible)
 
 ### Compat (`compat` feature)
 - **`compat_bip39_tests.rs`** — TREZOR vectors: entropy↔mnemonic (22 vectors), mnemonic→seed, validation (bad sentences, wrong word count, bad checksum), generation (12/15/18/21/24 words), randomized roundtrips (100 iterations per entropy size)

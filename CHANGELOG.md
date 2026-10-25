@@ -38,6 +38,41 @@ hand resolution survives main moving again. `ci.yml` gains `workflow_dispatch`
 so the sync starts the suite on its branch. `RELEASING.md` steps 17 to 20
 write the rule; `tests/arch_ci_lines.rs` pins the three jobs.
 
+### Added: `sign_with`, `encrypt_with`, `split_private_key_with`; corpus-gen reproducible (#180)
+
+`messages::sign`, `messages::encrypt` and `primitives::bsv::shamir::split_private_key`
+draw a key id, an IV and polynomial coefficients with no way to pass them, so
+a rerun of `fuzz/corpus-gen` rewrote 6 signed, 6 encrypted and 12 Shamir seeds
+and the corpus could not be checked as identical. Three additive public
+functions, the owner's names (2026-10-25), take those values:
+`messages::sign_with(message, signer, verifier, key_id: [u8; 32])`,
+`messages::encrypt_with(message, sender, recipient, key_id: [u8; 32], iv: [u8; 32])`,
+`shamir::split_private_key_with(key, threshold, total, coefficients: &[[u8; 32]])`.
+The plain forms draw as before and call them, so there is one body and no
+byte the plain forms write moves. A key id or IV of the wrong size cannot be
+passed (the arrays); a coefficient count other than `threshold - 1` is
+`InvalidDataLength` (in bytes, 32 per coefficient), and a coefficient 0 modulo
+p is `CryptoError` (it would lower the polynomial's degree; the plain form
+never draws one). corpus-gen passes fixed values (the key id `[1; 32]`, the IV
+`[2; 32]`, the coefficients `[3; 32]`, `[4; 32]`, ...): the 24 seeds' bytes
+moved once, in their own commit (the names are unchanged), and two reruns
+into a clean tree write all 18 directories byte for byte. The tests that pin
+it: `tests/messages_tests.rs`' `sign_with_writes_what_sign_writes_given_its_key_id`
+and `encrypt_with_writes_what_encrypt_writes_given_its_key_id_and_iv` (the
+drawn values read back from the plain form's output), and
+`tests/integration_tests.rs`' `split_private_key_with_returns_what_split_private_key_returns_given_its_coefficients`
+(the coefficients solved from the shares at x = 1, 2), with the refusals.
+
+### Notes: cross-SDK parity
+
+The `_with` forms are this crate's addition, not a divergence: the TypeScript
+SDK draws the key id inside `sign` and `encrypt` (`ts-sdk@9e3ede6`
+`SignedMessage.ts:31`, `EncryptedMessage.ts:41`) and the IV inside
+`SymmetricKey.encrypt`; the wire is the same. TS's `toKeyShares` draws random
+points (`Polynomial.fromPrivateKey`, `Polynomial.ts:54-69`) and x coordinates
+from an HMAC seed, where this crate draws coefficients and evaluates at
+x = 1 to n (unchanged here); a share of either recovers under either reader.
+
 ### Removed: the three writer helpers of the old identity-certificate layout (#184)
 
 `WireWriter::write_identity_certifier`, `write_optional_identity_certifier`
@@ -74,7 +109,7 @@ ratchet and bench-compare tools.
 `compound` row's at byte 218: `door-MismatchedNode-bad_index-4-3` replaces
 `door-MismatchedNode-compound-218-5`, the directory stays at 63 seeds, and
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
-encrypted and Shamir seeds a rerun still moves are #180's item 1.
+encrypted and Shamir seeds a rerun still moved are #180's item 1 (below).
 
 ### Fixed: the processor's error frame is the reference's: unknownError, `Wallet operation failed` for a wallet's error, the processor's own words for its own, the empty stack (#202)
 

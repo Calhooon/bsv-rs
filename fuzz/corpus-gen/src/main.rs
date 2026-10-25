@@ -36,7 +36,7 @@ use bsv_rs::compat::bip32::{ExtendedKey, Network};
 use bsv_rs::compat::bip39::{Language, Mnemonic};
 use bsv_rs::compat::{bsm, ecies};
 use bsv_rs::messages;
-use bsv_rs::primitives::bsv::shamir::split_private_key;
+use bsv_rs::primitives::bsv::shamir::split_private_key_with;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
 use bsv_rs::primitives::{from_hex, to_base64, PrivateKey};
 use bsv_rs::transaction::{verify_stream, verify_stream_structure, Beef, Headers, Kind, Verdict};
@@ -735,8 +735,10 @@ fn parser_corpora(base: &Path) {
 /// The five readers of #140: the signed and encrypted messages (BRC-77,
 /// BRC-78), the BSM envelope, BIP-39 and the Shamir backup. The targets'
 /// fixed keys are the bytes 6, 7, 8 (sender, recipient, another) and 9 (the
-/// BSM key), repeated to 32. The message writers and the share split draw a
-/// random key id, IV or polynomial, so those seeds' bytes change on a rerun.
+/// BSM key), repeated to 32. The message writers and the share split take
+/// their key id, IV and coefficients through the `_with` forms (#180), each a
+/// fixed byte repeated to 32 (the key id 1, the IV 2, the coefficients 3 on),
+/// so a rerun writes the same bytes.
 fn reader_corpora(base: &Path) {
     let key = |b: u8| PrivateKey::from_bytes(&[b; 32]).unwrap();
     let (sender, recipient, other) = (key(6), key(7), key(8));
@@ -749,7 +751,7 @@ fn reader_corpora(base: &Path) {
         ("anyone", None),
         ("other", Some(other.public_key())),
     ] {
-        let sig = messages::sign(message, &sender, verifier.as_ref()).unwrap();
+        let sig = messages::sign_with(message, &sender, verifier.as_ref(), [1; 32]).unwrap();
         signed.add(&format!("signed-{name}"), &sig);
         signed.add(&format!("signed-{name}-header"), &sig[..sig.len().min(102)]);
     }
@@ -758,9 +760,18 @@ fn reader_corpora(base: &Path) {
     let mut encrypted = Corpus::new(base, "fuzz_messages_encrypted");
     for plaintext in [&b""[..], b"Secret", &[0x42; 64]] {
         let n = plaintext.len();
-        let sealed = messages::encrypt(plaintext, &sender, &recipient.public_key()).unwrap();
+        let sealed = messages::encrypt_with(
+            plaintext,
+            &sender,
+            &recipient.public_key(),
+            [1; 32],
+            [2; 32],
+        )
+        .unwrap();
         encrypted.add(&format!("encrypted-{n}"), &sealed);
-        let sealed = messages::encrypt(plaintext, &sender, &other.public_key()).unwrap();
+        let sealed =
+            messages::encrypt_with(plaintext, &sender, &other.public_key(), [1; 32], [2; 32])
+                .unwrap();
         encrypted.add(&format!("encrypted-other-{n}"), &sealed);
         encrypted.add(&format!("plain-{n}"), plaintext);
     }
@@ -843,10 +854,11 @@ fn reader_corpora(base: &Path) {
 
     // Shamir backups as `split_private_key` and `to_backup_format` write
     // them (`tests/integration_tests.rs`' 3-of-5 and its subsets), one share
-    // per line.
+    // per line, the coefficients the bytes 3, 4, ... repeated to 32.
     let mut shamir = Corpus::new(base, "fuzz_shamir_backup");
     for (b, threshold, total) in [(5u8, 3usize, 5usize), (10, 2, 3), (11, 5, 8)] {
-        let lines = split_private_key(&key(b), threshold, total)
+        let coefficients: Vec<[u8; 32]> = (3..).take(threshold - 1).map(|c| [c; 32]).collect();
+        let lines = split_private_key_with(&key(b), threshold, total, &coefficients)
             .unwrap()
             .to_backup_format();
         shamir.add(
