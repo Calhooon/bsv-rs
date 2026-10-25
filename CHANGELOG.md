@@ -296,6 +296,97 @@ encrypted and Shamir seeds a rerun still moves are #180's item 1. (Since the
 repeat is `DuplicateOffset`, above, that seed is the new door's and the
 compound row's is `MismatchedNode`'s again.)
 
+### Fixed: the processor validates a request's arguments ahead of the wallet and its result after it, in the reference's rules and words (#216)
+
+The keeper's ruling on #216 (2026-10-25). The reference's processor calls
+`validateWalletArgs` after reading a request and before `#invokeWallet`
+(`ts-stack@edf6e03` `WalletWireProcessor.ts:1407`, `:1434`, `:1461`, `:1488`,
+`:1516`, `:1550`, `:1593`, `:1751`, `:1801`), and `validateWalletResult` on
+the wallet's answer through `#invokeValidatedWallet` (`:2421-2431`); the outer
+catch frames a refusal with its own words and its code when that is 2 to 8
+(`:2379-2387`). This processor had neither: an argument the reference refuses
+reached the wallet, whose refusal was framed as `Wallet operation failed`
+(#202), and a result the reference refuses was written. The rules are in
+`src/wallet/wire/validation.rs`; `tests/wire_processor_validation.rs` pins
+each, the expected frames hand-assembled (12 of its 15 tests red before).
+
+Arguments, `WERR_INVALID_PARAMETER`, code 6, `The <parameter> parameter must
+be <mustBe>` (`validationHelpers.ts:77-79`), the wallet never called:
+
+- the protocol name 5 to 400 bytes, `protocolID[1]` (`validateProtocol`,
+  `:198-205`, through `validateStringLength`, `:348-356`: `at least 5
+  length.`, `no more than 400 length.`), on getPublicKey, encrypt, decrypt,
+  createHmac, verifyHmac, createSignature, verifySignature and
+  revealSpecificKeyLinkage; `a_protocol_name_outside_5_to_400_bytes_is_refused_with_code_6`;
+- the key ID 1 to 800 bytes, `keyID` (`:227`, `:1748`), on the same eight,
+  after the protocol; `a_key_id_outside_1_to_800_bytes_is_refused_with_code_6`,
+  `the_protocol_is_judged_ahead_of_the_key_id`;
+- the privileged reason 5 to 50 bytes, then required when `privileged` is
+  true (`validatePrivilege`, `:207-222`: `The privilegedReason parameter must
+  be a value when 'privileged' is true`), on those eight, getPublicKey for the
+  identity key and revealCounterpartyKeyLinkage;
+  `a_privileged_reason_outside_5_to_50_bytes_is_refused_with_code_6`,
+  `privileged_without_a_reason_is_refused_with_code_6`;
+- verifySignature's signature at most 72 bytes, then canonical DER with both
+  scalars in 1 to n-1 (`:1795-1804`, `isCanonicalDERSignature`,
+  `Secp256k1Validation.ts:33-53`);
+  `a_signature_past_72_bytes_or_not_canonical_der_is_refused_with_code_6`;
+- the byte arrays (plaintext, ciphertext, data) at most 256 MiB
+  (`validateByteArray`, `:146-177`), reachable only past the reference's
+  frame bound; the module's unit test.
+
+getHeaderForHeight's height is read as `readVarIntNumStrict` and refused
+outside 1 to 2^32-1 in `#requireInteger`'s words, code 1, ahead of the
+trailing-data check (`WalletWireProcessor.ts:1670-1675`, `:138-148`:
+`Invalid getHeaderForHeight height: expected an integer from 1 to 4294967295,
+received N`); a height above `u32::MAX` was `invalid height: expected at most
+...` and 0 reached the wallet;
+`a_header_height_outside_1_to_u32_max_is_refused_in_the_reference_words`.
+
+Results, a plain `Error`, code 1, `Invalid <call> result <field>: expected
+<expectation>` (`WalletResultValidation.ts:510-512`):
+
+- getPublicKey's key an even-length hex string of 33 bytes that is a valid
+  compressed key (`:2207-2209`, `:917-933`);
+  `a_public_key_result_the_reference_refuses_is_refused_with_code_1`;
+- createSignature's signature at most 72 bytes and canonical DER
+  (`:2219-2225`); `a_signature_result_past_72_bytes_or_not_canonical_is_refused_with_code_1`;
+- getHeight's height 1 to 2^32-1 (`:2293-2295`);
+  `a_height_result_of_0_is_refused_with_code_1`;
+- revealCounterpartyKeyLinkage's revelation time 1 to 64 bytes, the pattern
+  `^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$` and a time `Date.parse` reads
+  (`isoTimestamp`, `:992-999`), its verifier and counterparty the requested
+  (`:2226-2241`); `a_counterparty_linkage_result_the_reference_refuses_is_refused_with_code_1`;
+- revealSpecificKeyLinkage's protocol name 5 to 400 bytes, key ID 1 to 800,
+  verifier the requested, counterparty the prover's key for self, the anyone
+  key for anyone, the requested key otherwise, protocol and key ID the
+  requested (`:2242-2281`);
+  `a_specific_linkage_result_the_reference_refuses_is_refused_with_code_1`;
+- encrypt's ciphertext and decrypt's plaintext at most 256 MiB (`:2210-2215`).
+
+Not repeated where the reader or a type already refuses: the security level
+(`read_protocol_id`), a counterparty or linkage key that is no point
+(`read_counterparty`, `PublicKey::from_bytes`), revealSpecificKeyLinkage's
+absent counterparty, the data-type flag and the 32-byte hash and HMAC
+(`requests.rs`), the booleans, the `PublicKey`, `u8` and `[u8; 32]` result
+fields; those refusals keep this crate's words, code 1. The thirteen stubs
+are untouched (`the_thirteen_stubs_are_untouched`); getNetwork and getVersion
+are answered by the processor, not a wallet, and are not checked.
+
+`ProtoWallet` answers revealSpecificKeyLinkage for anyone with `PrivateKey(1)`'s
+key, as the reference's does (`ProtoWallet.ts:235-240`), where it answered its
+identity key, a result the check refuses
+(`a_specific_linkage_for_anyone_names_the_anyone_key`, red before).
+`ProtoWallet`'s placeholder height 0 is now the processor's refusal
+(`test_roundtrip_get_height`, `test_process_go_get_height_request`). The
+result-vector test sends a call's own Go args vector where one exists, so a
+linkage result answers the request it was made for; its table holds at 15.
+
+Migration: a client of this processor that sent an argument the reference
+refuses got `Wallet operation failed`, code 1 (or the wallet's success), and
+now gets the reference's words and code 6; a wallet whose result the reference
+refuses is now answered with the refusal, code 1, where its result was written.
+
 ### Fixed: the processor's error frame is the reference's: unknownError, `Wallet operation failed` for a wallet's error, the processor's own words for its own, the empty stack (#202)
 
 ### Added: `privileged`, `privileged_reason` and `seek_permission` on the seven key-related args types (#193)
@@ -493,15 +584,13 @@ given, its `Message` uncut and its `Stack` as given
 (`wallet/serializer/frame.go:71-87`). This crate follows the TypeScript
 reference: the code mapped to 1 to 8, a wallet's un-coded error replaced by
 `Wallet operation failed`, the message cut at 4096 bytes, the stack empty.
-Two divergences from the reference stand, neither with a reference text to
-match: the thirteen calls this processor refuses as needing a full wallet
+One divergence from the reference stands, with no reference text to match:
+the thirteen calls this processor refuses as needing a full wallet
 (`createAction requires a full wallet implementation`, ...) are this crate's
 processor errors, framed in this crate's words, where the reference's
-processor reads every call's arguments and hands it to its wallet; and the
-reference validates a call's arguments in the processor before the wrapper
-(`validateWalletArgs`, `:1516`, `:1593`, `:1632`), framing a validation
-refusal in its own words, where this processor has no validation of its own
-and a refusal raised inside the wallet (`ProtoWallet`'s) is the constant.
+processor reads every call's arguments and hands it to its wallet. (The
+second this note named, the processor's missing argument validation, is
+withdrawn by #216.)
 
 ### Fixed: verifyHmac's request carries the raw hmac ahead of the data; the signature calls carry the reference's data-type flag (#199)
 
