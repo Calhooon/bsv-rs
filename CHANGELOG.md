@@ -27,7 +27,7 @@ encrypted and Shamir seeds a rerun still moves are #180's item 1.
 ### Fixed: the linkage requests carry the privileged parameters ahead of the keys (#191)
 
 `WalletWireProcessor` read revealCounterpartyKeyLinkage's two keys at the
-first parameter byte and handed the wallet `privileged: None`: a privileged
+parameter bytes' start and handed the wallet `privileged: None`: a privileged
 request's flag and reason were read as the start of the counterparty's key (Go's
 vector, `09 00 01 0b "test-reason" 0294c4...`, was refused as an invalid point),
 and the flag of a well-formed request was dropped. The reference writes and
@@ -72,7 +72,7 @@ order; no transceiver of this crate wrote either frame. One that spoke to the
 reference's or Go's transceiver now reads the request as they write it, where
 before a privileged counterparty request was refused and a specific one was
 misread. The responses of both calls still put the encrypted linkage ahead of
-the keys, where the reference and BRC-100 put the keys first (F2): a finding,
+the keys, where the reference and BRC-100 put the keys ahead of it (F2): a finding,
 not changed here.
 
 ### Fixed: the wallet wire's readers refuse what the reference's readers refuse (#183)
