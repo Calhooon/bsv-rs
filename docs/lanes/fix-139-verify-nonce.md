@@ -1,0 +1,16 @@
+# Lane fix-139-verify-nonce: verify_nonce never panics on a wallet's short HMAC (#139)
+
+**Repository.** `bsv-rs`, your worktree on a branch from `origin/beta` (at or after `80db123`, 0.9.0). `docs/lanes/README.md` binds you: rule 11 above all (never let one command run ten minutes: compile with `--no-run`, then run; everything in the foreground; the REPORT last; a scratch copy with its own `CARGO_TARGET_DIR`). Ninety minutes.
+
+**Read in this order.** #139. `CLAUDE.md` rules 1, 2, 4, 5 (nothing panics on input; on wasm32 a panic is an abort); the auth contract paragraph (nonces are the canonical 48-byte form since 0.3.6, the 32-byte legacy window in place). `src/auth/utils/nonce.rs` (`create_nonce`, `verify_nonce`, `validate_nonce_format`; the comparison `hmac_result.hmac[..stored_len] == *hmac_bytes` near the end of `verify_nonce`), `src/auth/CLAUDE.md` (the nonce rows), `src/wallet/interface.rs` (`create_hmac`'s answer type: `CreateHmacResult { hmac: Vec<u8> }`, its length a wallet's word, not this crate's), `tests/auth_*` for the nonce tests and how a wallet stand-in is built (`ProtoWallet` or a mock `WalletInterface`), the TS reference `~/bsv/ts-sdk/src/auth/utils/` (`verifyNonce`: how it compares; whether it slices) and Go (`auth/utils/nonce.go` or where it lives at `2ca481c`).
+
+**The work.**
+1. `verify_nonce` compares with `get(..stored_len)` (or `starts_with`), so a wallet answering fewer bytes than the stored tail never indexes past the end: the answer is `Ok(false)` (the tag does not match) or the module's existing error for a wallet answer of the wrong shape (read how the module treats a wrong-length answer elsewhere, and TS: say which and why; a typed refusal naming the length is better if the module has such a variant without adding one). The 32-byte legacy window keeps its arithmetic; a legacy nonce's shorter tail reads the same as before.
+2. A test RED before: a mock `WalletInterface` whose `create_hmac` answers a short `Vec<u8>` (0, 1 and `stored_len - 1` bytes), `verify_nonce` returning the chosen answer and never panicking (`catch_unwind` in the test); the canonical and legacy happy paths unchanged (the existing nonce tests green). Watch RED on a scratch copy (its own `CARGO_TARGET_DIR`), GREEN here; both tails.
+3. `CHANGELOG.md` under `[Unreleased]`: a `### Fixed` line in the house's voice (what was wrong, which test pins it, found by #108's cold review); `src/auth/CLAUDE.md`'s nonce row.
+
+**Gate.** README rule 5 in full under rule 11 (fmt, clippy -D warnings, compile then run the suite with `full,http,websocket`, doc tests, examples, readme_examples, the wasm32 build with `CC_wasm32_unknown_unknown=/opt/homebrew/opt/llvm/bin/clang`), `tests/fixtures_replay.rs` (the auth fixtures unchanged), `tools/ratchet/run --check` with `CARGO_TARGET_DIR=$HOME/bsv/targets/bsv-rs-lanes/ratchet`. No harness run (nothing under script or BEEF); say so.
+
+**Bounds.** No wire byte or nonce format changes; no public item changes; nothing outside `nonce.rs`, its tests, the changelog and the docs row; `Cargo.toml` untouched. Lanes never push.
+
+**Report.** `REPORT: STATUS done|blocked`, the base and tip commits, the answer chosen and why (with TS's and Go's reading), the RED and GREEN tails, the gate's tails, the six tests each choice passes. Write the full REPORT before your turn ends.
