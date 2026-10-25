@@ -84,7 +84,18 @@ async fn linkage_response<T: WalletWire>(
     Err(decoder.get_version("").await.unwrap_err())
 }
 
-fn read_linkage(r: &mut WireReader<'_>) -> bsv_rs::Result<KeyLinkageResult> {
+// The three keys open both results, in the reference's order
+// (`WalletWireTransceiver.ts:818-836`, `:890-908` at ts-stack@edf6e03; #194).
+fn read_linkage_keys(r: &mut WireReader<'_>) -> bsv_rs::Result<[PublicKey; 3]> {
+    Ok([
+        PublicKey::from_bytes(r.read_bytes(33)?)?,
+        PublicKey::from_bytes(r.read_bytes(33)?)?,
+        PublicKey::from_bytes(r.read_bytes(33)?)?,
+    ])
+}
+
+fn read_linkage(r: &mut WireReader<'_>, keys: [PublicKey; 3]) -> bsv_rs::Result<KeyLinkageResult> {
+    let [prover, verifier, counterparty] = keys;
     let len = r.read_var_int()? as usize;
     let encrypted_linkage = r.read_bytes(len)?.to_vec();
     let len = r.read_var_int()? as usize;
@@ -92,9 +103,9 @@ fn read_linkage(r: &mut WireReader<'_>) -> bsv_rs::Result<KeyLinkageResult> {
     Ok(KeyLinkageResult {
         encrypted_linkage,
         encrypted_linkage_proof,
-        prover: PublicKey::from_bytes(r.read_bytes(33)?)?,
-        verifier: PublicKey::from_bytes(r.read_bytes(33)?)?,
-        counterparty: PublicKey::from_bytes(r.read_bytes(33)?)?,
+        prover,
+        verifier,
+        counterparty,
     })
 }
 
@@ -109,9 +120,11 @@ pub async fn counterparty<T: WalletWire>(
         .write_bytes(&args.verifier.to_compressed());
     let bytes = linkage_response(client, w).await?;
     let mut r = WireReader::new(&bytes);
+    let keys = read_linkage_keys(&mut r)?;
+    let revelation_time = r.read_string()?;
     Ok(RevealCounterpartyKeyLinkageResult {
-        linkage: read_linkage(&mut r)?,
-        revelation_time: r.read_string()?,
+        linkage: read_linkage(&mut r, keys)?,
+        revelation_time,
     })
 }
 
@@ -128,10 +141,13 @@ pub async fn specific<T: WalletWire>(
     w.write_bytes(&args.verifier.to_compressed());
     let bytes = linkage_response(client, w).await?;
     let mut r = WireReader::new(&bytes);
+    let keys = read_linkage_keys(&mut r)?;
+    let protocol = r.read_protocol_id()?;
+    let key_id = r.read_string()?;
     Ok(RevealSpecificKeyLinkageResult {
-        linkage: read_linkage(&mut r)?,
-        protocol: r.read_protocol_id()?,
-        key_id: r.read_string()?,
+        linkage: read_linkage(&mut r, keys)?,
+        protocol,
+        key_id,
         proof_type: r.read_u8()?,
     })
 }

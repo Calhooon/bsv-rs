@@ -1332,3 +1332,262 @@ async fn the_go_specific_linkage_request_reads_the_key_related_params_then_the_v
         .await
         .unwrap();
 }
+
+// ============================================================================
+// Every Go result vector written through the processor to its wire (#194)
+// ============================================================================
+
+/// Every `*-result.json` under `tests/vectors/wallet_wire/`, by call.
+#[cfg(feature = "http")]
+const RESULT_VECTORS: [&str; 27] = [
+    "abortAction-simple-result.json",
+    "acquireCertificate-simple-result.json",
+    "createHmac-simple-result.json",
+    "createSignature-simple-result.json",
+    "decrypt-simple-result.json",
+    "discoverByAttributes-simple-result.json",
+    "discoverByIdentityKey-simple-result.json",
+    "encrypt-simple-result.json",
+    "getHeaderForHeight-simple-result.json",
+    "getHeight-simple-result.json",
+    "getNetwork-simple-result.json",
+    "getPublicKey-simple-result.json",
+    "getVersion-simple-result.json",
+    "internalizeAction-simple-result.json",
+    "isAuthenticated-simple-result.json",
+    "listActions-simple-result.json",
+    "listCertificates-full-result.json",
+    "listCertificates-simple-result.json",
+    "listOutputs-simple-result.json",
+    "proveCertificate-simple-result.json",
+    "relinquishCertificate-simple-result.json",
+    "relinquishOutput-simple-result.json",
+    "revealCounterpartyKeyLinkage-simple-result.json",
+    "revealSpecificKeyLinkage-simple-result.json",
+    "verifyHmac-simple-result.json",
+    "verifySignature-simple-result.json",
+    "waitForAuthentication-simple-result.json",
+];
+
+/// The result vectors the processor cannot write as their wire, with the
+/// reason. A vector that leaves this list, or joins it, moves the count.
+#[cfg(feature = "http")]
+const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 19] = [
+    (
+        "abortAction-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "acquireCertificate-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "createHmac-simple-result.json",
+        "the processor writes a varint length ahead of the HMAC; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1496 at ts-stack@edf6e03)",
+    ),
+    (
+        "createSignature-simple-result.json",
+        "the processor writes a varint length ahead of the signature; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1560 at ts-stack@edf6e03)",
+    ),
+    (
+        "decrypt-simple-result.json",
+        "the processor writes a varint length ahead of the plaintext; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1471 at ts-stack@edf6e03)",
+    ),
+    (
+        "discoverByAttributes-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "discoverByIdentityKey-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "encrypt-simple-result.json",
+        "the processor writes a varint length ahead of the ciphertext; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1444 at ts-stack@edf6e03)",
+    ),
+    (
+        "internalizeAction-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listActions-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listCertificates-full-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listCertificates-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listOutputs-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "proveCertificate-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "relinquishCertificate-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "relinquishOutput-simple-result.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "verifyHmac-simple-result.json",
+        "the processor writes a valid byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1522-1525 at ts-stack@edf6e03)",
+    ),
+    (
+        "verifySignature-simple-result.json",
+        "the processor writes a valid byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1600-1603 at ts-stack@edf6e03)",
+    ),
+    (
+        "waitForAuthentication-simple-result.json",
+        "the processor writes a authenticated byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1641-1644 at ts-stack@edf6e03)",
+    ),
+];
+
+/// A Go result vector's json in the shape the fixture stub answers with: the
+/// linkage results nest the keys and the bytes under `linkage` (the Rust
+/// type's serde form), every other call's json is the stub's own.
+#[cfg(feature = "http")]
+fn stub_reply(call: &str, json: &Value) -> Value {
+    let bytes = |name: &str| -> String {
+        let list: Vec<u8> = serde_json::from_value(json[name].clone()).unwrap();
+        hex::encode(list)
+    };
+    let linkage = || {
+        serde_json::json!({"prover": json["prover"], "verifier": json["verifier"],
+            "counterparty": json["counterparty"], "encryptedLinkage": bytes("encryptedLinkage"),
+            "encryptedLinkageProof": bytes("encryptedLinkageProof")})
+    };
+    match call {
+        "revealCounterpartyKeyLinkage" => {
+            serde_json::json!({"linkage": linkage(), "revelationTime": json["revelationTime"]})
+        }
+        "revealSpecificKeyLinkage" => serde_json::json!({"linkage": linkage(),
+            "protocol": {"securityLevel": json["protocolID"][0].to_string(),
+                "protocolName": json["protocolID"][1]},
+            "keyId": json["keyID"], "proofType": json["proofType"]}),
+        _ => json.clone(),
+    }
+}
+
+/// Sends the call's recorded request (`tests/fixtures/wire/<call>.json`, its
+/// first case: a frame the processor reads) to a wallet that answers with the
+/// Go result vector's json, and compares the processor's whole response, the
+/// error byte included, to the vector's wire.
+#[cfg(feature = "http")]
+async fn processor_writes_the_vector_wire(filename: &str) -> Result<(), String> {
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    use bsv_rs::wallet::Network;
+    let call = filename.split('-').next().unwrap();
+    let (json, wire) = load_vector(filename);
+    let recording: Value = serde_json::from_str(
+        &std::fs::read_to_string(format!(
+            "{}/tests/fixtures/wire/{call}.json",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let request = hex::decode(
+        recording["cases"][0]["expected"]["request_hex"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    let network = if json["network"] == "testnet" {
+        Network::Testnet
+    } else {
+        Network::Mainnet
+    };
+    let version = json["version"]
+        .as_str()
+        .unwrap_or("fixture-0.0.0")
+        .to_string();
+    let stub = fixtures::wallet::Stub::new(stub_reply(call, &json));
+    let observed = stub.observed.clone();
+    // The stub's reply decoder panics on a json its type does not read: a
+    // spawned task turns that into a row of the table.
+    let response = tokio::spawn(async move {
+        WalletWireProcessor::with_config(stub, network, &version)
+            .process_message(&request)
+            .await
+    })
+    .await
+    .map_err(|_| "the vector's json is not the result type's".to_string())?
+    .map_err(|e| format!("no response: {e}"))?;
+    if observed.lock().unwrap().is_none() && !matches!(call, "getNetwork" | "getVersion") {
+        let mut reader = WireReader::new(&response[1..]);
+        return Err(format!(
+            "the wallet was not called: {}",
+            reader.read_string().unwrap_or_default()
+        ));
+    }
+    if response != wire {
+        return Err(format!(
+            "wrote {}, the vector says {}",
+            hex::encode(&response),
+            hex::encode(&wire)
+        ));
+    }
+    Ok(())
+}
+
+/// The general form of #194's witness: every Go result vector whose call the
+/// processor answers, written through its result writer, is the vector's wire.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn every_go_result_vector_is_the_processors_wire_for_its_json() {
+    let mut on_disk: Vec<String> = std::fs::read_dir(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/vectors/wallet_wire"
+    ))
+    .unwrap()
+    .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+    .filter(|name| name.ends_with("-result.json"))
+    .collect();
+    on_disk.sort();
+    assert_eq!(on_disk, RESULT_VECTORS, "the table is every result vector");
+
+    let mut failing = Vec::new();
+    for filename in RESULT_VECTORS {
+        if let Err(why) = processor_writes_the_vector_wire(filename).await {
+            println!("{filename}: {why}");
+            failing.push(filename);
+        }
+    }
+    let allowed: Vec<&str> = PROCESSOR_RESULTS_UNSUPPORTED
+        .iter()
+        .map(|(f, _)| *f)
+        .collect();
+    assert_eq!(failing, allowed, "the vectors the processor cannot write");
+    assert_eq!(RESULT_VECTORS.len() - failing.len(), 8, "passing rows");
+}
+
+/// #194: revealCounterpartyKeyLinkage's response is the error byte, the
+/// prover, verifier and counterparty (33 bytes each), then revelationTime,
+/// encryptedLinkage and encryptedLinkageProof, each behind its length.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_counterparty_linkage_response_writes_the_three_keys_ahead_of_everything() {
+    processor_writes_the_vector_wire("revealCounterpartyKeyLinkage-simple-result.json")
+        .await
+        .unwrap();
+}
+
+/// #194: revealSpecificKeyLinkage's response is the error byte, the three
+/// keys, the protocol, keyID, encryptedLinkage, encryptedLinkageProof, then
+/// proofType as one byte.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_specific_linkage_response_writes_the_three_keys_ahead_of_everything() {
+    processor_writes_the_vector_wire("revealSpecificKeyLinkage-simple-result.json")
+        .await
+        .unwrap();
+}
