@@ -64,16 +64,19 @@
             "plaintext": [
               0
             ],
+            "privileged": null,
+            "privilegedReason": null,
             "protocolID": [
               1,
               "fixture keys"
-            ]
+            ],
+            "seekPermission": null
           },
           "method": "encrypt",
           "originator": "fixtures.invalid"
         },
         "processor_response_hex": "00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
-        "request_hex": "0b1066697874757265732e696e76616c6964010c66697874757265206b6579730766697874757265000100",
+        "request_hex": "0b1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726500ffff0100ff",
         "response_encoder": "WalletWireProcessor",
         "response_hex": "00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f"
       },
@@ -214,16 +217,19 @@
               254,
               255
             ],
+            "privileged": true,
+            "privilegedReason": "fixture reason",
             "protocolID": [
               1,
               "fixture keys"
-            ]
+            ],
+            "seekPermission": false
           },
           "method": "encrypt",
           "originator": "fixtures.invalid"
         },
         "processor_response_hex": "00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
-        "request_hex": "0b1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee50600017f80feff",
+        "request_hex": "0b1066697874757265732e696e76616c6964010c66697874757265206b657973076669787475726502c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5010e6669787475726520726561736f6e0600017f80feff00",
         "response_encoder": "WalletWireProcessor",
         "response_hex": "00000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f"
       },
@@ -239,10 +245,13 @@
             254,
             255
           ],
+          "privileged": true,
+          "privilegedReason": "fixture reason",
           "protocolID": [
             1,
             "fixture keys"
-          ]
+          ],
+          "seekPermission": false
         },
         "result": {
           "ciphertext": [
