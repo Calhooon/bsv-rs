@@ -126,6 +126,59 @@ that used them assemble the old bytes by hand
 names any of the three (a grep of bsv-overlay-cloudflare, rust-message-box,
 bsv-wallet-toolbox-rs, bsv-wallet-cli, bsv-middleware-cloudflare-public and
 rust-chaintracks, 2026-10-25). `WireReader::read_optional_string_map` stays.
+### Changed: a repeated leaf offset is `DuplicateOffset`; `Kind` and `Reason` are non-exhaustive (#86, #167)
+
+A BUMP level carrying a second leaf at an offset, agreeing with the earlier
+one or not, was refused under the walk's name, `MismatchedNode { level,
+offset }`, a node the level below contradicts. It now has its own reason,
+`Reason::DuplicateOffset { level, offset }` and `Kind::DuplicateOffset` (the
+twenty-fifth kind, after `MismatchedNode` in `Kind::ALL`), by the owner's word
+of 2026-10-25. The two sites that refuse a repeat move together, so one BUMP
+means one thing on the stream, the whole-BEEF reader and the standalone BUMP
+reader: the decoder's offset state (`invalid BEEF at byte N: DuplicateOffset
+{ level, offset }` at the second leaf's offset varint; `invalid BUMP at byte
+N: ..` from `MerklePath::from_binary`) and `merkle_path_root`'s pre-pass over
+a BUMP held in memory (`Beef::verify_structure` answers
+`Err(Kind::DuplicateOffset)`). The walk's two `MismatchedNode` sites stay: a
+repeat never reaches it (the level's map holds one leaf per offset), so what
+it refuses there is a carried node or a parent its children contradict, the
+Lean's `mismatchedNode` (`bsv-stack-lean@6104e4e` `lean/BeefOfAnySize.lean:169`,
+`climb` `:501-502`, `:527`). `MerklePath::new`'s `Duplicate offset` text is
+unchanged.
+
+`Kind` and `Reason` are `#[non_exhaustive]` from this release, so the next
+kind is not a break; 0.9.0 takes this one. **Migration:** a `match` on either
+outside this crate ends in a wildcard arm (`_ => ..`); a compile_fail doc
+test on each enum pins it. `SpendRefusal` (the interpreter's verdict, not a
+byte rule) is left exhaustive; the owner's list does not name it. In the four
+downstreams (`bsv-overlay-cloudflare`, `rust-message-box`,
+`bsv-wallet-toolbox-rs`, `bsv-wallet-cli`) no exhaustive `match` on `Kind` or
+`Reason` was found: they compare a kind with `==` or in a pattern of one
+value (`overlay-cloudflare/src/submit_census.rs:1567`,
+`rust-message-box/src/beef_door.rs:1642,1666,1678,1736`,
+`bsv-wallet-toolbox-rs/src/storage/sqlx/internalize_action.rs:1947,1981`,
+`create_action.rs:6111`, `beef_verification.rs:487`), and one matches on the
+refusal's words (`submit_census.rs:1149`, `"BadFlag"`, a flag mutation this
+change does not touch); none needs a change.
+
+The Lean's `Reason` gains the constructor `duplicateOffset (level offset :
+Nat)` after `mismatchedNode` (`BeefOfAnySize.lean:169`), its `Kind`,
+`Reason.kind` and `Kind.all` (`:213-251`) the same, and `levelMap` (`:481`,
+the earliest leaf standing) the refusal: the keeper's, told. The types moved
+to `src/transaction/beef_stream/reason.rs` (a move in its own commit,
+re-exported where they stood: `beef_stream.rs` sits at its recorded 3,617
+lines). Pinned by `a_repeated_leaf_offset_is_duplicate_offset_on_both_readers`
+(`tests/merkle_path_two_readers_agree.rs`, the standalone reader and the BEEF
+reader on three repeats), the four repeated-offset tests of
+`tests/beef_two_readers_agree.rs` (`a_level_0_leaf_repeated_with_the_same_hash_..`,
+`.._with_a_different_node_..`, `a_higher_level_leaf_repeated_..`,
+`a_repeated_leaf_offset_in_a_bump_held_in_memory_..`), and
+`the_twenty_five_kinds_are_twenty_five_and_distinct` (`tests/beef_stream.rs`).
+The corpus seed that reached `MismatchedNode` was a repeat: corpus-gen writes
+the same bytes as `door-DuplicateOffset-bad_index-4-3`, and `MismatchedNode`'s
+door is `door-MismatchedNode-compound-218-5` again (64 seeds, all 25 kinds
+reached). TS has no separate name: its `MerklePath` throws `Duplicate offset`
+(`MerklePath.ts:221`); Go keeps the later leaf.
 
 ### Changed: the fuzz crates are formatted and checked (#180)
 
@@ -143,6 +196,9 @@ ratchet and bench-compare tools.
 `door-MismatchedNode-compound-218-5`, the directory stays at 63 seeds, and
 corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
 encrypted and Shamir seeds a rerun still moved are #180's item 1 (below).
+encrypted and Shamir seeds a rerun still moves are #180's item 1. (Since the
+repeat is `DuplicateOffset`, above, that seed is the new door's and the
+compound row's is `MismatchedNode`'s again.)
 
 ### Fixed: the processor's error frame is the reference's: unknownError, `Wallet operation failed` for a wallet's error, the processor's own words for its own, the empty stack (#202)
 
@@ -866,7 +922,7 @@ the public `BeefDecoder` behind the header of a BEEF of one BUMP), with the
 in-memory form the whole-BEEF reader keeps (`Bump::in_memory`, crate-private:
 each level by offset, a height above a `u32` refused `RootNotCarried` at the
 BUMP). The same flag reading, the same offset rule (a repeated offset is
-`MismatchedNode` at the second leaf's offset varint), the same tree-height
+`DuplicateOffset` at the second leaf's offset varint, above), the same tree-height
 bounds, the same walk, and the stream's `Reason`s with their offsets counted
 from the BUMP's leading byte, in the words of the BUMP the caller handed:
 `merkle path error: invalid BUMP at byte N: Reason` (the stream's `Refusal`,
@@ -1118,7 +1174,7 @@ what the stream said:
   `DuplicateInput`).
 - **A repeated leaf offset, refused on both paths**: a BUMP level that
   carries a second leaf at an offset, agreeing with the earlier one or not,
-  is `MismatchedNode { level, offset }` at the second leaf's offset varint
+  is `DuplicateOffset { level, offset }` (above; `MismatchedNode` on the branch) at the second leaf's offset varint
   (the decoder refuses it as it reads the offset; `merkle_path_root` refuses
   one held in memory ahead of the walk). Through 0.9.0 the whole reader
   refused it as `MerklePath::new_unchecked`'s "Duplicate offset", naming no
