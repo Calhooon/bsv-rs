@@ -45,7 +45,7 @@ A reference-parity port of the TypeScript `@bsv/sdk` (`~/bsv/ts-sdk`; the `ts-st
 
 ```toml
 default = ["primitives", "script"]
-transaction = ["script"]; wallet = ["transaction"]; messages = ["wallet"]
+block = ["primitives"]; transaction = ["script", "block"]; wallet = ["transaction"]; messages = ["wallet"]
 compat = ["primitives"]; totp = ["primitives"]
 auth = ["wallet", "messages", "dep:tokio"]; overlay = ["wallet", "dep:tokio"]
 storage = ["overlay"]; registry = ["overlay"]; kvstore = ["overlay"]; identity = ["auth", "overlay"]
