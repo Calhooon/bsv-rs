@@ -37,7 +37,6 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::beef_stream::{Bump, Refusal};
 use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
 use crate::Result;
 
@@ -235,7 +234,9 @@ impl MerklePath {
         Ok(merkle_path)
     }
 
-    /// Creates a MerklePath from binary data.
+    /// Creates a MerklePath from binary data: the bytes are one BUMP, read
+    /// as [`from_reader`](Self::from_reader) reads it, and a byte after its
+    /// frame is refused, `TrailingBytes` at that byte's offset (bsv-rs#167).
     ///
     /// # Arguments
     ///
@@ -245,11 +246,11 @@ impl MerklePath {
     ///
     /// The parsed MerklePath.
     pub fn from_binary(bin: &[u8]) -> Result<Self> {
-        let mut reader = Reader::new(bin);
-        Self::from_reader(&mut reader)
+        Self::read_bump(bin, true).map(|(path, _)| path)
     }
 
-    /// Creates a MerklePath from a hex string.
+    /// Creates a MerklePath from a hex string, the bytes one BUMP as
+    /// [`from_binary`](Self::from_binary) reads them.
     ///
     /// # Arguments
     ///
@@ -270,17 +271,12 @@ impl MerklePath {
     /// is 1 to 64; every hashed leaf of level 0 climbs to one root; the block
     /// height fits a `u32`. A refusal is the stream's, `invalid BUMP at byte
     /// N: Reason`, `N` counted from the BUMP's leading byte. The reader is
-    /// advanced past the BUMP alone.
+    /// advanced past the BUMP alone, the bytes after it left to the caller
+    /// (TS's `fromBinary` reads through a reader, `ts-stack@edf6e03`
+    /// `MerklePath.ts:161-168`).
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        let refused = |r: Refusal| {
-            crate::Error::MerklePathError(format!(
-                "invalid BUMP at byte {}: {:?}",
-                r.offset, r.reason
-            ))
-        };
-        let bump = Bump::read_alone(reader.clone().read_remaining()).map_err(refused)?;
-        let path = bump.in_memory().map_err(refused)?;
-        reader.read_bytes(usize::try_from(bump.wire_len).unwrap_or(usize::MAX))?;
+        let (path, used) = Self::read_bump(reader.clone().read_remaining(), false)?;
+        reader.read_bytes(used)?;
         Ok(path)
     }
 

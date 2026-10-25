@@ -622,6 +622,37 @@ fn an_even_offset_duplicate_is_refused_by_both_readers_at_its_flag() {
     }
 }
 
+/// A byte after the BUMP: the slice (`from_binary`, `from_hex`) says the
+/// bytes are a BUMP and refuses it, `TrailingBytes` at that byte's offset;
+/// the reader (`from_reader`) reads one frame and leaves the cursor after it,
+/// one short of the end (bsv-rs#167; the harness row `bump-032`).
+#[test]
+fn a_byte_after_the_bump_is_refused_by_the_slice_and_left_by_the_reader() {
+    let bump = with_sibling_flag(0);
+    MerklePath::from_binary(&bump).expect("the BUMP alone is valid");
+    let mut bytes = bump.clone();
+    bytes.push(0);
+    let refusal = format!(
+        "merkle path error: invalid BUMP at byte {}: TrailingBytes",
+        bump.len()
+    );
+    assert_eq!(
+        MerklePath::from_binary(&bytes).unwrap_err().to_string(),
+        refusal
+    );
+    assert_eq!(
+        MerklePath::from_hex(&to_hex(&bytes))
+            .unwrap_err()
+            .to_string(),
+        refusal
+    );
+    let mut reader = Reader::new(&bytes);
+    let path = MerklePath::from_reader(&mut reader).expect("the reader reads one frame");
+    assert_eq!(path.to_binary(), bump);
+    assert_eq!(reader.position(), bytes.len() - 1);
+    assert_eq!(reader.remaining(), 1);
+}
+
 /// The same shape held in memory: `MerklePath::new` and `new_unchecked`
 /// refuse it ahead of the walk, `Beef::verify_structure` in
 /// `merkle_path_root`'s pre-pass as the decoder refuses its flag, and
@@ -678,15 +709,23 @@ fn the_standalone_reader_and_the_beef_reader_agree_on_every_bump_the_tree_holds(
     let mut accepted = 0usize;
     for (name, bytes) in &inputs {
         let alone = standalone(bytes);
-        // The three standalone entry points are one reader.
+        // The three standalone entry points are one reader; the slice's
+        // bytes are the BUMP, a byte after it `TrailingBytes` there.
         let binary = MerklePath::from_binary(bytes).map(|p| p.to_binary());
         let hex = MerklePath::from_hex(&to_hex(bytes)).map(|p| p.to_binary());
         assert_eq!(binary, hex, "{name}: from_binary and from_hex");
-        assert_eq!(
-            binary.is_ok(),
-            matches!(alone, Answer::Valid { .. }),
-            "{name}"
-        );
+        match (&alone, &binary) {
+            (Answer::Valid { used, .. }, Ok(_)) => assert_eq!(*used, bytes.len(), "{name}"),
+            (Answer::Valid { used, .. }, Err(e)) => assert_eq!(
+                e.to_string(),
+                format!("merkle path error: invalid BUMP at byte {used}: TrailingBytes"),
+                "{name}"
+            ),
+            (Answer::Refused { text, .. }, Err(e)) => assert_eq!(*text, e.to_string(), "{name}"),
+            (Answer::Refused { .. }, Ok(_)) => {
+                panic!("{name}: the slice accepts what the reader refuses")
+            }
+        }
         let beef = beef_reader(bytes);
         accepted += usize::from(matches!(beef, Answer::Valid { .. }));
         if let Some(class) = disagreement(&alone, &beef) {

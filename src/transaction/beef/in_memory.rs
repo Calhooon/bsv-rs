@@ -48,7 +48,7 @@ impl Bump {
         Ok(MerklePath { block_height, path })
     }
 
-    /// One BUMP read alone (`MerklePath::from_binary`, bsv-rs#167) by the
+    /// One BUMP read alone (`MerklePath::read_bump`, bsv-rs#167) by the
     /// decoder that reads one in a BEEF, behind the header of a BEEF of one
     /// BUMP: the same flags, offsets, tree height and walk, each refusal the
     /// stream's, every offset counted from the BUMP's leading byte. The
@@ -102,6 +102,32 @@ impl Bump {
 }
 
 impl MerklePath {
+    /// One BUMP the caller handed (`MerklePath::from_binary`, `from_hex`,
+    /// `from_reader`; bsv-rs#167), read by [`Bump::read_alone`] into
+    /// [`Bump::in_memory`]'s form, with the bytes it took. `whole`: the bytes
+    /// are the BUMP (a slice), a byte after its frame refused `TrailingBytes`
+    /// at that byte's offset (the Lean's `trailingBytes`); otherwise one frame
+    /// is read and the rest left (a reader). A refusal is `invalid BUMP at
+    /// byte N: Reason`, `N` counted from the bytes given, the refusal type
+    /// and the words after "at byte" the stream's.
+    pub(crate) fn read_bump(bin: &[u8], whole: bool) -> crate::Result<(MerklePath, usize)> {
+        let refused = |r: Refusal| {
+            let (at, reason) = (r.offset, r.reason);
+            crate::Error::MerklePathError(format!("invalid BUMP at byte {at}: {reason:?}"))
+        };
+        let bump = Bump::read_alone(bin).map_err(refused)?;
+        let path = bump.in_memory().map_err(refused)?;
+        let used = usize::try_from(bump.wire_len).unwrap_or(usize::MAX);
+        if whole && used < bin.len() {
+            let reason = Reason::TrailingBytes;
+            return Err(refused(Refusal {
+                offset: bump.wire_len,
+                reason,
+            }));
+        }
+        Ok((path, used))
+    }
+
     /// A duplicate at an even offset refused (bsv-rs#167): the flag
     /// duplicates the working hash, the left node already in hand (BRC-74 at
     /// `5119a9b`, `transactions/0074.md:41,71,76`), and an even offset is a

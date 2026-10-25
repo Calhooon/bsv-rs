@@ -68,9 +68,19 @@ from the BUMP's leading byte, in the words of the BUMP the caller handed:
 `merkle path error: invalid BUMP at byte N: Reason` (the stream's `Refusal`,
 its public `offset` and `reason`; the words after "at byte" are the stream's,
 whose own refusal of a BEEF reads `invalid BEEF`), the variant
-`Error::MerklePathError` as before. `from_binary` still
-reads a prefix and leaves the bytes after the BUMP, as `@bsv/sdk`'s
-`fromBinary` does (`ts-stack@edf6e03` `MerklePath.ts:161-168`). No public item
+`Error::MerklePathError` as before. A slice says its bytes are a BUMP:
+`from_binary` and `from_hex` refuse a byte after the frame, `invalid BUMP at
+byte N: TrailingBytes` at that byte's offset (the stream's refusal of a byte
+that belongs to no field; the Lean's `trailingBytes`), where through 0.9.0
+they read a prefix and dropped the rest. A reader reads one frame:
+`from_reader` leaves the cursor after the BUMP and the bytes after it to the
+caller, which is `@bsv/sdk`'s `fromBinary` (it wraps a reader,
+`ts-stack@edf6e03` `MerklePath.ts:161-168`), so parity holds through the
+reader form
+(`a_byte_after_the_bump_is_refused_by_the_slice_and_left_by_the_reader`, red
+on the lane's draft, where the slice read the prefix). The differential
+asserts both on every input: the slice accepts exactly what the reader
+accepts whole, and refuses `TrailingBytes` at the reader's end otherwise. No public item
 was renamed, retyped or moved: a scratch crate naming every public item of
 `transaction::merkle_path` (each fn at its exact signature, both structs by
 literal and by pattern, the derives) compiles against 0.9.0 and this tree.
@@ -160,8 +170,11 @@ refuses them, and close. `bump-031` (a height of 2^32 plus 900,000, which the
 spec's codec reads) moves from an `objects` witness (the height cut to
 900,000) to a `codec` one: the in-memory height is a `u32`, and the parse
 refuses the BUMP as the BEEF reader has since #86. `bump-032` (a byte after
-the BUMP) stays a `codec` witness, as it is for go-sdk and ts-sdk: the
-standalone reader is a prefix reader. The census (`tools/ratchet/run`):
+the BUMP; `run_wire` reads it with `from_binary`) is now refused on the slice,
+`TrailingBytes`, as the spec's codec refuses it, and closes; it stays a
+`codec` witness for go-sdk and ts-sdk, whose readers are prefix readers. The
+reader's prefix read (`from_reader`, the cursor one short of the end) is its
+own row for the harness to add; this crate's test pins it. The census (`tools/ratchet/run`):
 `src/transaction/merkle_path.rs` 1,470 to 1,469 lines, `beef_stream.rs`
 3,617 unchanged, every counter unchanged (`duplicate_windows_40` holds at
 8,666: the old flag reader was not a window of the decoder's).
@@ -186,9 +199,13 @@ BRC-74's own walk (`transactions/0074.md:326-345`) synthesizes no node and
 throws for one the level does not carry (`:335`): it is silent on a computed
 node, it does not rule it. The stack's Lean has the self-pair today (`climb`,
 `BeefOfAnySize.lean:509-520`) and corrects it in its own lane, with the
-`duplicateOffset` row. Go keeps the later of two leaves at one offset (`go-sdk@2ca481c`
-`transaction/merklepath.go:87-90`); this crate refuses the second, on both of
-its readers.
+`duplicateOffset` row. Go keeps the later of two leaves at one offset
+(`go-sdk@2ca481c` `transaction/merklepath.go:87-90`); this crate refuses the
+second, on both of its readers. TS's `fromBinary` and Go's
+`NewMerklePathFromBinary` (`merklepath.go:189-194`, a reader over the bytes)
+read a prefix of the bytes they are handed; this
+crate's `from_binary` refuses a byte after the frame and its `from_reader`
+reads the prefix.
 
 ### Changed: the interpreter is split by opcode group (#85)
 
