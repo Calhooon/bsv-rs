@@ -114,15 +114,16 @@ what the stream said:
 - **A repeated leaf offset, refused on both paths**: a BUMP level that
   carries a second leaf at an offset, agreeing with the earlier one or not,
   is `MismatchedNode { level, offset }` at the second leaf's offset varint
-  (the decoder refuses it as it reads the offset; `merkle_path_root`
-  refuses one held in memory ahead of the walk). Through 0.9.0 the whole reader refused
-  it as `MerklePath::new_unchecked`'s "Duplicate offset", naming no byte, and
-  the stream let the earlier leaf stand, accepting a repeat its walk accepted
-  (the same hash, a flag-`01` leaf after a hash, a higher level's sibling);
-  the lane's draft accepted it on both. The stack's Lean names the refusal
-  `duplicateOffset (level, offset)`; `Reason` and `Kind` are exhaustive
-  public enums (no `#[non_exhaustive]`, `Kind::ALL: [Kind; 24]`), so no
-  variant is added here: a new one is the owner's word. Red before the fold:
+  (the decoder refuses it as it reads the offset; `merkle_path_root` refuses
+  one held in memory ahead of the walk). Through 0.9.0 the whole reader
+  refused it as `MerklePath::new_unchecked`'s "Duplicate offset", naming no
+  byte, and the stream let the earlier leaf stand, accepting a repeat its
+  walk accepted (the same hash, a flag-`01` leaf after a hash, a higher
+  level's sibling); the lane's draft accepted it on both. The stack's Lean
+  names the refusal `duplicateOffset (level, offset)`; `Reason` and `Kind`
+  are exhaustive public enums (no `#[non_exhaustive]`,
+  `Kind::ALL: [Kind; 24]`), so no variant is added here: a new one is the
+  owner's word. Red before the fold:
   `a_level_0_leaf_repeated_with_the_same_hash_is_refused_on_both_paths`,
   `a_level_0_leaf_repeated_with_a_different_node_is_refused_on_both_paths`,
   `a_higher_level_leaf_repeated_is_refused_on_both_paths`,
