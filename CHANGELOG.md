@@ -96,6 +96,9 @@ words, and each is pinned by a test in `tests/wire_reader_strictness.rs`
   `an_identity_certificate_with_nothing_optional_writes_empty_strings_and_counts`
   now pins the refusal, and the absent iconUrl, description and maps written
   as empty strings and counts under a trust of 1.
+  #184's `wire_identity_certificate_roundtrip.rs` hand-assembles Go's zero
+  value (which this writer no longer writes) and reads it back through
+  `read_identity_certificate`; the transceiver refuses the same bytes.
 
 `read_string_map` and `read_optional_string_map` keep their NIL sentinel, and
 neither now has a caller that reads a frame the reference reads strictly. The
