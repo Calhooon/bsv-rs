@@ -164,12 +164,14 @@ impl Beef {
             } => {
                 // An index past `usize` names no BUMP, as the stream reads it.
                 let bump_index = bump_index.map(|i| usize::try_from(i).unwrap_or(usize::MAX));
-                // The bytes the decoder read, kept as the transaction's own
-                // (its hash is theirs, not a serialization's).
+                // The bytes the decoder read, kept as the transaction's own,
+                // and the txid it hashed from them (its hash is theirs, not a
+                // serialization's, and computed once).
                 let tx = Transaction::from_binary(&body.raw)?;
+                let txid = display_hex(&txid);
                 self.push_tx(
-                    BeefTx::from_parts(tx, body.raw, bump_index),
-                    display_hex(&txid),
+                    BeefTx::from_parts(tx, body.raw, bump_index).with_txid(txid.clone()),
+                    txid,
                 );
             }
             Element::TxidOnly { txid, .. } => {

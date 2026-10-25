@@ -110,6 +110,14 @@ impl BeefTx {
         btx
     }
 
+    /// The entry with its txid in hand: the display hex of the hash the
+    /// decoder computed as the bytes passed, so [`txid`](Self::txid) does not
+    /// serialize and hash the transaction again on each call (bsv-rs#86).
+    pub(crate) fn with_txid(mut self, txid: String) -> Self {
+        self.txid = Some(txid);
+        self
+    }
+
     /// Creates a BeefTx from just a transaction ID.
     pub fn from_txid(txid: String) -> Self {
         Self {
