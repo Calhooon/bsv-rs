@@ -89,22 +89,40 @@ the rest are 332 inputs it accepted with a flag the BEEF reader refuses
 with a carried node its children contradict (`MismatchedNode`), 1 with no
 hash at level 0 (`NoTxidAtLevelZero`), 83 above a `u32` height
 (`RootNotCarried`), and 468 it refused (`Mismatched roots`) that the BEEF
-reader accepts. Now, on the same inputs: 0. `fuzz_merkle_path` asserts the
+reader accepts. Now, on the same inputs: 0, the BEEF reader accepting 18,126
+of the 53,875. `fuzz_merkle_path` asserts the
 same agreement on every input (60 seconds, 298,316 runs, no disagreement and
 no crash).
 
-The 468 are one shape: a duplicate leaf at an even offset (the left sibling)
-that a walk meets as a child of a node it computes from the level below. The
-BEEF reader's walk reads a duplicate as the working hash paired with itself
-wherever it meets one (BRC-74 at `5119a9b`, `transactions/0074.md:71,76`:
-"duplicate working hash"); `RootWalker` hashed an empty left hash there, so
-the txids of one path could climb to two roots and the parse refused it.
-`MerklePath::compute_root` (and `new`, `new_unchecked`, `combine`) now compute
-that node as the right child paired with itself: a different root on that
-shape only, the one the BEEF reader computes, the same verdict
-(`an_even_offset_duplicate_reads_as_the_beef_reader_reads_it`, red on
-0.9.0). The in-memory differentials of `merkle_path.rs` carry the ruling in
-their 0.3.34 rescan, as they carry the lone-leaf one.
+The 468 are one shape: a duplicate leaf (flag `01`) at an even offset, a
+left node, that a walk meets as the left child of a node it computes from the
+level below. Through 0.9.0 `RootWalker` hashed an empty left hash there, so
+the txids of one path climbed to two roots and the parse refused `Mismatched
+roots`; the BEEF reader's walk, meeting the duplicate as the sibling of the
+other txid's path node, paired that node with itself and accepted it. BRC-74
+gives the duplicate flag as a right-hand optimization (`5119a9b`
+`transactions/0074.md:41`, "skip encoding of far right leaves when
+duplication of working hash would suffice"; `:71` and `:76`, "duplicate
+working hash", the left node already in hand): at an even offset it has no
+meaning in the tree, and it is refused on both paths. The decoder refuses its
+flag, `BadFlag { byte: 1 }` at the flag's byte, on the stream, the whole BEEF
+and a BUMP read alone (`BadFlag` names the byte that is wrong: the offset is
+a legal one under flag `00` or `02`, `OffsetOutsideTree` names a leaf outside
+its level, and a new `Reason` is a change to an exhaustive public enum, the
+owner's word); `merkle_path_root`'s pre-pass refuses it in a BUMP held in
+memory (`Beef::verify_structure`, `verify_valid`: `Kind::BadFlag`);
+`MerklePath::new` and `new_unchecked` refuse it ahead of the walk
+(`Duplicate at an even offset: N, at height: N`); and `RootWalker` computes no
+node from a duplicate on the left (`Missing hash at height N, offset N`,
+where the reference gives up), so `compute_root` on a struct built by hand
+gives one root or a refusal, never two. The 468 are refusals on both paths,
+with 2 more inputs whose even-offset duplicate is met only as a path node's
+sibling (both readers accepted those at the lane's draft): 18,596 accepted
+there, 18,126 now. `an_even_offset_duplicate_is_refused_by_both_readers_at_its_flag`
+(at level 2 and at level 0) and `an_even_offset_duplicate_held_in_memory_is_refused`
+were red on the draft (both parsed, `new` accepted, the struct had one root).
+The in-memory differentials of `merkle_path.rs` carry the ruling in their
+0.3.34 rescan, as they carry the lone-leaf one.
 
 The refusals that moved, by test:
 
@@ -152,9 +170,20 @@ TS has one BUMP reader, the `MerklePath` constructor behind `fromReader`
 leaf flag by its bits (`:133-140`), refuses a repeated offset as `Duplicate
 offset` (`:221`), and by default refuses a leaf above level 0 at an offset no
 txid's path needs (`legalOffsetsOnly = true`, `:161-168`), which neither of
-this crate's readers refuses. Its `findOrComputeLeaf` gives up on a node whose
-left child is a duplicate (`:437`), where this crate pairs the right child
-with itself. Go keeps the later of two leaves at one offset (`go-sdk@2ca481c`
+this crate's readers refuses. A duplicate at an even offset: TS refuses it at
+construction where a walk computes a node from it (`cachedFindLeaf` gives up
+on a left duplicate, `:628-631`, and `nextCachedHash` throws `Missing hash for
+index N at height N`, `:58`; `findOrComputeLeaf`, `:437`, is the `computeRoot`
+path), and pairs the working hash with itself where the duplicate is the
+working hash's sibling (`:60`); Go's reader accepts the bytes and
+`ComputeRoot` errors for the txid whose walk computes a node from it
+(`go-sdk@2ca481c` `transaction/merklepath.go:47-50`, `:396-397`), pairing it
+met as a sibling (`:399-400`); this crate refuses the parse on both paths.
+BRC-74's own walk (`transactions/0074.md:326-345`) synthesizes no node and
+throws for one the level does not carry (`:335`): it is silent on a computed
+node, it does not rule it. The stack's Lean has the self-pair today (`climb`,
+`BeefOfAnySize.lean:509-520`) and corrects it in its own lane, with the
+`duplicateOffset` row. Go keeps the later of two leaves at one offset (`go-sdk@2ca481c`
 `transaction/merklepath.go:87-90`); this crate refuses the second, on both of
 its readers.
 

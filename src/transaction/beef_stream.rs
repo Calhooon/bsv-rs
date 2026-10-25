@@ -209,8 +209,8 @@ pub enum Reason {
         /// The bytes that were due.
         needed: u64,
     },
-    /// A BUMP leaf flag not `00`, `01` or `02`; a has-BUMP byte not `00` or
-    /// `01`; a V2 format byte not 0, 1 or 2.
+    /// A BUMP leaf flag not `00`, `01` or `02`, or `01` at an even offset; a
+    /// has-BUMP byte not `00` or `01`; a V2 format byte not 0, 1 or 2.
     BadFlag {
         /// The byte read.
         byte: u8,
@@ -1238,8 +1238,8 @@ impl BeefDecoder {
             St::LeafFlag => {
                 let flag = self.scratch[0];
                 let bump = self.bump.as_mut().expect("a BUMP is in hand");
-                match flag {
-                    1 => {
+                match (flag, bump.leaf_offset % 2) {
+                    (1, 1) => {
                         let leaf = Leaf {
                             at: bump.leaf_at,
                             offset: bump.leaf_offset,
@@ -1248,11 +1248,11 @@ impl BeefDecoder {
                         };
                         return self.leaf_done(leaf);
                     }
-                    0 | 2 => {
+                    (0 | 2, _) => {
                         bump.leaf_client = flag == 2;
                         self.st = St::LeafHash;
                     }
-                    byte => return Err(Refusal::new(self.field_at, Reason::BadFlag { byte })),
+                    (byte, _) => return Err(Refusal::new(self.field_at, Reason::BadFlag { byte })),
                 }
             }
             St::LeafHash => {

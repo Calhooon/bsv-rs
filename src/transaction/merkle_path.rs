@@ -202,6 +202,7 @@ impl MerklePath {
             }
         }
 
+        Self::even_offset_duplicate(&path)?;
         let merkle_path = Self { block_height, path };
 
         // Verify all txids compute to the same root. The walks share every
@@ -700,8 +701,11 @@ impl<'a> RootWalker<'a> {
         let h = height - 1;
         let l = offset << 1;
 
+        // A duplicate on the left (an even offset) has no hash to pair, as
+        // the reference's walk gives up there (`ts-stack@edf6e03`
+        // `MerklePath.ts:437`); through 0.9.0 an empty hash stood in (#167).
         let leaf0 = self.find_or_compute(h, l)?;
-        if leaf0.hash.is_none() && !leaf0.duplicate {
+        if leaf0.hash.is_none() {
             return Err(format!("Missing hash at height {}, offset {}", h, l));
         }
 
@@ -710,12 +714,6 @@ impl<'a> RootWalker<'a> {
         let working_hash = if leaf1.duplicate {
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             hash_pair(h0, h0)
-        } else if leaf0.duplicate {
-            // A duplicate on the left duplicates the working hash on its
-            // right, as the BEEF reader's walk reads it (BRC-74's "duplicate
-            // working hash"); through 0.9.0 an empty hash stood in (#167).
-            let h1 = leaf1.hash.as_deref().unwrap_or("");
-            hash_pair(h1, h1)
         } else {
             // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
             let h0 = leaf0.hash.as_deref().unwrap_or("");
@@ -975,6 +973,8 @@ mod linear_root_equivalence_tests {
             }
         }
 
+        // The ruling of #167: a duplicate at an even offset is refused.
+        MerklePath::even_offset_duplicate(&path)?;
         let merkle_path = MerklePath { block_height, path };
 
         // Verify all txids compute to the same root
@@ -1062,8 +1062,11 @@ mod linear_root_equivalence_tests {
         let h = height - 1;
         let l = offset << 1;
 
+        // The ruling of #167, as `expected_after_lone_leaf_ruling` carries the
+        // offset-0 one: a duplicate on the left is no hash to pair; 0.3.34
+        // hashed an empty left hash, and a path's walks could disagree.
         let leaf0 = legacy_find_or_compute_leaf(mp, h, l)?;
-        if leaf0.hash.is_none() && !leaf0.duplicate {
+        if leaf0.hash.is_none() {
             return Err(crate::Error::MerklePathError(format!(
                 "Missing hash at height {}, offset {}",
                 h, l
@@ -1075,14 +1078,6 @@ mod linear_root_equivalence_tests {
         let working_hash = if leaf1.duplicate {
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             hash_pair(h0, h0)
-        } else if leaf0.duplicate {
-            // The ruling of #167, as `expected_after_lone_leaf_ruling` carries
-            // the offset-0 one: a duplicate on the left is the working hash
-            // on its right paired with itself, the BEEF reader's reading;
-            // 0.3.34 hashed an empty left hash, and a path's walks could
-            // disagree (one root per txid no longer held).
-            let h1 = leaf1.hash.as_deref().unwrap_or("");
-            hash_pair(h1, h1)
         } else {
             // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
             let h0 = leaf0.hash.as_deref().unwrap_or("");
@@ -1442,7 +1437,7 @@ mod linear_root_equivalence_tests {
             // accepts the 0.3.34 parse accepted, to the same roots and bytes;
             // every refusal is the decoder's, in its words, and it refuses
             // more (an offset outside its level, a carried node its children
-            // contradict, a level 0 with no hash).
+            // contradict, a level 0 with no hash, an even-offset duplicate).
             match (&new, &old) {
                 (Ok(new), Ok(old)) => {
                     assert_eq!(
