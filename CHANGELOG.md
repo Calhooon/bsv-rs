@@ -38,8 +38,49 @@ writes the reference's bytes, and the four certificate recordings were
 re-recorded in their own commit. `write_identity_certificate` itself departs
 from the reference and from Go (`identity_certificate.go:12-49`): it writes a
 present-flag byte before certifierInfo, NIL-sentinel optional strings, and the
-keyring values as strings. It is left as it is (a writer, outside this fix),
-and the follow-up is the captain's to file.
+keyring values as strings. It was left as it was (a writer, outside this fix);
+the follow-up is #182, below.
+
+### Fixed: the writer writes an identity certificate as the reference writes it (#182)
+
+`WireWriter::write_identity_certificate` wrote the certificate behind its
+length, then a present-flag byte, the certifier's iconUrl and description as
+NIL-sentinel strings, and the keyring and decrypted fields as NIL-sentinel
+string maps, the keyring's values as their base64 text. The reference's
+`#serializeDiscoveryResult` (`ts-stack@edf6e03` `WalletWireProcessor.ts:2478-2558`)
+and Go's `SerializeIdentityCertificate` (`go-sdk@2ca481c`
+`wallet/serializer/identity_certificate.go:12-49`) write the certificate
+behind its length, the name, iconUrl and description as plain varint-length
+strings and trust a byte, the keyring as a count and varint-length key with
+varint-length raw-byte value pairs, and the decrypted fields as a count of
+string pairs; the shared vector agrees, and the transceiver reads those bytes
+since #177. The keeper's word: the writer moves to them. An absent certifier
+info, iconUrl, description or map is written as Go writes its zero value
+(empty strings, trust 0, a count of 0); a keyring value that is not base64 is
+refused (`WalletError`), as both references refuse it.
+`tests/wire_identity_certificate_writer.rs` (five tests, RED on the old writer)
+feeds the writer's bytes to the transceiver's discovery reader, compares them
+with the reference's bytes assembled to the lines above and with the shared
+vector's entry, and pins the absent case and the refusal. The three tests that
+read the old layout back through `WireReader::read_identity_certificate`
+(`encoding.rs`'s `test_identity_certificate_roundtrip`,
+`wire_method_roundtrip_tests`' `test_identity_certificate_roundtrip` and
+`test_identity_certificate_minimal_roundtrip`) left in their own commit. The
+fixture recorder's helper calls the writer again; the recordings are
+unchanged. Readers: no readers in LOW (no LOW worker reads this crate's
+binary wallet wire; the tower signs through its signer binding, the monitor
+reads over HTTP routes, the fleet's seats run the JSON substrate); this
+crate's transceiver never read the old frame (it underflowed), the toolbox's
+door is not on the wire, the CLI speaks JSON. Migration: none; a caller of
+the writer gets the reference's bytes.
+
+`write_identity_certifier`, `write_optional_identity_certifier` and
+`write_optional_string_map` no longer have a writer in the crate that calls
+them; they are public methods of `WireWriter` and stay (removing one is a
+change of the public API's shape, the owner's word).
+`WireReader::read_identity_certificate` and `read_optional_identity_certifier`
+still read the old layout: no caller in the crate, outside this fix, the
+follow-up the captain's to file.
 
 ### Fixed: getHeaderForHeight's processor writes the header with no length prefix (#178)
 
