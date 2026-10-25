@@ -610,11 +610,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let args = crate::wallet::GetHeaderArgs { height };
         let result = self.wallet.get_header_for_height(args, originator).await?;
 
-        let mut writer = WireWriter::new();
-        let header_bytes = from_hex(&result.header)?;
-        writer.write_var_int(header_bytes.len() as u64);
-        writer.write_bytes(&header_bytes);
-        Ok(writer.into_bytes())
+        // The 80 bytes raw, no length prefix (`WalletWireProcessor.ts:1687-1690`
+        // at `ts-stack@edf6e03`; BRC-100 `0100.md:2478` at `5119a9b`)
+        from_hex(&result.header)
     }
 
     async fn handle_get_network(&self, _originator: &str) -> Result<Vec<u8>, Error> {
