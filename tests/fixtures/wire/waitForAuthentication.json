@@ -13,10 +13,10 @@
           "method": "wait_for_authentication",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "0001",
+        "processor_response_hex": "00",
         "request_hex": "181066697874757265732e696e76616c6964",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "0001"
+        "response_hex": "00"
       },
       "input": {
         "args": {},
@@ -40,10 +40,10 @@
           "method": "wait_for_authentication",
           "originator": "fixtures.invalid"
         },
-        "processor_response_hex": "0001",
+        "processor_response_hex": "00",
         "request_hex": "181066697874757265732e696e76616c6964",
         "response_encoder": "WalletWireProcessor",
-        "response_hex": "0001"
+        "response_hex": "00"
       },
       "input": {
         "args": {},
