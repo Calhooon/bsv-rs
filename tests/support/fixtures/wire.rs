@@ -366,7 +366,8 @@ async fn error_frames() -> Vec<Value> {
         ));
     }
     // Pin the frames the production processor emits, with its own error writer:
-    // every one unknownError (1) and the bare words since bsv-rs#202.
+    // every one unknownError (1) since bsv-rs#202, and each a wallet error, so
+    // the reference's `Wallet operation failed` (`#invokeWallet`, `:2417`).
     for (name, error) in [
         (
             "processor_generic",

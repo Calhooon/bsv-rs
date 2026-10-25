@@ -37,6 +37,8 @@ encrypted and Shamir seeds a rerun still moves are #180's item 1.
 
 ### Fixed: the processor's error frame carries the wallet's bare words, unknownError and the empty stack (#202)
 
+### Fixed: the processor's error frame is the reference's: unknownError, `Wallet operation failed` for a wallet's error, the processor's own words for its own, the empty stack (#202)
+
 `WalletWireProcessor` wrote an error frame's message as `e.to_string()`, this
 crate's `Display` with its class prefix (`wallet error: HMAC is not valid`,
 `wallet error: createAction requires a full wallet implementation`), and its
@@ -47,54 +49,77 @@ code when it lies in unsupportedAction to abortRefused (2 to 8), else
 unknownError (1, `WalletError.ts:72`; `:2379-2384`); the error's own
 `message`, or `Unknown error` when it has none, cut at
 `MAX_WIRE_ERROR_MESSAGE_BYTES` = 4096 bytes (`:25`, `:2387-2393`); and the
-stack as an empty string, a varint 0 (`:2395-2396`). The reference's client
-throws `new WalletError(errorMessage, errorByte, stackTrace)` with the message
-as framed (`WalletWireTransceiver.ts:136-153`), so a TypeScript consumer read
-`wallet error: ` as part of the wallet's words. The frame is now the
-reference's: a `WalletError` writes its words, `WalletBusy`, `WalletTransport`
-and `TransportFault` their `detail`, every other variant (this crate's own
-errors, the processor's reader refusals among them) its `Display` sentence; the
-three false verdicts of #197 are the bare `HMAC is not valid` (`:1520`),
-`Signature is not valid` (`:1597`) and `Wallet did not affirmatively
-authenticate` (`:1637`). The cut is at the byte, as the reference's `subarray`
-cuts, inside a character too (the reference's and this crate's readers then
-refuse the frame's invalid UTF-8). This crate's `Error` carries no wallet code,
-so every frame is unknownError (1): the reference's 2 to 8 come from a typed
-error's `code` (`WERR_INVALID_PARAMETER` 6, `WERR_INSUFFICIENT_FUNDS` 7), never
-from its words, and the old reading of the words, which a plain `Error` with
-those words does not get from the reference, goes. A wallet that needs to frame
-2 to 8 needs a code on its error, a public type change this release does not (#137)
-make.
+stack as an empty string, a varint 0 (`:2395-2396`). Before the catch, every
+wallet call goes through `#invokeWallet` (`:2402-2418`): an explicit wallet
+error (a `WalletError`, or an error with a `WERR_` name, carrying a code 2 to
+8) is rethrown with its words and code (`:2408-2416`); every other error is
+replaced by `new WalletError('Wallet operation failed', unknownError)`
+(`:2417`). The reference's client throws `new WalletError(errorMessage,
+errorByte, stackTrace)` with the message as framed
+(`WalletWireTransceiver.ts:136-153`).
 
-The tests that pin it: `tests/wire_error_frames.rs` (new, 7 tests; each frame
-hand-assembled to `:2379-2396`): a wallet refusal framed 1 with its bare words
-and read back by the transceiver; every wallet error framed 1 in its own words
-(the words that chose 6 and 7, a busy, a transport answer, a transport fault, a
-crate error, the minimal-length-key HMAC refusal); the processor's own reader
-refusal (unchanged, its sentence); the three false verdicts through the
-processor over a stub wallet, byte for byte; a 5,000-byte message cut at 4096
-(`fd 00 10`); the cut inside `é`; the stack field 0 (`01 00 00` for an empty
-message). RED on `7e437ba`: 6 of 7 (the processor's own refusal was framed the
-same before). `tests/wire_method_roundtrip_tests.rs`
-`test_error_response_format` now asserts the bare frame;
-`tests/wallet_wire_cross_sdk_tests.rs` `a_false_verdict_is_answered_with_an_error_frame`
-and `a_signature_data_type_flag_of_three_is_refused` and
+The frame is now the reference's, in the keeper's division (2026-10-25):
+(1) an explicit wallet error with a code 2 to 8 keeps its words and code: this
+crate's `Error` carries no wallet code (#137), so no error is explicit today;
+the processor's `explicit_wallet_code` is the one branch a coded error takes
+when one exists, and no public type moves. (2) Every other error a wallet
+returns is `Wallet operation failed`, code 1, `01 17 ... 00`, whatever its
+variant (`WalletError`, `WalletBusy`, `WalletTransport`, `TransportFault`,
+`ProtocolValidationError`, `InvalidCounterparty`, `HmacMinimalLengthKey`, any
+other): the processor's `invoke_wallet` wraps every one of its thirteen wallet
+calls, as `#invokeWallet` does, so a wallet's words (which can carry paths or
+internal state) never reach the wire. (3) The processor's own errors keep
+their words, code 1, as the reference's own throws outside the wrapper are
+(`:2387`): its reading of the request (a frame fault, an unknown call, the
+readers' refusals, a `WalletError` its words, another variant its `Display`
+sentence), the three false verdicts of #197, the bare `HMAC is not valid`
+(`:1520`), `Signature is not valid` (`:1597`) and `Wallet did not
+affirmatively authenticate` (`:1637`), each thrown after `#invokeWallet` has
+returned the wallet's answer (`:1517-1519`, `:1594-1596`, `:1633-1635`), and
+the thirteen calls the processor refuses as needing a full wallet. The cut is
+at the byte, as the reference's `subarray` cuts, inside a character too. The
+wallet's own words are not logged: the crate has no logging facility (no
+`log` or `tracing` dependency) and the processor logged nothing before; the
+log line the ruling names waits on a word (a feature in `Cargo.toml` or a
+public hook on the processor).
+
+The tests that pin it: `tests/wire_error_frames.rs` (new, 5 tests; each frame
+hand-assembled to `:2417` and `:2379-2396`): an un-coded wallet error
+(`WalletError("anything")`) framed `01 17 Wallet operation failed 00` and read
+back by the transceiver as `wallet error (code 1): Wallet operation failed`;
+every wallet error variant (the words that chose 6 and 7, a 5,000-byte and an
+empty message, a busy, a transport answer, a transport fault, a hex error, a
+protocol and a counterparty refusal, the minimal-length-key HMAC refusal) the
+same constant; a wallet erring on verifyHmac the constant where its false
+verdict is the processor's words; the processor's own reader refusal its
+sentence; the three false verdicts through the processor over a stub wallet,
+byte for byte. The frame writer's unit tests in `processor.rs`: a 5,000-byte
+message cut at 4096 (`fd 00 10`), the cut inside `é`, the stack field 0 (`01
+00 00` for an empty message), a processor error that is not a `WalletError`
+its `Display`. RED on `02da747` (the wallet's words framed): the three
+wallet-error tests; the processor's refusal and the verdicts passed there as
+here. `tests/wire_method_roundtrip_tests.rs` `test_error_response_format`
+asserts a stub's bare frame; `tests/wallet_wire_cross_sdk_tests.rs`
+`a_false_verdict_is_answered_with_an_error_frame` and
+`a_signature_data_type_flag_of_three_is_refused` and
 `tests/wire_u32_field_bounds_tests.rs`
-`a_header_height_above_u32_max_is_refused_not_truncated` the bare words. Sixteen
-recordings under `tests/fixtures/wire/` are re-recorded in their own commits
-(`error_frames.json`'s three processor cases, the verifyHmac and
-verifySignature `minimal` cases, the thirteen calls the processor refuses as
-needing a full wallet; docs/FIXTURES.md F15); the wire_codec bench's error
-layout reads any message and did not move.
+`a_header_height_above_u32_max_is_refused_not_truncated` the processor's bare
+words. Sixteen recordings under `tests/fixtures/wire/` are re-recorded in their
+own commits (`error_frames.json`'s three processor cases, now the constant;
+the verifyHmac and verifySignature `minimal` cases and the thirteen calls the
+processor refuses, the processor's bare words; docs/FIXTURES.md F15); the
+wire_codec bench's error layout reads any message and did not move.
 
 Migration: a consumer that matched an error frame's message over the wire
-(`message.starts_with("wallet error: ")`, or the code 6 or 7 for those words)
-matches the wallet's words and code 1 now. This crate's own `Display` is
-unchanged, and so is the transceiver's reading of a frame
+(`message.starts_with("wallet error: ")`, a wallet's own words, or the code 6
+or 7 for those words) reads `Wallet operation failed` and code 1 for every
+wallet error, and the processor's bare words for its own. This crate's own
+`Display` is unchanged, and so is the transceiver's reading of a frame
 (`WalletError("wallet error (code N): <message>")`): a caller of this crate's
-transceiver against this crate's processor sees `wallet error (code 1): HMAC is
-not valid` where it saw `wallet error (code 1): wallet error: HMAC is not
-valid`.
+transceiver against this crate's processor sees `wallet error (code 1): Wallet
+operation failed` where it saw `wallet error (code 1): wallet error: <the
+wallet's words>`, and `wallet error (code 1): HMAC is not valid` where it saw
+`wallet error (code 1): wallet error: HMAC is not valid`.
 
 ### Notes: cross-SDK parity (#202)
 
@@ -103,8 +128,17 @@ error (`error calling N: ...`, `wallet/substrates/wallet_wire_processor.go:94-96
 to its transport; its `WriteResultFrame` writes a `wallet.Error`'s `Code` as
 given, its `Message` uncut and its `Stack` as given
 (`wallet/serializer/frame.go:71-87`). This crate follows the TypeScript
-reference: the code mapped to 1 to 8, the message cut at 4096 bytes, the stack
-empty. The reference wraps every wallet call in `#invokeWallet` (`WalletWireProcessor.ts:2402-2418` at `ts-stack@edf6e03`): a wallet error that is not a typed `WalletError` or `WERR_` error with a code 2 to 8 is replaced by `Wallet operation failed`, code 1, before the catch frames it; this crate frames the wallet's own words instead (the keeper's reading asked, 2026-10-25).
+reference: the code mapped to 1 to 8, a wallet's un-coded error replaced by
+`Wallet operation failed`, the message cut at 4096 bytes, the stack empty.
+Two divergences from the reference stand, neither with a reference text to
+match: the thirteen calls this processor refuses as needing a full wallet
+(`createAction requires a full wallet implementation`, ...) are this crate's
+processor errors, framed in this crate's words, where the reference's
+processor reads every call's arguments and hands it to its wallet; and the
+reference validates a call's arguments in the processor before the wrapper
+(`validateWalletArgs`, `:1516`, `:1593`, `:1632`), framing a validation
+refusal in its own words, where this processor has no validation of its own
+and a refusal raised inside the wallet (`ProtoWallet`'s) is the constant.
 
 ### Fixed: verifyHmac's request carries the raw hmac ahead of the data; the signature calls carry the reference's data-type flag (#199)
 
