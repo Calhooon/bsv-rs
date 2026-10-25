@@ -427,7 +427,7 @@ Nonce verification on InitialResponse uses `nonce` if present, falls back to `in
 
 - **Signature**: Protocol `"auth message signature"`, security level 2 (Counterparty), key ID `"{nonce} {peer_session_nonce}"`
 - **InitialResponse key ID**: `"{your_nonce} {initial_nonce}"` (uses message's own fields)
-- **Nonce**: 32 bytes (16 random + 16 HMAC via `"server hmac"` protocol), base64 encoded
+- **Nonce**: 48 bytes (16 random + the 32-byte HMAC via `"server hmac"` protocol), base64 encoded; `verify_nonce` still accepts the legacy 32-byte form (16 + the first 16 HMAC bytes). The wallet's answer is a `[u8; 32]`, so the comparison never runs past it; a substrate refuses a short body as `WalletError("invalid HMAC length: ...")` (pinned, #139)
 - **Certificate fields**: Protocol `"certificate field encryption"`, security level 2. Master key ID: `"{field_name}"`, verifiable key ID: `"{serial_number_base64} {field_name}"`
 
 ## BRC-104 HTTP Headers
