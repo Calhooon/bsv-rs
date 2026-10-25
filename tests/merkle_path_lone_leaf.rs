@@ -23,6 +23,12 @@ fn missing(offset: u64) -> Error {
     ))
 }
 
+/// The parse's refusal: the BEEF reader's BUMP decoder in its words, at the
+/// leaf's offset varint, byte 7 of the BUMP (bsv-rs#167).
+fn parse_refused(reason: &str) -> Error {
+    Error::MerklePathError(format!("invalid BEEF at byte 7: {reason}"))
+}
+
 fn in_memory(offset: u64) -> MerklePath {
     MerklePath {
         block_height: 800_005,
@@ -52,6 +58,13 @@ fn lone_at_one_parsers_refuse_missing_sibling() {
         MerklePath::from_binary(&bytes),
         MerklePath::from_hex(LONE_AT_ONE),
         MerklePath::from_reader(&mut Reader::new(&bytes)),
+    ] {
+        assert_eq!(
+            result.unwrap_err(),
+            parse_refused("MissingSibling { level: 0, offset: 0 }")
+        );
+    }
+    for result in [
         MerklePath::new(800_005, in_memory(1).path),
         MerklePath::new_unchecked(800_005, in_memory(1).path),
     ] {
@@ -75,10 +88,17 @@ fn lone_compute_root_refuses_every_nonzero_offset_class() {
                 missing(offset)
             );
         }
+        // The parse refuses an offset outside the one-level tree before the
+        // walk, as the BEEF reader does (bsv-rs#167).
         let bytes = in_memory(offset).to_binary();
+        let reason = if offset == 1 {
+            "MissingSibling { level: 0, offset: 0 }".to_string()
+        } else {
+            format!("OffsetOutsideTree {{ level: 0, offset: {offset} }}")
+        };
         assert_eq!(
             MerklePath::from_binary(&bytes).unwrap_err(),
-            missing(offset)
+            parse_refused(&reason)
         );
     }
 }
@@ -173,7 +193,12 @@ fn beef_and_merkle_path_agree_on_both_owned_bodies() {
                     "invalid BEEF at byte 12: MissingSibling { level: 0, offset: 0 }".to_string()
                 )
             );
-            assert_eq!(MerklePath::from_hex(bump).unwrap_err(), missing(1));
+            // The standalone reader is the same decoder (#167): the same
+            // refusal, its offset counted from the BUMP's leading byte.
+            assert_eq!(
+                MerklePath::from_hex(bump).unwrap_err(),
+                parse_refused("MissingSibling { level: 0, offset: 0 }")
+            );
         }
     }
 }
