@@ -337,6 +337,7 @@ fn beef_corpora(base: &Path) {
         "NoTxidAtLevelZero",
         "MissingSibling",
         "MismatchedNode",
+        "DuplicateOffset",
         "RootNotCarried",
         "BumpIndexNamesNoBump",
         "TxidNotInBump",
