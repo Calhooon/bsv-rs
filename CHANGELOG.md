@@ -58,6 +58,16 @@ since #177. The keeper's word: the writer moves to them. An absent certifier
 info, iconUrl, description or map is written as Go writes its zero value
 (empty strings, trust 0, a count of 0); a keyring value that is not base64 is
 refused (`WalletError`), as both references refuse it.
+
+### Notes: cross-SDK parity
+
+TS's reader refuses a trust byte outside 1 to 10 (`ts-stack@edf6e03`
+`WalletWireTransceiver.ts:1710`, `#requireInteger(..., 'discovery trust', 1, 10)`),
+and TS's type has no absent certifierInfo (`Wallet.interfaces.ts:877-881`,
+trust `PositiveIntegerMax10`): the frame this writer makes for
+`certifier_info: None` is one the reference client refuses, while Go's reader
+accepts it (`identity_certificate.go:60-63`). The zero value is Go's choice
+alone, and this crate follows it.
 `tests/wire_identity_certificate_writer.rs` (five tests, RED on the old writer)
 feeds the writer's bytes to the transceiver's discovery reader, compares them
 with the reference's bytes assembled to the lines above and with the shared
@@ -80,7 +90,7 @@ them; they are public methods of `WireWriter` and stay (removing one is a
 change of the public API's shape, the owner's word).
 `WireReader::read_identity_certificate` and `read_optional_identity_certifier`
 still read the old layout: no caller in the crate, outside this fix, the
-follow-up the captain's to file.
+follow-up filed as #184.
 
 ### Fixed: getHeaderForHeight's processor writes the header with no length prefix (#178)
 
