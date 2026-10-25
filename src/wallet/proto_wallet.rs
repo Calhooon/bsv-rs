@@ -707,9 +707,11 @@ impl WalletInterface for ProtoWallet {
 
         // Parse the hex strings back to PublicKeys
         let prover = PublicKey::from_hex(&result.prover)?;
-        // Counterparty may be "self" or "anyone" - handle gracefully
+        // Self is the prover's identity key, anyone `PrivateKey(1)`'s key, as
+        // the reference names them (`ProtoWallet.ts:235-240`, bsv-rs#216)
         let counterparty_key = match args.counterparty {
-            Counterparty::Self_ | Counterparty::Anyone => self.identity_key(),
+            Counterparty::Self_ => self.identity_key(),
+            Counterparty::Anyone => super::KeyDeriver::anyone_key().1,
             Counterparty::Other(ref pk) => pk.clone(),
         };
 

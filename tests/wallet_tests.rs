@@ -465,6 +465,36 @@ mod cached_key_deriver_tests {
 mod proto_wallet_tests {
     use super::*;
 
+    /// revealSpecificKeyLinkage names the counterparty as the reference's
+    /// ProtoWallet does (`ts-stack@edf6e03` `ProtoWallet.ts:235-240`): self the
+    /// prover's identity key, anyone `PrivateKey(1)`'s key, a key itself; the
+    /// processor's result check refuses any other (bsv-rs#216).
+    #[tokio::test]
+    async fn a_specific_linkage_for_anyone_names_the_anyone_key() {
+        use bsv_rs::wallet::{WalletInterface, WalletRevealSpecificArgs};
+        let wallet = ProtoWallet::new(Some(PrivateKey::from_bytes(&[7; 32]).unwrap()));
+        let other = PrivateKey::from_bytes(&[5; 32]).unwrap().public_key();
+        for (counterparty, named) in [
+            (Counterparty::Self_, wallet.identity_key()),
+            (Counterparty::Anyone, KeyDeriver::anyone_key().1),
+            (Counterparty::Other(other.clone()), other.clone()),
+        ] {
+            let args = WalletRevealSpecificArgs {
+                counterparty,
+                verifier: PrivateKey::from_bytes(&[9; 32]).unwrap().public_key(),
+                protocol_id: Protocol::new(SecurityLevel::App, "testing wire"),
+                key_id: "1".into(),
+                privileged: None,
+                privileged_reason: None,
+            };
+            let result = WalletInterface::reveal_specific_key_linkage(&wallet, args, "test")
+                .await
+                .unwrap();
+            assert_eq!(result.linkage.counterparty, named);
+            assert_eq!(result.linkage.prover, wallet.identity_key());
+        }
+    }
+
     #[test]
     fn test_proto_wallet_creation() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
