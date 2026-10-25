@@ -104,9 +104,23 @@ what the stream said:
   outside `MoneyRange`, a null outpoint in a regular transaction, a repeated
   outpoint (`UnprovenCoinbase`, `ValueOutOfRange`, `NullOutpoint`,
   `DuplicateInput`).
-- **Read by the parse, refused before**: a BUMP that carries one leaf offset
-  twice and whose walk the stream accepts (`MerklePath::new_unchecked`'s
-  "Duplicate offset"). `MerklePath::from_binary` still refuses it.
+- **A repeated leaf offset, refused on both paths**: a BUMP level that
+  carries a second leaf at an offset, agreeing with the earlier one or not,
+  is `MismatchedNode { level, offset }` at the second leaf's offset varint
+  (the decoder refuses it as it reads the offset; `bump_root` refuses one
+  held in memory ahead of its walk). Through 0.9.0 the whole reader refused
+  it as `MerklePath::new_unchecked`'s "Duplicate offset", naming no byte, and
+  the stream let the earlier leaf stand, accepting a repeat its walk accepted
+  (the same hash, a flag-`01` leaf after a hash, a higher level's sibling);
+  the lane's draft accepted it on both. The stack's Lean names the refusal
+  `duplicateOffset (level, offset)`; `Reason` and `Kind` are exhaustive
+  public enums (no `#[non_exhaustive]`, `Kind::ALL: [Kind; 24]`), so no
+  variant is added here: a new one is the owner's word. Red before the fold:
+  `a_level_0_leaf_repeated_with_the_same_hash_is_refused_on_both_paths`,
+  `a_level_0_leaf_repeated_with_a_different_node_is_refused_on_both_paths`,
+  `a_higher_level_leaf_repeated_is_refused_on_both_paths`,
+  `a_repeated_leaf_offset_in_a_bump_held_in_memory_is_refused_by_verify_structure`
+  (`beef_two_readers_agree`).
 - **Refused by `verify_structure`, accepted before: a transaction written
   ahead of the parent it spends.** The order is BRC-62's, parents before
   children (`5119a9b` `transactions/0062.md:43,74`; the charter's validity
@@ -159,9 +173,11 @@ reads any V2 format byte other than 2 as a raw transaction
 (`packages/sdk/src/transaction/BeefTx.ts:293-301`), any nonzero V1 has-BUMP
 byte as an index (`:306`), and a leaf flag by its bits
 (`MerklePath.ts:133-140`), where both readers here refuse `BadFlag`; TS's
-`verifyValid` does not apply the node's transaction rules; TS refuses a
-repeated leaf offset (`MerklePath.ts:221`), which both readers here accept
-when the walk does.
+`verifyValid` does not apply the node's transaction rules. A repeated leaf
+offset: TS refuses it as it builds the `MerklePath` (`MerklePath.ts:221`,
+`Duplicate offset`, at `edf6e03` and `4d0ea63`), Go accepts it with the later
+leaf standing (`go-sdk@2ca481c` `transaction/merklepath.go:87-90`), and this
+crate refuses it on both paths.
 
 The order of the transactions is BRC-62's on both paths. TS's `verifyValid`
 sorts before judging (`ts-stack@edf6e03`
