@@ -1227,21 +1227,41 @@ impl WireWriter {
         }
     }
 
-    /// Writes an IdentityCertificate (Go-compatible: length-prefixed certificate bytes).
+    /// Writes an IdentityCertificate as one discovery entry
+    /// (`WalletWireProcessor.ts:2478-2558` at `ts-stack@edf6e03`; go-sdk@2ca481c
+    /// `wallet/serializer/identity_certificate.go:12-49`): the certificate behind
+    /// a varint length, certifierInfo's name, iconUrl and description as plain
+    /// strings and trust a byte, the public keyring's values as raw bytes, the
+    /// decrypted fields as strings. Absent is Go's zero value: empty, 0.
     pub fn write_identity_certificate(
         &mut self,
         cert: &IdentityCertificate,
     ) -> Result<&mut Self, Error> {
-        // Go format: serialize certificate to bytes, then write as VarInt(len) + bytes
         let mut cert_writer = WireWriter::new();
         cert_writer.write_wallet_certificate(&cert.certificate)?;
         let cert_bytes = cert_writer.into_bytes();
         self.write_var_int(cert_bytes.len() as u64);
         self.write_bytes(&cert_bytes);
 
-        self.write_optional_identity_certifier(cert.certifier_info.as_ref());
-        self.write_optional_string_map(cert.publicly_revealed_keyring.as_ref());
-        self.write_optional_string_map(cert.decrypted_fields.as_ref());
+        let info = cert.certifier_info.as_ref();
+        self.write_string(info.map_or("", |c| &c.name));
+        self.write_string(info.and_then(|c| c.icon_url.as_deref()).unwrap_or(""));
+        self.write_string(info.and_then(|c| c.description.as_deref()).unwrap_or(""));
+        self.write_u8(info.map_or(0, |c| c.trust));
+
+        let empty = HashMap::new();
+        let keyring = cert.publicly_revealed_keyring.as_ref().unwrap_or(&empty);
+        let mut keys: Vec<&String> = keyring.keys().collect();
+        keys.sort();
+        self.write_var_int(keys.len() as u64);
+        for key in keys {
+            let value = from_base64(&keyring[key])
+                .map_err(|e| Error::WalletError(format!("invalid keyring value base64: {}", e)))?;
+            self.write_string(key);
+            self.write_var_int(value.len() as u64);
+            self.write_bytes(&value);
+        }
+        self.write_string_map(cert.decrypted_fields.as_ref().unwrap_or(&empty));
         Ok(self)
     }
 
