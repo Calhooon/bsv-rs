@@ -44,8 +44,8 @@ corpus when `BSV_CONFORMANCE_DIR` is set, a deep chain, and from each of
 them every prefix, three single-byte changes at every byte and the
 transactions in reverse order) to `Beef::from_binary` then
 `Beef::verify_structure`, and to `verify_stream_structure`. On 0.9.0's tree:
-64,370 inputs, 29,726 disagreements in 85 classes. Now: 0, and 31 inputs in
-the one stated difference below.
+64,370 inputs, 29,726 disagreements in 85 classes. Now: 0, and no stated
+difference.
 
 The whole reader is the streaming reader's decoder in a collect mode
 (`BeefDecoder::collecting`, crate-private): `src/transaction/beef/collect.rs`
@@ -107,21 +107,30 @@ what the stream said:
 - **Read by the parse, refused before**: a BUMP that carries one leaf offset
   twice and whose walk the stream accepts (`MerklePath::new_unchecked`'s
   "Duplicate offset"). `MerklePath::from_binary` still refuses it.
+- **Refused by `verify_structure`, accepted before: a transaction written
+  ahead of the parent it spends.** The order is BRC-62's, parents before
+  children (`5119a9b` `transactions/0062.md:43,74`; the charter's validity
+  clause), as the stream reads it: an input of an unproven transaction that
+  names an entry held after it is `InputNamesNoElement`, judged in the order
+  held, before `sort_txs` runs. Through 0.9.0 (and the lane's draft)
+  `verify_structure` sorted ahead of judging and accepted it, or named the
+  next fault. The tests that asserted acceptance moved in their own commit:
+  `a_reversed_deep_chain_sorts_in_linear_time_on_a_small_stack`
+  (`beef_deep_chain`), now
+  `a_reversed_deep_chain_is_refused_and_sorts_in_linear_time_on_a_small_stack`,
+  and the differential's exemption of the class (30 inputs without the
+  corpus, `fixtures/beef/v1.json#0 reversed` among them, which disagreed
+  before the fold).
+  `a_transaction_written_ahead_of_its_parent_is_refused_on_the_whole_path`
+  (`beef_two_readers_agree`), red before the fold.
 - **The kind named when a BEEF holds two faults** is the one the stream
   meets first: the parse's for an earlier element's content or fold, and
   `verify_structure`'s in the order held (through 0.9.0: no input before any
   BUMP index, every stub before any BUMP index, every BUMP index before any
   input).
 
-The one stated difference: a transaction written ahead of the parent it
-spends. The stream reads the order written and refuses the input
-(`InputNamesNoElement`, BRC-62's dependency order); `verify_structure` sorts
-first, as `@bsv/sdk`'s `Beef.verifyValid` does (`ts-stack@4d0ea63`
-`packages/sdk/src/transaction/Beef.ts:1054-1088`), and accepts or names the
-next fault. The differential checks each such input is exactly that.
-
 `fuzz_beef_parser` drives both entry points on every input and asserts they
-agree, the order aside: 60 seconds, 178,958 runs, no disagreement and no
+agree: 60 seconds, 178,958 runs, no disagreement and no
 crash.
 
 The cost, `Beef::from_binary` alone 17 to 20 percent faster, and parse then
@@ -152,8 +161,16 @@ byte as an index (`:306`), and a leaf flag by its bits
 (`MerklePath.ts:133-140`), where both readers here refuse `BadFlag`; TS's
 `verifyValid` does not apply the node's transaction rules; TS refuses a
 repeated leaf offset (`MerklePath.ts:221`), which both readers here accept
-when the walk does. The order of the transactions stays the reference's
-(sorted) on the whole path.
+when the walk does.
+
+The order of the transactions is BRC-62's on both paths. TS's `verifyValid`
+sorts before judging (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Beef.ts:1065`, `sortTxs`), and so does Go's
+(`go-sdk@2ca481c` `transaction/beef.go:1240-1243`, `ValidateTransactions`):
+both accept a transaction written ahead of its parent, the reference's
+leniency against the BRC's "must". This crate refuses it on both paths, by
+the charter (`InputNamesNoElement`); the stack records the divergence row
+(child before parent, two transactions).
 
 ### Changed: the BIP-39 wordlists are data, not code (#89)
 
