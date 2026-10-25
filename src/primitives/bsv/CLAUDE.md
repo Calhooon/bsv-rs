@@ -14,7 +14,8 @@ This module provides BSV blockchain-specific operations including transaction si
 | `tx_signature.rs` | 309 | Transaction signatures with sighash scope (checksig format) |
 | `schnorr.rs` | 413 | Schnorr ZK proofs for ECDH shared secret verification |
 | `polynomial.rs` | 394 | Polynomial operations for Lagrange interpolation |
-| `shamir.rs` | 1023 | Shamir Secret Sharing for private key backup |
+| `shamir.rs` | 440 | Shamir Secret Sharing for private key backup; `split_private_key_with` (bsv-rs#180) |
+| `shamir_tests.rs` | 604 | `shamir.rs`'s unit tests (moved for the file-size ratchet, bsv-rs#180) |
 
 ## Key Exports
 
@@ -478,7 +479,7 @@ The integrity field allows verification that shares belong together and that rec
 | `tx_signature.rs` | 6 unit tests | Roundtrip, blank sig, scope values, low-S |
 | `schnorr.rs` | 7 unit tests | Roundtrip, wrong inputs, mutual verification, deterministic challenge |
 | `polynomial.rs` | 8 unit tests | Linear/quadratic/constant polys, large numbers, string roundtrip, invalid format |
-| `shamir.rs` | 34 unit tests | Split/recover, backup format, edge cases, parameter validation, cross-SDK parity |
+| `shamir_tests.rs` | 34 unit tests | Split/recover, backup format, edge cases, parameter validation, cross-SDK parity |
 
 Cross-SDK sighash test vectors (500 vectors) are in `tests/vectors/` and exercised by integration tests.
 
