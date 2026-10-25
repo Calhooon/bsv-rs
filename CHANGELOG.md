@@ -261,6 +261,110 @@ compound row's is `MismatchedNode`'s again.)
 
 ### Fixed: the processor's error frame is the reference's: unknownError, `Wallet operation failed` for a wallet's error, the processor's own words for its own, the empty stack (#202)
 
+### Added: `privileged`, `privileged_reason` and `seek_permission` on the seven key-related args types (#193)
+
+`GetPublicKeyArgs`, `EncryptArgs`, `DecryptArgs`, `CreateHmacArgs`,
+`VerifyHmacArgs`, `CreateSignatureArgs` and `VerifySignatureArgs` gain three
+public fields, the reference's `privileged?: boolean`,
+`privilegedReason?: string` and `seekPermission?: boolean`
+(`ts-stack@edf6e03` `Wallet.interfaces.ts:663-672`, `WalletEncryptionArgs`,
+which `GetPublicKeyArgs` extends; BRC-100 `wallet/0100.md` at `ed1b015`
+names the three in getPublicKey's request at `:1987-1990` and seekPermission
+in the six others' at `:2084`, `:2106`, `:2128`, `:2151`, `:2171`, `:2197`;
+encrypt's at `:2107` at `5119a9b`): `privileged: Option<bool>` (absent read as
+false), `privileged_reason: Option<String>`, `seek_permission: Option<bool>`
+(absent read as true). Each type gains `Default` (every option absent, an empty
+key ID and data, and for the types whose protocol is required the protocol the
+reference writes for a getPublicKey that names none, `[0, "default"]`,
+`WalletWireTransceiver.ts:761`). `ProtoWallet` reads neither field, as the
+reference's ProtoWallet does not ("not concerned with privileged keys",
+`ProtoWallet.ts:147`); it drops the linkage calls' pair the same way. The seven
+types and their results move from `proto_wallet.rs` to `wallet/key_args.rs`;
+their paths (`bsv_rs::wallet::EncryptArgs` and the rest) are unchanged. The
+owner's word of 2026-10-25 (the 0.9.0 list).
+
+Migration: a struct literal of any of the seven types needs the three fields
+or `..Default::default()` (every literal of this crate's own code, doc
+examples, tests, examples and fuzz support takes the latter; in `auth`,
+`identity`, `kvstore` and `registry`, files at their ratchet line limit, a
+`None` field the default covers is dropped beside it); the dependents' sites
+are the captain's list.
+
+### Fixed: the seven key-related requests carry the privileged pair and seekPermission; a request not read to its end is refused (#193)
+
+`WalletWireTransceiver` wrote, and `WalletWireProcessor` read, the requests of
+getPublicKey, encrypt, decrypt, createHmac, verifyHmac, createSignature and
+verifySignature without the privileged flag, the privileged reason and
+seekPermission, and the processor never asked that a request be read to its
+end: a Go or TypeScript request was misread without an error (the privileged
+flag `01` read as encrypt's plaintext length, as getPublicKey's forSelf, as a
+signature call's data-type flag). getPublicKey's request was this crate's own:
+identityKey an optional bool, an optional protocol (`255` for none), an
+optional key ID behind the nil sentinel. The reference writes and reads the
+key-related parameters as the protocol, the key ID, the counterparty, then the
+privileged flag (an `i8`, -1 absent) and the reason (an `i8` length, -1 absent,
+then its UTF-8 bytes) (`#encodeKeyRelatedParams` and `#encodePrivilegedParams`,
+`WalletWireTransceiver.ts:1351-1376`, `:1448-1462`; `#decodeKeyRelatedParams`
+and `#decodePrivilegedParams`, `WalletWireProcessor.ts:2564-2583`,
+`:2465-2476`), each call's own fields after them and seekPermission last (an
+`i8`; `WalletWireTransceiver.ts:926-1150`, `WalletWireProcessor.ts:1421-1592`);
+getPublicKey's request is identityKey as a byte 0 or 1, then the privileged
+pair alone for the identity key, else the key-related parameters (an absent
+protocol and key ID written as `[0, "default"]` and `""`) and forSelf, then
+seekPermission (`WalletWireTransceiver.ts:756-779`,
+`WalletWireProcessor.ts:1386-1403`). Every call's reader ends in
+`#assertRequestConsumed` (`:2433-2437`): `Wallet Wire <call> request contains
+trailing data`. Go writes the same bytes (`go-sdk@2ca481c`
+`wallet/serializer/{get_public_key,encrypt,decrypt,create_hmac,verify_hmac,create_signature,verify_signature}.go`);
+BRC-100's request tables read the same (`wallet/0100.md:1975-1990`,
+`:2084`, `:2106`, `:2128`, `:2151`, `:2171`, `:2197` at `ed1b015`); Go's
+args vectors are the witness (`encrypt-simple-args.json`:
+`0b 00 01 0d "test-protocol" 08 "test-key" 0b 01 0b "test reason" 04 01020304 01`).
+
+Both sides move together (the readers in `src/wallet/wire/requests.rs`, the
+writers through `write_key_related_params` and `write_privileged_params` in
+`src/wallet/wire/mod.rs`). The processor refuses trailing data for every call
+it reads: the seven, the two linkage calls, getHeaderForHeight and the five
+calls with no parameters; the thirteen refusal stubs read nothing and keep
+their refusal (docs/FIXTURES.md F1). The transceiver refuses a privileged
+reason past 127 bytes, which the `i8` length cannot carry, before a byte is
+sent (`Invalid privilegedReason length: expected 0 to 127 bytes, got N`). The
+JSON substrate sends the three fields in the reference's names on the seven
+calls, an absent one omitted (`HTTPWalletJSON` sends the args object as given).
+
+The tests that pin it: `tests/wallet_wire_cross_sdk_tests.rs`
+`every_go_args_vector_decodes_through_the_processor_to_its_json` (the seven
+Go args vectors reach the wallet with every field of their json, the three
+new ones included; the allowlist falls from 21 to 14, the passing rows rise
+from 6 to 13), `the_transceiver_writes_the_seven_key_related_go_requests_whole`
+(the transceiver's request over each vector's json is the vector's wire, every
+byte; #199's trimming of the pair and the last byte is gone),
+`a_request_with_a_byte_after_its_last_field_is_refused` (15 calls),
+`the_go_hmac_and_signature_requests_read_as_their_json` (now on the whole
+frame); `tests/wire_method_roundtrip_tests.rs`
+`permission_field_tests` (the seven calls with the fields present and absent,
+and the reason past 127 bytes refused); `src/wallet/substrates/http_json/key_requests.rs`
+`create_signature_sends_the_permission_fields_in_the_references_names`. RED on
+a scratch copy of the tip with the pair and seekPermission neither written nor
+read and the trailing-data check removed (eight cross-SDK tests fail, the
+seven vectors misread as `invalid boolean flag` or a reader underflow), on one
+with the trailing-data check alone removed (`a_request_with_a_byte_after_its_last_field_is_refused`:
+the trailing byte reaches the wallet), and on one with the JSON fields
+dropped. The seven wire recordings and the seven HTTP JSON recordings under
+`tests/fixtures/` are re-recorded in their own commits (the request bytes and
+bodies move; the `full` case sets the three fields); the wire_codec bench's
+layouts follow.
+
+Migration: this crate's own transceiver and processor agreed with each other
+on the old bytes and now agree on the reference's: one side from this release
+against the other from bsv-rs 0.9.0 or older does not (an old processor reads
+the new frames' privileged flag as a length or a flag and refuses or misreads
+what follows; the new processor reads an old frame's data as the privileged
+pair, or refuses its last bytes as trailing data). Upgrade both sides
+together. A Go or TypeScript peer reads and writes the new frames.
+
+### Fixed: the processor's error frame carries the wallet's bare words, unknownError and the empty stack (#202)
+
 `WalletWireProcessor` wrote an error frame's message as `e.to_string()`, this
 crate's `Display` with its class prefix (`wallet error: HMAC is not valid`,
 `wallet error: createAction requires a full wallet implementation`), and its
