@@ -684,24 +684,23 @@ impl Beef {
     ///   BUMPs at one height with different roots: [`Kind::RootNotCarried`]
     ///   (the headers carry one root per height).
     /// - Then the entries in the order held when this is called, each judged
-    ///   as the reader's fold judges an element, so the first refused is the
-    ///   one the reader refuses first on the same bytes (bsv-rs#86): a raw
+    ///   as the reader's fold judges an element, so the entry refused is the
+    ///   one the reader refuses on the same bytes (bsv-rs#86): a raw
     ///   transaction with no input, [`Kind::NoInputs`] (0.4.1), or with an
     ///   input and no output, [`Kind::NoOutputs`] (0.4.3), which the parse
     ///   refuses and a BEEF built in memory can hold; a txid-only entry no
     ///   BUMP of this BEEF proves, [`Kind::StubNotProven`] (NL-8 W5); a BUMP
     ///   index that names no BUMP, or a BUMP that does not carry the txid,
     ///   [`Kind::BumpIndexNamesNoBump`], [`Kind::TxidNotInBump`]; an input of
-    ///   an unproven transaction that names no entry of this BEEF,
+    ///   an unproven transaction that names no entry held ahead of it,
     ///   [`Kind::InputNamesNoElement`].
-    /// - An input that names an entry held after it is not refused: the
-    ///   transactions are sorted ([`sort_txs`](Self::sort_txs)), as the
-    ///   reference sorts them (`@bsv/sdk` `Beef.verifyValid`), and one that
-    ///   no order makes valid is [`Kind::InputNamesNoElement`]. The stream
-    ///   reads its order as written and refuses the input
-    ///   (`InputNamesNoElement` at its offset): the one place the two
-    ///   entry points differ on the same bytes, a stated difference
-    ///   (`tests/beef_two_readers_agree.rs`).
+    /// - The order is BRC-62's, parents before children, as the stream reads
+    ///   it: an input that names an entry held after it is
+    ///   [`Kind::InputNamesNoElement`], before any sort (bsv-rs#86; through
+    ///   0.9.0 this sorted ahead of judging, as `@bsv/sdk`'s
+    ///   `Beef.verifyValid` and go-sdk's `verifyValid` do). The entries are
+    ///   then sorted ([`sort_txs`](Self::sort_txs)), proven ones leading, as
+    ///   they always were after this call.
     /// - Atomic (NL-8 W4, BRC-95): the subject is a raw transaction of this
     ///   BEEF, else [`Kind::SubjectMissing`]; every other transaction or
     ///   txid-only entry is in the subject's dependency graph (reached from
@@ -721,9 +720,7 @@ impl Beef {
         let roots = self.bump_roots()?;
         self.entries_as_folded()?;
 
-        // The order the reference reads: an input may name a transaction
-        // held after it (`@bsv/sdk` `Beef.verifyValid` sorts first); one no
-        // order makes valid names nothing that becomes valid.
+        // Judged in the order held, the sort only reorders what is valid.
         let sr = self.sort_txs();
         if !sr.missing_inputs.is_empty()
             || !sr.not_valid.is_empty()
@@ -783,7 +780,8 @@ impl Beef {
         let proven: HashSet<&str> = carried.iter().map(|(_, h)| *h).collect();
         // A raw entry's txid is a hash of its bytes: computed once.
         let txids: Vec<String> = self.txs.iter().map(BeefTx::txid).collect();
-        let held: HashSet<&str> = txids.iter().map(String::as_str).collect();
+        // The entries held ahead of the one judged (BRC-62's order).
+        let mut held: HashSet<&str> = HashSet::with_capacity(txids.len());
         for (tx, txid) in self.txs.iter().zip(&txids) {
             if let Some(kind) = in_memory::content_refused(tx) {
                 return Err(kind);
@@ -792,6 +790,7 @@ impl Beef {
                 if !proven.contains(txid.as_str()) {
                     return Err(Kind::StubNotProven);
                 }
+                held.insert(txid.as_str());
                 continue;
             }
             let refused = match tx.bump_index() {
@@ -807,6 +806,7 @@ impl Beef {
             if let Some(kind) = refused {
                 return Err(kind);
             }
+            held.insert(txid.as_str());
         }
         Ok(())
     }
