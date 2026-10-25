@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- CI only: main's gate takes beta's `deny`, `dependents` (plan, one check per consumer, the summary), `semver`, `ratchet` (its baseline measured on main), `fixtures` (skipping with a warning while the recordings are beta's), `features`, `wasm32` slices and `scoreboard` jobs; `semver` checks a PR against the last release tag held to a patch, and a release tag against the release before it (#214).
+
 ## [0.8.3] - 2026-10-25
 
 ### Changed: the Test Suite runs every integration binary; vectors, fixtures and corpora check out byte for byte (#146, #147)

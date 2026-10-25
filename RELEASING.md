@@ -1,7 +1,7 @@
 # Releasing bsv-rs
 
 1. Every change reaches `main` through a pull request; `main` is protected, admins included, linear history.
-2. The PR merges (rebase-merge) once its four required checks are green: `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`.
+2. The PR merges (rebase-merge) once its seven required checks are green: `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`, `deny`, `dependents`, `semver` (beta's five plus `dependents` and `semver`, #214). `semver` holds a PR to a patch against the last release tag, and the tag's own run against the release before it (`docs/DEPENDENTS.md`).
 3. A release is a PR like any other: bump `version` in `Cargo.toml`, add the `CHANGELOG.md` heading, merge it green.
 4. Tag the merged commit on `main`: `git tag vX.Y.Z <sha> && git push origin vX.Y.Z` (the tag must equal `Cargo.toml`'s version).
 5. The tag runs `.github/workflows/release.yml`: it checks the tag against the manifest and that the commit is on `main`, re-runs the CI jobs, then `cargo publish --dry-run` and `cargo publish`.
