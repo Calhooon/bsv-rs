@@ -1662,7 +1662,6 @@ mod complex_type_roundtrips {
 
     /// Tests IdentityCertifier write/read roundtrip.
     #[test]
-    #[allow(deprecated)]
     fn test_identity_certifier_roundtrip() {
         let certifier = IdentityCertifier {
             name: "BSV Authority".to_string(),
@@ -1672,7 +1671,10 @@ mod complex_type_roundtrips {
         };
 
         let mut writer = WireWriter::new();
-        writer.write_identity_certifier(&certifier);
+        writer.write_string(&certifier.name);
+        writer.write_string(certifier.icon_url.as_deref().unwrap());
+        writer.write_string(certifier.description.as_deref().unwrap());
+        writer.write_u8(certifier.trust);
 
         let mut reader = WireReader::new(writer.as_bytes());
         let read = reader.read_identity_certifier().unwrap();
@@ -2144,23 +2146,22 @@ mod complex_type_roundtrips {
 
     /// Tests optional string map roundtrip.
     #[test]
-    #[allow(deprecated)]
     fn test_optional_string_map_roundtrip() {
         let mut map = HashMap::new();
         map.insert("key1".to_string(), "value1".to_string());
         map.insert("key2".to_string(), "value2".to_string());
 
-        // Some case
+        // Some case: a count and its pairs
         let mut writer = WireWriter::new();
-        writer.write_optional_string_map(Some(&map));
+        writer.write_string_map(&map);
         let mut reader = WireReader::new(writer.as_bytes());
         let read = reader.read_optional_string_map().unwrap();
         assert!(read.is_some());
         assert_eq!(read.unwrap(), map);
 
-        // None case
+        // None case: the NIL sentinel
         let mut writer = WireWriter::new();
-        writer.write_optional_string_map(None);
+        writer.write_var_int(u64::MAX);
         let mut reader = WireReader::new(writer.as_bytes());
         let read = reader.read_optional_string_map().unwrap();
         assert!(read.is_none());

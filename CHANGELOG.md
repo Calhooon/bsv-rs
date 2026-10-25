@@ -38,6 +38,27 @@ hand resolution survives main moving again. `ci.yml` gains `workflow_dispatch`
 so the sync starts the suite on its branch. `RELEASING.md` steps 17 to 20
 write the rule; `tests/arch_ci_lines.rs` pins the three jobs.
 
+### Removed: the three writer helpers of the old identity-certificate layout (#184)
+
+`WireWriter::write_identity_certifier`, `write_optional_identity_certifier`
+and `write_optional_string_map`, `#[deprecated]` since #187 (bb79c71), are
+removed in 0.9.0 on the owner's word (2026-10-25, the keeper's
+recommendation on #184). No frame of the reference's wire carries a present
+flag or a NIL-sentinel map, and nothing in the crate called them. Migration:
+write a discovery entry with `write_identity_certificate` (it writes the
+certifier in the reference's layout, Go's zero value for `None`); write a map
+with `write_string_map` (a count, 0 for an empty or absent map). The tests
+that used them assemble the old bytes by hand
+(`tests/wire_identity_certificate_roundtrip.rs`'s
+`the_layout_before_182_is_refused` and
+`the_certifier_reader_reads_three_plain_strings_and_the_trust_byte`,
+`tests/wallet_tests.rs`, `tests/wire_method_roundtrip_tests.rs`,
+`encoding.rs`'s `test_optional_string_map_roundtrip`); the wire_codec bench's
+`OptMap` layout, which no recorded frame uses, goes with them. No downstream
+names any of the three (a grep of bsv-overlay-cloudflare, rust-message-box,
+bsv-wallet-toolbox-rs, bsv-wallet-cli, bsv-middleware-cloudflare-public and
+rust-chaintracks, 2026-10-25). `WireReader::read_optional_string_map` stays.
+
 ### Changed: the fuzz crates are formatted and checked (#180)
 
 The root has no `[workspace]`, so the fmt job's `cargo fmt --all -- --check`
