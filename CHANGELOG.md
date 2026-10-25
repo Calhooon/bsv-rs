@@ -167,8 +167,11 @@ entry for the fold, several times per entry in `sort_txs`, once more for the
 atomic table) serialized and hashed the transaction again. The collector now
 keeps the hash the decoder computed as the bytes passed (`BeefTx::with_txid`,
 crate-private): parse then `verify_structure` went from 3.90 to 4.10 ms and
-40.7 to 41.7 ms to the figures above. The streaming reader's bench is
-unchanged within 3 percent.
+40.7 to 41.7 ms to the figures above. The streaming reader's bench
+(`beef_stream`, 1 MB and 10 MB, structure and scripts), re-run after the
+repeated-offset refusal at load average 7.3 to 9.5: 0.3 to 3.4 percent above
+the draft's run at load 4.3 to 5 (1.345 ms against 1.300 ms for the 1 MB
+structure, the widest), the fixtures' one BUMP holding one leaf.
 
 ### Fixed: a read BEEF entry names each input txid once (#86)
 
