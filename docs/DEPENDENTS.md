@@ -126,15 +126,21 @@ when the secret is missing; it neither prints nor persists the credential.
 The release caller forwards this one named secret to CI. Fork PRs without
 that secret cannot complete those private checks.
 
-`semver` runs on every PR against the last `v*` tag reachable from the immutable
-PR base commit, using `cargo-semver-checks 0.51.0` and Rust `1.95.0`.
-The [tool's baseline-rev mode](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0#does-the-crate-im-checking-have-to-be-published-on-cratesio)
-reads the tagged tree. `--all-features --release-type minor` keeps breaking
-API changes fatal even when a 0.x minor bump or beta suffix would otherwise
-be treated as permission to break. The tool documents its
-[release-type override](https://github.com/obi1kenobi/cargo-semver-checks/blob/v0.51.0/src/main.rs).
-Its pinned compiler avoids drift in rustdoc JSON formats. Baseline today:
-`v0.8.2` (`efe12e6`).
+`semver` uses `cargo-semver-checks 0.51.0` and Rust `1.95.0`; its pinned
+compiler avoids drift in rustdoc JSON formats. The
+[tool's baseline-rev mode](https://github.com/obi1kenobi/cargo-semver-checks/tree/v0.51.0#does-the-crate-im-checking-have-to-be-published-on-cratesio)
+reads the tagged tree. On `main` it runs on every PR, against the last
+release tag reachable from the immutable PR base commit, and on every
+release tag (release.yml's call), against the release tag before it, never
+the tag itself; a `-beta.N` tag is never main's baseline. The tool reads a
+0.x patch (0.8.3 to 0.8.4) and an unchanged version as minor, so a version
+whose major.minor equals the baseline's is held to `--release-type patch`
+(the [release-type override](https://github.com/obi1kenobi/cargo-semver-checks/blob/v0.51.0/src/main.rs));
+any other version move is inferred from the version. The patch lints catch
+a minor-level change (a `#[must_use]` added: exit 100 under patch, a pass
+under the inferred minor, measured 2026-10-25); no lint flags a plain new
+public item, so "a patch adds no public surface" stays the reviewer's.
+Baseline today: `v0.8.3` (`092c9a6`) for a PR, `v0.8.2` for the `v0.8.3` tag.
 
 Design alignment: the bounded, pinned consumer matrix serves T1 (work scales
 with the consumers) and T3 (targeted checks); exact revisions and resolution
