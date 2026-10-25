@@ -7,9 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a dead function under every slice without `script` (#115)
+
+`after_last_code_separator` (`primitives/bsv/sighash.rs`) has one caller, the
+script templates' signing path, but compiled under `primitives`, so a consumer
+building `block`, `primitives`, `compat` or `totp` alone with warnings denied
+(the Cloudflare workers' CI) could not build the crate. Found by the dependents
+check (#83) on its first hosted run, on chaintracks-cloudflare's `block` slice.
+The function is gated on `script`; the `clippy` job now checks each published
+slice alone with `-D warnings`, which was RED on the pre-fix tree for the four
+slices and is the pin.
+
 ### Changed
 
-- CI only: main's gate takes beta's `deny`, `dependents` (plan, one check per consumer, the summary), `semver`, `ratchet` (its baseline measured on main), `fixtures` (skipping with a warning while the recordings are beta's), `features`, `wasm32` slices and `scoreboard` jobs; `semver` checks a PR against the last release tag held to a patch, and a release tag against the release before it (#214).
+- main's gate takes beta's `deny`, `dependents` (plan, one check per consumer, the summary), `semver`, `ratchet` (its baseline measured on main), `fixtures` (skipping with a warning while the recordings are beta's), `features`, `wasm32` slices and `scoreboard` jobs; `semver` checks a PR against the last release tag held to a patch, and a release tag against the release before it (#214).
 
 ## [0.8.3] - 2026-10-25
 
