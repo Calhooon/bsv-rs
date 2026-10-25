@@ -212,6 +212,11 @@ jobs:
       - name: Run the memory profiling tests
         run: cargo test --test memory_profiling --all-features --verbose -- --test-threads=1
 
+      # The `tracing` sink (#212) is outside `full`: its event, and the wire's
+      # frames with the feature on, the same bytes as without it.
+      - name: Run the tracing sink tests
+        run: cargo test --features "full,http,tracing" --test wire_tracing_sink --test wire_error_frames --test fixtures_replay --verbose
+
       - name: Run doc tests
         run: cargo test --doc --all-features
 

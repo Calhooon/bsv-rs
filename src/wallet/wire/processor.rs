@@ -257,16 +257,29 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     /// or internal state) never reach the wire. The processor's own errors
     /// (its reading of the request, a false verdict, a stub) are raised
     /// outside this call and framed in their own words, as the reference's
-    /// throws outside the wrapper are.
+    /// throws outside the wrapper are. With the `tracing` feature the words
+    /// the frame drops go to one `warn` event here, with the call's name
+    /// (bsv-rs#212); the wire is the same with the feature on or off.
     async fn invoke_wallet<T>(
         &self,
+        call: WalletCall,
         operation: impl std::future::Future<Output = Result<T, Error>>,
     ) -> Result<T, Error> {
+        #[cfg(not(feature = "tracing"))]
+        let _ = call;
         operation
             .await
             .map_err(|error| match explicit_wallet_code(&error) {
                 Some(_) => error,
-                None => Error::WalletError(WALLET_OPERATION_FAILED.to_string()),
+                None => {
+                    #[cfg(feature = "tracing")]
+                    tracing::warn!(
+                        call = call.method_name(),
+                        error = %error,
+                        "wallet error framed as Wallet operation failed"
+                    );
+                    Error::WalletError(WALLET_OPERATION_FAILED.to_string())
+                }
             })
     }
 
@@ -324,7 +337,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             for_self,
         };
         let result = self
-            .invoke_wallet(self.wallet.get_public_key(args, originator))
+            .invoke_wallet(
+                WalletCall::GetPublicKey,
+                self.wallet.get_public_key(args, originator),
+            )
             .await?;
 
         // Serialize response - result.public_key is a hex string
@@ -354,7 +370,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             counterparty,
         };
         let result = self
-            .invoke_wallet(self.wallet.encrypt(args, originator))
+            .invoke_wallet(WalletCall::Encrypt, self.wallet.encrypt(args, originator))
             .await?;
 
         Ok(write_encrypt_result(&result))
@@ -380,7 +396,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             counterparty,
         };
         let result = self
-            .invoke_wallet(self.wallet.decrypt(args, originator))
+            .invoke_wallet(WalletCall::Decrypt, self.wallet.decrypt(args, originator))
             .await?;
 
         Ok(write_decrypt_result(&result))
@@ -406,7 +422,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             counterparty,
         };
         let result = self
-            .invoke_wallet(self.wallet.create_hmac(args, originator))
+            .invoke_wallet(
+                WalletCall::CreateHmac,
+                self.wallet.create_hmac(args, originator),
+            )
             .await?;
 
         Ok(write_create_hmac_result(&result))
@@ -419,7 +438,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         let args = super::requests::read_verify_hmac_args(reader)?;
         let result = self
-            .invoke_wallet(self.wallet.verify_hmac(args, originator))
+            .invoke_wallet(
+                WalletCall::VerifyHmac,
+                self.wallet.verify_hmac(args, originator),
+            )
             .await?;
 
         write_verify_hmac_result(&result)
@@ -432,7 +454,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         let args = super::requests::read_create_signature_args(reader)?;
         let result = self
-            .invoke_wallet(self.wallet.create_signature(args, originator))
+            .invoke_wallet(
+                WalletCall::CreateSignature,
+                self.wallet.create_signature(args, originator),
+            )
             .await?;
 
         Ok(write_create_signature_result(&result))
@@ -445,7 +470,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         let args = super::requests::read_verify_signature_args(reader)?;
         let result = self
-            .invoke_wallet(self.wallet.verify_signature(args, originator))
+            .invoke_wallet(
+                WalletCall::VerifySignature,
+                self.wallet.verify_signature(args, originator),
+            )
             .await?;
 
         write_verify_signature_result(&result)
@@ -459,6 +487,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let args = read_reveal_counterparty_key_linkage_args(reader)?;
         let result = self
             .invoke_wallet(
+                WalletCall::RevealCounterpartyKeyLinkage,
                 self.wallet
                     .reveal_counterparty_key_linkage(args, originator),
             )
@@ -474,7 +503,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     ) -> Result<Vec<u8>, Error> {
         let args = read_reveal_specific_key_linkage_args(reader)?;
         let result = self
-            .invoke_wallet(self.wallet.reveal_specific_key_linkage(args, originator))
+            .invoke_wallet(
+                WalletCall::RevealSpecificKeyLinkage,
+                self.wallet.reveal_specific_key_linkage(args, originator),
+            )
             .await?;
 
         Ok(write_reveal_specific_key_linkage_result(&result))
@@ -486,7 +518,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
 
     async fn handle_is_authenticated(&self, originator: &str) -> Result<Vec<u8>, Error> {
         let result = self
-            .invoke_wallet(self.wallet.is_authenticated(originator))
+            .invoke_wallet(
+                WalletCall::IsAuthenticated,
+                self.wallet.is_authenticated(originator),
+            )
             .await?;
         let mut writer = WireWriter::new();
         writer.write_optional_bool(Some(result.authenticated));
@@ -495,14 +530,17 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
 
     async fn handle_wait_for_authentication(&self, originator: &str) -> Result<Vec<u8>, Error> {
         let result = self
-            .invoke_wallet(self.wallet.wait_for_authentication(originator))
+            .invoke_wallet(
+                WalletCall::WaitForAuthentication,
+                self.wallet.wait_for_authentication(originator),
+            )
             .await?;
         write_wait_for_authentication_result(&result)
     }
 
     async fn handle_get_height(&self, originator: &str) -> Result<Vec<u8>, Error> {
         let result = self
-            .invoke_wallet(self.wallet.get_height(originator))
+            .invoke_wallet(WalletCall::GetHeight, self.wallet.get_height(originator))
             .await?;
         let mut writer = WireWriter::new();
         writer.write_var_int(result.height as u64);
@@ -519,7 +557,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
 
         let args = crate::wallet::GetHeaderArgs { height };
         let result = self
-            .invoke_wallet(self.wallet.get_header_for_height(args, originator))
+            .invoke_wallet(
+                WalletCall::GetHeaderForHeight,
+                self.wallet.get_header_for_height(args, originator),
+            )
             .await?;
 
         // The 80 bytes raw, no length prefix (`WalletWireProcessor.ts:1687-1690`

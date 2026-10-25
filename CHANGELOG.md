@@ -6,6 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added: an optional `tracing` feature: the processor's wrapper logs the wallet's words it frames away (#212)
+
+The keeper's ruling on #202: an un-coded wallet error is framed as the
+reference's `Wallet operation failed` (`WalletWireProcessor.ts:2417` at
+`ts-stack@edf6e03`), and the wallet's words go to the processor's log line,
+not the wire. The new cargo feature `tracing` (`tracing = ["dep:tracing"]`,
+the `tracing` 0.1 crate with `default-features = false`, MIT) is off by
+default and not in `full` (a diagnostics sink, not a module, so a `full`
+build is unchanged). With it on, `invoke_wallet` emits one `warn` event when
+the frame it chooses is the constant: `call` the call's name
+(`WalletCall::method_name`, `getHeight`), `error` the wallet error's
+`Display`, the message `wallet error framed as Wallet operation failed`.
+Nothing else is instrumented: no event for an explicit coded error (none
+today, #137), the processor's own refusals or a success. The level is
+`warn` because the reference's processor logs nothing there (no `console`
+call in `WalletWireProcessor.ts` at `edf6e03`) and the processor answers
+normally: the event reports a wallet's failure the client sees only as the
+constant, not a fault of the processor. The wire is the same bytes with the
+feature on or off. Without the feature no `tracing` symbol is compiled; the
+private `invoke_wallet` takes the call as a parameter in both builds.
+
+The tests that pin it: `tests/wire_tracing_sink.rs` (new, 5 tests, under
+`#![cfg(feature = "tracing")]`, a collector of its own on
+`tracing::Subscriber`, no `tracing-subscriber`): one event with the call and
+the wallet's words for getHeight and isAuthenticated, none for the
+processor's own refusal or a success, the frame the same with a listener and
+without. RED before: on `7c86b71` the feature does not exist (`cargo test
+--features "full,http,tracing"`: `the package 'bsv-rs' does not contain this
+feature: tracing`); with the plumbing and no `warn!`, the two event tests
+fail at `left: 0, right: 1`. CI runs the file in its own step (`--features
+"full,http,tracing"`, with `wire_error_frames` and `fixtures_replay`), allowlisted
+in `tests/arch_ci_runs_every_test.rs`'s `RUN_APART` with that reason.
+
 ### Added: a guard that CI runs every integration test binary (#146)
 
 `tests/arch_ci_runs_every_test.rs` reads `.github/workflows/ci.yml`,
@@ -155,7 +188,7 @@ at the byte, as the reference's `subarray` cuts, inside a character too. The
 wallet's own words are not logged: the crate has no logging facility (no
 `log` or `tracing` dependency) and the processor logged nothing before; the
 log line the ruling names waits on a word (a feature in `Cargo.toml` or a
-public hook on the processor).
+public hook on the processor; the feature `tracing`, #212, above).
 
 The tests that pin it: `tests/wire_error_frames.rs` (new, 5 tests; each frame
 hand-assembled to `:2417` and `:2379-2396`): an un-coded wallet error

@@ -170,11 +170,12 @@ an OS) is a finding, never a pass. The guard refuses, naming the file:
 - a `[[test]]` or `autotests` in `Cargo.toml` (the file list would no longer
   be the binary list).
 
-**Allowlist: one entry.**
+**Allowlist: two entries.**
 
 | File | Step | Reason |
 | --- | --- | --- |
 | `tests/memory_profiling.rs` | `--test memory_profiling --all-features -- --test-threads=1` | `dhat-profiling` installs a global allocator; it runs alone, single-threaded |
+| `tests/wire_tracing_sink.rs` | `--features "full,http,tracing" --test wire_tracing_sink` | the `tracing` feature is a diagnostics sink outside `full` (#212); its step adds it |
 
 To add a test file: nothing. The `cargo test --features "full,http,websocket"
 --tests` step runs every file that feature set compiles, this guard included.
