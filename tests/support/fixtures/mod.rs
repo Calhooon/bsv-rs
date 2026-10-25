@@ -1,7 +1,7 @@
 mod binary;
 mod cases;
 mod http;
-mod wallet;
+pub mod wallet;
 mod wallet_json;
 mod wire;
 
