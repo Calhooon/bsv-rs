@@ -194,17 +194,21 @@ fn merkle_root_from_display_txids(txids: &[&str]) -> String {
 ///
 /// *** BUG (parity with ts-sdk MerklePath.computeRoot): for a compound BUMP
 /// whose txids all sit at level 0 with offsets implying a taller tree
-/// (mp-compound-001: 4 txids, offsets 0..3, one stored level), ts-sdk derives
-/// the effective tree height from the maximum level-0 offset
+/// (mp-compound-001: 4 txids, offsets 0..3, a tree height of 1), ts-sdk
+/// derives the effective tree height from the maximum level-0 offset
 /// (`Math.max(path.length, 32 - clz32(maxOffset))`) and computes missing
-/// upper levels. bsv-rs `MerklePath::compute_root` only climbs
-/// `self.path.len()` levels, so the four txids yield two different "roots"
-/// and `MerklePath::from_hex` rejects the whole BUMP with "Mismatched roots".
-/// src/transaction/merkle_path.rs (compute_root / validation). ***
+/// upper levels. Through 0.9.0 bsv-rs climbed `self.path.len()` levels, so the
+/// four txids yielded two roots and `MerklePath::from_hex` refused the BUMP
+/// with "Mismatched roots"; since #167 the parse is the BEEF reader's BUMP
+/// decoder, which refuses it earlier: the leaf at offset 2 lies outside a
+/// level of a tree of height 1, `OffsetOutsideTree { level: 0, offset: 2 }`
+/// at byte 71, its offset varint. src/transaction/beef_stream.rs (the
+/// decoder's offset rule). ***
 const MP_KNOWN_FAILURES: &[(&str, &str)] = &[(
     "mp-compound-001",
     "single-level compound BUMP: bsv-rs lacks ts-sdk's effective-tree-height derivation; \
-     from_hex fails with 'Mismatched roots'",
+     from_hex fails in the parse, 'invalid BUMP at byte 71: OffsetOutsideTree { level: 0, offset: 2 }' \
+     (through 0.9.0 the four txids yielded two roots, 'Mismatched roots')",
 )];
 
 #[test]

@@ -2,7 +2,7 @@
 //! `MerklePath::from_reader` (the standalone reader, with `from_binary` and
 //! `from_hex` on the same bytes) and the BEEF reader's BUMP decoder, reached
 //! by wrapping the bytes as a one-BUMP BEEF (`0100BEEF`, one BUMP): the
-//! stream's first element names the BUMP's extent or its refusal, and
+//! stream's leading element names the BUMP's extent or its refusal, and
 //! `Beef::from_binary` on the BUMP with no transaction after it gives the
 //! in-memory form. Every disagreement is recorded: accepted by one and
 //! refused by the other, the kinds, the offsets (the BEEF's less the five
