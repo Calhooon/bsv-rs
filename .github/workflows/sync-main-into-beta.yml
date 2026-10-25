@@ -79,7 +79,7 @@ jobs:
             done <<< "$files"
             changed="$(git diff -U0 "$1^" "$1" | grep -E '^[-+]' | grep -vE '^(\+\+\+|---) ' || true)"
             grep -qE '^\+version = "' <<< "$changed" || return 1
-            ! grep -qvE '^[-+](version = "[^"]*"|## \[.*)$' <<< "$changed"
+            ! grep -qvE '^[-+](version = "[^"]*"|## \[(Unreleased|[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)\]( - [0-9]{4}-[0-9]{2}-[0-9]{2})?)?$' <<< "$changed"
           }
           short="$(git rev-parse --short origin/main)"
           body="$RUNNER_TEMP/sync-body.md"
@@ -108,7 +108,7 @@ jobs:
                 if ! git cherry-pick --keep-redundant-commits "$sha" > /dev/null; then
                   git cherry-pick --abort
                   git checkout --quiet -B "$SYNC_BRANCH" origin/beta
-                  note="Beta moved and the branch's earlier commits do not carry onto its tip cleanly; the branch is rebuilt from beta. The earlier tip is \`${old}\` (\`git log origin/beta..${old}\`): a hand resolution there is not lost."
+                  note="Beta moved and the branch's earlier commits do not carry onto its tip cleanly; the branch is rebuilt from beta. The earlier tip is \`${old}\` (\`git log origin/beta..${old}\`): a hand resolution there survives only while GitHub still holds that sha (no branch names it after the force push)."
                   break
                 fi
               done < <(git cherry origin/beta "$old")
