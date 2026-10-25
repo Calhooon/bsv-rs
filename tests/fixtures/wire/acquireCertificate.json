@@ -4,8 +4,15 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 1 bytes, only 0 available",
-          "error": "ReaderUnderflow { needed: 1, available: 0 }"
+          "ok": {
+            "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+            "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "fields": {},
+            "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+            "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+            "signature": "3006020101020101",
+            "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+          }
         },
         "processor_observed": null,
         "processor_response_hex": "014677616c6c6574206572726f723a2061637175697265436572746966696361746520726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
@@ -38,8 +45,17 @@
       "error_frames": "wire/error_frames.json",
       "expected": {
         "client_result": {
-          "display": "reader underflow: need 97 bytes, only 18 available",
-          "error": "ReaderUnderflow { needed: 97, available: 18 }"
+          "ok": {
+            "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
+            "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+            "fields": {
+              "name": "Fixture"
+            },
+            "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+            "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+            "signature": "3006020101020101",
+            "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+          }
         },
         "processor_observed": null,
         "processor_response_hex": "014677616c6c6574206572726f723a2061637175697265436572746966696361746520726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
