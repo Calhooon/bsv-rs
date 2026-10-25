@@ -27,7 +27,11 @@ const SYNC_FILE: &str = ".github/workflows/sync-main-into-beta.yml";
 
 fn read(path: &str) -> String {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    fs::read_to_string(root.join(path)).unwrap_or_else(|e| panic!("read {path}: {e}"))
+    // A Windows checkout converts the workflows to CRLF (`.gitattributes` keeps only the
+    // vectors, fixtures and corpora byte for byte); the needles are written with `\n`.
+    fs::read_to_string(root.join(path))
+        .unwrap_or_else(|e| panic!("read {path}: {e}"))
+        .replace("\r\n", "\n")
 }
 
 /// The lines of the block opened by `header` at `indent` spaces: every line
