@@ -10,7 +10,7 @@ This module implements BRC-77 (signed messages) and BRC-78 (encrypted messages) 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `mod.rs` | 131 | Module root with version constants, public re-exports, and integration tests |
-| `signed.rs` | 463 | BRC-77 message signing and verification with comprehensive test suite |
+| `signed.rs` | 472 | BRC-77 message signing and verification with comprehensive test suite |
 | `encrypted.rs` | 442 | BRC-78 message encryption and decryption with cross-SDK test vectors |
 
 ## Key Exports
@@ -176,7 +176,7 @@ assert_eq!(plaintext.to_vec(), decrypted);
 | Error | Description |
 |-------|-------------|
 | `MessageVersionMismatch { expected, actual }` | Version bytes don't match expected protocol version (includes hex of both) |
-| `MessageError(String)` | General message format error (too short, missing recipient key) |
+| `MessageError(String)` | General message format error (too short, missing recipient key); `verify` asks for 78 bytes, then, once the recipient field is read, 110 for a named recipient (the key ID and 8 bytes of DER behind it; a shorter one panicked until #173) |
 | `MessageRecipientMismatch { expected, actual }` | Provided recipient key doesn't match encrypted/signed recipient (hex public keys) |
 
 ### Error Examples
