@@ -147,13 +147,20 @@ what the stream said:
 agree: 60 seconds, 178,958 runs, no disagreement and no
 crash.
 
-The cost, `Beef::from_binary` alone 17 to 20 percent faster, and parse then
-`verify_structure` 10 to 13 percent slower (the node's transaction rules
-the whole path never ran, and the txid hash, which the old parse computed
-for its index, now computed by the first `txid()`), on the
-`benches/beef_stream.rs` fixtures of 1 MB and 10 MB, p50 of 30 runs, load
-average 4.3 to 5. The streaming reader's bench is unchanged within 3
-percent.
+The cost, against 0.9.0's tree run beside it: `Beef::from_binary` alone 16
+to 20 percent faster, and parse then `verify_structure` 12 to 16 percent
+faster (3.10 to 3.26 ms against 3.67 to 3.82 ms at 1 MB, 32.6 to 34.2 ms
+against 37.7 to 38.8 ms at 10 MB), on the `benches/beef_stream.rs` fixtures,
+p50 of 30 runs, three rounds interleaved, load average 9.8 to 10.3. The
+node's transaction rules the whole path never ran were not the cost: the lane's
+draft measured 10 to 13 percent slower than 0.9.0 because the collector left
+each entry's txid unset, so every `txid()` in `verify_structure` (once per
+entry for the fold, several times per entry in `sort_txs`, once more for the
+atomic table) serialized and hashed the transaction again. The collector now
+keeps the hash the decoder computed as the bytes passed (`BeefTx::with_txid`,
+crate-private): parse then `verify_structure` went from 3.90 to 4.10 ms and
+40.7 to 41.7 ms to the figures above. The streaming reader's bench is
+unchanged within 3 percent.
 
 ### Fixed: a read BEEF entry names each input txid once (#86)
 
