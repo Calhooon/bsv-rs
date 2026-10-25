@@ -64,8 +64,11 @@ each level by offset, a height above a `u32` refused `RootNotCarried` at the
 BUMP). The same flag reading, the same offset rule (a repeated offset is
 `MismatchedNode` at the second leaf's offset varint), the same tree-height
 bounds, the same walk, and the stream's `Reason`s with their offsets counted
-from the BUMP's leading byte: `merkle path error: invalid BEEF at byte N:
-Reason`, the variant `Error::MerklePathError` as before. `from_binary` still
+from the BUMP's leading byte, in the words of the BUMP the caller handed:
+`merkle path error: invalid BUMP at byte N: Reason` (the stream's `Refusal`,
+its public `offset` and `reason`; the words after "at byte" are the stream's,
+whose own refusal of a BEEF reads `invalid BEEF`), the variant
+`Error::MerklePathError` as before. `from_binary` still
 reads a prefix and leaves the bytes after the BUMP, as `@bsv/sdk`'s
 `fromBinary` does (`ts-stack@edf6e03` `MerklePath.ts:161-168`). No public item
 was renamed, retyped or moved: a scratch crate naming every public item of
@@ -128,7 +131,7 @@ The refusals that moved, by test:
 
 - `tests/merkle_path_lone_leaf.rs`: `lone_at_one_parsers_refuse_missing_sibling`
   and `beef_and_merkle_path_agree_on_both_owned_bodies` read the parse's
-  refusal of a lone leaf at offset 1 as `invalid BEEF at byte 7:
+  refusal of a lone leaf at offset 1 as `invalid BUMP at byte 7:
   MissingSibling { level: 0, offset: 0 }` (it was `MissingSibling { level:
   0, offset: 0 }` alone); `lone_compute_root_refuses_every_nonzero_offset_class`
   reads a lone leaf at offset 2 and above as `OffsetOutsideTree { level: 0,

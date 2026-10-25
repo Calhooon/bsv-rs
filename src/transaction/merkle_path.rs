@@ -268,11 +268,16 @@ impl MerklePath {
     /// wherever this crate reads it. A leaf flag is `00`, `01` or `02`; an
     /// offset lies within its level and appears once there; the tree height
     /// is 1 to 64; every hashed leaf of level 0 climbs to one root; the block
-    /// height fits a `u32`. A refusal is the stream's, in its words, its
-    /// offset counted from the BUMP's leading byte. The reader is advanced
-    /// past the BUMP alone.
+    /// height fits a `u32`. A refusal is the stream's, `invalid BUMP at byte
+    /// N: Reason`, `N` counted from the BUMP's leading byte. The reader is
+    /// advanced past the BUMP alone.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        let refused = |r: Refusal| crate::Error::MerklePathError(r.to_string());
+        let refused = |r: Refusal| {
+            crate::Error::MerklePathError(format!(
+                "invalid BUMP at byte {}: {:?}",
+                r.offset, r.reason
+            ))
+        };
         let bump = Bump::read_alone(reader.clone().read_remaining()).map_err(refused)?;
         let path = bump.in_memory().map_err(refused)?;
         reader.read_bytes(usize::try_from(bump.wire_len).unwrap_or(usize::MAX))?;
@@ -1451,7 +1456,7 @@ mod linear_root_equivalence_tests {
                 (Err(e), old) => {
                     let text = e.to_string();
                     assert!(
-                        text.contains("invalid BEEF at byte "),
+                        text.contains("invalid BUMP at byte "),
                         "round {round}: {text}"
                     );
                     stricter += usize::from(old.is_ok());
