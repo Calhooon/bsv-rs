@@ -49,15 +49,26 @@ impl WalletWire for ReplyWire {
 }
 
 // The transceiver exposes no linkage methods. As in wire_method_roundtrip_tests,
-// use the public low-level codec for these two processor-supported calls. This
-// deliberately records the processor's existing field order, including its
-// omission of the privileged fields. It is not a new production client API.
+// use the public low-level codec for these two processor-supported calls, in the
+// reference's order (`WalletWireTransceiver.ts:809-811`, `:874-883` at
+// ts-stack@edf6e03; #191). It is not a new production client API.
 fn linkage_request(call: WalletCall, originator: &str) -> WireWriter {
     let mut w = WireWriter::new();
     w.write_u8(call.as_u8())
         .write_u8(originator.len() as u8)
         .write_bytes(originator.as_bytes());
     w
+}
+
+// The reference's `#encodePrivilegedParams` (`WalletWireTransceiver.ts:1448-1462`).
+fn privileged_params(w: &mut WireWriter, privileged: Option<bool>, reason: Option<&str>) {
+    w.write_optional_bool(privileged);
+    match reason {
+        Some(reason) => w
+            .write_i8(reason.len() as i8)
+            .write_bytes(reason.as_bytes()),
+        None => w.write_i8(-1),
+    };
 }
 
 async fn linkage_response<T: WalletWire>(
@@ -93,6 +104,7 @@ pub async fn counterparty<T: WalletWire>(
     originator: &str,
 ) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
     let mut w = linkage_request(WalletCall::RevealCounterpartyKeyLinkage, originator);
+    privileged_params(&mut w, args.privileged, args.privileged_reason.as_deref());
     w.write_bytes(&args.counterparty.to_compressed())
         .write_bytes(&args.verifier.to_compressed());
     let bytes = linkage_response(client, w).await?;
@@ -109,10 +121,11 @@ pub async fn specific<T: WalletWire>(
     originator: &str,
 ) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
     let mut w = linkage_request(WalletCall::RevealSpecificKeyLinkage, originator);
-    w.write_counterparty(Some(&args.counterparty))
-        .write_bytes(&args.verifier.to_compressed())
-        .write_protocol_id(&args.protocol_id)
-        .write_string(&args.key_id);
+    w.write_protocol_id(&args.protocol_id)
+        .write_string(&args.key_id)
+        .write_counterparty(Some(&args.counterparty));
+    privileged_params(&mut w, args.privileged, args.privileged_reason.as_deref());
+    w.write_bytes(&args.verifier.to_compressed());
     let bytes = linkage_response(client, w).await?;
     let mut r = WireReader::new(&bytes);
     Ok(RevealSpecificKeyLinkageResult {

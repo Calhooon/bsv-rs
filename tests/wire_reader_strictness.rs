@@ -812,7 +812,8 @@ fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_before_a_byte
 
 /// The processor reads revealCounterpartyKeyLinkage's two keys with
 /// `PublicKey::from_bytes`, a point check, where the reference reads 33 bytes
-/// and `validateWalletArgs` checks them (`WalletWireProcessor.ts:1741-1751`):
+/// and `validateWalletArgs` checks them (`WalletWireProcessor.ts:1741-1751`),
+/// after the privileged flag and reason (`:1739`):
 /// a key that is not a point is refused before the wallet is called (the
 /// header wallet's other methods are unreachable).
 #[tokio::test]
@@ -820,7 +821,13 @@ async fn the_processor_refuses_a_linkage_key_that_is_not_a_compressed_point() {
     let mut prefixed = key(G);
     prefixed[0] = 0x04;
     for bad in [prefixed, off_curve()] {
-        let mut request = vec![WalletCall::RevealCounterpartyKeyLinkage.as_u8(), 0];
+        // The absent privileged flag and reason, then the keys (#191).
+        let mut request = vec![
+            WalletCall::RevealCounterpartyKeyLinkage.as_u8(),
+            0,
+            0xff,
+            0xff,
+        ];
         request.extend_from_slice(&bad);
         request.extend_from_slice(&key(G));
         let answer = processor_answer(String::new(), &request).await;

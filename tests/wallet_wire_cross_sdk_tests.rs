@@ -1113,3 +1113,222 @@ async fn test_process_go_get_header_for_height_request() {
     // Error byte should be non-zero (ProtoWallet doesn't support this)
     assert_ne!(response[0], 0x00);
 }
+
+// ============================================================================
+// Every Go args vector decoded through the processor to its json (#191)
+// ============================================================================
+
+#[cfg(feature = "http")]
+#[allow(dead_code)]
+#[path = "support/fixtures/mod.rs"]
+mod fixtures;
+
+/// Every `*-args.json` under `tests/vectors/wallet_wire/`, by call.
+#[cfg(feature = "http")]
+const ARGS_VECTORS: [&str; 27] = [
+    "abortAction-simple-args.json",
+    "acquireCertificate-issuance-args.json",
+    "acquireCertificate-simple-args.json",
+    "createAction-1-out-args.json",
+    "createHmac-simple-args.json",
+    "createSignature-simple-args.json",
+    "decrypt-simple-args.json",
+    "discoverByAttributes-simple-args.json",
+    "discoverByIdentityKey-simple-args.json",
+    "encrypt-simple-args.json",
+    "getHeaderForHeight-simple-args.json",
+    "getHeight-simple-args.json",
+    "getPublicKey-simple-args.json",
+    "internalizeAction-simple-args.json",
+    "isAuthenticated-simple-args.json",
+    "listActions-simple-args.json",
+    "listCertificates-simple-args.json",
+    "listOutputs-simple-args.json",
+    "proveCertificate-simple-args.json",
+    "relinquishCertificate-simple-args.json",
+    "relinquishOutput-simple-args.json",
+    "revealCounterpartyKeyLinkage-simple-args.json",
+    "revealSpecificKeyLinkage-simple-args.json",
+    "signAction-simple-args.json",
+    "verifyHmac-simple-args.json",
+    "verifySignature-simple-args.json",
+    "waitForAuthentication-simple-args.json",
+];
+
+/// The args vectors the processor cannot decode to their json, with the
+/// reason. A vector that leaves this list, or joins it, moves the count.
+#[cfg(feature = "http")]
+const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 21] = [
+    (
+        "abortAction-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "acquireCertificate-issuance-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "acquireCertificate-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "createAction-1-out-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "createHmac-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and CreateHmacArgs has no field for them: the flag 01 is read as the data's length",
+    ),
+    (
+        "createSignature-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and CreateSignatureArgs has no field for them: the flag 01 is read as the data's, the reason as a length past the end",
+    ),
+    (
+        "decrypt-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and DecryptArgs has no field for them: the flag 01 is read as the ciphertext's length",
+    ),
+    (
+        "discoverByAttributes-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "discoverByIdentityKey-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "encrypt-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and EncryptArgs has no field for them: the flag 01 is read as the plaintext's length",
+    ),
+    (
+        "getPublicKey-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and GetPublicKeyArgs has no field for them: the flag 01 is read as forSelf",
+    ),
+    (
+        "internalizeAction-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listActions-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listCertificates-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "listOutputs-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "proveCertificate-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "relinquishCertificate-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "relinquishOutput-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "signAction-simple-args.json",
+        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "verifyHmac-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifyHmacArgs has no field for them: the reason is read as the HMAC, a length past the end",
+    ),
+    (
+        "verifySignature-simple-args.json",
+        "the processor reads no privileged flag, reason or seekPermission of the key-related parameters (WalletWireProcessor.ts:2564-2583 at ts-stack@edf6e03), and VerifySignatureArgs has no field for them: the reason is read as the signature, a length past the end",
+    ),
+];
+
+/// Sends a Go args vector through `WalletWireProcessor` to a wallet that
+/// records what it is handed, and compares that to the vector's json: a field
+/// absent on one side reads as null.
+#[cfg(feature = "http")]
+async fn processor_decodes_to_json(filename: &str) -> Result<(), String> {
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    let (json, wire) = load_vector(filename);
+    let mut stub = fixtures::wallet::Stub::new(Value::Null);
+    stub.error = Some(bsv_rs::Error::WalletError("observed".into()));
+    let observed = stub.observed.clone();
+    let response = WalletWireProcessor::new(stub)
+        .process_message(&wire)
+        .await
+        .map_err(|e| format!("no response: {e}"))?;
+    let Some(seen) = observed.lock().unwrap().take() else {
+        let mut reader = WireReader::new(&response[1..]);
+        return Err(format!(
+            "the wallet was not called: {}",
+            reader.read_string().unwrap_or_default()
+        ));
+    };
+    let (seen, want) = (&seen["args"], json.as_object().unwrap());
+    let mut names: Vec<&String> = want.keys().collect();
+    names.extend(seen.as_object().into_iter().flat_map(|args| args.keys()));
+    names.sort();
+    names.dedup();
+    for name in names {
+        let (got, expected) = (&seen[name.as_str()], &json[name.as_str()]);
+        if got != expected {
+            return Err(format!("{name}: read {got}, the vector says {expected}"));
+        }
+    }
+    Ok(())
+}
+
+/// The keeper's general form of #191's witness: `test_all_request_call_codes`
+/// read each vector's call code alone, which is how the linkage frames passed.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn every_go_args_vector_decodes_through_the_processor_to_its_json() {
+    let mut on_disk: Vec<String> = std::fs::read_dir(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/vectors/wallet_wire"
+    ))
+    .unwrap()
+    .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+    .filter(|name| name.ends_with("-args.json"))
+    .collect();
+    on_disk.sort();
+    assert_eq!(on_disk, ARGS_VECTORS, "the table is every args vector");
+
+    let mut failing = Vec::new();
+    for filename in ARGS_VECTORS {
+        if let Err(why) = processor_decodes_to_json(filename).await {
+            println!("{filename}: {why}");
+            failing.push(filename);
+        }
+    }
+    let allowed: Vec<&str> = PROCESSOR_ARGS_UNSUPPORTED.iter().map(|(f, _)| *f).collect();
+    assert_eq!(failing, allowed, "the vectors the processor cannot decode");
+    assert_eq!(ARGS_VECTORS.len() - failing.len(), 6, "passing rows");
+}
+
+/// #191: Go's privileged revealCounterpartyKeyLinkage request (`09 00 01 0b
+/// "test-reason"` then the two keys) reaches the wallet with its flag, its
+/// reason and its keys, read in the reference's order.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_go_counterparty_linkage_request_reads_its_privileged_params_ahead_of_the_keys() {
+    let (json, _) = load_vector("revealCounterpartyKeyLinkage-simple-args.json");
+    assert_eq!(json["privileged"], true);
+    assert_eq!(json["privilegedReason"], "test-reason");
+    processor_decodes_to_json("revealCounterpartyKeyLinkage-simple-args.json")
+        .await
+        .unwrap();
+}
+
+/// #191, the same defect beside it: revealSpecificKeyLinkage's request is the
+/// key-related parameters (protocol, key ID, counterparty, privileged, reason),
+/// then the verifier.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_go_specific_linkage_request_reads_the_key_related_params_then_the_verifier() {
+    processor_decodes_to_json("revealSpecificKeyLinkage-simple-args.json")
+        .await
+        .unwrap();
+}

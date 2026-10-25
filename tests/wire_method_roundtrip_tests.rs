@@ -585,7 +585,7 @@ mod key_linkage_tests {
     /// Tests revealCounterpartyKeyLinkage roundtrip.
     /// This exercises the complex response type with encrypted linkage, proof, and public keys.
     #[tokio::test]
-    async fn test_roundtrip_reveal_counterparty_key_linkage() {
+    async fn test_roundtrip_reveal_counterparty_key_linkage_privileged() {
         let (_transceiver, _alice, bob) = create_two_party_loopback();
         let verifier_key = PrivateKey::random().public_key();
 
@@ -600,6 +600,11 @@ mod key_linkage_tests {
         let orig = b"test";
         writer.write_u8(orig.len() as u8);
         writer.write_bytes(orig);
+        // Privileged flag and reason ahead of the keys, as the reference
+        // writes them (`WalletWireTransceiver.ts:809-811`; #191)
+        writer.write_optional_bool(Some(true));
+        writer.write_i8(11);
+        writer.write_bytes(b"test-reason");
         // Counterparty (33-byte pubkey)
         writer.write_bytes(&bob.identity_key().to_compressed());
         // Verifier (33-byte pubkey)
@@ -637,9 +642,28 @@ mod key_linkage_tests {
         assert!(!revelation_time.is_empty());
     }
 
+    /// The reason's length is an `i8`, -1 absent or 0 to 127; another negative
+    /// length is refused, as the reference's `#readOptionalInt8Length` refuses
+    /// it (`WalletWireProcessor.ts:54-61`; #191).
+    #[tokio::test]
+    async fn a_linkage_privileged_reason_length_below_minus_one_is_refused() {
+        let processor = WalletWireProcessor::new(ProtoWallet::new(Some(PrivateKey::random())));
+        let key = PrivateKey::random().public_key().to_compressed();
+        let mut writer = WireWriter::new();
+        writer.write_u8(WalletCall::RevealCounterpartyKeyLinkage.as_u8());
+        writer.write_u8(0);
+        writer.write_optional_bool(Some(true));
+        writer.write_i8(-2);
+        writer.write_bytes(&key).write_bytes(&key);
+        let response = processor.process_message(writer.as_bytes()).await.unwrap();
+        assert_ne!(response[0], 0, "an error frame");
+        let message = WireReader::new(&response[1..]).read_string().unwrap();
+        assert!(message.contains("privilegedReason length"), "{message}");
+    }
+
     /// Tests revealSpecificKeyLinkage roundtrip.
     #[tokio::test]
-    async fn test_roundtrip_reveal_specific_key_linkage() {
+    async fn test_roundtrip_reveal_specific_key_linkage_privileged() {
         let bob_key = PrivateKey::random();
         let bob_pub = bob_key.public_key();
         let verifier_key = PrivateKey::random().public_key();
@@ -653,15 +677,15 @@ mod key_linkage_tests {
         let orig = b"test";
         writer.write_u8(orig.len() as u8);
         writer.write_bytes(orig);
-        // Counterparty (Other)
-        writer.write_bytes(&bob_pub.to_compressed());
-        // Verifier
-        writer.write_bytes(&verifier_key.to_compressed());
-        // Protocol ID
+        // The key-related parameters, then the verifier, as the reference
+        // writes them (`WalletWireTransceiver.ts:874-883`; #191)
         writer.write_u8(SecurityLevel::App.as_u8());
         writer.write_string("linkage test app");
-        // Key ID
         writer.write_string("link-key-1");
+        writer.write_bytes(&bob_pub.to_compressed());
+        writer.write_optional_bool(Some(false));
+        writer.write_i8(-1);
+        writer.write_bytes(&verifier_key.to_compressed());
 
         let response = processor.process_message(writer.as_bytes()).await.unwrap();
         let mut reader = WireReader::new(&response);
