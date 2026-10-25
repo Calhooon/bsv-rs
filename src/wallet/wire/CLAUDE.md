@@ -66,6 +66,8 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 └─────────┴────────────────┴────────────────┴──────────┘
 ```
 
+The processor writes the reference's error frame (`WalletWireProcessor.ts:2370-2396` at `ts-stack@edf6e03`, #202): the code unknownError (1), this crate's `Error` carrying no wallet code for the reference's 2 to 8; the message the error's own words, never the crate's `Display` prefix (a `WalletError` its words, `WalletBusy`, `WalletTransport` and `TransportFault` their `detail`, any other variant its `Display` sentence), cut at 4096 bytes at the byte; the stack an empty string, a varint 0. The transceiver reads a frame as `WalletError("wallet error (code N): <message>")`.
+
 ## Call Codes
 
 | Code | Method | Code | Method |
@@ -222,7 +224,7 @@ pub mod status_codes {
 
 All 28 call codes are dispatched in the match statement. Stub handlers return descriptive errors indicating a full wallet implementation is required.
 
-**Error codes:** 0=success, 1=generic, 6=invalid parameter, 7=insufficient funds.
+**Error codes:** 0=success; every error frame 1 (unknownError): the reference takes 2 to 8 from a typed error's `code`, which this crate's `Error` does not carry; the words no longer choose 6 or 7 (#202).
 
 ## Transceiver (Client-Side)
 
