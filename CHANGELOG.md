@@ -370,8 +370,13 @@ Not repeated where the reader or a type already refuses: the security level
 absent counterparty, the data-type flag and the 32-byte hash and HMAC
 (`requests.rs`), the booleans, the `PublicKey`, `u8` and `[u8; 32]` result
 fields; those refusals keep this crate's words, code 1. The thirteen stubs
-are untouched (`the_thirteen_stubs_are_untouched`); getNetwork and getVersion
-are answered by the processor, not a wallet, and are not checked.
+are untouched (`the_thirteen_stubs_are_untouched`). getNetwork and getVersion
+are answered by the processor from its own configuration, not asked of the
+wallet, and are not checked, where the reference asks its wallet and checks the
+answer (`WalletWireProcessor.ts:1694-1730`; the network `mainnet` or `testnet`,
+the version 7 to 30 bytes, `WalletResultValidation.ts:2299-2306`): the
+processor's default version `0.1.0` is 5 bytes, a result the reference refuses,
+and is neither this crate's version nor its wallet's (a follow-up issue).
 
 `ProtoWallet` answers revealSpecificKeyLinkage for anyone with `PrivateKey(1)`'s
 key, as the reference's does (`ProtoWallet.ts:235-240`), where it answered its
@@ -379,7 +384,13 @@ identity key, a result the check refuses
 (`a_specific_linkage_for_anyone_names_the_anyone_key`, red before).
 `ProtoWallet`'s placeholder height 0 is now the processor's refusal
 (`test_roundtrip_get_height`, `test_process_go_get_height_request`). The
-result-vector test sends a call's own Go args vector where one exists, so a
+fixture recorder's `minimal` getHeaderForHeight request and getHeight answer
+moved from height 0, which the reference refuses on both sides, to 1, the
+smallest it accepts: a recording pins the writers' bytes on valid inputs, and
+the refusals are `tests/wire_processor_validation.rs`'s. Four recordings moved
+(`tests/fixtures/{wire,http_json}/{getHeight,getHeaderForHeight}.json`: the
+wire's height byte `00` to `01`, the JSON bodies' `0` to `1`; F17 in
+`docs/FIXTURES.md`). The result-vector test sends a call's own Go args vector where one exists, so a
 linkage result answers the request it was made for; its table holds at 15.
 
 Migration: a client of this processor that sent an argument the reference
