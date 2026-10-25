@@ -365,7 +365,8 @@ async fn error_frames() -> Vec<Value> {
             bytes,
         ));
     }
-    // Pin all codes the production processor emits, with its own error writer.
+    // Pin the frames the production processor emits, with its own error writer:
+    // every one unknownError (1) and the bare words since bsv-rs#202.
     for (name, error) in [
         (
             "processor_generic",

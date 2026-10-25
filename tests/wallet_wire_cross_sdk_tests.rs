@@ -1729,7 +1729,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
 
 /// #197: a wallet's false verdict is the reference's error frame, never the
 /// error byte alone (which the reference's transceiver, and this one, read as
-/// true): `HMAC is not valid` (`WalletWireProcessor.ts:1520`), `Signature is
+/// true), its words bare (#202): `HMAC is not valid` (`WalletWireProcessor.ts:1520`), `Signature is
 /// not valid` (`:1597`), `Wallet did not affirmatively authenticate` (`:1636-1638`).
 #[cfg(feature = "http")]
 #[tokio::test]
@@ -1778,7 +1778,7 @@ async fn a_false_verdict_is_answered_with_an_error_frame() {
         );
         let mut expected = WireWriter::new();
         expected.write_u8(1);
-        expected.write_string(&format!("wallet error: {refusal}"));
+        expected.write_string(refusal);
         expected.write_var_int(0);
         assert_eq!(
             hex::encode(&response),
@@ -1903,7 +1903,7 @@ async fn a_signature_data_type_flag_of_three_is_refused() {
         assert_eq!(
             why,
             format!(
-                "the wallet was not called: wallet error: Invalid {call} data type flag: expected 1 or 2, received 3"
+                "the wallet was not called: Invalid {call} data type flag: expected 1 or 2, received 3"
             ),
             "{filename}"
         );
