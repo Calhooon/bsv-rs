@@ -97,3 +97,33 @@ name = "fuzz_auth_messages"
 path = "fuzz_targets/fuzz_auth_messages.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_messages_signed"
+path = "fuzz_targets/fuzz_messages_signed.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_messages_encrypted"
+path = "fuzz_targets/fuzz_messages_encrypted.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_bsm"
+path = "fuzz_targets/fuzz_bsm.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_bip39"
+path = "fuzz_targets/fuzz_bip39.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_shamir_backup"
+path = "fuzz_targets/fuzz_shamir_backup.rs"
+test = false
+doc = false

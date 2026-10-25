@@ -33,9 +33,12 @@ use bsv_rs::auth::transports::socketio::codec::{EngineIoPacket, SocketIoPacket};
 use bsv_rs::auth::transports::{HttpRequest, HttpResponse};
 use bsv_rs::auth::{AuthMessage, Certificate, MessageType, RequestedCertificateSet};
 use bsv_rs::compat::bip32::{ExtendedKey, Network};
-use bsv_rs::compat::ecies;
+use bsv_rs::compat::bip39::{Language, Mnemonic};
+use bsv_rs::compat::{bsm, ecies};
+use bsv_rs::messages;
+use bsv_rs::primitives::bsv::shamir::split_private_key;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
-use bsv_rs::primitives::{from_hex, PrivateKey};
+use bsv_rs::primitives::{from_hex, to_base64, PrivateKey};
 use bsv_rs::transaction::{verify_stream, verify_stream_structure, Beef, Headers, Kind, Verdict};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -677,6 +680,7 @@ fn main() {
     auth_corpus(&base);
     script_corpus(&base, rest.as_deref());
     parser_corpora(&base);
+    reader_corpora(&base);
 }
 
 /// The six targets that predate this corpus: the parsers' inputs as the
@@ -726,4 +730,137 @@ fn parser_corpora(base: &Path) {
     chain.add("bits", &0x1d00ffffu32.to_le_bytes());
     chain.add("varint", &[0xfd, 0x00, 0x01]);
     chain.report("fuzz_chain_primitives");
+}
+
+/// The five readers of #140: the signed and encrypted messages (BRC-77,
+/// BRC-78), the BSM envelope, BIP-39 and the Shamir backup. The targets'
+/// fixed keys are the bytes 6, 7, 8 (sender, recipient, another) and 9 (the
+/// BSM key), repeated to 32. The message writers and the share split draw a
+/// random key id, IV or polynomial, so those seeds' bytes change on a rerun.
+fn reader_corpora(base: &Path) {
+    let key = |b: u8| PrivateKey::from_bytes(&[b; 32]).unwrap();
+    let (sender, recipient, other) = (key(6), key(7), key(8));
+
+    let mut signed = Corpus::new(base, "fuzz_messages_signed");
+    // The message `fuzz_messages_signed` verifies against.
+    let message = b"fuzz_messages_signed";
+    for (name, verifier) in [
+        ("recipient", Some(recipient.public_key())),
+        ("anyone", None),
+        ("other", Some(other.public_key())),
+    ] {
+        let sig = messages::sign(message, &sender, verifier.as_ref()).unwrap();
+        signed.add(&format!("signed-{name}"), &sig);
+        signed.add(&format!("signed-{name}-header"), &sig[..sig.len().min(102)]);
+    }
+    signed.report("fuzz_messages_signed");
+
+    let mut encrypted = Corpus::new(base, "fuzz_messages_encrypted");
+    for plaintext in [&b""[..], b"Secret", &[0x42; 64]] {
+        let n = plaintext.len();
+        let sealed = messages::encrypt(plaintext, &sender, &recipient.public_key()).unwrap();
+        encrypted.add(&format!("encrypted-{n}"), &sealed);
+        let sealed = messages::encrypt(plaintext, &sender, &other.public_key()).unwrap();
+        encrypted.add(&format!("encrypted-other-{n}"), &sealed);
+        encrypted.add(&format!("plain-{n}"), plaintext);
+    }
+    encrypted.report("fuzz_messages_encrypted");
+
+    let mut envelope = Corpus::new(base, "fuzz_bsm");
+    let bsm_key = key(9);
+    for message in [&b"hello world"[..], b"", b"Hello, BSV!", &[b'a'; 300]] {
+        let n = message.len();
+        for compressed in [true, false] {
+            let sig = bsm::sign_message_with_compression(&bsm_key, message, compressed).unwrap();
+            let mut seed = sig.clone();
+            seed.extend_from_slice(message);
+            envelope.add(&format!("compact-{compressed}-{n}"), &seed);
+            let mut text = to_base64(&sig).into_bytes();
+            text.push(b'\n');
+            text.extend_from_slice(message);
+            envelope.add(&format!("base64-{compressed}-{n}"), &text);
+        }
+    }
+    let der = bsm_key.sign(&bsm::magic_hash(b"")).unwrap().to_der();
+    envelope.add("der-empty", &der);
+    // The TypeScript SDK's signature over "hello world" (`src/compat/bsm.rs`,
+    // `test_cross_sdk_bsm_known_vector`), as an envelope.
+    envelope.add(
+        "ts-sdk-hello-world",
+        b"H4T8Asr0WkC6wYfBESR6pCAfECtdsPM4fwiSQ2qndFi8dVtv/mrOFaySx9xQE7j24ugoJ4iGnsRwAC8QwaoHOXk=\nhello world",
+    );
+    envelope.report("fuzz_bsm");
+
+    // The BIP-39 vectors (TREZOR's, and the Go SDK's bad sentences) as
+    // `tests/compat_bip39_tests.rs` carries them, each entropy also as a
+    // phrase of every language.
+    let mut bip39 = Corpus::new(base, "fuzz_bip39");
+    let languages = [
+        Language::ChineseSimplified,
+        Language::ChineseTraditional,
+        Language::Czech,
+        Language::English,
+        Language::French,
+        Language::Italian,
+        Language::Japanese,
+        Language::Korean,
+        Language::Spanish,
+    ];
+    let text = read("tests/compat_bip39_tests.rs");
+    let quoted = |line: &str| line.split('"').nth(1).map(str::to_string);
+    let mut in_bad = false;
+    for (i, line) in text.lines().enumerate() {
+        let line = line.trim();
+        if line.starts_with("fn bad_mnemonic_sentences") {
+            in_bad = true;
+        } else if in_bad && line == "}" {
+            in_bad = false;
+        }
+        if let Some(entropy) = line.strip_prefix("entropy: ").and_then(quoted) {
+            let Ok(bytes) = from_hex(&entropy) else {
+                continue;
+            };
+            bip39.add(&format!("entropy-{i}"), &bytes);
+            for language in languages {
+                if let Ok(m) = Mnemonic::from_entropy_with_language(&bytes, language) {
+                    bip39.add(&format!("phrase-{language:?}-{i}"), m.phrase().as_bytes());
+                }
+            }
+        } else if let Some(phrase) = line.strip_prefix("mnemonic: ").and_then(quoted) {
+            bip39.add(&format!("mnemonic-{i}"), phrase.as_bytes());
+            let shouted = format!("  {}  ", phrase.to_uppercase().replace(' ', "\t "));
+            bip39.add(&format!("mnemonic-spelled-{i}"), shouted.as_bytes());
+        } else if in_bad && line.starts_with('"') {
+            if let Some(phrase) = quoted(line) {
+                bip39.add(&format!("bad-{i}"), phrase.as_bytes());
+            }
+        }
+    }
+    bip39.report("fuzz_bip39");
+
+    // Shamir backups as `split_private_key` and `to_backup_format` write
+    // them (`tests/integration_tests.rs`' 3-of-5 and its subsets), one share
+    // per line.
+    let mut shamir = Corpus::new(base, "fuzz_shamir_backup");
+    for (b, threshold, total) in [(5u8, 3usize, 5usize), (10, 2, 3), (11, 5, 8)] {
+        let lines = split_private_key(&key(b), threshold, total)
+            .unwrap()
+            .to_backup_format();
+        shamir.add(
+            &format!("split-{threshold}-of-{total}"),
+            lines.join("\n").as_bytes(),
+        );
+        let subset = lines[..threshold].join("\n");
+        shamir.add(&format!("subset-{threshold}-of-{total}"), subset.as_bytes());
+        let fewer = lines[..threshold - 1].join("\n");
+        shamir.add(&format!("fewer-{threshold}-of-{total}"), fewer.as_bytes());
+        let mut mixed = lines[..threshold].to_vec();
+        mixed[0] = mixed[0].replace(&format!(".{threshold}."), &format!(".{}.", threshold + 1));
+        shamir.add(
+            &format!("mismatch-{threshold}-of-{total}"),
+            mixed.join("\n").as_bytes(),
+        );
+    }
+    shamir.add("zero-point", b"1.1.2.abcd\n2.3J.2.abcd");
+    shamir.report("fuzz_shamir_backup");
 }

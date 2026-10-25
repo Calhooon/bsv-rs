@@ -54,6 +54,24 @@ Go (`go-sdk@2ca481c` `message/signed.go`, `Verify`) slices `sig[counter :
 counter+32]` with no bound and panics on the same input (and on any input under
 70 bytes). This crate refuses it by length, as it refuses a short anyone form.
 
+### Added: a fuzz target for each of the five readers of outside bytes that had none (#140)
+
+Fuzz harness only; nothing under `src/` moved. `fuzz_messages_signed`
+(`messages::verify`), `fuzz_messages_encrypted` (`messages::decrypt`),
+`fuzz_bsm` (the BSM envelope's readers), `fuzz_bip39` (`Mnemonic`'s phrase,
+binary and entropy readers in the nine languages) and `fuzz_shamir_backup`
+(`KeyShares::from_backup_format`, then `recover_private_key`) each assert the
+reader returns, and the writer's round trip: the same bytes where the writer is
+deterministic (the BSM signer), the canonical form where the reader accepts
+more than one spelling (a phrase, a share), and the input through the writer
+and back where the writer draws a random key id or IV (the two message
+formats). Their seeds come from `fuzz/corpus-gen` (the BIP-39 vectors of
+`tests/compat_bip39_tests.rs`, the TypeScript SDK's BSM signature, the writers
+with fixed test keys); the nightly runs eighteen targets. The signed-message
+target's 30-second run found `verify` slicing past a short signature that names
+the given recipient (`src/messages/signed.rs:188:22`), filed as bsv-rs#173 and
+not skipped, so the nightly's job for it is red until the fix.
+
 ### Added: a BEEF whose source links form a cycle is pinned (#160)
 
 Tests only; no reader moved. `tests/beef_cycle.rs` (five tests) builds rings of

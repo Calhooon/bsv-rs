@@ -155,7 +155,7 @@ The fuzz job files its own crashes (below).
 
 ## Fuzz (#82)
 
-**What runs.** One job per target of `fuzz/Cargo.toml` (13 today; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for one hour from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=3600`): a crash is recorded and the run goes on.
+**What runs.** One job per target of `fuzz/Cargo.toml` (18 today; the table is in `fuzz/fuzz_targets/CLAUDE.md`), each built with `cargo fuzz build -O` on the pinned nightly (`FUZZ_TOOLCHAIN`, `cargo-fuzz` by version) and run for one hour from its checked-in corpus `fuzz/corpus/<target>/` (`-fork=2 -ignore_crashes=1 -max_total_time=3600`): a crash is recorded and the run goes on.
 
 **Where the results land.**
 

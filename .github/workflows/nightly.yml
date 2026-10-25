@@ -176,12 +176,17 @@ jobs:
           - fuzz_base58
           - fuzz_beef_parser
           - fuzz_bip32
+          - fuzz_bip39
+          - fuzz_bsm
           - fuzz_chain_primitives
           - fuzz_ecies
           - fuzz_http_json_responses
           - fuzz_merkle_path
+          - fuzz_messages_encrypted
+          - fuzz_messages_signed
           - fuzz_script_parser
           - fuzz_script_spend
+          - fuzz_shamir_backup
           - fuzz_transaction_parser
           - fuzz_wire_decoders
           - fuzz_wire_protocol
