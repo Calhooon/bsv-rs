@@ -171,12 +171,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::Encrypt, originator, writer.as_bytes())
             .await?;
 
-        // Parse response
-        let mut reader = WireReader::new(&response);
-        let ciphertext_len = reader.read_var_int()? as usize;
-        let ciphertext = reader.read_bytes(ciphertext_len)?.to_vec();
-
-        Ok(EncryptResult { ciphertext })
+        // The rest of the frame (`WalletWireTransceiver.ts:953-957`; #197)
+        Ok(EncryptResult {
+            ciphertext: response,
+        })
     }
 
     /// Decrypts data using the wallet's derived key.
@@ -204,12 +202,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::Decrypt, originator, writer.as_bytes())
             .await?;
 
-        // Parse response
-        let mut reader = WireReader::new(&response);
-        let plaintext_len = reader.read_var_int()? as usize;
-        let plaintext = reader.read_bytes(plaintext_len)?.to_vec();
-
-        Ok(DecryptResult { plaintext })
+        // The rest of the frame (`WalletWireTransceiver.ts:988`; #197)
+        Ok(DecryptResult {
+            plaintext: response,
+        })
     }
 
     /// Creates an HMAC using the wallet's derived key.
@@ -237,18 +233,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::CreateHmac, originator, writer.as_bytes())
             .await?;
 
-        // Parse response - HMAC is always 32 bytes
-        let mut reader = WireReader::new(&response);
-        let hmac_len = reader.read_var_int()? as usize;
-        if hmac_len != 32 {
-            return Err(Error::WalletError(format!(
-                "invalid HMAC length: expected 32, got {}",
-                hmac_len
-            )));
-        }
-        let hmac_bytes = reader.read_bytes(32)?;
+        // The rest of the frame, 32 bytes (`WalletWireTransceiver.ts:1019-1021`; #197)
+        super::require_response_length(&response, 32, "createHmac")?;
         let mut hmac = [0u8; 32];
-        hmac.copy_from_slice(hmac_bytes);
+        hmac.copy_from_slice(&response);
 
         Ok(CreateHmacResult { hmac })
     }
@@ -282,11 +270,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::VerifyHmac, originator, writer.as_bytes())
             .await?;
 
-        // Parse response
-        let mut reader = WireReader::new(&response);
-        let valid = reader.read_optional_bool()?.unwrap_or(false);
-
-        Ok(VerifyHmacResult { valid })
+        // Nothing after the error byte: a false verdict is an error frame
+        // (`WalletWireTransceiver.ts:1053-1055`; #197)
+        super::require_response_length(&response, 0, "verifyHmac")?;
+        Ok(VerifyHmacResult { valid: true })
     }
 
     /// Creates a signature using the wallet's derived key.
@@ -316,12 +303,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::CreateSignature, originator, writer.as_bytes())
             .await?;
 
-        // Parse response - DER-encoded signature
-        let mut reader = WireReader::new(&response);
-        let sig_len = reader.read_var_int()? as usize;
-        let signature = reader.read_bytes(sig_len)?.to_vec();
-
-        Ok(CreateSignatureResult { signature })
+        // The rest of the frame, the DER signature (`WalletWireTransceiver.ts:1093-1101`; #197)
+        Ok(CreateSignatureResult {
+            signature: response,
+        })
     }
 
     /// Verifies a signature using the wallet's derived key.
@@ -358,11 +343,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             .transmit(WalletCall::VerifySignature, originator, writer.as_bytes())
             .await?;
 
-        // Parse response
-        let mut reader = WireReader::new(&response);
-        let valid = reader.read_optional_bool()?.unwrap_or(false);
-
-        Ok(VerifySignatureResult { valid })
+        // Nothing after the error byte: a false verdict is an error frame
+        // (`WalletWireTransceiver.ts:1147-1149`; #197)
+        super::require_response_length(&response, 0, "verifySignature")?;
+        Ok(VerifySignatureResult { valid: true })
     }
 
     /// Checks if the wallet is authenticated.
@@ -1340,8 +1324,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
     /// Waits for authentication.
     pub async fn wait_for_authentication(&self, originator: &str) -> Result<bool, Error> {
-        self.transmit(WalletCall::WaitForAuthentication, originator, &[])
+        let response = self
+            .transmit(WalletCall::WaitForAuthentication, originator, &[])
             .await?;
+        // Nothing after the error byte (`WalletWireTransceiver.ts:1870-1872`; #197)
+        super::require_response_length(&response, 0, "waitForAuthentication")?;
         Ok(true)
     }
 

@@ -28,7 +28,10 @@ use super::requests::{
     read_reveal_counterparty_key_linkage_args, read_reveal_specific_key_linkage_args,
 };
 use super::results::{
-    write_reveal_counterparty_key_linkage_result, write_reveal_specific_key_linkage_result,
+    write_create_hmac_result, write_create_signature_result, write_decrypt_result,
+    write_encrypt_result, write_reveal_counterparty_key_linkage_result,
+    write_reveal_specific_key_linkage_result, write_verify_hmac_result,
+    write_verify_signature_result, write_wait_for_authentication_result,
 };
 use super::WalletCall;
 use crate::primitives::from_hex;
@@ -308,11 +311,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         };
         let result = self.wallet.encrypt(args, originator).await?;
 
-        // Serialize response
-        let mut writer = WireWriter::new();
-        writer.write_var_int(result.ciphertext.len() as u64);
-        writer.write_bytes(&result.ciphertext);
-        Ok(writer.into_bytes())
+        Ok(write_encrypt_result(&result))
     }
 
     async fn handle_decrypt(
@@ -336,11 +335,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         };
         let result = self.wallet.decrypt(args, originator).await?;
 
-        // Serialize response
-        let mut writer = WireWriter::new();
-        writer.write_var_int(result.plaintext.len() as u64);
-        writer.write_bytes(&result.plaintext);
-        Ok(writer.into_bytes())
+        Ok(write_decrypt_result(&result))
     }
 
     async fn handle_create_hmac(
@@ -364,11 +359,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         };
         let result = self.wallet.create_hmac(args, originator).await?;
 
-        // Serialize response - hmac is [u8; 32]
-        let mut writer = WireWriter::new();
-        writer.write_var_int(32);
-        writer.write_bytes(&result.hmac);
-        Ok(writer.into_bytes())
+        Ok(write_create_hmac_result(&result))
     }
 
     async fn handle_verify_hmac(
@@ -405,10 +396,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         };
         let result = self.wallet.verify_hmac(args, originator).await?;
 
-        // Serialize response
-        let mut writer = WireWriter::new();
-        writer.write_optional_bool(Some(result.valid));
-        Ok(writer.into_bytes())
+        write_verify_hmac_result(&result)
     }
 
     async fn handle_create_signature(
@@ -443,11 +431,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         };
         let result = self.wallet.create_signature(args, originator).await?;
 
-        // Serialize response - signature is Vec<u8> (DER encoded)
-        let mut writer = WireWriter::new();
-        writer.write_var_int(result.signature.len() as u64);
-        writer.write_bytes(&result.signature);
-        Ok(writer.into_bytes())
+        Ok(write_create_signature_result(&result))
     }
 
     async fn handle_verify_signature(
@@ -489,10 +473,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         };
         let result = self.wallet.verify_signature(args, originator).await?;
 
-        // Serialize response
-        let mut writer = WireWriter::new();
-        writer.write_optional_bool(Some(result.valid));
-        Ok(writer.into_bytes())
+        write_verify_signature_result(&result)
     }
 
     async fn handle_reveal_counterparty_key_linkage(
@@ -536,9 +517,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
 
     async fn handle_wait_for_authentication(&self, originator: &str) -> Result<Vec<u8>, Error> {
         let result = self.wallet.wait_for_authentication(originator).await?;
-        let mut writer = WireWriter::new();
-        writer.write_optional_bool(Some(result.authenticated));
-        Ok(writer.into_bytes())
+        write_wait_for_authentication_result(&result)
     }
 
     async fn handle_get_height(&self, originator: &str) -> Result<Vec<u8>, Error> {
