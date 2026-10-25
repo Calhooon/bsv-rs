@@ -1520,28 +1520,6 @@ impl BeefDecoder {
     }
 }
 
-/// One BUMP read alone, as the decoder reads one in a BEEF (the standalone
-/// reader, `MerklePath::from_binary`, bsv-rs#167): the same flags, offsets,
-/// tree height and walk, each refusal the stream's, its offset counted from
-/// the BUMP's leading byte. The bytes after the BUMP are not read; the
-/// BUMP's `wire_len` is the bytes it took.
-pub(crate) fn read_bump(bin: &[u8]) -> Result<Bump, Refusal> {
-    let mut decoder = BeefDecoder::at(Frame {
-        phase: Phase::Bumps,
-        bumps_left: 1,
-        ..Frame::start()
-    });
-    let mut input = bin;
-    match decoder.next(&mut input)? {
-        Step::Element(Element::Bump(bump)) => Ok(bump),
-        // The decoder yields the BUMP or stops inside it: the field cut short.
-        _ => Err(decoder
-            .finish()
-            .err()
-            .unwrap_or(Refusal::new(decoder.offset(), Reason::BadVarint))),
-    }
-}
-
 // ---------------------------------------------------------------------------
 // The stream over a reader
 // ---------------------------------------------------------------------------

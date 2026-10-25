@@ -37,14 +37,9 @@
 
 use std::collections::{HashMap, HashSet};
 
-use super::beef_stream::{read_bump, Refusal};
+use super::beef_stream::{Bump, Refusal};
 use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
 use crate::Result;
-
-/// A BUMP the decoder refused, in the stream's words.
-fn refused(refusal: Refusal) -> crate::Error {
-    crate::Error::MerklePathError(refusal.to_string())
-}
 
 /// The most levels a path may have. Offsets are `u64`, so a path of 64 levels
 /// shifts an offset by at most 63; a tree-height byte over this is refused
@@ -276,7 +271,8 @@ impl MerklePath {
     /// offset counted from the BUMP's leading byte. The reader is advanced
     /// past the BUMP alone.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        let bump = read_bump(reader.clone().read_remaining()).map_err(refused)?;
+        let refused = |r: Refusal| crate::Error::MerklePathError(r.to_string());
+        let bump = Bump::read_alone(reader.clone().read_remaining()).map_err(refused)?;
         let path = bump.in_memory().map_err(refused)?;
         reader.read_bytes(usize::try_from(bump.wire_len).unwrap_or(usize::MAX))?;
         Ok(path)
