@@ -11,7 +11,7 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 |------|---------|-------|
 | `mod.rs` | Module root, WalletWire trait, status/counterparty codes | ~173 |
 | `calls.rs` | WalletCall enum (28 call codes), TryFrom/Display/method_name impls | ~197 |
-| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2525 |
+| `encoding.rs` | WireReader/WireWriter with Go-compatible nil sentinel and complex type support | ~2468 |
 | `processor.rs` | Generic server-side processor over WalletInterface | ~949 |
 | `transceiver.rs` | Client-side message serialization and full wallet interface (all 28 methods) | ~1628 |
 
@@ -182,7 +182,7 @@ pub mod status_codes {
 
 **WalletCertificate wire format (Go-compatible):** `type(32 raw bytes, base64) -> serial(32 raw bytes, base64) -> subject(33 pubkey) -> certifier(33 pubkey) -> revocation outpoint -> fields(sorted map) -> signature(remaining bytes, no length prefix)`.
 
-**IdentityCertificate wire format (the writer's, the reference's `#serializeDiscoveryResult` and Go's `SerializeIdentityCertificate`, bsv-rs#182):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> name, iconUrl, description (plain varint-length strings, an absent one empty) -> trust (u8) -> keyring (varint count + sorted (varint-length key, varint-length raw bytes of the base64 value)) -> decrypted fields (string map)`; no present-flag byte, no NIL sentinel, an absent certifier info or map Go's zero value. `read_identity_certificate` still reads the old layout (a present flag, NIL-sentinel strings and maps); the transceiver's discovery reader reads the writer's.
+**IdentityCertificate wire format (the writer's, the reference's `#serializeDiscoveryResult` and Go's `SerializeIdentityCertificate`, bsv-rs#182):** `VarInt(cert_len) + cert_bytes (WalletCertificate format) -> name, iconUrl, description (plain varint-length strings, an absent one empty) -> trust (u8) -> keyring (varint count + sorted (varint-length key, varint-length raw bytes of the base64 value)) -> decrypted fields (string map)`; no present-flag byte, no NIL sentinel, an absent certifier info or map Go's zero value. `read_identity_certificate` and `read_optional_identity_certifier` read the same bytes as the transceiver's discovery reader does (bsv-rs#184): an empty iconUrl or description is `Some("")`, Go's zero value is `Some` with empty strings and trust 0 (never `None`), an empty map is `None`; the old layout's bytes are refused. `write_identity_certifier` writes these bytes only when iconUrl and description are present; it, `write_optional_identity_certifier` and `write_optional_string_map` have no caller in the crate and stay public (#184 keeps their fate open).
 
 **WalletAction wire format (Go-compatible):** `txid(32) -> satoshis(unsigned VarInt) -> status(i8) -> isOutgoing(optional bool) -> description(string) -> labels(string array) -> version(VarInt) -> lockTime(VarInt) -> inputs(VarInt count or MaxUint64) -> outputs(VarInt count or MaxUint64)`.
 
@@ -281,7 +281,8 @@ impl WalletWire for LoopbackWire {
 ```
 
 **Test coverage:**
-- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, optional string arrays, send-with-results, sign-action-spends, wallet certificates, identity certifiers/certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
+- encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, optional string arrays, send-with-results, sign-action-spends, wallet certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
+- `tests/wire_identity_certificate_writer.rs` and `tests/wire_identity_certificate_roundtrip.rs`: the identity certificate's writer and readers against the reference's bytes and the shared discovery vector (#182, #184).
 - processor.rs: Tests for getPublicKey, getNetwork, getVersion, isAuthenticated, invalid call codes, and createAction error.
 - transceiver.rs: End-to-end loopback tests for get_public_key, encrypt/decrypt roundtrip, create/verify HMAC, create/verify signature, is_authenticated, get_network, get_version.
 

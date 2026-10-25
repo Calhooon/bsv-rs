@@ -109,6 +109,46 @@ change of the public API's shape, the owner's word).
 still read the old layout: no caller in the crate, outside this fix, the
 follow-up filed as #184.
 
+### Fixed: the identity-certificate readers read the reference's layout (#184)
+
+`WireReader::read_identity_certificate` and `read_optional_identity_certifier`
+still read the layout this crate's writer wrote before #182: a present-flag
+byte, NIL-sentinel strings and maps, the keyring's values as base64 text. Fed
+the writer's bytes or the shared vector's entry, they returned an error;
+nothing in the crate called them and no test read the new bytes through them,
+so nothing here saw it. They now read what
+`write_identity_certificate` writes and the reference reads (`ts-stack@edf6e03`
+`WalletWireTransceiver.ts:1702-1745`; go-sdk@2ca481c
+`wallet/serializer/identity_certificate.go:51-100`), the same reading as the
+transceiver's `parse_discovery_result`: the certificate behind its varint
+length, name, iconUrl and description as plain strings, trust a byte, the
+keyring as a count of varint-length keys and raw-byte values (base64 in the
+struct), the decrypted fields as a count of string pairs. `read_identity_certifier`
+reads the three strings and the byte the same way. The reference has no absent
+certifier: Go's zero value, which the writer writes for `None`, reads back as
+`Some` with empty strings and trust 0, never `None`; an empty iconUrl or
+description is `Some("")`, an empty map `None`. A byte length past the bytes
+is `ReaderUnderflow`, and the capacities are bounded by the bytes remaining.
+`tests/wire_identity_certificate_roundtrip.rs` (seven tests, six RED on the old
+readers) reads back the writer's bytes, the zero value as the transceiver reads
+it, the shared vector's entry to the vector's fields, and a keyring value whose
+bytes are not UTF-8; it pins the overrun refusal and the old layout's bytes.
+The tests that paired the old writer helpers with these readers moved with
+them: `encoding.rs`'s `test_identity_certifier_roundtrip` and
+`test_optional_identity_certifier_roundtrip` left (the new file covers them),
+and `wire_method_roundtrip_tests`' `test_optional_identity_certifier_minimal_roundtrip`
+reads the reference's bytes. Migration: a caller that read this crate's
+pre-#182 bytes with these readers now gets `ReaderUnderflow` for them (other
+contents can misread; none reads as written), and must read the reference's
+layout, which every writer of 0.9 writes. None in LOW (the keeper's reading
+on #182: no LOW worker reads this crate's binary wallet wire). The public
+signatures are unchanged. TS's reader refuses trust 0 (the parity note under
+#182 above); these readers, like the transceiver and Go's, accept it.
+`write_identity_certifier` (whose bytes are the reference's only when iconUrl
+and description are present), `write_optional_identity_certifier` and
+`write_optional_string_map` stay public and untouched, with no caller in the
+crate; their removal or deprecation is the owner's word, still open on #184.
+
 ### Fixed: getHeaderForHeight's processor writes the header with no length prefix (#178)
 
 `WalletWireProcessor`'s getHeaderForHeight wrote a varint length (`0x50`)
