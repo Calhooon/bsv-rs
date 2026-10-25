@@ -213,23 +213,8 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
         DiscoverByIdentityKey | DiscoverByAttributes => {
             let r = DiscoverCertificatesResult::from_fixture(value.clone());
             w.write_var_int(r.total_certificates.into());
-            // `#serializeDiscoveryResult` (`WalletWireProcessor.ts:2478-2560` at
-            // `ts-stack@edf6e03`, Go's `SerializeIdentityCertificate`):
-            // `write_identity_certificate` departs from both (bsv-rs#177's report).
             for entry in r.certificates {
-                let mut certificate = WireWriter::new();
-                certificate
-                    .write_wallet_certificate(&entry.certificate)
-                    .unwrap();
-                w.write_var_int(certificate.len() as u64)
-                    .write_bytes(certificate.as_bytes());
-                let info = entry.certifier_info.unwrap();
-                w.write_string(&info.name)
-                    .write_string(info.icon_url.as_deref().unwrap_or_default())
-                    .write_string(info.description.as_deref().unwrap_or_default())
-                    .write_u8(info.trust);
-                keyring_bytes(&mut w, &entry.publicly_revealed_keyring.unwrap_or_default());
-                w.write_string_map(&entry.decrypted_fields.unwrap_or_default());
+                w.write_identity_certificate(&entry).unwrap();
             }
         }
         _ => return None,
