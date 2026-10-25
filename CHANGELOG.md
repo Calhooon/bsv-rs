@@ -365,8 +365,7 @@ Results, a plain `Error`, code 1, `Invalid <call> result <field>: expected
 - encrypt's ciphertext and decrypt's plaintext at most 256 MiB (`:2210-2215`).
 
 Not repeated where the reader or a type already refuses: the security level
-(`read_protocol_id`), a counterparty or linkage key that is no point
-(`read_counterparty`, `PublicKey::from_bytes`), revealSpecificKeyLinkage's
+(`read_protocol_id`), a key-related counterparty that is no point (`read_counterparty`, as the reference's decoder refuses it at `:2460`), revealSpecificKeyLinkage's
 absent counterparty, the data-type flag and the 32-byte hash and HMAC
 (`requests.rs`), the booleans, the `PublicKey`, `u8` and `[u8; 32]` result
 fields; those refusals keep this crate's words, code 1. The thirteen stubs
@@ -376,7 +375,7 @@ wallet, and are not checked, where the reference asks its wallet and checks the
 answer (`WalletWireProcessor.ts:1694-1730`; the network `mainnet` or `testnet`,
 the version 7 to 30 bytes, `WalletResultValidation.ts:2299-2306`): the
 processor's default version `0.1.0` is 5 bytes, a result the reference refuses,
-and is neither this crate's version nor its wallet's (a follow-up issue).
+and is neither this crate's version nor its wallet's (a follow-up issue). The two linkage keys of revealCounterpartyKeyLinkage, revealSpecificKeyLinkage's verifier and its absent counterparty are refused at this crate's reader, code 1, where the reference refuses them in `validateWalletArgs`, code 6 (`validationHelpers.ts:1736-1738`, `:1744-1745`); #226 moves them.
 
 `ProtoWallet` answers revealSpecificKeyLinkage for anyone with `PrivateKey(1)`'s
 key, as the reference's does (`ProtoWallet.ts:235-240`), where it answered its
