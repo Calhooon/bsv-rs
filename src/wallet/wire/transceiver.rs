@@ -1104,29 +1104,20 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
 
             // Keyring
-            let keyring = if reader.read_i8()? == 1 {
-                let num_fields = reader.read_var_int()? as usize;
-                let mut keyring = std::collections::HashMap::with_capacity(bounded_capacity(
-                    num_fields,
-                    reader.remaining(),
-                    1,
-                ));
-                for _ in 0..num_fields {
-                    let key = reader.read_string()?;
-                    let value_len = reader.read_var_int()? as usize;
-                    let value_bytes = reader.read_bytes(value_len)?;
-                    keyring.insert(key, to_base64(value_bytes));
-                }
-                Some(keyring)
+            // Keyring (`WalletWireTransceiver.ts:1513-1531` at `ts-stack@edf6e03`)
+            let keyring = if reader.read_boolean_flag("listCertificates keyring present")? {
+                let name = "listCertificates keyring";
+                let count = reader.read_collection_count(name)?;
+                Some(reader.read_wire_record(name, count, WireReader::read_base64_value)?)
             } else {
                 None
             };
 
-            // Verifier: absent (length 0) or a 33-byte public key, rendered as
-            // hex (`WalletWireTransceiver.ts:1533-1542` at `ts-stack@edf6e03`)
+            // Verifier: absent (length 0) or a 33-byte compressed key, as hex
+            // (`:1533-1542`)
             let verifier = match reader.read_var_int()? {
                 0 => None,
-                33 => Some(to_hex(reader.read_bytes(33)?)),
+                33 => Some(reader.read_compressed_key("listCertificates verifier")?),
                 n => {
                     return Err(Error::WalletError(format!(
                         "invalid listCertificates verifier length: expected 33 bytes, received {n}"
@@ -1340,7 +1331,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 writer.as_bytes(),
             )
             .await?;
-
+        // `WalletWireTransceiver.ts:1903`: exactly 80 bytes (bsv-rs#183)
+        super::require_response_length(&response, 80, "getHeaderForHeight")?;
         Ok(GetHeaderResult {
             header: to_hex(&response),
         })
@@ -1357,44 +1349,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     // Helper methods
     // =========================================================================
 
-    /// Parses a certificate from binary format, in the reference's order
-    /// (`Certificate.toBinary`, `ts-stack@edf6e03` `Certificate.ts:229-321`;
-    /// `WireWriter::write_wallet_certificate`): type, serial number, subject,
-    /// certifier, revocation outpoint, the fields, then the signature as the
-    /// bytes remaining, with no length prefix.
+    /// Parses a certificate as `Certificate.fromBinary` does
+    /// (`WireReader::read_wallet_certificate`, bsv-rs#183).
     fn parse_certificate_from_binary(&self, data: &[u8]) -> Result<WalletCertificate, Error> {
-        let mut reader = WireReader::new(data);
-
-        // Type (32 bytes)
-        let certificate_type = to_base64(reader.read_bytes(32)?);
-
-        // Serial number (32 bytes)
-        let serial_number = to_base64(reader.read_bytes(32)?);
-
-        // Subject (33 bytes)
-        let subject = to_hex(reader.read_bytes(33)?);
-
-        // Certifier (33 bytes)
-        let certifier = to_hex(reader.read_bytes(33)?);
-
-        // Revocation outpoint
-        let revocation_outpoint = reader.read_outpoint_string()?;
-
-        // Fields
-        let fields = reader.read_string_map()?;
-
-        // Signature: the remaining bytes
-        let signature = to_hex(reader.read_remaining());
-
-        Ok(WalletCertificate {
-            certificate_type,
-            subject,
-            serial_number,
-            certifier,
-            revocation_outpoint,
-            signature,
-            fields,
-        })
+        WireReader::new(data).read_wallet_certificate()
     }
 
     /// Parses a discovery result.
@@ -1418,7 +1376,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             let name = reader.read_string()?;
             let icon_url = Some(reader.read_string()?);
             let description = Some(reader.read_string()?);
-            let trust = reader.read_u8()?;
+            let trust = super::require_discovery_trust(reader.read_u8()?)?;
 
             let certifier_info = crate::wallet::IdentityCertifier {
                 name,
@@ -1427,42 +1385,15 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 trust,
             };
 
-            // Publicly revealed keyring
-            let num_public = reader.read_var_int()? as usize;
-            let publicly_revealed_keyring = if num_public > 0 {
-                let mut keyring = std::collections::HashMap::with_capacity(bounded_capacity(
-                    num_public,
-                    reader.remaining(),
-                    1,
-                ));
-                for _ in 0..num_public {
-                    let key = reader.read_string()?;
-                    let value_len = reader.read_var_int()? as usize;
-                    let value_bytes = reader.read_bytes(value_len)?;
-                    keyring.insert(key, to_base64(value_bytes));
-                }
-                Some(keyring)
-            } else {
-                None
-            };
-
-            // Decrypted fields
-            let num_decrypted = reader.read_var_int()? as usize;
-            let decrypted_fields = if num_decrypted > 0 {
-                let mut fields = std::collections::HashMap::with_capacity(bounded_capacity(
-                    num_decrypted,
-                    reader.remaining(),
-                    1,
-                ));
-                for _ in 0..num_decrypted {
-                    let key = reader.read_string()?;
-                    let value = reader.read_string()?;
-                    fields.insert(key, value);
-                }
-                Some(fields)
-            } else {
-                None
-            };
+            // The maps: strict counts, record keys (`WalletWireTransceiver.ts:1711-1752`)
+            let name = "discovery public keyring";
+            let count = reader.read_collection_count(name)?;
+            let keyring = reader.read_wire_record(name, count, WireReader::read_base64_value)?;
+            let name = "discovery decrypted fields";
+            let count = reader.read_collection_count(name)?;
+            let fields = reader.read_wire_record(name, count, WireReader::read_utf8_value)?;
+            let publicly_revealed_keyring = Some(keyring).filter(|m| !m.is_empty());
+            let decrypted_fields = Some(fields).filter(|m| !m.is_empty());
 
             certificates.push(crate::wallet::IdentityCertificate {
                 certificate,
