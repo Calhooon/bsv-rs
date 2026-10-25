@@ -2745,3 +2745,295 @@ mod index_bounds_tests {
         assert_index_refused(err, "action output index");
     }
 }
+
+// ============================================================================
+// The seven result frames of #197, read to their last byte
+// ============================================================================
+
+mod result_frame_tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    /// A loopback that keeps the processor's last response frame.
+    struct TapeWire {
+        processor: WalletWireProcessor<ProtoWallet>,
+        tape: Mutex<Vec<u8>>,
+    }
+
+    #[async_trait::async_trait]
+    impl WalletWire for TapeWire {
+        async fn transmit_to_wallet(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+            let response = self.processor.process_message(message).await?;
+            if let Ok(mut tape) = self.tape.lock() {
+                *tape = response.clone();
+            }
+            Ok(response)
+        }
+    }
+
+    fn taped() -> WalletWireTransceiver<TapeWire> {
+        WalletWireTransceiver::new(TapeWire {
+            processor: WalletWireProcessor::new(ProtoWallet::new(Some(PrivateKey::random()))),
+            tape: Mutex::default(),
+        })
+    }
+
+    fn last_frame(client: &WalletWireTransceiver<TapeWire>) -> Vec<u8> {
+        client
+            .wire()
+            .tape
+            .lock()
+            .map(|tape| tape.clone())
+            .unwrap_or_default()
+    }
+
+    /// The error byte then `bytes`, nothing between and nothing after.
+    fn success(bytes: &[u8]) -> Vec<u8> {
+        let mut frame = vec![0];
+        frame.extend_from_slice(bytes);
+        frame
+    }
+
+    fn protocol() -> Protocol {
+        Protocol::new(SecurityLevel::App, "result frames")
+    }
+
+    /// Answers every request with one frame.
+    struct FrameWire(Vec<u8>);
+
+    #[async_trait::async_trait]
+    impl WalletWire for FrameWire {
+        async fn transmit_to_wallet(&self, _: &[u8]) -> Result<Vec<u8>, Error> {
+            Ok(self.0.clone())
+        }
+    }
+
+    /// #197: encrypt's frame is the error byte then the ciphertext alone,
+    /// decrypt's the error byte then the plaintext alone.
+    #[tokio::test]
+    async fn the_encrypt_and_decrypt_frames_carry_the_bytes_alone() {
+        let client = taped();
+        let plaintext = b"the rest of the frame".to_vec();
+        let encrypted = client
+            .encrypt(
+                EncryptArgs {
+                    plaintext: plaintext.clone(),
+                    protocol_id: protocol(),
+                    key_id: "frame-1".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await
+            .unwrap();
+        assert_eq!(last_frame(&client), success(&encrypted.ciphertext));
+        let decrypted = client
+            .decrypt(
+                DecryptArgs {
+                    ciphertext: encrypted.ciphertext,
+                    protocol_id: protocol(),
+                    key_id: "frame-1".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await
+            .unwrap();
+        assert_eq!(decrypted.plaintext, plaintext);
+        assert_eq!(last_frame(&client), success(&plaintext));
+    }
+
+    /// #197: createHmac's frame is 33 bytes, the error byte then the HMAC;
+    /// verifyHmac's is the error byte alone.
+    #[tokio::test]
+    async fn the_hmac_frames_carry_the_32_bytes_then_nothing() {
+        let client = taped();
+        let created = client
+            .create_hmac(
+                CreateHmacArgs {
+                    data: b"frame data".to_vec(),
+                    protocol_id: protocol(),
+                    key_id: "frame-2".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await
+            .unwrap();
+        assert_eq!(last_frame(&client), success(&created.hmac));
+        assert_eq!(last_frame(&client).len(), 33);
+        let verified = client
+            .verify_hmac(
+                VerifyHmacArgs {
+                    data: b"frame data".to_vec(),
+                    hmac: created.hmac,
+                    protocol_id: protocol(),
+                    key_id: "frame-2".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await
+            .unwrap();
+        assert!(verified.valid);
+        assert_eq!(last_frame(&client), vec![0]);
+    }
+
+    /// #197: createSignature's frame is the error byte then the DER alone;
+    /// verifySignature's is the error byte alone.
+    #[tokio::test]
+    async fn the_signature_frames_carry_the_der_then_nothing() {
+        let client = taped();
+        let created = client
+            .create_signature(
+                CreateSignatureArgs {
+                    data: Some(b"frame message".to_vec()),
+                    hash_to_directly_sign: None,
+                    protocol_id: protocol(),
+                    key_id: "frame-3".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await
+            .unwrap();
+        assert_eq!(last_frame(&client), success(&created.signature));
+        bsv_rs::primitives::Signature::from_der(&created.signature).expect("a DER signature");
+        let verified = client
+            .verify_signature(
+                VerifySignatureArgs {
+                    data: Some(b"frame message".to_vec()),
+                    hash_to_directly_verify: None,
+                    signature: created.signature,
+                    protocol_id: protocol(),
+                    key_id: "frame-3".to_string(),
+                    counterparty: Some(Counterparty::Anyone),
+                    for_self: Some(true),
+                },
+                "test",
+            )
+            .await
+            .unwrap();
+        assert!(verified.valid);
+        assert_eq!(last_frame(&client), vec![0]);
+    }
+
+    /// #197: waitForAuthentication's frame is the error byte alone.
+    #[tokio::test]
+    async fn the_wait_for_authentication_frame_is_the_error_byte_alone() {
+        let client = taped();
+        assert!(client.wait_for_authentication("test").await.unwrap());
+        assert_eq!(last_frame(&client), vec![0]);
+    }
+
+    /// The three verdict calls through a transceiver answered with `frame`.
+    async fn verdicts(frame: &[u8]) -> [Result<bool, Error>; 3] {
+        let client = WalletWireTransceiver::new(FrameWire(frame.to_vec()));
+        let hmac = client
+            .verify_hmac(
+                VerifyHmacArgs {
+                    data: vec![1],
+                    hmac: [0; 32],
+                    protocol_id: protocol(),
+                    key_id: "frame-4".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await
+            .map(|r| r.valid);
+        let signature = client
+            .verify_signature(
+                VerifySignatureArgs {
+                    data: Some(vec![1]),
+                    hash_to_directly_verify: None,
+                    signature: vec![0x30, 0x00],
+                    protocol_id: protocol(),
+                    key_id: "frame-4".to_string(),
+                    counterparty: None,
+                    for_self: None,
+                },
+                "test",
+            )
+            .await
+            .map(|r| r.valid);
+        let authenticated = client.wait_for_authentication("test").await;
+        [hmac, signature, authenticated]
+    }
+
+    /// #197: the error byte alone reads as true for the three verdicts.
+    #[tokio::test]
+    async fn the_error_byte_alone_reads_as_a_true_verdict() {
+        for verdict in verdicts(&[0]).await {
+            assert_eq!(verdict, Ok(true));
+        }
+    }
+
+    /// #197: an error frame reads as the error for the three verdicts, never
+    /// as a false verdict.
+    #[tokio::test]
+    async fn an_error_frame_reads_as_the_error_for_a_verdict() {
+        let mut frame = WireWriter::new();
+        frame.write_u8(1);
+        frame.write_string("HMAC is not valid");
+        frame.write_var_int(0);
+        for verdict in verdicts(frame.as_bytes()).await {
+            assert_eq!(
+                verdict,
+                Err(Error::WalletError(
+                    "wallet error (code 1): HMAC is not valid".to_string()
+                ))
+            );
+        }
+    }
+
+    /// #197: a byte after the error byte is refused, as the reference's
+    /// `#requireEmptyResponse` refuses it: an older bsv-rs processor's `00 00`
+    /// (its false verdict) is never read as true, nor its `00 01`.
+    #[tokio::test]
+    async fn a_byte_after_a_verdicts_error_byte_is_refused() {
+        for frame in [[0u8, 0], [0, 1]] {
+            let [hmac, signature, authenticated] = verdicts(&frame).await;
+            for (verdict, call) in [
+                (hmac, "verifyHmac"),
+                (signature, "verifySignature"),
+                (authenticated, "waitForAuthentication"),
+            ] {
+                assert_eq!(
+                    verdict,
+                    Err(Error::WalletError(format!(
+                        "Wallet Wire {call} response has an invalid length"
+                    ))),
+                    "{frame:?}"
+                );
+            }
+        }
+    }
+
+    /// #197: createHmac's result is 32 bytes: an older bsv-rs processor's
+    /// length-prefixed 33 is refused, as the reference refuses it
+    /// (`WalletWireTransceiver.ts:1020`).
+    #[tokio::test]
+    async fn a_create_hmac_result_other_than_32_bytes_is_refused() {
+        let mut frame = vec![0, 0x20];
+        frame.extend([0x0d; 32]);
+        let client = WalletWireTransceiver::new(FrameWire(frame));
+        let result = client
+            .create_hmac(
+                CreateHmacArgs {
+                    data: vec![1],
+                    protocol_id: protocol(),
+                    key_id: "frame-5".to_string(),
+                    counterparty: None,
+                },
+                "test",
+            )
+            .await;
+        assert_eq!(
+            result.err(),
+            Some(Error::WalletError(
+                "Wallet Wire createHmac response has an invalid length".to_string()
+            ))
+        );
+    }
+}

@@ -1370,9 +1370,10 @@ const RESULT_VECTORS: [&str; 27] = [
 ];
 
 /// The result vectors the processor cannot write as their wire, with the
-/// reason. A vector that leaves this list, or joins it, moves the count.
+/// reason. A vector that leaves this list, or joins it, moves the count (19
+/// at #194; the seven result writers of #197 left it).
 #[cfg(feature = "http")]
-const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 19] = [
+const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 12] = [
     (
         "abortAction-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
@@ -1382,28 +1383,12 @@ const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 19] = [
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
     ),
     (
-        "createHmac-simple-result.json",
-        "the processor writes a varint length ahead of the HMAC; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1496 at ts-stack@edf6e03)",
-    ),
-    (
-        "createSignature-simple-result.json",
-        "the processor writes a varint length ahead of the signature; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1560 at ts-stack@edf6e03)",
-    ),
-    (
-        "decrypt-simple-result.json",
-        "the processor writes a varint length ahead of the plaintext; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1471 at ts-stack@edf6e03)",
-    ),
-    (
         "discoverByAttributes-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
     ),
     (
         "discoverByIdentityKey-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
-    ),
-    (
-        "encrypt-simple-result.json",
-        "the processor writes a varint length ahead of the ciphertext; the reference writes the bytes alone to the end of the frame (WalletWireProcessor.ts:1444 at ts-stack@edf6e03)",
     ),
     (
         "internalizeAction-simple-result.json",
@@ -1436,18 +1421,6 @@ const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 19] = [
     (
         "relinquishOutput-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
-    ),
-    (
-        "verifyHmac-simple-result.json",
-        "the processor writes a valid byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1522-1525 at ts-stack@edf6e03)",
-    ),
-    (
-        "verifySignature-simple-result.json",
-        "the processor writes a valid byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1600-1603 at ts-stack@edf6e03)",
-    ),
-    (
-        "waitForAuthentication-simple-result.json",
-        "the processor writes an authenticated byte 01 after the error byte; the reference writes the error byte alone (WalletWireProcessor.ts:1641-1644 at ts-stack@edf6e03)",
     ),
 ];
 
@@ -1567,7 +1540,7 @@ async fn every_go_result_vector_is_the_processors_wire_for_its_json() {
         .map(|(f, _)| *f)
         .collect();
     assert_eq!(failing, allowed, "the vectors the processor cannot write");
-    assert_eq!(RESULT_VECTORS.len() - failing.len(), 8, "passing rows");
+    assert_eq!(RESULT_VECTORS.len() - failing.len(), 15, "passing rows");
 }
 
 /// #194: revealCounterpartyKeyLinkage's response is the error byte, the
@@ -1590,4 +1563,227 @@ async fn the_specific_linkage_response_writes_the_three_keys_ahead_of_everything
     processor_writes_the_vector_wire("revealSpecificKeyLinkage-simple-result.json")
         .await
         .unwrap();
+}
+
+// ============================================================================
+// The seven result frames of #197, both sides
+// ============================================================================
+
+/// The four byte-array results and the three verdicts of #197.
+#[cfg(feature = "http")]
+const RESULT_BYTES_VECTORS: [&str; 7] = [
+    "encrypt-simple-result.json",
+    "decrypt-simple-result.json",
+    "createHmac-simple-result.json",
+    "createSignature-simple-result.json",
+    "verifyHmac-simple-result.json",
+    "verifySignature-simple-result.json",
+    "waitForAuthentication-simple-result.json",
+];
+
+/// #197: encrypt, decrypt, createHmac and createSignature answer the error
+/// byte then the bytes alone, no length ahead of them; verifyHmac,
+/// verifySignature and waitForAuthentication answer the error byte alone.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_seven_result_writers_write_the_vectors_wire_byte_for_byte() {
+    for filename in RESULT_BYTES_VECTORS {
+        processor_writes_the_vector_wire(filename)
+            .await
+            .unwrap_or_else(|why| panic!("{filename}: {why}"));
+    }
+}
+
+/// Answers every request with one recorded frame.
+#[cfg(feature = "http")]
+struct FrameWire(Vec<u8>);
+
+#[cfg(feature = "http")]
+#[async_trait::async_trait]
+impl bsv_rs::wallet::wire::WalletWire for FrameWire {
+    async fn transmit_to_wallet(&self, _: &[u8]) -> Result<Vec<u8>, bsv_rs::Error> {
+        Ok(self.0.clone())
+    }
+}
+
+/// #197, the reader's side: this crate's transceiver reads each of the seven
+/// Go result vectors' wire as the vector's json (the rest of the frame as the
+/// bytes; an empty result as a true verdict).
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
+    use bsv_rs::wallet::wire::WalletWireTransceiver;
+    use bsv_rs::wallet::{
+        CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, Protocol, SecurityLevel,
+        VerifyHmacArgs, VerifySignatureArgs,
+    };
+    let protocol = || Protocol::new(SecurityLevel::App, "fixture keys");
+    let key = || "fixture".to_string();
+    for filename in RESULT_BYTES_VECTORS {
+        let (json, wire) = load_vector(filename);
+        let client = WalletWireTransceiver::new(FrameWire(wire));
+        let read = match filename.split('-').next().unwrap() {
+            "encrypt" => {
+                let r = client
+                    .encrypt(
+                        EncryptArgs {
+                            plaintext: vec![0],
+                            protocol_id: protocol(),
+                            key_id: key(),
+                            counterparty: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+                serde_json::json!({"ciphertext": r.ciphertext})
+            }
+            "decrypt" => {
+                let r = client
+                    .decrypt(
+                        DecryptArgs {
+                            ciphertext: vec![0],
+                            protocol_id: protocol(),
+                            key_id: key(),
+                            counterparty: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+                serde_json::json!({"plaintext": r.plaintext})
+            }
+            "createHmac" => {
+                let r = client
+                    .create_hmac(
+                        CreateHmacArgs {
+                            data: vec![0],
+                            protocol_id: protocol(),
+                            key_id: key(),
+                            counterparty: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+                serde_json::json!({"hmac": r.hmac.to_vec()})
+            }
+            "createSignature" => {
+                let r = client
+                    .create_signature(
+                        CreateSignatureArgs {
+                            data: Some(vec![0]),
+                            hash_to_directly_sign: None,
+                            protocol_id: protocol(),
+                            key_id: key(),
+                            counterparty: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+                serde_json::json!({"signature": r.signature})
+            }
+            "verifyHmac" => {
+                let r = client
+                    .verify_hmac(
+                        VerifyHmacArgs {
+                            data: vec![0],
+                            hmac: [0; 32],
+                            protocol_id: protocol(),
+                            key_id: key(),
+                            counterparty: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+                serde_json::json!({"valid": r.valid})
+            }
+            "verifySignature" => {
+                let r = client
+                    .verify_signature(
+                        VerifySignatureArgs {
+                            data: Some(vec![0]),
+                            hash_to_directly_verify: None,
+                            signature: vec![0],
+                            protocol_id: protocol(),
+                            key_id: key(),
+                            counterparty: None,
+                            for_self: None,
+                        },
+                        "",
+                    )
+                    .await
+                    .unwrap();
+                serde_json::json!({"valid": r.valid})
+            }
+            "waitForAuthentication" => {
+                serde_json::json!({"authenticated": client.wait_for_authentication("").await.unwrap()})
+            }
+            other => unreachable!("{other}"),
+        };
+        assert_eq!(read, json, "{filename}");
+    }
+}
+
+/// #197: a wallet's false verdict is the reference's error frame, never the
+/// error byte alone (which the reference's transceiver, and this one, read as
+/// true): `HMAC is not valid` (`WalletWireProcessor.ts:1520`), `Signature is
+/// not valid` (`:1597`), `Wallet did not affirmatively authenticate` (`:1636-1638`).
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn a_false_verdict_is_answered_with_an_error_frame() {
+    use bsv_rs::wallet::wire::WalletWireProcessor;
+    for (call, reply, refusal) in [
+        (
+            "verifyHmac",
+            serde_json::json!({"valid": false}),
+            "HMAC is not valid",
+        ),
+        (
+            "verifySignature",
+            serde_json::json!({"valid": false}),
+            "Signature is not valid",
+        ),
+        (
+            "waitForAuthentication",
+            serde_json::json!({"authenticated": false}),
+            "Wallet did not affirmatively authenticate",
+        ),
+    ] {
+        let recording: Value = serde_json::from_str(
+            &std::fs::read_to_string(format!(
+                "{}/tests/fixtures/wire/{call}.json",
+                env!("CARGO_MANIFEST_DIR")
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let request = hex::decode(
+            recording["cases"][1]["expected"]["request_hex"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        let stub = fixtures::wallet::Stub::new(reply);
+        let observed = stub.observed.clone();
+        let response = WalletWireProcessor::new(stub)
+            .process_message(&request)
+            .await
+            .unwrap();
+        assert!(
+            observed.lock().unwrap().is_some(),
+            "{call}: the wallet was called"
+        );
+        let mut expected = WireWriter::new();
+        expected.write_u8(1);
+        expected.write_string(&format!("wallet error: {refusal}"));
+        expected.write_var_int(0);
+        assert_eq!(
+            hex::encode(&response),
+            hex::encode(expected.as_bytes()),
+            "{call}"
+        );
+    }
 }
