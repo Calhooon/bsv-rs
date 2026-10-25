@@ -140,7 +140,8 @@ and `wire_method_roundtrip_tests`' `test_optional_identity_certifier_minimal_rou
 reads the reference's bytes. Migration: a caller that read this crate's
 pre-#182 bytes with these readers now gets `ReaderUnderflow` for them (other
 contents can misread; none reads as written), and must read the reference's
-layout, which every writer of 0.9 writes. None in LOW (the keeper's reading
+layout, which `write_identity_certificate` writes (the deprecated pair
+still writes the old bytes). None in LOW (the keeper's reading
 on #182: no LOW worker reads this crate's binary wallet wire). The public
 signatures are unchanged. TS's reader refuses trust 0 (the parity note under
 #182 above); these readers, like the transceiver and Go's, accept it.
@@ -152,8 +153,9 @@ its replacement (`write_identity_certificate` for the two certifier writers,
 `write_string_map` with a count of 0 for an absent map), the keeper's reading
 on #184 (2026-10-25). Their removal is the owner's word, in the window beside
 the 0.9.0-beta.1 prerelease; a downstream building with `-D warnings` that
-calls one sees the deprecation now (the dependents job builds the toolbox and
-the CLI against beta on every PR: neither calls them).
+calls one sees the deprecation now (neither the toolbox nor the CLI names any
+of the three, by a grep of both trees; the dependents job builds them against
+the pins they carry, 0.8.x, not this tree).
 
 ### Fixed: getHeaderForHeight's processor writes the header with no length prefix (#178)
 
