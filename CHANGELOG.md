@@ -179,6 +179,62 @@ the same bytes as `door-DuplicateOffset-bad_index-4-3`, and `MismatchedNode`'s
 door is `door-MismatchedNode-compound-218-5` again (64 seeds, all 25 kinds
 reached). TS has no separate name: its `MerklePath` throws `Duplicate offset`
 (`MerklePath.ts:221`); Go keeps the later leaf.
+### Changed: a BIP-39 phrase and passphrase are read in NFKD, as BIP-39 says (#163)
+
+BIP-39 asks NFKD of a wordlist and seeds PBKDF2 with the NFKD mnemonic and the
+NFKD passphrase (`bitcoin/bips@100ba872` `bip-0039.mediawiki:86-87,94-96`).
+This crate's `NfkdNormalize` was a pass-through and `Language::word_index`
+compared bytes against the NFC wordlists, so two things were wrong:
+
+- **The lookup.** A phrase was read only in the files' form (NFC): an NFD phrase
+  (Go's lists, a Trezor-style wallet's) was refused as `InvalidMnemonicWord`
+  (`agre\u{301}able`, `a\u{301}baco`, every Korean word). Now
+  `Mnemonic::from_phrase_with_language` NFKD-normalizes the phrase before it
+  splits it and compares each word with the list's words in NFKD, so a phrase
+  reads the same in NFC, NFD, NFKC or NFKD, and Japanese reads with U+3000 or
+  an ASCII space (NFKD maps the one to the other). The words a `Mnemonic` keeps,
+  and so `phrase()`, `words()` and `Display`, are the list's own (NFC, the files
+  unchanged, digests unmoved), whatever form the phrase was read in. A token an
+  NFKD decomposition splits (U+00B4 is a space and U+0301) counts as two words:
+  `"<12 words>\u{b4}"` is `InvalidMnemonic("invalid word count: 13, ...")`,
+  where it was `InvalidMnemonicWord`. An unknown word's error carries it in
+  NFKD, lower-cased.
+- **The seed.** `to_seed` hashed the phrase and passphrase as given, so a phrase
+  with a character NFKD changes (366 French words, 644 Japanese, all 2048
+  Korean, 334 Spanish; the Japanese U+3000 separator) or a passphrase not in
+  NFKD seeded other bytes than BIP-39's. The 24 Japanese vectors of
+  `bip32JP/bip32JP.github.io@5a43706` (`test_JP_BIP39.json`, the file BIP-39
+  names at `:135`; public domain), now `tests/vectors/bip39_japanese.json`,
+  failed on their seeds; they pass.
+
+Migration: a caller that stored an NFD phrase and was refused is accepted now.
+A phrase that was accepted reads to the same words and the same entropy, and
+an English phrase with an ASCII passphrase (every TREZOR vector,
+`tests/compat_bip39_tests.rs`, 29 green before and after) seeds the same
+bytes. **A French, Japanese, Korean or Spanish phrase with a character NFKD
+changes, or a passphrase NFKD changes, seeds different bytes from 0.9.0 on:
+BIP-39's, as every other BIP-39 wallet derives them.** A key derived from such
+a seed by an earlier `bsv-rs` is not the key the phrase names elsewhere; re-derive
+from the phrase. `unicode-normalization` 0.1 (MIT OR Apache-2.0, pure Rust)
+joins the `compat` feature. Pinned by `tests/compat_bip39_nfkd.rs` (8 tests:
+the NFD French, Spanish and Korean phrases accepted with BIP-39's seed computed
+outside this crate, the 24 Japanese vectors read and seeded with their
+passphrases, each with ASCII spaces too, the count a normalization changes,
+an NFD passphrase seeding as the NFC one; seven red on `1be93d8`'s source; the
+eighth, every list word its own NFKC form, is the premise of the lookup's byte
+compare).
+
+### Notes: cross-SDK parity (#163)
+
+The TypeScript SDK NFKD-normalizes the phrase and passphrase for the seed
+(`ts-sdk@9e3ede6` `src/compat/Mnemonic.ts:271-272`; `ts-stack@4d0ea63`
+`packages/sdk/src/compat/Mnemonic.ts:425-426`) and looks words up by bytes
+after splitting on the list's space (`:219-222`); it ships English only, so
+its lookup decides nothing for the four lists. go-sdk@2ca481c does not
+normalize: `NewSeed` hashes the raw bytes (`compat/bip39/bip39.go:256-257`),
+and its lists are NFD, so Go refuses the NFC phrase this crate prints and seeds
+a non-NFKD passphrase otherwise; the seeds agree where Go's input is already
+NFKD.
 
 ### Changed: the fuzz crates are formatted and checked (#180)
 
@@ -1297,10 +1353,10 @@ its `init` checking upstream's crc32) and as BIP-39 asks of a wordlist
 always been their NFC form, and the files keep that, a refactor carrying no
 behavior change. The behavior it keeps: `Mnemonic::word_index` compares bytes,
 so an NFD phrase from Go or a Trezor-style wallet is refused here as
-`InvalidMnemonicWord` and never reaches `to_seed`; a phrase that parses seeds
-the same either way (`to_seed` normalizes to NFKD). The fix, normalizing both
+`InvalidMnemonicWord` and never reaches `to_seed`. The fix, normalizing both
 sides of the lookup, changes what a phrase is and waits on the owner's word
-(the follow-up issue in CLAUDE.md's divergence list).
+(the follow-up issue in CLAUDE.md's divergence list); #163 above is that fix,
+and found `to_seed`'s NFKD a pass-through too.
 
 ### Changed: the transport fault typed end to end (#87)
 
