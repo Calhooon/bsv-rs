@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the fuzz crates are formatted and checked (#180)
+
+The root has no `[workspace]`, so the fmt job's `cargo fmt --all -- --check`
+never reached `fuzz/` or `fuzz/corpus-gen/`, and `fuzz_beef_parser.rs:73` had
+drifted from rustfmt. Both crates are formatted (one tuple pattern rewrapped,
+nothing semantic) and the job checks each by manifest path, as it checks the
+ratchet and bench-compare tools.
+
+### Changed: the fuzz_beef_parser corpus is what corpus-gen writes (#180)
+
+#86's one reader refuses a repeated leaf offset as `MismatchedNode`, so the
+`bad_index` row's mutation at byte 4 now reaches that door ahead of the
+`compound` row's at byte 218: `door-MismatchedNode-bad_index-4-3` replaces
+`door-MismatchedNode-compound-218-5`, the directory stays at 63 seeds, and
+corpus-gen rerun into a clean tree writes it byte for byte. The 24 signed,
+encrypted and Shamir seeds a rerun still moves are #180's item 1.
+
 ### Fixed: the transceiver reads certificate results as the reference writes them (#177)
 
 A client on this crate's transceiver could not read a certificate that this

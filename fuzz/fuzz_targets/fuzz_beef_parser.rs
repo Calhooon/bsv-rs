@@ -73,7 +73,12 @@ fn the_two_readers_agree(data: &[u8]) {
         }
         (Err(e), _) => panic!("the parse refused what the stream accepts: {e}; {stream:?}"),
         (Ok(mut beef), _) => match (beef.verify_structure(), &stream) {
-            (Ok(roots), Verdict::Valid { roots: streamed, .. }) => {
+            (
+                Ok(roots),
+                Verdict::Valid {
+                    roots: streamed, ..
+                },
+            ) => {
                 let mut whole: Vec<(u64, String)> =
                     roots.into_iter().map(|(h, r)| (u64::from(h), r)).collect();
                 let mut streamed: Vec<(u64, String)> =
