@@ -11,7 +11,9 @@
 #[path = "../benches/wire_codec/support.rs"]
 mod support;
 
-use support::{calls, decode, encode, frames, request_layout, result_layout, CASE, CASES};
+use support::{
+    calls, decode, encode, error_layout, frames, request_layout, result_layout, CASE, CASES,
+};
 
 #[test]
 fn the_bench_frames_are_the_recordings_byte_for_byte() {
@@ -19,9 +21,13 @@ fn the_bench_frames_are_the_recordings_byte_for_byte() {
     for call in calls() {
         for case in CASES {
             let recorded = frames(call, case);
+            let result = match recorded.result.first() {
+                Some(0) => result_layout(call),
+                _ => error_layout(),
+            };
             for (side, layout, bytes) in [
                 ("request", request_layout(call), &recorded.request),
-                ("result", result_layout(call), &recorded.result),
+                ("result", result, &recorded.result),
             ] {
                 match decode(&layout, bytes) {
                     Err(e) => drift.push(format!("{call} {case} {side}: {e}")),

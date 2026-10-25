@@ -414,6 +414,12 @@ pub fn result_layout(call: WalletCall) -> Vec<Layout> {
     out
 }
 
+/// An error frame: the code, the message behind its length, the stack behind
+/// its length (the recorded minimal verdicts of #197: a false verdict).
+pub fn error_layout() -> Vec<Layout> {
+    vec![Layout::U8, Layout::Str, Layout::Blob]
+}
+
 fn common() -> Vec<Layout> {
     vec![Layout::Protocol, Layout::Str, Layout::Counterparty]
 }
@@ -583,10 +589,9 @@ fn result_fields(call: WalletCall) -> Vec<Layout> {
             fields.extend([Protocol, Str, Blob, Blob, U8]);
             fields
         }
-        C::Encrypt | C::Decrypt | C::CreateHmac | C::CreateSignature => vec![Blob],
-        C::VerifyHmac | C::VerifySignature | C::IsAuthenticated | C::WaitForAuthentication => {
-            vec![OptBool]
-        }
+        // The bytes alone to the end of the frame (#197).
+        C::Encrypt | C::Decrypt | C::CreateHmac | C::CreateSignature => vec![Rest],
+        C::IsAuthenticated => vec![OptBool],
         C::AcquireCertificate => writer_certificate(),
         C::ListCertificates => vec![Array(vec![
             Framed(writer_certificate()),
@@ -612,8 +617,13 @@ fn result_fields(call: WalletCall) -> Vec<Layout> {
         C::GetHeaderForHeight => vec![Raw(80)],
         C::GetNetwork => vec![U8],
         C::GetVersion => vec![Rest],
-        C::AbortAction | C::InternalizeAction | C::RelinquishOutput | C::RelinquishCertificate => {
-            Vec::new()
-        }
+        // The error byte alone; the three verdicts too (#197).
+        C::AbortAction
+        | C::InternalizeAction
+        | C::RelinquishOutput
+        | C::RelinquishCertificate
+        | C::VerifyHmac
+        | C::VerifySignature
+        | C::WaitForAuthentication => Vec::new(),
     }
 }
