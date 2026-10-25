@@ -299,7 +299,8 @@ fn the_atomic_form_of_a_ring_is_refused_by_the_readers_and_from_atomic_beef_stop
 
 /// An in-memory BEEF holding a real ring of `n`: a chain `T0 <- T1 <- ..`
 /// read from bytes, then `T0`'s input pointed at the last link's txid.
-/// Each entry keeps the txid it was read with, so the names form a cycle.
+/// Each entry keeps the txid it was read with, so the names form a cycle,
+/// in the parsed input and in the entry's cached `input_txids` alike.
 fn in_memory_ring(n: usize) -> (Beef, Vec<String>) {
     let mut chain = vec![tx(&["e5".repeat(32).as_str()])];
     for i in 1..n {
@@ -311,16 +312,15 @@ fn in_memory_ring(n: usize) -> (Beef, Vec<String>) {
     let ids: Vec<String> = chain.iter().map(Transaction::id).collect();
     let mut beef = Beef::from_binary(&write(None, &[], &entries)).unwrap();
     let last = ids[n - 1].clone();
-    beef.find_txid_mut(&ids[0])
-        .unwrap()
-        .tx_mut()
-        .unwrap()
-        .inputs[0]
-        .source_txid = Some(last);
+    let entry = beef.find_txid_mut(&ids[0]).unwrap();
+    entry.tx_mut().unwrap().inputs[0].source_txid = Some(last.clone());
+    // `tx_mut` leaves the cached input list as it was read; the sort and the
+    // whole-path judge read that list, so it names the ring's link too.
+    entry.input_txids = vec![last];
     (beef, ids)
 }
 
-/// The links below `tx`, following each input's first source: the depth of
+/// The links below `tx`, following the source of input 0: the depth of
 /// the linked shape.
 fn linked_depth(tx: &Transaction) -> usize {
     let mut depth = 0;
@@ -353,8 +353,9 @@ fn a_ring_held_in_memory_links_each_entry_once_and_every_walk_stops() {
             n + 1,
             "ring of {n}: each entry linked once, then the stub"
         );
-        // The atomic closure and the sort stop; the sort holds nothing of
-        // the ring valid, and the judge refuses it.
+        // The atomic closure and the sort stop; the sort finds every input
+        // in the BEEF and holds each link of the ring not valid, and the
+        // judge refuses the ring.
         let (closure, _) = bounded(&format!("in-memory ring of {n}: to_binary_atomic"), {
             let (mut beef, subject) = (beef.clone(), subject.clone());
             move || beef.to_binary_atomic(&subject).map(|b| b.len())
@@ -364,20 +365,22 @@ fn a_ring_held_in_memory_links_each_entry_once_and_every_walk_stops() {
             let mut beef = beef.clone();
             move || {
                 let sr = beef.sort_txs();
-                sr.missing_inputs.len() + sr.not_valid.len() + sr.with_missing_inputs.len()
+                (sr.missing_inputs.len(), sr.not_valid.len())
             }
         });
-        assert!(
-            sorted > 0,
-            "ring of {n}: the sort holds the ring unresolved"
+        assert_eq!(
+            sorted,
+            (0, n),
+            "ring of {n}: no input missing, every link not valid"
         );
         let (whole, _) = bounded(&format!("in-memory ring of {n}: verify_structure"), {
             let mut beef = beef.clone();
             move || beef.verify_structure().err()
         });
         assert_eq!(whole, Some(Kind::InputNamesNoElement), "ring of {n}");
-        // Written out, the mutated entry hashes anew: the ring is broken on
-        // the wire and the whole path refuses what it reads back.
+        // The writer emits the bytes each entry was read with, so the wire
+        // carries the chain, not the ring: read back, `T0` spends the
+        // placeholder again and the whole path refuses it.
         let (reread, _) = bounded(&format!("in-memory ring of {n}: round trip"), {
             let mut beef = beef.clone();
             move || {
