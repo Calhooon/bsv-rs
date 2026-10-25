@@ -91,7 +91,7 @@ fn read(bytes: &[u8]) -> IdentityCertificate {
     cert
 }
 
-async fn discovered(entry: &[u8]) -> IdentityCertificate {
+async fn discovered(entry: &[u8]) -> Result<IdentityCertificate, Error> {
     let mut frame = vec![1];
     frame.extend_from_slice(entry);
     let args = DiscoverByIdentityKeyArgs {
@@ -102,9 +102,22 @@ async fn discovered(entry: &[u8]) -> IdentityCertificate {
     };
     let mut result = WalletWireTransceiver::new(CannedWire { body: frame })
         .discover_by_identity_key(args, "fixtures.invalid")
-        .await
-        .unwrap();
-    result.certificates.remove(0)
+        .await?;
+    Ok(result.certificates.remove(0))
+}
+
+/// Go's zero value for an entry with no certifier info and no maps, as
+/// `SerializeIdentityCertificate` writes it (`identity_certificate.go:23-46`):
+/// the certificate behind its length, three empty strings, trust 0, two counts
+/// of 0. Hand-assembled: this crate's writer refuses to write it since #183.
+fn zero_value_entry() -> Vec<u8> {
+    let mut c = WireWriter::new();
+    c.write_wallet_certificate(&certificate()).unwrap();
+    let mut w = WireWriter::new();
+    w.write_var_int(c.as_bytes().len() as u64);
+    w.write_bytes(c.as_bytes());
+    w.write_bytes(&[0, 0, 0, 0, 0, 0]);
+    w.into_bytes()
 }
 
 #[test]
@@ -113,17 +126,14 @@ fn an_identity_certificate_the_writer_writes_reads_back_through_the_reader() {
     assert_eq!(json(&read(&written(&cert))), json(&cert));
 }
 
-/// Go's zero value, which the writer writes for an absent certifierInfo or map,
-/// reads back as the transceiver reads it: `Some` with empty strings and trust
-/// 0, the maps `None`; never `None` for the certifier.
+/// Go's zero value for an absent certifierInfo or map (which Go's writer
+/// writes and this crate's refuses to, #183) reads back through the reader as
+/// `Some` with empty strings and trust 0, the maps `None`; never `None` for
+/// the certifier. The transceiver refuses the same bytes as the reference's
+/// reader does (`WalletWireTransceiver.ts:1710`, trust 1 to 10; #183).
 #[tokio::test]
 async fn the_zero_value_entry_reads_back_as_the_transceiver_reads_it() {
-    let bytes = written(&IdentityCertificate {
-        certificate: certificate(),
-        certifier_info: None,
-        publicly_revealed_keyring: None,
-        decrypted_fields: None,
-    });
+    let bytes = zero_value_entry();
     let entry = read(&bytes);
     let zero = IdentityCertifier {
         name: String::new(),
@@ -134,7 +144,8 @@ async fn the_zero_value_entry_reads_back_as_the_transceiver_reads_it() {
     assert_eq!(json(&entry.certifier_info), json(&Some(zero)));
     assert_eq!(entry.publicly_revealed_keyring, None);
     assert_eq!(entry.decrypted_fields, None);
-    assert_eq!(json(&entry), json(&discovered(&bytes).await));
+    let error = discovered(&bytes).await.unwrap_err().to_string();
+    assert!(error.contains("Invalid discovery trust"), "{error:?}");
 }
 
 /// The shared vector's entry (the bytes TS and Go exchange) reads to the
@@ -189,12 +200,7 @@ fn a_keyring_value_whose_bytes_are_not_utf8_round_trips_as_base64() {
 /// allocation of the count (`bounded_capacity`, CLAUDE.md rule 5).
 #[test]
 fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
-    let zero = written(&IdentityCertificate {
-        certificate: certificate(),
-        certifier_info: None,
-        publicly_revealed_keyring: None,
-        decrypted_fields: None,
-    });
+    let zero = zero_value_entry();
     let huge = [0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f];
     let at = |tail: usize| -> Vec<u8> {
         let mut bytes = zero[..zero.len() - tail].to_vec();
