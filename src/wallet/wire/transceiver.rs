@@ -1122,15 +1122,16 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 None
             };
 
-            // Verifier
-            let verifier_len = reader.read_var_int()? as usize;
-            let verifier = if verifier_len > 0 {
-                Some(
-                    String::from_utf8(reader.read_bytes(verifier_len)?.to_vec())
-                        .map_err(|_| Error::WalletError("invalid verifier UTF-8".to_string()))?,
-                )
-            } else {
-                None
+            // Verifier: absent (length 0) or a 33-byte public key, rendered as
+            // hex (`WalletWireTransceiver.ts:1533-1542` at `ts-stack@edf6e03`)
+            let verifier = match reader.read_var_int()? {
+                0 => None,
+                33 => Some(to_hex(reader.read_bytes(33)?)),
+                n => {
+                    return Err(Error::WalletError(format!(
+                        "invalid listCertificates verifier length: expected 33 bytes, received {n}"
+                    )))
+                }
             };
 
             certificates.push(crate::wallet::CertificateResult {
@@ -1356,36 +1357,34 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     // Helper methods
     // =========================================================================
 
-    /// Parses a certificate from binary format.
+    /// Parses a certificate from binary format, in the reference's order
+    /// (`Certificate.toBinary`, `ts-stack@edf6e03` `Certificate.ts:229-321`;
+    /// `WireWriter::write_wallet_certificate`): type, serial number, subject,
+    /// certifier, revocation outpoint, the fields, then the signature as the
+    /// bytes remaining, with no length prefix.
     fn parse_certificate_from_binary(&self, data: &[u8]) -> Result<WalletCertificate, Error> {
         let mut reader = WireReader::new(data);
 
         // Type (32 bytes)
-        let type_bytes = reader.read_bytes(32)?;
-        let certificate_type = to_base64(type_bytes);
-
-        // Subject (33 bytes)
-        let subject_bytes = reader.read_bytes(33)?;
-        let subject = to_hex(subject_bytes);
+        let certificate_type = to_base64(reader.read_bytes(32)?);
 
         // Serial number (32 bytes)
-        let serial_bytes = reader.read_bytes(32)?;
-        let serial_number = to_base64(serial_bytes);
+        let serial_number = to_base64(reader.read_bytes(32)?);
+
+        // Subject (33 bytes)
+        let subject = to_hex(reader.read_bytes(33)?);
 
         // Certifier (33 bytes)
-        let certifier_bytes = reader.read_bytes(33)?;
-        let certifier = to_hex(certifier_bytes);
+        let certifier = to_hex(reader.read_bytes(33)?);
 
         // Revocation outpoint
         let revocation_outpoint = reader.read_outpoint_string()?;
 
-        // Signature
-        let sig_len = reader.read_var_int()? as usize;
-        let sig_bytes = reader.read_bytes(sig_len)?;
-        let signature = to_hex(sig_bytes);
-
         // Fields
         let fields = reader.read_string_map()?;
+
+        // Signature: the remaining bytes
+        let signature = to_hex(reader.read_remaining());
 
         Ok(WalletCertificate {
             certificate_type,
@@ -1414,10 +1413,11 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             let cert_bytes = reader.read_bytes(cert_len)?;
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
 
-            // Certifier info
+            // Certifier info: three plain strings, an empty one length 0
+            // (`#serializeDiscoveryResult`, `WalletWireProcessor.ts:2507-2518`)
             let name = reader.read_string()?;
-            let icon_url = reader.read_optional_string()?;
-            let description = reader.read_optional_string()?;
+            let icon_url = Some(reader.read_string()?);
+            let description = Some(reader.read_string()?);
             let trust = reader.read_u8()?;
 
             let certifier_info = crate::wallet::IdentityCertifier {
