@@ -768,17 +768,20 @@ fn reader_corpora(base: &Path) {
 
     let mut envelope = Corpus::new(base, "fuzz_bsm");
     let bsm_key = key(9);
-    for message in [&b"hello world"[..], b"", b"Hello, BSV!", &[b'a'; 300]] {
-        let n = message.len();
+    // Named by position: "hello world" and "Hello, BSV!" are both 11 bytes.
+    for (k, message) in [&b"hello world"[..], b"", b"Hello, BSV!", &[b'a'; 300]]
+        .iter()
+        .enumerate()
+    {
         for compressed in [true, false] {
             let sig = bsm::sign_message_with_compression(&bsm_key, message, compressed).unwrap();
             let mut seed = sig.clone();
             seed.extend_from_slice(message);
-            envelope.add(&format!("compact-{compressed}-{n}"), &seed);
+            envelope.add(&format!("compact-{compressed}-{k}"), &seed);
             let mut text = to_base64(&sig).into_bytes();
             text.push(b'\n');
             text.extend_from_slice(message);
-            envelope.add(&format!("base64-{compressed}-{n}"), &text);
+            envelope.add(&format!("base64-{compressed}-{k}"), &text);
         }
     }
     let der = bsm_key.sign(&bsm::magic_hash(b"")).unwrap().to_der();
