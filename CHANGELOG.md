@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added: a guard that CI runs every integration test binary (#146)
+
+`tests/arch_ci_runs_every_test.rs` reads `.github/workflows/ci.yml`,
+`Cargo.toml`'s features and every top-level `tests/*.rs`, and refuses, naming
+the file, any binary no whole-suite `cargo test --tests` step compiles (its
+`#![cfg]` gate read against the step's features), unless allowlisted with its
+reason and step (`memory_profiling`, alone under `dhat-profiling`); and any
+`--test <name>` in ci.yml with no file behind it. The Test Suite's enumerated
+list had drifted to 34 of 73 files; the guard keeps it from drifting again
+(`docs/ARCH-RULES.md` section 6).
+
 
 ### Changed: the fuzz crates are formatted and checked (#180)
 
@@ -1256,40 +1267,6 @@ and `-1` for absence (`:1646-1647`, `:1661`, `:1741`, `:1799-1800`; `5119a9b`
 the same nine lines later) and gives no encoding of a negative: its `VarInt`
 (`:1620-1628`) is unsigned.
 
-### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
-
-RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time
-operations) reached every dependent through k256 0.13.4 and p256 0.13.2, both
-on crypto-bigint 0.5.5, which no 0.5 release fixes. k256 and p256 move to
-0.14.0 (elliptic-curve 0.14.1, crypto-bigint 0.7.6); the hashes move with them
-to their digest 0.11 releases so the crate signs and hashes on one digest
-generation: sha2 0.10 to 0.11, sha1 0.10 to 0.11, hmac 0.12 to 0.13, pbkdf2
-0.12 to 0.13, ripemd 0.1 to 0.2. aes-gcm, aes, cbc and subtle stay where they
-were (the resolver asks nothing of them). No public type, function signature
-or error text of bsv-rs changed. `cargo deny --locked check` is clean on the
-three graphs with an empty ignore list.
-
-k256 and p256 are built without their default features: their `std` turns on
-`getrandom` 0.4, which has no wasm32-unknown-unknown backend without its own
-`wasm_js` feature. `PrivateKey::random` and `P256PrivateKey::random` draw 32
-bytes from the OS CSPRNG through this crate's `getrandom` 0.2 and refuse zero
-and values at or above n, the rejection sampling the 0.13 `SecretKey::random`
-did. `primeorder` is named with only `std` so the curves keep their
-precomputed basepoint tables.
-
-### Notes: cross-SDK parity
-
-For a digest at or above n, k256 0.14's deterministic signature is the one
-`@bsv/sdk` 2.0.16 (`ECDSA.sign`) and the Go SDK (`signRFC6979`, the clone at
-`2ca481c`) produce: derived with both on 2026-10-24 for the pinned key and
-digest, `3045022100dd92…cf39`, byte for byte. k256 0.13 signed that regime
-differently, which this crate pinned and listed as a divergence; the pin
-(`rfc6979_digest_ge_n_der_is_pinned`, `tests/ec_tests.rs`) now holds the
-references' bytes and the divergence left the list (the captain's ruling
-under rule 1). Every digest below n signs as before. Which step of the nonce
-derivation differed between the two k256 lines is not stated here: the
-derivation is the evidence, not a reading of the libraries.
-
 ### Fixed: a dead function under every slice without `script` (#115)
 
 `after_last_code_separator` (`primitives/bsv/sighash.rs`) has one caller, the
@@ -1386,17 +1363,6 @@ time at `:235-236`, the input's sequence number at `:259`, `totalOutputs` at
 `list_certificates.go:132` and `discover_certificates_result.go:37`. The
 references' own gap, not followed.
 
-### Added: a guard that CI runs every integration test binary (#146)
-
-`tests/arch_ci_runs_every_test.rs` reads `.github/workflows/ci.yml`,
-`Cargo.toml`'s features and every top-level `tests/*.rs`, and refuses, naming
-the file, any binary no whole-suite `cargo test --tests` step compiles (its
-`#![cfg]` gate read against the step's features), unless allowlisted with its
-reason and step (`memory_profiling`, alone under `dhat-profiling`); and any
-`--test <name>` in ci.yml with no file behind it. The Test Suite's enumerated
-list had drifted to 34 of 73 files; the guard keeps it from drifting again
-(`docs/ARCH-RULES.md` section 6).
-
 ### Added: internalizeAction refuses a basket insertion's `customInstructions` over 1,000 UTF-8 bytes (#117)
 
 BRC-100 bounds the field since `5119a9b` (`wallet/0100.md:867`, upstream,
@@ -1425,6 +1391,42 @@ characters accepted and 251 refused, an absent field accepted, a second
 output named by its index, the createAction copy unbounded, the ProtoWallet
 and HTTP JSON doors refusing before acting or sending), RED on the tree
 without the bound. No wire byte or JSON shape changed.
+
+## [0.8.3] - 2026-10-25
+
+### Security: RUSTSEC-2026-0387, k256 and p256 to the 0.14 line (#125)
+
+RUSTSEC-2026-0387 (timing variability in crypto-bigint's constant-time
+operations) reached every dependent through k256 0.13.4 and p256 0.13.2, both
+on crypto-bigint 0.5.5, which no 0.5 release fixes. k256 and p256 move to
+0.14.0 (elliptic-curve 0.14.1, crypto-bigint 0.7.6); the hashes move with them
+to their digest 0.11 releases so the crate signs and hashes on one digest
+generation: sha2 0.10 to 0.11, sha1 0.10 to 0.11, hmac 0.12 to 0.13, pbkdf2
+0.12 to 0.13, ripemd 0.1 to 0.2. aes-gcm, aes, cbc and subtle stay where they
+were (the resolver asks nothing of them). No public type, function signature
+or error text of bsv-rs changed. `cargo deny --locked check` is clean on the
+three graphs with an empty ignore list.
+
+k256 and p256 are built without their default features: their `std` turns on
+`getrandom` 0.4, which has no wasm32-unknown-unknown backend without its own
+`wasm_js` feature. `PrivateKey::random` and `P256PrivateKey::random` draw 32
+bytes from the OS CSPRNG through this crate's `getrandom` 0.2 and refuse zero
+and values at or above n, the rejection sampling the 0.13 `SecretKey::random`
+did. `primeorder` is named with only `std` so the curves keep their
+precomputed basepoint tables.
+
+### Notes: cross-SDK parity
+
+For a digest at or above n, k256 0.14's deterministic signature is the one
+`@bsv/sdk` 2.0.16 (`ECDSA.sign`) and the Go SDK (`signRFC6979`, the clone at
+`2ca481c`) produce: derived with both on 2026-10-24 for the pinned key and
+digest, `3045022100dd92…cf39`, byte for byte. k256 0.13 signed that regime
+differently, which this crate pinned and listed as a divergence; the pin
+(`rfc6979_digest_ge_n_der_is_pinned`, `tests/ec_tests.rs`) now holds the
+references' bytes and the divergence left the list (the captain's ruling
+under rule 1). Every digest below n signs as before. Which step of the nonce
+derivation differed between the two k256 lines is not stated here: the
+derivation is the evidence, not a reading of the libraries.
 
 ## [0.8.2] - 2026-10-23
 
