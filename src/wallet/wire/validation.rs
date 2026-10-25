@@ -319,7 +319,8 @@ pub(super) fn bytes_result(bytes: &[u8], call: &str, field: &str) -> Checked {
 /// compressed key; the 33 bytes the frame carries.
 pub(super) fn public_key_result(public_key: &str) -> Checked<Vec<u8>> {
     const CALL: &str = "getPublicKey";
-    let is_hex = public_key.len() % 2 == 0 && public_key.bytes().all(|b| b.is_ascii_hexdigit());
+    let is_hex =
+        public_key.len().is_multiple_of(2) && public_key.bytes().all(|b| b.is_ascii_hexdigit());
     if !is_hex {
         return Err(invalid_result(
             CALL,
