@@ -507,16 +507,18 @@ fn a_der_signature_is_kept_as_the_reference_re_encodes_it() {
     assert_eq!(read.signature, "300702020081020101");
 
     // An S of zero is the one value `toDER` leaves empty (`Signature.ts:237-239`,
-    // the trailing `while` loop); R keeps its `00` (`toArray`).
+    // the trailing `while` loop); a zero R never reaches `toDER`: `fromDER`
+    // refuses a lone `00` as an invalid R-value.
     parts.signature = vec![0x30, 0x05, 0x02, 0x01, 0x01, 0x02, 0x00];
     assert_eq!(
         read_certificate(&parts.bytes()).unwrap().signature,
         "30050201010200"
     );
     parts.signature = vec![0x30, 0x06, 0x02, 0x01, 0x00, 0x02, 0x01, 0x01];
-    assert_eq!(
-        read_certificate(&parts.bytes()).unwrap().signature,
-        "3006020100020101"
+    let error = message(read_certificate(&parts.bytes()).unwrap_err());
+    assert!(
+        error.contains("Invalid R-value in signature DER"),
+        "{error:?}"
     );
 
     parts.signature = vec![];
