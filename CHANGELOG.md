@@ -175,8 +175,9 @@ the BUMP; `run_wire` reads it with `from_binary`) is now refused on the slice,
 `codec` witness for go-sdk and ts-sdk, whose readers are prefix readers. The
 reader's prefix read (`from_reader`, the cursor one short of the end) is its
 own row for the harness to add; this crate's test pins it. The census (`tools/ratchet/run`):
-`src/transaction/merkle_path.rs` 1,470 to 1,469 lines, `beef_stream.rs`
-3,617 unchanged, every counter unchanged (`duplicate_windows_40` holds at
+`src/transaction/merkle_path.rs` 1,470 to 1,465 lines, `beef_stream.rs`
+3,617 unchanged (the even-offset refusal is the flag match's arms, keyed by
+the offset's parity), every counter unchanged (`duplicate_windows_40` holds at
 8,666: the old flag reader was not a window of the decoder's).
 
 ### Notes: cross-SDK parity (#167)
