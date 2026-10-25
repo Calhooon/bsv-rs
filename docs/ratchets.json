@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "044a072655a77a5023ad51ffc2ed6f4b58723255",
+  "source_commit": "2a63eeade28d7bcca8725a6d39b3b4170bc00591",
   "toolchain": "1.95.0",
   "metrics": {
     "files_over_800": 45,
@@ -98,7 +98,7 @@
     },
     {
       "path": "src/primitives/bsv/sighash.rs",
-      "lines": 1714
+      "lines": 1720
     },
     {
       "path": "src/primitives/encoding.rs",

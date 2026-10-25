@@ -63,7 +63,7 @@ also needs an explicit review of the changed census; do not refresh a
 baseline just to turn a red check green.
 
 On `main` the bootstrap baseline is measured from main's own tree at
-`044a072655a77a5023ad51ffc2ed6f4b58723255` (the 0.8.3 sources with this
+`2a63eeade28d7bcca8725a6d39b3b4170bc00591` (the 0.8.3 sources with this
 tool added, #214), not copied from beta's: the two lines carry different
 code, so each records its own. In main's tree the nine BIP-39 wordlist
 tables are still `.rs` files (beta's #89 moved them to text); five have
