@@ -346,8 +346,13 @@ jobs:
           toolchain: stable
           components: rustfmt
 
+      # The root has no [workspace], so --all stops at the crate: the fuzz
+      # crates are checked by manifest path, as the tools are (#180).
       - name: Check formatting
-        run: cargo fmt --all -- --check
+        run: |
+          cargo fmt --all -- --check
+          cargo fmt --manifest-path fuzz/Cargo.toml -- --check
+          cargo fmt --manifest-path fuzz/corpus-gen/Cargo.toml -- --check
 
   # the conformance vectors as one named check (a required status on main): the shared JSON under
   # tests/vectors/ and the ts-stack corpus. The conformance files skip when the corpus is absent
