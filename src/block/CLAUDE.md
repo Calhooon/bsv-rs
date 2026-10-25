@@ -1,0 +1,81 @@
+# BSV Block Module
+> Block headers, compact targets, proof of work, chain work, merkle roots and the node's difficulty rule
+
+## Overview
+
+`block` is the node's header arithmetic and nothing more: the 80-byte frame, the compact target as `SetCompact` decodes it (with its negative and overflow flags kept apart), `CheckProofOfWork`, the work a header's bits credit (`GetBlockProof`) and its 256-bit wrapping sum, the transaction-list merkle root with the CVE-2012-2459 mutation flag, and `GetNextWorkRequired` with the per-chain constants it reads. It stands on `primitives` alone (`Cargo.toml`: `block = ["primitives"]`), and `transaction` stands on it (`transaction = ["script", "block"]`: `MerklePath` and the streaming BEEF reader hash their pairs with `merkle_parent`). Height, chain selection, checkpoints, the genesis hash, the store of ancestors and every JSON shape belong to the host; this module answers questions about bytes and numbers the host hands it, and holds no state.
+
+The reference is the node, not the TypeScript SDK: `@bsv/sdk` has no block module (its headers live in the wallet toolbox's chaintracks), go-sdk has `block/`. The code's comments cite bitcoin-sv v1.2.3 (`6504a3af`) through bsv-script-lean@50d437b `lean/BsvChain/{Header,Pow,Merkle}.lean` (#63, #64, #65); the line's pin is v1.2.2 (`879fc8b`, the clone at `~/bsv/bitcoin-sv`). `pow.cpp`, `chainparams.cpp`, `consensus/params.h`, `arith_uint256.cpp`, `block_index.{h,cpp}` and `primitives/block.cpp` are byte-identical at the two tags (`git diff 879fc8b 6504a3af -- <file>` is empty), so those line numbers hold at either. `primitives/block.h` differs only below the header (four comment lines in `CBlock`, after `:85`), and `consensus/merkle.cpp` and `validation.cpp` moved: the table below gives both where they differ.
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `mod.rs` | Module docs and the re-exports (`src/lib.rs` re-exports nothing of `block`; callers write `bsv_rs::block::...`) |
+| `header.rs` | `BlockHeader`, `HEADER_SIZE`: the exact frame, its hash and display ids, its target, work and proof-of-work check |
+| `target.rs` | `CompactTarget` (`SetCompact`), `U256::to_compact`/`to_compact_signed` (`GetCompact`), the four `POW_LIMIT_*` constants, `PowError`, `check_proof_of_work` |
+| `work.rs` | `ChainWork`: `GetBlockProof`, wrapping accumulation, hex and big-endian forms |
+| `merkle.rs` | `MerkleRoot`, `merkle_parent`, `merkle_root`; `block_merkle_root` under `transaction` |
+| `params.rs` | `ChainParams` (`main`, `test`, `regtest`), the adjustment interval, the limit's bits, the window a host must hold |
+| `difficulty.rs` | `HeaderLink`, `HeaderAncestry`, `DifficultyError`, `next_work_required` and its regimes, `median_time_past`, `chain_work_between` (moved from chaintracks-cloudflare@74cc110 `src/consensus.rs`) |
+
+## The public surface
+
+The node citations are at `879fc8b`. Test files are `tests/chain_primitives.rs` (`cp`) and `tests/chain_difficulty.rs` (`cd`); both are `#![cfg(feature = "block")]`.
+
+| Item | What it promises | The node | Pinned by |
+|------|------------------|----------|-----------|
+| `BlockHeader::from_binary`, `from_hex` | Exactly 80 bytes, else `InvalidDataLength { expected: 80, actual }`; signed `i32` version, hashes in internal order | `primitives/block.h:23-65` | `node_genesis_header_and_exact_frame`, `teranode_header_runs_link_work_and_pow` (`cp`) |
+| `BlockHeader::from_reader` | Takes the whole frame before any field: a short reader moves nothing, trailing bytes stay | as above | `node_genesis_header_and_exact_frame` (`cp`) |
+| `to_binary`, `to_hex`, `to_writer` | The frame back, byte for byte, without allocating (`to_binary`) | as above | `node_genesis_header_and_exact_frame` (`cp`) |
+| `hash`, `id`, `hash_number`, `prev_id`, `merkle_root_hex` | `sha256d` of the frame in internal order; the `id`s in reversed display order; `hash_number` is `UintToArith256` | `primitives/block.cpp:16-18` | `node_genesis_header_and_exact_frame`, `teranode_header_runs_link_work_and_pow` (`cp`) |
+| `CompactTarget::from_bits` | `SetCompact`: the magnitude truncated to 256 bits, `negative` only for a nonzero mantissa, `overflow` as the node computes it | `arith_uint256.cpp:182-201` | `node_compact_tables_and_limits` (`cp`) |
+| `U256::to_compact`, `to_compact_signed` | `GetCompact(fNegative)`; zero never carries a sign | `arith_uint256.cpp:203-224` | `node_compact_tables_and_limits`, `teranode_header_runs_link_work_and_pow` (`cp`) |
+| `POW_LIMIT_MAIN`, `_TEST`, `_STN`, `_REGTEST` | `consensus.powLimit` per chain (`0x1d00ffff` main, test, STN; `0x207fffff` regtest) | `chainparams.cpp:1047-1048`, `:1343-1344`, `:1214`, `:1471-1472` | `node_compact_tables_and_limits`, `node_pow_refusals_and_equality` (`cp`) |
+| `check_proof_of_work`, `BlockHeader::check_proof_of_work` | `CheckProofOfWork` in the node's order: negative, zero, overflow, above the limit, hash above the target; never the expected difficulty | `pow.cpp:150-171` (the order `:159-167`) | `node_pow_refusals_and_equality`, `teranode_header_runs_link_work_and_pow` (`cp`) |
+| `PowError`, `reject_reason` | One variant per refusal, `#[non_exhaustive]`; every one is the node's `high-hash` | `pow.cpp:150-171` | `node_pow_refusals_and_equality` (`cp`) |
+| `ChainWork::from_bits`, `BlockHeader::work` | `GetBlockProof`: `~target / (target + 1) + 1`, zero for bits that are not valid; no limit applied | `block_index.cpp:114-127` | `node_block_proof_and_wrapping_chain_work`, `teranode_header_runs_link_work_and_pow` (`cp`) |
+| `ChainWork::wrapping_add`, `checked_sub`, `to_hex`, `from_hex`, `to_be_bytes`, `from_be_bytes` | Accumulation modulo 2^256 (`nChainWork`); `checked_sub` is `None` on underflow; `from_hex` refuses with no zero fallback | `block_index.h:349`, `:661-666` | `node_block_proof_and_wrapping_chain_work` (`cp`) |
+| `merkle_parent` | `sha256d` of the left hash then the right, both in internal order | `consensus/merkle.cpp:49` (`MerkleComputation`) | `merkle_empty_single_and_zero_sentinel_collision`, `node_merkle_property_and_all_bump_paths` (`cp`) |
+| `merkle_root`, `MerkleRoot` | Empty is zero, one leaf is itself, odd padding never sets `mutated`, equal real siblings at any level do; one O(n) buffer | `consensus/merkle.cpp:150-154`, CVE note `:10-44` (at `6504a3af`: `:247-282`, `:18-50`) | `merkle_empty_single_and_zero_sentinel_collision`, `cve_2012_2459_six_into_eight_root_and_mutation` (`cp`) |
+| `block_merkle_root` (`transaction`) | The root of the transactions' hashes in block order | `consensus/merkle.cpp:184-191` (at `6504a3af`: `:312-319`) | `node_merkle_property_and_all_bump_paths` (`cp`, module `merkle_paths`, under `transaction`) |
+| `ChainParams::main`, `test`, `regtest` | `powLimit`, `nPowTargetSpacing` 600, `nPowTargetTimespan` 1,209,600, `fPowAllowMinDifficultyBlocks`, `fPowNoRetargeting`, `daaHeight` (504031, 1188697, 0); `#[non_exhaustive]` | `chainparams.cpp:1047-1053`, `:1068`; `:1343-1349`, `:1364`; `:1471-1477`, `:1490`; `consensus/params.h:41-49` | `the_chain_params_are_the_node_values` (`cd`) |
+| `difficulty_adjustment_interval`, `pow_limit_bits` | `nPowTargetTimespan / nPowTargetSpacing` (2016), zero where the node divides by zero; `GetCompact(powLimit)`, the genesis answer | `consensus/params.h:47-49`; `pow.cpp:101-104` | `the_chain_params_are_the_node_values` (`cd`) |
+| `window_depth` | How many headers ending at the parent the rule may read: 1 (regtest), 147 (DAA), an interval (a legacy boundary, testnet), 17 (the emergency adjustment); never more than the chain holds | `pow.cpp:22-93`, `:214-297` | `the_window_depth_covers_what_each_regime_reads` (`cd`) |
+| `next_work_required` | `GetNextWorkRequired` to the line: regtest keeps the parent's bits, a parent at or above `daa_height` takes the DAA, below it the EDA path; a host that compares it with the header's bits is `ContextualCheckBlockHeader`'s `bad-diffbits` | `pow.cpp:95-117`; `validation.cpp:5896-5901` (at `6504a3af`: `:5943-5948`) | `regtest_keeps_the_parents_bits_and_testnet_grants_the_limit_after_20_minutes`, `testnet_walks_back_past_minimum_difficulty_headers`, `the_emergency_adjustment_matches_retargeting_test`, `real_testnet_daa_headers_carry_the_rules_bits` (`cd`) |
+| `calculate_next_work_required` | The two-week retarget, the timespan clamped to a quarter and four times, the `uint32_t` multiply | `pow.cpp:119-148` | `calculate_next_work_required_matches_the_node_vectors` (`cd`, `pow_tests.cpp`'s tables) |
+| `next_cash_work_required` | The DAA over 144 blocks, `GetSuitableBlock`'s own sorting network, testnet's 20-minute rule ahead of it | `pow.cpp:177-208`, `:214-245`, `:256-297` | `the_daa_matches_cash_difficulty_test`, `real_testnet_daa_headers_carry_the_rules_bits` (`cd`) |
+| `median_time_past`, `chain_work_between`, `HeaderAncestry::work_between` | `GetMedianTimePast` over up to 11 headers; the `GetBlockProof` sum over the heights above the lower bound up to the upper | `block_index.h:720-737`; `:661-666` | `median_time_past_and_chain_work_read_the_held_ancestors` (`cd`) |
+| `HeaderLink`, `HeaderAncestry` (`impl for [HeaderLink]`) | What the rule reads (height, time, bits) and the host's `GetAncestor`; a slice ascending by consecutive height implements it | `block_index.h:856-857` (`GetAncestor`), `:466-467` (`GetPrev`) | `median_time_past_and_chain_work_read_the_held_ancestors` (`cd`) |
+| `DifficultyError` | `MissingAncestor` (the host lacks a header), `ChainTooShort` (where the node asserts, `pow.cpp:73`, `:275`), `InvalidParams` (no interval), `ZeroWork` (where `ComputeTarget` divides by zero, `:207`); `#[non_exhaustive]` | as cited | `the_rule_refuses_where_the_node_asserts`, `median_time_past_and_chain_work_read_the_held_ancestors` (`cd`) |
+
+## Rules
+
+1. **Nothing panics on input** (root rule 5). The header reader allocates nothing: `from_binary` checks the length against `HEADER_SIZE` before it reads, `from_reader` takes the 80-byte frame with `read_bytes` (an `Err` when short) before it reads a field. `merkle_root` copies the leaves once and reduces in place; `median_time_past` reserves 11. Where the node asserts or divides by zero, the rule returns a `DifficultyError` instead (`ChainTooShort`, `InvalidParams`, `ZeroWork`), and `difficulty_adjustment_interval` is zero, never a division panic. `fuzz/fuzz_targets/fuzz_chain_primitives.rs` drives the header reader, the compact round trip and `ChainWork::from_hex`: run it on a change here.
+2. **`next_work_required` is the node's `GetNextWorkRequired`, line for line.** Each private step names its node function and lines (`GetNextEDAWorkRequired`, `ComputeTarget`, `GetSuitableBlock`, `GetNextCashWorkRequired`), and the node's quirks are kept on purpose: `bnNew *= nActualTimespan` and `work *= nPowTargetSpacing` take the `uint32_t` overload (`arith_uint256.cpp:52-60`), `GetSuitableBlock`'s sorting network decides among equal times whose chain work is read. A change here reads `pow.cpp` at the pin before it is written and lands with the node's own vector (`src/test/pow_tests.cpp`) or a real header run, never a rounded rewrite.
+3. **`ChainParams` carries the node's constants, named.** Each field is the `consensus.` field it copies (`powLimit`, `nPowTargetSpacing`, `nPowTargetTimespan`, `fPowAllowMinDifficultyBlocks`, `fPowNoRetargeting`, `daaHeight`), each constructor cites its `chainparams.cpp` lines, and `the_chain_params_are_the_node_values` reads every one. A parameter the rule does not read (checkpoints, genesis, ports) does not go here.
+4. **A proof-of-work check never reads the clock.** `check_proof_of_work` sees a hash, bits and a limit; `next_work_required` sees the new header's time as the caller's `new_time` argument. Nothing in `src/block/` calls a time function (`grep -rn "SystemTime\|util::\|now" src/block/` is empty), so a verdict is a function of its inputs on every target. Future-time and median-time-past acceptance windows are the host's checks.
+5. **Hashes are internal order; display order is a method.** `prev_hash`, `merkle_root`, `hash()` and `MerkleRoot::root` are wire order; `id`, `prev_id`, `merkle_root_hex` reverse. A chain tracker comparing a `MerklePath` root with a header uses `merkle_root_hex` (`src/transaction/merkle_path.rs:7`).
+6. **The proof-of-work check is not the difficulty check.** `check_proof_of_work` asks whether the hash meets the header's own bits under a network limit; whether those bits are the chain's required ones is `next_work_required` compared by the host. Two functions, two node sites, never merged.
+
+## wasm32
+
+`block` is built alone on `wasm32-unknown-unknown` by chaintracks-cloudflare (`docs/dependents.lock`: `sdk_features = ["block"]`, `sdk_default_features = false`) and by CI's `wasm32 (chaintracks)` job (`--no-default-features --features block` with the workflow's `RUSTFLAGS: -Dwarnings`). The #115 lesson: a function that compiles under `block` but has no caller there is a dead-code warning, and a consumer that denies warnings cannot build the crate (`after_last_code_separator` in `primitives` broke the `block` slice until it was gated on `script`). The `clippy` job's "Clippy on each slice alone" step runs `block` alone with `-D warnings` and is the pin. So: anything added to `primitives` for this module's sake is used here, and anything this module needs only under a sibling feature is gated on it (`block_merkle_root` on `transaction`). No time, no threads, no new dependency.
+
+## Tests
+
+| File | Gate | What it pins |
+|------|------|--------------|
+| `tests/chain_primitives.rs` | `block` (module `merkle_paths` also `transaction`) | 9 tests: the compact tables and limits, the refusal order, the genesis and exact frame, Teranode header runs (link, work, proof of work), `GetBlockProof` and wrapping work, `U256` against `num-bigint`, the merkle edge cases, every BUMP path against `merkle_root`, CVE-2012-2459 |
+| `tests/chain_difficulty.rs` | `block` | 10 tests: the params, `pow_tests.cpp`'s retarget, EDA and DAA tables, regtest and testnet's rules, the walk back, median time and chain work, the refusals where the node asserts, the window depth, a real testnet DAA run |
+| `tests/chain_encoding.rs` | `primitives` | 4 tests: the node's base58 vectors and CompactSize refusals and boundaries (the encodings beside this module, at the same node pin) |
+| `tests/canonical_varint.rs` | `primitives` | 6 tests: non-canonical varints refused by the reader, the transaction, BEEF, BUMP and stream parsers |
+| `tests/hash_stream.rs` | none | 3 tests: the incremental hashers equal `sha256`/`sha256d` for every chunking |
+
+The last three pin `primitives` items this module reads (`Reader`, `sha256d`) and run without `block`. Every public item in `src/block/` also carries a compiled doc example.
+
+## Downstreams
+
+- **chaintracks-cloudflare** (`Calhooon/chaintracks-cloudflare`): `block` alone, wasm32, warnings denied; the difficulty rule moved here from its `src/consensus.rs`. A change to `HeaderAncestry`, `ChainParams`'s fields or `DifficultyError`'s variants is a change to it.
+- **Everything on `transaction`** (the whole wasm32 line): `MerklePath::compute_root` and the streaming BEEF reader call `merkle_parent`; a change to its byte order changes every proof.
+- `~/bsv/rust-chaintracks` (root `CLAUDE.md`'s downstream list): grep its `Cargo.toml` before a change to a public shape here.

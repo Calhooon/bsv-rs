@@ -28,6 +28,10 @@ ring. With the memo in
 loops and the test fails at the bound. `docs/ARCHITECTURE.md`'s gap line names
 the tests.
 
+### Changed: `src/block/` has its working rules (#161)
+
+Documentation only: `src/block/CLAUDE.md` (the public surface with the node's lines at bitcoin-sv v1.2.2 `879fc8b` and the test that pins each, the rules, the wasm32 note, the downstreams); the root `CLAUDE.md` counts fourteen modules with `block` in the dependency line and 28 module `CLAUDE.md` files under `src/`; `docs/ARCHITECTURE.md`'s HMAC invariant names the `wallet_brc56_hmac_tests` that pin it (#148) and its gaps lose those two items. No code, test or public item changed.
+
 ### Changed: the interpreter is split by opcode group (#85)
 
 `src/script/spend.rs` (4,419 lines) is the directory `src/script/spend/`:
