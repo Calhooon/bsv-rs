@@ -196,6 +196,7 @@ pub trait ChainTracker: Send + Sync {
 /// median time past 1,700,000,000, mainnet's Genesis and CSV activation
 /// heights, no candidate block time. [`with_mining_tip`](Self::with_mining_tip)
 /// sets another, or `None` for a test of the hold.
+/// The heights are mainnet's: a mock below 620,537 is a pre-Genesis tip.
 ///
 /// # Example
 ///

@@ -2823,6 +2823,32 @@ async fn the_mock_tracker_set_to_no_tip_holds_at_the_door() {
         mining_spend(answer, offsets[1], "Unverifiable { check: Finality }");
     }
 }
+#[tokio::test]
+async fn the_mock_tracker_below_genesis_is_a_pre_genesis_tip() {
+    let mut p2sh = vec![0xa9, 0x14];
+    p2sh.extend([0; 20]);
+    p2sh.push(0x87);
+    let (p, bump, roots) = funded(&[(1000, OP_TRUE)]);
+    let c = tx_with(&[(txid(&p), 0, &[])], &[(1, &p2sh)]);
+    let (bytes, offsets) = wire(
+        V1,
+        None,
+        &[bump],
+        &[Entry::Raw(p, Some(0)), Entry::Raw(c, None)],
+    );
+    let (sync, asynchronous) = mock_both_paths(&bytes, &mock_with(&roots, 620_536)).await;
+    assert!(sync.is_valid(), "{sync:?}");
+    assert!(asynchronous.is_valid(), "{asynchronous:?}");
+    let (sync, asynchronous) = mock_both_paths(&bytes, &mock_with(&roots, 620_537)).await;
+    for answer in [sync, asynchronous] {
+        mining_spend(answer, offsets[1] + 47, "P2shOutput { vout: 0 }");
+    }
+    let tracker = mock_with(&roots, 1_000).with_mining_tip(None);
+    let (sync, asynchronous) = mock_both_paths(&bytes, &tracker).await;
+    for answer in [sync, asynchronous] {
+        mining_spend(answer, offsets[1] + 47, "P2shOutput { vout: 0 }");
+    }
+}
 #[test]
 fn mining_lean_rows_have_the_same_wire_offsets() {
     let mut previous = [0; 32];

@@ -54,6 +54,13 @@ crate had no constant, a private one is kept beside the mock),
 `next_block_time` `None`. The door judges against it as against a real tip: a
 coinbase spent 99 blocks deep is `PrematureCoinbase`, a lock time at the next
 height `NonFinal`.
+The tip is mainnet's, so a mock whose `height` is below 620,537 is a
+pre-Genesis tip and the door does not refuse a P2SH output where the old `None`
+refused it (`P2shOutput`; `verify_stream`'s `after_genesis` read,
+`src/transaction/beef_stream.rs:2141-2142`), and below 419,327 a time lock
+(lock time at or above 500,000,000) is `Unverifiable { check: Finality }`, the
+tip carrying no `next_block_time` (`:2174-2177`); pinned by
+`the_mock_tracker_below_genesis_is_a_pre_genesis_tip`.
 
 Added (additive): `MockChainTracker::with_mining_tip(Option<ChainTip>)` sets
 the tip both methods answer. Migration: a host test that asserted the hold on
