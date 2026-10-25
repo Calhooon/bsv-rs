@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use bsv_rs::transaction::{
     verify_stream, verify_stream_structure, Beef, BeefLimits, BeefStream, Element, Headers, Kind,
-    Reason, Transaction, Verdict,
+    Transaction, Verdict,
 };
 use libfuzzer_sys::fuzz_target;
 
@@ -57,22 +57,11 @@ fn named(text: &str) -> Option<(u64, Kind)> {
 /// `Beef::from_binary` then `verify_structure`, and `verify_stream_structure`
 /// under the leading roots, accept the same inputs with the same roots and
 /// refuse the rest with the same kind, at the same offset when the parse
-/// names one. The stated difference is the order: an input naming a parent
-/// held after it, which the stream refuses and the whole path does not.
+/// names one. No difference is stated: an input naming a parent held after
+/// it is refused by both.
 fn the_two_readers_agree(data: &[u8]) {
     let stream = verify_stream_structure(data, &leading_roots(data), None).expect("a slice reads");
     let parsed = Beef::from_binary(data);
-    if let Verdict::Invalid {
-        reason: Reason::InputNamesNoElement { txid },
-        ..
-    } = &stream
-    {
-        if let Ok(beef) = &parsed {
-            if beef.find_txid(&display(txid)).is_some() {
-                return;
-            }
-        }
-    }
     match (parsed, &stream) {
         (Err(e), Verdict::Invalid { offset, kind, .. }) => {
             let text = e.to_string();
