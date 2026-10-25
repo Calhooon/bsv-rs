@@ -35,8 +35,8 @@ use super::results::{
     write_reveal_specific_key_linkage_result, write_verify_hmac_result,
     write_verify_signature_result, write_wait_for_authentication_result,
 };
+use super::validation::{self, Refusal};
 use super::WalletCall;
-use crate::primitives::from_hex;
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::types::Network;
 use crate::Error;
@@ -71,6 +71,20 @@ fn wire_message(error: &Error) -> String {
     match error {
         Error::WalletError(words) => words.clone(),
         other => other.to_string(),
+    }
+}
+
+/// A call's answer: its result's bytes, or the processor's refusal.
+type Answer = Result<Vec<u8>, Refusal>;
+
+impl From<Error> for Refusal {
+    /// The reference's outer catch (`WalletWireProcessor.ts:2379-2387`): an
+    /// explicit wallet code or unknownError, and the error's own words.
+    fn from(error: Error) -> Self {
+        Self {
+            code: explicit_wallet_code(&error).unwrap_or(UNKNOWN_ERROR),
+            words: wire_message(&error),
+        }
     }
 }
 
@@ -155,7 +169,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     }
 
     /// Internal message processing that can return errors.
-    async fn process_message_inner(&self, message: &[u8]) -> Result<Vec<u8>, Error> {
+    async fn process_message_inner(&self, message: &[u8]) -> Answer {
         let mut reader = WireReader::new(message);
 
         // Read call code
@@ -299,7 +313,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     }
 
     /// Encodes a response (success or error) into wire format.
-    fn encode_response(&self, result: Result<Vec<u8>, Error>) -> Result<Vec<u8>, Error> {
+    fn encode_response(&self, result: Answer) -> Result<Vec<u8>, Error> {
         let mut writer = WireWriter::new();
 
         match result {
@@ -309,14 +323,12 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             }
             Err(e) => {
                 // The reference's outer catch (`WalletWireProcessor.ts:2370-2396`
-                // at `ts-stack@edf6e03`, bsv-rs#202): the error's own code when
-                // it lies in 2 to 8, else unknownError (1); this crate's `Error`
-                // carries no code (#137), so every frame is 1 today. The message
-                // is the error's own words, cut at 4096 bytes; the stack an
-                // empty string.
-                writer.write_u8(explicit_wallet_code(&e).unwrap_or(UNKNOWN_ERROR));
-                let message = wire_message(&e);
-                let bytes = message.as_bytes();
+                // at `ts-stack@edf6e03`, bsv-rs#202): the refusal's code (6 for
+                // an argument the reference's validator refuses, #216; else 1,
+                // this crate's `Error` carrying no code, #137) and its words,
+                // cut at 4096 bytes; the stack an empty string.
+                writer.write_u8(e.code);
+                let bytes = e.words.as_bytes();
                 let bytes = &bytes[..bytes.len().min(MAX_WIRE_ERROR_MESSAGE_BYTES)];
                 writer.write_var_int(bytes.len() as u64);
                 writer.write_bytes(bytes);
@@ -331,13 +343,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Key Operation Handlers
     // =========================================================================
 
-    async fn handle_get_public_key(
-        &self,
-        reader: &mut WireReader<'_>,
-        originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    async fn handle_get_public_key(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
         let args = read_get_public_key_args(reader)?;
         assert_request_consumed(reader, "getPublicKey")?;
+        validation::get_public_key_args(&args)?;
         let result = self
             .invoke_wallet(
                 WalletCall::GetPublicKey,
@@ -345,48 +354,38 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             )
             .await?;
 
-        // Serialize response - result.public_key is a hex string
-        let mut writer = WireWriter::new();
-        let pubkey_bytes = from_hex(&result.public_key)?;
-        writer.write_bytes(&pubkey_bytes);
-        Ok(writer.into_bytes())
+        // The key's 33 bytes, a result the reference refuses refused (#216)
+        validation::public_key_result(&result.public_key)
     }
 
-    async fn handle_encrypt(
-        &self,
-        reader: &mut WireReader<'_>,
-        originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    async fn handle_encrypt(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
         let args = read_encrypt_args(reader)?;
         assert_request_consumed(reader, "encrypt")?;
+        validation::encrypt_args(&args)?;
         let result = self
             .invoke_wallet(WalletCall::Encrypt, self.wallet.encrypt(args, originator))
             .await?;
 
+        validation::bytes_result(&result.ciphertext, "encrypt", "ciphertext")?;
         Ok(write_encrypt_result(&result))
     }
 
-    async fn handle_decrypt(
-        &self,
-        reader: &mut WireReader<'_>,
-        originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    async fn handle_decrypt(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
         let args = read_decrypt_args(reader)?;
         assert_request_consumed(reader, "decrypt")?;
+        validation::decrypt_args(&args)?;
         let result = self
             .invoke_wallet(WalletCall::Decrypt, self.wallet.decrypt(args, originator))
             .await?;
 
+        validation::bytes_result(&result.plaintext, "decrypt", "plaintext")?;
         Ok(write_decrypt_result(&result))
     }
 
-    async fn handle_create_hmac(
-        &self,
-        reader: &mut WireReader<'_>,
-        originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    async fn handle_create_hmac(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
         let args = read_create_hmac_args(reader)?;
         assert_request_consumed(reader, "createHmac")?;
+        validation::create_hmac_args(&args)?;
         let result = self
             .invoke_wallet(
                 WalletCall::CreateHmac,
@@ -397,13 +396,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(write_create_hmac_result(&result))
     }
 
-    async fn handle_verify_hmac(
-        &self,
-        reader: &mut WireReader<'_>,
-        originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    async fn handle_verify_hmac(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
         let args = read_verify_hmac_args(reader)?;
         assert_request_consumed(reader, "verifyHmac")?;
+        validation::verify_hmac_args(&args)?;
         let result = self
             .invoke_wallet(
                 WalletCall::VerifyHmac,
@@ -411,22 +407,24 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             )
             .await?;
 
-        write_verify_hmac_result(&result)
+        Ok(write_verify_hmac_result(&result)?)
     }
 
     async fn handle_create_signature(
         &self,
         reader: &mut WireReader<'_>,
         originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         let args = read_create_signature_args(reader)?;
         assert_request_consumed(reader, "createSignature")?;
+        validation::create_signature_args(&args)?;
         let result = self
             .invoke_wallet(
                 WalletCall::CreateSignature,
                 self.wallet.create_signature(args, originator),
             )
             .await?;
+        validation::signature_result(&result.signature)?;
 
         Ok(write_create_signature_result(&result))
     }
@@ -435,9 +433,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self,
         reader: &mut WireReader<'_>,
         originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         let args = read_verify_signature_args(reader)?;
         assert_request_consumed(reader, "verifySignature")?;
+        validation::verify_signature_args(&args)?;
         let result = self
             .invoke_wallet(
                 WalletCall::VerifySignature,
@@ -445,16 +444,18 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             )
             .await?;
 
-        write_verify_signature_result(&result)
+        Ok(write_verify_signature_result(&result)?)
     }
 
     async fn handle_reveal_counterparty_key_linkage(
         &self,
         reader: &mut WireReader<'_>,
         originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         let args = read_reveal_counterparty_key_linkage_args(reader)?;
         assert_request_consumed(reader, "revealCounterpartyKeyLinkage")?;
+        validation::reveal_counterparty_args(&args)?;
+        let request = args.clone();
         let result = self
             .invoke_wallet(
                 WalletCall::RevealCounterpartyKeyLinkage,
@@ -462,6 +463,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
                     .reveal_counterparty_key_linkage(args, originator),
             )
             .await?;
+        validation::reveal_counterparty_result(&request, &result)?;
 
         Ok(write_reveal_counterparty_key_linkage_result(&result))
     }
@@ -470,15 +472,18 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self,
         reader: &mut WireReader<'_>,
         originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         let args = read_reveal_specific_key_linkage_args(reader)?;
         assert_request_consumed(reader, "revealSpecificKeyLinkage")?;
+        validation::reveal_specific_args(&args)?;
+        let request = args.clone();
         let result = self
             .invoke_wallet(
                 WalletCall::RevealSpecificKeyLinkage,
                 self.wallet.reveal_specific_key_linkage(args, originator),
             )
             .await?;
+        validation::reveal_specific_result(&request, &result)?;
 
         Ok(write_reveal_specific_key_linkage_result(&result))
     }
@@ -487,7 +492,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Chain/Status Operation Handlers
     // =========================================================================
 
-    async fn handle_is_authenticated(&self, originator: &str) -> Result<Vec<u8>, Error> {
+    async fn handle_is_authenticated(&self, originator: &str) -> Answer {
         let result = self
             .invoke_wallet(
                 WalletCall::IsAuthenticated,
@@ -499,22 +504,22 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_wait_for_authentication(&self, originator: &str) -> Result<Vec<u8>, Error> {
+    async fn handle_wait_for_authentication(&self, originator: &str) -> Answer {
         let result = self
             .invoke_wallet(
                 WalletCall::WaitForAuthentication,
                 self.wallet.wait_for_authentication(originator),
             )
             .await?;
-        write_wait_for_authentication_result(&result)
+        Ok(write_wait_for_authentication_result(&result)?)
     }
 
-    async fn handle_get_height(&self, originator: &str) -> Result<Vec<u8>, Error> {
+    async fn handle_get_height(&self, originator: &str) -> Answer {
         let result = self
             .invoke_wallet(WalletCall::GetHeight, self.wallet.get_height(originator))
             .await?;
         let mut writer = WireWriter::new();
-        writer.write_var_int(result.height as u64);
+        writer.write_var_int(validation::height_result(result.height)?.into());
         Ok(writer.into_bytes())
     }
 
@@ -522,9 +527,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self,
         reader: &mut WireReader<'_>,
         originator: &str,
-    ) -> Result<Vec<u8>, Error> {
-        // Read height argument
-        let height = reader.read_var_int_u32("height")?;
+    ) -> Answer {
+        let height = validation::read_header_height(reader)?;
         assert_request_consumed(reader, "getHeaderForHeight")?;
 
         let args = crate::wallet::GetHeaderArgs { height };
@@ -538,10 +542,10 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         // The 80 bytes raw, no length prefix (`WalletWireProcessor.ts:1687-1690`
         // at `ts-stack@edf6e03`; BRC-100 `0100.md:2478` at `5119a9b`), another
         // length refused (`WalletResultValidation.ts:2297`, bsv-rs#183)
-        super::header_result(&result.header)
+        Ok(super::header_result(&result.header)?)
     }
 
-    async fn handle_get_network(&self, _originator: &str) -> Result<Vec<u8>, Error> {
+    async fn handle_get_network(&self, _originator: &str) -> Answer {
         // Go uses single byte: 0x00=mainnet, 0x01=testnet (not length-prefixed string)
         let mut writer = WireWriter::new();
         let code = match self.network {
@@ -552,7 +556,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_get_version(&self, _originator: &str) -> Result<Vec<u8>, Error> {
+    async fn handle_get_version(&self, _originator: &str) -> Answer {
         // Go writes raw UTF-8 bytes with NO length prefix
         let mut writer = WireWriter::new();
         writer.write_bytes(self.version.as_bytes());
@@ -570,74 +574,65 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
-        Err(Error::WalletError(
-            "createAction requires a full wallet implementation".to_string(),
-        ))
+    ) -> Answer {
+        Err(
+            Error::WalletError("createAction requires a full wallet implementation".to_string())
+                .into(),
+        )
     }
 
-    async fn handle_sign_action(
-        &self,
-        _reader: &mut WireReader<'_>,
-        _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
-        Err(Error::WalletError(
-            "signAction requires a full wallet implementation".to_string(),
-        ))
+    async fn handle_sign_action(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+        Err(
+            Error::WalletError("signAction requires a full wallet implementation".to_string())
+                .into(),
+        )
     }
 
-    async fn handle_abort_action(
-        &self,
-        _reader: &mut WireReader<'_>,
-        _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
-        Err(Error::WalletError(
-            "abortAction requires a full wallet implementation".to_string(),
-        ))
+    async fn handle_abort_action(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+        Err(
+            Error::WalletError("abortAction requires a full wallet implementation".to_string())
+                .into(),
+        )
     }
 
-    async fn handle_list_actions(
-        &self,
-        _reader: &mut WireReader<'_>,
-        _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
-        Err(Error::WalletError(
-            "listActions requires a full wallet implementation".to_string(),
-        ))
+    async fn handle_list_actions(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+        Err(
+            Error::WalletError("listActions requires a full wallet implementation".to_string())
+                .into(),
+        )
     }
 
     async fn handle_internalize_action(
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "internalizeAction requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     // =========================================================================
     // Output Operation Handlers
     // =========================================================================
 
-    async fn handle_list_outputs(
-        &self,
-        _reader: &mut WireReader<'_>,
-        _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
-        Err(Error::WalletError(
-            "listOutputs requires a full wallet implementation".to_string(),
-        ))
+    async fn handle_list_outputs(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+        Err(
+            Error::WalletError("listOutputs requires a full wallet implementation".to_string())
+                .into(),
+        )
     }
 
     async fn handle_relinquish_output(
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "relinquishOutput requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     // =========================================================================
@@ -648,40 +643,44 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "acquireCertificate requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     async fn handle_list_certificates(
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "listCertificates requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     async fn handle_prove_certificate(
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "proveCertificate requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     async fn handle_relinquish_certificate(
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "relinquishCertificate requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     // =========================================================================
@@ -692,20 +691,22 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "discoverByIdentityKey requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 
     async fn handle_discover_by_attributes(
         &self,
         _reader: &mut WireReader<'_>,
         _originator: &str,
-    ) -> Result<Vec<u8>, Error> {
+    ) -> Answer {
         Err(Error::WalletError(
             "discoverByAttributes requires a full wallet implementation".to_string(),
-        ))
+        )
+        .into())
     }
 }
 
@@ -718,7 +719,9 @@ mod tests {
     /// The frame `encode_response` writes for an error: since #202's division
     /// a wallet's words never reach it, so the cut is pinned on the writer.
     fn error_frame(error: Error) -> Vec<u8> {
-        create_test_processor().encode_response(Err(error)).unwrap()
+        create_test_processor()
+            .encode_response(Err(error.into()))
+            .unwrap()
     }
 
     /// #202: a message past 4096 bytes is cut at 4096 (`:2388-2391`), its
