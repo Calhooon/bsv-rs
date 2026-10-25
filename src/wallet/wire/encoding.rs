@@ -508,7 +508,10 @@ impl<'a> WireReader<'a> {
         })
     }
 
-    /// Reads an optional IdentityCertifier.
+    /// Reads an optional IdentityCertifier in the layout this crate's writer
+    /// wrote before #182 (a present flag, NIL sentinels for the optional
+    /// strings), not the reference's; the transceiver's discovery reader reads
+    /// the reference's. The follow-up is #184.
     pub fn read_optional_identity_certifier(&mut self) -> Result<Option<IdentityCertifier>, Error> {
         let flag = self.read_i8()?;
         if flag < 0 {
@@ -527,9 +530,12 @@ impl<'a> WireReader<'a> {
         }))
     }
 
-    /// Reads an IdentityCertificate (Go-compatible: length-prefixed certificate bytes).
+    /// Reads an IdentityCertificate in the layout this crate's writer wrote
+    /// before #182 (present flag, NIL sentinels, keyring values as text), not
+    /// the reference's; the transceiver's discovery reader reads the
+    /// reference's. The follow-up is #184.
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
-        // Go format: VarInt(cert_len) + cert_bytes, then certifier_info fields, keyring, decrypted_fields
+        // The old layout: VarInt(cert_len) + cert_bytes, then certifier_info fields, keyring, decrypted_fields
         let cert_len = self.read_var_int()? as usize;
         let cert_bytes = self.read_bytes(cert_len)?;
         let mut cert_reader = WireReader::new(cert_bytes);

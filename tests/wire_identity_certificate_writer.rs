@@ -182,7 +182,8 @@ fn the_shared_discovery_vector_entry_is_the_writers_bytes() {
 
 /// An absent iconUrl or description is the empty string, an absent
 /// certifierInfo or map Go's zero value (`identity_certificate.go:23-46` reads
-/// the struct's fields; TS has no absent case): three empty strings, trust 0,
+/// the struct's fields; TS's type has no absent case and its reader refuses
+/// trust 0, `WalletWireTransceiver.ts:1710`): three empty strings, trust 0,
 /// a count of 0. The transceiver reads them back as it reads the reference's.
 #[tokio::test]
 async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_counts() {
