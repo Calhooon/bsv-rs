@@ -46,7 +46,6 @@ pub enum Layout {
     /// A string array whose absent form is the nil count.
     OptStrs,
     Map,
-    OptMap,
     Protocol,
     OptProtocol,
     Counterparty,
@@ -89,7 +88,6 @@ pub enum Value {
     Strs(Vec<String>),
     OptStrs(Option<Vec<String>>),
     Map(HashMap<String, String>),
-    OptMap(Option<HashMap<String, String>>),
     Protocol(Protocol),
     OptProtocol(Option<Protocol>),
     Counterparty(Option<Counterparty>),
@@ -148,7 +146,6 @@ fn read(field: &Layout, r: &mut WireReader<'_>) -> Result<Value> {
             }
         }
         L::Map => Value::Map(r.read_string_map()?),
-        L::OptMap => Value::OptMap(r.read_optional_string_map()?),
         L::Protocol => Value::Protocol(r.read_protocol_id()?),
         L::OptProtocol => Value::OptProtocol(r.read_optional_protocol_id()?),
         L::Counterparty => Value::Counterparty(r.read_counterparty()?),
@@ -246,7 +243,6 @@ fn write_all(values: &[Value], w: &mut WireWriter) {
     }
 }
 
-#[allow(deprecated)]
 fn write(value: &Value, w: &mut WireWriter) {
     match value {
         Value::U8(v) => {
@@ -287,9 +283,6 @@ fn write(value: &Value, w: &mut WireWriter) {
         }
         Value::Map(v) => {
             w.write_string_map(v);
-        }
-        Value::OptMap(v) => {
-            w.write_optional_string_map(v.as_ref());
         }
         Value::Protocol(v) => {
             w.write_protocol_id(v);

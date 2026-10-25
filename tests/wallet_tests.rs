@@ -1290,7 +1290,6 @@ mod wire_protocol_tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_string_map_roundtrip() {
         use std::collections::HashMap;
 
@@ -1300,8 +1299,9 @@ mod wire_protocol_tests {
         map.insert("key2".to_string(), "value2".to_string());
 
         writer.write_string_map(&map);
-        writer.write_optional_string_map(Some(&map));
-        writer.write_optional_string_map(None);
+        // An optional map: a count, or the NIL sentinel for None.
+        writer.write_string_map(&map);
+        writer.write_var_int(u64::MAX);
 
         let bytes = writer.into_bytes();
         let mut reader = WireReader::new(&bytes);

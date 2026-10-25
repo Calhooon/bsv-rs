@@ -233,18 +233,38 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
 /// the bytes left. Other contents can misread rather than refuse; none reads as
 /// written.
 #[test]
-#[allow(deprecated)]
 fn the_layout_before_182_is_refused() {
     let cert = identity_certificate();
+    // The old layout assembled by hand: the present flag, NIL-sentinel
+    // strings, and maps behind a count or the NIL sentinel.
+    let old_map = |w: &mut WireWriter, map: Option<&HashMap<String, String>>| match map {
+        None => {
+            w.write_var_int(u64::MAX);
+        }
+        Some(map) => {
+            w.write_string_map(map);
+        }
+    };
     let old = |certifier: Option<&IdentityCertifier>| -> Vec<u8> {
         let mut c = WireWriter::new();
         c.write_wallet_certificate(&cert.certificate).unwrap();
         let mut w = WireWriter::new();
         w.write_var_int(c.as_bytes().len() as u64);
         w.write_bytes(c.as_bytes());
-        w.write_optional_identity_certifier(certifier);
-        w.write_optional_string_map(cert.publicly_revealed_keyring.as_ref());
-        w.write_optional_string_map(cert.decrypted_fields.as_ref());
+        match certifier {
+            None => {
+                w.write_i8(-1);
+            }
+            Some(c) => {
+                w.write_i8(1);
+                w.write_string(&c.name);
+                w.write_optional_string(c.icon_url.as_deref());
+                w.write_optional_string(c.description.as_deref());
+                w.write_u8(c.trust);
+            }
+        }
+        old_map(&mut w, cert.publicly_revealed_keyring.as_ref());
+        old_map(&mut w, cert.decrypted_fields.as_ref());
         w.into_bytes()
     };
     for bytes in [old(cert.certifier_info.as_ref()), old(None)] {
@@ -256,12 +276,11 @@ fn the_layout_before_182_is_refused() {
     }
 }
 
-/// `read_identity_certifier` reads the three strings and the byte; the old
-/// `write_identity_certifier` writes the same bytes when iconUrl and
-/// description are present, and a NIL sentinel for an absent one, which is now
-/// a length past the bytes, refused.
+/// `read_identity_certifier` reads the three strings and the byte; the layout
+/// before #182 is the same bytes when iconUrl and description are present, and
+/// a NIL sentinel for an absent one, which is now a length past the bytes,
+/// refused.
 #[test]
-#[allow(deprecated)]
 fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
     let info = identity_certificate().certifier_info.unwrap();
     let mut w = WireWriter::new();
@@ -269,9 +288,6 @@ fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
     w.write_string(info.icon_url.as_deref().unwrap());
     w.write_string(info.description.as_deref().unwrap());
     w.write_u8(info.trust);
-    let mut old = WireWriter::new();
-    old.write_identity_certifier(&info);
-    assert_eq!(old.as_bytes(), w.as_bytes());
     let mut reader = WireReader::new(w.as_bytes());
     assert_eq!(
         json(&reader.read_identity_certifier().unwrap()),
@@ -280,10 +296,10 @@ fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
     assert_eq!(reader.remaining(), 0);
 
     let mut nil = WireWriter::new();
-    nil.write_identity_certifier(&IdentityCertifier {
-        icon_url: None,
-        ..info
-    });
+    nil.write_string(&info.name);
+    nil.write_var_int(u64::MAX);
+    nil.write_string(info.description.as_deref().unwrap());
+    nil.write_u8(info.trust);
     assert!(matches!(
         WireReader::new(nil.as_bytes()).read_identity_certifier(),
         Err(Error::ReaderUnderflow { .. })
