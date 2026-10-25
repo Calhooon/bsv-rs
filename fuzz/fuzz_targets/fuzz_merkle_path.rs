@@ -8,7 +8,8 @@
 //! `tests/merkle_path_two_readers_agree.rs`): the bytes wrapped as a
 //! one-BUMP BEEF are accepted when the parse accepts them, to the same bytes
 //! taken, levels and root, and refused otherwise with the same refusal, its
-//! offset the BEEF's less the five bytes of its header.
+//! offset the BEEF's less the five bytes of its header, in the words of a
+//! BUMP read alone (`invalid BUMP at byte N: Reason`).
 use bsv_rs::primitives::{to_hex, Reader};
 use bsv_rs::transaction::{Beef, BeefStream, Element, MerklePath};
 use libfuzzer_sys::fuzz_target;
@@ -16,7 +17,8 @@ use libfuzzer_sys::fuzz_target;
 /// The BEEF header the BUMP is wrapped in: the V1 word and a count of one.
 const HEADER: [u8; 5] = [0x01, 0x00, 0xbe, 0xef, 0x01];
 
-/// A refusal's text with its offset moved back by `less` bytes.
+/// A BEEF refusal's text in the words of a BUMP read alone (`invalid BUMP
+/// at byte N`), its offset moved back by `less` bytes.
 fn moved(text: &str, less: u64) -> String {
     const AT: &str = "invalid BEEF at byte ";
     let Some(i) = text.find(AT) else {
@@ -27,7 +29,7 @@ fn moved(text: &str, less: u64) -> String {
         return text.to_string();
     };
     let offset: u64 = offset.parse().expect("an offset");
-    format!("{AT}{}: {reason}", offset - less)
+    format!("invalid BUMP at byte {}: {reason}", offset - less)
 }
 
 fn both_readers_agree(data: &[u8]) {

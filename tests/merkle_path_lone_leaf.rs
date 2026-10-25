@@ -26,7 +26,7 @@ fn missing(offset: u64) -> Error {
 /// The parse's refusal: the BEEF reader's BUMP decoder in its words, at the
 /// leaf's offset varint, byte 7 of the BUMP (bsv-rs#167).
 fn parse_refused(reason: &str) -> Error {
-    Error::MerklePathError(format!("invalid BEEF at byte 7: {reason}"))
+    Error::MerklePathError(format!("invalid BUMP at byte 7: {reason}"))
 }
 
 fn in_memory(offset: u64) -> MerklePath {

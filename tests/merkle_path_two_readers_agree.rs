@@ -56,10 +56,13 @@ enum Answer {
 }
 
 /// The kind and the offset of a refusal in the stream's words, `invalid
-/// BEEF at byte N: Reason`.
+/// BEEF at byte N: Reason` (or `invalid BUMP at byte N: Reason`, the
+/// standalone reader's words for the BUMP it was handed).
 fn refusal_in_words(text: &str) -> Option<(u64, Kind)> {
-    let rest = &text[text.find("invalid BEEF at byte ")? + "invalid BEEF at byte ".len()..];
-    let (offset, reason) = rest.split_once(": ")?;
+    let at = ["invalid BEEF at byte ", "invalid BUMP at byte "]
+        .into_iter()
+        .find_map(|words| Some(text.find(words)? + words.len()))?;
+    let (offset, reason) = text[at..].split_once(": ")?;
     let name: String = reason
         .chars()
         .take_while(char::is_ascii_alphanumeric)
@@ -614,7 +617,7 @@ fn an_even_offset_duplicate_is_refused_by_both_readers_at_its_flag() {
         }
         assert_eq!(
             MerklePath::from_binary(&bytes).unwrap_err().to_string(),
-            format!("merkle path error: invalid BEEF at byte {at}: BadFlag {{ byte: 1 }}")
+            format!("merkle path error: invalid BUMP at byte {at}: BadFlag {{ byte: 1 }}")
         );
     }
 }
