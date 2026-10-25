@@ -183,26 +183,9 @@ impl Beef {
     }
 }
 
-/// A streamed BUMP as the in-memory [`MerklePath`], each level's leaves by
-/// offset (the order the in-memory form has always held). The in-memory
-/// height is a `u32` (go-sdk's too): a BUMP that claims a block above it
-/// claims a block no chain's headers carry, and is refused as the stream
-/// refuses it under them, `RootNotCarried` at the BUMP. Through 0.9.0 the
-/// height was cut to its low 32 bits and the root keyed there.
+/// A streamed BUMP as the in-memory [`MerklePath`] ([`Bump::in_memory`]):
+/// each level's leaves by offset, a height above a `u32` refused. Through
+/// 0.9.0 the height was cut to its low 32 bits and the root keyed there.
 fn in_memory_bump(bump: &Bump) -> Result<MerklePath> {
-    if u32::try_from(bump.block_height).is_err() {
-        let refusal = Refusal {
-            offset: bump.offset,
-            reason: Reason::RootNotCarried {
-                height: bump.block_height,
-                root: bump.root,
-            },
-        };
-        return Err(refusal_error(&refusal));
-    }
-    let mut path = bump.to_merkle_path()?;
-    for level in &mut path.path {
-        level.sort_by_key(|leaf| leaf.offset);
-    }
-    Ok(path)
+    bump.in_memory().map_err(|r| refusal_error(&r))
 }

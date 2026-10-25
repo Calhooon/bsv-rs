@@ -16,7 +16,7 @@
 //!   [varint]  leaf count
 //!   For each leaf:
 //!     [varint]  offset
-//!     [1]       flags (bit0=duplicate, bit1=txid)
+//!     [1]       flags (00 hash, 01 duplicate, 02 client txid; no other)
 //!     [32]      hash (if not duplicate, little-endian)
 //! ```
 //!
@@ -37,8 +37,14 @@
 
 use std::collections::{HashMap, HashSet};
 
+use super::beef_stream::{read_bump, Refusal};
 use crate::primitives::{from_hex, sha256d, to_hex, Reader, Writer};
 use crate::Result;
+
+/// A BUMP the decoder refused, in the stream's words.
+fn refused(refusal: Refusal) -> crate::Error {
+    crate::Error::MerklePathError(refusal.to_string())
+}
 
 /// The most levels a path may have. Offsets are `u64`, so a path of 64 levels
 /// shifts an offset by at most 63; a tree-height byte over this is refused
@@ -261,51 +267,19 @@ impl MerklePath {
         Self::from_binary(&bin)
     }
 
-    /// Creates a MerklePath from a Reader.
+    /// Creates a MerklePath from a Reader: one BUMP, read by the BEEF
+    /// reader's BUMP decoder (bsv-rs#167), so a BUMP means one thing
+    /// wherever this crate reads it. A leaf flag is `00`, `01` or `02`; an
+    /// offset lies within its level and appears once there; the tree height
+    /// is 1 to 64; every hashed leaf of level 0 climbs to one root; the block
+    /// height fits a `u32`. A refusal is the stream's, in its words, its
+    /// offset counted from the BUMP's leading byte. The reader is advanced
+    /// past the BUMP alone.
     pub fn from_reader(reader: &mut Reader) -> Result<Self> {
-        let block_height = reader.read_var_int_num()? as u32;
-        let tree_height = reader.read_u8()? as usize;
-        if tree_height > MAX_TREE_HEIGHT {
-            return Err(tree_height_error(tree_height));
-        }
-
-        let mut path: Vec<Vec<MerklePathLeaf>> = vec![Vec::new(); tree_height];
-
-        #[allow(clippy::needless_range_loop)]
-        for level in 0..tree_height {
-            let n_leaves = reader.read_var_int_num()?;
-
-            for _ in 0..n_leaves {
-                let offset = reader.read_var_int_num()? as u64;
-                let flags = reader.read_u8()?;
-
-                let leaf = if (flags & 1) != 0 {
-                    // Duplicate flag set
-                    MerklePathLeaf::new_duplicate(offset)
-                } else {
-                    // Read 32-byte hash in little-endian
-                    let hash_slice = reader.read_bytes(32)?;
-                    let mut hash_bytes = hash_slice.to_vec();
-                    hash_bytes.reverse(); // Convert from LE to display format
-                    let hash = to_hex(&hash_bytes);
-
-                    let txid = (flags & 2) != 0;
-                    MerklePathLeaf {
-                        offset,
-                        hash: Some(hash),
-                        txid,
-                        duplicate: false,
-                    }
-                };
-
-                path[level].push(leaf);
-            }
-
-            // Sort leaves by offset
-            path[level].sort_by_key(|l| l.offset);
-        }
-
-        Self::new_unchecked(block_height, path)
+        let bump = read_bump(reader.clone().read_remaining()).map_err(refused)?;
+        let path = bump.in_memory().map_err(refused)?;
+        reader.read_bytes(usize::try_from(bump.wire_len).unwrap_or(usize::MAX))?;
+        Ok(path)
     }
 
     /// Creates a MerklePath for a coinbase transaction in a block with no other transactions.
@@ -740,6 +714,12 @@ impl<'a> RootWalker<'a> {
         let working_hash = if leaf1.duplicate {
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             hash_pair(h0, h0)
+        } else if leaf0.duplicate {
+            // A duplicate on the left duplicates the working hash on its
+            // right, as the BEEF reader's walk reads it (BRC-74's "duplicate
+            // working hash"); through 0.9.0 an empty hash stood in (#167).
+            let h1 = leaf1.hash.as_deref().unwrap_or("");
+            hash_pair(h1, h1)
         } else {
             // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
             let h0 = leaf0.hash.as_deref().unwrap_or("");
@@ -1099,6 +1079,14 @@ mod linear_root_equivalence_tests {
         let working_hash = if leaf1.duplicate {
             let h0 = leaf0.hash.as_deref().unwrap_or("");
             hash_pair(h0, h0)
+        } else if leaf0.duplicate {
+            // The ruling of #167, as `expected_after_lone_leaf_ruling` carries
+            // the offset-0 one: a duplicate on the left is the working hash
+            // on its right paired with itself, the BEEF reader's reading;
+            // 0.3.34 hashed an empty left hash, and a path's walks could
+            // disagree (one root per txid no longer held).
+            let h1 = leaf1.hash.as_deref().unwrap_or("");
+            hash_pair(h1, h1)
         } else {
             // h0 is at offset l (even, LEFT), h1 is at offset l+1 (odd, RIGHT)
             let h0 = leaf0.hash.as_deref().unwrap_or("");
@@ -1414,7 +1402,7 @@ mod linear_root_equivalence_tests {
     #[test]
     fn the_parse_matches_the_rescan_except_the_ruled_lone_leaf() {
         let mut rng = StdRng::seed_from_u64(0x0335);
-        let mut parsed = 0;
+        let (mut parsed, mut stricter) = (0, 0usize);
         for round in 0..1000 {
             let path = random_path(&mut rng);
             let bytes = MerklePath {
@@ -1454,17 +1442,32 @@ mod linear_root_equivalence_tests {
                 let legacy = legacy_new_internal(800_000, path.clone(), false);
                 expected_after_lone_leaf_ruling(&path, legacy)
             });
-            assert_eq!(outcome(&new), outcome(&old), "round {round}");
-            if let (Ok(new), Ok(old)) = (&new, &old) {
-                assert_eq!(
-                    roots(new, |mp, t| mp.compute_root(t)),
-                    roots(old, legacy_compute_root)
-                );
-                assert_eq!(new.to_binary(), old.to_binary());
-                parsed += 1;
+            // Since #167 the parse is the BEEF reader's BUMP decoder: what it
+            // accepts the 0.3.34 parse accepted, to the same roots and bytes;
+            // every refusal is the decoder's, in its words, and it refuses
+            // more (an offset outside its level, a carried node its children
+            // contradict, a level 0 with no hash).
+            match (&new, &old) {
+                (Ok(new), Ok(old)) => {
+                    assert_eq!(
+                        roots(new, |mp, t| mp.compute_root(t)),
+                        roots(old, legacy_compute_root)
+                    );
+                    assert_eq!(new.to_binary(), old.to_binary());
+                    parsed += 1;
+                }
+                (Ok(_), Err(e)) => panic!("round {round}: accepted what 0.3.34 refused: {e}"),
+                (Err(e), old) => {
+                    let text = e.to_string();
+                    assert!(
+                        text.contains("invalid BEEF at byte "),
+                        "round {round}: {text}"
+                    );
+                    stricter += usize::from(old.is_ok());
+                }
             }
         }
-        println!("parsed {parsed}");
+        println!("parsed {parsed}, refused where 0.3.34 parsed {stricter}");
         assert!(parsed > 250);
     }
 }
