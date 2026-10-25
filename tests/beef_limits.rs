@@ -87,7 +87,7 @@ fn a_claimed_count_is_refused_for_the_bytes_and_reserves_nothing() {
     for limits in [hints(1_000, 10), hints(usize::MAX, usize::MAX)] {
         let error = Beef::from_binary_with_limits(&claimed, &limits).expect_err("no bytes");
         // The parse is the stream's decoder (#86): the refusal in its words,
-        // a field cut short where the first entry was due.
+        // a field cut short where the entry that was due begins.
         assert_eq!(
             error,
             bsv_rs::Error::BeefError(format!(
