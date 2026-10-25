@@ -63,7 +63,7 @@ so every frame is unknownError (1): the reference's 2 to 8 come from a typed
 error's `code` (`WERR_INVALID_PARAMETER` 6, `WERR_INSUFFICIENT_FUNDS` 7), never
 from its words, and the old reading of the words, which a plain `Error` with
 those words does not get from the reference, goes. A wallet that needs to frame
-2 to 8 needs a code on its error, a public type change this release does not
+2 to 8 needs a code on its error, a public type change this release does not (#137)
 make.
 
 The tests that pin it: `tests/wire_error_frames.rs` (new, 7 tests; each frame
@@ -104,7 +104,7 @@ to its transport; its `WriteResultFrame` writes a `wallet.Error`'s `Code` as
 given, its `Message` uncut and its `Stack` as given
 (`wallet/serializer/frame.go:71-87`). This crate follows the TypeScript
 reference: the code mapped to 1 to 8, the message cut at 4096 bytes, the stack
-empty.
+empty. The reference wraps every wallet call in `#invokeWallet` (`WalletWireProcessor.ts:2402-2418` at `ts-stack@edf6e03`): a wallet error that is not a typed `WalletError` or `WERR_` error with a code 2 to 8 is replaced by `Wallet operation failed`, code 1, before the catch frames it; this crate frames the wallet's own words instead (the keeper's reading asked, 2026-10-25).
 
 ### Fixed: verifyHmac's request carries the raw hmac ahead of the data; the signature calls carry the reference's data-type flag (#199)
 
