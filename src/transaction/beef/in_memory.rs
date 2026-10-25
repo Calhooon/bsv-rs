@@ -10,8 +10,8 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
 use super::super::beef_stream::{
-    bump_root, check_transaction, display_hex, AtomicNode, Bump, Hash32, InputRef, Kind, Leaf,
-    Node, OutputRef, Reason, Refusal,
+    bump_root, check_transaction, display_hex, AtomicNode, BeefDecoder, Bump, Element, Hash32,
+    InputRef, Kind, Leaf, Node, OutputRef, Reason, Refusal, Step,
 };
 use super::super::beef_tx::BeefTx;
 use super::super::merkle_path::{MerklePath, MerklePathLeaf};
@@ -46,6 +46,39 @@ impl Bump {
             })
             .collect();
         Ok(MerklePath { block_height, path })
+    }
+
+    /// One BUMP read alone (`MerklePath::from_binary`, bsv-rs#167) by the
+    /// decoder that reads one in a BEEF, behind the header of a BEEF of one
+    /// BUMP: the same flags, offsets, tree height and walk, each refusal the
+    /// stream's, every offset counted from the BUMP's leading byte. The
+    /// bytes after the BUMP are not read; `wire_len` is the bytes it took.
+    pub(crate) fn read_alone(mut bin: &[u8]) -> Result<Bump, Refusal> {
+        const HEADER: [u8; 5] = [0x01, 0x00, 0xbe, 0xef, 0x01];
+        let back = |r: Refusal| Refusal {
+            offset: r.offset.saturating_sub(HEADER.len() as u64),
+            ..r
+        };
+        let mut decoder = BeefDecoder::new();
+        // A frame's header: read whole, it yields nothing.
+        let _ = decoder.next(&mut &HEADER[..]);
+        let mut bump = match decoder.next(&mut bin).map_err(back)? {
+            Step::Element(Element::Bump(bump)) => bump,
+            // Stopped inside the BUMP: the refusal names the field cut short.
+            _ => {
+                return Err(decoder.finish().map_or_else(back, |()| {
+                    back(Refusal {
+                        offset: decoder.offset(),
+                        reason: Reason::BadVarint,
+                    })
+                }))
+            }
+        };
+        bump.offset = 0;
+        for leaf in bump.levels.iter_mut().flatten() {
+            leaf.at = leaf.at.saturating_sub(HEADER.len() as u64);
+        }
+        Ok(bump)
     }
 
     /// The in-memory form both readers keep, each level's leaves by offset.
