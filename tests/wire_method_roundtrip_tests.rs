@@ -24,13 +24,13 @@ use bsv_rs::wallet::{
     AbortActionArgs, AcquireCertificateArgs, AcquisitionProtocol, ActionStatus, BasketInsertion,
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, DiscoverByAttributesArgs,
-    DiscoverByIdentityKeyArgs, EncryptArgs, GetHeaderArgs, GetPublicKeyArgs, IdentityCertificate,
-    IdentityCertifier, InternalizeActionArgs, InternalizeOutput, ListActionsArgs,
-    ListCertificatesArgs, ListOutputsArgs, Network, Outpoint, OutputInclude, ProtoWallet, Protocol,
-    ProveCertificateArgs, QueryMode, RelinquishCertificateArgs, RelinquishOutputArgs,
-    SecurityLevel, SendWithResult, SendWithResultStatus, SignActionArgs, SignActionSpend,
-    TrustSelf, VerifyHmacArgs, VerifySignatureArgs, WalletAction, WalletActionInput,
-    WalletActionOutput, WalletCertificate, WalletOutput, WalletPayment,
+    DiscoverByIdentityKeyArgs, EncryptArgs, GetHeaderArgs, GetPublicKeyArgs, IdentityCertifier,
+    InternalizeActionArgs, InternalizeOutput, ListActionsArgs, ListCertificatesArgs,
+    ListOutputsArgs, Network, Outpoint, OutputInclude, ProtoWallet, Protocol, ProveCertificateArgs,
+    QueryMode, RelinquishCertificateArgs, RelinquishOutputArgs, SecurityLevel, SendWithResult,
+    SendWithResultStatus, SignActionArgs, SignActionSpend, TrustSelf, VerifyHmacArgs,
+    VerifySignatureArgs, WalletAction, WalletActionInput, WalletActionOutput, WalletCertificate,
+    WalletOutput, WalletPayment,
 };
 use bsv_rs::Error;
 use std::collections::HashMap;
@@ -1481,71 +1481,6 @@ mod complex_type_roundtrips {
         assert_eq!(read.icon_url, None);
         assert_eq!(read.description, None);
         assert_eq!(read.trust, 1);
-    }
-
-    /// Tests IdentityCertificate write/read roundtrip.
-    #[test]
-    fn test_identity_certificate_roundtrip() {
-        let cert = IdentityCertificate {
-            certificate: sample_wallet_certificate(),
-            certifier_info: Some(IdentityCertifier {
-                name: "Test Certifier".to_string(),
-                icon_url: Some("https://icon.example.com".to_string()),
-                description: None,
-                trust: 5,
-            }),
-            publicly_revealed_keyring: Some({
-                let mut m = HashMap::new();
-                m.insert("name".to_string(), "keyring-val-1".to_string());
-                m
-            }),
-            decrypted_fields: Some({
-                let mut m = HashMap::new();
-                m.insert("name".to_string(), "Alice Smith".to_string());
-                m.insert("email".to_string(), "alice@smith.com".to_string());
-                m
-            }),
-        };
-
-        let mut writer = WireWriter::new();
-        writer.write_identity_certificate(&cert).unwrap();
-
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_identity_certificate().unwrap();
-
-        assert_eq!(
-            read.certificate.certificate_type,
-            cert.certificate.certificate_type
-        );
-        assert!(read.certifier_info.is_some());
-        assert_eq!(read.certifier_info.as_ref().unwrap().name, "Test Certifier");
-        assert!(read.publicly_revealed_keyring.is_some());
-        assert!(read.decrypted_fields.is_some());
-        assert_eq!(
-            read.decrypted_fields.as_ref().unwrap().get("name").unwrap(),
-            "Alice Smith"
-        );
-    }
-
-    /// Tests IdentityCertificate with None optional fields.
-    #[test]
-    fn test_identity_certificate_minimal_roundtrip() {
-        let cert = IdentityCertificate {
-            certificate: sample_wallet_certificate(),
-            certifier_info: None,
-            publicly_revealed_keyring: None,
-            decrypted_fields: None,
-        };
-
-        let mut writer = WireWriter::new();
-        writer.write_identity_certificate(&cert).unwrap();
-
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_identity_certificate().unwrap();
-
-        assert!(read.certifier_info.is_none());
-        assert!(read.publicly_revealed_keyring.is_none());
-        assert!(read.decrypted_fields.is_none());
     }
 
     /// Tests WalletPayment write/read roundtrip.

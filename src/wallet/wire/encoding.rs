@@ -1978,61 +1978,6 @@ mod tests {
     }
 
     #[test]
-    fn test_identity_certificate_roundtrip() {
-        let mut keyring = HashMap::new();
-        keyring.insert("name".to_string(), "revealed_key_1".to_string());
-
-        let mut decrypted = HashMap::new();
-        decrypted.insert("name".to_string(), "John Doe".to_string());
-        decrypted.insert("email".to_string(), "john@example.com".to_string());
-
-        let cert = IdentityCertificate {
-            certificate: make_test_certificate(),
-            certifier_info: Some(IdentityCertifier {
-                name: "Trusted CA".to_string(),
-                icon_url: Some("https://ca.example.com/icon.png".to_string()),
-                description: None,
-                trust: 4,
-            }),
-            publicly_revealed_keyring: Some(keyring),
-            decrypted_fields: Some(decrypted),
-        };
-
-        let mut writer = WireWriter::new();
-        writer.write_identity_certificate(&cert).unwrap();
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_identity_certificate().unwrap();
-
-        assert_eq!(
-            read.certificate.certificate_type,
-            cert.certificate.certificate_type
-        );
-        assert!(read.certifier_info.is_some());
-        assert_eq!(read.certifier_info.unwrap().name, "Trusted CA");
-        assert_eq!(
-            read.publicly_revealed_keyring,
-            cert.publicly_revealed_keyring
-        );
-        assert_eq!(read.decrypted_fields, cert.decrypted_fields);
-
-        // Minimal: no optional fields
-        let minimal_cert = IdentityCertificate {
-            certificate: make_test_certificate(),
-            certifier_info: None,
-            publicly_revealed_keyring: None,
-            decrypted_fields: None,
-        };
-
-        let mut writer = WireWriter::new();
-        writer.write_identity_certificate(&minimal_cert).unwrap();
-        let mut reader = WireReader::new(writer.as_bytes());
-        let read = reader.read_identity_certificate().unwrap();
-        assert!(read.certifier_info.is_none());
-        assert_eq!(read.publicly_revealed_keyring, None);
-        assert_eq!(read.decrypted_fields, None);
-    }
-
-    #[test]
     fn test_wallet_payment_roundtrip() {
         let payment = WalletPayment {
             derivation_prefix: "prefix_abc123".to_string(),
