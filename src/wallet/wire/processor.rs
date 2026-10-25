@@ -24,11 +24,12 @@
 //! ```
 
 use super::encoding::{WireReader, WireWriter};
-use super::WalletCall;
-use crate::primitives::{from_hex, PublicKey};
-use crate::wallet::interface::{
-    RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs, WalletInterface,
+use super::requests::{
+    read_reveal_counterparty_key_linkage_args, read_reveal_specific_key_linkage_args,
 };
+use super::WalletCall;
+use crate::primitives::from_hex;
+use crate::wallet::interface::WalletInterface;
 use crate::wallet::types::Network;
 use crate::wallet::{
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
@@ -496,19 +497,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let counterparty_bytes = reader.read_bytes(33)?;
-        let counterparty = PublicKey::from_bytes(counterparty_bytes)?;
-        let verifier_bytes = reader.read_bytes(33)?;
-        let verifier = PublicKey::from_bytes(verifier_bytes)?;
-
-        // Call wallet method
-        let args = RevealCounterpartyKeyLinkageArgs {
-            counterparty,
-            verifier,
-            privileged: None,
-            privileged_reason: None,
-        };
+        let args = read_reveal_counterparty_key_linkage_args(reader)?;
         let result = self
             .wallet
             .reveal_counterparty_key_linkage(args, originator)
@@ -534,24 +523,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Result<Vec<u8>, Error> {
-        // Read arguments
-        let counterparty = reader
-            .read_counterparty()?
-            .ok_or_else(|| Error::WalletError("counterparty is required".to_string()))?;
-        let verifier_bytes = reader.read_bytes(33)?;
-        let verifier = PublicKey::from_bytes(verifier_bytes)?;
-        let protocol_id = reader.read_protocol_id()?;
-        let key_id = reader.read_string()?;
-
-        // Call wallet method
-        let args = RevealSpecificKeyLinkageArgs {
-            counterparty,
-            verifier,
-            protocol_id,
-            key_id,
-            privileged: None,
-            privileged_reason: None,
-        };
+        let args = read_reveal_specific_key_linkage_args(reader)?;
         let result = self
             .wallet
             .reveal_specific_key_linkage(args, originator)

@@ -75,6 +75,7 @@
 mod calls;
 mod encoding;
 mod processor;
+mod requests;
 mod transceiver;
 
 pub use calls::WalletCall;
