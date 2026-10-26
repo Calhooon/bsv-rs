@@ -96,6 +96,10 @@ impl std::fmt::Display for MessageType {
 /// and [`signing_data`](Self::signing_data) signs it, while it still reads
 /// back to the member's value; a member changed since is serialized afresh.
 /// Its serde is JSON's: the texts are `serde_json` raw values.
+/// A member set directly rather than through its setter is serialized
+/// from the parsed value at signing and again at send, the same instance
+/// both times, so the signature covers what goes on the wire; a text that
+/// disagrees with its member is dropped at both points (#280).
 #[derive(Debug, Clone)]
 pub struct AuthMessage {
     /// Protocol version (e.g., "0.1").

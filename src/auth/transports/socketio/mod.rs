@@ -57,6 +57,12 @@
 //!         // self.0.send_text(&EngineIoPacket::Message(pkt.encode()).encode())
 //!         Ok(())
 //!     }
+//!     // An auth message's packet arrives here as the text the peer signed
+//!     // (#280): send it as it is, never re-encoded through a JSON value.
+//!     fn send_socketio_text(&self, packet: &str) -> Result<(), String> {
+//!         // self.0.send_text(&EngineIoPacket::Message(packet.to_owned()).encode())
+//!         Ok(())
+//!     }
 //! }
 //!
 //! // 2. Build the transport, hand it to a Peer.
