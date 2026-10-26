@@ -111,6 +111,13 @@
           "display": "wallet error: wallet error (code 8): fixture refusal",
           "error": "WalletError(\"wallet error (code 8): fixture refusal\")"
         },
+        "client_result_by_call": {
+          "abortAction": {
+            "ok": {
+              "aborted": false
+            }
+          }
+        },
         "response_hex": "080f66697874757265207265667573616c00"
       },
       "input": {
