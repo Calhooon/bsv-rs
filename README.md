@@ -25,7 +25,7 @@ module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
 `socketio`), `full` (all of those), the native transports `http` and
 `websocket` (neither in `full`), `wasm`, `tracing` (not in `full`: one `warn`
 event at the wallet wire processor carrying a wallet's error words that the
-frame replaces with `Wallet operation failed`), and `dhat-profiling` for the
+frame replaces with `Wallet operation failed`, and one naming a wallet refusal's class (#137)), and `dhat-profiling` for the
 heap profiling tests. `transaction` enables `block`. A Worker should select the
 features it needs and enable `wasm`; native HTTP transports are separate:
 `http` is native-only, and a wasm32 build with it stops at `build.rs` with one
