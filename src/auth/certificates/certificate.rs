@@ -76,14 +76,8 @@ pub struct Certificate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revocation_outpoint: Option<Outpoint>,
 
-    /// Field values (field_name -> the value's base64 text). BRC-52 carries
-    /// a field value as a base64 string and signs and writes that text's
-    /// UTF-8 bytes, never the ciphertext it encodes (`brcs@5119a9b`
-    /// `peer-to-peer/0052.md:41,97`); the reference's
-    /// `Record<CertificateFieldNameUnder50Bytes, Base64String>`
-    /// (`ts-stack@edf6e03` `Certificate.ts:294-296`) and Go's
-    /// `map[string]string` (`go-sdk@2ca481c` `wallet/interfaces.go:122`).
-    /// In JSON each value is that string (#261).
+    /// Field values (name -> base64 text), signed and written as the text's UTF-8 bytes
+    /// (BRC-52 `0052.md:41,97`; `Certificate.ts:294-296`; Go's `interfaces.go:122`; #261).
     #[serde(default)]
     pub fields: HashMap<String, String>,
 
@@ -416,21 +410,14 @@ impl Certificate {
         format!("{} {}", serial_b64, field_name)
     }
 
-    /// Sets a field value: its base64 text, whose UTF-8 bytes are signed and
-    /// written (BRC-52 `0052.md:97`), never the ciphertext it encodes. Any
-    /// string is accepted, as the reference's `fields` record accepts any
-    /// string (#261).
+    /// Sets a field value: its base64 text, any string, as the reference takes it (#261).
     ///
     /// ```
-    /// use bsv_rs::auth::certificates::Certificate;
-    /// use bsv_rs::primitives::{to_base64, PrivateKey};
-    ///
+    /// use bsv_rs::{auth::certificates::Certificate, primitives::{to_base64, PrivateKey}};
     /// let key = PrivateKey::random().public_key();
     /// let mut cert = Certificate::new([1; 32], [2; 32], key.clone(), key);
     /// cert.set_field("email", to_base64(&[0xff, 0xfe, 0x41]));
-    /// let wire = cert.to_binary(false);
-    /// let text = b"\x05email\x04//5B";
-    /// assert!(wire.windows(text.len()).any(|w| w == text));
+    /// assert!(cert.to_binary(false).windows(11).any(|w| w == b"\x05email\x04//5B"));
     /// ```
     pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<String>) {
         self.received_unsigned = None;
@@ -447,8 +434,7 @@ impl Certificate {
         self.fields.keys().collect()
     }
 
-    /// Converts to wallet certificate format. Each field value is its held
-    /// base64 text (#261).
+    /// Converts to wallet certificate format, each field its text (#261).
     pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate {
         crate::wallet::types::Certificate {
             certificate_type: self.type_base64(),
@@ -526,14 +512,10 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
             )));
         }
         let value_len = reader.read_len()?;
-        // The value is UTF-8 text, refused otherwise, as the reference's
-        // `toUTF8Strict` refuses it (`ts-stack@edf6e03` `Certificate.ts:384`)
-        // and BRC-52 asks (`0052.md:103`: malformed UTF-8 MUST NOT be made
-        // acceptable by retaining bytes; #261).
+        // UTF-8 or refused, as `toUTF8Strict` (`Certificate.ts:384`; BRC-52 `0052.md:103`; #261)
         let value = std::str::from_utf8(reader.read_bytes(value_len)?).map_err(|e| {
             Error::InvalidUtf8(format!(
-                "certificate field {} is not UTF-8 base64 text: {}",
-                name, e
+                "certificate field {name} is not UTF-8 base64 text: {e}"
             ))
         })?;
         fields.insert(name, value.to_string());

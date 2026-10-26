@@ -1516,7 +1516,8 @@ bytes as given; it is now `HashMap<String, String>`, the base64 text, as the
 reference's `Record<CertificateFieldNameUnder50Bytes, Base64String>` and Go's
 `map[string]string` hold it (the owner's word of 2026-10-26, option A), the
 writer writing `value.as_bytes()`, so the wire bytes are the text's UTF-8 as
-before. The sites that put the decoded ciphertext there:
+before. #249's `with_fields` and `set_fields`, unreleased, take the same
+`HashMap<String, String>`. The sites that put the decoded ciphertext there:
 
 - `get_verifiable_certificates` (`src/auth/utils/validation.rs`) decoded each
   field of the wallet's `listCertificates` result before building the
