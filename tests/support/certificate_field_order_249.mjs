@@ -14,7 +14,7 @@
 // prints the reference's refusal of a repeated field name
 // (`fromBinary`), prints a corpus of names in `localeCompare` order (every
 // printable ASCII and Latin-1 character alone, then strings drawn from a
-// fixed seed: the order `src/auth/certificates/collation.rs` must give),
+// fixed seed: the order `src/wallet/collation.rs` must give),
 // then runs the reference's `verify` (`Certificate.ts:428-431`)
 // on every witness the vector file carries and prints the verdicts the file
 // records.

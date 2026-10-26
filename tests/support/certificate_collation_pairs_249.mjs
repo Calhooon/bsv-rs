@@ -1,7 +1,7 @@
-// The pair check of `src/auth/certificates/collation.rs` (#249).
+// The pair check of `src/wallet/collation.rs` (#249).
 //
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/certificate_collation_pairs_249.mjs \
-//     src/auth/certificates/collation_latin1.txt \
+//     src/wallet/collation_latin1.txt \
 //     tests/vectors/auth_certificate_field_order_249.json
 //
 // Builds the sort key `collation.rs` builds from the same table (every

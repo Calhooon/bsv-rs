@@ -1,4 +1,4 @@
-# The collation table of src/auth/certificates/collation.rs (#249), written by
+# The collation table of src/wallet/collation.rs (#249), written by
 # tests/support/certificate_collation_table_249.mjs from the DUCET 13.0.0
 # (allkeys.txt), under Node v22.18.0 (ICU 77.1, CLDR 47.0, Unicode
 # 16.0), whose localeCompare the rows are checked against. Weights ranked

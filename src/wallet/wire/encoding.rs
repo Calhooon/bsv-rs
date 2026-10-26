@@ -1136,8 +1136,9 @@ impl WireWriter {
     /// Writes a WalletCertificate as `Certificate.toBinary` writes it
     /// (`ts-stack@edf6e03` `Certificate.ts:229-321`; go-sdk@2ca481c
     /// `wallet/serializer/certificate.go:27-66`): type(32), serial(32),
-    /// subject(33), certifier(33), the outpoint, the fields (sorted), then the
-    /// signature's bytes with no length prefix. What the reference's writer
+    /// subject(33), certifier(33), the outpoint, the fields (in the signed
+    /// order, `localeCompare`'s, `:282`; bsv-rs#246), then the signature's
+    /// bytes with no length prefix. What the reference's writer
     /// refuses is refused before a byte is written, in the readers' words
     /// (bsv-rs#189): a subject or certifier that is not a compressed point
     /// (`:241-253`), a field name outside 1 to 50 bytes or unsafe (`:289`), a
@@ -1408,9 +1409,9 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
             super::MAX_CERTIFICATE_FIELDS
         )));
     }
-    let mut names: Vec<&String> = cert.fields.keys().collect();
-    names.sort();
-    for name in names {
+    let mut names: Vec<&str> = cert.fields.keys().map(String::as_str).collect();
+    crate::wallet::collation::sort_field_names(&mut names);
+    for &name in &names {
         super::require_certificate_field_name_length(name.len())?;
         super::require_safe_certificate_field_name(name)?;
         if cert.fields[name].len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
@@ -1420,7 +1421,14 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
             )));
         }
     }
-    w.write_string_map(&cert.fields);
+    // In the order the signature is made over, `localeCompare`'s
+    // (`Certificate.ts:282`), not the bytes: a byte-ordered frame of a
+    // certificate signed here does not verify over the bytes received (#246)
+    w.write_var_int(names.len() as u64);
+    for name in names {
+        w.write_string(name);
+        w.write_string(&cert.fields[name]);
+    }
 
     // Signature: raw bytes, no length prefix (the bytes remaining)
     let sig_bytes = from_hex(&cert.signature)?;

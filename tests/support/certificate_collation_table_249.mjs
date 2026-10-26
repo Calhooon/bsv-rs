@@ -1,8 +1,8 @@
-// The collation table of `src/auth/certificates/collation.rs` (#249).
+// The collation table of `src/wallet/collation.rs` (#249).
 //
 //   node tests/support/certificate_collation_table_249.mjs \
 //     /System/Library/Perl/5.34/Unicode/Collate/allkeys.txt \
-//     > src/auth/certificates/collation_latin1.txt
+//     > src/wallet/collation_latin1.txt
 //
 // Reads the DUCET (`allkeys.txt`, 13.0.0 in the system Perl's
 // Unicode::Collate) for U+0000..U+00FF and the two contractions inside that
@@ -43,7 +43,7 @@ const R = [rank(0), rank(1), rank(2)]
 const row = (es) => es.map((e) => e.map((w, i) => (w ? R[i].get(w) : 0)).join('.')).join(' ')
 
 const v = process.versions
-console.log(`# The collation table of src/auth/certificates/collation.rs (#249), written by`)
+console.log(`# The collation table of src/wallet/collation.rs (#249), written by`)
 console.log(`# tests/support/certificate_collation_table_249.mjs from the DUCET ${version}`)
 console.log(`# (allkeys.txt), under Node ${process.version} (ICU ${v.icu}, CLDR ${v.cldr}, Unicode`)
 console.log(`# ${v.unicode}), whose localeCompare the rows are checked against. Weights ranked`)
