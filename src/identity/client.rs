@@ -1257,8 +1257,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         }
 
         // The signature is hex, as the reference's WalletCertificate carries it;
-        // one that is not skips the output at the verify below, as the sibling
-        // parser and the reference skip it (`IdentityClient.ts:823-825`)
+        // one that is not skips the output below (`IdentityClient.ts:823-825`)
         if let Some(sig_str) = cert_data["signature"].as_str() {
             certificate.signature = from_hex(sig_str).ok();
         }
