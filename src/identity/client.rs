@@ -1247,8 +1247,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Parse the fields: each value held as its base64 text's bytes, never
-        // decoded, as BRC-52 signs it (`0052.md:97`; #261)
+        // Each field held as its base64 text's bytes, as BRC-52 signs it (#261)
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
@@ -1257,8 +1256,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Parse signature if present: hex, as the reference's
-        // `WalletCertificate.signature` (`HexString`) is written
+        // The signature is hex, as the reference's WalletCertificate carries it
         if let Some(sig_str) = cert_data["signature"].as_str() {
             certificate.signature = Some(from_hex(sig_str)?);
         }
@@ -1423,8 +1421,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Parse the fields: each value held as its base64 text's bytes, never
-        // decoded, as BRC-52 signs it (`0052.md:97`; #261)
+        // Each field held as its base64 text's bytes, as BRC-52 signs it (#261)
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
@@ -1433,12 +1430,9 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Parse signature if present: hex, as the reference's
-        // `WalletCertificate.signature` (`HexString`) is written
+        // The signature is hex, as the reference's WalletCertificate carries it
         if let Some(sig_str) = cert_data["signature"].as_str() {
-            if let Ok(sig_bytes) = from_hex(sig_str) {
-                certificate.signature = Some(sig_bytes);
-            }
+            certificate.signature = from_hex(sig_str).ok();
         }
 
         // Parse the keyring from JSON
