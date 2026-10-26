@@ -678,16 +678,20 @@ impl Beef {
     ///   refuses and a BEEF built in memory can hold; a txid-only entry no
     ///   BUMP of this BEEF proves, [`Kind::StubNotProven`] (NL-8 W5); a BUMP
     ///   index that names no BUMP, or a BUMP that does not carry the txid,
-    ///   [`Kind::BumpIndexNamesNoBump`], [`Kind::TxidNotInBump`]; an input of
-    ///   an unproven transaction that names no entry held ahead of it,
-    ///   [`Kind::InputNamesNoElement`].
-    /// - The order is BRC-62's, parents before children, as the stream reads
-    ///   it: an input that names an entry held after it is
-    ///   [`Kind::InputNamesNoElement`], before any sort (bsv-rs#86; through
-    ///   0.9.0 this sorted ahead of judging, as `@bsv/sdk`'s
-    ///   `Beef.verifyValid` and go-sdk's `verifyValid` do). The entries are
-    ///   then sorted ([`sort_txs`](Self::sort_txs)), proven ones leading, as
-    ///   they always were after this call.
+    ///   [`Kind::BumpIndexNamesNoBump`], [`Kind::TxidNotInBump`].
+    /// - Then the sort ([`sort_txs`](Self::sort_txs)), whose result decides
+    ///   as `@bsv/sdk`'s `Beef.verifyValid` reads `sortTxs`' (`ts-stack@edf6e03`
+    ///   `packages/sdk/src/transaction/Beef.ts:1065-1073`): an unproven
+    ///   transaction an input of which names no entry of this BEEF
+    ///   (`missing_inputs`, `with_missing_inputs`), or one whose inputs do
+    ///   not reach proven entries (`not_valid`: a ring, or a parent that
+    ///   does not), is [`Kind::InputNamesNoElement`]. Whatever the order on
+    ///   the wire (bsv-rs#240): a child held ahead of its parent is valid, as
+    ///   the reference reads it and as the stream reads it, holding the child
+    ///   until the parent is in. From bsv-rs#86 to #240 an input that named an
+    ///   entry held after it was refused here before the sort. The entries
+    ///   are left sorted, proven ones leading, as they always were after this
+    ///   call.
     /// - Atomic (NL-8 W4, BRC-95): the subject is a raw transaction of this
     ///   BEEF, else [`Kind::SubjectMissing`]; every other transaction or
     ///   txid-only entry is in the subject's dependency graph (reached from
@@ -708,7 +712,8 @@ impl Beef {
         let roots = self.bump_roots()?;
         self.entries_as_folded()?;
 
-        // Judged in the order held, the sort only reorders what is valid.
+        // The sort decides where the inputs lead, whatever the order held
+        // (`Beef.ts:1065-1073` at `edf6e03`; bsv-rs#240).
         let sr = self.sort_txs();
         if !sr.missing_inputs.is_empty()
             || !sr.not_valid.is_empty()
@@ -748,8 +753,9 @@ impl Beef {
     /// `check_transaction`: an unproven coinbase, no input, no output, a
     /// value outside `MoneyRange`, a null or repeated outpoint), a txid-only
     /// entry no BUMP proves, a BUMP index that names no BUMP or a BUMP that
-    /// does not carry the txid, an unproven transaction's input that names
-    /// no entry of this BEEF.
+    /// does not carry the txid. Where an unproven transaction's inputs lead
+    /// is the sort's to answer, after this pass, as the stream answers it
+    /// for a transaction it holds at the end (bsv-rs#240).
     fn entries_as_folded(&self) -> std::result::Result<(), Kind> {
         // Every hash of each BUMP's level 0 is a txid that BUMP proves,
         // indexed once.
@@ -766,35 +772,25 @@ impl Beef {
             })
             .collect();
         let proven: HashSet<&str> = carried.iter().map(|(_, h)| *h).collect();
-        // A raw entry's txid is a hash of its bytes: computed once.
-        let txids: Vec<String> = self.txs.iter().map(BeefTx::txid).collect();
-        // The entries held ahead of the one judged (BRC-62's order).
-        let mut held: HashSet<&str> = HashSet::with_capacity(txids.len());
-        for (tx, txid) in self.txs.iter().zip(&txids) {
+        for tx in &self.txs {
             if let Some(kind) = in_memory::content_refused(tx) {
                 return Err(kind);
             }
-            if tx.is_txid_only() {
-                if !proven.contains(txid.as_str()) {
-                    return Err(Kind::StubNotProven);
+            // A raw entry's txid is a hash of its bytes: computed once.
+            let txid = tx.txid();
+            let refused = match (tx.is_txid_only(), tx.bump_index()) {
+                (true, _) if !proven.contains(txid.as_str()) => Some(Kind::StubNotProven),
+                (false, Some(index)) if index >= self.bumps.len() => {
+                    Some(Kind::BumpIndexNamesNoBump)
                 }
-                held.insert(txid.as_str());
-                continue;
-            }
-            let refused = match tx.bump_index() {
-                Some(index) if index >= self.bumps.len() => Some(Kind::BumpIndexNamesNoBump),
-                Some(index) if !carried.contains(&(index, txid.as_str())) => {
+                (false, Some(index)) if !carried.contains(&(index, txid.as_str())) => {
                     Some(Kind::TxidNotInBump)
-                }
-                None if tx.input_txids.iter().any(|t| !held.contains(t.as_str())) => {
-                    Some(Kind::InputNamesNoElement)
                 }
                 _ => None,
             };
             if let Some(kind) = refused {
                 return Err(kind);
             }
-            held.insert(txid.as_str());
         }
         Ok(())
     }

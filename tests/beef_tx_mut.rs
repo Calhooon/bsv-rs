@@ -107,13 +107,12 @@ fn an_input_repointed_through_tx_mut_is_what_every_reader_reads() {
     let at = |id: &str| order.iter().position(|t| t == id).unwrap();
     assert!(at(&q.id()) < at(&mutated.id()), "{order:?}");
 
-    // The whole-path judge reads the new input in the order held: `C` now
-    // names `Q`, which is not held ahead of it.
-    assert_eq!(
-        beef.clone().verify_structure().err(),
-        Some(Kind::InputNamesNoElement)
-    );
-    // Sorted, the same BEEF is well formed.
+    // The whole-path judge reads the new input: `C` now names `Q`, held
+    // after it, which the sort reads whatever the order (bsv-rs#240; from
+    // #86 to #240 `InputNamesNoElement` in the order held). Sorted or not,
+    // the BEEF is well formed; the refresh itself is pinned by the cache and
+    // the order above, and by the input repointed outside the BEEF below.
+    assert!(beef.clone().verify_structure().is_ok());
     assert!(sorted.verify_structure().is_ok());
 
     // The atomic writer finds the subject by its new txid, and its closure

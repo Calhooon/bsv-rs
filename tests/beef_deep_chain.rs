@@ -352,32 +352,65 @@ fn a_deep_chain_history_builds_on_a_small_stack() {
 
 /// The same chain written newest first: a sort that rescans the pending list
 /// once per resolved link is quadratic here, so a stranger's byte order alone
-/// would cost `N^2 / 2` lookups. The order on the wire is BRC-62's or it is
-/// refused: through 0.9.0 `verify_valid` sorted ahead of judging and accepted
-/// it; since bsv-rs#86 the newest link, held ahead of its parent, is
-/// `InputNamesNoElement` on the whole path, as on the stream, and the sort of
-/// the chain held newest to oldest stays linear.
+/// would cost `N^2 / 2` lookups. A BEEF is valid whatever its order on the
+/// wire (bsv-rs#240): the whole path sorts before judging, as the
+/// reference's `Beef.verifyValid` does, and the stream holds each link until
+/// its parent is in, the funding transaction, written last, releasing the
+/// chain on a heap. Each reader is linear and runs on a 1 MiB stack. From
+/// bsv-rs#86 to #240 the newest link, held ahead of its parent, was
+/// `InputNamesNoElement` on both.
 #[test]
-fn a_reversed_deep_chain_is_refused_and_sorts_in_linear_time_on_a_small_stack() {
+fn a_reversed_deep_chain_is_valid_on_the_three_readers_in_linear_time_on_a_small_stack() {
     let n = depth(DEFAULT_DEPTH);
     let (mut beef, _) = chain_beef(n);
     beef.sort_txs();
+    let root = beef.bumps[0].path[0][0]
+        .hash
+        .clone()
+        .expect("the funding txid");
+    let mut root: [u8; 32] = bsv_rs::primitives::from_hex(&root)
+        .unwrap()
+        .try_into()
+        .unwrap();
+    root.reverse();
     beef.txs.reverse();
     let mut writer = bsv_rs::primitives::Writer::new();
     beef.to_writer(&mut writer);
-    let bytes = writer.into_bytes();
-    let ((verdict, sorted), elapsed) = on_small_stack("reversed verify_structure", move || {
-        let mut beef = Beef::from_binary(&bytes).expect("the chain parses");
-        let verdict = beef.verify_structure().map(|_| ());
-        let sorted = beef.sort_txs().missing_inputs.is_empty();
-        (verdict, sorted)
-    });
-    println!("reversed verify_structure: N={n} {verdict:?} in {elapsed:?}");
-    assert_eq!(verdict, Err(bsv_rs::transaction::Kind::InputNamesNoElement));
-    assert!(sorted, "every parent is held");
+    let bytes = std::sync::Arc::new(writer.into_bytes());
+    let whole = {
+        let bytes = bytes.clone();
+        on_small_stack("reversed verify_structure", move || {
+            let mut beef = Beef::from_binary(&bytes).expect("the chain parses");
+            beef.verify_structure().map(|_| ())
+        })
+    };
+    println!(
+        "reversed verify_structure: N={n} {:?} in {:?}",
+        whole.0, whole.1
+    );
+    assert_eq!(whole.0, Ok(()));
+    for scripts in [false, true] {
+        let bytes = bytes.clone();
+        let (verdict, elapsed) = on_small_stack("reversed stream", move || {
+            let headers = std::collections::HashMap::from([(800_000u64, root)]);
+            if scripts {
+                bsv_rs::transaction::verify_stream(bytes.as_slice(), &headers, None)
+            } else {
+                bsv_rs::transaction::verify_stream_structure(bytes.as_slice(), &headers, None)
+            }
+            .unwrap()
+        });
+        println!("reversed stream (scripts {scripts}): N={n} in {elapsed:?}");
+        assert!(verdict.is_valid(), "{verdict:?}");
+        assert!(
+            elapsed < Duration::from_secs(30),
+            "the stream over {n} reversed links must be linear, took {elapsed:?}"
+        );
+    }
     assert!(
-        elapsed < Duration::from_secs(30),
-        "sorting {n} reversed links must be linear, took {elapsed:?}"
+        whole.1 < Duration::from_secs(30),
+        "sorting {n} reversed links must be linear, took {:?}",
+        whole.1
     );
 }
 

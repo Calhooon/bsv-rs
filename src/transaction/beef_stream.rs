@@ -22,11 +22,24 @@
 //!   32 bytes per input of a raw transaction (0.8.1, the Lean's `prevs`; an
 //!   input is 41 bytes or more on the wire, so this too is linear in the
 //!   bytes read); never a sibling hash, never a transaction's bytes after its
-//!   step.
+//!   step, save a transaction held for a parent not read yet (below).
+//! - A BEEF is valid whatever its order on the wire (bsv-rs#240): an
+//!   unproven transaction an input of which names a txid the index does not
+//!   hold yet is held, as read, until that txid is folded in, then folded in
+//!   (in wire order); at the end one still held is refused,
+//!   [`Kind::InputNamesNoElement`] at its input that names nothing. The
+//!   whole-BEEF reader sorts before judging, as the reference does
+//!   (`ts-stack@edf6e03 packages/sdk/src/transaction/Beef.ts:1054-1073`), so
+//!   the two give one verdict. A BEEF in BRC-62's order (parents before
+//!   children, `BRCs@5119a9b transactions/0062.md:72-74`, as every writer
+//!   writes it) holds nothing; one written children first holds at most the
+//!   bytes read, with no bound unless the caller sets one
+//!   ([`DeferredLimit`]), past which the reading is declined
+//!   ([`DeferredOverLimit`]), never judged.
 //! - [`verify_stream`] is one pass: one step per element, each BUMP's root
 //!   checked against the [`Headers`] as it streams, each unproven
-//!   transaction's inputs resolved against the index and executed against the
-//!   parent output the index retained. The verdict is [`Verdict`].
+//!   transaction's inputs resolved against the index (or held until they
+//!   are) and executed against the parent output the index retained. The verdict is [`Verdict`].
 //!   [`verify_stream_two_pass`] reads a source at rest twice and keeps only
 //!   the outputs that are spent.
 //! - [`Cursor`] is the state after `k` elements, serializable;
@@ -72,7 +85,8 @@
 //! }
 //! ```
 
-use std::collections::{HashMap, HashSet};
+use std::cmp::Reverse;
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::fmt;
 use std::future::Future;
 use std::io::{Read, Seek, SeekFrom};
@@ -1622,6 +1636,16 @@ pub enum MiningCheck {
     CoinbaseMaturity,
 }
 
+/// What [`BeefIndex::fold_one`] came to.
+enum Folded {
+    /// Paused before this input.
+    Paused(u32),
+    /// Held until a parent is in ([`Deferred`]).
+    Held,
+    /// Folded in; `new` when its txid was not in the index before.
+    In { txid: Hash32, new: bool },
+}
+
 /// What stops a step: invalid bytes, or a spend the interpreter refused.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Stop {
@@ -1664,7 +1688,9 @@ impl From<Refusal> for Stop {
 /// are kept until a later input spends them: every output in one pass (the
 /// reader cannot know which will be spent), or only the outputs a first pass
 /// named ([`BeefIndex::retaining`]). Never a sibling hash, never an
-/// unlocking script, never a transaction's bytes after its step.
+/// unlocking script, never a transaction's bytes after its step, save an
+/// unproven transaction read ahead of a parent, held whole until the parent
+/// is in (bsv-rs#240, [`deferred`](Self::deferred)).
 ///
 /// The tables are keyed by digests a stranger chose (a BUMP's leaves are not
 /// hashed here), so they keep the standard library's keyed hasher.
@@ -1692,6 +1718,63 @@ pub struct BeefIndex {
     /// the unproven inputs of the BEEF spend, less the ones spent so far.
     /// `None` keeps every output until it is spent.
     wanted: Option<HashSet<(Hash32, u32)>>,
+    /// The transactions read ahead of a parent, held until it arrives
+    /// (bsv-rs#240).
+    deferred: Deferred,
+}
+
+/// The unproven transactions read ahead of a parent (bsv-rs#240): each held
+/// as read (the element the decoder yielded: its raw bytes and the places of
+/// its fields) until every txid its inputs name is in the index, then folded
+/// in, in wire order. A BEEF in BRC-62's order (parents
+/// before children) holds none.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+struct Deferred {
+    /// The transactions held, by stream offset.
+    held: BTreeMap<u64, Element>,
+    /// For each one held, the distinct txids it still waits on.
+    missing: HashMap<u64, usize>,
+    /// For each txid waited on, the offsets of the transactions waiting.
+    waiting: HashMap<Hash32, Vec<u64>>,
+    /// The raw bytes held.
+    bytes: u64,
+}
+
+impl Deferred {
+    /// Holds `element` until each txid of `missing` is in the index.
+    fn hold(&mut self, element: Element, missing: HashSet<Hash32>) {
+        let at = element.offset();
+        for txid in &missing {
+            self.waiting.entry(*txid).or_default().push(at);
+        }
+        self.missing.insert(at, missing.len());
+        self.bytes += element.wire_len();
+        self.held.insert(at, element);
+    }
+
+    /// `txid` is in the index: each transaction it was the last wait of is
+    /// ready.
+    fn wake(&mut self, txid: &Hash32, ready: &mut BinaryHeap<Reverse<u64>>) {
+        let Some(waiters) = self.waiting.remove(txid) else {
+            return;
+        };
+        for at in waiters {
+            if let Some(left) = self.missing.get_mut(&at) {
+                *left -= 1;
+                if *left == 0 {
+                    self.missing.remove(&at);
+                    ready.push(Reverse(at));
+                }
+            }
+        }
+    }
+
+    /// The transaction held at `at`, released.
+    fn take(&mut self, at: u64) -> Option<Element> {
+        let element = self.held.remove(&at)?;
+        self.bytes -= element.wire_len();
+        Some(element)
+    }
 }
 
 /// The outpoints the unproven transactions of a BEEF spend: what a first
@@ -1736,6 +1819,7 @@ impl BeefIndex {
             work: 0,
             check_spends,
             wanted: None,
+            deferred: Deferred::default(),
         }
     }
 
@@ -1812,6 +1896,14 @@ impl BeefIndex {
         (count, bytes)
     }
 
+    /// The transactions held for a parent not read yet (bsv-rs#240), and
+    /// their raw bytes: none for a BEEF in BRC-62's order (parents before
+    /// children); for one written children first, at most every unproven
+    /// transaction read, whole, until its parents are in.
+    pub fn deferred(&self) -> (u64, u64) {
+        (self.deferred.held.len() as u64, self.deferred.bytes)
+    }
+
     /// The roots checked, by BUMP position: height and root (wire order).
     pub fn roots(&self) -> &[(u64, Hash32)] {
         &self.bumps
@@ -1883,6 +1975,13 @@ impl BeefIndex {
     /// [`fold_checked`](Self::fold_checked) with the scripts run from input
     /// `from` and `spent` asked between inputs. `Ok(Some(i))` is a pause
     /// before input `i`: the index is unchanged.
+    ///
+    /// An unproven transaction an input of which names a txid the index does
+    /// not hold yet is held ([`Deferred`], bsv-rs#240) and folded in when the
+    /// last such txid is: a BEEF is valid whatever its order on the wire. The
+    /// transactions an element releases are folded in this step, in wire
+    /// order, their scripts run with `spent` not asked; a refusal of one is
+    /// the step's, and the index then holds what was folded ahead of it.
     fn fold_checked_from(
         &mut self,
         element: &Element,
@@ -1891,12 +1990,47 @@ impl BeefIndex {
         work_limit: Option<u64>,
         tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
+        let txid = match self.fold_one(element, from, spent, work_limit, tip)? {
+            Folded::Paused(input) => return Ok(Some(input)),
+            Folded::Held | Folded::In { new: false, .. } => return Ok(None),
+            Folded::In { txid, new: true } => txid,
+        };
+        if self.deferred.waiting.is_empty() {
+            return Ok(None);
+        }
+        // The transactions released, in wire order: an
+        // explicit heap, so a chain held newest first unwinds on no stack.
+        let mut ready = BinaryHeap::new();
+        self.deferred.wake(&txid, &mut ready);
+        while let Some(Reverse(at)) = ready.pop() {
+            let Some(released) = self.deferred.take(at) else {
+                continue;
+            };
+            if let Folded::In { txid, new: true } =
+                self.fold_one(&released, 0, &mut || false, work_limit, tip)?
+            {
+                self.deferred.wake(&txid, &mut ready);
+            }
+        }
+        Ok(None)
+    }
+
+    /// One element folded in, or held ([`Folded`]).
+    fn fold_one(
+        &mut self,
+        element: &Element,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
+        tip: Option<ChainTip>,
+    ) -> Result<Folded, Stop> {
         match element {
             Element::Bump(_) => unreachable!("a BUMP is folded with its header answer"),
             Element::TxidOnly { offset, txid } => {
                 if !self.proven.contains_key(txid) {
                     return Err(Refusal::new(*offset, Reason::StubNotProven { txid: *txid }).into());
                 }
+                let new = !self.txs.contains_key(txid);
                 self.txs.entry(*txid).or_insert(TxEntry {
                     at: *offset,
                     prevs: Box::default(),
@@ -1908,7 +2042,7 @@ impl BeefIndex {
                 });
                 self.steps += 1;
                 self.work += 32 + 3;
-                Ok(None)
+                Ok(Folded::In { txid: *txid, new })
             }
             Element::Tx {
                 offset,
@@ -1921,7 +2055,10 @@ impl BeefIndex {
                 check_transaction(*offset, &body.inputs, &body.outputs, *bump_index)?;
                 // The Lean's `checkTx`: with a BUMP index, the BUMP carries
                 // the txid and its proof vouches for the inputs; without one,
-                // each input names an earlier transaction of this BEEF.
+                // each input names a transaction of this BEEF, folded in
+                // ahead of it (bsv-rs#240: one read ahead of a parent is held
+                // until the parent is in, and refused at the end if it never
+                // is).
                 match bump_index {
                     Some(index) => {
                         if *index >= self.bumps.len() as u64 {
@@ -1943,14 +2080,16 @@ impl BeefIndex {
                         }
                     }
                     None => {
-                        for input in &body.inputs {
-                            if !self.txs.contains_key(&input.prev) {
-                                return Err(Refusal::new(
-                                    input.at,
-                                    Reason::InputNamesNoElement { txid: input.prev },
-                                )
-                                .into());
-                            }
+                        let missing: HashSet<Hash32> = body
+                            .inputs
+                            .iter()
+                            .map(|input| input.prev)
+                            .filter(|prev| !self.txs.contains_key(prev))
+                            .collect();
+                        if !missing.is_empty() {
+                            self.note_raw(txid, *offset);
+                            self.deferred.hold(element.clone(), missing);
+                            return Ok(Folded::Held);
                         }
                     }
                 }
@@ -2013,7 +2152,7 @@ impl BeefIndex {
                         if let Some(next) =
                             self.check_spends_of(*offset, txid, body, from, spent, work_limit, tip)?
                         {
-                            return Ok(Some(next));
+                            return Ok(Folded::Paused(next));
                         }
                     }
                     for input in &body.inputs {
@@ -2052,6 +2191,7 @@ impl BeefIndex {
                 } else {
                     None
                 };
+                let new = !self.txs.contains_key(txid);
                 match self.txs.get_mut(txid) {
                     Some(entry) => {
                         if !entry.raw {
@@ -2078,11 +2218,18 @@ impl BeefIndex {
                         );
                     }
                 }
-                self.last_raw = Some((*txid, *offset));
+                self.note_raw(txid, *offset);
                 self.steps += 1;
                 self.work += body.raw.len() as u64 + 5 + 2 * body.inputs.len() as u64;
-                Ok(None)
+                Ok(Folded::In { txid: *txid, new })
             }
+        }
+    }
+
+    /// The last raw transaction on the wire, a held one included.
+    fn note_raw(&mut self, txid: &Hash32, offset: u64) {
+        if self.last_raw.is_none_or(|(_, at)| at <= offset) {
+            self.last_raw = Some((*txid, offset));
         }
     }
 
@@ -2277,7 +2424,20 @@ impl BeefIndex {
     /// judged. The entry a refusal names is the earliest the walk does not
     /// reach in the Lean's trie order (the txid's bytes, each byte's bits
     /// reversed, least first), at its offset.
+    ///
+    /// Ahead of it, a transaction still held for a parent that never came
+    /// (bsv-rs#240) is refused: the earliest held on the wire, at its
+    /// earliest input that names no transaction of the index,
+    /// [`Kind::InputNamesNoElement`].
     pub fn finish(&mut self, subject: Option<&Hash32>, subject_at: u64) -> Result<(), Refusal> {
+        if let Some((_, Element::Tx { offset, body, .. })) = self.deferred.held.iter().next() {
+            let input = body
+                .inputs
+                .iter()
+                .find(|input| !self.txs.contains_key(&input.prev));
+            let (at, txid) = input.map_or((*offset, [0u8; 32]), |i| (i.at, i.prev));
+            return Err(Refusal::new(at, Reason::InputNamesNoElement { txid }));
+        }
         let Some(subject) = subject else {
             return Ok(());
         };
@@ -2509,6 +2669,10 @@ struct Pending {
 }
 
 const CURSOR_MAGIC: &[u8; 4] = b"BSC3";
+/// BSC3 and, after the outputs named, the transactions held for a parent
+/// (bsv-rs#240): written only when one is held, so a cursor of a BEEF in
+/// BRC-62's order keeps BSC3's bytes.
+const CURSOR_MAGIC_BSC4: &[u8; 4] = b"BSC4";
 /// 0.5.0 to 0.8.0's layout: BSC3 without the input count and the edges,
 /// and a transaction's flags byte carrying a spent bit (ignored).
 const CURSOR_MAGIC_BSC2: &[u8; 4] = b"BSC2";
@@ -2541,7 +2705,10 @@ impl Cursor {
     /// The cursor's bytes. Equal states give equal bytes; a cursor between
     /// two elements encodes the verified coinbase heights as well, and (BSC3,
     /// 0.8.1) the inputs counted and the edges the atomic walk follows: each
-    /// raw transaction's prevs, by txid strictly ascending.
+    /// raw transaction's prevs, by txid strictly ascending. A cursor taken
+    /// while a transaction is held for a parent (bsv-rs#240) is BSC4: BSC3,
+    /// then after the outputs named the held transactions by offset, each
+    /// its raw bytes; a cursor that holds nothing keeps BSC3's bytes.
     /// [`from_binary`](Self::from_binary) reads a BSC2 cursor as BSC3 with no
     /// edge for a transaction read before it: the walk reaches less, so it
     /// only refuses more, never accepts wrongly. BSC1 is refused: restart
@@ -2560,7 +2727,12 @@ impl Cursor {
             }
         }
         let mut w = Writer::new();
-        w.write_bytes(CURSOR_MAGIC);
+        let held = &self.index.deferred.held;
+        w.write_bytes(if held.is_empty() {
+            CURSOR_MAGIC
+        } else {
+            CURSOR_MAGIC_BSC4
+        });
         w.write_u8(self.index.check_spends as u8);
         put_hash(&mut w, &self.subject);
         w.write_u64_le(self.frame.pos);
@@ -2676,6 +2848,17 @@ impl Cursor {
                 }
             }
         }
+        // The transactions held (BSC4): by offset, each its raw bytes, read
+        // again as the decoder read them.
+        if !held.is_empty() {
+            w.write_var_int(held.len() as u64);
+            for (at, element) in held {
+                if let Element::Tx { body, .. } = element {
+                    w.write_u64_le(*at);
+                    w.write_var_bytes(&body.raw);
+                }
+            }
+        }
         if let Some(pending) = &self.pending {
             w.write_u8(1);
             w.write_u64_le(pending.offset);
@@ -2703,9 +2886,10 @@ impl Cursor {
             }
         }
         let mut r = Reader::new(bin);
-        let bsc3 = match r.read_bytes(4)? {
-            magic if magic == CURSOR_MAGIC => true,
-            magic if magic == CURSOR_MAGIC_BSC2 => false,
+        let (bsc3, bsc4) = match r.read_bytes(4)? {
+            magic if magic == CURSOR_MAGIC_BSC4 => (true, true),
+            magic if magic == CURSOR_MAGIC => (true, false),
+            magic if magic == CURSOR_MAGIC_BSC2 => (false, false),
             _ => return Err(bad("the leading word")),
         };
         let check_spends = match r.read_u8()? {
@@ -2844,6 +3028,35 @@ impl Cursor {
             }
             _ => return Err(bad("a presence byte")),
         };
+        if bsc4 {
+            let n = r.read_var_int()?;
+            if n == 0 {
+                return Err(bad("a BSC4 cursor that holds nothing"));
+            }
+            let mut previous: Option<u64> = None;
+            for _ in 0..n {
+                let at = r.read_u64_le()?;
+                if previous.is_some_and(|p| p >= at) {
+                    return Err(bad("held transactions out of order"));
+                }
+                previous = Some(at);
+                let element = reread_held(at, r.read_var_bytes()?)
+                    .ok_or_else(|| bad("a held transaction"))?;
+                let Element::Tx { body, .. } = &element else {
+                    return Err(bad("a held transaction"));
+                };
+                let missing: HashSet<Hash32> = body
+                    .inputs
+                    .iter()
+                    .map(|input| input.prev)
+                    .filter(|prev| !index.txs.contains_key(prev))
+                    .collect();
+                if missing.is_empty() {
+                    return Err(bad("a held transaction that waits on nothing"));
+                }
+                index.deferred.hold(element, missing);
+            }
+        }
         let pending = if r.is_empty() {
             None
         } else {
@@ -2871,6 +3084,29 @@ impl Cursor {
             subject,
             pending,
         })
+    }
+}
+
+/// A held transaction's raw bytes at stream offset `at`, read again by the
+/// decoder as an unproven V1 entry: the element the stream yielded, its
+/// fields at the same offsets, or `None` when the bytes are not one
+/// transaction the stream would hold.
+fn reread_held(at: u64, raw: &[u8]) -> Option<Element> {
+    let mut decoder = BeefDecoder::at(Frame {
+        pos: at,
+        k: 0,
+        phase: Phase::Txs,
+        version: BEEF_V1,
+        subject: None,
+        bumps_left: 0,
+        txs_left: 1,
+    });
+    let mut entry = raw.to_vec();
+    entry.push(0); // V1's has-BUMP byte: no BUMP.
+    let mut input = entry.as_slice();
+    match decoder.next(&mut input) {
+        Ok(Step::Element(element @ Element::Tx { .. })) if input.is_empty() => Some(element),
+        _ => None,
     }
 }
 
@@ -2979,6 +3215,91 @@ impl Judge {
     }
 }
 
+/// A bound on what a reading holds for a parent it has not read yet
+/// (bsv-rs#240): the transactions held at once and their raw bytes. A BEEF
+/// in BRC-62's order (parents before children, as every SDK's writer writes
+/// it) holds none; one written children first holds each unproven
+/// transaction until its parents are in, at most the bytes read. No bound is
+/// the default ([`StreamVerifier::set_deferred_limit`]): a valid BEEF is
+/// never refused for its size or its counts. A door that must bound its
+/// memory sets one, and a reading past it is declined, never judged
+/// ([`DeferredOverLimit`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct DeferredLimit {
+    /// The most transactions held at once.
+    pub transactions: u64,
+    /// The most raw bytes held at once.
+    pub bytes: u64,
+}
+
+impl DeferredLimit {
+    /// At most `transactions` held at once, of at most `bytes` raw bytes.
+    pub fn new(transactions: u64, bytes: u64) -> Self {
+        Self {
+            transactions,
+            bytes,
+        }
+    }
+}
+
+/// A reading declined for its [`DeferredLimit`] (bsv-rs#240): holding the
+/// transaction at `offset` for a parent not read yet passed the bound. A
+/// LOCAL resource decline, never a verdict: it says nothing about the bytes,
+/// and the BEEF may be valid. It is the [`std::io::Error`] the reader
+/// returns (kind [`std::io::ErrorKind::OutOfMemory`]), this its inner error
+/// ([`DeferredOverLimit::of`]); the asynchronous reader returns it as
+/// [`AsyncVerifyError::Source`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct DeferredOverLimit {
+    /// The stream offset of the transaction whose holding passed the bound.
+    pub offset: u64,
+    /// The transactions held with it.
+    pub transactions: u64,
+    /// Their raw bytes.
+    pub bytes: u64,
+    /// The bound.
+    pub limit: DeferredLimit,
+}
+
+impl DeferredOverLimit {
+    /// The decline an error of the reader carries, if it is one.
+    pub fn of(error: &std::io::Error) -> Option<&Self> {
+        error.get_ref()?.downcast_ref::<Self>()
+    }
+
+    /// The decline when `index` holds more than `limit` allows, the
+    /// element in hand at `offset`.
+    fn check(index: &BeefIndex, limit: Option<DeferredLimit>, offset: u64) -> Option<Self> {
+        let limit = limit?;
+        let (transactions, bytes) = index.deferred();
+        (transactions > limit.transactions || bytes > limit.bytes).then_some(Self {
+            offset,
+            transactions,
+            bytes,
+            limit,
+        })
+    }
+
+    fn to_io(self) -> std::io::Error {
+        std::io::Error::new(std::io::ErrorKind::OutOfMemory, self)
+    }
+}
+
+impl fmt::Display for DeferredOverLimit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "the BEEF reader declined at byte {}: {} transactions ({} bytes) held for a parent \
+             not read yet, over the limit of {} ({} bytes); the BEEF was not judged",
+            self.offset, self.transactions, self.bytes, self.limit.transactions, self.limit.bytes
+        )
+    }
+}
+
+impl std::error::Error for DeferredOverLimit {}
+
 /// What one call to [`StreamVerifier::step`] came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Progress {
@@ -3011,6 +3332,9 @@ pub struct StreamVerifier<R, H> {
     /// The transaction a pause left in hand and the input it reached.
     held: Option<(Element, u32)>,
     work_limit: Option<u64>,
+    deferred_limit: Option<DeferredLimit>,
+    /// The reading was declined for its deferred limit.
+    declined: Option<DeferredOverLimit>,
 }
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
@@ -3033,6 +3357,16 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// cursor state: reapply it after `resume`, including a decoded cursor.
     pub fn set_work_limit(&mut self, limit: Option<u64>) {
         self.work_limit = limit;
+    }
+
+    /// Bounds what the reading holds for a parent not read yet (bsv-rs#240,
+    /// [`DeferredLimit`]). Past it the reading is declined: [`step`](Self::step)
+    /// and [`run`](Self::run) return the [`std::io::Error`] that carries
+    /// [`DeferredOverLimit`], never a verdict. `None`, no bound, is the
+    /// default. This configuration is not cursor state: reapply it after
+    /// `resume`.
+    pub fn set_deferred_limit(&mut self, limit: Option<DeferredLimit>) {
+        self.deferred_limit = limit;
     }
 
     /// The same reader for the BEEF's structure alone: no script is run and
@@ -3083,6 +3417,8 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             verdict: None,
             held: None,
             work_limit: None,
+            deferred_limit: None,
+            declined: None,
         }
     }
 
@@ -3127,6 +3463,9 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
         if let Some(verdict) = &self.verdict {
             return Ok(Timed::Progress(Progress::Verdict(verdict.clone())));
         }
+        if let Some(declined) = self.declined {
+            return Err(declined.to_io());
+        }
         let (element, from) = match self.held.take() {
             Some(held) => held,
             None => {
@@ -3163,6 +3502,15 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
         match folded {
             Ok(None) => {
                 self.boundary = self.source.decoder.frame.clone();
+                let over = DeferredOverLimit::check(
+                    &self.judge.index,
+                    self.deferred_limit,
+                    element.offset(),
+                );
+                if let Some(declined) = over {
+                    self.declined = Some(declined);
+                    return Err(declined.to_io());
+                }
                 Ok(Timed::Progress(Progress::Stepped))
             }
             Ok(Some(next)) => {
@@ -3193,9 +3541,11 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
 /// resolved against the index and their scripts executed against the parent
 /// output the index kept, the subject held to the atomic rule.
 ///
-/// Memory is the one element in hand and the index; nothing is refused for
-/// its size or its counts. `Err` is the source's failure and says nothing
-/// about the bytes.
+/// Memory is the one element in hand and the index, and the transactions
+/// held for a parent not read yet (none for a BEEF in BRC-62's order);
+/// nothing is refused for its size or its counts. `Err` is the source's
+/// failure, or a [`DeferredOverLimit`] decline under a bound the caller set
+/// on a [`StreamVerifier`], and says nothing about the bytes.
 pub fn verify_stream<R: Read, H: Headers>(
     source: R,
     headers: H,
@@ -3302,6 +3652,7 @@ pub struct AsyncStreamVerifier {
     decoder: BeefDecoder,
     judge: Judge,
     work_limit: Option<u64>,
+    deferred_limit: Option<DeferredLimit>,
 }
 
 impl AsyncStreamVerifier {
@@ -3311,6 +3662,7 @@ impl AsyncStreamVerifier {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::new()),
             work_limit: None,
+            deferred_limit: None,
         }
     }
 
@@ -3322,12 +3674,22 @@ impl AsyncStreamVerifier {
         self.work_limit = limit;
     }
 
+    /// Bounds what the reading holds for a parent not read yet (see
+    /// [`StreamVerifier::set_deferred_limit`]). Past it [`run`](Self::run)
+    /// returns [`AsyncVerifyError::Source`] with the [`std::io::Error`] that
+    /// carries [`DeferredOverLimit`], never a verdict. `None` is the default;
+    /// reapply it after `resume`.
+    pub fn set_deferred_limit(&mut self, limit: Option<DeferredLimit>) {
+        self.deferred_limit = limit;
+    }
+
     /// The same for the BEEF's structure alone.
     pub fn structure_only(subject: Option<Hash32>) -> Self {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::structure_only()),
             work_limit: None,
+            deferred_limit: None,
         }
     }
 
@@ -3339,6 +3701,7 @@ impl AsyncStreamVerifier {
             decoder: BeefDecoder::at(frame),
             judge,
             work_limit: None,
+            deferred_limit: None,
         }
     }
 
@@ -3375,6 +3738,10 @@ impl AsyncStreamVerifier {
                 if let Err(r) = self.judge.check_named_subject(&self.decoder) {
                     return Ok(r.into());
                 }
+                let at = match &step {
+                    Step::Element(element) => element.offset(),
+                    _ => 0,
+                };
                 let folded = match step {
                     Step::NeedMore | Step::Done => break,
                     Step::Element(Element::Bump(bump)) => {
@@ -3389,14 +3756,18 @@ impl AsyncStreamVerifier {
                     }
                     Step::Element(other) => {
                         let from = self.judge.start_of(&other);
+                        // An unproven transaction's spends, or those of the
+                        // transactions held for a parent this element may
+                        // release (bsv-rs#240), read the mining tip.
                         let tip = if self.judge.index.check_spends
-                            && matches!(
+                            && (matches!(
                                 &other,
                                 Element::Tx {
                                     bump_index: None,
                                     ..
                                 }
-                            ) {
+                            ) || self.judge.index.deferred().0 > 0)
+                        {
                             tracker
                                 .mining_tip()
                                 .await
@@ -3412,6 +3783,11 @@ impl AsyncStreamVerifier {
                 };
                 if let Err(stop) = folded {
                     return Ok(stop.into());
+                }
+                if let Some(declined) =
+                    DeferredOverLimit::check(&self.judge.index, self.deferred_limit, at)
+                {
+                    return Err(AsyncVerifyError::Source(declined.to_io()));
                 }
             }
         }
