@@ -696,11 +696,33 @@ mod base64_32_bytes {
     }
 }
 
+/// Reads a certificate's revocation outpoint from its text: `<txid>.<index>`,
+/// or the txid alone as index 0, as the reference reads it
+/// (`ts-stack@edf6e03` `Certificate.ts:261-262`, `MasterCertificate.ts:112-123`):
+/// its default issuance writes the txid alone (`MasterCertificate.ts:442`).
+/// go-sdk@2ca481c refuses the txid alone (`transaction/outpoint.go:50`).
+pub(crate) fn revocation_outpoint_from_str(text: &str) -> Result<Outpoint> {
+    if text.contains('.') {
+        Outpoint::from_string(text)
+    } else {
+        Outpoint::from_string(&format!("{text}.0"))
+    }
+}
+
 /// Serde module for the revocation outpoint: `None` written as the binary
-/// form's sentinel string, read back from it, from `null` or from no key.
+/// form's sentinel string, read back from it, from `null` or from no key; a
+/// txid alone read as index 0 (`revocation_outpoint_from_str`).
 mod revocation_outpoint_json {
     use crate::wallet::types::Outpoint;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// The text the reference writes, or the object form `Outpoint` reads.
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Read {
+        Text(String),
+        Object(Outpoint),
+    }
 
     pub fn serialize<S>(outpoint: &Option<Outpoint>, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -716,7 +738,13 @@ mod revocation_outpoint_json {
     where
         D: Deserializer<'de>,
     {
-        let outpoint = Option::<Outpoint>::deserialize(deserializer)?;
+        let outpoint = match Option::<Read>::deserialize(deserializer)? {
+            Some(Read::Text(text)) => {
+                Some(super::revocation_outpoint_from_str(&text).map_err(serde::de::Error::custom)?)
+            }
+            Some(Read::Object(outpoint)) => Some(outpoint),
+            None => None,
+        };
         Ok(outpoint.filter(|o| o.txid != [0u8; 32] || o.vout != 0))
     }
 }

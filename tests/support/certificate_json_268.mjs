@@ -8,9 +8,10 @@
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/certificate_json_268.mjs \
 //     "$W/sdk-edf6e03.mjs" rust_issued.json > tests/vectors/certificate_json_268.json
 //
-// It issues two certificates with the reference's
+// It issues three certificates with the reference's
 // `MasterCertificate.issueCertificateForSubject` (`MasterCertificate.ts:437-497`),
-// three fields and one, its randomness fixed (globalThis.crypto.getRandomValues
+// three fields and one with the outpoint `<64 zeros>.0`, and one with the
+// reference's default outpoint, the txid alone (#268's fold), its randomness fixed (globalThis.crypto.getRandomValues
 // replaced by a SHA-256 counter stream before the SDK loads), a keyring for a
 // verifier by `createKeyringForVerifier`, and records the reference's
 // `JSON.stringify` of a `Certificate`, the `MasterCertificate` and a
@@ -73,9 +74,12 @@ const verdicts = async (three, keys) => ({
 // The reference's certificates: certifier 31, subject 37, verifier 41.
 const keys = { certifier: 31, subject: 37, verifier: 41 }
 const referenceIssued = []
-for (const plaintexts of [
-  { name: 'Alice Example', email: 'alice@example.com', city: 'Zoë\'s Café' },
-  { name: 'Alice Example' }
+// The third takes the reference's default revocation outpoint, the txid
+// alone (`MasterCertificate.ts:442`, `'00'.repeat(32)`).
+for (const [plaintexts, getRevocationOutpoint] of [
+  [{ name: 'Alice Example', email: 'alice@example.com', city: 'Zoë\'s Café' }, async () => '00'.repeat(32) + '.0'],
+  [{ name: 'Alice Example' }, async () => '00'.repeat(32) + '.0'],
+  [{ name: 'Alice Example' }, undefined]
 ]) {
   const names = Object.keys(plaintexts).sort()
   const issued = await MasterCertificate.issueCertificateForSubject(
@@ -83,7 +87,7 @@ for (const plaintexts of [
     pub(keys.subject),
     plaintexts,
     Utils.toBase64(new Array(32).fill(6)),
-    async () => '00'.repeat(32) + '.0',
+    getRevocationOutpoint,
     Utils.toBase64(new Array(32).fill(7))
   )
   const keyring = await MasterCertificate.createKeyringForVerifier(
@@ -99,7 +103,7 @@ for (const plaintexts of [
   }
   const v = await verdicts({ certificate, master: issued, verifiable }, keys)
   referenceIssued.push({
-    origin: 'issued by the reference\'s MasterCertificate.issueCertificateForSubject (certifier key 31, subject key 37, type 32 x 0x06, serial 32 x 0x07, revocation outpoint 32 zero bytes index 0), a keyring by createKeyringForVerifier for verifier key 41; each JSON text the reference\'s JSON.stringify of the instance; randomness the script\'s SHA-256 counter stream',
+    origin: `issued by the reference's MasterCertificate.issueCertificateForSubject (certifier key 31, subject key 37, type 32 x 0x06, serial 32 x 0x07, revocation outpoint ${getRevocationOutpoint ? '32 zero bytes index 0' : 'the reference\'s default, 32 zero bytes as the txid alone'}), a keyring by createKeyringForVerifier for verifier key 41; each JSON text the reference\'s JSON.stringify of the instance; randomness the script's SHA-256 counter stream`,
     keys,
     plaintexts,
     json,

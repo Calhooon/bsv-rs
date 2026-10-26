@@ -267,7 +267,7 @@ All certificate types' JSON is the reference's (`ts-stack@edf6e03`
 `VerifiableCertificate.ts:80-118`; go-sdk@2ca481c `auth/certificates/*.go`;
 #268), pinned by `tests/auth_certificate_json_268.rs`:
 - `type` (`cert_type`) and `serialNumber` base64; `subject` and `certifier` hex
-- `revocationOutpoint` `<txid>.<index>`; `None` written as the sentinel `"<64 zeros>.0"`, read from it, `null` or no key
+- `revocationOutpoint` `<txid>.<index>`; `None` written as the sentinel `"<64 zeros>.0"`, read from it, `null` or no key; the txid alone (the reference's default issuance) read as index 0 by `revocation_outpoint_from_str`, the one reader of the text here, the identity client's two parsers and `get_verifiable_certificates` (#268)
 - `fields` the plain map of strings (each the base64 text of a ciphertext), never re-encoded (#261)
 - `signature` the DER bytes in hex, omitted when `None`
 - `masterKeyring` and `keyring` maps of base64 strings, held as given and decoded only at the wallet's decrypt

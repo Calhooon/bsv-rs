@@ -56,6 +56,30 @@
       "reference_verifier_plaintexts": {
         "name": "Alice Example"
       }
+    },
+    {
+      "origin": "issued by the reference's MasterCertificate.issueCertificateForSubject (certifier key 31, subject key 37, type 32 x 0x06, serial 32 x 0x07, revocation outpoint the reference's default, 32 zero bytes as the txid alone), a keyring by createKeyringForVerifier for verifier key 41; each JSON text the reference's JSON.stringify of the instance; randomness the script's SHA-256 counter stream",
+      "keys": {
+        "certifier": 31,
+        "subject": 37,
+        "verifier": 41
+      },
+      "plaintexts": {
+        "name": "Alice Example"
+      },
+      "json": {
+        "certificate": "{\"type\":\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\",\"serialNumber\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\",\"subject\":\"0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d\",\"certifier\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"revocationOutpoint\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"fields\":{\"name\":\"zotMbiCXoRuPOx9pEd+UAfqmo2IMmpfn0TbamH4JFJ1OtTMXsfhvg6bkQA/DHhQACpjKCVyC6f/H/J2JJA==\"},\"signature\":\"3044022076101d31d06d58d1450c410d14b62d5657720ce77dd87f32553ed35418fa00d00220237b899e2f7abe9b2c495a3daf68e39ef9a5436450841e5f8033ff12f54f65b1\"}",
+        "master": "{\"type\":\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\",\"serialNumber\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\",\"subject\":\"0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d\",\"certifier\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"revocationOutpoint\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"fields\":{\"name\":\"zotMbiCXoRuPOx9pEd+UAfqmo2IMmpfn0TbamH4JFJ1OtTMXsfhvg6bkQA/DHhQACpjKCVyC6f/H/J2JJA==\"},\"signature\":\"3044022076101d31d06d58d1450c410d14b62d5657720ce77dd87f32553ed35418fa00d00220237b899e2f7abe9b2c495a3daf68e39ef9a5436450841e5f8033ff12f54f65b1\",\"masterKeyring\":{\"name\":\"2if3mRJtK0ovt/nONytX0Oh3Uxs22yxFGc5uUMKd23cXP1Z5jdaWXT4CpPs6rHQpp5EXn33+n5nxUeoHMkIBtHBTHsL6dq3dgHLS0OcRd3o=\"}}",
+        "verifiable": "{\"type\":\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\",\"serialNumber\":\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\",\"subject\":\"0362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d\",\"certifier\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"revocationOutpoint\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"fields\":{\"name\":\"zotMbiCXoRuPOx9pEd+UAfqmo2IMmpfn0TbamH4JFJ1OtTMXsfhvg6bkQA/DHhQACpjKCVyC6f/H/J2JJA==\"},\"signature\":\"3044022076101d31d06d58d1450c410d14b62d5657720ce77dd87f32553ed35418fa00d00220237b899e2f7abe9b2c495a3daf68e39ef9a5436450841e5f8033ff12f54f65b1\",\"keyring\":{\"name\":\"ENK4mY/ZQlW4DW6Lh+KxTExCt7MIijTjh5lb2grjrqyJ+V5KXwhTesAtp7uYmRhj3lhrDmRCxO/RNHw87Sbm7KwEaEwbCvbv2klvHQLzndo=\"}}"
+      },
+      "binary_hex": "060606060606060606060606060606060606060606060606060606060606060607070707070707070707070707070707070707070707070707070707070707070362d14dab4150bf497402fdc45a215e10dcb01c354959b10cfe31c7e9d87ff33d026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b400000000000000000000000000000000000000000000000000000000000000000001046e616d65547a6f744d626943586f5275504f78397045642b554166716d6f32494d6d70666e305462616d48344a464a314f74544d58736668766736626b51412f444868514143706a4b4356794336662f482f4a324a4a413d3d3044022076101d31d06d58d1450c410d14b62d5657720ce77dd87f32553ed35418fa00d00220237b899e2f7abe9b2c495a3daf68e39ef9a5436450841e5f8033ff12f54f65b1",
+      "reference_verify": true,
+      "reference_master_plaintexts": {
+        "name": "Alice Example"
+      },
+      "reference_verifier_plaintexts": {
+        "name": "Alice Example"
+      }
     }
   ],
   "rust_issued": [

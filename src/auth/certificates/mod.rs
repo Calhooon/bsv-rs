@@ -31,6 +31,7 @@ mod certificate;
 mod master;
 mod verifiable;
 
+pub(crate) use certificate::revocation_outpoint_from_str;
 pub use certificate::Certificate;
 pub use master::MasterCertificate;
 pub use verifiable::VerifiableCertificate;
