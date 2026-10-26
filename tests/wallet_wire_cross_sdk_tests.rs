@@ -1380,7 +1380,7 @@ const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 13] = [
         "getVersion-simple-result.json",
         "Go's version \"1.0.0\" is 5 bytes: the processor forwards the wallet's answer and \
          refuses it as the reference's result check does (7 to 30 UTF-8 bytes, \
-         WalletResultValidation.ts:2302-2304; bsv-rs#222)",
+         WalletResultValidation.ts:2304-2306; bsv-rs#222)",
     ),
     (
         "internalizeAction-simple-result.json",
