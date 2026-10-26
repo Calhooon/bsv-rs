@@ -86,7 +86,7 @@ Paths under "reference" are `src/` of `ts-sdk@9e3ede6` unless marked
 
 Across every module: one `Error` enum ([`src/error.rs`](../src/error.rs),
 `Clone + PartialEq + Eq`, `#[non_exhaustive]`, so tests assert on it and a
-variant is additive); `TransportFault` re-exported at the crate root; the
+variant is additive); `TransportFault` and `WalletRefusalClass` (#137) re-exported at the crate root; the
 `http` feature for reqwest (ARC, WhatsOnChain, the headers service, the HTTP
 substrates, the overlay hosts), `websocket` opt-in and outside `full`, `wasm`
 for the JS RNG and timers; the 18 fuzz targets of
