@@ -1,11 +1,9 @@
 //! What the stream holds for a parent it has not read yet (bsv-rs#240): the
-//! held transactions ([`Deferred`]), the caller's bound on them
-//! ([`DeferredLimit`]) and the decline past it ([`DeferredOverLimit`]), and
-//! the held transactions read again from a cursor ([`read_held`]).
+//! held transactions ([`Deferred`]), under no bound, and the held
+//! transactions read again from a cursor ([`read_held`]).
 
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
-use std::fmt;
 
 use crate::primitives::Reader;
 
@@ -64,95 +62,6 @@ impl Deferred {
         Some(element)
     }
 }
-
-/// A bound on what a reading holds for a parent it has not read yet
-/// (bsv-rs#240): the transactions held at once and their raw bytes. A BEEF
-/// in BRC-62's order (parents before children, as every SDK's writer writes
-/// it) holds none; one written children first holds each unproven
-/// transaction until its parents are in, at most the bytes read. No bound is
-/// the default ([`StreamVerifier::set_deferred_limit`]): a valid BEEF is
-/// never refused for its size or its counts. A door that must bound its
-/// memory sets one, and a reading past it is declined, never judged
-/// ([`DeferredOverLimit`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct DeferredLimit {
-    /// The most transactions held at once.
-    pub transactions: u64,
-    /// The most raw bytes held at once.
-    pub bytes: u64,
-}
-
-impl DeferredLimit {
-    /// At most `transactions` held at once, of at most `bytes` raw bytes.
-    pub fn new(transactions: u64, bytes: u64) -> Self {
-        Self {
-            transactions,
-            bytes,
-        }
-    }
-}
-
-/// A reading declined for its [`DeferredLimit`] (bsv-rs#240): holding the
-/// transaction at `offset` for a parent not read yet passed the bound. A
-/// LOCAL resource decline, never a verdict: it says nothing about the bytes,
-/// and the BEEF may be valid. It is the [`std::io::Error`] the reader
-/// returns (kind [`std::io::ErrorKind::OutOfMemory`]), this its inner error
-/// ([`DeferredOverLimit::of`]); the asynchronous reader returns it as
-/// [`AsyncVerifyError::Source`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct DeferredOverLimit {
-    /// The stream offset of the transaction whose holding passed the bound.
-    pub offset: u64,
-    /// The transactions held with it.
-    pub transactions: u64,
-    /// Their raw bytes.
-    pub bytes: u64,
-    /// The bound.
-    pub limit: DeferredLimit,
-}
-
-impl DeferredOverLimit {
-    /// The decline an error of the reader carries, if it is one.
-    pub fn of(error: &std::io::Error) -> Option<&Self> {
-        error.get_ref()?.downcast_ref::<Self>()
-    }
-
-    /// The decline when `index` holds more than `limit` allows, the
-    /// element in hand at `offset`.
-    pub(super) fn check(
-        index: &BeefIndex,
-        limit: Option<DeferredLimit>,
-        offset: u64,
-    ) -> Option<Self> {
-        let limit = limit?;
-        let (transactions, bytes) = index.deferred();
-        (transactions > limit.transactions || bytes > limit.bytes).then_some(Self {
-            offset,
-            transactions,
-            bytes,
-            limit,
-        })
-    }
-
-    pub(super) fn to_io(self) -> std::io::Error {
-        std::io::Error::new(std::io::ErrorKind::OutOfMemory, self)
-    }
-}
-
-impl fmt::Display for DeferredOverLimit {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "the BEEF reader declined at byte {}: {} transactions ({} bytes) held for a parent \
-             not read yet, over the limit of {} ({} bytes); the BEEF was not judged",
-            self.offset, self.transactions, self.bytes, self.limit.transactions, self.limit.bytes
-        )
-    }
-}
-
-impl std::error::Error for DeferredOverLimit {}
 
 /// A held transaction's raw bytes at stream offset `at`, read again by the
 /// decoder as an unproven V1 entry: the element the stream yielded, its
