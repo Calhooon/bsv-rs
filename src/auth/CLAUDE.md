@@ -23,6 +23,8 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 Certificate types for BRC-52/53 selective disclosure:
 - `mod.rs` - Re-exports and constants
 - `certificate.rs` - Base Certificate type with signing/verification
+- `certificate_json.rs` - `Certificate`'s JSON serde and `revocation_outpoint_from_str`, `pub(crate)` (#268)
+- `collation.rs` - The reference's field-name order (`localeCompare` under ICU root) for U+0000..U+00FF, `pub(crate)` (#249)
 - `certificate.rs` - Base Certificate type with signing/verification; `from_binary` refuses a revocation outpoint index above `u32::MAX` (#122) through the wire's `integer_refusal` (`Invalid revocation outpoint index: expected an integer from 0 to 4294967295, received N`, the name this crate's: the reference's reader has no bound, `Certificate.ts:353`; #258)
 - `master.rs` - MasterCertificate with field encryption and keyring management
 - `verifiable.rs` - VerifiableCertificate with verifier-specific keyring
