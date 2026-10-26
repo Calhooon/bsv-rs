@@ -43,15 +43,17 @@ regexes = [
 
 # tests/vectors/wallet_http_json_shapes_105.json and tests/wallet_http_json_shapes_105.rs: the
 # #105 HTTP JSON witnesses' identity key is secp256k1's generator point G in compressed form, the
-# public key of the private key 1, a public constant of the curve. Only that literal is let
+# public key of the private key 1, a public constant of the curve; the same literal sits in the
+# EC, sighash and cross-SDK tests and the auth and overlay vectors. Only that literal is let
 # through, never the files.
 [[allowlists]]
 description = "the generator point as the #105 witnesses' identity key"
 regexes = ['''^0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798$''']
 
 # tests/wallet_http_json_shapes_105.rs: the public-key-shaped hex the old `{"publicKey": ..}` revealer
-# test sends to show the shape is refused (#105, item 9); a test literal, not a key in use. Only that
-# literal is let through, never the file.
+# test sends to show the shape is refused (#105, item 9): the Go SDK's test public key, which the
+# wallet-wire vectors carry too; a test literal, not a key in use. Only that literal is let
+# through, never the files.
 [[allowlists]]
 description = "the old revealer shape's test key (#105)"
 regexes = ['''^025ad43a22ac38d0bc1f8bacaabb323b5d634703b7a774c4268f6a09e4ddf79097$''']
