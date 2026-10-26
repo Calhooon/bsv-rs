@@ -18,8 +18,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 2): fixture refusal",
-          "error": "WalletError(\"wallet error (code 2): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: UnsupportedAction, message: \"fixture refusal\" }"
         },
         "response_hex": "020f66697874757265207265667573616c00"
       },
@@ -33,8 +33,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 3): fixture refusal",
-          "error": "WalletError(\"wallet error (code 3): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: InvalidHmac, message: \"fixture refusal\" }"
         },
         "response_hex": "030f66697874757265207265667573616c00"
       },
@@ -48,8 +48,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 4): fixture refusal",
-          "error": "WalletError(\"wallet error (code 4): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: InvalidSignature, message: \"fixture refusal\" }"
         },
         "response_hex": "040f66697874757265207265667573616c00"
       },
@@ -63,8 +63,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 5): fixture refusal",
-          "error": "WalletError(\"wallet error (code 5): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: ReviewActions, message: \"fixture refusal\" }"
         },
         "response_hex": "050f66697874757265207265667573616c00"
       },
@@ -78,8 +78,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 6): fixture refusal",
-          "error": "WalletError(\"wallet error (code 6): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: InvalidParameter, message: \"fixture refusal\" }"
         },
         "response_hex": "060f66697874757265207265667573616c00"
       },
@@ -93,8 +93,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 7): fixture refusal",
-          "error": "WalletError(\"wallet error (code 7): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: InsufficientFunds, message: \"fixture refusal\" }"
         },
         "response_hex": "070f66697874757265207265667573616c00"
       },
@@ -108,8 +108,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 8): fixture refusal",
-          "error": "WalletError(\"wallet error (code 8): fixture refusal\")"
+          "display": "fixture refusal",
+          "error": "WalletRefusal { class: AbortRefused, message: \"fixture refusal\" }"
         },
         "client_result_by_call": {
           "abortAction": {
