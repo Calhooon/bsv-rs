@@ -628,6 +628,88 @@ both ways on each line (every required context proven to run on a PR into
 it, no job outside the set and its needs able to run there), plus every job
 on a push and on the nightly's dispatch save five named exceptions. A context
 added to or dropped from a protection is a change to the test's constants.
+### Fixed: the HTTP JSON substrate's certificate `type` and flat key-linkage results, as BRC-100 and the reference have them (#105)
+
+`HttpWalletJson` sent and read the certificate's type field as
+`certificateType`: `WalletCertificate`, `AcquireCertificateArgs` and
+`RelinquishCertificateArgs` carried `certificate_type` under
+`rename_all = "camelCase"` with no rename, so acquireCertificate's and
+relinquishCertificate's requests, the certificate inside proveCertificate's,
+and every certificate a result carries (acquireCertificate, listCertificates,
+proveCertificate, both discovery calls) named it so. BRC-100 at `5119a9b`
+names it `type` (`wallet/0100.md:1247`, `:1265`, `:1300`, `:1332`, `:1365`,
+`:1394`, `:1437`), as the reference's interfaces do (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/Wallet.interfaces.ts:837`, `:852`, `:937`), and its
+`HTTPWalletJSON` sends the interface objects as they are
+(`substrates/HTTPWalletJSON.ts:303`, `stringifyBRC100`). A TypeScript client
+against a server built on these types, or this crate against a TypeScript
+wallet, failed on all six certificate calls.
+
+The two key-linkage results were read nested under `linkage` with the
+linkage and its proof as hex strings, and revealSpecificKeyLinkage's with the
+protocol as an object (`{"securityLevel": "1", "protocolName": ..}`) and
+`keyId`. BRC-100 has them flat, `encryptedLinkage` and
+`encryptedLinkageProof` as `Byte[]`, then `revelationTime`, or `protocolID`
+(the `[level, name]` pair), `keyID` and `proofType` (`0100.md:1011-1018`,
+`:1043-1052`), as the reference does (`Wallet.interfaces.ts:719-744`;
+`HTTPWalletJSON.ts:390-440`).
+
+Now, with serde attributes only (no Rust field or type moves):
+`#[serde(rename = "type")]` on the three certificate shapes' `certificate_type`
+(the Rust name stays); `#[serde(flatten)]` on both results' `linkage`;
+`KeyLinkageResult`'s two byte fields in serde's default form, an array of
+numbers (`hex_bytes` dropped there); the specific result's `protocol` as
+`protocolID` through a private `[level, name]` helper, a level other than 0,
+1 or 2 refused, and `key_id` as `keyID`. The binary wire is untouched.
+
+Pinned by `tests/wallet_http_json_shapes_105.rs` on the witnesses
+`tests/vectors/wallet_http_json_shapes_105.json` (seven cases: two
+acquireCertificate, listCertificates, proveCertificate,
+relinquishCertificate, the two linkage calls), recorded by
+`tests/support/http_json_shapes_105.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` (bundled with bun) under Node v22.18.0, both directions:
+this crate's request bodies equal the reference's for the same args, the
+reference's request bodies parse as this crate's args, the reference's result
+bodies parse here and write back as they came, and the reference's client
+takes this crate's request bodies as its args and reads this crate's result
+bodies to the values it reads from its own; on `95075b0` the request bodies
+carried `certificateType` and the reference's bodies were refused (`missing
+field certificateType`, `missing field linkage`). The Go vectors' json, the
+three certificate args, a certificate and the two linkage results, now read
+as this crate's types and write back unchanged (they were refused the same
+way), so the fuzz harness's reshape of a certificate's `type` is gone (`tx` and
+a public-key `keyringRevealer` remain, #105's comments). Sixteen recordings
+moved, in JSON only, no wire byte (`docs/FIXTURES.md` F7, F8, F20).
+
+Consumer note: a JSON consumer of these types moves with them, both ways.
+bsv-wallet-cli serves the certificate and linkage results from these types
+on its JSON wire, and bsv-wallet-toolbox-rs builds `WalletCertificate` and
+the linkage results; both move to `type` and the flat byte-array linkage in
+the next prerelease (0.9.0-beta.2), and both captains are told the field
+names ahead of it (the owner's word, 2026-10-26). A body in the old shape is
+refused here, not read: the keeper's reading puts the one-minor acceptance of
+both shapes on the CLI's way in.
+
+### Notes: cross-SDK parity (#105)
+
+What #105 recorded and this fix leaves, each a JSON shape the owner has not
+ruled: revealSpecificKeyLinkage's request still sends `protocolId` and
+`keyId` (item 7, with the seven other key-related requests; the reference's
+client refuses this crate's request, `The protocolID parameter must be a
+[securityLevel, protocolName] tuple`, recorded in the vector); the certificate
+list and discovery results nest each certificate under `certificate` where
+BRC-100 has it flat (item 3, `0100.md:1298-1307`); the discovery result's
+`certifierInfo`, `publiclyRevealedKeyring` and `decryptedFields` are optional
+(item 4); a public-key `keyringRevealer` is `{"publicKey": ..}` where BRC-100
+has the bare hex; the action calls' BEEF, transaction and txid encodings and
+`hashToDirectlySign` (items 5, 6, 8). `wallet::Certificate` (built by
+`auth::Certificate::to_wallet_certificate`, not carried by the JSON
+substrate) keeps `certificateType`. `spendable` does not move: the wire
+writes `1` for every output listed, where BRC-100 at `5119a9b` permits `0`
+for a BRC-207 module inventory record (`0100.md:1963`, `:1974-1980`);
+nothing this crate serves is a module inventory, and a field that carries no
+verdict here does not move ahead of a consumer that asks (the owner's word,
+2026-10-26).
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 

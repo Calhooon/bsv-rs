@@ -186,6 +186,7 @@ Binary data in JSON requests/responses uses base64 encoding:
 - `hmac`, `signature` - base64
 - `hash_to_directly_sign`, `hash_to_directly_verify` - hex (32 bytes)
 - `public_key` - hex (33 bytes compressed)
+- `encryptedLinkage`, `encryptedLinkageProof` (the two key-linkage results) - arrays of byte numbers, flat in the result with `protocolID` and `keyID` for the specific one; a certificate's type field is `type` (#105, BRC-100 and the reference's `HTTPWalletJSON`)
 
 ## Constants
 

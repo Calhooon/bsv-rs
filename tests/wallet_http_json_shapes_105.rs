@@ -5,7 +5,7 @@
 //! `:937`), not `certificateType`; the two linkage results are flat with the
 //! linkage and its proof as byte arrays, and the specific one names the
 //! protocol `protocolID` (a `[level, name]` pair) and the key `keyID`
-//! (`0100.md:1010-1018`, `:1043-1052`; `Wallet.interfaces.ts:719-744`).
+//! (`0100.md:1011-1018`, `:1043-1052`; `Wallet.interfaces.ts:719-744`).
 //!
 //! The witnesses are `tests/vectors/wallet_http_json_shapes_105.json`,
 //! recorded by `tests/support/http_json_shapes_105.mjs` against the
