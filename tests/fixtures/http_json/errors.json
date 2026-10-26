@@ -296,8 +296,8 @@
             "data": [
               0
             ],
-            "keyId": "fixture",
-            "protocolId": [
+            "keyID": "fixture",
+            "protocolID": [
               1,
               "fixture keys"
             ]
@@ -305,7 +305,7 @@
           "method": "POST",
           "path": "/createHmac"
         },
-        "request_body_hex": "7b2270726f746f636f6c4964223a5b312c2266697874757265206b657973225d2c226b65794964223a2266697874757265222c2264617461223a5b305d7d"
+        "request_body_hex": "7b2270726f746f636f6c4944223a5b312c2266697874757265206b657973225d2c226b65794944223a2266697874757265222c2264617461223a5b305d7d"
       },
       "input": {
         "args": {

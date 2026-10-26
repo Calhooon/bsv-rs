@@ -18,7 +18,14 @@
         "args": {
           "description": "fixture action",
           "outputs": [],
-          "tx": "0100beef0000"
+          "tx": [
+            1,
+            0,
+            190,
+            239,
+            0,
+            0
+          ]
         },
         "result": {
           "accepted": true
@@ -72,7 +79,14 @@
             }
           ],
           "seekPermission": false,
-          "tx": "0100beef0000"
+          "tx": [
+            1,
+            0,
+            190,
+            239,
+            0,
+            0
+          ]
         },
         "result": {
           "accepted": true
