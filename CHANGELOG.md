@@ -303,71 +303,135 @@ does). Through 0.9.0-beta.1 this crate refused every even-offset duplicate
 Every refusal a wallet returned reached this crate as
 `Error::WalletError(String)`: words, no class. The wire processor framed it
 as `Wallet operation failed`, code 1 (#202), and a host serving BRC-100 over
-HTTP could not tell a bad argument from too few funds without matching the
-words. The reference's `WalletError` carries a numeric code beside its
-message (`ts-stack@edf6e03` `packages/sdk/src/wallet/WalletError.ts:3-8`),
-and its processor keeps a code 2 to 8 and the words on the wire
-(`#invokeWallet`, `WalletWireProcessor.ts:2407-2416`).
+HTTP could not tell a bad argument from too few funds, or an unauthorized
+call from an internal fault, without matching the words. The reference's
+wallet errors carry a code beside their message: the SDK's `WalletError` a
+number (`ts-stack@edf6e03` `packages/sdk/src/wallet/WalletError.ts:3-8`, the
+table `walletErrors` at `:71-80`), the wallet-toolbox's `WERR_*` classes their
+name (`packages/wallet/wallet-toolbox/src/sdk/WalletError.ts:35-37`: `code`
+is `name`), four of them a number as well in their JSON "to match
+HTTPWalletJSON.ts" (`WERR_errors.ts:110`, `:136`, `:225`, `:278`).
 
 `Error::WalletRefusal { class: WalletRefusalClass, message: String }` (new
 variant, `wallet` feature) is that error. `WalletRefusalClass` (new,
-`#[non_exhaustive]`, `Copy + Eq + Hash`, re-exported at the crate root) has one
-variant per code of the reference's table `walletErrors` (`WalletError.ts:71-80`)
-that the processor keeps; `code()` is the frame's byte, `name()` the
-reference's key, `from_code` the inverse, `ALL` the seven in code order:
+`#[non_exhaustive]`, `Copy + Eq + Hash`, re-exported at the crate root) is the
+reference's table by name: the SDK's seven coded classes, then every class of
+the toolbox's `WERR_errors.ts` the SDK does not already name. `name()` is the
+reference's name (the `WERR_*` class name where one exists, else the SDK's
+`walletErrors` key), `code_name()` the SDK's key for its seven, `code()` the
+reference's number where it assigns one, `wire_code()` the binary frame's
+byte (the SDK's 2 to 8), `from_name` (a name or a key) and `from_code` (the
+SDK's 2 to 8) the inverses, `ALL` the twenty in this order:
 
-| Class | `code()` | `name()` | Reference |
-|---|---:|---|---|
-| `UnsupportedAction` | 2 | `unsupportedAction` | `WalletError.ts:73` |
-| `InvalidHmac` | 3 | `invalidHmac` | `:74` |
-| `InvalidSignature` | 4 | `invalidSignature` | `:75` |
-| `ReviewActions` | 5 | `reviewActions` | `:76`; `WERR_REVIEW_ACTIONS.ts:24-25` |
-| `InvalidParameter` | 6 | `invalidParameter` | `:77`; `WERR_INVALID_PARAMETER.ts:14-15` |
-| `InsufficientFunds` | 7 | `insufficientFunds` | `:78`; `WERR_INSUFFICIENT_FUNDS.ts:19-20` |
-| `AbortRefused` | 8 | `abortRefused` | `:79`; `WalletWireProcessor.ts:801-804` |
+| Class | `name()` | `code()` | `wire_code()` | Reference at `edf6e03` |
+|---|---|---:|---:|---|
+| `UnsupportedAction` | `unsupportedAction` | 2 | 2 | `sdk/src/wallet/WalletError.ts:73` |
+| `InvalidHmac` | `invalidHmac` | 3 | 3 | `:74` |
+| `InvalidSignature` | `invalidSignature` | 4 | 4 | `:75` |
+| `ReviewActions` | `WERR_REVIEW_ACTIONS` | 5 | 5 | `:76`; `WERR_REVIEW_ACTIONS.ts:8,25`; toolbox `WERR_errors.ts:260,278` |
+| `InvalidParameter` | `WERR_INVALID_PARAMETER` | 6 | 6 | `:77`; `WERR_INVALID_PARAMETER.ts:6,15`; `WERR_errors.ts:100,110` |
+| `InsufficientFunds` | `WERR_INSUFFICIENT_FUNDS` | 7 | 7 | `:78`; `WERR_INSUFFICIENT_FUNDS.ts:7,20`; `WERR_errors.ts:208,225` |
+| `AbortRefused` | `abortRefused` | 8 | 8 | `:79`; `WalletWireProcessor.ts:801-804` |
+| `NotImplemented` | `WERR_NOT_IMPLEMENTED` | none | none | `WERR_errors.ts:8` |
+| `Internal` | `WERR_INTERNAL` | none | none | `:19` |
+| `InvalidOperation` | `WERR_INVALID_OPERATION` | none | none | `:30` |
+| `UtxoReviewInconclusive` | `WERR_UTXO_REVIEW_INCONCLUSIVE` | none | none | `:41` |
+| `ActionBatchState` | `WERR_ACTION_BATCH_STATE` | none | none | `:68`, exported at `:84` |
+| `BroadcastUnavailable` | `WERR_BROADCAST_UNAVAILABLE` | none | none | `:89` |
+| `InvalidMerkleRoot` | `WERR_INVALID_MERKLE_ROOT` | 8 | none | `:121`, the code at `:136` |
+| `MissingParameter` | `WERR_MISSING_PARAMETER` | none | none | `:150` |
+| `BadRequest` | `WERR_BAD_REQUEST` | none | none | `:165` |
+| `NetworkChain` | `WERR_NETWORK_CHAIN` | none | none | `:174` |
+| `Unauthorized` | `WERR_UNAUTHORIZED` | none | none | `:183` |
+| `NotActive` | `WERR_NOT_ACTIVE` | none | none | `:192` |
+| `InvalidPublicKey` | `WERR_INVALID_PUBLIC_KEY` | none | none | `:232` |
 
-Code 1, `unknownError` (`:72`), is no class: it is `Error::WalletError`, which
-the processor frames as `Wallet operation failed` (`:2417`). BRC-100 (`5119a9b`
-`wallet/0100.md:289-319`) asks a machine-readable code of every error and
-leaves its naming to the implementation; its wire's error byte is
-`1-255`, "predefined error types or ... custom error categorization"
-(`:1609`): these are the reference's predefined ones, no class of this crate's
-own. `Display` of the variant is the message alone; the class is the typed
-field.
+The SDK's three `WERR_*` classes (codes 5, 6, 7) and the toolbox's classes of
+the same names are one class each. Code 1, `unknownError` (`:72`), is no
+class: it is `Error::WalletError`; nor is the toolbox's `WERR_UNKNOWN`
+(`WalletError.ts:71-72,108` there, the name `fromUnknown` gives an unclassed error).
+BRC-100 (`5119a9b` `wallet/0100.md:289-319`) asks a machine-readable code of
+every error and leaves its naming to the implementation; its wire's error
+byte is `1-255`, "predefined error types or ... custom error categorization"
+(`:1609`). No class is this crate's own. `Display` of the variant is the
+message alone; the class is the typed field.
 
-The processor frames a refusal with its class's code and its words, cut at
-4096 bytes as every frame is (`explicit_wallet_code`; the #202 reading: a
-coded error keeps its code and words); an un-coded `WalletError` stays
-`Wallet operation failed`, code 1. With `tracing` a refusal raises one `warn`
-event, `call` and `class` (the reference's name), `wallet refusal framed with
-its code`; its words are on the wire, so the event does not repeat them. The
-transceiver reads a frame coded 2 to 8 back as `WalletRefusal` with that
-class and the frame's words, as the reference's client throws
-`new WalletError(errorMessage, errorByte, stackTrace)`
-(`WalletWireTransceiver.ts:153`); code 8 on abortAction stays
+The collision is the reference's: the toolbox gives `WERR_INVALID_MERKLE_ROOT`
+the code 8 (`WERR_errors.ts:136`), the SDK's `abortRefused` (`WalletError.ts:79`).
+This crate reads a code 8 by the SDK's table: `from_code(8)` is `AbortRefused`;
+on abortAction a code-8 frame stays `aborted: false` (#206), elsewhere it is
+the `AbortRefused` class; an HTTP JSON body naming `WERR_INVALID_MERKLE_ROOT`
+beside its 8 is that class, the name deciding. The merkle-root class has no
+wire code: the binary frame carries the SDK's codes only.
+
+The binary wire. The processor frames a refusal whose class has a wire code
+with that code and its words, cut at 4096 bytes as every frame is
+(`explicit_wallet_code`; the #202 reading: a coded error keeps its code and
+words); a class with none, as an un-coded `WalletError`, as `Wallet operation
+failed`, code 1 (`WalletWireProcessor.ts:2406-2418`: the reference's
+`#invokeWallet` keeps an error whose `code` is an integer 2 to 8, and a
+toolbox `WERR_*`'s `code` is its name). With `tracing` a refusal kept with its
+code raises one `warn` event, `call` and `class` (its name), `wallet refusal
+framed with its code`; one framed as the constant raises the #212 event with
+`class` beside `call` and `error` (its words). The transceiver reads a frame
+coded 2 to 8 back as `WalletRefusal` with that class and the frame's words, as
+the reference's client throws `new WalletError(errorMessage, errorByte,
+stackTrace)` (`WalletWireTransceiver.ts:153`); code 8 on abortAction stays
 `aborted: false` (#206); code 1 and a code above 8 stay
-`WalletError("wallet error (code N): <words>")`. `HttpWalletJson` serves no
-error body (it is a client), so it is unchanged; its reading of a numeric
-code stays `WalletError` (the reference's client builds a typed error from
-a 400 body's `code` 5, 6, 7, `HTTPWalletJSON.ts:199-267`, `:336-338`: a
-follow-up, not this entry).
+`WalletError("wallet error (code N): <words>")`.
+
+The HTTP JSON substrate. `HttpWalletJson` reads an error answer's body as its
+class: the body's `name`, else its `code` (an SDK code 2 to 8, or a class's
+name as a string), names the class, the words its `message`, else its
+`description`, else the name. It reads the SDK's `unknownToJson`
+(`WalletError.ts:29-67`: `isError`, `name`, `message`, `code` 5, 6, 7), the
+toolbox's `toJson` (`WalletError.ts:143-151` there, with the four codes of
+`WERR_errors.ts`) and its `asStatus` (`:126-132`: `code` the name,
+`description`). A numeric `code` no class names, with a `description`, stays
+`WalletError("wallet error (code N): <description>")`; the busy codes (#73)
+and a 429 are read ahead of it, as before; a 502, 503 or 504 whose body names
+a class is that refusal, the wallet's word, where it was `WalletTransport`
+(#87). `HttpWalletJson` is a client and
+serves no error body, so there is no writer to change.
+
+### Notes: cross-SDK parity (#137)
+
+The reference's `HTTPWalletJSON` builds a typed error from a 400 body alone,
+for codes 5, 6, 7 alone (each with its fields checked: the review results,
+the `parameter`, the satoshis), and refuses a body whose `code` is not an
+integer as `Invalid wallet error envelope` (`HTTPWalletJSON.ts:199-267`,
+`:329-335`): a toolbox `toJson` body for any class but its four coded ones,
+and every `asStatus` body, is refused there. This crate reads the class of
+every body by its name at any error status and checks no extra field. On the
+binary wire the reference's processor frames a toolbox `WERR_INSUFFICIENT_FUNDS`
+(or `_INVALID_PARAMETER`, `_REVIEW_ACTIONS`) as code 1, its `code` being its
+name, and the SDK's class of the same name with its code; here they are one
+class, framed with the SDK's code. go-sdk at `2ca481c` writes no error frame
+from its processor (#202's note) and has no class table.
 
 Migration: `Error` is `#[non_exhaustive]`, so no downstream `match` on it is
 exhaustive and nothing breaks; a consumer that matched the transceiver's
-`"wallet error (code N): "` text for N from 2 to 8 matches the variant
-instead (none of the downstreams in `docs/DEPENDENTS.md` does). Consumer
-note: `bsv-wallet-toolbox-rs`'s `From<Error>` maps each of its error variants
-to a class (its `Error::InsufficientFunds` to `InsufficientFunds`, for one),
-and `bsv-wallet-cli` deletes its message-prefix matching (`toolbox_words.rs`,
-named on #137) for the class; both are their captains' work, told on #137
-with the owner's word of 2026-10-26.
+`"wallet error (code N): "` text for N from 2 to 8, or `HttpWalletJson`'s for
+N from 2 to 8, matches the variant instead (none of the downstreams in
+`docs/DEPENDENTS.md` does). Consumer note: `bsv-wallet-toolbox-rs`'s
+`From<Error>` maps each of its error variants to one class by name (its
+`Error::InsufficientFunds` to `WERR_INSUFFICIENT_FUNDS`, for one), and
+`bsv-wallet-cli`'s host maps each class to its HTTP status and deletes its
+message-prefix matching (`toolbox_words.rs`, named on #137); both are their
+captains' work, told on #137 with the owner's word of 2026-10-26 and its
+refinement of the same day.
 
 Pinned by `tests/wire_wallet_refusal_class.rs` (the class table against the
-reference's; `Display`, `Clone`, `Eq`; each class's frame byte for byte the
-reference's, read back as the class end to end; codes 1, 9, 255 read as
-before; the 4096-byte cut) and `tests/wire_tracing_sink.rs`'s
-`a_wallet_refusal_raises_one_event_with_the_call_and_its_class`, each red on
-the pre-fix processor. `tests/fixtures/wire/error_frames.json` re-recorded in
+reference's, and against the toolbox's file read as data when the `ts-stack`
+tree is present; `Display`, `Clone`, `Eq`; each class's frame byte for byte
+the reference's, coded or `Wallet operation failed`, read back end to end;
+codes 1, 9, 255 read as before; the 4096-byte cut),
+`tests/wire_tracing_sink.rs` (the two events), and
+`tests/wallet_http_json_refusal_class.rs` (`wiremock` bodies in the
+reference's three shapes, the collision, the old reading kept), each red on
+the pre-fix tree. `tests/wallet_http_json_busy_tests.rs`'s
+`every_other_status_keeps_the_wallet_error_mapping` now reads the codes 6
+and 7 as their classes. `tests/fixtures/wire/error_frames.json` re-recorded in
 its own commit: cases `status_2` to `status_8` read back as the class, their
 bytes unchanged.
 
