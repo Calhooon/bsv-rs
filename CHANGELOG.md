@@ -562,6 +562,43 @@ sort key with `localeCompare` on every ordered pair of the 256
 one-character names, of the corpus's names, and of the 65,536 two-character
 names with the one-character ones: 18,808,356 pairs, 0 disagreements under
 each of the three (its header records the run).
+### Changed: a pull request runs exactly its line's required set; the full matrix on a push and nightly
+
+The owner's word of 2026-10-26, through the keeper: CI must pass and must not
+put needless load on GitHub. The keeper's count that day: 215 workflow runs on
+the account in 24 hours, 99 of them this crate's CI at 32 jobs each, 79
+cancelled by concurrency. The merge queue already gives one CI run per PR, so
+the jobs per run were what remained.
+
+On a pull request a job of `ci.yml` now runs if and only if its context is
+required on the base line's protection (beta's eleven, main's twelve): the
+Test Suite matrix produces its `(ubuntu-latest, stable)` cell alone, `wasm32`
+its `combined` consumer alone (the six consumers' features moved from
+`include` rows to a step's table, so no row can add a cell), `dependents` with
+`Plan pinned dependents` and each `dependent (<id>)` (the jobs it needs to
+decide) only into `main`; `main-in-beta`, `beta-born` and `semver` as before.
+`docs`, `actionlint`, `msrv`, `features`, `unused dependencies`, the other
+five test cells, the other four wasm32 slices, `Benchmark Regression Check`,
+`Benchmarks Build` and `scoreboard` no longer run on a pull request: a PR into
+`beta` runs 11 jobs (32 before), into `main` 13 plus one per consumer the plan
+admits. A push to `beta` or `main`, the sync's dispatch and a tag's call run
+every job as before; `nightly.yml`'s new `ci-full` job dispatches `ci.yml` on
+`beta` and on `main` each night, so each line's own workflow runs its whole
+matrix at its tip whether or not anything was pushed (a `workflow_call` from
+the nightly would run the caller's ref, `main`'s on a schedule, and share its
+concurrency group; a schedule on `ci.yml` fires on `main` alone).
+`cancel-in-progress` is unchanged. The benchmarks job's baseline record moves
+from a `[bench-baseline-record]` marker in a PR's description to a dispatch
+input: `gh workflow run ci.yml --ref <branch> -f bench_baseline_record=true`.
+
+`tests/arch_ci_pr_runs_the_required_set.rs` pins it: the two lines' required
+contexts as constants (read by `gh api
+repos/Calhooon/bsv-rs/branches/<line>/protection/required_status_checks`), a
+string-level reader of each job's `if:`, `needs:` and matrix, and the rule
+both ways on each line (every required context proven to run on a PR into
+it, no job outside the set and its needs able to run there), plus every job
+on a push and on the nightly's dispatch save five named exceptions. A context
+added to or dropped from a protection is a change to the test's constants.
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
