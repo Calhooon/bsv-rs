@@ -82,7 +82,7 @@ async fn a_reference_issued_certificate_published_for_anyone_parses_to_a_verifyi
     assert!(cert.verify().unwrap());
     let subject = cert.certificate.subject.clone();
     let decrypted = cert
-        .decrypt_fields(&ProtoWallet::anyone(), &subject, "test")
+        .decrypt_fields(&ProtoWallet::anyone(), &subject, None, None, "test")
         .await
         .unwrap();
     assert_eq!(decrypted, plaintexts(&r));

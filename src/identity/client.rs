@@ -1290,7 +1290,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             .unwrap_or("identity-client");
 
         let decrypted_fields: HashMap<String, String> = verifiable_cert
-            .decrypt_fields(&anyone_wallet, &subject, originator)
+            .decrypt_fields(&anyone_wallet, &subject, None, None, originator)
             .await
             .unwrap_or_default();
 

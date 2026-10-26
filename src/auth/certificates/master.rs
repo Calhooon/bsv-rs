@@ -52,7 +52,8 @@ impl MasterCertificate {
     /// * `creator_wallet` - Wallet for encryption (certifier's wallet)
     /// * `subject` - Subject's public key
     /// * `fields` - Plain text field values to encrypt
-    /// * `_serial_number` - Certificate serial number (unused, for future use)
+    /// * `privileged` - The reference's `privileged`, passed to each `encrypt`
+    /// * `privileged_reason` - The reference's `privilegedReason`, likewise
     /// * `originator` - Application originator
     ///
     /// # Returns
@@ -61,7 +62,8 @@ impl MasterCertificate {
         creator_wallet: &W,
         subject: &PublicKey,
         fields: HashMap<String, String>,
-        _serial_number: &[u8; 32],
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<(HashMap<String, Vec<u8>>, HashMap<String, Vec<u8>>)> {
         let mut encrypted_fields = HashMap::new();
@@ -80,6 +82,8 @@ impl MasterCertificate {
                         protocol_id: field_protocol(),
                         key_id: Certificate::get_field_encryption_key_id_master(&field_name),
                         counterparty: Some(Counterparty::Other(subject.clone())),
+                        privileged,
+                        privileged_reason: privileged_reason.map(str::to_owned),
                         ..Default::default()
                     },
                     originator,
@@ -96,16 +100,20 @@ impl MasterCertificate {
     /// (`MasterCertificate.ts:325-414`): for each revealed field the subject
     /// decrypts the field's revelation key from the master keyring, checks
     /// that it decrypts the field, and encrypts it to the verifier under key
-    /// ID `"<serial base64> <field>"`.
+    /// ID `"<serial base64> <field>"`. The parameters are the reference's, in
+    /// its order (`:325-346`), then `originator`.
     ///
     /// # Arguments
     /// * `subject_wallet` - Subject's wallet for re-encryption
     /// * `certifier` - Certifier's public key
     /// * `verifier` - Verifier's public key
+    /// * `fields` - The certificate's field values (base64 text)
     /// * `fields_to_reveal` - List of field names to reveal
-    /// * `encrypted_fields` - The certificate's field values (base64 text)
     /// * `master_keyring` - The master keyring (encrypted revelation keys)
     /// * `serial_number` - Certificate serial number
+    /// * `privileged` - The reference's `privileged`, passed to each `decrypt`
+    ///   and `encrypt` (`:384-402`)
+    /// * `privileged_reason` - The reference's `privilegedReason`, likewise
     /// * `originator` - Application originator
     ///
     /// # Returns
@@ -115,16 +123,18 @@ impl MasterCertificate {
         subject_wallet: &W,
         certifier: &PublicKey,
         verifier: &PublicKey,
+        fields: &HashMap<String, Vec<u8>>,
         fields_to_reveal: &[String],
-        encrypted_fields: &HashMap<String, Vec<u8>>,
         master_keyring: &HashMap<String, Vec<u8>>,
         serial_number: &[u8; 32],
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<HashMap<String, Vec<u8>>> {
         let mut keyring = HashMap::new();
 
         for field_name in fields_to_reveal {
-            let field_value = encrypted_fields.get(field_name).ok_or_else(|| {
+            let field_value = fields.get(field_name).ok_or_else(|| {
                 Error::AuthError(format!("Field '{}' not found in certificate", field_name))
             })?;
 
@@ -134,6 +144,8 @@ impl MasterCertificate {
                 certifier,
                 field_name,
                 field_value,
+                privileged,
+                privileged_reason,
                 originator,
             )
             .await?;
@@ -147,6 +159,8 @@ impl MasterCertificate {
                         protocol_id: field_protocol(),
                         key_id: verifiable_key_id,
                         counterparty: Some(Counterparty::Other(verifier.clone())),
+                        privileged,
+                        privileged_reason: privileged_reason.map(str::to_owned),
                         ..Default::default()
                     },
                     originator,
@@ -163,12 +177,15 @@ impl MasterCertificate {
     /// field value with it (the reference's `MasterCertificate.decryptField`,
     /// `MasterCertificate.ts:564-625`). Returns the revelation key, 32 bytes,
     /// and the plaintext.
+    #[allow(clippy::too_many_arguments)]
     async fn decrypt_with_master_keyring<W: WalletInterface>(
         wallet: &W,
         master_keyring: &HashMap<String, Vec<u8>>,
         counterparty: &PublicKey,
         field_name: &str,
         field_value: &[u8],
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<(Vec<u8>, String)> {
         let encrypted_key = master_keyring.get(field_name).ok_or_else(|| {
@@ -185,6 +202,8 @@ impl MasterCertificate {
                     protocol_id: field_protocol(),
                     key_id: Certificate::get_field_encryption_key_id_master(field_name),
                     counterparty: Some(Counterparty::Other(counterparty.clone())),
+                    privileged,
+                    privileged_reason: privileged_reason.map(str::to_owned),
                     ..Default::default()
                 },
                 originator,
@@ -224,11 +243,14 @@ impl MasterCertificate {
         });
 
         // Create encrypted fields and master keyring
+        // The reference's issueCertificateForSubject takes no privileged pair
+        // (`MasterCertificate.ts:437-444`).
         let (encrypted_fields, master_keyring) = Self::create_certificate_fields(
             certifier_wallet,
             &subject,
             plain_fields,
-            &serial_number,
+            None,
+            None,
             originator,
         )
         .await?;
@@ -260,12 +282,17 @@ impl MasterCertificate {
     /// * `subject_wallet` - Subject's wallet for decryption
     /// * `certifier` - Certifier's public key
     /// * `field_name` - Name of the field to decrypt
+    /// * `privileged` - The reference's `privileged`, passed to the `decrypt`
+    ///   (`MasterCertificate.ts:564-597`)
+    /// * `privileged_reason` - The reference's `privilegedReason`, likewise
     /// * `originator` - Application originator
     pub async fn decrypt_field<W: WalletInterface>(
         &self,
         subject_wallet: &W,
         certifier: &PublicKey,
         field_name: &str,
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<String> {
         let field_value = self.certificate.fields.get(field_name).ok_or_else(|| {
@@ -278,24 +305,37 @@ impl MasterCertificate {
             certifier,
             field_name,
             field_value,
+            privileged,
+            privileged_reason,
             originator,
         )
         .await?;
         Ok(plaintext)
     }
 
-    /// Decrypts all fields using the master keyring.
+    /// Decrypts all fields using the master keyring, `privileged` and
+    /// `privileged_reason` passed to each `decrypt` as the reference's
+    /// `MasterCertificate.decryptFields` passes them (`:512-555`).
     pub async fn decrypt_fields<W: WalletInterface>(
         &self,
         subject_wallet: &W,
         certifier: &PublicKey,
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<HashMap<String, String>> {
         let mut decrypted = HashMap::new();
 
         for field_name in self.certificate.fields.keys() {
             let value = self
-                .decrypt_field(subject_wallet, certifier, field_name, originator)
+                .decrypt_field(
+                    subject_wallet,
+                    certifier,
+                    field_name,
+                    privileged,
+                    privileged_reason,
+                    originator,
+                )
                 .await?;
             decrypted.insert(field_name.clone(), value);
         }
