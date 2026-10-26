@@ -22,11 +22,12 @@
 //! names no offset; an offset is compared where both name one.
 //!
 //! No difference is stated. A transaction written ahead of the parent it
-//! spends is refused by both, `InputNamesNoElement` (BRC-62's dependency
-//! order, the charter's validity clause): through 0.9.0 the whole
-//! path sorted ahead of judging, as `@bsv/sdk`'s `Beef.verifyValid` does
-//! (`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:1065`), and
-//! accepted what the stream refused.
+//! spends is accepted by both when the parent is in the BEEF (bsv-rs#240):
+//! the whole path sorts before judging, as `@bsv/sdk`'s `Beef.verifyValid`
+//! does (`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:1065`),
+//! and the stream holds the child until the parent is in. From bsv-rs#86 to
+//! #240 both refused it, `InputNamesNoElement`; through 0.8 the whole path
+//! sorted and accepted what the stream refused.
 //!
 //! `BEEF_TWO_READERS_TABLE=<path>` writes the table of disagreements there.
 #![cfg(feature = "transaction")]
@@ -436,26 +437,22 @@ fn the_whole_path_and_the_stream_agree_on_every_beef_the_tree_holds() {
 }
 
 /// The reversed v1 fixture: its unproven transaction written ahead of the
-/// parent it spends. Through 0.9.0 the whole path sorted ahead of
-/// judging and accepted it; the stream refused it. Both refuse it now, the
-/// stream at the input's previous txid.
+/// parent it spends. Accepted by both (bsv-rs#240), as the reference accepts
+/// it (`tests/vectors/beef_order_240.json`, `children_first_v1`); from
+/// bsv-rs#86 to #240 both refused it, the stream at the input's previous
+/// txid.
 #[test]
-fn a_transaction_written_ahead_of_its_parent_is_refused_on_the_whole_path() {
+fn a_transaction_written_ahead_of_its_parent_is_valid_on_both_paths() {
     let (_, v1) = seeds()
         .into_iter()
         .find(|(name, _)| name == "fixtures/beef/v1.json#0")
         .expect("the v1 fixture");
     let bytes = reversed(&v1).expect("two transactions");
     let mut beef = Beef::from_binary(&bytes).expect("the frame parses");
-    assert_eq!(beef.verify_structure(), Err(Kind::InputNamesNoElement));
-    assert!(!beef.verify_valid(false).valid);
-    let Answer::Refused {
-        kind: Some(Kind::InputNamesNoElement),
-        offset: Some(_),
-        ..
-    } = stream(&bytes)
-    else {
-        panic!("the stream refuses the input: {:?}", stream(&bytes));
+    assert!(beef.verify_structure().is_ok());
+    assert!(beef.verify_valid(false).valid);
+    let Answer::Valid(_) = stream(&bytes) else {
+        panic!("the stream accepts it: {:?}", stream(&bytes));
     };
     assert_eq!(disagreement(&whole(&bytes), &stream(&bytes)), None);
 }
