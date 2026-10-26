@@ -4,6 +4,7 @@
 //! primitives Reader/Writer with signed varint support and convenience methods
 //! for the WalletWire protocol.
 
+use super::set_unique_record_entry;
 use crate::primitives::encoding::{Reader, Writer};
 use crate::primitives::{bounded_capacity, from_base64, from_hex, to_base64, to_hex, PublicKey};
 use crate::wallet::types::{
@@ -507,7 +508,9 @@ impl<'a> WireReader<'a> {
     /// at `ts-stack@edf6e03`; go-sdk@2ca481c `identity_certificate.go:51-100`):
     /// the certificate behind a varint length, the certifier info, the public
     /// keyring as varint-length keys and raw-byte values (base64 in the struct),
-    /// the decrypted fields as string pairs. An empty map is `None` (bsv-rs#184).
+    /// the decrypted fields as string pairs. An empty map is `None` (bsv-rs#184);
+    /// a repeated key in either map is refused in the transceiver's words
+    /// (`#setUniqueWireRecordEntry`, `:1992-2002`; bsv-rs#192).
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
         let cert_len = self.inner.read_var_int_num()?;
         let certificate = WireReader::new(self.read_bytes(cert_len)?).read_wallet_certificate()?;
@@ -519,14 +522,16 @@ impl<'a> WireReader<'a> {
         for _ in 0..count {
             let key = self.read_string()?;
             let len = self.inner.read_var_int_num()?;
-            keyring.insert(key, to_base64(self.read_bytes(len)?));
+            let value = to_base64(self.read_bytes(len)?);
+            set_unique_record_entry(&mut keyring, "discovery public keyring", key, value)?;
         }
         let count = self.read_var_int()?;
         let mut fields =
             HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
         for _ in 0..count {
             let key = self.read_string()?;
-            fields.insert(key, self.read_string()?);
+            let value = self.read_string()?;
+            set_unique_record_entry(&mut fields, "discovery decrypted fields", key, value)?;
         }
 
         Ok(IdentityCertificate {
