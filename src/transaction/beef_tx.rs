@@ -169,6 +169,12 @@ impl BeefTx {
         }
 
         if let Some(ref tx) = self.tx {
+            // A hash cached inside the `tx_mut` borrow may be the pre-mutation
+            // one (the caller read `id()` before editing a field): hash from the
+            // fields until `refresh` clears the mark (bsv-rs#171, the review's fold).
+            if self.mutated {
+                tx.invalidate_caches();
+            }
             return tx.id();
         }
 
