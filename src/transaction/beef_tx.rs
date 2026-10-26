@@ -64,6 +64,9 @@ pub struct BeefTx {
     pub input_txids: Vec<String>,
     /// Whether this transaction is valid (has proof or chains to proofs).
     pub is_valid: Option<bool>,
+    /// Set by [`tx_mut`](Self::tx_mut): `input_txids` waits for
+    /// [`refresh`](Self::refresh) (bsv-rs#171).
+    mutated: bool,
 }
 
 impl BeefTx {
@@ -76,6 +79,7 @@ impl BeefTx {
             txid: None,
             input_txids: Vec::new(),
             is_valid: None,
+            mutated: false,
         };
         btx.update_input_txids();
         btx
@@ -90,6 +94,7 @@ impl BeefTx {
             txid: None,
             input_txids: Vec::new(),
             is_valid: None,
+            mutated: false,
         };
         btx.update_input_txids();
         btx
@@ -105,6 +110,7 @@ impl BeefTx {
             txid: None,
             input_txids: Vec::new(),
             is_valid: None,
+            mutated: false,
         };
         btx.update_input_txids();
         btx
@@ -128,6 +134,7 @@ impl BeefTx {
             txid: Some(txid),
             input_txids: Vec::new(),
             is_valid: None,
+            mutated: false,
         }
     }
 
@@ -181,10 +188,58 @@ impl BeefTx {
         self.tx.as_ref()
     }
 
-    /// Returns a mutable reference to the parsed transaction.
+    /// Returns a mutable reference to the parsed transaction, parsing from
+    /// raw bytes if needed.
+    ///
+    /// From this call the transaction is the entry's only reading (bsv-rs#171,
+    /// as `@bsv/sdk` 3's `BeefTx.syncRawTxFromTransaction`): the bytes and the
+    /// txid it was read with are dropped, so [`txid`](Self::txid) is the
+    /// mutated transaction's hash and the writer emits its serialization; the
+    /// BUMP index stays as it was, so a proven entry whose hash moves is
+    /// refused `TxidNotInBump`. `input_txids` is refreshed by the BEEF's next
+    /// whole-BEEF reader (`sort_txs`, `verify_structure`, `verify_valid`,
+    /// `is_valid`, `to_binary`, `to_binary_atomic`, `trim_known_proven`,
+    /// `to_log_string`), which also re-keys the BEEF's index by the new
+    /// txid; until then a lookup by the new txid misses and one by the old
+    /// txid finds nothing.
     pub fn tx_mut(&mut self) -> Option<&mut Transaction> {
         self.parse_raw();
+        if let Some(ref tx) = self.tx {
+            tx.invalidate_caches();
+            self.raw_tx = None;
+            self.txid = None;
+            self.mutated = true;
+        }
         self.tx.as_mut()
+    }
+
+    /// The parsed transaction, parsing from raw bytes if needed, for a
+    /// reader: unlike [`tx_mut`](Self::tx_mut) the entry keeps its bytes.
+    pub(crate) fn parsed(&mut self) -> Option<&Transaction> {
+        self.parse_raw();
+        self.tx.as_ref()
+    }
+
+    /// After [`tx_mut`](Self::tx_mut), reads `input_txids` from the mutated
+    /// transaction again; true when it did.
+    pub(crate) fn refresh(&mut self) -> bool {
+        if !std::mem::take(&mut self.mutated) {
+            return false;
+        }
+        if let Some(ref tx) = self.tx {
+            // A field edit after `tx_mut` may have left the hash cached.
+            tx.invalidate_caches();
+        }
+        self.update_input_txids();
+        true
+    }
+
+    /// True when the entry's txid is `txid`, without a copy when it is held.
+    pub(crate) fn has_txid(&self, txid: &str) -> bool {
+        match self.txid {
+            Some(ref held) => held == txid,
+            None => self.txid() == txid,
+        }
     }
 
     /// Parses the raw bytes into the transaction, when only the bytes are

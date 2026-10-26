@@ -83,6 +83,66 @@ The tests that pin it, in `tests/wire_reader_strictness.rs`:
 (the error the wasm32 run gives, asserted on the host, where the cast was
 already lossless; its red is the wasm32 run's). No public shape moves: no new
 `Error` variant, the new length helpers `pub(crate)`.
+### Fixed: an entry mutated through `BeefTx::tx_mut` is one thing to every reader (#171)
+
+`BeefTx` caches the txids its inputs spend (`input_txids`) and keeps the
+bytes and the txid it was read with; `tx_mut` refreshed none of them. After a
+caller pointed an input elsewhere, `sort_txs` and `verify_structure` read the
+old list, `to_binary_atomic` looked the subject up under the old txid and its
+closure read the new inputs, and the writer emitted the bytes the entry was
+read with: three readings of one entry. Now the mutated transaction is the
+entry's only reading, as `@bsv/sdk` 3 makes it (`ts-stack@4d0ea63`
+`BeefTx.ts:160-177` `syncRawTxFromTransaction`, `Beef.ts:342-351`):
+
+- `tx_mut` drops the bytes and the txid the entry was read with and clears
+  the transaction's own hash cache, so `txid()` is the mutated transaction's
+  hash and the writer emits its serialization (`raw_tx()` answers `None`
+  until `raw_tx_or_compute` serializes it again);
+- the BUMP index stays as it was: a proven entry whose hash moves keeps the
+  index and is refused `TxidNotInBump` by `verify_structure`, as it is on the
+  wire it writes;
+- `input_txids` is refreshed by the BEEF's next whole-BEEF reader
+  (`sort_txs`, `verify_structure`, `verify_valid`, `is_valid`, `to_binary`,
+  `to_binary_atomic`, `trim_known_proven`, `to_log_string`), which also
+  re-keys the BEEF's txid index by the new txid and marks the order to be
+  sorted;
+- `find_txid`, `find_txid_mut`, `merge_*`, `make_txid_only` check an index hit
+  against the entry's txid, so a renamed entry is not found, replaced or
+  removed by its old txid. `merge_transaction` and `merge_raw_tx` keep the
+  txid they computed, so the check costs a string compare.
+
+The choice, of the issue's two that keep the method: a refresh of the cache
+and the bytes, without the guard type. A guard's `Drop` sees the entry but
+not the BEEF, so it could not re-key the BEEF's index by the new txid, and it
+would change `tx_mut`'s return type, a public shape the owner's word for
+0.9.0 does not cover. Dropping the cache (the other choice) would remove the
+public field `input_txids`, and its readers would still meet the stale bytes
+and the stale index. `tx_mut`'s signature is unchanged; no public type,
+field or method is added or removed. The in-crate caller (`trim_known_proven`,
+read-only) now reads through a private accessor that keeps the bytes. No
+dependent on disk calls `tx_mut` (`bsv-overlay-cloudflare`,
+`rust-message-box`, `bsv-wallet-toolbox-rs`, `bsv-wallet-cli`).
+
+Pinned by `tests/beef_tx_mut.rs` (three tests, each RED before the fix: an
+input repointed within the BEEF read by the sort, the judge, the atomic
+writer and the writer; one repointed outside it a missing input; a proven
+entry mutated `TxidNotInBump`). `tests/beef_cycle.rs`'s in-memory ring set
+`input_txids` by hand beside `tx_mut` because `tx_mut` left it stale; that
+line goes, and the ring with it: renamed by its hash, the entry leaves a
+chain with `T0` missing
+(`a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain`, RED before
+the fix). The sort's, the judge's and the trim's termination on a ring is
+pinned where a ring is still possible, the public cache written by hand on an
+entry `tx_mut` never touched
+(`a_ring_written_in_the_input_cache_stops_the_sort_and_the_judge`).
+
+### Notes: cross-SDK parity (#171)
+
+TS 3 synchronizes on every `findTxid` (`Beef.ts:497-499`) as on its other
+readers. Here the lookups do not refresh (`find_txid` takes `&self`, and a
+scan of every entry per lookup would make a loop of lookups quadratic): until
+the next whole-BEEF reader runs, a lookup by the new txid misses, and one by
+the old txid finds nothing. Nothing on the wire differs.
 
 ## [0.9.0-beta.1] - 2026-10-26
 
