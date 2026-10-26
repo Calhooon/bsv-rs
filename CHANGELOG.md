@@ -156,6 +156,146 @@ and reads any byte (`:66`, `cert.CertifierInfo.Trust = r.ReadByteValue()`), so
 the entry it writes for an absent certifier info (its zero value, trust 0) is
 refused by this crate's readers as by the reference's; the divergence is the
 #183 line of `CLAUDE.md`'s list, now naming both readers.
+### Changed: a duplicate at an even offset is read as the reference reads it (#167)
+
+A BUMP leaf flagged duplicate (`01`) at an even offset was refused on every
+path since 0.9.0-beta.1: the decoder's `BadFlag { byte: 1 }` at the flag
+(the stream, the whole BEEF, a BUMP read alone), `merkle_path_root`'s
+pre-pass over a BUMP held in memory (`Kind::BadFlag`), and `MerklePath::new`
+and `new_unchecked` ahead of their walk (`Duplicate at an even offset: N, at
+height: N`). The reference reads it. `@bsv/sdk` at `ts-stack@edf6e03`
+(`packages/sdk/src/transaction/MerklePath.ts`) pairs the working hash with
+itself wherever the duplicate is its sibling, at either offset
+(`nextCachedHash`, `:60`: `if (leaf.duplicate === true) return
+hashPair(workingHash, workingHash)`), and refuses a path only where its own
+walk gives up: a node it must compute whose left child is a duplicate has
+no hash (`cachedFindLeaf`, `:628-631`; `findOrComputeLeaf`, `:437`), and
+`nextCachedHash` throws `Missing hash for index N at height N` (`:58`).
+
+The owner's word of 2026-10-26, on this refusal as a candidate for
+upstream filing: "hm... this is worrisome... understand that people like to
+switch between the SDKs at will (they are all becoming more conformant by
+the day)". The keeper's reading on it (#167, 2026-10-26): a BUMP the
+reference computes a root for computes the same root here, so a user moving
+between the SDKs sees one verdict; the computed root against the header
+decides; a repeated offset within a level stays a refusal (`DuplicateOffset`,
+the reference's `Duplicate offset`, `:217-222`); BRC-74's question (the
+duplicate flag's side, `5119a9b` `transactions/0074.md:75-77`) goes to
+`bsv-blockchain/BRCs`, and the strict reading returns only if its
+maintainers say the flag is forbidden there.
+
+Now, on the one decoder and walk (#86): the decoder reads flag `01` at any
+offset (`BadFlag` stays for a flag other than `00`, `01`, `02`); the walk
+(`beef_stream`'s `bump_root`) pairs a path node with itself where its
+sibling is a duplicate, as it always did at an odd offset, and refuses a
+computed sibling that rests on a duplicate at an even offset, as its left
+child or under a child computed in turn, with a reason of its own,
+`Reason::LeftDuplicateBelow { level, offset }` (the node the path needs, at
+the offset varint of the level-0 leaf whose path needs it) and
+`Kind::LeftDuplicateBelow`: the reference throws a string, this crate names
+the node. `merkle_path_root`'s pre-pass for the flag goes (its
+`DuplicateOffset` pre-pass stays); `MerklePath::even_offset_duplicate`
+(crate-private) goes, and `new` and `new_unchecked` read the path with
+their walk (`RootWalker`, the reference's `computeRootCached`), which
+already gave up where the reference gives up (`Missing hash at height N,
+offset N`, unchanged). The one reader's three paths and the two
+constructors give the reference's root or a refusal on every shape below.
+
+**Public shape:** `Kind` gains `LeftDuplicateBelow` (the twenty-sixth, after
+`DuplicateOffset` in `Kind::ALL`, now `[Kind; 26]`) and `Reason` gains
+`LeftDuplicateBelow { level: u8, offset: u64 }`; both enums are
+`#[non_exhaustive]` since 0.9.0, so the variant is additive. `Kind::ALL`'s
+array length is a type: code that names `[Kind; 25]` reads `[Kind; 26]`.
+No downstream names either (a grep of bsv-overlay-cloudflare,
+rust-message-box, bsv-wallet-toolbox-rs, bsv-middleware-cloudflare-public
+and rust-chaintracks, 2026-10-26; the two `BadFlag` matches in
+bsv-overlay-cloudflare, `submit_census.rs:1149` and
+`overlay-engine/tests/script_door_fold.rs:1163`, are a flag of unknown
+bits, unchanged). The Lean's `Reason` (`BeefOfAnySize.lean`) takes the
+constructor in the stack's lane, with the flipped row: the keeper's.
+
+Pinned by `tests/merkle_path_even_offset_duplicate.rs` on the vectors
+`tests/vectors/merkle_path_even_offset_duplicate_167.json`, written by
+`tests/support/even_offset_duplicate_167.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` (bundled with bun) under Node v22.18.0: nine shapes, each
+the bytes the reference writes and this crate's writer writes, read by the
+reference's `fromHex` with its defaults and with `legalOffsetsOnly` false.
+The reference accepts four, and every reader here gives its root from every
+hash of level 0, with the header carrying that root deciding
+(`verify_stream_structure`): the txid at offset 1 with the duplicate at 0
+(level 0), the duplicate at level 1 offset 0 and at level 2 offset 0 beside
+a txid's path, and two txids whose second path finds the node over the
+duplicate carried. It refuses five, and so does every reader here: a node
+computed from the duplicate as a left child (`Missing hash for index 2 at
+height 1`; `LeftDuplicateBelow { level: 1, offset: 0 }`), the #167 seed's
+shape (`index 8 at height 3`; `level: 3`), a right child computed from it
+(`index 4 at height 2`; `level: 2`), the node over the duplicate carried
+wrong (`Mismatched roots`; `MismatchedNode { level: 1, offset: 0 }`), and a
+duplicate at a path node's own offset (`Invalid offset: 0, at height: 1`;
+`MismatchedNode`, below). `an_even_offset_duplicate_reads_as_the_reference_reads_it`
+was red on the base (`level-0-duplicate-left-of-the-txid: here
+Err("BadFlag { byte: 1 }"), the reference accepts`).
+
+The refusals that moved, by test:
+
+- `tests/merkle_path_two_readers_agree.rs`:
+  `an_even_offset_duplicate_is_refused_by_both_readers_at_its_flag` is now
+  `an_even_offset_duplicate_is_read_by_both_readers_as_the_reference_reads_it`:
+  the level-0 shape (the txid at 1, the duplicate at 0) is accepted by both
+  readers with the root `sha256d(h1 || h1)`; the level-2 shape (the seed) is
+  refused by both `LeftDuplicateBelow { level: 3, offset: 0 }` at the txid
+  at 8's offset varint (byte 71), where it was `BadFlag { byte: 1 }` at the
+  flag (byte 210). `an_even_offset_duplicate_held_in_memory_is_refused` is
+  now `an_even_offset_duplicate_held_in_memory_is_read_as_the_reference_reads_it`:
+  `new` and `new_unchecked` refuse it `Missing hash at height 2, offset 0`
+  (their walk, where it was the pre-pass's `Duplicate at an even offset: 0,
+  at height: 2`), `verify_structure` `Kind::LeftDuplicateBelow` (it was
+  `Kind::BadFlag`), `compute_root` unchanged.
+- `tests/beef_stream.rs`: `the_twenty_five_kinds_are_twenty_five_and_distinct`
+  is `the_twenty_six_kinds_are_twenty_six_and_distinct`.
+- `merkle_path.rs`'s in-memory differentials: the 0.3.34 model no longer
+  carries the even-offset refusal (its left-duplicate give-up stays, the
+  reference's).
+
+The 468 inputs of the 0.9.0 note: every input of the BUMP differential the
+base refused `BadFlag { byte: 1 }` (741, with the corpus) was read by this
+tree's `MerklePath::from_reader` and by the reference's `fromBinary` with
+its defaults (a prefix reader both). All 741 have one verdict: the 468 are
+`LeftDuplicateBelow` here and `Missing hash for index N at height N` there;
+2 are accepted by both with the same root (`fixtures/beef/v2.json#2 byte
+665 ^ 0x01` and `fixtures/merkle_path/paths.json#3 byte 417 ^ 0x01`, a
+sibling's flag `00` turned `01` at an even offset); the other 271 are
+refused by both for other reasons (a carried node its children contradict,
+an offset outside its level, a cut). The lists and both readers' verdicts
+are kept under `/Volumes/Lanes/out/bsv-rs/fix-167-even-offset-duplicate/`.
+The differential's count moves by those 2: 54,763 inputs, 18,129 accepted by
+the BEEF reader on the base and 18,131 now, 0 disagreements on both; the
+BEEF differential (`tests/beef_two_readers_agree.rs`) reads 68,222 inputs,
+0 disagreements, as before. `tests/conformance_beef.rs` with the corpus:
+every total unchanged (merklepath 16 total, 12 run, 11 passed, 4
+unsupported, 1 known failure; serialization 15, 12, 12, 3; regressions 16,
+15, 15, 1 skipped; atomic-beef 8, 8, 8): no corpus vector carries the
+shape. `fuzz_beef_parser`'s corpus gains `door-LeftDuplicateBelow-hand`
+(corpus-gen's written door, the level-1 refusal as a BEEF of one BUMP; no
+byte mutation of a Lean row reaches the kind): 65 seeds, all 26 kinds
+reached.
+
+### Notes: cross-SDK parity (#167, the even-offset duplicate)
+
+One verdict with the reference on every shape above, and with Go on the
+pairing: go-sdk@2ca481c pairs a duplicate met as the working hash's sibling
+(`transaction/merklepath.go:399-400`) and computes no node from a duplicate
+on the left (`:47-50`), so `ComputeRoot` errors for the txid whose walk
+needs one (`:396-397`, `we do not have a hash for this index at height`);
+its reader checks no root (`NewMerklePathFromReader`, `:197`), so it parses
+the refused shapes and errs only when that txid's root is asked. A carried
+node at a path node's own offset is refused here (`MismatchedNode`, as a
+hash its children contradict is, the stated line of #167); the reference
+refuses the one shape in the vectors by its legal-offset rule (`:230-234`)
+and with `legalOffsetsOnly` false reads it, its walk never reading the
+node at the path's own offset (`MerklePath::new_unchecked` reads it as that
+does). Through 0.9.0-beta.1 this crate refused every even-offset duplicate
+(the published section's #167 entry); the BRC-74 question is upstream.
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
