@@ -869,3 +869,42 @@ async fn the_processor_refuses_a_linkage_key_that_is_not_a_compressed_point() {
         assert_eq!(answer, frame, "{:?}", String::from_utf8_lossy(&answer));
     }
 }
+
+// ---------------------------------------------------------------------------
+// 6. A wire length past the bytes, on every target (bsv-rs#192)
+// ---------------------------------------------------------------------------
+
+/// A varint length of `2^32 + 3` before three bytes. On wasm32 `as usize`
+/// kept its low 32 bits, 3, and read the three bytes as the value (`Ok("abc")`,
+/// measured under wasm-bindgen-test-runner before the fix); the length is now
+/// compared with the bytes remaining before it is narrowed, so every target
+/// refuses it with the same error (CLAUDE.md rule 5).
+#[test]
+fn a_wire_length_past_u32_is_refused_on_every_target_not_cut_to_its_low_bits() {
+    let length = (1u64 << 32) + 3;
+    let mut bytes = Vec::new();
+    var_int(&mut bytes, length);
+    bytes.extend_from_slice(b"abc");
+    let refused = Err(Error::ReaderUnderflow {
+        needed: usize::try_from(length).unwrap_or(usize::MAX),
+        available: 3,
+    });
+    assert_eq!(WireReader::new(&bytes).read_string(), refused);
+    assert_eq!(
+        WireReader::new(&bytes).read_optional_string(),
+        refused.clone().map(Some)
+    );
+    assert_eq!(
+        WireReader::new(&bytes).read_optional_bytes(),
+        refused.clone().map(|_: String| None)
+    );
+    // The same length as a discovery keyring value, in the writer's layout.
+    let frame = discovery_frame(&Parts::valid().bytes(), 5, &[1, 4], &[]);
+    let entry = [&frame[1..], b"name", &bytes].concat();
+    assert_eq!(
+        WireReader::new(&entry)
+            .read_identity_certificate()
+            .map(drop),
+        refused.map(drop)
+    );
+}
