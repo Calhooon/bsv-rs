@@ -231,11 +231,7 @@ impl WireReader<'_> {
     /// `Certificate.ts:135-142`; `#readCompressedPublicKey`, `:2004-2008`).
     pub(crate) fn read_compressed_key(&mut self, what: &str) -> Result<String, Error> {
         let bytes = self.read_bytes(33)?;
-        if !matches!(bytes[0], 0x02 | 0x03) || PublicKey::from_bytes(bytes).is_err() {
-            return Err(refused(format!(
-                "Invalid {what}: expected a compressed secp256k1 public key"
-            )));
-        }
+        require_compressed_key(bytes, what)?;
         Ok(crate::primitives::to_hex(bytes))
     }
 
@@ -327,15 +323,9 @@ impl WireReader<'_> {
         let mut fields = HashMap::with_capacity(count);
         for _ in 0..count {
             let length = self.read_var_int_num_strict()?;
-            if !(1..=50).contains(&length) {
-                return Err(refused(format!(
-                    "Invalid certificate field name length: received {length}"
-                )));
-            }
+            require_certificate_field_name_length(length)?;
             let name = utf8(self.read_bytes(length)?)?;
-            if is_unsafe_record_key(&name) {
-                return Err(refused(format!("Unsafe certificate field name: {name}")));
-            }
+            require_safe_certificate_field_name(&name)?;
             if fields.contains_key(&name) {
                 return Err(refused(format!("Duplicate certificate field name: {name}")));
             }
@@ -358,11 +348,55 @@ impl WireReader<'_> {
         if bytes.is_empty() {
             return Ok(String::new());
         }
-        if bytes.len() > MAX_CERTIFICATE_SIGNATURE_BYTES {
-            return Err(refused("Certificate signature exceeds the DER size limit"));
-        }
-        reference_der(bytes).map(|der| crate::primitives::to_hex(&der))
+        certificate_signature_der(bytes).map(|der| crate::primitives::to_hex(&der))
     }
+}
+
+// The certificate checks the readers and `write_wallet_certificate` share
+// (bsv-rs#189): `Certificate.toBinary` refuses before it writes what
+// `fromBinary` refuses (`Certificate.ts:229-321`), so one reading, one set of
+// words.
+
+/// 33 bytes that decompress to a point (`assertCompressedPublicKey`,
+/// `Certificate.ts:136-142`).
+pub(crate) fn require_compressed_key(bytes: &[u8], what: &str) -> Result<(), Error> {
+    if bytes.len() != 33
+        || !matches!(bytes[0], 0x02 | 0x03)
+        || PublicKey::from_bytes(bytes).is_err()
+    {
+        return Err(refused(format!(
+            "Invalid {what}: expected a compressed secp256k1 public key"
+        )));
+    }
+    Ok(())
+}
+
+/// A field name of 1 to 50 bytes (`Certificate.ts:367-370`).
+pub(crate) fn require_certificate_field_name_length(length: usize) -> Result<(), Error> {
+    if !(1..=50).contains(&length) {
+        return Err(refused(format!(
+            "Invalid certificate field name length: received {length}"
+        )));
+    }
+    Ok(())
+}
+
+/// A field name that is no unsafe record key (`assertCertificateFieldName`,
+/// `Certificate.ts:117-126`).
+pub(crate) fn require_safe_certificate_field_name(name: &str) -> Result<(), Error> {
+    if is_unsafe_record_key(name) {
+        return Err(refused(format!("Unsafe certificate field name: {name}")));
+    }
+    Ok(())
+}
+
+/// A signature of at most 72 bytes that `Signature.fromDER` parses
+/// (`Certificate.ts:390-397`, `:300-312`), as `toDER` re-encodes it.
+pub(crate) fn certificate_signature_der(bytes: &[u8]) -> Result<Vec<u8>, Error> {
+    if bytes.len() > MAX_CERTIFICATE_SIGNATURE_BYTES {
+        return Err(refused("Certificate signature exceeds the DER size limit"));
+    }
+    reference_der(bytes)
 }
 
 /// `#setUniqueWireRecordEntry` (`:1992-2002`): a repeated key refused, never
