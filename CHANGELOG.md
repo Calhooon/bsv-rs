@@ -43,7 +43,9 @@ A one-byte script and a length of 1 are accepted as before. Pinned by
 `an_empty_create_action_unlocking_script_is_refused_in_the_reference_words`,
 `a_zero_create_action_unlocking_script_length_is_refused_as_brc100_positive_integer`
 and `the_create_action_args_refuse_an_empty_unlocking_script_and_a_zero_length`
-(`src/wallet/validation.rs`) and by
+(`src/wallet/validation/create_action_input.rs`, where
+`validate_create_action_input` now lives, re-exported at its old path, so
+`validation.rs` stays within its recorded line bound) and by
 `tests/wallet_create_action_unlocking_script_282.rs` against
 `tests/vectors/wallet_create_action_unlocking_script_282.json`, the
 reference's verdicts and words from `Validation.validateCreateActionArgs`
