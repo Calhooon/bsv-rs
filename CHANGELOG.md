@@ -393,8 +393,10 @@ being `JSON.stringify` of the instance and `Certificate.fromObject`,
 auth messages' `certificates` (`AuthMessage.certificates`, a
 certificateResponse's JSON on every transport) carry the same keys; before,
 a reference peer's certificateResponse did not deserialize here. The identity
-client's publish (`publicly_reveal_attributes`) and the HTTP JSON substrate's
-`WalletCertificate` already wrote the reference's shape and do not move.
+client's publish (`publicly_reveal_attributes`) writes `type` by hand
+(`src/identity/client.rs:452`) and does not move. The HTTP JSON substrate's
+`WalletCertificate` writes `certificateType` where the reference writes `type`
+(`Wallet.interfaces.ts:851-852`): that is #105's (PR #271), outside this change.
 
 The keyrings' type (the owner's word of 2026-10-26 on #261: base64 strings
 held, decoded only where the wallet decrypts): `MasterCertificate.master_keyring`
