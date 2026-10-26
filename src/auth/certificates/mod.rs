@@ -28,6 +28,7 @@
 //! - Key ID (verifiable): `"{serial_number_base64} {field_name}"`
 
 mod certificate;
+mod collation;
 mod master;
 mod verifiable;
 

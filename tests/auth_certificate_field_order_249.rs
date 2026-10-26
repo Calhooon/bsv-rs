@@ -13,8 +13,10 @@
 
 use bsv_rs::auth::Certificate;
 use bsv_rs::primitives::{from_hex, to_hex, PrivateKey};
+use bsv_rs::wallet::types::Outpoint;
 use bsv_rs::Error;
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Witnesses {
@@ -132,7 +134,7 @@ fn received_bytes_carrying_other_values_are_never_used() {
 
 #[test]
 fn a_certificate_signed_here_keeps_the_preimage_it_signed() {
-    let certifier = PrivateKey::from_hex(&format!("{:064x}", 21)).unwrap();
+    let certifier = key(21);
     let w = witness("byte_order_signed_mixed_names");
     let read = Certificate::from_binary(&bytes(&w)).unwrap();
     let mut cert = Certificate::new(
@@ -148,4 +150,125 @@ fn a_certificate_signed_here_keeps_the_preimage_it_signed() {
         Some(&cert.to_binary(false)[..])
     );
     assert_eq!(cert.verify(), Ok(true));
+}
+
+fn key(scalar: u8) -> PrivateKey {
+    PrivateKey::from_hex(&format!("{:064x}", scalar)).unwrap()
+}
+
+#[test]
+fn a_certificate_signed_here_over_mixed_case_names_verifies_in_the_reference() {
+    let w = witness("rust_signed_mixed_names");
+    assert_eq!(w.reference_verify, Some(true));
+    let names = Certificate::from_binary(&bytes(&witness("reference_signed_mixed_names")))
+        .unwrap()
+        .fields;
+    let mut cert = Certificate::new(
+        [8u8; 32],
+        [9u8; 32],
+        key(27).public_key(),
+        key(25).public_key(),
+    )
+    .with_revocation_outpoint(Some(Outpoint::new([10u8; 32], 1)))
+    .with_fields(names);
+    cert.sign(&key(25)).unwrap();
+    assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
+}
+
+#[test]
+fn a_certificate_rebuilt_from_json_signs_in_the_reference_order() {
+    let w = witness("reference_signed_mixed_names");
+    let read = Certificate::from_binary(&bytes(&w)).unwrap();
+    let json = serde_json::to_string(&read).unwrap();
+    let mut rebuilt: Certificate = serde_json::from_str(&json).unwrap();
+    assert_eq!(rebuilt.received_unsigned, None);
+
+    // Its signature verifies over the serializer's order, the reference's.
+    assert_eq!(rebuilt.verify(), Ok(true));
+    assert_eq!(to_hex(&rebuilt.to_binary(true)), w.hex);
+
+    // Signed again here, it is the reference's bytes.
+    rebuilt.set_signature(None);
+    rebuilt.sign(&key(21)).unwrap();
+    assert_eq!(to_hex(&rebuilt.to_binary(true)), w.hex);
+}
+
+/// The field names of an unsigned prefix, in the order written.
+fn names_written(unsigned: &[u8]) -> Vec<String> {
+    fn varint(b: &[u8], at: &mut usize) -> usize {
+        let lead = b[*at];
+        *at += 1;
+        match lead {
+            0xfd => {
+                let n = u16::from_le_bytes([b[*at], b[*at + 1]]) as usize;
+                *at += 2;
+                n
+            }
+            0xfe | 0xff => panic!("no name list this long"),
+            n => n as usize,
+        }
+    }
+    let mut at = 32 + 32 + 33 + 33 + 32;
+    varint(unsigned, &mut at); // the revocation index
+    let count = varint(unsigned, &mut at);
+    let mut names = Vec::with_capacity(count);
+    for _ in 0..count {
+        let n = varint(unsigned, &mut at);
+        names.push(String::from_utf8(unsigned[at..at + n].to_vec()).unwrap());
+        at += n;
+        let v = varint(unsigned, &mut at);
+        at += v;
+    }
+    assert_eq!(at, unsigned.len());
+    names
+}
+
+#[test]
+fn the_serializer_orders_names_as_local_compare_does_on_the_latin_1_corpus() {
+    #[derive(Deserialize)]
+    struct Corpus {
+        collation_corpus: Vec<String>,
+    }
+    let data = std::fs::read_to_string("tests/vectors/auth_certificate_field_order_249.json")
+        .expect("read the #249 witnesses");
+    let corpus: Corpus = serde_json::from_str(&data).unwrap();
+    assert_eq!(corpus.collation_corpus.len(), 1402);
+
+    let fields: HashMap<String, Vec<u8>> = corpus
+        .collation_corpus
+        .iter()
+        .map(|n| (n.clone(), Vec::new()))
+        .collect();
+    let cert = Certificate::new(
+        [1u8; 32],
+        [2u8; 32],
+        key(3).public_key(),
+        key(5).public_key(),
+    )
+    .with_fields(fields);
+    assert_eq!(
+        names_written(&cert.to_binary(false)),
+        corpus.collation_corpus
+    );
+}
+
+#[test]
+fn the_six_witness_names_are_written_a_b_a0_age_ea_f_name() {
+    let read = Certificate::from_binary(&bytes(&witness("byte_order_signed_mixed_names"))).unwrap();
+    let rebuilt = Certificate::new(
+        read.cert_type,
+        read.serial_number,
+        read.subject.clone(),
+        read.certifier.clone(),
+    )
+    .with_fields(read.fields.clone());
+    assert_eq!(
+        names_written(&rebuilt.to_binary(false)),
+        ["a_b", "a0", "age", "éa", "f", "Name"]
+    );
+    // The byte order it was received in is kept for the received bytes.
+    assert_eq!(
+        names_written(&read.to_binary(false)),
+        ["Name", "a0", "a_b", "age", "f", "éa"]
+    );
 }
