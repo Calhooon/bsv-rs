@@ -56,6 +56,43 @@ it, not the decoded ciphertext; no vector moved: the one signed vector of
 (`Certificate.test.ts:312-328`, with its type and serial changed here), and
 its signature verifies under no reading, in the reference (`false`, both the
 crate's copy and the original) or here (decoded or text, raw or derived).
+### Changed: crypto-bigint at 0.7.10 or later, P-256 verification back under 0.13's time (#126)
+
+P-256 verification measured about twice as slow after #125 moved p256 to
+0.14 (two A/B rounds on the Studio: 247 µs at p256 0.13.2, 486 to 509 µs at
+0.14.0). The cause is crypto-bigint, not p256, its features or this crate's
+profile: the #125 resolve took crypto-bigint 0.7.6, whose Montgomery
+multiplication (the P-256 field and scalar arithmetic run through it,
+`primefield::monty_field_element!`) propagates carries through `ctutils`
+`Choice` conversions; 0.7.10 (2026-10-26) splits the wide sums and vendors
+the primitives back (RustCrypto/crypto-bigint#1376, #1377), and yanks 0.7.6
+to 0.7.8. Bisected with elliptic-curve 0.14.1 held, in retired instructions
+per `P256PublicKey::verify` (`/usr/bin/time -l`, a harness on this crate):
+0.7.6 to 0.7.9 2.69 M, 0.7.10 1.81 M; p256 0.13.2 took 2.34 M. p256's
+features are not it (0.13.2 had no `precomputed-tables`; 0.14 has it on here),
+nor a profile (none is set). `Cargo.toml` names `crypto-bigint = "0.7.10"`
+for its floor alone, as `primeorder` is named for a feature, so a downstream
+lock left on a slow release moves on its next `cargo update -p bsv-rs`; the
+ratchet library lock moves crypto-bigint 0.7.6 to 0.7.10 and ctutils 0.4.5 to
+0.4.6, nothing else.
+
+`cargo bench --locked --bench primitives_bench -- --warm-up-time 1
+--measurement-time 3 '^(Verification|Signing)/'`, two interleaved rounds
+(load 15 to 30), origin/beta `eb5cef4` with its lock (0.7.6) against this
+change (0.7.10), medians:
+
+| bench | 0.7.6 | 0.7.10 | instructions, 0.7.6 to 0.7.10 |
+|---|---|---|---|
+| `Verification/P256PublicKey::verify` | 467 to 673 µs | 213 to 216 µs | 2.69 M to 1.82 M |
+| `Signing/P256PrivateKey::sign_hash` | 127 to 206 µs | 62 to 106 µs | 0.85 M to 0.64 M (`sign`) |
+| `Verification/PublicKey::verify (secp256k1)` | 56 to 58 µs | 53 to 73 µs | 0.62 M to 0.61 M |
+
+k256 has its own field arithmetic and moves 1.5 percent: no k256 feature
+changes. `benches/baseline.json` keeps its 0.13-era record (P-256 verify p50
+249 µs), and the CI bench job (`cargo generate-lockfile`, then the p99 gate on
+`primitives_bench`) measures `Verification/P256PublicKey::verify` against it
+from now on; a fresh resolve already takes 0.7.10, so the floor is for the
+locks that exist.
 
 ### Added: `ScriptResourceLimit` prints the interpreter's sentence, from one place (#228)
 
