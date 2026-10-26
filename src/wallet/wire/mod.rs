@@ -170,6 +170,29 @@ impl WireReader<'_> {
         self.wire_length(value)
     }
 
+    /// `#readActionSatoshis` (`WalletWireTransceiver.ts:400-416`): a negative
+    /// net amount is `0xff` and a signed int64 with its high bit set, any other
+    /// value `readVarIntNumStrict(false)`; the value then
+    /// `#requireInteger(value, 'listActions satoshis', -21e14, 21e14)`
+    /// (`:2018-2025`). The varint read as a `u64` and reinterpreted is the
+    /// same int64 for the `0xff` form (bsv-rs#236).
+    pub(crate) fn read_action_satoshis(&mut self) -> Result<i64, Error> {
+        const BOUND: i64 = 2_100_000_000_000_000;
+        let raw = self.read_var_int()?;
+        let value = raw as i64;
+        if value >= 0 && raw > MAX_SAFE_INTEGER {
+            return Err(refused(
+                "number too large to retain precision - use readVarIntBn",
+            ));
+        }
+        if !(-BOUND..=BOUND).contains(&value) {
+            return Err(refused(format!(
+                "Invalid listActions satoshis: expected an integer from -{BOUND} to {BOUND}, received {value}"
+            )));
+        }
+        Ok(value)
+    }
+
     /// A count, then `#requireResponseCollectionLength` (`:1955-1969`) with a
     /// byte per item.
     pub(crate) fn read_collection_count(&mut self, name: &str) -> Result<usize, Error> {
