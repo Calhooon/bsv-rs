@@ -143,6 +143,19 @@ fn encryption(
     privilege(privileged, reason)
 }
 
+/// `validateAbortActionArgs` (`:893-899`, `WalletArgumentValidation.ts:44-46`):
+/// the reference a base64 string (`validateBase64String`, `:488-498`). The
+/// processor builds it from the request's bytes as the reference does
+/// (`toBase64`, `WalletWireProcessor.ts:786`), a canonical encoding, so the
+/// one rule it can break is the empty string's (`:491`, `invalidBase64`,
+/// `:439-441`).
+pub(super) fn abort_action_args(reference: &str) -> Checked {
+    if reference.is_empty() {
+        return Err(invalid("reference", "valid base64 string"));
+    }
+    Ok(())
+}
+
 /// `validateGetPublicKeyArgs` (`:1717-1732`): for the identity key the
 /// privilege alone (the wire carries no protocol, key ID or counterparty),
 /// otherwise the encryption arguments.

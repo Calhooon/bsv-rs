@@ -37,13 +37,22 @@ use super::results::{
 };
 use super::validation::{self, Refusal};
 use super::WalletCall;
+use crate::primitives::to_base64;
 use crate::wallet::interface::WalletInterface;
 use crate::wallet::types::Network;
+use crate::wallet::AbortActionArgs;
 use crate::Error;
 use std::marker::PhantomData;
 
 /// `walletErrors.unknownError` (`WalletError.ts:72` at `ts-stack@edf6e03`).
 const UNKNOWN_ERROR: u8 = 1;
+
+/// `walletErrors.abortRefused` (`WalletError.ts:79` at `ts-stack@edf6e03`).
+const ABORT_REFUSED: u8 = 8;
+
+/// The words of the reference's refused abort (`WalletWireProcessor.ts:801-804`).
+const ABORT_REFUSED_WORDS: &str =
+    "The wallet refused to abort this action because it has already been broadcast";
 
 /// `MAX_WIRE_ERROR_MESSAGE_BYTES` (`WalletWireProcessor.ts:25`).
 const MAX_WIRE_ERROR_MESSAGE_BYTES: usize = 4096;
@@ -580,7 +589,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Action Operation Handlers
     // NOTE: These require a full wallet implementation. When args parsing
     // is implemented in encoding.rs, these can be updated to call the wallet.
-    // For now, they return early errors since ProtoWallet doesn't support them.
+    // For now, they return early errors since ProtoWallet doesn't support them;
+    // abortAction calls the wallet (bsv-rs#206).
     // =========================================================================
 
     async fn handle_create_action(
@@ -601,11 +611,31 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         )
     }
 
-    async fn handle_abort_action(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
-        Err(
-            Error::WalletError("abortAction requires a full wallet implementation".to_string())
-                .into(),
-        )
+    async fn handle_abort_action(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+        // The reference's bytes are the rest of the request, handed to the
+        // wallet as base64 (`WalletWireProcessor.ts:785-786` at
+        // `ts-stack@edf6e03`), validated ahead of it (`:790`; #216)
+        let reference = to_base64(reader.read_remaining());
+        validation::abort_action_args(&reference)?;
+        let result = self
+            .invoke_wallet(
+                WalletCall::AbortAction,
+                self.wallet
+                    .abort_action(AbortActionArgs { reference }, originator),
+            )
+            .await?;
+
+        // A refusal is the reference's error frame, code 8 (`:797-804`),
+        // raised after the wallet answers and so outside the wrapper; its
+        // client reads 8 as `aborted: false` (`WalletWireTransceiver.ts:337`).
+        // An abort is the error byte alone (`:806-809`; bsv-rs#206)
+        if !result.aborted {
+            return Err(Refusal {
+                code: ABORT_REFUSED,
+                words: ABORT_REFUSED_WORDS.to_string(),
+            });
+        }
+        Ok(Vec::new())
     }
 
     async fn handle_list_actions(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {

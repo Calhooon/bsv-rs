@@ -851,14 +851,14 @@ async fn a_security_level_outside_0_to_2_is_refused_in_the_reference_words() {
     }
 }
 
-/// The thirteen calls this processor refuses as needing a full wallet keep
-/// their words and code 1: no validation runs ahead of them.
+/// The twelve calls this processor refuses as needing a full wallet keep
+/// their words and code 1: no validation runs ahead of them. abortAction left
+/// them for the wallet (bsv-rs#206).
 #[tokio::test]
-async fn the_thirteen_stubs_are_untouched() {
+async fn the_twelve_stubs_are_untouched() {
     for call in [
         WalletCall::CreateAction,
         WalletCall::SignAction,
-        WalletCall::AbortAction,
         WalletCall::ListActions,
         WalletCall::InternalizeAction,
         WalletCall::ListOutputs,

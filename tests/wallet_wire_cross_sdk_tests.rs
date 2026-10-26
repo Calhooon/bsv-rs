@@ -1169,13 +1169,10 @@ const ARGS_VECTORS: [&str; 27] = [
 
 /// The args vectors the processor cannot decode to their json, with the
 /// reason. A vector that leaves this list, or joins it, moves the count (21
-/// at #191; the seven key-related requests of #193 left it).
+/// at #191; the seven key-related requests of #193 left it; abortAction's
+/// left it with #206).
 #[cfg(feature = "http")]
-const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 14] = [
-    (
-        "abortAction-simple-args.json",
-        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
-    ),
+const PROCESSOR_ARGS_UNSUPPORTED: [(&str, &str); 13] = [
     (
         "acquireCertificate-issuance-args.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
@@ -1290,7 +1287,7 @@ async fn every_go_args_vector_decodes_through_the_processor_to_its_json() {
     }
     let allowed: Vec<&str> = PROCESSOR_ARGS_UNSUPPORTED.iter().map(|(f, _)| *f).collect();
     assert_eq!(failing, allowed, "the vectors the processor cannot decode");
-    assert_eq!(ARGS_VECTORS.len() - failing.len(), 13, "passing rows");
+    assert_eq!(ARGS_VECTORS.len() - failing.len(), 14, "passing rows");
 }
 
 /// #191: Go's privileged revealCounterpartyKeyLinkage request (`09 00 01 0b
@@ -1357,13 +1354,9 @@ const RESULT_VECTORS: [&str; 27] = [
 /// The result vectors the processor cannot write as their wire, with the
 /// reason. A vector that leaves this list, or joins it, moves the count (19
 /// at #194; the seven result writers of #197 left it; getVersion's joined it
-/// with #222).
+/// with #222; abortAction's left it with #206).
 #[cfg(feature = "http")]
-const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 13] = [
-    (
-        "abortAction-simple-result.json",
-        "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
-    ),
+const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 12] = [
     (
         "acquireCertificate-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
@@ -1530,7 +1523,7 @@ async fn every_go_result_vector_is_the_processors_wire_for_its_json() {
         .map(|(f, _)| *f)
         .collect();
     assert_eq!(failing, allowed, "the vectors the processor cannot write");
-    assert_eq!(RESULT_VECTORS.len() - failing.len(), 14, "passing rows");
+    assert_eq!(RESULT_VECTORS.len() - failing.len(), 15, "passing rows");
 }
 
 /// #194: revealCounterpartyKeyLinkage's response is the error byte, the
