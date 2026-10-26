@@ -19,6 +19,9 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
 | `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl; reads neither `privileged` nor `seek_permission`, as the reference's ProtoWallet does not | ~1284 |
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282) and `validation/internalize.rs` (#117) re-exported from it | ~1130 |
+| `validation.rs` | 40+ input validation helpers + validated structs | ~1170 |
+| `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
+| `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
 | `wire/` | Wire protocol encoding/decoding | - |

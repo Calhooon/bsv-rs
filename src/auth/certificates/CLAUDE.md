@@ -16,6 +16,9 @@ This module implements identity certificates for the BSV authentication system, 
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | 421 |
 | `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | 309 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | ~786 |
+| `master.rs` | `MasterCertificate` with field encryption and keyring management | ~336 |
+| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | ~287 |
 
 ## Certificate Flow
 
@@ -175,7 +178,7 @@ The `Certificate::to_binary()` method produces a deterministic binary representa
 **Notes:**
 - Revocation outpoint uses a sentinel value: all-zeros TXID with index 0 means "no outpoint"
 - Signature is appended as raw bytes without length prefix (matches TypeScript SDK)
-- Fields are written in the reference's order, `a.localeCompare(b)` under Node's default ICU collation (`ts-stack@edf6e03` `Certificate.ts:282`), not by bytes: `a_b, a0, age, éa, f, Name` (`collation.rs`, U+0000..U+00FF; above that, code point order after the table, the residual). Go sorts by bytes (`go-sdk@2ca481c` `wallet/serializer/certificate.go:48`)
+- Fields are written in the reference's order, `a.localeCompare(b)` under Node's default ICU collation (`ts-stack@edf6e03` `Certificate.ts:282`), not by bytes: `a_b, a0, age, éa, f, Name` (`src/wallet/collation.rs`, U+0000..U+00FF; above that, code point order after the table, the residual; under `wallet` since #246, where the wire's certificate writer writes the same order). Go sorts by bytes (`go-sdk@2ca481c` `wallet/serializer/certificate.go:48`)
 - A certificate read by `from_binary` (or signed by `sign`) keeps its unsigned prefix in `received_unsigned`; `verify`, `signing_hash` and `to_binary` use those bytes while they parse to the current values, so the issuer's order is kept (BRC-52 `0052.md:103`; #249). A value changed afterwards unbinds them
 
 ## Usage Examples
