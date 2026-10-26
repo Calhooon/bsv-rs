@@ -889,6 +889,117 @@ for a BRC-207 module inventory record (`0100.md:1963`, `:1974-1980`);
 nothing this crate serves is a module inventory, and a field that carries no
 verdict here does not move ahead of a consumer that asks (the owner's word,
 2026-10-26).
+### Changed: a BEEF is valid whatever its order on the wire; the whole path sorts before judging, the stream holds a child until its parent is in (#240)
+
+0.9.0-beta.1 (bsv-rs#86) judged a BEEF's transactions in the order written:
+a child written ahead of the parent it spends was `InputNamesNoElement` at
+its input, from the stream, `Beef::verify_structure` and `verify_valid`
+alike. 0.8's `verify_valid` sorted ahead of judging and accepted it, and so
+does the reference: `@bsv/sdk`'s `Beef.verifyValid` calls `sortTxs` ahead of
+its checks (`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:1054-1073`,
+`sortTxs` at `:1065`, defined at `:1352-1406`; go-sdk's `verifyValid` sorts
+too, `go-sdk@2ca481c` `transaction/beef.go:1240-1243`). The toolbox's pin
+lane met it: its children-first BEEFs failed eleven tests here.
+
+The keeper's re-reading of 2026-10-26, on the owner's north star (a user
+moving between the SDKs sees one verdict) and the stack's precedent (the
+owner's ruling of 2026-10-22: the atomic rule is read on the graph, never on
+wire position), replaces the reading of the same morning (state the order
+held, PR #243): a BEEF is valid when every input of every transaction names
+a transaction of the BEEF or a proven txid, whatever the order. BRC-62 at
+`5119a9b` keeps the order on the writer's side (`transactions/0062.md:43`,
+the order has streaming validation in mind; `:72-74`, a transaction's inputs
+above it; `:172-191`, the validation process); this crate's writer still
+writes parents before children. Whether BRC-62's order is normative for
+validity goes upstream to `bsv-blockchain/BRCs`, so the strict reading can
+return if its maintainers say so.
+
+- **The whole path** (`verify_structure`, `verify_valid`): the entries are
+  judged one by one as before (content, txid-only proof, BUMP index), then
+  `sort_txs` decides where the inputs lead as `sortTxs` does: an input that
+  names no entry (`missing_inputs`, `with_missing_inputs`) or a transaction
+  whose inputs reach no proven entry (`not_valid`: a ring) is
+  `InputNamesNoElement`, in any order. The linker (`find_atomic_transaction`,
+  `from_beef`) looks entries up by txid and was never order-bound.
+- **The stream** (`verify_stream`, `verify_stream_structure`, the
+  asynchronous reader, and the whole reader's judge): an unproven
+  transaction an input of which names a txid the index does not hold yet is
+  held, as read (the element: its raw bytes and the places of its fields),
+  until the last such txid is folded in; then it is folded in, its scripts
+  run, in wire order, on a heap (a chain written
+  newest first unwinds on no stack). At the end a transaction still held is
+  refused, `InputNamesNoElement` at the earliest held transaction's earliest
+  input that names nothing, ahead of the atomic rule. So the stream and the
+  whole path give one verdict, and a refusal after a held child is the later
+  element's (a raw transaction with no output written after a held child is
+  `NoOutputs` on both). A held transaction's scripts run in the step that
+  releases it, `step_until`'s clock not asked between them.
+- **The bound**: none by default (a valid BEEF is never refused for its size
+  or its counts: the beef-of-any-size charter). A BEEF in BRC-62's order
+  holds nothing; one written children first holds at most every unproven
+  transaction read, whole, at most the bytes read. A door that must bound its
+  memory sets `StreamVerifier::set_deferred_limit` (and
+  `AsyncStreamVerifier::set_deferred_limit`) to a `DeferredLimit { transactions,
+  bytes }`; past it the reading is declined, never judged: `step` and `run`
+  return an `io::Error` of kind `OutOfMemory` carrying `DeferredOverLimit {
+  offset, transactions, bytes, limit }` (`DeferredOverLimit::of`), the
+  asynchronous reader `AsyncVerifyError::Source` with it. `BeefIndex::deferred()`
+  answers what is held. All additive: `DeferredLimit` and `DeferredOverLimit`
+  are `#[non_exhaustive]`; no `Verdict`, `Kind` or `Reason` variant is added
+  (`Verdict` and `AsyncVerifyError` are exhaustive, and a decline is not a
+  verdict).
+- **The cursor**: a cursor taken while a transaction is held is `BSC4`, BSC3
+  and after the outputs named the held transactions by offset, each its raw
+  bytes read again by the decoder as the stream read them; a cursor that
+  holds nothing keeps BSC3's bytes, so every cursor of a BEEF in BRC-62's
+  order is unchanged.
+
+Measured (`benches/beef_stream.rs`, its 1 MB and 10 MB chains of about
+1 KB links; `BSV_BEEF_REVERSED=1` adds `beef_stream_reversed`, the same
+chains newest first, off by default so the gate's inventory is unchanged;
+Criterion medians, `--warm-up-time 1 --measurement-time 3`, on a box shared
+with other lanes): the reversed chain was refused at its newest link in
+about 30 us before (`95075b0`), and is valid in 4.7 ms (structure) and
+6.2 ms (scripts) at 1 MB, 89 ms and 163 ms at 10 MB. Parents before children,
+before and after: 3.1 and 1.5 ms (structure, 1 MB), 5.2 and 2.5 ms (scripts,
+1 MB), 35.6 and 16.7 ms (structure, 10 MB), 32.5 and 58.9 ms (scripts,
+10 MB): load noise in both directions; such a BEEF holds nothing, and the
+path adds one emptiness check per transaction. Linear (release,
+`tests/beef_deep_chain.rs` with `BEEF_DEPTH`): the stream over the chain
+newest first at 10,000, 100,000 and 1,000,000 links, 15.8 ms, 194 ms,
+2.94 s (structure) and 24.0 ms, 218 ms, 3.00 s (scripts); the whole path
+41.5 ms, 543 ms, 13.5 s, the sort's cost: the parents-first `verify_valid`
+takes 1.10 s and 19.8 s at 100,000 and 1,000,000 links on the same run.
+
+Pinned by `tests/beef_order_held.rs` (PR #243's pin of the refusal, now the
+acceptance's): the children-first BEEF (V1, V2) and a chain of 2, 3, 40 and
+1,000 written newest first (and atomic) valid on the three readers; a child
+naming a stranger refused at the end by all three, the stream at the
+stranger's input; a refusal after a held child the later element's; the
+bound declining at the fifth held link of a reversed chain of 10, by count
+and by bytes, with no verdict; a cursor carrying the held children (BSC4)
+resuming to the verdict of the whole; the reference's verdicts on seven
+witnesses (`tests/vectors/beef_order_240.json`, recorded by
+`tests/support/beef_order_240.mjs` against `@bsv/sdk` at `ts-stack@edf6e03`
+under Node v22.18.0: the six children-first and BRC-62-ordered witnesses
+`true`, the stranger `false`), equal to the three readers'; the asynchronous reader
+asking the tracker for the mining tip when the element in hand may release a
+held child (a child whose finality needs it, released by its proven parent,
+was `Unverifiable` with the tip asked only for an unproven element in hand:
+RED on this tree with that line reverted). RED on 0.9.0-beta.1: six of the
+ten tests (the bound and the cursor need the new API). Moved: `tests/beef_deep_chain.rs`'s reversed chain of 100,000
+links, refused, is valid on the three readers on a 1 MiB stack;
+`tests/beef_two_readers_agree.rs`'s reversed v1 fixture, refused by both, is
+accepted by both (the differential stays at 0 disagreements).
+
+### Notes: cross-SDK parity (#240)
+
+The order line of the divergence list goes: the three readers accept what
+the reference's `verifyValid` accepts on the order. The writer is unchanged
+(parents before children, as `#ensureSortedForSerialization` writes,
+`Beef.ts:354-358`). `Transaction::from_beef` with no txid still takes the
+last entry on the wire, as `Transaction.#fromAnyBeef` does (`Transaction.ts:342-346`
+at `edf6e03`; its `Beef.fromReader` does not sort).
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
