@@ -10,8 +10,8 @@
 //! the public keyring as a count of varint-length key and varint-length raw-byte
 //! pairs (rendered base64), the decrypted fields as a count of string pairs.
 //! The reader reads as the transceiver's `parse_discovery_result` reads: an
-//! empty string is `Some("")`, an empty map `None`, a trust outside 1 to 10
-//! refused (`WalletWireTransceiver.ts:1710`; bsv-rs#247).
+//! empty string is `""`, an empty map empty, a trust outside 1 to 10 refused
+//! (`WalletWireTransceiver.ts:1710`; bsv-rs#247).
 #![cfg(feature = "wallet")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -64,17 +64,17 @@ fn certificate() -> WalletCertificate {
 fn identity_certificate() -> IdentityCertificate {
     IdentityCertificate {
         certificate: certificate(),
-        certifier_info: Some(IdentityCertifier {
+        certifier_info: IdentityCertifier {
             name: "Fixture Certifier".into(),
-            icon_url: Some("https://certifier.invalid/icon".into()),
-            description: Some("fixture only".into()),
+            icon_url: "https://certifier.invalid/icon".into(),
+            description: "fixture only".into(),
             trust: 5,
-        }),
-        publicly_revealed_keyring: Some(map(&[
+        },
+        publicly_revealed_keyring: map(&[
             ("role", &to_base64(b"key-2")),
             ("name", &to_base64(b"key-1")),
-        ])),
-        decrypted_fields: Some(map(&[("role", "reader"), ("name", "Fixture")])),
+        ]),
+        decrypted_fields: map(&[("role", "reader"), ("name", "Fixture")]),
     }
 }
 
@@ -130,10 +130,9 @@ fn an_identity_certificate_the_writer_writes_reads_back_through_the_reader() {
 /// Go's zero value for an absent certifierInfo (which Go's writer writes and
 /// this crate's refuses to, #183) is refused by the reader as the transceiver
 /// refuses it, in the same words: trust 0 is outside the reference's 1 to 10
-/// (`WalletWireTransceiver.ts:1710`, `:2018-2025`; bsv-rs#247). Until #247 the
-/// reader read it as `Some` with empty strings and trust 0 (#184). The same
-/// bytes at trust 1 read as the transceiver reads them: `Some` with empty
-/// strings, the maps `None`, never `None` for the certifier.
+/// (`WalletWireTransceiver.ts:1710`, `:2018-2025`; bsv-rs#247). The same
+/// bytes at trust 1 read as the transceiver reads them: empty strings and
+/// empty maps, the members being required (bsv-rs#105).
 #[tokio::test]
 async fn the_zero_value_entry_is_refused_as_the_transceiver_refuses_it() {
     let words = "Invalid discovery trust: expected an integer from 1 to 10, received 0";
@@ -153,13 +152,13 @@ async fn the_zero_value_entry_is_refused_as_the_transceiver_refuses_it() {
     let entry = read(&bytes);
     let empty = IdentityCertifier {
         name: String::new(),
-        icon_url: Some(String::new()),
-        description: Some(String::new()),
+        icon_url: String::new(),
+        description: String::new(),
         trust: 1,
     };
-    assert_eq!(json(&entry.certifier_info), json(&Some(empty)));
-    assert_eq!(entry.publicly_revealed_keyring, None);
-    assert_eq!(entry.decrypted_fields, None);
+    assert_eq!(json(&entry.certifier_info), json(&empty));
+    assert!(entry.publicly_revealed_keyring.is_empty());
+    assert!(entry.decrypted_fields.is_empty());
     assert_eq!(json(&discovered(&bytes).await.unwrap()), json(&entry));
 }
 
@@ -190,9 +189,9 @@ fn the_shared_discovery_vector_entry_reads_through_the_reader_to_the_vectors_fie
             signature: s("signature"),
             fields: strings(&e["fields"]),
         },
-        certifier_info: Some(serde_json::from_value(e["certifierInfo"].clone()).unwrap()),
-        publicly_revealed_keyring: Some(strings(&e["publiclyRevealedKeyring"])),
-        decrypted_fields: Some(strings(&e["decryptedFields"])),
+        certifier_info: serde_json::from_value(e["certifierInfo"].clone()).unwrap(),
+        publicly_revealed_keyring: strings(&e["publiclyRevealedKeyring"]),
+        decrypted_fields: strings(&e["decryptedFields"]),
     };
     assert_eq!(json(&read(&wire[2..])), json(&expected));
 }
@@ -203,7 +202,7 @@ fn the_shared_discovery_vector_entry_reads_through_the_reader_to_the_vectors_fie
 fn a_keyring_value_whose_bytes_are_not_utf8_round_trips_as_base64() {
     let raw = [0xff, 0xfe, 0x80, 0x00, 0xc3];
     let mut cert = identity_certificate();
-    cert.publicly_revealed_keyring = Some(map(&[("name", &to_base64(&raw))]));
+    cert.publicly_revealed_keyring = map(&[("name", &to_base64(&raw))]);
     let bytes = written(&cert);
     assert!(bytes
         .windows(raw.len() + 1)
@@ -278,16 +277,16 @@ fn the_layout_before_182_is_refused() {
             Some(c) => {
                 w.write_i8(1);
                 w.write_string(&c.name);
-                w.write_optional_string(c.icon_url.as_deref());
-                w.write_optional_string(c.description.as_deref());
+                w.write_optional_string(Some(&c.icon_url));
+                w.write_optional_string(Some(&c.description));
                 w.write_u8(c.trust);
             }
         }
-        old_map(&mut w, cert.publicly_revealed_keyring.as_ref());
-        old_map(&mut w, cert.decrypted_fields.as_ref());
+        old_map(&mut w, Some(&cert.publicly_revealed_keyring));
+        old_map(&mut w, Some(&cert.decrypted_fields));
         w.into_bytes()
     };
-    for bytes in [old(cert.certifier_info.as_ref()), old(None)] {
+    for bytes in [old(Some(&cert.certifier_info)), old(None)] {
         let mut reader = WireReader::new(&bytes);
         assert!(matches!(
             reader.read_identity_certificate(),
@@ -303,11 +302,11 @@ fn the_layout_before_182_is_refused() {
 /// refused.
 #[test]
 fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
-    let info = identity_certificate().certifier_info.unwrap();
+    let info = identity_certificate().certifier_info;
     let mut w = WireWriter::new();
     w.write_string(&info.name);
-    w.write_string(info.icon_url.as_deref().unwrap());
-    w.write_string(info.description.as_deref().unwrap());
+    w.write_string(&info.icon_url);
+    w.write_string(&info.description);
     w.write_u8(info.trust);
     let mut reader = WireReader::new(w.as_bytes());
     assert_eq!(
@@ -319,7 +318,7 @@ fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
     let mut nil = WireWriter::new();
     nil.write_string(&info.name);
     nil.write_var_int(u64::MAX);
-    nil.write_string(info.description.as_deref().unwrap());
+    nil.write_string(&info.description);
     nil.write_u8(info.trust);
     assert!(matches!(
         WireReader::new(nil.as_bytes()).read_identity_certifier(),

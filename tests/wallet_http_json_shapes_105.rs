@@ -366,6 +366,77 @@ fn the_references_substrate_reads_this_crates_bodies() {
     }
 }
 
+/// The discovery entry's members BRC-100 requires (`0100.md:1401-1411`;
+/// `Wallet.interfaces.ts:870-882`), as paths into the entry: the owner's word
+/// of 2026-10-26 on #105 item 4.
+const DISCOVERY_MEMBERS: &[&str] = &[
+    "certifierInfo",
+    "certifierInfo.iconUrl",
+    "certifierInfo.description",
+    "publiclyRevealedKeyring",
+    "decryptedFields",
+];
+
+/// The reference's own discovery result with one required member removed is
+/// refused on intake, naming the member, as the reference's client refuses it
+/// (`WalletResultValidation.ts:1894-1910`, recorded per member in
+/// `reference_refuses_without`). Until #105 item 4 this crate read each as
+/// absent (`Option`) and wrote the entry back without it.
+#[test]
+fn a_discovery_entry_without_a_required_member_is_refused_naming_it() {
+    let vector = vector();
+    let cases: Vec<&Value> = vector["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| c["call"].as_str().unwrap().starts_with("discoverBy"))
+        .collect();
+    assert!(!cases.is_empty());
+    let mut read_without = Vec::new();
+    for case in cases {
+        let name = &case["name"];
+        // The whole entry reads and writes back as the reference's
+        let read: DiscoverCertificatesResult =
+            serde_json::from_value(case["result"].clone()).unwrap();
+        assert_eq!(
+            serde_json::to_value(&read).unwrap(),
+            case["result"],
+            "{name}"
+        );
+        for member in DISCOVERY_MEMBERS {
+            let mut result = case["result"].clone();
+            let (parent, leaf) = match member.rsplit_once('.') {
+                Some((parent, leaf)) => (format!("/certificates/0/{parent}"), leaf),
+                None => ("/certificates/0".to_string(), *member),
+            };
+            let entry = result
+                .pointer_mut(&parent)
+                .unwrap()
+                .as_object_mut()
+                .unwrap();
+            assert!(entry.remove(leaf).is_some(), "{name}: {member}");
+            let reference = case["reference_refuses_without"][member].as_str().unwrap();
+            assert!(
+                reference.contains(&format!("certificates[0].{member}: expected")),
+                "{name}: the reference's refusal of {member}: {reference}"
+            );
+            let Err(error) = serde_json::from_value::<DiscoverCertificatesResult>(result) else {
+                read_without.push(format!("{name}: {member}"));
+                continue;
+            };
+            let error = error.to_string();
+            assert!(
+                error.contains(&format!("missing field `{leaf}`")),
+                "{name}: {member}: {error}"
+            );
+        }
+    }
+    assert!(
+        read_without.is_empty(),
+        "entries read without a required member: {read_without:?}"
+    );
+}
+
 fn go_vector(file: &str) -> Value {
     let text = std::fs::read_to_string(format!(
         "{}/tests/vectors/wallet_wire/{file}",

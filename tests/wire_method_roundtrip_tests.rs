@@ -1860,15 +1860,15 @@ mod complex_type_roundtrips {
     fn test_identity_certifier_roundtrip() {
         let certifier = IdentityCertifier {
             name: "BSV Authority".to_string(),
-            icon_url: Some("https://example.com/icon.png".to_string()),
-            description: Some("Official BSV certificate authority".to_string()),
+            icon_url: "https://example.com/icon.png".to_string(),
+            description: "Official BSV certificate authority".to_string(),
             trust: 9,
         };
 
         let mut writer = WireWriter::new();
         writer.write_string(&certifier.name);
-        writer.write_string(certifier.icon_url.as_deref().unwrap());
-        writer.write_string(certifier.description.as_deref().unwrap());
+        writer.write_string(&certifier.icon_url);
+        writer.write_string(&certifier.description);
         writer.write_u8(certifier.trust);
 
         let mut reader = WireReader::new(writer.as_bytes());
@@ -1882,7 +1882,7 @@ mod complex_type_roundtrips {
 
     /// Tests the optional IdentityCertifier read of a minimal entry: the
     /// reference's layout has no present flag, an empty iconUrl or description
-    /// is length 0 and reads as `Some("")`, as the transceiver reads it (#184).
+    /// is length 0 and reads as `""`, as the transceiver reads it (#184).
     #[test]
     fn test_optional_identity_certifier_minimal_roundtrip() {
         let mut writer = WireWriter::new();
@@ -1896,8 +1896,8 @@ mod complex_type_roundtrips {
         assert!(read.is_some());
         let read = read.unwrap();
         assert_eq!(read.name, "Minimal");
-        assert_eq!(read.icon_url, Some(String::new()));
-        assert_eq!(read.description, Some(String::new()));
+        assert_eq!(read.icon_url, "");
+        assert_eq!(read.description, "");
         assert_eq!(read.trust, 1);
         assert_eq!(reader.remaining(), 0);
     }

@@ -660,10 +660,7 @@ async fn a_discovery_trust_outside_1_to_10_is_refused() {
         let read = discover(discovery_frame(&cert, trust, &[0], &[0]))
             .await
             .unwrap();
-        assert_eq!(
-            read.certificates[0].certifier_info.as_ref().unwrap().trust,
-            trust
-        );
+        assert_eq!(read.certificates[0].certifier_info.trust, trust);
     }
 }
 
@@ -779,8 +776,8 @@ async fn a_discovery_record_key_out_of_bounds_or_repeated_is_refused() {
     let entry = &read.certificates[0];
     let keyring: HashMap<String, String> = [("name".to_string(), to_base64(b"key"))].into();
     let decrypted: HashMap<String, String> = [("name".to_string(), "Fixture".to_string())].into();
-    assert_eq!(entry.publicly_revealed_keyring.as_ref(), Some(&keyring));
-    assert_eq!(entry.decrypted_fields.as_ref(), Some(&decrypted));
+    assert_eq!(entry.publicly_revealed_keyring, keyring);
+    assert_eq!(entry.decrypted_fields, decrypted);
 }
 
 /// `WireReader::read_identity_certificate` reads one discovery entry, the
@@ -897,21 +894,21 @@ async fn an_identity_certificate_refuses_the_record_keys_and_counts_discovery_re
 // 5. The writer: no frame the reference's reader refuses
 // ---------------------------------------------------------------------------
 
-fn identity_certificate(info: Option<IdentityCertifier>) -> IdentityCertificate {
+fn identity_certificate(info: IdentityCertifier) -> IdentityCertificate {
     let cert = read_certificate(&Parts::valid().bytes()).unwrap();
     IdentityCertificate {
         certificate: cert,
         certifier_info: info,
-        publicly_revealed_keyring: None,
-        decrypted_fields: None,
+        publicly_revealed_keyring: HashMap::new(),
+        decrypted_fields: HashMap::new(),
     }
 }
 
 fn certifier(trust: u8) -> IdentityCertifier {
     IdentityCertifier {
         name: "Fixture Certifier".into(),
-        icon_url: None,
-        description: None,
+        icon_url: String::new(),
+        description: String::new(),
         trust,
     }
 }
@@ -925,7 +922,7 @@ fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_before_a_byte
     for trust in [0u8, 11, 0xff] {
         let mut w = WireWriter::new();
         let error = message(
-            w.write_identity_certificate(&identity_certificate(Some(certifier(trust))))
+            w.write_identity_certificate(&identity_certificate(certifier(trust)))
                 .err()
                 .expect("refused"),
         );
@@ -937,7 +934,7 @@ fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_before_a_byte
     }
     for trust in [1u8, 10] {
         let mut w = WireWriter::new();
-        w.write_identity_certificate(&identity_certificate(Some(certifier(trust))))
+        w.write_identity_certificate(&identity_certificate(certifier(trust)))
             .unwrap();
     }
 }

@@ -1435,7 +1435,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
             certificates.push(crate::wallet::IdentityCertificate {
                 certificate,
-                certifier_info: Some(certifier_info),
+                certifier_info,
                 publicly_revealed_keyring,
                 decrypted_fields,
             });
