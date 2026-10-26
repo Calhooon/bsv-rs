@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added: `SpendRefusal` prints its rule, its text pinned (#213)
+
+`beef_stream::SpendRefusal` implements `Display`, so a host prints the
+verifier's refusal as a sentence instead of rendering each arm itself. A
+script refusal prints the interpreter's sentence verbatim (the `String` the
+arm carries, no prefix); a resource decline prints the interpreter's own
+resource sentence (`Stack memory usage has exceeded <limit> bytes`, `Work
+budget exhausted: spent <n> units, budget <limit>`: `ScriptResourceLimit`
+has no `Display`, so the words are `src/script/spend/limits.rs`'s, written
+from the limit's fields); every other arm its rule in its rustdoc's words,
+the field named (`vout`, `lock_time`, `height`), lowercase and with no
+trailing period, as the crate's `Error` texts go. The texts are a wire of
+sorts, a downstream matching on them: each is pinned by its own test in
+`tests/beef_stream.rs` (`a_spend_refusal_prints_its_rule_for_a_txid_only_parent`
+and the eight `a_spend_refusal_prints_*` beside it), and the script
+refusal's text on the verifier's path in
+`a_spend_the_script_allows_is_valid_and_one_it_refuses_is_a_spend_refusal`. Additive: the enum's shape and arms do
+not move; it gains no `std::error::Error`, as `Reason` has none.
+
 ### Added: an optional `tracing` feature: the processor's wrapper logs the wallet's words it frames away (#212)
 
 The keeper's ruling on #202: an un-coded wallet error is framed as the

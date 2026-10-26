@@ -40,7 +40,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `beef/collect.rs` | The whole-BEEF reader: the streaming decoder's collect mode collected into a `Beef`, with the stream's judge beside it (#86) |
 | `beef/in_memory.rs` | The stream's rules on the in-memory forms: `Bump::to_merkle_path`, `Bump::in_memory` (each level by offset, the `u32` height bound) and `Bump::read_alone` (one BUMP by the decoder, #167), the walk on a `MerklePath`, `check_transaction` on a `BeefTx`, the atomic table (#86) |
 | `beef_tx.rs` | `BeefTx` wrapper, `TxDataFormat`, format constants; `BeefTx::from_reader` reads one entry (no BEEF reader calls it since #86) |
-| `beef_stream.rs` | The streaming reader: `BeefDecoder` (and its collect mode, the whole reader's parser), `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`; the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
+| `beef_stream.rs` | The streaming reader: `BeefDecoder` (and its collect mode, the whole reader's parser), `BeefStream`, `BeefIndex`, `verify_stream`, `Verdict`, `Cursor`, `SpendRefusal` (its `Display` beside the enum, one sentence per arm, the texts pinned in `tests/beef_stream.rs`'s `a_spend_refusal_prints_*`, #213); the specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean |
 | `beef_stream/reason.rs` | The refusal's names, `Kind` (twenty-five, `Kind::ALL`) and `Reason`, re-exported from `beef_stream`; both `#[non_exhaustive]` (#86, #167): a `match` outside the crate ends in a wildcard arm |
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
