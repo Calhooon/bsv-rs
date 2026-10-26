@@ -259,7 +259,7 @@ fn a_child_written_ahead_of_its_parent_is_valid_on_the_three_readers() {
 }
 
 /// RED on 0.9.0-beta.1 at the newest link's input. Linear: the held chain
-/// unwinds on a heap when the funding transaction arrives, the whole path's
+/// unwinds one link per step once the funding transaction arrives, the whole path's
 /// sort is the work list of `sort_txs`.
 #[test]
 fn a_chain_written_newest_first_is_valid_on_the_three_readers() {

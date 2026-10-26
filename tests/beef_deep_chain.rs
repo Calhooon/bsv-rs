@@ -356,7 +356,7 @@ fn a_deep_chain_history_builds_on_a_small_stack() {
 /// wire (bsv-rs#240): the whole path sorts before judging, as the
 /// reference's `Beef.verifyValid` does, and the stream holds each link until
 /// its parent is in, the funding transaction, written last, releasing the
-/// chain on a heap. Each reader is linear and runs on a 1 MiB stack. From
+/// chain one link per step. Each reader is linear and runs on a 1 MiB stack. From
 /// bsv-rs#86 to #240 the newest link, held ahead of its parent, was
 /// `InputNamesNoElement` on both.
 #[test]

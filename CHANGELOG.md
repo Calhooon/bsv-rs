@@ -890,6 +890,7 @@ nothing this crate serves is a module inventory, and a field that carries no
 verdict here does not move ahead of a consumer that asks (the owner's word,
 2026-10-26).
 ### Changed: a BEEF is valid whatever its order on the wire; the whole path sorts before judging, the stream holds a child until its parent is in (#240)
+### Changed: a BEEF is valid whatever its order on the wire; the whole path sorts before judging, the stream holds a child by its index entry until its parent is in, under no bound (#240)
 
 0.9.0-beta.1 (bsv-rs#86) judged a BEEF's transactions in the order written:
 a child written ahead of the parent it spends was `InputNamesNoElement` at
@@ -924,73 +925,126 @@ return if its maintainers say so.
 - **The stream** (`verify_stream`, `verify_stream_structure`, the
   asynchronous reader, and the whole reader's judge): an unproven
   transaction an input of which names a txid the index does not hold yet is
-  held, as read (the element: its raw bytes and the places of its fields),
-  until the last such txid is folded in; then it is folded in, its scripts
-  run, in wire order, on a heap (a chain written
-  newest first unwinds on no stack). At the end a transaction still held is
-  refused, `InputNamesNoElement` at the earliest held transaction's earliest
-  input that names nothing, ahead of the atomic rule. So the stream and the
-  whole path give one verdict, and a refusal after a held child is the later
-  element's (a raw transaction with no output written after a held child is
-  `NoOutputs` on both). A held transaction's scripts run in the step that
-  releases it, `step_until`'s clock not asked between them.
-- **The bound**: none by default (a valid BEEF is never refused for its size
-  or its counts: the beef-of-any-size charter). A BEEF in BRC-62's order
-  holds nothing; one written children first holds at most every unproven
-  transaction read, whole, at most the bytes read. A door that must bound its
-  memory sets `StreamVerifier::set_deferred_limit` (and
-  `AsyncStreamVerifier::set_deferred_limit`) to a `DeferredLimit { transactions,
-  bytes }`; past it the reading is declined, never judged: `step` and `run`
-  return an `io::Error` of kind `OutOfMemory` carrying `DeferredOverLimit {
-  offset, transactions, bytes, limit }` (`DeferredOverLimit::of`), the
-  asynchronous reader `AsyncVerifyError::Source` with it. `BeefIndex::deferred()`
-  answers what is held. All additive: `DeferredLimit` and `DeferredOverLimit`
-  are `#[non_exhaustive]`; no `Verdict`, `Kind` or `Reason` variant is added
-  (`Verdict` and `AsyncVerifyError` are exhaustive, and a decline is not a
-  verdict).
+  held by its index entry, never its raw bytes, until the last such txid is
+  folded in; then it is ready, and the reader folds it in, its scripts run,
+  in wire order, one per step, ahead of the next element: under
+  `step_until` its scripts run under the caller's budget and may pause
+  inside it, as any transaction's; a transaction it releases in turn is
+  folded in the same way (the asynchronous reader, which has no step budget,
+  folds every released one after the element, the mining tip asked once).
+  `BeefIndex::fold` still folds what an element releases in the same call.
+  At the end a transaction still held is refused, `InputNamesNoElement` at
+  the earliest held transaction's earliest input that names nothing, ahead
+  of the atomic rule. So the stream and the whole path give one verdict, and
+  a refusal after a held child is the later element's (a raw transaction
+  with no output written after a held child is `NoOutputs` on both).
+- **What a held transaction holds** (`beef_stream/deferred.rs`): its txid,
+  offset and wire length (56 bytes); per input the outpoint, the sequence
+  and the input's offset (48 bytes); with spends checked, the version and
+  the lock time (8), each unlocking script, and the outputs (16 bytes and
+  the script each). The outputs stay because a signature whose hash type
+  carries the CHRONICLE bit dispatches to the original digest (the default
+  mode admits the bit at every version), which hashes every output after the
+  scriptCode the parent supplies; SHA-256 keeps no midstate for a suffix, so
+  no component computed ahead of the parent stands in for them. That digest
+  needs nothing per input beyond the 48 bytes held (the template's slot for
+  the input is its outpoint and sequence, the other slots' scripts empty);
+  the outputs are per transaction, what the one-pass index retains for it
+  once folded anyway (`BeefIndex::retaining` keeps only the outputs a first
+  pass named, so there the unreferenced outputs of a held transaction are
+  held beyond the index). The FORKID midstates are computed from the held
+  fields when the scripts run, as for a transaction read in order: every
+  field they cover is held to resolve the parents, so holding them would add
+  bytes and save none. The whole reader's structure-only judge holds the
+  same entry (56 bytes and 48 per input) beside the `Beef` it collects, not
+  a copy of the bytes the `Beef` already holds.
+- **No bound** (the stack's charter, `bsv-stack-lean
+  docs/charters/beef-of-any-size.md`, the owner's ruling of 2026-10-09: a
+  valid BEEF is never refused for its size or its counts; the keeper's stop
+  on #240, 2026-10-26): a BEEF in BRC-62's order holds nothing; one written
+  children first holds, at most, the entry of every unproven transaction
+  read. 0.9.0-beta.1's first fold of #240 (never released) had a
+  `DeferredLimit` the caller could set and a decline past it
+  (`DeferredOverLimit`, an `io::Error`); both are gone. A platform whose
+  memory cannot hold a BEEF stops between steps and resumes from the
+  cursor; that is not a verdict. `BeefIndex::deferred()` answers the
+  transactions held and the bytes their entries hold.
 - **The cursor**: a cursor taken while a transaction is held is `BSC4`, BSC3
-  and after the outputs named the held transactions by offset, each its raw
-  bytes read again by the decoder as the stream read them; a cursor that
-  holds nothing keeps BSC3's bytes, so every cursor of a BEEF in BRC-62's
-  order is unchanged.
+  and after the outputs named the held entries by offset (offset, txid, wire
+  length, the inputs, then the spends when checked), each count bounded by
+  the bytes left, an output value outside MoneyRange refused; one held and
+  ready, or a pause inside one released, is carried too (the pause names it
+  before the frame). A cursor that holds nothing keeps BSC3's bytes, so every
+  cursor of a BEEF in BRC-62's order is unchanged, and a BSC3 cursor of
+  0.9.0-beta.1 resumes.
 
-Measured (`benches/beef_stream.rs`, its 1 MB and 10 MB chains of about
-1 KB links; `BSV_BEEF_REVERSED=1` adds `beef_stream_reversed`, the same
-chains newest first, off by default so the gate's inventory is unchanged;
-Criterion medians, `--warm-up-time 1 --measurement-time 3`, on a box shared
-with other lanes): the reversed chain was refused at its newest link in
-about 30 us before (`95075b0`), and is valid in 4.7 ms (structure) and
-6.2 ms (scripts) at 1 MB, 89 ms and 163 ms at 10 MB. Parents before children,
-before and after: 3.1 and 1.5 ms (structure, 1 MB), 5.2 and 2.5 ms (scripts,
-1 MB), 35.6 and 16.7 ms (structure, 10 MB), 32.5 and 58.9 ms (scripts,
-10 MB): load noise in both directions; such a BEEF holds nothing, and the
-path adds one emptiness check per transaction. Linear (release,
-`tests/beef_deep_chain.rs` with `BEEF_DEPTH`): the stream over the chain
-newest first at 10,000, 100,000 and 1,000,000 links, 15.8 ms, 194 ms,
-2.94 s (structure) and 24.0 ms, 218 ms, 3.00 s (scripts); the whole path
-41.5 ms, 543 ms, 13.5 s, the sort's cost: the parents-first `verify_valid`
-takes 1.10 s and 19.8 s at 100,000 and 1,000,000 links on the same run.
+Measured on the chain of `tests/beef_deep_chain.rs` (61-byte links), on a
+box shared with other lanes (load 17 to 45). Memory (dhat,
+`tests/memory_profiling.rs`'s `test_beef_stream_memory_on_a_reversed_chain`,
+`BEEF_REVERSED_DEPTHS=10000,100000`): held per link over the parents-first
+peak, 187 and 196 bytes (structure), 212 and 234 (scripts) at 10,000 and
+100,000 links; holding the element as read was 321 and 349; the whole
+path's peak equals the parents-first peak. Peak RSS in fresh processes
+(release; the reversed builder's own vectors in its baseline), parents
+first then newest first, over the bytes alone: the stream's structure 3.8
+and 7.9 MB, 28.1 and 58.1 MB, 441 and 728 MB at 10,000, 100,000 and
+1,000,000 links; its scripts 4.0 and 8.9 MB, 26.2 and 72.5 MB, 441 and
+837 MB; the whole path 27.3 and 29.7 MB, 249 and 266 MB, 2.51 and 2.95 GB.
+Time (release, the same processes): the stream's structure 9.4 and 17.4 ms,
+92.5 and 184 ms, 3.49 and 3.50 s; its scripts 15.4 and 22.7 ms, 157 and
+231 ms, 2.19 and 2.80 s; the whole path 33.3 and 36.6 ms, 360 and 521 ms,
+4.88 and 5.64 s. Linear in the links in both orders. `benches/beef_stream.rs`
+carries the same chains newest first behind `BSV_BEEF_REVERSED=1`
+(`beef_stream_reversed`, outside the gate's inventory).
 
 Pinned by `tests/beef_order_held.rs` (PR #243's pin of the refusal, now the
 acceptance's): the children-first BEEF (V1, V2) and a chain of 2, 3, 40 and
 1,000 written newest first (and atomic) valid on the three readers; a child
 naming a stranger refused at the end by all three, the stream at the
-stranger's input; a refusal after a held child the later element's; the
-bound declining at the fifth held link of a reversed chain of 10, by count
-and by bytes, with no verdict; a cursor carrying the held children (BSC4)
-resuming to the verdict of the whole; the reference's verdicts on seven
-witnesses (`tests/vectors/beef_order_240.json`, recorded by
-`tests/support/beef_order_240.mjs` against `@bsv/sdk` at `ts-stack@edf6e03`
-under Node v22.18.0: the six children-first and BRC-62-ordered witnesses
-`true`, the stranger `false`), equal to the three readers'; the asynchronous reader
-asking the tracker for the mining tip when the element in hand may release a
-held child (a child whose finality needs it, released by its proven parent,
-was `Unverifiable` with the tip asked only for an unproven element in hand:
-RED on this tree with that line reverted). RED on 0.9.0-beta.1: six of the
-ten tests (the bound and the cursor need the new API). Moved: `tests/beef_deep_chain.rs`'s reversed chain of 100,000
-links, refused, is valid on the three readers on a 1 MiB stack;
-`tests/beef_two_readers_agree.rs`'s reversed v1 fixture, refused by both, is
-accepted by both (the differential stays at 0 disagreements).
+stranger's input; a refusal after a held child the later element's; a
+reversed chain of 2,000 judged on both modes of the stream, 1,999 links held
+at the peak (`a_reversed_beef_is_judged_whatever_its_size`); a cursor
+carrying the held children (BSC4) resuming to the verdict of the whole; a
+signed family released newest first (ALL, SINGLE, ANYONECANPAY, NONE, and
+ALL|CHRONICLE over the original digest), its verdict, valid and with one
+signature broken, parents first's, its BSC4 cursor holding no transaction's
+bytes (`a_held_child_is_held_by_its_index_entry_and_its_signatures_verify_on_release`);
+every prefix of that cursor refused and every single-byte change refused or
+read, never a panic; a chain of 1,000 two-input links newest first folded
+one released link per step, the caller's budget asked inside each, 999
+pauses resumed through cursors to the same verdict
+(`a_released_child_is_folded_one_per_step_under_the_callers_budget`, RED
+with the release in one step: the budget asked 0 times); the reference's
+verdicts on seven witnesses (`tests/vectors/beef_order_240.json`, recorded
+by `tests/support/beef_order_240.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` under Node v22.18.0: the six children-first and
+BRC-62-ordered witnesses `true`, the stranger `false`), equal to the three
+readers'; the asynchronous reader asking the tracker for the mining tip for
+a released child (a child whose finality needs it, released by its proven
+parent, was `Unverifiable` with the tip asked only for an unproven element
+in hand). RED on 0.9.0-beta.1: the acceptance tests refuse
+`InputNamesNoElement` at the newest link's input. Moved:
+`tests/beef_deep_chain.rs`'s reversed chain of 100,000 links, refused, is
+valid on the three readers on a 1 MiB stack; `tests/beef_two_readers_agree.rs`'s
+reversed v1 fixture, refused by both, is accepted by both (the differential
+stays at 0 disagreements); `tests/memory_profiling.rs` measures the
+reversed chain.
+
+### Changed: `Stop`, `Verdict` and `AsyncVerifyError` are `#[non_exhaustive]` (#240)
+
+As `Kind` and `Reason` already are (#86, #167), on the owner's word on #240
+(2026-10-26): 0.9.0 is the minor that takes the breaks, so a later variant
+is not one. No variant is added: nothing produces a resource decline once
+the stream holds under no bound, and a decline is never an invalidity (the
+`ScriptResourceLimit` rule): a platform's irreducible bound is met by
+resuming from the cursor, not by a verdict. `cargo semver-checks` (minor,
+against beta) reports `enum_marked_non_exhaustive` on the three and nothing
+else. Migration: a `match` on one of them outside the crate ends in a
+wildcard arm (`_ => ...`). On disk, overlay-engine's `structure_roots`
+(`crates/overlay-engine/src/beef_limits.rs:240-255`, on bsv-rs 0.6.0) and
+rust-message-box's `refusal_word` (`src/beef_door.rs:543-595`, on bsv-rs
+=0.4.5) match `Verdict` exhaustively and take the arm when they move to
+0.9.
 
 ### Notes: cross-SDK parity (#240)
 
