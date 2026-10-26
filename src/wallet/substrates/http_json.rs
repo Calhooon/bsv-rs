@@ -335,9 +335,7 @@ impl HttpWalletJson {
             key_id: args.key_id,
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             data: args.data,
-            hash_to_directly_sign: args
-                .hash_to_directly_sign
-                .map(|h| crate::primitives::to_hex(&h)),
+            hash_to_directly_sign: args.hash_to_directly_sign.map(|h| h.to_vec()),
             permission: permission!(args),
         };
 
@@ -362,9 +360,7 @@ impl HttpWalletJson {
             counterparty: args.counterparty.as_ref().map(counterparty_to_string),
             for_self: args.for_self,
             data: args.data,
-            hash_to_directly_verify: args
-                .hash_to_directly_verify
-                .map(|h| crate::primitives::to_hex(&h)),
+            hash_to_directly_verify: args.hash_to_directly_verify.map(|h| h.to_vec()),
             signature: args.signature,
             permission: permission!(args),
         };

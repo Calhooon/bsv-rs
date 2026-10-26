@@ -6,7 +6,14 @@
 //   git -C ~/bsv/ts-stack archive edf6e03 packages/sdk | tar -x -C "$W"
 //   (cd "$W/packages/sdk" && bun build mod.ts --target node --format esm --outfile "$W/sdk.mjs")
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/http_json_shapes_105.mjs \
-//     "$W/sdk.mjs" tests/vectors/wallet_http_json_shapes_105.json [--write]
+//     "$W/sdk.mjs" tests/vectors/wallet_http_json_shapes_105.json [--write] [--patch FILE]...
+//
+// Each `--patch` file is a list of `[case, JSON pointer, value]` written by
+// the Rust test under `BSV_SHAPES_105_RECORD=<dir>` (this crate's
+// transactions, `witnesses.json`, and bodies, `bodies.json`); they are applied
+// to the vector before anything is computed, so the vector has one writer and
+// keeps its order. Recording a new case: the transactions' patch, the script
+// with `--write`, the bodies' patch, the script with `--write` again.
 //
 // For every case of the vector file it runs the reference's client
 // (`substrates/HTTPWalletJSON.ts`) over a fetch that records the body and
@@ -24,8 +31,20 @@
 import fs from 'fs'
 import { pathToFileURL } from 'url'
 
-const [sdkPath, vectorPath, flag] = process.argv.slice(2)
+const [sdkPath, vectorPath, ...flags] = process.argv.slice(2)
+const flag = flags.includes('--write') ? '--write' : undefined
+const patches = flags.filter((f, i) => flags[i - 1] === '--patch')
 const { HTTPWalletJSON } = await import(pathToFileURL(sdkPath).href)
+
+function applyPatch (vector, [name, pointer, value]) {
+  const c = vector.cases.find(c => c.name === name)
+  if (c === undefined) throw new Error(`patch: no case ${name}`)
+  const keys = pointer.split('/').slice(1)
+  const last = keys.pop()
+  let target = c
+  for (const key of keys) target = target[key]
+  target[last] = value
+}
 
 async function run (call, args, responseBody) {
   let sent
@@ -46,6 +65,9 @@ async function run (call, args, responseBody) {
 }
 
 const vector = JSON.parse(fs.readFileSync(vectorPath, 'utf8'))
+for (const file of patches) {
+  for (const patch of JSON.parse(fs.readFileSync(file, 'utf8'))) applyPatch(vector, patch)
+}
 vector.node = process.version
 let differs = false
 for (const c of vector.cases) {
