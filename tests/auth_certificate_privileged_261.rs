@@ -202,7 +202,6 @@ async fn create_keyring_for_verifier_passes_privileged_and_its_reason_to_each_de
     let decrypted = verifiable
         .decrypt_fields(
             &ProtoWallet::new(Some(p.verifier.clone())),
-            &p.subject.public_key(),
             None,
             None,
             "test",
@@ -262,24 +261,16 @@ async fn verifiable_decrypt_field_and_decrypt_fields_pass_privileged_and_its_rea
     .unwrap();
     let mut verifiable = VerifiableCertificate::new(master.certificate.clone(), keyring);
     let verifier = Recording::new(&p.verifier);
-    let subject = p.subject.public_key();
 
     let email = verifiable
-        .decrypt_field(
-            &verifier,
-            &subject,
-            "email",
-            Some(true),
-            Some(REASON),
-            "test",
-        )
+        .decrypt_field(&verifier, "email", Some(true), Some(REASON), "test")
         .await
         .unwrap();
     assert_eq!(email, "alice@example.com");
     assert_privileged(&verifier.take(), 0, 1);
 
     let all = verifiable
-        .decrypt_fields(&verifier, &subject, Some(true), Some(REASON), "test")
+        .decrypt_fields(&verifier, Some(true), Some(REASON), "test")
         .await
         .unwrap();
     assert_eq!(all, plaintexts());

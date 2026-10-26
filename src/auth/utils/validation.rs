@@ -124,9 +124,8 @@ pub async fn validate_certificate<W: WalletInterface>(
                 }
 
                 // Attempt to decrypt fields to verify keyring is valid
-                let subject = &cert.certificate.subject;
                 cert.clone()
-                    .decrypt_fields(verifier_wallet, subject, None, None, originator)
+                    .decrypt_fields(verifier_wallet, None, None, originator)
                     .await?;
             }
         }

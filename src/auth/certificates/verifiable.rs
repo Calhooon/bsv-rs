@@ -66,11 +66,13 @@ impl VerifiableCertificate {
     /// (`ts-stack@edf6e03` `VerifiableCertificate.ts:152-219`): the keyring
     /// entry is the field's revelation key encrypted to the verifier under
     /// key ID `"<serial base64> <field>"`; the field's base64 text is decoded
-    /// and decrypted with that key here, and nowhere earlier (#261).
+    /// and decrypted with that key here, and nowhere earlier (#261). The
+    /// counterparty is the certificate's subject, read from the certificate
+    /// as the reference reads `this.subject` (`:196`) and Go `vc.Subject`
+    /// (`go-sdk@2ca481c` `auth/certificates/verifiable.go:76-99`).
     ///
     /// # Arguments
     /// * `verifier_wallet` - Verifier's wallet for decryption
-    /// * `subject` - Subject's public key (the counterparty)
     /// * `field_name` - Name of the field to decrypt
     /// * `privileged` - The reference's `privileged`, passed to the `decrypt`
     ///   (`:154`, `:197`)
@@ -79,7 +81,6 @@ impl VerifiableCertificate {
     pub async fn decrypt_field<W: WalletInterface>(
         &self,
         verifier_wallet: &W,
-        subject: &PublicKey,
         field_name: &str,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
@@ -106,7 +107,7 @@ impl VerifiableCertificate {
                     ciphertext: encrypted_key.clone(),
                     protocol_id: field_protocol(),
                     key_id,
-                    counterparty: Some(Counterparty::Other(subject.clone())),
+                    counterparty: Some(Counterparty::Other(self.certificate.subject.clone())),
                     privileged,
                     privileged_reason: privileged_reason.map(str::to_owned),
                     ..Default::default()
@@ -127,7 +128,6 @@ impl VerifiableCertificate {
     pub async fn decrypt_fields<W: WalletInterface>(
         &mut self,
         verifier_wallet: &W,
-        subject: &PublicKey,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: &str,
@@ -143,7 +143,6 @@ impl VerifiableCertificate {
             let value = self
                 .decrypt_field(
                     verifier_wallet,
-                    subject,
                     field_name,
                     privileged,
                     privileged_reason,

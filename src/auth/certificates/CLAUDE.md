@@ -141,8 +141,8 @@ time and nowhere earlier (#261):
 | `from_certificate()` | Create with empty keyring |
 | `has_keyring()` | Check if keyring has any keys |
 | `revealable_fields()` | List fields that can be decrypted |
-| `decrypt_field()` | Decrypt single field (async) |
-| `decrypt_fields()` | Decrypt all fields in keyring (async, cached) |
+| `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt`; the counterparty the certificate's subject, no parameter (`VerifiableCertificate.ts:152-198`) |
+| `decrypt_fields()` | Decrypt all fields in keyring (async, cached); the same pair |
 | `get_decrypted_fields()` | Get cached decrypted fields if available |
 | `clear_decrypted_cache()` | Clear the cached decrypted fields |
 | `verify()` | Verify underlying certificate signature |
@@ -232,7 +232,8 @@ assert!(verifiable_cert.verify()?);
 
 let decrypted = verifiable_cert.decrypt_fields(
     &verifier_wallet,
-    &subject_public_key,
+    None,  // privileged
+    None,  // privileged reason
     "app_originator",
 ).await?;
 

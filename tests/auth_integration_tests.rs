@@ -1311,13 +1311,7 @@ async fn test_verifiable_certificate_full_chain() {
 
     // Step 4: Verifier decrypts fields
     let decrypted = verifiable
-        .decrypt_fields(
-            &verifier_wallet,
-            &subject_key.public_key(),
-            None,
-            None,
-            "test-app",
-        )
+        .decrypt_fields(&verifier_wallet, None, None, "test-app")
         .await
         .unwrap();
 
@@ -1390,13 +1384,7 @@ async fn test_verifiable_certificate_selective_disclosure() {
 
     // Verifier can only decrypt revealed fields
     let decrypted = verifiable
-        .decrypt_fields(
-            &verifier_wallet,
-            &subject_key.public_key(),
-            None,
-            None,
-            "test-app",
-        )
+        .decrypt_fields(&verifier_wallet, None, None, "test-app")
         .await
         .unwrap();
 
@@ -1471,13 +1459,7 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
 
     // Try to decrypt with verifier B's wallet (wrong key) -- should fail
     let result = verifiable
-        .decrypt_fields(
-            &wrong_wallet,
-            &subject_key.public_key(),
-            None,
-            None,
-            "test-app",
-        )
+        .decrypt_fields(&wrong_wallet, None, None, "test-app")
         .await;
 
     assert!(
@@ -1593,13 +1575,7 @@ async fn test_full_issuance_to_verification_chain() {
 
     // === Phase 5: Verifier decrypts only revealed fields ===
     let verifier_decrypted = verifiable
-        .decrypt_fields(
-            &verifier_wallet,
-            &subject_key.public_key(),
-            None,
-            None,
-            "test-app",
-        )
+        .decrypt_fields(&verifier_wallet, None, None, "test-app")
         .await
         .unwrap();
 
@@ -2090,13 +2066,7 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
 
     // Attempting to decrypt with garbage keyring should fail
     let result = verifiable
-        .decrypt_fields(
-            &verifier_wallet,
-            &subject_key.public_key(),
-            None,
-            None,
-            "test-app",
-        )
+        .decrypt_fields(&verifier_wallet, None, None, "test-app")
         .await;
 
     assert!(
