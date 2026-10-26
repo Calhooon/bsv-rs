@@ -128,6 +128,14 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     }
 
     /// Creates a new processor with custom network and version.
+    ///
+    /// Since bsv-rs#222 the two values reach no frame: getNetwork and
+    /// getVersion answer the wallet's `get_network` and `get_version`, as the
+    /// reference's processor does. [`network`](Self::network) and
+    /// [`version`](Self::version) return what was given here.
+    #[deprecated(
+        note = "getNetwork and getVersion answer the wallet's get_network and get_version (bsv-rs#222); use WalletWireProcessor::new"
+    )]
     pub fn with_config(wallet: W, network: Network, version: impl Into<String>) -> Self {
         Self {
             wallet,
@@ -142,12 +150,20 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         &self.wallet
     }
 
-    /// Returns the configured network.
+    /// Returns the configured network, which no frame carries since
+    /// bsv-rs#222: getNetwork and getVersion answer the wallet's.
+    #[deprecated(
+        note = "getNetwork and getVersion answer the wallet's get_network and get_version (bsv-rs#222)"
+    )]
     pub fn network(&self) -> Network {
         self.network
     }
 
-    /// Returns the configured version string.
+    /// Returns the configured version string, which no frame carries since
+    /// bsv-rs#222: getNetwork and getVersion answer the wallet's.
+    #[deprecated(
+        note = "getNetwork and getVersion answer the wallet's get_network and get_version (bsv-rs#222)"
+    )]
     pub fn version(&self) -> &str {
         &self.version
     }
@@ -545,22 +561,29 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(super::header_result(&result.header)?)
     }
 
-    async fn handle_get_network(&self, _originator: &str) -> Answer {
-        // Go uses single byte: 0x00=mainnet, 0x01=testnet (not length-prefixed string)
-        let mut writer = WireWriter::new();
-        let code = match self.network {
+    async fn handle_get_network(&self, originator: &str) -> Answer {
+        // The wallet's answer forwarded (`WalletWireProcessor.ts:1701-1705` at
+        // `ts-stack@edf6e03`, bsv-rs#222), one byte: 0 mainnet, 1 testnet
+        // (`:1710`); the result's rule is the `Network` type's
+        let result = self
+            .invoke_wallet(WalletCall::GetNetwork, self.wallet.get_network(originator))
+            .await?;
+        let code = match result.network {
             Network::Mainnet => 0u8,
             Network::Testnet => 1u8,
         };
-        writer.write_u8(code);
-        Ok(writer.into_bytes())
+        Ok(vec![code])
     }
 
-    async fn handle_get_version(&self, _originator: &str) -> Answer {
-        // Go writes raw UTF-8 bytes with NO length prefix
-        let mut writer = WireWriter::new();
-        writer.write_bytes(self.version.as_bytes());
-        Ok(writer.into_bytes())
+    async fn handle_get_version(&self, originator: &str) -> Answer {
+        // The wallet's answer forwarded (`:1721-1725`), 7 to 30 UTF-8 bytes
+        // (`WalletResultValidation.ts:2302-2304`), written with no length
+        // prefix (`:1730`)
+        let result = self
+            .invoke_wallet(WalletCall::GetVersion, self.wallet.get_version(originator))
+            .await?;
+        validation::version_result(&result.version)?;
+        Ok(result.version.into_bytes())
     }
 
     // =========================================================================
@@ -828,8 +851,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_process_get_network() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let processor = WalletWireProcessor::with_config(wallet, Network::Testnet, "1.0.0");
+        // The wallet's answer, ProtoWallet's mainnet (#222)
+        let processor = create_test_processor();
 
         let mut writer = WireWriter::new();
         writer.write_u8(WalletCall::GetNetwork.as_u8());
@@ -844,13 +867,13 @@ mod tests {
 
         // Go wire format: single byte (0x00=mainnet, 0x01=testnet)
         let network_byte = reader.read_u8().unwrap();
-        assert_eq!(network_byte, 0x01); // testnet
+        assert_eq!(network_byte, 0x00); // mainnet
     }
 
     #[tokio::test]
     async fn test_process_get_version() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let processor = WalletWireProcessor::with_config(wallet, Network::Mainnet, "2.0.0-beta");
+        // The wallet's answer, ProtoWallet's bsv-rs-<version> (#222)
+        let processor = create_test_processor();
 
         let mut writer = WireWriter::new();
         writer.write_u8(WalletCall::GetVersion.as_u8());
@@ -865,7 +888,7 @@ mod tests {
 
         // Go wire format: raw UTF-8 bytes (no length prefix)
         let version = std::str::from_utf8(reader.read_remaining()).unwrap();
-        assert_eq!(version, "2.0.0-beta");
+        assert_eq!(version, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
     }
 
     #[tokio::test]

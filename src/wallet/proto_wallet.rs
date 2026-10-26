@@ -927,8 +927,11 @@ impl WalletInterface for ProtoWallet {
     }
 
     async fn get_version(&self, _originator: &str) -> Result<GetVersionResult> {
+        // BRC-100's vendor-1.0.0 shape (`wallet/0100.md:2517` at `5119a9b`),
+        // 7 to 30 bytes as the reference's result check asks
+        // (`WalletResultValidation.ts:2302-2304`, bsv-rs#222)
         Ok(GetVersionResult {
-            version: "bsv-rs-0.3.0".to_string(),
+            version: concat!("bsv-rs-", env!("CARGO_PKG_VERSION")).to_string(),
         })
     }
 }
