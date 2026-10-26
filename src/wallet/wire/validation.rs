@@ -27,6 +27,7 @@ use crate::wallet::{
     RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult, VerifyHmacArgs,
     VerifySignatureArgs,
 };
+use crate::Error;
 use std::fmt::Display;
 
 /// `walletErrors.invalidParameter` (`WalletError.ts:78`), the code
@@ -62,6 +63,41 @@ impl Refusal {
             code: UNKNOWN_ERROR,
             words: words.into(),
         }
+    }
+}
+
+impl From<Error> for Refusal {
+    /// The reference's outer catch (`WalletWireProcessor.ts:2379-2387`): an
+    /// explicit wallet code or unknownError, and the error's own words.
+    fn from(error: Error) -> Self {
+        Self {
+            code: explicit_wallet_code(&error).unwrap_or(UNKNOWN_ERROR),
+            words: wire_message(&error),
+        }
+    }
+}
+
+/// The code of an explicit wallet error, 2 to 8 (`WalletWireProcessor.ts:2405-2416`:
+/// a `WalletError`, or a `WERR_` error, whose `code` lies in unsupportedAction
+/// to abortRefused): a [`Error::WalletRefusal`]'s class (#137), which keeps
+/// its words and its code on the wire. Every other error has none.
+pub(super) fn explicit_wallet_code(error: &Error) -> Option<u8> {
+    match error {
+        Error::WalletRefusal { class, .. } => Some(class.code()),
+        _ => None,
+    }
+}
+
+/// The words an error frame carries: the reference writes `error.message`
+/// (`WalletWireProcessor.ts:2387`), never this crate's `Display` prefix. A
+/// `WalletError` is its own words (the replacement's constant, a stub's
+/// refusal), a `WalletRefusal` its message (#137); every other variant, the
+/// processor's own reading of the request, is this crate's own sentence,
+/// written as its `Display` reads.
+fn wire_message(error: &Error) -> String {
+    match error {
+        Error::WalletError(words) | Error::WalletRefusal { message: words, .. } => words.clone(),
+        other => other.to_string(),
     }
 }
 
