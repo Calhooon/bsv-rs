@@ -57,6 +57,8 @@ subtle = "2.5"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
+# `float_roundtrip`: a JSON number reads to the correctly rounded double, as
+# `JSON.parse` does; the default reader can land a bit off (bsv-rs#285).
 serde_json = { version = "1.0", features = ["float_roundtrip", "raw_value"] }
 hex = "0.4"
 bs58 = "0.5"
