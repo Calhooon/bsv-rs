@@ -216,10 +216,7 @@ impl WireReader<'_> {
                 return Err(refused(format!("Unsafe {name} key: {key}")));
             }
             let entry = value(self)?;
-            if record.contains_key(&key) {
-                return Err(refused(format!("Duplicate {name} key: {key}")));
-            }
-            record.insert(key, entry);
+            set_unique_record_entry(&mut record, name, key, entry)?;
         }
         Ok(record)
     }
@@ -293,6 +290,21 @@ impl WireReader<'_> {
         }
         reference_der(bytes).map(|der| crate::primitives::to_hex(&der))
     }
+}
+
+/// `#setUniqueWireRecordEntry` (`:1992-2002`): a repeated key refused, never
+/// kept over the earlier one.
+pub(crate) fn set_unique_record_entry(
+    record: &mut HashMap<String, String>,
+    name: &str,
+    key: String,
+    value: String,
+) -> Result<(), Error> {
+    if record.contains_key(&key) {
+        return Err(refused(format!("Duplicate {name} key: {key}")));
+    }
+    record.insert(key, value);
+    Ok(())
 }
 
 /// `isUnsafeRecordKey` (`SafeRecord.ts`).

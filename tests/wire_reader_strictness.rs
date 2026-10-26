@@ -757,6 +757,36 @@ async fn a_discovery_record_key_out_of_bounds_or_repeated_is_refused() {
     assert_eq!(entry.decrypted_fields.as_ref(), Some(&decrypted));
 }
 
+/// `WireReader::read_identity_certificate` reads one discovery entry, the
+/// writer's layout, and refuses a repeated key in either map as the
+/// transceiver does, in its words (`#setUniqueWireRecordEntry`, `:1992-2002`);
+/// it kept the later value until #192.
+#[tokio::test]
+async fn an_identity_certificate_with_a_repeated_record_key_is_refused_as_discovery_refuses_it() {
+    let cert = Parts::valid().bytes();
+    let repeated = record(&[(b"name", b"1"), (b"name", b"2")]);
+    for (keyring, decrypted, words) in [
+        (
+            &repeated[..],
+            &[0u8][..],
+            "Duplicate discovery public keyring key: name",
+        ),
+        (
+            &[0u8][..],
+            &repeated[..],
+            "Duplicate discovery decrypted fields key: name",
+        ),
+    ] {
+        let frame = discovery_frame(&cert, 5, keyring, decrypted);
+        let read = WireReader::new(&frame[1..]).read_identity_certificate();
+        assert_eq!(read.map(drop), Err(Error::WalletError(words.into())));
+        assert_eq!(
+            discover(frame).await.map(drop),
+            Err(Error::WalletError(words.into()))
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 5. The writer: no frame the reference's reader refuses
 // ---------------------------------------------------------------------------
