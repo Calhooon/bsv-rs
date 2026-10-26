@@ -697,8 +697,8 @@ jobs:
             echo '::error::the wasm32 build with http succeeded; build.rs no longer refuses it (#152)'
             exit 1
           fi
-          grep -F 'bsv-rs: the `http` feature is native-only and does not build for wasm32' "$RUNNER_TEMP/http.log"
-          ! grep -E '^error\[E[0-9]+\]|could not compile `bsv-rs` \(lib\)' "$RUNNER_TEMP/http.log"
+          grep -F 'feature is native-only and does not build for wasm32' "$RUNNER_TEMP/http.log"
+          ! grep -E '^error\[E[0-9]+\]|could not compile .bsv-rs. \(lib\)' "$RUNNER_TEMP/http.log"
 
       - name: Measure the diagnostic wasm artifact
         run: |
