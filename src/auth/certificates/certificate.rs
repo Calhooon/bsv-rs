@@ -15,8 +15,46 @@ use std::collections::HashMap;
 /// A certificate binds identity attributes to a public key,
 /// signed by a trusted certifier. Fields are encrypted for
 /// selective disclosure.
+///
+/// The struct is `#[non_exhaustive]` (#249): build one with
+/// [`new`](Self::new) and the `with_*` methods, change one with the `set_*`
+/// methods; a struct literal does not compile outside this crate.
+///
+/// ```
+/// use bsv_rs::auth::Certificate;
+/// use bsv_rs::primitives::PrivateKey;
+/// use bsv_rs::wallet::types::Outpoint;
+/// use std::collections::HashMap;
+///
+/// let certifier = PrivateKey::random();
+/// let subject = PrivateKey::random().public_key();
+/// let fields = HashMap::from([("email".to_string(), b"ZW1haWw=".to_vec())]);
+/// let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key())
+///     .with_revocation_outpoint(Some(Outpoint::new([3u8; 32], 0)))
+///     .with_fields(fields);
+/// cert.sign(&certifier).unwrap();
+/// assert_eq!(cert.verify(), Ok(true));
+/// ```
+///
+/// ```compile_fail,E0639
+/// use bsv_rs::auth::Certificate;
+/// use bsv_rs::primitives::PrivateKey;
+///
+/// let key = PrivateKey::random().public_key();
+/// let cert = Certificate {
+///     cert_type: [1u8; 32],
+///     serial_number: [2u8; 32],
+///     subject: key.clone(),
+///     certifier: key,
+///     revocation_outpoint: None,
+///     fields: Default::default(),
+///     signature: None,
+///     received_unsigned: None,
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[non_exhaustive]
 pub struct Certificate {
     /// Certificate type (32 bytes, identifies the certificate schema).
     /// Base64 encoded in JSON.
@@ -46,6 +84,12 @@ pub struct Certificate {
     /// Certificate signature (DER-encoded).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<Vec<u8>>,
+
+    /// The unsigned prefix as the issuer wrote it: set by
+    /// [`from_binary`](Self::from_binary) and by [`sign`](Self::sign), never
+    /// carried in JSON.
+    #[serde(skip)]
+    pub received_unsigned: Option<Vec<u8>>,
 }
 
 impl Certificate {
@@ -64,7 +108,41 @@ impl Certificate {
             revocation_outpoint: None,
             fields: HashMap::new(),
             signature: None,
+            received_unsigned: None,
         }
+    }
+
+    /// Returns the certificate with its revocation outpoint set.
+    pub fn with_revocation_outpoint(mut self, revocation_outpoint: Option<Outpoint>) -> Self {
+        self.set_revocation_outpoint(revocation_outpoint);
+        self
+    }
+
+    /// Returns the certificate with its fields replaced.
+    pub fn with_fields(mut self, fields: HashMap<String, Vec<u8>>) -> Self {
+        self.set_fields(fields);
+        self
+    }
+
+    /// Returns the certificate with its signature set.
+    pub fn with_signature(mut self, signature: Option<Vec<u8>>) -> Self {
+        self.set_signature(signature);
+        self
+    }
+
+    /// Sets the revocation outpoint.
+    pub fn set_revocation_outpoint(&mut self, revocation_outpoint: Option<Outpoint>) {
+        self.revocation_outpoint = revocation_outpoint;
+    }
+
+    /// Replaces every field (already encrypted).
+    pub fn set_fields(&mut self, fields: HashMap<String, Vec<u8>>) {
+        self.fields = fields;
+    }
+
+    /// Sets the signature (DER-encoded).
+    pub fn set_signature(&mut self, signature: Option<Vec<u8>>) {
+        self.signature = signature;
     }
 
     /// Returns the certificate type as a base64 string.
@@ -224,6 +302,7 @@ impl Certificate {
             revocation_outpoint,
             fields,
             signature,
+            received_unsigned: None,
         })
     }
 
