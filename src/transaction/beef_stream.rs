@@ -82,7 +82,7 @@ use sha2::{Digest, Sha256};
 
 use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
 use crate::primitives::{to_hex, Reader, Writer};
-use crate::script::{LockingScript, Spend, TxSpendParams, UnlockingScript};
+use crate::script::{LockingScript, ScriptResource, Spend, TxSpendParams, UnlockingScript};
 
 use super::beef_tx::{ATOMIC_BEEF, BEEF_V1, BEEF_V2};
 use super::chain_tracker::{ChainTracker, ChainTrackerError};
@@ -1547,6 +1547,66 @@ pub enum SpendRefusal {
         /// The coinbase's verified block height; named at the spending input.
         height: u64,
     },
+}
+
+/// The refusal as one sentence (#213): the interpreter's words for a script,
+/// the interpreter's resource sentence for a decline, each other arm its
+/// rule. The texts are pinned (`tests/beef_stream.rs`,
+/// `a_spend_refusal_prints_*`): a host matches on them.
+impl fmt::Display for SpendRefusal {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SpendRefusal::ParentIsTxidOnly => write!(
+                f,
+                "the parent is a txid-only entry: its output is not in the BEEF"
+            ),
+            SpendRefusal::OutputNotAvailable { vout } => {
+                write!(f, "the parent has no unspent output at vout {vout}")
+            }
+            SpendRefusal::Script(reason) => f.write_str(reason),
+            // `ScriptResourceLimit` has no `Display`: the sentence is the
+            // interpreter's own (`src/script/spend/limits.rs`,
+            // `resource_error` and `work_error`), from the fields it carries.
+            SpendRefusal::Resource(limit) => {
+                let budget = limit.limit;
+                match limit.resource {
+                    ScriptResource::Stack => {
+                        write!(f, "Stack memory usage has exceeded {budget} bytes")
+                    }
+                    ScriptResource::AltStack => {
+                        write!(f, "Alt stack memory usage has exceeded {budget} bytes")
+                    }
+                    ScriptResource::ElementSize => {
+                        write!(f, "Script element allocation has exceeded {budget} bytes")
+                    }
+                    ScriptResource::Work => write!(
+                        f,
+                        "Work budget exhausted: spent {} units, budget {budget}",
+                        limit.work_spent.unwrap_or(0)
+                    ),
+                }
+            }
+            SpendRefusal::CreatesValue => {
+                write!(f, "the transaction's outputs are worth more than its inputs")
+            }
+            SpendRefusal::InputValueOutOfRange => write!(
+                f,
+                "an input value or running input total is outside MoneyRange"
+            ),
+            SpendRefusal::P2shOutput { vout } => write!(
+                f,
+                "an exact P2SH output template at vout {vout} in a regular transaction mined after Genesis"
+            ),
+            SpendRefusal::NonFinal { lock_time } => write!(
+                f,
+                "the transaction is not final for mining in the next block under the supplied headers: lock_time {lock_time}"
+            ),
+            SpendRefusal::PrematureCoinbase { height } => write!(
+                f,
+                "a proven coinbase output at height {height} has not matured for the next block"
+            ),
+        }
+    }
 }
 
 /// A mining check that cannot be judged without header context.
