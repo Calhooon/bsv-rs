@@ -1920,10 +1920,13 @@ impl BeefIndex {
         Ok(())
     }
 
-    /// A transaction or a txid-only entry.
+    /// A transaction or a txid-only entry, and every held transaction it
+    /// releases (bsv-rs#240), in wire order.
     fn fold_checked(&mut self, element: &Element, tip: Option<ChainTip>) -> Result<(), Stop> {
         self.fold_checked_from(element, 0, &mut || false, None, tip)
-            .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))
+            .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))?;
+        while self.release_one(0, &mut || false, None, tip)?.is_some() {}
+        Ok(())
     }
 
     /// [`fold_checked`](Self::fold_checked) with the scripts run from input
@@ -1932,10 +1935,10 @@ impl BeefIndex {
     ///
     /// An unproven transaction an input of which names a txid the index does
     /// not hold yet is held ([`Deferred`], bsv-rs#240) and folded in when the
-    /// last such txid is: a BEEF is valid whatever its order on the wire. The
-    /// transactions an element releases are folded in this step, in wire
-    /// order, their scripts run with `spent` not asked; a refusal of one is
-    /// the step's, and the index then holds what was folded ahead of it.
+    /// last such txid is: a BEEF is valid whatever its order on the wire.
+    /// The transactions an element releases are left ready, and the readers
+    /// fold them in one per step ([`release_one`](Self::release_one)), in
+    /// wire order, under the caller's budget, before the next element.
     fn fold_checked_from(
         &mut self,
         element: &Element,
@@ -1949,11 +1952,6 @@ impl BeefIndex {
             Folded::In { txid, new: true } => self.deferred.wake(&txid),
             Folded::Held | Folded::In { new: false, .. } => {}
         }
-        // The transactions released, in wire order.
-        while self
-            .release_one(0, &mut || false, work_limit, tip)?
-            .is_some()
-        {}
         Ok(None)
     }
 
@@ -2679,7 +2677,9 @@ pub struct Cursor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Pending {
     /// The transaction's stream offset (its raw bytes' leading byte; the
-    /// frame stands at the element's first byte, at or before it).
+    /// frame stands at the element's first byte, at or before it, or, for a
+    /// transaction held for a parent and released, after the last element
+    /// read, bsv-rs#240).
     offset: u64,
     txid: Hash32,
     /// The first input whose script has not run.
@@ -3056,7 +3056,9 @@ impl Cursor {
             let offset = r.read_u64_le()?;
             let txid = hash(&mut r)?;
             let input = r.read_u32_le()?;
-            if offset < frame.pos {
+            // A pause inside a held transaction a step released names it
+            // where the stream read it, before the frame (bsv-rs#240).
+            if offset < frame.pos && !index.deferred.is_ready(offset, &txid) {
                 return Err(bad("a pause before its frame"));
             }
             Some(Pending {
@@ -3138,6 +3140,38 @@ impl Judge {
         }
     }
 
+    /// Folds in the earliest held transaction that waits on nothing
+    /// (bsv-rs#240), its scripts run under `spent` from the input a paused
+    /// reading reached in it, else the first: `None` when none waits on
+    /// nothing, `Some(Ok(true))` a pause, which `resume_at` then names.
+    fn release_next(
+        &mut self,
+        spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
+        tip: Option<ChainTip>,
+    ) -> Option<Result<bool, Stop>> {
+        let (at, txid) = self.index.deferred.next_ready()?;
+        let from = match self.resume_at {
+            Some(p) if p.offset == at && p.txid == txid => {
+                self.resume_at = None;
+                p.input
+            }
+            _ => 0,
+        };
+        Some(match self.index.release_one(from, spent, work_limit, tip) {
+            Ok(Some(Folded::Paused(input))) => {
+                self.resume_at = Some(Pending {
+                    offset: at,
+                    txid,
+                    input,
+                });
+                Ok(true)
+            }
+            Ok(_) => Ok(false),
+            Err(stop) => Err(stop),
+        })
+    }
+
     /// A subject the caller named and a prefix that names another: the 32
     /// bytes at offset 4 are not the subject asked for.
     fn check_named_subject(&mut self, decoder: &BeefDecoder) -> Result<(), Refusal> {
@@ -3185,7 +3219,8 @@ impl Judge {
 /// What one call to [`StreamVerifier::step`] came to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Progress {
-    /// One element was read and folded in.
+    /// One element was read and folded in, or one transaction held for a
+    /// parent and released by an earlier step was (bsv-rs#240).
     Stepped,
     /// The reading is over.
     Verdict(Verdict),
@@ -3197,8 +3232,9 @@ pub enum Timed {
     /// As [`StreamVerifier::step`].
     Progress(Progress),
     /// The budget was spent between two inputs of an unproven transaction:
-    /// [`StreamVerifier::cursor`] stands before the transaction and names
-    /// the input reached ([`Cursor::input_reached`]).
+    /// [`StreamVerifier::cursor`] stands before the transaction (after the
+    /// last element read, for one held for a parent and released, bsv-rs#240)
+    /// and names the input reached ([`Cursor::input_reached`]).
     Paused,
 }
 
@@ -3271,7 +3307,9 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     ///
     /// A cursor paused inside a transaction is positioned at that
     /// transaction: it is read again and its scripts run from the input
-    /// reached, the inputs before it never again.
+    /// reached, the inputs before it never again. One paused inside a
+    /// transaction held for a parent (bsv-rs#240) carries it: the source
+    /// continues after the last element read.
     pub fn resume(cursor: Cursor, source: R, headers: H) -> Self {
         let (frame, judge) = Judge::resumed(cursor);
         Self::from_parts(BeefDecoder::at(frame), judge, source, headers)
@@ -3329,6 +3367,16 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     pub fn step_until(&mut self, spent: &mut dyn FnMut() -> bool) -> std::io::Result<Timed> {
         if let Some(verdict) = &self.verdict {
             return Ok(Timed::Progress(Progress::Verdict(verdict.clone())));
+        }
+        // A held transaction an earlier step released (bsv-rs#240): one per
+        // step, under the caller's budget, ahead of the next element.
+        if self.held.is_none() && self.judge.index.deferred.has_ready() {
+            let tip = self.headers.mining_tip();
+            return Ok(match self.judge.release_next(spent, self.work_limit, tip) {
+                Some(Ok(true)) => Timed::Paused,
+                Some(Err(stop)) => self.latch(stop.into()),
+                Some(Ok(false)) | None => Timed::Progress(Progress::Stepped),
+            });
         }
         let (element, from) = match self.held.take() {
             Some(held) => held,
@@ -3552,6 +3600,32 @@ impl AsyncStreamVerifier {
         self.judge.cursor(&self.decoder)
     }
 
+    /// Folds in every held transaction that waits on nothing (bsv-rs#240),
+    /// in wire order, with the mining tip asked once: this reader has no
+    /// step budget.
+    async fn release_all(
+        &mut self,
+        tracker: &dyn ChainTracker,
+    ) -> Result<Option<Verdict>, AsyncVerifyError> {
+        if !self.judge.index.deferred.has_ready() {
+            return Ok(None);
+        }
+        let tip = if self.judge.index.check_spends {
+            tracker
+                .mining_tip()
+                .await
+                .map_err(AsyncVerifyError::Headers)?
+        } else {
+            None
+        };
+        while let Some(released) = self.judge.release_next(&mut || false, self.work_limit, tip) {
+            if let Err(stop) = released {
+                return Ok(Some(stop.into()));
+            }
+        }
+        Ok(None)
+    }
+
     /// Reads the source to its end, asking `tracker` for each BUMP's root as
     /// it streams.
     pub async fn run<S: AsyncByteSource>(
@@ -3559,6 +3633,10 @@ impl AsyncStreamVerifier {
         source: &mut S,
         tracker: &dyn ChainTracker,
     ) -> Result<Verdict, AsyncVerifyError> {
+        // A cursor taken between a release and its fold.
+        if let Some(verdict) = self.release_all(tracker).await? {
+            return Ok(verdict);
+        }
         loop {
             let chunk = source
                 .next_chunk()
@@ -3593,18 +3671,16 @@ impl AsyncStreamVerifier {
                     }
                     Step::Element(other) => {
                         let from = self.judge.start_of(&other);
-                        // An unproven transaction's spends, or those of the
-                        // transactions held for a parent this element may
-                        // release (bsv-rs#240), read the mining tip.
+                        // An unproven transaction's spends read the mining
+                        // tip.
                         let tip = if self.judge.index.check_spends
-                            && (matches!(
+                            && matches!(
                                 &other,
                                 Element::Tx {
                                     bump_index: None,
                                     ..
                                 }
-                            ) || self.judge.index.deferred().0 > 0)
-                        {
+                            ) {
                             tracker
                                 .mining_tip()
                                 .await
@@ -3620,6 +3696,10 @@ impl AsyncStreamVerifier {
                 };
                 if let Err(stop) = folded {
                     return Ok(stop.into());
+                }
+                // The held transactions this element released.
+                if let Some(verdict) = self.release_all(tracker).await? {
+                    return Ok(verdict);
                 }
             }
         }

@@ -266,6 +266,16 @@ impl Deferred {
         }
     }
 
+    /// A held transaction waits on nothing.
+    pub(super) fn has_ready(&self) -> bool {
+        !self.ready.is_empty()
+    }
+
+    /// The transaction at `at` is held, waits on nothing, and is `txid`.
+    pub(super) fn is_ready(&self, at: u64, txid: &Hash32) -> bool {
+        self.ready.contains(&at) && self.held.get(&at).is_some_and(|tx| tx.txid == *txid)
+    }
+
     /// The earliest ready transaction on the wire: its offset and txid.
     pub(super) fn next_ready(&self) -> Option<(u64, Hash32)> {
         let at = *self.ready.first()?;
@@ -430,9 +440,8 @@ pub(super) fn read_held(
             .map(|input| input.prev)
             .filter(|prev| !known(prev))
             .collect();
-        if missing.is_empty() {
-            return Err("a held transaction that waits on nothing");
-        }
+        // One that waits on nothing was released by the step that took the
+        // cursor and is folded in, one per step, before the next element.
         deferred.hold(
             HeldTx {
                 offset,
