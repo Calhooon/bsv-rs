@@ -10,7 +10,9 @@
 //! other is replaced by `Wallet operation failed`, code 1 (`:2417`). This
 //! crate's `Error` carries no wallet code (#137), so every frame is 1 and
 //! every wallet error the constant; the processor's own errors (its reading,
-//! the three false verdicts, raised outside the wrapper) keep their words.
+//! the three false verdicts, raised outside the wrapper) keep their words. A
+//! wallet's `aborted: false` is the reference's refusal, code 8 (`:797-804`),
+//! read back as `aborted: false` (`WalletWireTransceiver.ts:337`; #206).
 //! Every frame below is hand-assembled to those lines.
 #![cfg(all(feature = "wallet", feature = "http"))]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -298,4 +300,98 @@ async fn the_three_false_verdicts_are_framed_in_the_references_words() {
             "{words}"
         );
     }
+}
+
+/// An abortAction request from the fixtures' originator: the reference's
+/// bytes, the rest of the frame (`WalletWireProcessor.ts:785-786`).
+fn abort_request(reference: &[u8]) -> Vec<u8> {
+    let originator = fixtures::wallet::ORIGINATOR.as_bytes();
+    let mut request = vec![WalletCall::AbortAction.as_u8(), originator.len() as u8];
+    request.extend(originator);
+    request.extend(reference);
+    request
+}
+
+/// The reference's frame for a refused abort (`WalletWireProcessor.ts:797-804`
+/// at `ts-stack@edf6e03`, framed by `:2379-2396`): `08` (`abortRefused`,
+/// `WalletError.ts:79`), `0x4d`, the 77 bytes of its words, `00`.
+const ABORT_REFUSED_FRAME: &str = "084d5468652077616c6c6574207265667573656420746f2061626f7274207468697320616374696f6e20626563617573652069742068617320616c7265616479206265656e2062726f61646361737400";
+
+/// #206: a wallet answering `aborted: false` is framed as the reference frames
+/// its own (`WalletWireProcessor.ts:797-804`): code 8, `abortRefused`, the
+/// reference's words, thrown after `#invokeValidatedWallet` returns and so
+/// outside the wrapper. The wallet is called with the reference's bytes as
+/// base64 (`:786`).
+#[tokio::test]
+async fn a_wallets_refused_abort_is_framed_code_8_in_the_references_words() {
+    assert_eq!(
+        hex::encode(reference_frame(
+            8,
+            b"The wallet refused to abort this action because it has already been broadcast"
+        )),
+        ABORT_REFUSED_FRAME
+    );
+    let stub = Stub::new(json!({"aborted": false}));
+    let observed = stub.observed.clone();
+    let frame = WalletWireProcessor::new(stub)
+        .process_message(&abort_request(b"fixture"))
+        .await
+        .unwrap();
+    assert_eq!(hex::encode(&frame), ABORT_REFUSED_FRAME);
+    let seen = observed
+        .lock()
+        .unwrap()
+        .take()
+        .expect("the wallet is called");
+    assert_eq!(seen["method"], "abort_action");
+    assert_eq!(seen["args"]["reference"], "Zml4dHVyZQ==");
+}
+
+/// #206: a wallet answering `aborted: true` is the reference's success frame,
+/// the error byte alone (`WalletWireProcessor.ts:806-809`), and the
+/// transceiver reads it as `aborted: true` (`WalletWireTransceiver.ts:334-335`).
+#[tokio::test]
+async fn an_aborted_action_is_the_success_frame_and_reads_aborted_true() {
+    let (client, tape) = taped(json!({"aborted": true}));
+    let result = client
+        .abort_action(
+            bsv_rs::wallet::AbortActionArgs {
+                reference: "Zml4dHVyZQ==".into(),
+            },
+            "test",
+        )
+        .await
+        .map(|r| r.aborted);
+    assert_eq!(hex::encode(tape.lock().unwrap().as_slice()), "00");
+    assert_eq!(result, Ok(true));
+}
+
+/// #206: an empty reference is refused ahead of the wallet as the reference
+/// refuses it (`validateAbortActionArgs`, `validationHelpers.ts:893-899`;
+/// `validateBase64String`, `:488-498`, `invalidBase64`, `:439-441`): code 6,
+/// the wallet not called; a wallet error on abortAction is the constant.
+#[tokio::test]
+async fn an_empty_abort_reference_is_refused_code_6() {
+    let stub = Stub::new(json!({"aborted": true}));
+    let observed = stub.observed.clone();
+    let frame = WalletWireProcessor::new(stub)
+        .process_message(&abort_request(b""))
+        .await
+        .unwrap();
+    assert!(observed.lock().unwrap().is_none());
+    assert_eq!(
+        hex::encode(&frame),
+        hex::encode(reference_frame(
+            6,
+            b"The reference parameter must be valid base64 string"
+        ))
+    );
+
+    let mut stub = Stub::new(json!({}));
+    stub.error = Some(Error::WalletError("no such action".into()));
+    let frame = WalletWireProcessor::new(stub)
+        .process_message(&abort_request(b"fixture"))
+        .await
+        .unwrap();
+    assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
 }
