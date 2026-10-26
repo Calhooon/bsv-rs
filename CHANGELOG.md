@@ -435,6 +435,113 @@ the pre-fix tree. `tests/wallet_http_json_busy_tests.rs`'s
 and 7 as their classes. `tests/fixtures/wire/error_frames.json` re-recorded in
 its own commit: cases `status_2` to `status_8` read back as the class, their
 bytes unchanged.
+### Changed: a certificate verifies over the issuer's bytes and signs in the reference's field order; `Certificate` is `#[non_exhaustive]` (#249)
+
+**The break, once (0.9.0's minor).** `auth::Certificate` is
+`#[non_exhaustive]` and carries a new public field,
+`#[serde(skip)] pub received_unsigned: Option<Vec<u8>>`, so a struct literal
+outside this crate stops compiling, here and never again when a field is
+added. The four-argument `Certificate::new` is the constructor; three `with_*`
+methods chain onto it for the fields a literal set, and `set_revocation_outpoint`,
+`set_fields`, `set_signature` change one afterwards (the fields stay public
+to read and to write). The migration:
+
+```rust
+// before
+let cert = Certificate { cert_type, serial_number, subject, certifier,
+    revocation_outpoint, fields, signature };
+// after
+let cert = Certificate::new(cert_type, serial_number, subject, certifier)
+    .with_revocation_outpoint(revocation_outpoint)
+    .with_fields(fields)
+    .with_signature(signature);
+```
+
+No dependent builds one by literal: `bsv-wallet-toolbox-rs` (`6317222`) calls
+`Certificate::new` and `set_field` and writes `revocation_outpoint` and
+`signature` in place (`src/wallet/certificate_issuance.rs:533-561`), which
+compiles unchanged;
+`bsv-wallet-cli` and the other dependents do not use the type.
+
+**Half (a): the issuer's bytes.** BRC-52 at `5119a9b`
+(`peer-to-peer/0052.md:99-103`): the reference's order is "host-dependent
+collation, not UTF-8 byte ordering"; "an implementation reconstructing the
+preimage MUST reproduce the issuer's field order"; "a binary transport or
+adapter SHOULD retain the original unsigned prefix and signature bytes so
+verification does not depend on local reordering", binding every accepted
+value to the bytes it parsed, a duplicate name never made acceptable by
+retaining bytes. `from_binary` keeps the unsigned prefix in
+`received_unsigned`, `sign` keeps the preimage it signed there, and `verify`,
+`signing_hash` and `to_binary` use those bytes while they parse, whole, to
+the certificate's current values: a received certificate verifies over the
+bytes its issuer signed whatever order the issuer's fields came in, and
+`from_binary` then `to_binary` writes them unchanged. The mutation rule: a
+value changed after the bytes were kept, through a setter or a public field,
+unbinds them (they authenticate nothing and are not written; the serializer
+writes the new values); `set_field`, `set_fields` and
+`set_revocation_outpoint` also clear them, `set_signature` keeps them. The
+binding check is a parse of the kept bytes and an equality on every value,
+so a stale or hand-set `received_unsigned` never stands for values it does
+not carry. `from_binary` refuses a repeated field name in the reference's
+words, `Duplicate certificate field name: <name>` (`ts-stack@edf6e03`
+`Certificate.ts:374`), where the later value won; go-sdk@2ca481c keeps the
+later value (`wallet/serializer/certificate.go:115`).
+
+**Half (b): the reference's order.** The reference sorts the names with
+`a.localeCompare(b)`, no locale or options (`ts-stack@edf6e03`
+`Certificate.ts:282`; `:216-226` says the order is part of the signed
+representation; `verify` and `sign` over `toBinary(false)`, `:427`, `:458`).
+This crate sorted by bytes, so the six names `Name, a_b, age, a0, éa, f`,
+which `localeCompare` orders `a_b, a0, age, éa, f, Name` and bytes order
+`Name, a0, a_b, age, f, éa`, signed here to a certificate the reference
+refused. The serializer, used to sign and for a certificate with no kept
+bytes (built, or rebuilt from JSON), now orders by the Unicode Collation
+Algorithm at tertiary strength, punctuation non-ignorable, over the DUCET
+rows (13.0.0) of U+0000..U+00FF and the two contractions in that range
+(`l` and `L` before U+00B7), with no new dependency
+(`src/auth/certificates/collation.rs`; the table written by
+`tests/support/certificate_collation_table_249.mjs`). Go orders by bytes
+(`go-sdk@2ca481c` `wallet/serializer/certificate.go:48`, `sort.Strings`) and
+re-serializes to verify; a certificate Go signs over names the two orders
+disagree on verifies here (its bytes are kept) and not in the reference.
+
+**The residual.** A name with a character above U+00FF sorts after every
+Latin-1 name, in code point order, which is ICU's order for none of them in
+general (U+0101 sorts before `z` there); a host whose default locale is not
+`en` or root sorts otherwise in the reference itself (`sv-SE` puts `ä` after
+`z`); names that tie at all three levels (they differ in a weightless control
+character only) fall back to their bytes where the reference keeps its key
+list's order. Each reaches a certificate signed here or rebuilt from JSON,
+never a received binary one.
+
+**The verdicts.** A certificate the reference signed over such names now
+verifies here (it was `Ok(false)`); one signed in byte order (by this crate
+before this release, or by Go) still verifies here over its bytes, and is
+false in the reference, whose `fromBinary(...).verify()` re-sorts (BRC-52
+`0052.md:103` says the reference is not the retaining adapter); one this
+crate signs now verifies in the reference. Every field name the dependents
+carry is lowercase ASCII (the toolbox's seven, the CLI's three), where the
+two orders agree. Consumer note: the toolbox verifies through
+`Certificate::verify()` at `src/wallet/certificate_issuance.rs:703` on a
+certificate it builds from the certifier's JSON, so it is the serializer's
+order there, the reference's after this change.
+
+Pinned by `tests/auth_certificate_field_order_249.rs` on
+`tests/vectors/auth_certificate_field_order_249.json`, written by
+`tests/support/certificate_field_order_249.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` under Node v22.18.0 (ICU 77.1): the reference's
+certificate over the six names verifies over the bytes received and
+round-trips through `from_binary` and `to_binary` byte for byte (both red on
+the base); a certificate signed here is the one the reference verifies
+(`rust_signed_mixed_names`, `verify()` true; red on the base); the
+reference's certificate rebuilt from JSON verifies and signs again to the
+reference's bytes (red); a byte-order certificate (reference `false`)
+verifies here; a repeated name is refused in the reference's words (red);
+a field changed after `from_binary` unbinds the bytes (red); and the
+serializer orders a 1,402-name corpus of printable ASCII and Latin-1 names as
+`localeCompare` orders it under Node v22.18.0, v20.19.5 and v24.11.1 (red).
+The table's comparison agreed with `localeCompare` on 1,065,536 pairs before
+it was committed.
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
