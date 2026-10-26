@@ -11,7 +11,7 @@ prereleases. This canary paragraph does not authorize a pin, tag, deployment
 or release; #100 owns the full release policy.
 
 1. Every change reaches `main` through a pull request; `main` is protected, admins included, linear history.
-2. The PR merges (rebase-merge) once its required checks are green: `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`, `deny`.
+2. The PR merges (rebase-merge) once its required checks are green, twelve on `main` since 2026-10-26: `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`, `deny`, `dependents`, `semver`, `beta-born`, `ratchet`, `fixtures`, `secrets`, `wasm32 (combined)` (`beta` requires the same less `dependents` and `beta-born`, plus `main-in-beta`: eleven). A pull request runs exactly its line's required set and nothing else; the full matrix runs on a push to either line and in the nightly.
 
    From north-star wave 1, `deny` is a required check; the captain adds it to branch protection at landing. The job builds cargo-deny from its pinned crates.io version, resolves one audit lockfile, then checks all features, the Cloudflare wasm32 slice and default features with `--locked`. RustSec findings and yanked crates fail the gate, the advisory ignore list stays empty, licenses are allowlisted, and dependency sources are restricted to crates.io.
 

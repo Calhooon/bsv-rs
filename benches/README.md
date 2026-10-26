@@ -165,7 +165,7 @@ dispatches CI on the baseline PR's branch with the record input:
 2026-10-26 a `[bench-baseline-record]` marker in the PR's description did this;
 no pull request runs the job now). That run proposes `linux-baseline.json` as an artifact; it does not commit or
 publish it. Review the machine line and measurements, commit the Linux entry,
-remove the marker, and rerun to exercise the comparison path. Record that
+and dispatch the run again to exercise the comparison path. Record that
 run's URL in the landing report. If three Linux repeats demonstrate noise
 above 5%, report their numbers before proposing a wider threshold. The tool
 has no option to silently widen it.
