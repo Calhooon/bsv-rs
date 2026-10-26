@@ -19,7 +19,7 @@ from 0 to 4294967295, received 4294967296`, still
 is this crate's: the reference has no words for this bound. The bound
 stands under #122 (a refusal, never a cast; BRC-12's outpoint index is four
 bytes on the wire). No behavior beyond the words. Pinned by
-`a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated`
+`a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bound_refusals_form`
 (`src/auth/certificates/certificate.rs`, RED on the pre-fix tree). No vector
 or recording carried these words.
 
@@ -30,7 +30,11 @@ The reference's `Certificate.fromBinary` reads the index with
 `packages/sdk/src/auth/certificates/Certificate.ts:353`), so it accepts an
 index above `0xffffffff` up to `2^53 - 1` (`readVarIntNumStrict.ts`'s
 precision bound) into the outpoint string; its `toBinary` refuses one above
-`0xffffffff` (`Certificate.ts:263-270`). This crate's reader refuses it.
+`0xffffffff` (`Certificate.ts:263-270`). Go's reader casts the varint to
+`uint32` (`go-sdk@2ca481c` `wallet/serializer/serializer.go:82-96`, a
+truncation above the bound) and its writer writes a `uint32` (`:20-25`).
+This crate's reader refuses it: no SDK writer produces the oversized index,
+so the bound meets the north star's "accept what the reference accepts".
 
 ### Changed: the secrets scan covers the commits the event brings (#272)
 
