@@ -16,6 +16,13 @@ use std::collections::HashMap;
 /// signed by a trusted certifier. Fields are encrypted for
 /// selective disclosure.
 ///
+/// Its JSON is the reference's (`ts-stack@edf6e03` `Certificate.ts:150-212`,
+/// go-sdk@2ca481c `auth/certificates/certificate.go:32-52`): `type` and
+/// `serialNumber` base64, `subject` and `certifier` hex, `revocationOutpoint`
+/// `<txid>.<index>`, `fields` the base64 strings, `signature` the DER bytes
+/// in hex (#268). A key the reader does not know is ignored, as the
+/// reference's `fromObject` ignores it.
+///
 /// The struct is `#[non_exhaustive]` (#249): build one with
 /// [`new`](Self::new) and the `with_*` methods, change one with the `set_*`
 /// methods; a struct literal does not compile outside this crate.
@@ -57,8 +64,8 @@ use std::collections::HashMap;
 #[non_exhaustive]
 pub struct Certificate {
     /// Certificate type (32 bytes, identifies the certificate schema).
-    /// Base64 encoded in JSON.
-    #[serde(with = "base64_32_bytes")]
+    /// Base64 encoded in JSON, under the reference's key `type` (#268).
+    #[serde(rename = "type", with = "base64_32_bytes")]
     pub cert_type: [u8; 32],
 
     /// Unique serial number (32 bytes).
@@ -72,8 +79,13 @@ pub struct Certificate {
     /// Certifier's public key.
     pub certifier: PublicKey,
 
-    /// Revocation outpoint (txid.output_index).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Revocation outpoint (txid.output_index). `None` is the binary
+    /// form's sentinel, 32 zero bytes and index 0, and its JSON is that
+    /// sentinel's string, as the reference's `revocationOutpoint` is always a
+    /// string (`Certificate.ts:174`, `:257-258`); the reader takes the
+    /// sentinel, `null` (Go's nil, `certificate.go:46`) or no key as `None`
+    /// (#268).
+    #[serde(default, with = "revocation_outpoint_json")]
     pub revocation_outpoint: Option<Outpoint>,
 
     /// Field values (name -> base64 text), signed and written as the text's UTF-8 bytes
@@ -81,8 +93,14 @@ pub struct Certificate {
     #[serde(default)]
     pub fields: HashMap<String, String>,
 
-    /// Certificate signature (DER-encoded).
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Certificate signature (DER-encoded). Hex in JSON, as the
+    /// reference's `HexString` (`Certificate.ts:184`) and Go's
+    /// `util.ByteString` (`certificate.go:52`) write it (#268).
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        with = "signature_hex"
+    )]
     pub signature: Option<Vec<u8>>,
 
     /// The unsigned prefix as the issuer wrote it: set by
@@ -675,6 +693,55 @@ mod base64_32_bytes {
         let mut arr = [0u8; 32];
         arr.copy_from_slice(&bytes);
         Ok(arr)
+    }
+}
+
+/// Serde module for the revocation outpoint: `None` written as the binary
+/// form's sentinel string, read back from it, from `null` or from no key.
+mod revocation_outpoint_json {
+    use crate::wallet::types::Outpoint;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(outpoint: &Option<Outpoint>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match outpoint {
+            Some(outpoint) => outpoint.serialize(serializer),
+            None => Outpoint::new([0u8; 32], 0).serialize(serializer),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Outpoint>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let outpoint = Option::<Outpoint>::deserialize(deserializer)?;
+        Ok(outpoint.filter(|o| o.txid != [0u8; 32] || o.vout != 0))
+    }
+}
+
+/// Serde module for the signature: its DER bytes as a hex string.
+mod signature_hex {
+    use serde::{Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(signature: &Option<Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match signature {
+            Some(bytes) => serializer.serialize_str(&crate::primitives::to_hex(bytes)),
+            None => serializer.serialize_none(),
+        }
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Option<Vec<u8>>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Option::<String>::deserialize(deserializer)?
+            .map(|hex| crate::primitives::from_hex(&hex).map_err(serde::de::Error::custom))
+            .transpose()
     }
 }
 

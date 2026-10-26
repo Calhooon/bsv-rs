@@ -99,17 +99,17 @@ fn keyring(map: &HashMap<String, String>) -> HashMap<String, Vec<u8>> {
         .collect()
 }
 
-/// The reference's JSON in this crate's serde shape (`certType`, the
-/// signature's bytes), its `fields` object carried verbatim.
-fn crate_serde_json(c: &CertificateJson) -> serde_json::Value {
+/// The reference's JSON of the certificate, carried verbatim: since #268
+/// this crate's serde shape is the reference's (`type`, the signature hex).
+fn reference_json(c: &CertificateJson) -> serde_json::Value {
     serde_json::json!({
-        "certType": c.cert_type,
+        "type": c.cert_type,
         "serialNumber": c.serial_number,
         "subject": c.subject,
         "certifier": c.certifier,
         "revocationOutpoint": c.revocation_outpoint,
         "fields": c.fields,
-        "signature": from_hex(&c.signature).unwrap(),
+        "signature": c.signature,
     })
 }
 
@@ -118,7 +118,7 @@ fn a_reference_issued_encrypted_field_certificate_read_from_json_signs_the_refer
     let r = vectors().reference_issued;
     assert!(r.reference_verify);
 
-    let cert: Certificate = serde_json::from_value(crate_serde_json(&r.certificate)).unwrap();
+    let cert: Certificate = serde_json::from_value(reference_json(&r.certificate)).unwrap();
     for (name, text) in &r.certificate.fields {
         assert_eq!(&cert.fields[name], text, "field {name} held as its text");
     }
@@ -232,7 +232,7 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
     assert_eq!(w.reference_verifier_plaintexts, w.plaintexts);
 
     // The recorded certificate: its bytes are the reference's for its JSON.
-    let cert: Certificate = serde_json::from_value(crate_serde_json(&w.certificate)).unwrap();
+    let cert: Certificate = serde_json::from_value(reference_json(&w.certificate)).unwrap();
     assert_eq!(to_hex(&cert.to_binary(true)), w.binary_hex);
     assert_eq!(w.binary_hex, w.reference_to_binary_hex);
     assert!(cert.verify().unwrap());
@@ -324,7 +324,7 @@ fn set_field_holds_any_string_and_writes_its_bytes_as_the_reference_does() {
 #[test]
 fn the_json_reader_refuses_a_field_value_that_is_not_utf8() {
     let r = vectors().reference_issued;
-    let json = serde_json::to_string(&crate_serde_json(&r.certificate)).unwrap();
+    let json = serde_json::to_string(&reference_json(&r.certificate)).unwrap();
     let text = r.certificate.fields.values().next().unwrap();
 
     // Raw bytes that are not UTF-8 where a value's text stands.

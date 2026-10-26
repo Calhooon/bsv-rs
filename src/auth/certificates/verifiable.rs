@@ -193,17 +193,19 @@ impl VerifiableCertificate {
         &self.certificate.serial_number
     }
 
-    /// Converts to a JSON-serializable format: each field value its held
-    /// base64 text (#261), the keyring's values base64-encoded.
+    /// Converts to a JSON-serializable format, the reference's shape: each
+    /// field value its held base64 text (#261), the signature hex (#268),
+    /// the keyring's values base64-encoded.
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "type": self.certificate.type_base64(),
             "serialNumber": self.certificate.serial_number_base64(),
             "subject": self.certificate.subject.to_hex(),
             "certifier": self.certificate.certifier.to_hex(),
-            "revocationOutpoint": self.certificate.revocation_outpoint.as_ref().map(|o| o.to_string()),
+            "revocationOutpoint": self.certificate.revocation_outpoint.clone()
+                .unwrap_or_else(|| crate::wallet::types::Outpoint::new([0u8; 32], 0)).to_string(),
             "fields": self.certificate.fields,
-            "signature": self.certificate.signature.as_ref().map(|s| crate::primitives::to_base64(s)),
+            "signature": self.certificate.signature.as_ref().map(|s| crate::primitives::to_hex(s)),
             "keyring": self.keyring.iter()
                 .map(|(k, v)| (k.clone(), crate::primitives::to_base64(v)))
                 .collect::<HashMap<String, String>>(),
