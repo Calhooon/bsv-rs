@@ -1287,12 +1287,9 @@ pub struct ListOutputsArgs {
 pub struct ListOutputsResult {
     /// Total number of matching outputs.
     pub total_outputs: u32,
-    /// Optional aggregated BEEF data (hex encoded).
-    #[serde(
-        with = "hex_bytes_option",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
+    /// Optional aggregated BEEF data; `BEEF`, an array of byte numbers, in
+    /// JSON (#105).
+    #[serde(rename = "BEEF", skip_serializing_if = "Option::is_none", default)]
     pub beef: Option<Vec<u8>>,
     /// The matching outputs.
     pub outputs: Vec<WalletOutput>,
