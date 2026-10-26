@@ -117,6 +117,45 @@ counterpart: they refuse at the read in `#requireInteger`'s words, named
 `readVarIntNumStrict` ahead of `#requireInteger`; the `u32` readers here
 read the whole varint and refuse it in `#requireInteger`'s words, as they
 refused it in #122's.
+### Fixed: `read_identity_certificate` refuses a trust outside 1 to 10 in the reference's words (#247)
+
+`WireReader::read_identity_certifier`, which `read_identity_certificate` and
+`read_optional_identity_certifier` read a discovery entry's certifier info
+through, read the trust byte unchecked (#184's reading), so Go's zero value
+for an absent certifier info read back as `Some` with empty strings and trust
+0. The reference's discovery reader bounds the byte,
+`this.#requireInteger(resultReader.readUInt8(), 'discovery trust', 1, 10)`
+(`ts-stack@edf6e03` `packages/sdk/src/wallet/substrates/WalletWireTransceiver.ts:1710`,
+`#requireInteger` at `:2018-2025`), its result validation the same range
+(`WalletResultValidation.ts:1900`, `rangedInteger(info.trust, call, ..., 1, 10)`),
+the field's type `PositiveIntegerMax10` (`Wallet.interfaces.ts:874`), and this
+crate's transceiver has refused it since #183. The reader now takes the byte
+through the transceiver's check (`require_discovery_trust`), in its words,
+`Invalid discovery trust: expected an integer from 1 to 10, received <n>`, and
+the transceiver's discovery reader reads its certifier info through
+`read_identity_certifier`: one reading. The writer has refused such a trust
+before a byte since #183.
+
+The tests that pin it: `the_zero_value_entry_is_refused_as_the_transceiver_refuses_it`
+(`tests/wire_identity_certificate_roundtrip.rs`; on the pre-fix tree the
+reader read Go's zero value `Ok` with trust 0) and the certifier reader's
+trust 0 and 11 in `the_certifier_reader_reads_three_plain_strings_and_the_trust_byte`;
+`an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_as_discovery_refuses_it`
+(`tests/wire_reader_strictness.rs`: 0, 11 and `0xff` refused by the reader and
+the transceiver in the same words, 1 and 10 read; on the pre-fix tree the
+reader read 0 `Ok`). `a_count_that_overruns_the_bytes_is_refused_without_a_panic`
+builds its entry at trust 1, so it still reaches the maps. No recorded
+certificate moved (every one carries a trust in 1 to 10); no public shape
+moves, no new `Error` variant.
+
+### Notes: cross-SDK parity (#247)
+
+go-sdk writes the trust byte as given (`go-sdk@2ca481c`
+`wallet/serializer/identity_certificate.go:26`, `w.WriteByteValue(cert.CertifierInfo.Trust)`)
+and reads any byte (`:66`, `cert.CertifierInfo.Trust = r.ReadByteValue()`), so
+the entry it writes for an absent certifier info (its zero value, trust 0) is
+refused by this crate's readers as by the reference's; the divergence is the
+#183 line of `CLAUDE.md`'s list, now naming both readers.
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
@@ -516,8 +555,8 @@ entries is refused at the count; one that runs long leaves an entry the next
 reading meets and refuses. The record values' lengths go through
 `wire_length` after the strict bound, so a length past the bytes stays
 `ReaderUnderflow` on every target (#192). No reading loosens. The certifier's
-trust byte stays unbounded in this reader, as #184 chose (Go's zero value
-reads as trust 0); the transceiver refuses one outside 1 to 10.
+trust byte stayed unbounded in this reader, as #184 chose (Go's zero value
+read as trust 0), until #247 bounded it as the transceiver does.
 
 `read_wallet_action` cast the satoshis varint `as i64`. The reference reads
 the signed net amount as `#readActionSatoshis` does (`:400-416`): `0xff` and
@@ -1731,7 +1770,8 @@ keyring as a count of varint-length keys and raw-byte values (base64 in the
 struct), the decrypted fields as a count of string pairs. `read_identity_certifier`
 reads the three strings and the byte the same way. The reference has no absent
 certifier: Go's zero value, which the writer writes for `None`, reads back as
-`Some` with empty strings and trust 0, never `None`; an empty iconUrl or
+`Some` with empty strings and trust 0, never `None` (until #247, which refuses
+its trust 0 as the reference does); an empty iconUrl or
 description is `Some("")`, an empty map `None`. A byte length past the bytes
 is `ReaderUnderflow`, and the capacities are bounded by the bytes remaining.
 `tests/wire_identity_certificate_roundtrip.rs` (seven tests, six RED on the old
@@ -1749,7 +1789,8 @@ layout, which `write_identity_certificate` writes (the deprecated pair
 still writes the old bytes). None in LOW (the keeper's reading
 on #182: no LOW worker reads this crate's binary wallet wire). The public
 signatures are unchanged. TS's reader refuses trust 0 (the parity note under
-#182 above); these readers, like the transceiver and Go's, accept it.
+#182 above); these readers, like Go's, accepted it (the transceiver refuses
+it since #183, these readers since #247).
 `write_identity_certifier` (whose bytes are the reference's only when iconUrl
 and description are present), `write_optional_identity_certifier` and
 `write_optional_string_map` have no caller in the crate and no frame of the
