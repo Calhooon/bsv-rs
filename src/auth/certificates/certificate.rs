@@ -3,7 +3,7 @@
 //! A certificate binds identity attributes to a public key,
 //! signed by a trusted certifier.
 
-use crate::primitives::{bounded_capacity, sha256, PrivateKey, PublicKey, Signature};
+use crate::primitives::{bounded_capacity, sha256, to_hex, PrivateKey, PublicKey, Signature};
 use crate::wallet::types::Outpoint;
 use crate::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use crate::{Error, Result};
@@ -341,7 +341,17 @@ impl Certificate {
     /// reference's `sign` writes it (`Certificate.ts:458`): a received
     /// prefix in another order is not re-signed. The preimage it signed is
     /// kept in [`received_unsigned`](Self::received_unsigned) (#249).
+    /// A certificate already signed is refused in the reference's words
+    /// (`Certificate.ts:450-453`); clear it with
+    /// [`set_signature(None)`](Self::set_signature) to re-sign (#262).
     pub fn sign(&mut self, certifier_key: &PrivateKey) -> Result<()> {
+        if let Some(present) = self.signature.as_ref().filter(|s| !s.is_empty()) {
+            return Err(Error::CertificateValidationError(format!(
+                "Certificate has already been signed! Signature present: {}",
+                to_hex(present)
+            )));
+        }
+
         // Verify the certifier key matches
         if certifier_key.public_key() != self.certifier {
             return Err(Error::CryptoError(
