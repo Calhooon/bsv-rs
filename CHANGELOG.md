@@ -185,6 +185,44 @@ and cross-SDK tests and the auth and overlay vectors) and the old revealer
 shape's test key of `tests/wallet_http_json_shapes_105.rs` (the Go SDK's
 test public key, also across the wallet-wire vectors), beside the BRC-56
 vectors and the corpus-gen nonce.
+### Changed: `Certificate::sign` refuses a certificate already signed, as the reference does (#262)
+
+`Certificate::sign` signed over a certificate that already carried a
+signature and replaced it. The reference refuses it (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts:450-453`: when
+`this.signature` is present with a length above 0 it throws `Certificate has
+already been signed! Signature present: <signature hex>`, before it reads
+the wallet), and so does Go (`go-sdk@2ca481c`
+`auth/certificates/certificate.go:209-211`: `Sign` returns
+`ErrAlreadySigned`, `certificate has already been signed`, `:22`, when
+`Signature` is not nil). Now `sign` refuses a `Some` non-empty signature
+ahead of every other check, as `Error::CertificateValidationError` (the
+variant of the crate's other certificate refusals) carrying the reference's
+words, the present DER signature in lower-case hex as the reference prints
+its `HexString`; the certificate is left as it was. An empty signature is
+no signature, as `length > 0` reads it. The keeper's ruling on #262
+(2026-10-26): a signed certificate is immutable here too.
+
+Migration: a caller that re-signed a signed certificate clears it before
+`sign` with `set_signature(None)`, as the reference's caller sets
+`signature = undefined`. No public signature moves and no `Error` variant is
+added. None of `bsv-wallet-toolbox-rs` (`6317222`), `bsv-wallet-cli`
+(`a55990c`), `rust-message-box` (`419bf18`) or `bsv-overlay-cloudflare`
+(`9a0f3c29`) calls `Certificate::sign` (the toolbox builds a certificate
+with `Certificate::new` and sets the certifier's signature it received,
+`src/wallet/certificate_issuance.rs:533,562`); nothing in this crate signs
+twice.
+
+Pinned by `tests/auth_certificate_sign_refusal_262.rs` on the witness
+`tests/vectors/auth_certificate_sign_refusal_262.json`, recorded by
+`tests/support/certificate_sign_refusal_262.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` (bundled with bun) under Node v22.18.0: #251's `email`
+certificate signed twice, the second refused in the reference's words byte
+for byte (`Ok(())` on the base), the certificate unchanged and verifying;
+signed again with another key, the signature refusal ahead of the key check
+(the base's `CryptoError` for the key); cleared with `set_signature(None)`,
+it signs to a single signing's bytes, the reference's after
+`signature = undefined`; an empty signature signs.
 
 ### Added: what `auth_certificate.json` vector 0 is, and the test that says so (#252)
 
@@ -675,7 +713,7 @@ disagree on verifies here (its bytes are kept) and not in the reference.
 certificate that already carries a signature (`ts-stack@edf6e03`
 `Certificate.ts:450-453`, `Certificate has already been signed!`); this
 crate's `sign` signs over it and replaces it. Not changed here; the behavior
-waits on its own issue.
+waits on its own issue (#262, above: `sign` now refuses it).
 
 **The residual.** A name with a character above U+00FF sorts after every
 Latin-1 name, in code point order, which is ICU's order for none of them in

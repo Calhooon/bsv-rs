@@ -106,7 +106,7 @@ time and nowhere earlier (#261):
 | `new()` | Create unsigned certificate with type, serial, subject, certifier |
 | `with_revocation_outpoint()`, `with_fields()`, `with_signature()` | Chain onto `new()` for the fields a struct literal set (#249) |
 | `set_revocation_outpoint()`, `set_fields()`, `set_signature()` | Change one after construction; the two that change the preimage clear `received_unsigned` (#249) |
-| `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251) |
+| `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251); a certificate already signed refused, `CertificateValidationError` in the reference's words (`Certificate has already been signed! Signature present: <hex>`), cleared with `set_signature(None)` to re-sign (#262) |
 | `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249) |
 | `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
 | `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249) |
