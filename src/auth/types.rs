@@ -7,7 +7,8 @@
 //! - `RequestedCertificateSet` - Certificate request specification
 
 use crate::primitives::PublicKey;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde_json::value::RawValue;
 use std::collections::HashMap;
 
 /// Protocol version for BRC-31 authentication.
@@ -79,8 +80,23 @@ impl std::fmt::Display for MessageType {
 ///
 /// This structure represents all message types in the authentication protocol.
 /// Different fields are used depending on the message type.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+///
+/// A certificateRequest's signature covers the UTF-8 bytes of its
+/// `requestedCertificates` JSON text and a certificateResponse's those of
+/// its `certificates` text, the text as transmitted (#280): the reference
+/// signs `JSON.stringify` of what it sends and verifies `JSON.stringify` of
+/// what it parsed (`ts-stack@edf6e03` `Peer.ts:453`, `:1068`, `:1140`,
+/// `:1203`), which is the received text when that text is compact JSON.
+/// [`certificates_text`](Self::certificates_text) and
+/// [`requested_certificates_text`](Self::requested_certificates_text) carry
+/// those texts: a parsed message keeps them as received, a message built
+/// with [`set_certificates`](Self::set_certificates) or
+/// [`set_requested_certificates`](Self::set_requested_certificates) the
+/// compact text it will send. The serializer writes a text as it stands
+/// and [`signing_data`](Self::signing_data) signs it, while it still reads
+/// back to the member's value; a member changed since is serialized afresh.
+/// Its serde is JSON's: the texts are `serde_json` raw values.
+#[derive(Debug, Clone)]
 pub struct AuthMessage {
     /// Protocol version (e.g., "0.1").
     pub version: String,
@@ -92,32 +108,34 @@ pub struct AuthMessage {
     pub identity_key: PublicKey,
 
     /// Sender's nonce for this message (base64, 32 bytes: 16 random + 16 HMAC).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
 
     /// Session nonce from initial handshake (for InitialResponse).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub initial_nonce: Option<String>,
 
     /// Recipient's nonce from previous message.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub your_nonce: Option<String>,
 
     /// Attached certificates (for CertificateResponse).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub certificates: Option<Vec<crate::auth::certificates::VerifiableCertificate>>,
 
     /// Requested certificate specifications (for InitialRequest, CertificateRequest).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub requested_certificates: Option<RequestedCertificateSet>,
 
     /// Message payload (for General messages).
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub payload: Option<Vec<u8>>,
 
     /// DER-encoded signature over message contents.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<Vec<u8>>,
+
+    /// The `certificates` member's JSON text: as received, or as this
+    /// crate sends it. The certificateResponse signature covers its bytes.
+    pub certificates_text: Option<Box<RawValue>>,
+
+    /// The `requestedCertificates` member's JSON text: as received, or as
+    /// this crate sends it. The certificateRequest signature covers its
+    /// bytes.
+    pub requested_certificates_text: Option<Box<RawValue>>,
 }
 
 impl AuthMessage {
@@ -134,7 +152,45 @@ impl AuthMessage {
             requested_certificates: None,
             payload: None,
             signature: None,
+            certificates_text: None,
+            requested_certificates_text: None,
         }
+    }
+
+    /// Sets the certificates and the compact JSON text this message sends
+    /// and signs for them.
+    pub fn set_certificates(
+        &mut self,
+        certificates: Vec<crate::auth::certificates::VerifiableCertificate>,
+    ) {
+        self.certificates_text = serde_json::value::to_raw_value(&certificates).ok();
+        self.certificates = Some(certificates);
+    }
+
+    /// Sets the requested certificate set and the compact JSON text this
+    /// message sends and signs for it.
+    pub fn set_requested_certificates(&mut self, requested: RequestedCertificateSet) {
+        self.requested_certificates_text = serde_json::value::to_raw_value(&requested).ok();
+        self.requested_certificates = Some(requested);
+    }
+
+    /// The `certificates` text this message sends and signs: the carried
+    /// text while it reads back to `certificates`, `None` otherwise.
+    fn current_certificates_text(&self) -> Option<&RawValue> {
+        current_text(
+            self.certificates_text.as_deref(),
+            self.certificates.as_ref(),
+        )
+    }
+
+    /// The `requestedCertificates` text this message sends and signs: the
+    /// carried text while it reads back to `requested_certificates`, `None`
+    /// otherwise.
+    fn current_requested_certificates_text(&self) -> Option<&RawValue> {
+        current_text(
+            self.requested_certificates_text.as_deref(),
+            self.requested_certificates.as_ref(),
+        )
     }
 
     /// Returns the bytes to sign for this message.
@@ -278,6 +334,137 @@ impl AuthMessage {
         }
 
         Ok(())
+    }
+}
+
+/// The carried text when it still reads back to `value`: parsed as `T`, it
+/// serializes to the same JSON value as `value` does.
+fn current_text<'a, T>(text: Option<&'a RawValue>, value: Option<&T>) -> Option<&'a RawValue>
+where
+    T: Serialize + serde::de::DeserializeOwned,
+{
+    let (text, value) = (text?, value?);
+    let carried: T = serde_json::from_str(text.get()).ok()?;
+    let carried = serde_json::to_value(&carried).ok()?;
+    (serde_json::to_value(value).ok()? == carried).then_some(text)
+}
+
+/// A signed member on the wire: its carried text as it stands, or its value.
+#[derive(Serialize)]
+#[serde(untagged)]
+enum WireMember<'a, T: Serialize> {
+    Text(&'a RawValue),
+    Value(&'a T),
+}
+
+impl<'a, T: Serialize> WireMember<'a, T> {
+    fn new(text: Option<&'a RawValue>, value: Option<&'a T>) -> Option<Self> {
+        match (text, value) {
+            (Some(text), Some(_)) => Some(Self::Text(text)),
+            (None, Some(value)) => Some(Self::Value(value)),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthMessageOut<'a> {
+    version: &'a str,
+    message_type: MessageType,
+    identity_key: &'a PublicKey,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    nonce: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    initial_nonce: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    your_nonce: Option<&'a String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    certificates: Option<WireMember<'a, Vec<crate::auth::certificates::VerifiableCertificate>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    requested_certificates: Option<WireMember<'a, RequestedCertificateSet>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    payload: Option<&'a Vec<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    signature: Option<&'a Vec<u8>>,
+}
+
+impl Serialize for AuthMessage {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        AuthMessageOut {
+            version: &self.version,
+            message_type: self.message_type,
+            identity_key: &self.identity_key,
+            nonce: self.nonce.as_ref(),
+            initial_nonce: self.initial_nonce.as_ref(),
+            your_nonce: self.your_nonce.as_ref(),
+            certificates: WireMember::new(
+                self.current_certificates_text(),
+                self.certificates.as_ref(),
+            ),
+            requested_certificates: WireMember::new(
+                self.current_requested_certificates_text(),
+                self.requested_certificates.as_ref(),
+            ),
+            payload: self.payload.as_ref(),
+            signature: self.signature.as_ref(),
+        }
+        .serialize(serializer)
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AuthMessageIn {
+    version: String,
+    message_type: MessageType,
+    identity_key: PublicKey,
+    #[serde(default)]
+    nonce: Option<String>,
+    #[serde(default)]
+    initial_nonce: Option<String>,
+    #[serde(default)]
+    your_nonce: Option<String>,
+    #[serde(default)]
+    certificates: Option<Box<RawValue>>,
+    #[serde(default)]
+    requested_certificates: Option<Box<RawValue>>,
+    #[serde(default)]
+    payload: Option<Vec<u8>>,
+    #[serde(default)]
+    signature: Option<Vec<u8>>,
+}
+
+impl<'de> Deserialize<'de> for AuthMessage {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> std::result::Result<Self, D::Error> {
+        let wire = AuthMessageIn::deserialize(deserializer)?;
+        let certificates = match &wire.certificates {
+            Some(text) => Some(
+                serde_json::from_str(text.get())
+                    .map_err(|e| serde::de::Error::custom(format_args!("certificates: {e}")))?,
+            ),
+            None => None,
+        };
+        let requested_certificates = match &wire.requested_certificates {
+            Some(text) => Some(serde_json::from_str(text.get()).map_err(|e| {
+                serde::de::Error::custom(format_args!("requestedCertificates: {e}"))
+            })?),
+            None => None,
+        };
+        Ok(Self {
+            version: wire.version,
+            message_type: wire.message_type,
+            identity_key: wire.identity_key,
+            nonce: wire.nonce,
+            initial_nonce: wire.initial_nonce,
+            your_nonce: wire.your_nonce,
+            certificates,
+            requested_certificates,
+            payload: wire.payload,
+            signature: wire.signature,
+            certificates_text: wire.certificates,
+            requested_certificates_text: wire.requested_certificates,
+        })
     }
 }
 
