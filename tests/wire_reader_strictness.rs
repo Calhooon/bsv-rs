@@ -810,14 +810,19 @@ fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_before_a_byte
 // 6. The processor's reads
 // ---------------------------------------------------------------------------
 
-/// The processor reads revealCounterpartyKeyLinkage's two keys with
-/// `PublicKey::from_bytes`, a point check, where the reference reads 33 bytes
-/// and `validateWalletArgs` checks them (`WalletWireProcessor.ts:1741-1751`),
-/// after the privileged flag and reason (`:1739`):
-/// a key that is not a point is refused before the wallet is called (the
-/// header wallet's other methods are unreachable).
+/// The processor reads revealCounterpartyKeyLinkage's two keys as 33 raw
+/// bytes after the privileged flag and reason, as the reference does
+/// (`WalletWireProcessor.ts:1739-1747`), and `validateWalletArgs` refuses a
+/// key that is not a point (`validationHelpers.ts:1734-1738`): the
+/// reference's frame, code 6, before the wallet is called (the header
+/// wallet's other methods are unreachable). Until #226 this crate's reader
+/// refused it, code 1, in its own words.
 #[tokio::test]
 async fn the_processor_refuses_a_linkage_key_that_is_not_a_compressed_point() {
+    let words = b"The counterparty parameter must be a valid compressed secp256k1 public key";
+    let mut frame = vec![6, words.len() as u8];
+    frame.extend_from_slice(words);
+    frame.push(0);
     let mut prefixed = key(G);
     prefixed[0] = 0x04;
     for bad in [prefixed, off_curve()] {
@@ -831,6 +836,6 @@ async fn the_processor_refuses_a_linkage_key_that_is_not_a_compressed_point() {
         request.extend_from_slice(&bad);
         request.extend_from_slice(&key(G));
         let answer = processor_answer(String::new(), &request).await;
-        assert_ne!(answer[0], 0, "an error frame");
+        assert_eq!(answer, frame, "{:?}", String::from_utf8_lossy(&answer));
     }
 }

@@ -694,6 +694,136 @@ async fn valid_arguments_at_the_bounds_reach_the_wallet() {
     }
 }
 
+/// Four 33-byte keys that are no compressed point (`isValidCompressedPublicKey`,
+/// `Secp256k1Validation.ts:15-22`): an `04` prefix, a `00` prefix, x = 5 (no
+/// y; 5^3 + 7 is not a square modulo p), x = p + 1 (at or above the prime).
+fn non_points() -> Vec<[u8; 33]> {
+    let good = verifier().to_compressed();
+    let mut prefixed = [0u8; 33];
+    prefixed.copy_from_slice(&good);
+    prefixed[0] = 0x04;
+    let mut zero = prefixed;
+    zero[0] = 0x00;
+    let mut off_curve = [0u8; 33];
+    off_curve[0] = 0x02;
+    off_curve[32] = 5;
+    let mut above_p = [0xffu8; 33];
+    above_p[0] = 0x02;
+    above_p[25..].copy_from_slice(&[0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xfc, 0x30]);
+    vec![prefixed, zero, off_curve, above_p]
+}
+
+fn reveal_counterparty_keys(counterparty: &[u8], verifier: &[u8]) -> Vec<u8> {
+    let mut writer = head(WalletCall::RevealCounterpartyKeyLinkage);
+    privileged(&mut writer, -1, &None);
+    writer.write_bytes(counterparty);
+    writer.write_bytes(verifier);
+    writer.into_bytes()
+}
+
+fn reveal_specific_verifier(key: &Key, verifier: &[u8]) -> Vec<u8> {
+    let mut writer = head(WalletCall::RevealSpecificKeyLinkage);
+    key.write(&mut writer);
+    writer.write_bytes(verifier);
+    writer.into_bytes()
+}
+
+/// `validateRevealCounterpartyKeyLinkageArgs` (`validationHelpers.ts:1734-1741`)
+/// over the keys the reference reads raw (`WalletWireProcessor.ts:1742-1747`):
+/// `validatePublicKey` (`:182-188`) refuses a key that is no point, code 6,
+/// the counterparty ahead of the verifier, both ahead of the privilege; the
+/// wallet is never called (#226; until then the reader refused it, code 1).
+#[tokio::test]
+async fn a_counterparty_linkage_key_that_is_no_point_is_refused_with_code_6() {
+    let good = verifier().to_compressed();
+    let must_be = "a valid compressed secp256k1 public key";
+    for bad in non_points() {
+        refused(
+            &reveal_counterparty_keys(&bad, &good),
+            &invalid("counterparty", must_be),
+        )
+        .await;
+        refused(
+            &reveal_counterparty_keys(&good, &bad),
+            &invalid("verifier", must_be),
+        )
+        .await;
+        refused(
+            &reveal_counterparty_keys(&bad, &bad),
+            &invalid("counterparty", must_be),
+        )
+        .await;
+        let mut writer = head(WalletCall::RevealCounterpartyKeyLinkage);
+        privileged(&mut writer, 1, &None);
+        writer.write_bytes(&good);
+        writer.write_bytes(&bad);
+        refused(&writer.into_bytes(), &invalid("verifier", must_be)).await;
+    }
+}
+
+/// `validateRevealSpecificKeyLinkageArgs` (`validationHelpers.ts:1743-1750`)
+/// over the verifier the reference reads raw (`WalletWireProcessor.ts:1796`):
+/// a verifier that is no point is refused, code 6, ahead of the protocol, the
+/// key ID and the privilege (#226).
+#[tokio::test]
+async fn a_specific_linkage_verifier_that_is_no_point_is_refused_with_code_6() {
+    let short_protocol = Key {
+        protocol: "abcd".into(),
+        ..Key::default()
+    };
+    for bad in non_points() {
+        for key in [Key::default(), short_protocol.clone()] {
+            refused(
+                &reveal_specific_verifier(&key, &bad),
+                &invalid("verifier", "a valid compressed secp256k1 public key"),
+            )
+            .await;
+        }
+    }
+}
+
+/// revealSpecificKeyLinkage's counterparty flag 0 is absent
+/// (`#decodeCounterparty`, `WalletWireProcessor.ts:2456-2457`), and
+/// `validateCounterparty` (`validationHelpers.ts:190-193`) hands it to
+/// `validateHexString` (`:523`): `The counterparty parameter must be a
+/// hexadecimal string`, code 6, ahead of the verifier and the protocol (#226;
+/// until then the reader refused it, `counterparty is required`, code 1).
+#[tokio::test]
+async fn a_specific_linkage_with_no_counterparty_is_refused_with_code_6() {
+    let frame = invalid("counterparty", "a hexadecimal string");
+    let absent = Key {
+        counterparty: vec![0],
+        ..Key::default()
+    };
+    refused(&reveal_specific_request(&absent), &frame).await;
+    refused(&reveal_specific_verifier(&absent, &non_points()[2]), &frame).await;
+    let short_protocol = Key {
+        protocol: "abcd".into(),
+        ..absent
+    };
+    refused(&reveal_specific_request(&short_protocol), &frame).await;
+}
+
+/// The keys that are points reach the wallet: `02` and `03` prefixes, and
+/// an absent counterparty is refused only on revealSpecificKeyLinkage.
+#[tokio::test]
+async fn linkage_keys_that_are_points_reach_the_wallet() {
+    let counterparty = counterparty_key().to_compressed();
+    let verifier = verifier().to_compressed();
+    let (reached, calls) = answer(&reveal_counterparty_keys(&counterparty, &verifier)).await;
+    assert_eq!(reached[0], 0, "{:?}", String::from_utf8_lossy(&reached));
+    assert_eq!(calls, 1);
+    for counterparty in [vec![11], vec![12], counterparty.to_vec()] {
+        let key = Key {
+            counterparty,
+            ..Key::default()
+        };
+        let (reached, calls) = answer(&reveal_specific_request(&key)).await;
+        assert_eq!(reached[0], 0, "{:?}", String::from_utf8_lossy(&reached));
+        assert_eq!(calls, 1);
+    }
+}
+
 /// The thirteen calls this processor refuses as needing a full wallet keep
 /// their words and code 1: no validation runs ahead of them.
 #[tokio::test]

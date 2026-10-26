@@ -2,8 +2,6 @@
 //! call's frame needs more than the handler's few lines.
 
 use super::encoding::WireReader;
-use crate::primitives::PublicKey;
-use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
 use crate::wallet::types::{Counterparty, Protocol};
 use crate::wallet::{
     CreateHmacArgs, CreateSignatureArgs, DecryptArgs, EncryptArgs, GetPublicKeyArgs,
@@ -92,18 +90,40 @@ fn read_privileged_params(
     Ok((privileged, privileged_reason))
 }
 
+/// revealCounterpartyKeyLinkage's request as the reference reads it: the two
+/// keys 33 raw bytes each, judged by `validation::reveal_counterparty_args`.
+pub(super) struct RevealCounterpartyRequest {
+    pub(super) counterparty: [u8; 33],
+    pub(super) verifier: [u8; 33],
+    pub(super) privileged: Option<bool>,
+    pub(super) privileged_reason: Option<String>,
+}
+
+/// revealSpecificKeyLinkage's request as the reference reads it: the
+/// counterparty as the key-related parameters carry it (absent when its flag
+/// is 0) and the verifier 33 raw bytes, judged by
+/// `validation::reveal_specific_args`.
+pub(super) struct RevealSpecificRequest {
+    pub(super) counterparty: Option<Counterparty>,
+    pub(super) verifier: [u8; 33],
+    pub(super) protocol_id: Protocol,
+    pub(super) key_id: String,
+    pub(super) privileged: Option<bool>,
+    pub(super) privileged_reason: Option<String>,
+}
+
 /// Reads revealCounterpartyKeyLinkage's parameters in the reference's order
 /// (`WalletWireProcessor.ts:1739-1747`, `WalletWireTransceiver.ts:809-811`;
 /// BRC-100 `wallet/0100.md:2016-2019` at `ed1b015`, `:2039-2042` at `5119a9b`):
 /// the privileged flag and reason, then the counterparty and the verifier,
-/// 33 bytes each (#191).
+/// 33 raw bytes each (#191), a non-point refused by validation (#226).
 pub(super) fn read_reveal_counterparty_key_linkage_args(
     reader: &mut WireReader<'_>,
-) -> Result<RevealCounterpartyKeyLinkageArgs, Error> {
+) -> Result<RevealCounterpartyRequest, Error> {
     let (privileged, privileged_reason) = read_privileged_params(reader)?;
-    let counterparty = PublicKey::from_bytes(reader.read_bytes(33)?)?;
-    let verifier = PublicKey::from_bytes(reader.read_bytes(33)?)?;
-    Ok(RevealCounterpartyKeyLinkageArgs {
+    let counterparty = read_33(reader)?;
+    let verifier = read_33(reader)?;
+    Ok(RevealCounterpartyRequest {
         counterparty,
         verifier,
         privileged,
@@ -115,24 +135,21 @@ pub(super) fn read_reveal_counterparty_key_linkage_args(
 /// (`#decodeKeyRelatedParams` then the verifier, `WalletWireProcessor.ts:1790-1797`
 /// and `:2564-2583`; `WalletWireTransceiver.ts:874-883`; BRC-100
 /// `wallet/0100.md:2045-2055` at `ed1b015`): the protocol, the key ID, the
-/// counterparty, the privileged flag and reason, then the verifier (#191).
+/// counterparty, the privileged flag and reason, then the verifier (#191);
+/// an absent counterparty and a verifier that is no point are refused by
+/// validation (#226).
 pub(super) fn read_reveal_specific_key_linkage_args(
     reader: &mut WireReader<'_>,
-) -> Result<RevealSpecificKeyLinkageArgs, Error> {
-    let protocol_id = reader.read_protocol_id()?;
-    let key_id = reader.read_string()?;
-    let counterparty = reader
-        .read_counterparty()?
-        .ok_or_else(|| Error::WalletError("counterparty is required".to_string()))?;
-    let (privileged, privileged_reason) = read_privileged_params(reader)?;
-    let verifier = PublicKey::from_bytes(reader.read_bytes(33)?)?;
-    Ok(RevealSpecificKeyLinkageArgs {
-        counterparty,
+) -> Result<RevealSpecificRequest, Error> {
+    let key = read_key_related_params(reader)?;
+    let verifier = read_33(reader)?;
+    Ok(RevealSpecificRequest {
+        counterparty: key.counterparty,
         verifier,
-        protocol_id,
-        key_id,
-        privileged,
-        privileged_reason,
+        protocol_id: key.protocol_id,
+        key_id: key.key_id,
+        privileged: key.privileged,
+        privileged_reason: key.privileged_reason,
     })
 }
 
@@ -147,6 +164,13 @@ fn read_length_prefixed(reader: &mut WireReader<'_>) -> Result<Vec<u8>, Error> {
 fn read_32(reader: &mut WireReader<'_>) -> Result<[u8; 32], Error> {
     let mut bytes = [0u8; 32];
     bytes.copy_from_slice(reader.read_bytes(32)?);
+    Ok(bytes)
+}
+
+/// Reads 33 raw bytes (the reference's `paramsReader.read(33)`).
+fn read_33(reader: &mut WireReader<'_>) -> Result<[u8; 33], Error> {
+    let mut bytes = [0u8; 33];
+    bytes.copy_from_slice(reader.read_bytes(33)?);
     Ok(bytes)
 }
 
