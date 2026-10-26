@@ -63,6 +63,60 @@ the other three combinations). The original and the verdicts are in
 `tests/vectors/auth_certificate_origin_252.json` (new), recorded by
 `tests/support/certificate_origin_252.mjs` under Node v22.18.0 against both
 references bundled with bun. No `src/` change.
+### Changed: a wallet wire u32 field above `u32::MAX` is refused in the reference's words (#255)
+
+The nine `u32` fields #122 bounded were refused in #122's words (`invalid
+totalCertificates: expected at most 4294967295, got 4294967296`). The
+reference at `ts-stack@edf6e03` reads each with `readVarIntNumStrict(false)`
+and bounds it with `#requireInteger(value, '<fieldName>', 0, 0xffffffff)`,
+whose words are `Invalid <fieldName>: expected an integer from <minimum> to
+<maximum>, received <value>`
+(`packages/sdk/src/wallet/substrates/WalletWireTransceiver.ts:2018-2025`,
+the processor's at `WalletWireProcessor.ts:138-148`). Each refusal now
+carries those words with the reference's name for the site, through one
+helper (`integer_refusal` in `src/wallet/wire/mod.rs`, which the discovery
+trust and getHeaderForHeight's height now share):
+
+| Field | The reference's site and name |
+|---|---|
+| listActions `totalActions` | `WalletWireTransceiver.ts:380-385`, `listActions totalActions` |
+| an action's `version` | `:437-442`, `listActions version` |
+| an action's `lockTime` | `:443-448`, `listActions lockTime` |
+| an action input's `sequenceNumber` | `:491-496`, `listActions input sequenceNumber` |
+| listOutputs `totalOutputs` | `:651-656`, `listOutputs totalOutputs` |
+| listCertificates `totalCertificates` | `:1501-1506`, `listCertificates totalCertificates` |
+| discovery `totalCertificates` | `:1676-1681`, `discovery totalCertificates` |
+| getHeaderForHeight `height` | `WalletWireProcessor.ts:1671-1675`, `getHeaderForHeight height` (1 to `u32::MAX`; the words since #216) |
+| signAction spend `sequenceNumber` | none: `signAction spend sequenceNumber` (below) |
+
+Two index readers outside the nine share the helper and take the words: an
+outpoint's index (`outpoint index`, the reference's at `:733-738` and
+`WalletWireProcessor.ts:226-231`) and an action output's (`listActions output
+outputIndex`, `:517-522`, until now `action output index`). The bound and the
+order of checks do not move: no behavior beyond the words. Pinned by the
+nine tests of `tests/wire_u32_field_bounds_tests.rs` (eight RED on the
+pre-fix tree, the height's words unchanged), by
+`a_sign_action_spend_sequence_number_above_the_bound_is_refused_naming_it`
+and by the four index tests of `tests/wire_method_roundtrip_tests.rs`. No
+recording carried these words; none is re-recorded.
+
+### Notes: cross-SDK parity (#255)
+
+The reference's processor reads a signAction spend's `sequenceNumber`, a
+signAction spend's input index and an internalizeAction output's index
+with `readVarIntNumStrict` and no `#requireInteger`
+(`WalletWireProcessor.ts:662`, `:671`, `:1082`); it bounds the two spend
+fields after the read in `validateSignActionArgs` (`spends key`,
+`spends.<index>.sequenceNumber`, 0 to `MAX_UINT32`, `validationHelpers.ts:840-856`)
+as `WERR_INVALID_PARAMETER`, and the output index at zero or above only
+(`validatePositiveIntegerOrZero(args.outputIndex, 'outputIndex')`, `:979`). This crate's processor refuses both calls as
+needing a full wallet, so these are public readers with no reference
+counterpart: they refuse at the read in `#requireInteger`'s words, named
+`signAction spend sequenceNumber`, `sign action spend input index` and
+`internalize output index`. A value above `2^53 - 1` is refused there by
+`readVarIntNumStrict` ahead of `#requireInteger`; the `u32` readers here
+read the whole varint and refuse it in `#requireInteger`'s words, as they
+refused it in #122's.
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
