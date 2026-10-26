@@ -93,8 +93,9 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | Method | Purpose |
 |--------|---------|
 | `new()` | Create unsigned certificate with type, serial, subject, certifier |
-| `sign()` | Sign with certifier's private key |
-| `verify()` | Verify certificate signature |
+| `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251) |
+| `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251) |
+| `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
 | `to_binary()` | Serialize to deterministic binary format |
 | `from_binary()` | Parse from binary format |
 | `signing_hash()` | Get SHA-256 hash for signing |

@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
+
+`Certificate::sign` signed with the certifier's raw key and `verify` checked
+against the certifier's raw public key. BRC-52 at `5119a9b` is a MUST
+(`peer-to-peer/0052.md:77`: "Implementations MUST verify certificates using
+the certifier identity key and the BRC-100 signature derivation described
+below"; `:115-117`: protocolID `[2, "certificate signature"]`, keyID `<type>
+<serialNumber>` with one U+0020 space, counterparty anyone). The reference at
+`ts-stack@edf6e03` derives in both (`packages/sdk/src/auth/certificates/Certificate.ts:428-431`:
+`verify` takes the certifier's child under private key 1 and
+`2-certificate signature-<type> <serial>`; `:458-462`: `sign` through
+`createSignature` with that protocol and keyID, counterparty defaulted to
+anyone), and Go agrees (`go-sdk@2ca481c` `auth/certificates/certificate.go:176-186`
+for `Verify`, `:227-240` for `Sign`). Now `sign` takes the certifier's child
+from `KeyDeriver::derive_private_key` under protocol `[2, "certificate
+signature"]`, keyID `Certificate::signature_key_id()` (`"<type base64>
+<serial base64>"`, new, additive) and `Counterparty::Anyone`, and `verify`
+takes the certifier's public child from `KeyDeriver::new(None)` (the anyone
+key) with `Counterparty::Other(certifier)`, over the SHA-256 of
+`to_binary(false)` as before. A wrong signature is `Ok(false)` as before.
+No public signature moves: `sign` still takes the certifier's `PrivateKey`.
+
+The verdict change: a certificate the reference or Go signed now verifies
+here (it was `Ok(false)`), and a certificate this crate signed under the raw
+key before this release (0.9.0-beta.1 and every earlier version) verifies
+under the old reading only: it is now `Ok(false)` here, as it always was in
+the reference and Go. Re-sign such a certificate with this release.
+Consumer note: `bsv-wallet-toolbox-rs` calls `Certificate::verify()` at
+`src/wallet/certificate_issuance.rs:703` (`6317222`) and discards the
+boolean, so a false verdict passes there before and after this change; that
+is the toolbox's item (its #188).
+
+Pinned by `tests/auth_certificate_signature_251.rs` on the witnesses
+`tests/vectors/auth_certificate_signature_251.json`, recorded by
+`tests/support/certificate_signature_251.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` (bundled with bun) under Node v22.18.0: the reference's
+one-field `email` certificate verifies (`Ok(false)` on the base), this
+crate's signer writes the reference's signature byte for byte (RFC 6979; a
+different signature on the base), a certificate signed here with a
+revocation outpoint verifies in the reference (`true`; the base's signature
+`false` there), a wrong signature is `Ok(false)` (both), and 0.9.0-beta.1's
+raw-key signature of the `email` certificate is `Ok(false)` (`Ok(true)` on
+the base). `tests/auth_cross_sdk_tests.rs`'s fixture now carries a field
+value as the UTF-8 bytes of its base64 text, as BRC-52 `0052.md:97` signs
+it, not the decoded ciphertext; no vector moved: the one signed vector of
+`auth_certificate.json` is `@bsv/sdk`'s `fromObject` parse fixture
+(`Certificate.test.ts:312-328`, with its type and serial changed here), and
+its signature verifies under no reading, in the reference (`false`, both the
+crate's copy and the original) or here (decoded or text, raw or derived).
+
 ### Added: `ScriptResourceLimit` prints the interpreter's sentence, from one place (#228)
 
 `script::ScriptResourceLimit` implements `Display`, carrying the
