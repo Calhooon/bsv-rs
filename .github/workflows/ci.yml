@@ -467,8 +467,12 @@ jobs:
       - name: Lint the workflows
         run: '"$RUNNER_TEMP/bin/actionlint" -no-color'
 
-  # the secrets scan (bsv-stack-lean #140): gitleaks over every commit of the checkout, the
-  # values redacted; the findings judged not secrets are named by fingerprint in .gitleaksignore.
+  # the secrets scan (bsv-stack-lean #140): gitleaks over the commits the event brings, the
+  # values redacted, the locations printed; the findings judged not secrets are named by
+  # fingerprint in .gitleaksignore or, for test material that is not a secret, by reason in
+  # .gitleaks.toml. On a pull request the scan covers the PR's own commits (what decides the
+  # merge; gitleaks's default is every ref of the checkout, so a literal on any pushed branch
+  # failed every PR, bsv-rs#272); on a push and on a dispatch the line's full history.
   # gitleaks is built from its release source, the tarball pinned by sha256 (no third-party action)
   secrets:
     name: secrets
@@ -490,8 +494,16 @@ jobs:
           cd "$RUNNER_TEMP/gitleaks-${GITLEAKS_VERSION}"
           go build -o "$RUNNER_TEMP/bin/gitleaks" .
 
-      - name: Scan the history
-        run: '"$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner --exit-code 1 .'
+      - name: Scan the commits the event brings
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            log_opts="${PR_BASE_SHA}..HEAD"
+          else
+            log_opts="HEAD"
+          fi
+          "$RUNNER_TEMP/bin/gitleaks" git --redact --no-banner --exit-code 1 -v --log-opts="${log_opts}" .
 
   # nothing sits on main that beta lacks (RELEASING.md, "The direction rule"): every commit of
   # origin/main is on the tree (the PR's merge commit, beta's tip after a push, the sync branch on
