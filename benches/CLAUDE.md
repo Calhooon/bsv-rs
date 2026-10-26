@@ -13,7 +13,7 @@ This module contains Criterion-based benchmarks for measuring the performance of
 | `primitives_bench.rs` | Comprehensive benchmarks for all primitives (11 groups) |
 | `script_bench.rs` | Script parsing, templates, signing, and serialization benchmarks (5 groups) |
 | `memory_bench.rs` | Performance benchmarks with RSS memory tracking (4 groups) |
-| `beef_stream.rs` | 1 MB and 10 MB file-backed streams, script/structure timing and fresh-process RSS |
+| `beef_stream.rs` | 1 MB and 10 MB file-backed streams, script/structure timing and fresh-process RSS; `BSV_BEEF_REVERSED=1` adds `beef_stream_reversed`, the same chains written newest first (#240), outside CI's inventory (`tools/bench-compare` and `baseline.json` do not carry it) |
 | `merkle_path.rs` | 10,000 depth-20 proofs into one synthetic block |
 | `transaction_sign_verify.rs` | Sign and verify a transaction with 100 P2PKH inputs |
 | `wire_codec.rs` | Four field codec operations for each of the 28 wallet calls, on #76's recorded frames (`tests/fixtures/wire/`); the layouts in `wire_codec/support.rs`, pinned by `tests/wire_codec_bench_bytes.rs` (#138) |

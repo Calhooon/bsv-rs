@@ -2,7 +2,7 @@
 //!
 //! `BSV_BEEF_REVERSED=1` adds `beef_stream_reversed`: the same chains written
 //! newest first, the proven funding transaction last (bsv-rs#240: every link
-//! held until it arrives, then released on a heap). Off by default, so the
+//! held by its index entry until it arrives, then folded one per step). Off by default, so the
 //! gate's inventory (`tools/bench-compare`) is unchanged.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: benchmark setup
 
