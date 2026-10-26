@@ -25,6 +25,54 @@ refusal's text on the verifier's path in
 `a_spend_the_script_allows_is_valid_and_one_it_refuses_is_a_spend_refusal`. Additive: the enum's shape and arms do
 not move; it gains no `std::error::Error`, as `Reason` has none.
 
+### Fixed: getNetwork and getVersion are the wallet's answers forwarded, the version checked as the reference checks it (#222)
+
+The keeper's ruling on #222 (2026-10-25). This processor answered both calls
+from its own configuration (`new` gave mainnet and `0.1.0`, `with_config` what
+it was given) and never asked its wallet, so #216's result validation had
+nothing to check. The reference's processor calls
+`this.wallet.getNetwork({}, originator)` and
+`this.wallet.getVersion({}, originator)` through `#invokeValidatedWallet`
+(`ts-stack@edf6e03` `WalletWireProcessor.ts:1701-1705`, `:1721-1725`) and
+writes the network as one byte, 0 for mainnet (`:1710`), and the version's
+UTF-8 bytes with no length (`:1730`); its result check wants the network
+`mainnet` or `testnet` and the version a string of 7 to 30 UTF-8 bytes
+(`WalletResultValidation.ts:2298-2304`, `string` `:908-915`). BRC-100 names
+the version "the wallet's version string (e.g., `vendor-1.0.0`)" (section 28,
+`wallet/0100.md:2517` at `5119a9b`). go-sdk forwards both too and checks
+neither (`go-sdk@2ca481c` `wallet/substrates/wallet_wire_processor.go:400-414`;
+`wallet/serializer/get_network.go` writes any network not mainnet as 1).
+
+Both calls now go through `invoke_wallet` to the `Wallet` trait's
+`get_network` and `get_version`, like the other thirteen (a wallet's error is
+`Wallet operation failed`, #202). A version outside 7 to 30 bytes is refused,
+code 1, `Invalid getVersion result version: expected 7–30 UTF-8 bytes`, the
+reference's words and en dash. The network's rule is the `Network` type's:
+it has the two values and no third, so a wallet here cannot answer one the
+reference refuses, and a third read from JSON is no `GetNetworkResult`.
+`ProtoWallet` answers `bsv-rs-<CARGO_PKG_VERSION>` (`bsv-rs-0.9.0`, 12 bytes),
+where it answered the stale `bsv-rs-0.3.0`, and mainnet as before.
+`WalletWireProcessor::with_config`, `network()` and `version()` keep their
+signatures and are deprecated: their values reach no frame.
+
+The tests that pin it, in `tests/wire_processor_validation.rs`:
+`get_network_and_get_version_forward_the_wallets_answers_byte_for_byte`,
+`a_version_result_outside_7_to_30_bytes_is_refused_with_code_1` (`0.1.0`,
+6 bytes and 31 refused; 7, 30 and six two-byte characters pass) and
+`the_proto_wallet_network_and_version_pass_the_result_checks`, red on
+`25875bb` (the wallet never called; the processor's `0.1.0` written);
+`a_network_outside_mainnet_and_testnet_is_no_network_result`, green before,
+says where the network's rule lives. Go's `getVersion-simple-result.json`
+answers `1.0.0`, 5 bytes, which the processor now refuses as the reference
+does: it joins the result-vector test's allowlist (12 to 13, passing rows 15
+to 14). The two wire recordings' `processor_observed` moved from `null` to
+the wallet's call; no byte moved (F18 in `docs/FIXTURES.md`).
+
+Migration: a client of `WalletWireProcessor::new` that read getVersion's
+`0.1.0` now reads its wallet's version (`bsv-rs-0.9.0` from `ProtoWallet`);
+a caller of `with_config` gives its network and version to its wallet's
+`get_network` and `get_version` instead, and a wallet whose version is
+outside 7 to 30 bytes is answered with the refusal, code 1.
 ### Added: an optional `tracing` feature: the processor's wrapper logs the wallet's words it frames away (#212)
 
 The keeper's ruling on #202: an un-coded wallet error is framed as the
@@ -389,12 +437,8 @@ absent counterparty, the data-type flag and the 32-byte hash and HMAC
 (`requests.rs`), the booleans, the `PublicKey`, `u8` and `[u8; 32]` result
 fields; those refusals keep this crate's words, code 1. The thirteen stubs
 are untouched (`the_thirteen_stubs_are_untouched`). getNetwork and getVersion
-are answered by the processor from its own configuration, not asked of the
-wallet, and are not checked, where the reference asks its wallet and checks the
-answer (`WalletWireProcessor.ts:1694-1730`; the network `mainnet` or `testnet`,
-the version 7 to 30 bytes, `WalletResultValidation.ts:2299-2306`): the
-processor's default version `0.1.0` is 5 bytes, a result the reference refuses,
-and is neither this crate's version nor its wallet's (a follow-up issue). The two linkage keys of revealCounterpartyKeyLinkage, revealSpecificKeyLinkage's verifier and its absent counterparty are refused at this crate's reader, code 1, where the reference refuses them in `validateWalletArgs`, code 6 (`validationHelpers.ts:1736-1738`, `:1744-1745`); #226 moves them.
+were answered by the processor from its own configuration and not checked;
+#222 forwards and checks them (the entry above). The two linkage keys of revealCounterpartyKeyLinkage, revealSpecificKeyLinkage's verifier and its absent counterparty are refused at this crate's reader, code 1, where the reference refuses them in `validateWalletArgs`, code 6 (`validationHelpers.ts:1736-1738`, `:1744-1745`); #226 moves them.
 
 `ProtoWallet` answers revealSpecificKeyLinkage for anyone with `PrivateKey(1)`'s
 key, as the reference's does (`ProtoWallet.ts:235-240`), where it answered its

@@ -151,7 +151,7 @@ ProtoWallet does NOT:
 ProtoWallet implements `WalletInterface` (via `#[async_trait]`) with full support for cryptographic operations:
 - Key operations: All 9 methods fully implemented (synchronous internally, wrapped as async)
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
-- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns `Network::Mainnet`, `get_version` returns `"bsv-rs-0.1.0"`, `get_height` returns 0, `get_header_for_height` returns error
+- Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns `Network::Mainnet`, `get_version` returns `bsv-rs-<CARGO_PKG_VERSION>` (`bsv-rs-0.9.0`; BRC-100's vendor-1.0.0 shape, 7 to 30 bytes as the wire processor checks it, #222), `get_height` returns 0, `get_header_for_height` returns error
 
 #### Schnorr Proof for Counterparty Key Linkage
 
