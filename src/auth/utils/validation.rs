@@ -124,15 +124,9 @@ pub async fn validate_certificate<W: WalletInterface>(
                 }
 
                 // Attempt to decrypt fields to verify keyring is valid
-                let mut cert_clone = cert.clone();
-                cert_clone
-                    .decrypt_fields(
-                        verifier_wallet,
-                        &cert.certificate.subject,
-                        None,
-                        None,
-                        originator,
-                    )
+                let subject = &cert.certificate.subject;
+                cert.clone()
+                    .decrypt_fields(verifier_wallet, subject, None, None, originator)
                     .await?;
             }
         }
@@ -775,7 +769,7 @@ mod tests {
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
         cert.set_field("name", b"alice".to_vec()).unwrap();
-        cert.set_field("email", b"alice@example.com".to_vec())
+        cert.set_field("email", b"alice@example.com".into())
             .unwrap();
         cert.set_field("phone", b"+1234567890".to_vec()).unwrap();
         cert.sign(&certifier).unwrap();
