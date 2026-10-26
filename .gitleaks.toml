@@ -1,5 +1,6 @@
-# gitleaks policy for the `secrets` CI job (gitleaks 8.30.1, `gitleaks git --redact --exit-code 1 .`;
-# every fetched branch is scanned). The default rules apply everywhere; each allowlist below names
+# gitleaks policy for the `secrets` CI job (gitleaks 8.30.1, `gitleaks git --redact -v --exit-code 1
+# --log-opts=<range> .`: on a pull request the PR's own commits, on a push and a dispatch the line's
+# full history; bsv-rs#272). The default rules apply everywhere; each allowlist below names
 # the recorded test material it lets through, which looks like a key and is not one. A real secret
 # never belongs in any of them; a reviewer reads a new file under these paths as a vector, and the
 # `secrets` job keeps scanning everything else.
@@ -39,3 +40,18 @@ regexes = [
   '''^001829e1dd58fc2c45b6edcbb277eecdecbab1c884b42fd779e131fea5881b45$''',
   '''^0000a52a35523175d6c181e90f463a27cdbf70f4ecf055e912d6fc24ac7d0e3c$''',
 ]
+
+# tests/vectors/wallet_http_json_shapes_105.json and tests/wallet_http_json_shapes_105.rs: the
+# #105 HTTP JSON witnesses' identity key is secp256k1's generator point G in compressed form, the
+# public key of the private key 1, a public constant of the curve. Only that literal is let
+# through, never the files.
+[[allowlists]]
+description = "the generator point as the #105 witnesses' identity key"
+regexes = ['''^0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798$''']
+
+# tests/wallet_http_json_shapes_105.rs: the public-key-shaped hex the old `{"publicKey": ..}` revealer
+# test sends to show the shape is refused (#105, item 9); a test literal, not a key in use. Only that
+# literal is let through, never the file.
+[[allowlists]]
+description = "the old revealer shape's test key (#105)"
+regexes = ['''^025ad43a22ac38d0bc1f8bacaabb323b5d634703b7a774c4268f6a09e4ddf79097$''']
