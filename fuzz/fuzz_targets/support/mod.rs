@@ -16,38 +16,13 @@ use serde::de::DeserializeOwned;
 /// The calls both the HTTP JSON substrate and the wire transceiver carry.
 pub const SHARED_CALLS: u8 = 26;
 
-/// A vector's `json` member as the call's arguments. Two of the Go JSON's
-/// shapes are not this crate's serde shapes (a transaction as an array of
-/// bytes, read here as hex; a public-key `keyringRevealer`, which
-/// `acquire_certificate`'s issuance vector does not carry): the vector is
-/// reshaped to this crate's form before it is read, so the call sends what
-/// this crate sends. A certificate's `type` is this crate's since #105.
+/// A vector's `json` member as the call's arguments, read as it is: the Go
+/// JSON's shapes are this crate's serde shapes since #105 (a transaction as
+/// an array of bytes, a public-key `keyringRevealer`, a certificate's `type`),
+/// so the call sends what the reference sends.
 pub fn vector<T: DeserializeOwned>(text: &str) -> T {
     let value: serde_json::Value = serde_json::from_str(text).expect("a vector is JSON");
-    serde_json::from_value(reshape(value["json"].clone()))
-        .expect("a vector's arguments deserialize")
-}
-
-fn reshape(value: serde_json::Value) -> serde_json::Value {
-    use serde_json::Value;
-    match value {
-        Value::Object(map) => Value::Object(
-            map.into_iter()
-                .map(|(key, value)| match (key.as_str(), value) {
-                    ("tx", Value::Array(bytes)) => {
-                        let hex: String = bytes
-                            .iter()
-                            .map(|b| format!("{:02x}", b.as_u64().unwrap_or(0)))
-                            .collect();
-                        ("tx".to_string(), Value::String(hex))
-                    }
-                    (_, value) => (key, reshape(value)),
-                })
-                .collect(),
-        ),
-        Value::Array(items) => Value::Array(items.into_iter().map(reshape).collect()),
-        other => other,
-    }
+    serde_json::from_value(value["json"].clone()).expect("a vector's arguments deserialize")
 }
 
 macro_rules! args_from_vector {

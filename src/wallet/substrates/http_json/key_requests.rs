@@ -1,6 +1,9 @@
 //! The JSON bodies of the nine key-related calls, in the reference's names
 //! (`HTTPWalletJSON` sends the args object as given), moved out of
-//! `http_json.rs`.
+//! `http_json.rs`: `protocolID` the `[level, name]` pair, `keyID`, and the
+//! two direct hashes as arrays of byte numbers (BRC-100 at `5119a9b`
+//! `wallet/0100.md:1037-1038`, `:1182-1184`, `:1213-1216`;
+//! `ts-stack@edf6e03` `Wallet.interfaces.ts:665-667`, `:798`, `:813`; #105).
 
 use serde::{Deserialize, Serialize};
 
@@ -34,10 +37,13 @@ pub(super) use permission;
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonGetPublicKeyRequest {
+    /// Written only when true, as BRC-100's `identityKey?: true`
+    /// (`wallet/0100.md:980`; `Wallet.interfaces.ts:683`; #105)
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub(super) identity_key: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "protocolID", skip_serializing_if = "Option::is_none")]
     pub(super) protocol_id: Option<(u8, String)>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "keyID", skip_serializing_if = "Option::is_none")]
     pub(super) key_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
@@ -56,7 +62,9 @@ pub(super) struct JsonGetPublicKeyResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonEncryptRequest {
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
@@ -74,7 +82,9 @@ pub(super) struct JsonEncryptResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonDecryptRequest {
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
@@ -92,7 +102,9 @@ pub(super) struct JsonDecryptResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonCreateHmacRequest {
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
@@ -110,7 +122,9 @@ pub(super) struct JsonCreateHmacResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonVerifyHmacRequest {
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
@@ -129,14 +143,16 @@ pub(super) struct JsonVerifyHmacResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonCreateSignatureRequest {
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) data: Option<Vec<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) hash_to_directly_sign: Option<String>, // hex
+    pub(super) hash_to_directly_sign: Option<Vec<u8>>,
     #[serde(flatten)]
     pub(super) permission: JsonPermission,
 }
@@ -150,7 +166,9 @@ pub(super) struct JsonCreateSignatureResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonVerifySignatureRequest {
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) counterparty: Option<String>,
@@ -159,7 +177,7 @@ pub(super) struct JsonVerifySignatureRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) data: Option<Vec<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) hash_to_directly_verify: Option<String>, // hex
+    pub(super) hash_to_directly_verify: Option<Vec<u8>>,
     pub(super) signature: Vec<u8>,
     #[serde(flatten)]
     pub(super) permission: JsonPermission,
@@ -187,7 +205,9 @@ pub(super) struct JsonRevealCounterpartyRequest {
 pub(super) struct JsonRevealSpecificRequest {
     pub(super) counterparty: String, // "self", "anyone", or hex pubkey
     pub(super) verifier: String,     // hex pubkey
+    #[serde(rename = "protocolID")]
     pub(super) protocol_id: (u8, String), // (security_level, protocol_name)
+    #[serde(rename = "keyID")]
     pub(super) key_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) privileged: Option<bool>,
@@ -208,8 +228,7 @@ mod tests {
     #[tokio::test]
     async fn create_signature_sends_the_permission_fields_in_the_references_names() {
         let server = MockServer::start().await;
-        // The crate's own `protocolId` and `keyId` spellings are as they were
-        let base = serde_json::json!({"protocolId": [1, "permission fields"], "keyId": "k",
+        let base = serde_json::json!({"protocolID": [1, "permission fields"], "keyID": "k",
             "data": [1, 2]});
         let mut with = base.clone();
         with["privileged"] = true.into();

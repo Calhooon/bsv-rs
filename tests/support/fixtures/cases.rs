@@ -35,11 +35,22 @@ fn certificate(full: bool) -> Value {
         "signature": "3006020101020101", "fields": if full { json!({"name": "Fixture"}) } else { json!({}) }})
 }
 
+/// A list or discovery entry: the certificate's fields flat beside the
+/// entry's own, as BRC-100 has them (#105).
+fn with_certificate(certificate: &Value, entry: Value) -> Value {
+    let mut flat = certificate.clone();
+    flat.as_object_mut()
+        .unwrap()
+        .extend(entry.as_object().unwrap().clone());
+    flat
+}
+
 fn sample(call: WalletCall, full: bool) -> (Value, Value) {
     use WalletCall::*;
-    let txid = vec![0x31u8; 32];
     let txid_hex = "31".repeat(32);
     let outpoint = format!("{txid_hex}.2");
+    // An atomic BEEF's bytes as a JSON array, as BRC-100's `AtomicBEEF` (#105)
+    let beef = vec![1u8, 0, 190, 239, 0, 0];
     let blob = if full {
         vec![0, 1, 127, 128, 254, 255]
     } else {
@@ -51,18 +62,18 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
             let mut input = json!({"description": "fixture action"});
             let mut result = json!({});
             if full {
-                input = json!({"description": "fixture action", "inputBeef": "0100beef0000",
+                input = json!({"description": "fixture action", "inputBEEF": beef,
                     "inputs": [{"outpoint": outpoint, "inputDescription": "fixture input", "unlockingScript": "51",
                         "unlockingScriptLength": 1, "sequenceNumber": 4294967294u32}],
                     "outputs": [{"lockingScript": "51", "satoshis": 1234, "outputDescription": "fixture output",
                         "basket": "fixtures", "customInstructions": "keep", "tags": ["alpha", "omega"]}],
                     "lockTime": 800000, "version": 2, "labels": ["alpha", "omega"],
                     "options": {"signAndProcess": false, "acceptDelayedBroadcast": false, "trustSelf": "known",
-                        "knownTxids": [txid], "returnTxidOnly": false, "noSend": true,
-                        "noSendChange": [outpoint], "sendWith": [vec![0x32u8;32]], "randomizeOutputs": false}});
-                result = json!({"txid": txid, "tx": "0100beef0000", "noSendChange": [outpoint],
+                        "knownTxids": [txid_hex], "returnTXIDOnly": false, "noSend": true,
+                        "noSendChange": [outpoint], "sendWith": ["32".repeat(32)], "randomizeOutputs": false}});
+                result = json!({"txid": txid_hex, "tx": beef, "noSendChange": [outpoint],
                     "sendWithResults": [{"txid": "32".repeat(32), "status": "unproven"}],
-                    "signableTransaction": {"tx": "0100beef0000", "reference": "66697874757265"},
+                    "signableTransaction": {"tx": beef, "reference": "Zml4dHVyZQ=="},
                     "inputType": "P2PKH", "inputs": input["inputs"], "referenceNumber": "fixture",
                     "beef": "0100beef0000"});
             }
@@ -71,12 +82,12 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
         SignAction => (
             if full {
                 json!({"reference": "Zml4dHVyZQ==", "spends": {"2": {"unlockingScript": "51", "sequenceNumber": 4294967294u32}},
-                "options": {"acceptDelayedBroadcast": false, "returnTxidOnly": true, "noSend": true, "sendWith": [txid]}})
+                "options": {"acceptDelayedBroadcast": false, "returnTXIDOnly": true, "noSend": true, "sendWith": [txid_hex]}})
             } else {
                 json!({"reference": "Zml4dHVyZQ==", "spends": {}})
             },
             if full {
-                json!({"txid": txid, "tx": "0100beef0000", "sendWithResults": [{"txid": txid_hex, "status": "sending"}]})
+                json!({"txid": txid_hex, "tx": beef, "sendWithResults": [{"txid": txid_hex, "status": "sending"}]})
             } else {
                 json!({})
             },
@@ -106,13 +117,13 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
         ),
         InternalizeAction => (
             if full {
-                json!({"tx": "0100beef0000", "description": "fixture action", "labels": ["alpha", "omega"], "seekPermission": false,
+                json!({"tx": beef, "description": "fixture action", "labels": ["alpha", "omega"], "seekPermission": false,
                 "outputs": [{"outputIndex": 0, "protocol": "wallet payment", "paymentRemittance": {
                     "derivationPrefix": "Zml4dHVyZQ==", "derivationSuffix": "c3VmZml4", "senderIdentityKey": PUBLIC_KEY}},
                     {"outputIndex": 1, "protocol": "basket insertion", "insertionRemittance": {
                         "basket": "fixtures", "customInstructions": "keep", "tags": ["alpha", "omega"]}}]})
             } else {
-                json!({"tx": "0100beef0000", "description": "fixture action", "outputs": []})
+                json!({"tx": beef, "description": "fixture action", "outputs": []})
             },
             json!({"accepted": true}),
         ),
@@ -231,8 +242,8 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
                 json!({"certifiers": [], "types": []})
             },
             if full {
-                json!({"totalCertificates": 1, "certificates": [{"certificate": certificate,
-                "keyring": {"name": "Zml4dHVyZQ==", "role": "cmVhZGVy"}, "verifier": PUBLIC_KEY}]})
+                json!({"totalCertificates": 1, "certificates": [with_certificate(&certificate,
+                json!({"keyring": {"name": "Zml4dHVyZQ==", "role": "cmVhZGVy"}, "verifier": PUBLIC_KEY}))]})
             } else {
                 json!({"totalCertificates": 0, "certificates": []})
             },
@@ -265,9 +276,9 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
                 input["seekPermission"] = json!(false);
             }
             let result = if full {
-                json!({"totalCertificates": 1, "certificates": [{"certificate": certificate,
+                json!({"totalCertificates": 1, "certificates": [with_certificate(&certificate, json!({
                 "certifierInfo": {"name": "Fixture Certifier", "iconUrl": "https://certifier.invalid/icon", "description": "fixture only", "trust": 5},
-                "publiclyRevealedKeyring": {"name": "Zml4dHVyZQ==", "role": "cmVhZGVy"}, "decryptedFields": {"name": "Fixture", "role": "reader"}}]})
+                "publiclyRevealedKeyring": {"name": "Zml4dHVyZQ==", "role": "cmVhZGVy"}, "decryptedFields": {"name": "Fixture", "role": "reader"}}))]})
             } else {
                 json!({"totalCertificates": 0, "certificates": []})
             };

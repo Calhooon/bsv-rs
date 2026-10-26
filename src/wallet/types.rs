@@ -578,11 +578,15 @@ pub struct CreateActionOptions {
     /// If "known", input transactions may omit validity proof data for known TXIDs.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trust_self: Option<TrustSelf>,
-    /// TXIDs that may be assumed valid.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// TXIDs that may be assumed valid (hex strings in JSON, #105).
+    #[serde(
+        with = "hex_txid_vec_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub known_txids: Option<Vec<TxId>>,
-    /// If true, only return TXID instead of full transaction.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// If true, only return TXID instead of full transaction; `returnTXIDOnly` in JSON (#105).
+    #[serde(rename = "returnTXIDOnly", skip_serializing_if = "Option::is_none")]
     pub return_txid_only: Option<bool>,
     /// If true, construct but don't send the transaction.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -590,8 +594,12 @@ pub struct CreateActionOptions {
     /// Change outpoints from prior noSend actions.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub no_send_change: Option<Vec<Outpoint>>,
-    /// Batch send with these TXIDs.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Batch send with these TXIDs (hex strings in JSON, #105).
+    #[serde(
+        with = "hex_txid_vec_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub send_with: Option<Vec<TxId>>,
     /// If false, don't randomize output order.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -676,11 +684,10 @@ pub struct ReviewActionResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignableTransaction {
-    /// The transaction in atomic BEEF format (hex encoded).
-    #[serde(with = "hex_bytes")]
+    /// The transaction in atomic BEEF format (an array of byte numbers in JSON, #105).
     pub tx: Vec<u8>,
-    /// Reference for signing (hex encoded).
-    #[serde(with = "hex_bytes")]
+    /// Reference for signing (base64 in JSON, BRC-100's `Base64String`, #105).
+    #[serde(with = "base64_bytes")]
     pub reference: Vec<u8>,
 }
 
@@ -688,15 +695,15 @@ pub struct SignableTransaction {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CreateActionResult {
-    /// The transaction ID (if available).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub txid: Option<TxId>,
-    /// The transaction in atomic BEEF format (if available, hex encoded).
+    /// The transaction ID (if available; a hex string in JSON, #105).
     #[serde(
-        with = "hex_bytes_option",
+        with = "hex_txid_option",
         skip_serializing_if = "Option::is_none",
         default
     )]
+    pub txid: Option<TxId>,
+    /// The transaction in atomic BEEF format (if available; an array of byte numbers in JSON, #105).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tx: Option<Vec<u8>>,
     /// Change outpoints for noSend transactions.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -765,9 +772,9 @@ pub struct Certificate {
     pub signature: Option<Vec<u8>>,
 }
 
-/// Keyring revealer for certificates.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// Keyring revealer for certificates: `'certifier'` or the key's hex in JSON
+/// (`types/json_forms.rs`, #105).
+#[derive(Debug, Clone)]
 pub enum KeyringRevealer {
     /// The certifier reveals the keyring.
     Certifier,
@@ -901,6 +908,8 @@ pub struct WalletOutput {
 // Key Linkage Types
 // =============================================================================
 
+mod json_forms;
+use json_forms::{base64_bytes, hex_txid_option};
 mod linkage;
 pub use linkage::{
     KeyLinkageResult, RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult,
@@ -996,12 +1005,8 @@ impl std::str::FromStr for OutputInclude {
 pub struct CreateActionArgs {
     /// A human-readable description of the action (5-50 characters).
     pub description: String,
-    /// Optional BEEF data for input transactions (hex encoded).
-    #[serde(
-        with = "hex_bytes_option",
-        skip_serializing_if = "Option::is_none",
-        default
-    )]
+    /// Optional BEEF data for input transactions; `inputBEEF`, an array of byte numbers, in JSON (#105).
+    #[serde(rename = "inputBEEF", skip_serializing_if = "Option::is_none", default)]
     pub input_beef: Option<Vec<u8>>,
     /// Optional array of inputs for the transaction.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1046,14 +1051,18 @@ pub struct SignActionOptions {
     /// If true, accept delayed broadcast.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub accept_delayed_broadcast: Option<bool>,
-    /// If true, only return TXID instead of full transaction.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// If true, only return TXID instead of full transaction; `returnTXIDOnly` in JSON (#105).
+    #[serde(rename = "returnTXIDOnly", skip_serializing_if = "Option::is_none")]
     pub return_txid_only: Option<bool>,
     /// If true, construct but don't send the transaction.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub no_send: Option<bool>,
-    /// Batch send with these TXIDs.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// Batch send with these TXIDs (hex strings in JSON, #105).
+    #[serde(
+        with = "hex_txid_vec_option",
+        skip_serializing_if = "Option::is_none",
+        default
+    )]
     pub send_with: Option<Vec<TxId>>,
 }
 
@@ -1074,15 +1083,15 @@ pub struct SignActionArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SignActionResult {
-    /// The transaction ID (if available).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub txid: Option<TxId>,
-    /// The transaction in atomic BEEF format (if available, hex encoded).
+    /// The transaction ID (if available; a hex string in JSON, #105).
     #[serde(
-        with = "hex_bytes_option",
+        with = "hex_txid_option",
         skip_serializing_if = "Option::is_none",
         default
     )]
+    pub txid: Option<TxId>,
+    /// The transaction in atomic BEEF format (if available; an array of byte numbers in JSON, #105).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
     pub tx: Option<Vec<u8>>,
     /// Results of transactions sent with this action.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1211,8 +1220,7 @@ pub struct InternalizeOutput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InternalizeActionArgs {
-    /// Transaction in atomic BEEF format (hex encoded).
-    #[serde(with = "hex_bytes")]
+    /// Transaction in atomic BEEF format (an array of byte numbers in JSON, #105).
     pub tx: Vec<u8>,
     /// Metadata about outputs to internalize.
     pub outputs: Vec<InternalizeOutput>,
@@ -1402,7 +1410,8 @@ pub struct ListCertificatesArgs {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CertificateResult {
-    /// The certificate.
+    /// The certificate; its fields flat on the entry in JSON (#105).
+    #[serde(flatten)]
     pub certificate: WalletCertificate,
     /// Optional keyring for field decryption.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1499,7 +1508,8 @@ pub struct IdentityCertifier {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct IdentityCertificate {
-    /// The base certificate.
+    /// The base certificate; its fields flat on the entry in JSON (#105).
+    #[serde(flatten)]
     pub certificate: WalletCertificate,
     /// Information about the certifier.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1883,8 +1893,8 @@ mod tests {
     }
 
     #[test]
-    fn test_create_action_args_hex_serialization() {
-        // Test the main CreateActionArgs struct
+    fn create_action_args_input_beef_is_a_byte_array() {
+        // `inputBEEF`, an array of byte numbers, as BRC-100's `BEEF` (#105)
         let args = CreateActionArgs {
             description: "Test action description".to_string(),
             input_beef: Some(vec![0xBE, 0xEF, 0x00, 0x01]),
@@ -1897,21 +1907,13 @@ mod tests {
         };
 
         let json = serde_json::to_string(&args).unwrap();
-        // Should contain hex string "beef0001"
-        assert!(
-            json.contains("\"beef0001\""),
-            "Expected hex string for inputBeef: {}",
-            json
-        );
-        assert!(
-            !json.contains("[190"),
-            "Should not contain int array: {}",
-            json
-        );
+        assert!(json.contains("\"inputBEEF\":[190,239,0,1]"), "{json}");
 
-        // Test deserialization
-        let json_input = r#"{"description":"Test action description","inputBeef":"beef0001"}"#;
+        let json_input = r#"{"description":"Test action description","inputBEEF":[190,239,0,1]}"#;
         let parsed: CreateActionArgs = serde_json::from_str(json_input).unwrap();
+        // The hex string and the name this crate wrote until #105 are not it
+        let hex = r#"{"description":"Test action description","inputBEEF":"beef0001"}"#;
+        assert!(serde_json::from_str::<CreateActionArgs>(hex).is_err());
         assert_eq!(parsed.input_beef, Some(vec![0xBE, 0xEF, 0x00, 0x01]));
     }
 }
