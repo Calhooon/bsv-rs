@@ -590,15 +590,19 @@ impl<'a> BinaryReader<'a> {
     }
 
     /// Reads a varint carrying an output index; above `u32::MAX` is refused
-    /// with the field named, never truncated to another index.
+    /// with the field named, never truncated to another index (#122), in the
+    /// bound refusal's one form (`integer_refusal`). The reference's reader
+    /// has no words here: it reads the index with `readVarIntNumStrict(false)`
+    /// and no bound (`ts-stack@edf6e03` `Certificate.ts:353`), so the field's
+    /// name is this crate's (#258).
     fn read_varint_index(&mut self, field: &str) -> Result<u32> {
         let value = self.read_varint()?;
         u32::try_from(value).map_err(|_| {
-            Error::CertificateValidationError(format!(
-                "invalid {}: expected at most {}, got {}",
+            Error::CertificateValidationError(crate::wallet::wire::integer_refusal(
                 field,
-                u32::MAX,
-                value
+                value,
+                0,
+                u32::MAX.into(),
             ))
         })
     }
@@ -780,7 +784,7 @@ mod tests {
         assert_eq!(
             err,
             Error::CertificateValidationError(
-                "invalid revocation outpoint index: expected at most 4294967295, got 4294967296"
+                "Invalid revocation outpoint index: expected an integer from 0 to 4294967295, received 4294967296"
                     .to_string()
             )
         );
