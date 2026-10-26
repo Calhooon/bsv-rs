@@ -908,3 +908,173 @@ fn a_wire_length_past_u32_is_refused_on_every_target_not_cut_to_its_low_bits() {
         refused.map(drop)
     );
 }
+
+/// A page of `entries` copies of one valid entry behind the declared `total`:
+/// the first frame's total byte replaced, its entry repeated.
+fn page(one: &[u8], total: u64, entries: usize) -> Vec<u8> {
+    let mut out = Vec::new();
+    var_int(&mut out, total);
+    for _ in 0..entries {
+        out.extend_from_slice(&one[1..]);
+    }
+    out
+}
+
+fn list_page(total: u64, entries: usize) -> Vec<u8> {
+    let one = list_frame(&Parts::valid().bytes(), &no_keyring(), &[]);
+    page(&one, total, entries)
+}
+
+fn discovery_page(total: u64, entries: usize) -> Vec<u8> {
+    let one = discovery_frame(&Parts::valid().bytes(), 5, &[0], &[0]);
+    page(&one, total, entries)
+}
+
+/// A refusal's words, or the typed error's form for one that is not a
+/// `WalletError`.
+fn words(error: Error) -> String {
+    match error {
+        Error::WalletError(m) => m,
+        other => format!("{other:?}"),
+    }
+}
+
+/// listCertificates and both discovery calls with a requested `limit`.
+async fn every_page_reader(
+    list_frame: Vec<u8>,
+    discovery_frame: Vec<u8>,
+    limit: Option<u32>,
+) -> [Result<(u32, usize), String>; 3] {
+    let listed = client(list_frame)
+        .list_certificates(
+            ListCertificatesArgs {
+                certifiers: vec![],
+                types: vec![],
+                limit,
+                offset: None,
+                privileged: None,
+                privileged_reason: None,
+            },
+            "fixtures.invalid",
+        )
+        .await
+        .map(|r| (r.total_certificates, r.certificates.len()))
+        .map_err(words);
+    let by_key = client(discovery_frame.clone())
+        .discover_by_identity_key(
+            DiscoverByIdentityKeyArgs {
+                identity_key: G.to_string(),
+                limit,
+                offset: None,
+                seek_permission: None,
+            },
+            "fixtures.invalid",
+        )
+        .await
+        .map(|r| (r.total_certificates, r.certificates.len()))
+        .map_err(words);
+    let by_attributes = client(discovery_frame)
+        .discover_by_attributes(
+            DiscoverByAttributesArgs {
+                attributes: HashMap::from([("name".to_string(), "x".to_string())]),
+                limit,
+                offset: None,
+                seek_permission: None,
+            },
+            "fixtures.invalid",
+        )
+        .await
+        .map(|r| (r.total_certificates, r.certificates.len()))
+        .map_err(words);
+    [listed, by_key, by_attributes]
+}
+
+/// `WalletWireTransceiver.ts:1507` (listCertificates) and `:1700`
+/// (discovery): the entries are read `while (!resultReader.eof())`, so a byte
+/// after the last entry is read as the start of another and refused by the
+/// entry's reader (bsv-rs#190). A one-byte `00` is an entry whose certificate
+/// is empty, its type's 32 bytes missing.
+#[tokio::test]
+async fn a_byte_after_the_last_certificates_entry_is_refused() {
+    let mut listed = list_page(1, 1);
+    listed.push(0);
+    let mut discovered = discovery_page(1, 1);
+    discovered.push(0);
+    for read in every_page_reader(listed, discovered, None).await {
+        assert_eq!(
+            read,
+            Err(format!(
+                "{:?}",
+                Error::ReaderUnderflow {
+                    needed: 32,
+                    available: 0
+                }
+            ))
+        );
+    }
+}
+
+/// `WalletWireTransceiver.ts:1550`, `:1759` and `#assertPageCount`
+/// (`:1940-1946`): a page holding more entries than the declared total is
+/// refused, where the entries were read to the total and the rest dropped
+/// (bsv-rs#190).
+#[tokio::test]
+async fn a_certificates_page_past_its_declared_total_is_refused() {
+    let reads = every_page_reader(list_page(1, 2), discovery_page(1, 2), None).await;
+    let calls = ["listCertificates", "discover", "discover"];
+    for (read, call) in reads.into_iter().zip(calls) {
+        assert_eq!(
+            read,
+            Err(format!(
+                "Wallet Wire {call} response returned 2 records but declared a total of 1"
+            ))
+        );
+    }
+}
+
+/// `totalCertificates` is the total of every page (the processor writes
+/// `certificatesPage.total` ahead of the page's records,
+/// `WalletWireProcessor.ts:2052-2053`, `:2486-2487`), so a total above the
+/// entries is read as given, where the reader asked for `total` entries
+/// (bsv-rs#190).
+#[tokio::test]
+async fn a_certificates_total_above_the_page_is_read() {
+    let reads = every_page_reader(list_page(25, 2), discovery_page(25, 2), None).await;
+    for read in reads {
+        assert_eq!(read, Ok((25, 2)));
+    }
+    let reads = every_page_reader(list_page(7, 0), discovery_page(7, 0), None).await;
+    for read in reads {
+        assert_eq!(read, Ok((7, 0)));
+    }
+}
+
+/// `#requirePageCapacity` (`WalletWireTransceiver.ts:1948-1953`), called
+/// before each entry (`:1509`, `:1701`): a page past the requested limit, or
+/// past 10 when none was requested (`requestedLimit ?? 10`), is refused; a
+/// page at the limit is read (bsv-rs#190).
+#[tokio::test]
+async fn a_certificates_page_past_the_requested_limit_is_refused() {
+    let calls = ["listCertificates", "discover", "discover"];
+    for (limit, maximum) in [(Some(3), 3usize), (None, 10)] {
+        let at =
+            every_page_reader(list_page(50, maximum), discovery_page(50, maximum), limit).await;
+        for read in at {
+            assert_eq!(read, Ok((50, maximum)));
+        }
+        let past = every_page_reader(
+            list_page(50, maximum + 1),
+            discovery_page(50, maximum + 1),
+            limit,
+        )
+        .await;
+        for (read, call) in past.into_iter().zip(calls) {
+            assert_eq!(
+                read,
+                Err(format!(
+                    "Wallet Wire {call} response exceeds the requested page limit of {maximum}"
+                ))
+            );
+        }
+    }
+}
