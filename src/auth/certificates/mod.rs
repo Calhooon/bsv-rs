@@ -28,11 +28,12 @@
 //! - Key ID (verifiable): `"{serial_number_base64} {field_name}"`
 
 mod certificate;
+mod certificate_json;
 mod master;
 mod verifiable;
 
-pub(crate) use certificate::revocation_outpoint_from_str;
 pub use certificate::Certificate;
+pub(crate) use certificate_json::revocation_outpoint_from_str;
 pub use master::MasterCertificate;
 pub use verifiable::VerifiableCertificate;
 
