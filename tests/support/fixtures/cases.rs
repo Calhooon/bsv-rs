@@ -30,7 +30,7 @@ pub fn cases(call: WalletCall) -> Vec<Case> {
 }
 
 fn certificate(full: bool) -> Value {
-    json!({"certificateType": to_base64(&[0x11; 32]), "serialNumber": to_base64(&[0x22; 32]),
+    json!({"type": to_base64(&[0x11; 32]), "serialNumber": to_base64(&[0x22; 32]),
         "subject": PUBLIC_KEY, "certifier": VERIFIER, "revocationOutpoint": format!("{}.1", "33".repeat(32)),
         "signature": "3006020101020101", "fields": if full { json!({"name": "Fixture"}) } else { json!({}) }})
 }
@@ -149,15 +149,18 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
                 input["privileged"] = json!(true);
                 input["privilegedReason"] = json!("fixture reason");
             }
-            let linkage = json!({"prover": PUBLIC_KEY, "verifier": VERIFIER, "counterparty": PUBLIC_KEY,
-                "encryptedLinkage": hex::encode(&blob), "encryptedLinkageProof": hex::encode(&blob)});
-            let result = if call == RevealSpecificKeyLinkage {
+            // Flat, the bytes as arrays, as BRC-100 has the two results (#105)
+            let mut result = json!({"prover": PUBLIC_KEY, "verifier": VERIFIER, "counterparty": PUBLIC_KEY,
+                "encryptedLinkage": blob, "encryptedLinkageProof": blob});
+            if call == RevealSpecificKeyLinkage {
                 input["protocolID"] = json!([1, "fixture keys"]);
                 input["keyID"] = json!("fixture");
-                json!({"linkage": linkage, "protocol": {"securityLevel": "1", "protocolName": "fixture keys"}, "keyId": "fixture", "proofType": if full {1} else {0}})
+                result["protocolID"] = json!([1, "fixture keys"]);
+                result["keyID"] = json!("fixture");
+                result["proofType"] = json!(if full { 1 } else { 0 });
             } else {
-                json!({"linkage": linkage, "revelationTime": "2026-10-19T00:00:00Z"})
-            };
+                result["revelationTime"] = json!("2026-10-19T00:00:00Z");
+            }
             (input, result)
         }
         Encrypt | Decrypt | CreateHmac | VerifyHmac | CreateSignature | VerifySignature => {
@@ -210,20 +213,20 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
         }
         AcquireCertificate => (
             if full {
-                json!({"certificateType": certificate["certificateType"], "certifier": VERIFIER,
+                json!({"type": certificate["type"], "certifier": VERIFIER,
                 "acquisitionProtocol": "direct", "fields": certificate["fields"], "serialNumber": certificate["serialNumber"],
                 "revocationOutpoint": certificate["revocationOutpoint"], "signature": certificate["signature"],
                 "keyringRevealer": "certifier", "keyringForSubject": {"name": "Zml4dHVyZQ=="},
                 "privileged": true, "privilegedReason": "fixture reason"})
             } else {
-                json!({"certificateType": certificate["certificateType"], "certifier": VERIFIER,
+                json!({"type": certificate["type"], "certifier": VERIFIER,
                 "acquisitionProtocol": "issuance", "fields": {}, "certifierUrl": "https://certifier.invalid"})
             },
             certificate,
         ),
         ListCertificates => (
             if full {
-                json!({"certifiers": [VERIFIER], "types": [certificate["certificateType"]], "limit": 10, "offset": 3, "privileged": true, "privilegedReason": "fixture reason"})
+                json!({"certifiers": [VERIFIER], "types": [certificate["type"]], "limit": 10, "offset": 3, "privileged": true, "privilegedReason": "fixture reason"})
             } else {
                 json!({"certifiers": [], "types": []})
             },
@@ -247,7 +250,7 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
             },
         ),
         RelinquishCertificate => (
-            json!({"certificateType": certificate["certificateType"], "serialNumber": certificate["serialNumber"], "certifier": VERIFIER}),
+            json!({"type": certificate["type"], "serialNumber": certificate["serialNumber"], "certifier": VERIFIER}),
             json!({"relinquished": true}),
         ),
         DiscoverByIdentityKey | DiscoverByAttributes => {

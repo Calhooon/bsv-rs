@@ -16,12 +16,12 @@ use serde::de::DeserializeOwned;
 /// The calls both the HTTP JSON substrate and the wire transceiver carry.
 pub const SHARED_CALLS: u8 = 26;
 
-/// A vector's `json` member as the call's arguments. Five of the Go JSON's
-/// shapes are not this crate's serde shapes (a certificate's `type`, read
-/// here as `certificateType`; a transaction as an array of bytes, read here
-/// as hex; a public-key `keyringRevealer`, which `acquire_certificate`'s
-/// issuance vector does not carry): the vector is reshaped to this crate's
-/// form before it is read, so the call sends what this crate sends.
+/// A vector's `json` member as the call's arguments. Two of the Go JSON's
+/// shapes are not this crate's serde shapes (a transaction as an array of
+/// bytes, read here as hex; a public-key `keyringRevealer`, which
+/// `acquire_certificate`'s issuance vector does not carry): the vector is
+/// reshaped to this crate's form before it is read, so the call sends what
+/// this crate sends. A certificate's `type` is this crate's since #105.
 pub fn vector<T: DeserializeOwned>(text: &str) -> T {
     let value: serde_json::Value = serde_json::from_str(text).expect("a vector is JSON");
     serde_json::from_value(reshape(value["json"].clone()))
@@ -34,7 +34,6 @@ fn reshape(value: serde_json::Value) -> serde_json::Value {
         Value::Object(map) => Value::Object(
             map.into_iter()
                 .map(|(key, value)| match (key.as_str(), value) {
-                    ("type", value) => ("certificateType".to_string(), reshape(value)),
                     ("tx", Value::Array(bytes)) => {
                         let hex: String = bytes
                             .iter()

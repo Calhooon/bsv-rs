@@ -1,0 +1,409 @@
+{
+  "description": "The HTTP JSON substrate's bodies for the four certificate calls and the two key-linkage calls (#105): the certificate's type field `type`, the linkage results flat with byte arrays and `protocolID`/`keyID`, as BRC-100 and the reference have them",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), HTTPWalletJSON over a recording fetch, run by tests/support/http_json_shapes_105.mjs",
+  "brc": "BRC-100 at brcs@5119a9b wallet/0100.md:1010-1018,1043-1052 (the linkage results), :1247,1265,1300,1332,1365 (the certificate's type)",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "acquireCertificate-issuance",
+      "call": "acquireCertificate",
+      "args": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "acquisitionProtocol": "issuance",
+        "fields": {
+          "name": "Fixture"
+        },
+        "certifierUrl": "https://certifier.invalid"
+      },
+      "result": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        }
+      },
+      "reference_result": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        }
+      },
+      "reference_request_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"acquisitionProtocol\":\"issuance\",\"fields\":{\"name\":\"Fixture\"},\"certifierUrl\":\"https://certifier.invalid\"}",
+      "crate_request_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"acquisitionProtocol\":\"issuance\",\"fields\":{\"name\":\"Fixture\"},\"certifierUrl\":\"https://certifier.invalid\"}",
+      "crate_result_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"}}",
+      "reference_resends_crate_request": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"acquisitionProtocol\":\"issuance\",\"fields\":{\"name\":\"Fixture\"},\"certifierUrl\":\"https://certifier.invalid\"}",
+      "reference_reads_crate_result": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        }
+      }
+    },
+    {
+      "name": "acquireCertificate-direct",
+      "call": "acquireCertificate",
+      "args": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "acquisitionProtocol": "direct",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        },
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "keyringRevealer": "certifier",
+        "keyringForSubject": {
+          "name": "a2V5cmluZw=="
+        },
+        "privileged": true,
+        "privilegedReason": "fixture reason"
+      },
+      "result": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        }
+      },
+      "reference_result": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        }
+      },
+      "reference_request_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"acquisitionProtocol\":\"direct\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"},\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"keyringRevealer\":\"certifier\",\"keyringForSubject\":{\"name\":\"a2V5cmluZw==\"},\"privileged\":true,\"privilegedReason\":\"fixture reason\"}",
+      "crate_request_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"acquisitionProtocol\":\"direct\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"},\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"keyringRevealer\":\"certifier\",\"keyringForSubject\":{\"name\":\"a2V5cmluZw==\"},\"privileged\":true,\"privilegedReason\":\"fixture reason\"}",
+      "crate_result_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"}}",
+      "reference_resends_crate_request": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"acquisitionProtocol\":\"direct\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"},\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"keyringRevealer\":\"certifier\",\"keyringForSubject\":{\"name\":\"a2V5cmluZw==\"},\"privileged\":true,\"privilegedReason\":\"fixture reason\"}",
+      "reference_reads_crate_result": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+        "signature": "3006020101020101",
+        "fields": {
+          "name": "Zml4dHVyZQ=="
+        }
+      }
+    },
+    {
+      "name": "listCertificates-empty-page",
+      "call": "listCertificates",
+      "args": {
+        "certifiers": [
+          "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+        ],
+        "types": [
+          "ERERERERERERERERERERERERERERERERERERERERERE="
+        ],
+        "limit": 10,
+        "offset": 0
+      },
+      "result": {
+        "totalCertificates": 0,
+        "certificates": []
+      },
+      "reference_result": {
+        "totalCertificates": 0,
+        "certificates": []
+      },
+      "reference_request_body": "{\"certifiers\":[\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"],\"types\":[\"ERERERERERERERERERERERERERERERERERERERERERE=\"],\"limit\":10,\"offset\":0}",
+      "crate_request_body": "{\"certifiers\":[\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"],\"types\":[\"ERERERERERERERERERERERERERERERERERERERERERE=\"],\"limit\":10,\"offset\":0}",
+      "crate_result_body": "{\"totalCertificates\":0,\"certificates\":[]}",
+      "reference_resends_crate_request": "{\"certifiers\":[\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"],\"types\":[\"ERERERERERERERERERERERERERERERERERERERERERE=\"],\"limit\":10,\"offset\":0}",
+      "reference_reads_crate_result": {
+        "totalCertificates": 0,
+        "certificates": []
+      }
+    },
+    {
+      "name": "proveCertificate",
+      "call": "proveCertificate",
+      "args": {
+        "certificate": {
+          "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+          "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+          "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
+          "signature": "3006020101020101",
+          "fields": {
+            "name": "Zml4dHVyZQ=="
+          }
+        },
+        "fieldsToReveal": [
+          "name"
+        ],
+        "verifier": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+      },
+      "result": {
+        "keyringForVerifier": {
+          "name": "a2V5cmluZw=="
+        }
+      },
+      "reference_result": {
+        "keyringForVerifier": {
+          "name": "a2V5cmluZw=="
+        }
+      },
+      "reference_request_body": "{\"certificate\":{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"}},\"fieldsToReveal\":[\"name\"],\"verifier\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"}",
+      "crate_request_body": "{\"certificate\":{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"}},\"fieldsToReveal\":[\"name\"],\"verifier\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"}",
+      "crate_result_body": "{\"keyringForVerifier\":{\"name\":\"a2V5cmluZw==\"}}",
+      "reference_resends_crate_request": "{\"certificate\":{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"subject\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"revocationOutpoint\":\"3333333333333333333333333333333333333333333333333333333333333333.1\",\"signature\":\"3006020101020101\",\"fields\":{\"name\":\"Zml4dHVyZQ==\"}},\"fieldsToReveal\":[\"name\"],\"verifier\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\"}",
+      "reference_reads_crate_result": {
+        "keyringForVerifier": {
+          "name": "a2V5cmluZw=="
+        }
+      }
+    },
+    {
+      "name": "relinquishCertificate",
+      "call": "relinquishCertificate",
+      "args": {
+        "type": "ERERERERERERERERERERERERERERERERERERERERERE=",
+        "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
+        "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "result": {
+        "relinquished": true
+      },
+      "reference_result": {
+        "relinquished": true
+      },
+      "reference_request_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "crate_request_body": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "crate_result_body": "{\"relinquished\":true}",
+      "reference_resends_crate_request": "{\"type\":\"ERERERERERERERERERERERERERERERERERERERERERE=\",\"serialNumber\":\"IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=\",\"certifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "reference_reads_crate_result": {
+        "relinquished": true
+      }
+    },
+    {
+      "name": "revealCounterpartyKeyLinkage",
+      "call": "revealCounterpartyKeyLinkage",
+      "args": {
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
+      },
+      "result": {
+        "prover": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "revelationTime": "2026-10-19T00:00:00.000Z",
+        "encryptedLinkage": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "encryptedLinkageProof": [
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1
+        ]
+      },
+      "reference_result": {
+        "prover": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "revelationTime": "2026-10-19T00:00:00.000Z",
+        "encryptedLinkage": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "encryptedLinkageProof": [
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1
+        ]
+      },
+      "reference_request_body": "{\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "crate_request_body": "{\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "crate_result_body": "{\"encryptedLinkage\":[1,2,3,4,5,6,7,8],\"encryptedLinkageProof\":[8,7,6,5,4,3,2,1],\"prover\":\"02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"revelationTime\":\"2026-10-19T00:00:00.000Z\"}",
+      "reference_resends_crate_request": "{\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\"}",
+      "reference_reads_crate_result": {
+        "encryptedLinkage": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "encryptedLinkageProof": [
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1
+        ],
+        "prover": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "revelationTime": "2026-10-19T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "revealSpecificKeyLinkage",
+      "call": "revealSpecificKeyLinkage",
+      "args": {
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "protocolID": [
+          1,
+          "fixture keys"
+        ],
+        "keyID": "fixture"
+      },
+      "result": {
+        "prover": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "protocolID": [
+          1,
+          "fixture keys"
+        ],
+        "keyID": "fixture",
+        "encryptedLinkage": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "encryptedLinkageProof": [
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1
+        ],
+        "proofType": 0
+      },
+      "reference_result": {
+        "prover": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "protocolID": [
+          1,
+          "fixture keys"
+        ],
+        "keyID": "fixture",
+        "encryptedLinkage": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "encryptedLinkageProof": [
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1
+        ],
+        "proofType": 0
+      },
+      "reference_request_body": "{\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"protocolID\":[1,\"fixture keys\"],\"keyID\":\"fixture\"}",
+      "crate_request_body": "{\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"protocolId\":[1,\"fixture keys\"],\"keyId\":\"fixture\"}",
+      "crate_result_body": "{\"encryptedLinkage\":[1,2,3,4,5,6,7,8],\"encryptedLinkageProof\":[8,7,6,5,4,3,2,1],\"prover\":\"02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9\",\"verifier\":\"02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5\",\"counterparty\":\"0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798\",\"protocolID\":[1,\"fixture keys\"],\"keyID\":\"fixture\",\"proofType\":0}",
+      "reference_resends_crate_request": "The protocolID parameter must be a [securityLevel, protocolName] tuple",
+      "reference_reads_crate_result": {
+        "encryptedLinkage": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "encryptedLinkageProof": [
+          8,
+          7,
+          6,
+          5,
+          4,
+          3,
+          2,
+          1
+        ],
+        "prover": "02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9",
+        "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
+        "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+        "protocolID": [
+          1,
+          "fixture keys"
+        ],
+        "keyID": "fixture",
+        "proofType": 0
+      },
+      "remaining": "the request names the protocol protocolId and the key keyId where the reference names them protocolID and keyID, and the reference refuses it: #105's item 7 (docs/FIXTURES.md F5), the eight key-related calls' request names, outside this fix"
+    }
+  ]
+}
