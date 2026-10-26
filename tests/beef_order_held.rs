@@ -36,7 +36,10 @@
 use std::collections::HashMap;
 use std::io::Read;
 
-use bsv_rs::primitives::{sha256d, to_hex, Writer};
+use bsv_rs::primitives::bsv::sighash::{
+    compute_sighash_dispatched_for_signing, SighashParams, TxInput, TxOutput,
+};
+use bsv_rs::primitives::{sha256d, to_hex, PrivateKey, Writer};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_async, verify_stream_structure, AsyncByteSource, Beef, BeefTx,
     Cursor, Kind, MerklePath, MockChainTracker, Progress, Reason, StreamVerifier, Verdict,
@@ -400,6 +403,252 @@ fn a_cursor_carries_the_held_children_and_resumes() {
         reader.step().unwrap();
     }
     assert_eq!(&reader.cursor().to_binary()[..4], b"BSC3");
+}
+
+// ---------------------------------------------------------------------------
+// A held child by its index entry, its signatures checked on release
+// ---------------------------------------------------------------------------
+
+/// The key every output of the signed family pays to (`<pubkey> OP_CHECKSIG`).
+fn family_key() -> PrivateKey {
+    PrivateKey::from_bytes(&[0x24; 32]).unwrap()
+}
+
+fn p2pk() -> Vec<u8> {
+    let mut lock = vec![33];
+    lock.extend_from_slice(&family_key().public_key().to_compressed());
+    lock.push(0xac);
+    lock
+}
+
+/// A raw transaction of `inputs` (outpoint, unlock) and `outputs`, version 1,
+/// every sequence final, lock time 0.
+fn raw_tx(inputs: &[(Hash32, u32, Vec<u8>)], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
+    let mut w = Writer::new();
+    w.write_u32_le(1);
+    w.write_var_int(inputs.len() as u64);
+    for (prev, vout, unlock) in inputs {
+        w.write_bytes(prev);
+        w.write_u32_le(*vout);
+        w.write_var_bytes(unlock);
+        w.write_u32_le(u32::MAX);
+    }
+    w.write_var_int(outputs.len() as u64);
+    for (satoshis, script) in outputs {
+        w.write_u64_le(*satoshis);
+        w.write_var_bytes(script);
+    }
+    w.write_u32_le(0);
+    w.into_bytes()
+}
+
+/// The transaction spending `spent` (each a parent's txid, vout and value,
+/// a P2PK output of the family key) into `outputs`, input `i` signed under
+/// hash type `types[i]` over the digest the interpreter dispatches to (the
+/// original digest for the CHRONICLE bit).
+fn signed(spent: &[(Hash32, u32, u64)], types: &[u32], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
+    let inputs: Vec<TxInput> = spent
+        .iter()
+        .map(|(txid, vout, _)| TxInput {
+            txid: *txid,
+            output_index: *vout,
+            script: Vec::new(),
+            sequence: u32::MAX,
+        })
+        .collect();
+    let tx_outputs: Vec<TxOutput> = outputs
+        .iter()
+        .map(|(satoshis, script)| TxOutput {
+            satoshis: *satoshis,
+            script: script.clone(),
+        })
+        .collect();
+    let lock = p2pk();
+    let unlocks: Vec<(Hash32, u32, Vec<u8>)> = spent
+        .iter()
+        .enumerate()
+        .map(|(i, (txid, vout, satoshis))| {
+            let digest = compute_sighash_dispatched_for_signing(&SighashParams {
+                version: 1,
+                inputs: &inputs,
+                outputs: &tx_outputs,
+                locktime: 0,
+                input_index: i,
+                subscript: &lock,
+                satoshis: *satoshis,
+                scope: types[i],
+            });
+            let mut sig = family_key().sign(&digest).unwrap().to_der();
+            sig.push(types[i] as u8);
+            let mut unlock = vec![sig.len() as u8];
+            unlock.extend_from_slice(&sig);
+            (*txid, *vout, unlock)
+        })
+        .collect();
+    raw_tx(&unlocks, outputs)
+}
+
+/// The signed family: the proven funding `F` (three P2PK outputs), the child
+/// `C` spending them under ALL|FORKID, SINGLE|FORKID and
+/// ALL|CHRONICLE|FORKID (the original digest, over every output, a data
+/// output among them), the grandchild `G` spending `C:0` under
+/// NONE|CHRONICLE|FORKID and `C:1` under ALL|ANYONECANPAY|FORKID. With
+/// `tamper`, the last byte of `C`'s CHRONICLE signature's `s` is flipped.
+fn signed_family(tamper: bool) -> [Vec<u8>; 3] {
+    let f = raw_tx(
+        &[([0xBB; 32], 0, Vec::new())],
+        &[(1_000, p2pk()), (1_000, p2pk()), (1_000, p2pk())],
+    );
+    let f_id = sha256d(&f);
+    let mut data = vec![0x00, 0x6a, 0x4c, 200];
+    data.extend_from_slice(&[0xD7; 200]);
+    let mut c = signed(
+        &[(f_id, 0, 1_000), (f_id, 1, 1_000), (f_id, 2, 1_000)],
+        &[0x41, 0x43, 0x61],
+        &[(900, p2pk()), (900, p2pk()), (0, data)],
+    );
+    if tamper {
+        // The third input's unlock is the last push before the outputs: its
+        // signature ends one byte (the hash type) before the sequence.
+        let outputs_at = c.len() - 4 - 1 - 2 * (8 + 1 + 35) - (8 + 3 + 204);
+        c[outputs_at - 4 - 2] ^= 0x01;
+    }
+    let c_id = sha256d(&c);
+    let g = signed(
+        &[(c_id, 0, 900), (c_id, 1, 900)],
+        &[0x62, 0xC1],
+        &[(1_500, p2pk())],
+    );
+    [f, c, g]
+}
+
+/// `raws` (the funding transaction proven by a one-transaction block) as a
+/// V2 BEEF in the order given, and the headers that carry its root.
+fn family_beef(raws: &[&Vec<u8>]) -> (Vec<u8>, HashMap<u64, Hash32>) {
+    let funding = raws.iter().find(|r| r.len() < 200).unwrap();
+    let root = sha256d(funding);
+    let mut beef = Beef::with_version(BEEF_V2);
+    beef.bumps.push(MerklePath::from_coinbase_txid(
+        &display(&root),
+        beef_chain::HEIGHT as u32,
+    ));
+    for raw in raws {
+        let proven = sha256d(raw) == root;
+        beef.txs
+            .push(BeefTx::from_raw_tx((*raw).clone(), proven.then_some(0)));
+    }
+    let mut writer = Writer::new();
+    beef.to_writer(&mut writer);
+    (
+        writer.into_bytes(),
+        HashMap::from([(beef_chain::HEIGHT, root)]),
+    )
+}
+
+/// A child held for its parent is held by its index entry (bsv-rs#240): per
+/// input the outpoint, the sequence and the unlocking script, the version,
+/// the lock time and the outputs, never its raw bytes. Released, its
+/// signatures verify against the digests they were made over: BIP-143 from
+/// the midstates (ALL, SINGLE, ANYONECANPAY, NONE) and the original digest
+/// a CHRONICLE-bit signature dispatches to, which hashes every output after
+/// the scriptCode the parent supplies. The verdict newest first is the
+/// verdict parents first, valid and with one signature broken; a cursor
+/// taken while both are held carries their entries (no transaction's bytes
+/// are in it) and resumes to the same verdict. RED on `10dd8c5` (the cursor
+/// carried each held transaction's raw bytes) and on the base `df6fb8a`
+/// (`InputNamesNoElement` newest first).
+#[test]
+fn a_held_child_is_held_by_its_index_entry_and_its_signatures_verify_on_release() {
+    for tamper in [false, true] {
+        let [f, c, g] = signed_family(tamper);
+        let (ordered, headers) = family_beef(&[&f, &c, &g]);
+        let (reversed, _) = family_beef(&[&g, &c, &f]);
+        let expected = verify_stream(ordered.as_slice(), &headers, None).unwrap();
+        let named = |v: &Verdict| match v {
+            Verdict::SpendRefused {
+                txid, input, why, ..
+            } => Some((*txid, *input, why.clone())),
+            _ => None,
+        };
+        if tamper {
+            assert_eq!(
+                named(&expected).map(|(txid, input, _)| (txid, input)),
+                Some((sha256d(&c), Some(2))),
+                "{expected:?}"
+            );
+        } else {
+            assert!(expected.is_valid(), "{expected:?}");
+        }
+        let got = verify_stream(reversed.as_slice(), &headers, None).unwrap();
+        assert_eq!(got.is_valid(), expected.is_valid(), "tamper {tamper}");
+        assert_eq!(named(&got), named(&expected), "tamper {tamper}");
+        assert!(
+            verify_stream_structure(reversed.as_slice(), &headers, None)
+                .unwrap()
+                .is_valid(),
+            "tamper {tamper}"
+        );
+
+        let mut reader = StreamVerifier::new(reversed.as_slice(), &headers, None);
+        for _ in 0..3 {
+            assert_eq!(reader.step().unwrap(), Progress::Stepped);
+        }
+        assert_eq!(reader.index().deferred().0, 2, "G and C held");
+        let encoded = reader.cursor().to_binary();
+        assert_eq!(&encoded[..4], b"BSC4");
+        for raw in [&g, &c] {
+            assert!(
+                !encoded.windows(raw.len()).any(|w| w == raw.as_slice()),
+                "the cursor carries a held transaction's bytes"
+            );
+        }
+        let decoded = Cursor::from_binary(&encoded).unwrap();
+        assert_eq!(decoded, reader.cursor());
+        let rest = &reversed[decoded.offset() as usize..];
+        let resumed = StreamVerifier::resume(decoded, rest, &headers)
+            .run()
+            .unwrap();
+        assert_eq!(named(&resumed), named(&got), "tamper {tamper}");
+        assert_eq!(resumed.is_valid(), got.is_valid(), "tamper {tamper}");
+    }
+}
+
+/// Rule 5 on the held entries a cursor carries: every proper prefix of a
+/// BSC4 cursor holding the signed child and grandchild is refused, and every
+/// single-byte change is refused or read, never a panic, and a cursor so
+/// read resumes to a verdict, never a panic.
+#[test]
+fn a_cut_or_changed_bsc4_cursor_is_refused_or_read_never_a_panic() {
+    let [f, c, g] = signed_family(false);
+    let (reversed, headers) = family_beef(&[&g, &c, &f]);
+    let mut reader = StreamVerifier::new(reversed.as_slice(), &headers, None);
+    for _ in 0..3 {
+        reader.step().unwrap();
+    }
+    let encoded = reader.cursor().to_binary();
+    assert_eq!(&encoded[..4], b"BSC4");
+    for cut in 0..encoded.len() {
+        assert!(
+            Cursor::from_binary(&encoded[..cut]).is_err(),
+            "a prefix of {cut} bytes read as a cursor"
+        );
+    }
+    let mut read = 0;
+    for at in 0..encoded.len() {
+        for bit in [0x01u8] {
+            let mut changed = encoded.clone();
+            changed[at] ^= bit;
+            let Ok(cursor) = Cursor::from_binary(&changed) else {
+                continue;
+            };
+            read += 1;
+            let Some(rest) = reversed.get(cursor.offset() as usize..) else {
+                continue;
+            };
+            let _ = StreamVerifier::resume(cursor, rest, &headers).run();
+        }
+    }
+    assert!(read > 0, "some change reads as a cursor");
 }
 
 // ---------------------------------------------------------------------------

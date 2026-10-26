@@ -22,20 +22,23 @@
 //!   32 bytes per input of a raw transaction (0.8.1, the Lean's `prevs`; an
 //!   input is 41 bytes or more on the wire, so this too is linear in the
 //!   bytes read); never a sibling hash, never a transaction's bytes after its
-//!   step, save a transaction held for a parent not read yet (below).
+//!   step.
 //! - A BEEF is valid whatever its order on the wire (bsv-rs#240): an
 //!   unproven transaction an input of which names a txid the index does not
-//!   hold yet is held, as read, until that txid is folded in, then folded in
-//!   (in wire order); at the end one still held is refused,
+//!   hold yet is held by its index entry, never its raw bytes, until that
+//!   txid is folded in, then folded in (in wire order); at the end one still
+//!   held is refused,
 //!   [`Kind::InputNamesNoElement`] at its input that names nothing. The
 //!   whole-BEEF reader sorts before judging, as the reference does
 //!   (`ts-stack@edf6e03 packages/sdk/src/transaction/Beef.ts:1054-1073`), so
 //!   the two give one verdict. A BEEF in BRC-62's order (parents before
 //!   children, `BRCs@5119a9b transactions/0062.md:72-74`, as every writer
-//!   writes it) holds nothing; one written children first holds at most the
-//!   bytes read, under no bound: a valid BEEF is never refused for its size
-//!   or its counts (the stack's charter, `bsv-stack-lean
-//!   docs/charters/beef-of-any-size.md`).
+//!   writes it) holds nothing; one written children first holds, per
+//!   transaction read ahead of a parent, its txid and per input the
+//!   outpoint and sequence, and with spends checked the unlocking scripts and
+//!   the outputs (`deferred.rs`), under no bound: a valid BEEF is never
+//!   refused for its size or its counts (the stack's charter,
+//!   `bsv-stack-lean docs/charters/beef-of-any-size.md`).
 //! - [`verify_stream`] is one pass: one step per element, each BUMP's root
 //!   checked against the [`Headers`] as it streams, each unproven
 //!   transaction's inputs resolved against the index (or held until they
@@ -85,8 +88,7 @@
 //! }
 //! ```
 
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::future::Future;
 use std::io::{Read, Seek, SeekFrom};
@@ -118,7 +120,7 @@ pub fn display_hex(hash: &Hash32) -> String {
 
 mod deferred;
 mod reason;
-use deferred::{read_held, Deferred};
+use deferred::{read_held, write_held, Deferred, HeldTx, TxFields};
 pub use reason::{Kind, Reason};
 
 /// A refusal: the offset of the byte it names, and the reason.
@@ -1689,10 +1691,12 @@ impl From<Refusal> for Stop {
 /// at level 0. When spends are checked, each transaction's unspent outputs
 /// are kept until a later input spends them: every output in one pass (the
 /// reader cannot know which will be spent), or only the outputs a first pass
-/// named ([`BeefIndex::retaining`]). Never a sibling hash, never an
-/// unlocking script, never a transaction's bytes after its step, save an
-/// unproven transaction read ahead of a parent, held whole until the parent
-/// is in (bsv-rs#240, [`deferred`](Self::deferred)).
+/// named ([`BeefIndex::retaining`]). Never a sibling hash, never a
+/// transaction's bytes after its step, and never an unlocking script save an
+/// unproven transaction's read ahead of a parent, held by its index entry
+/// (the outpoints and sequences, the unlocking scripts and the outputs, its
+/// raw bytes dropped) until the parent is in (bsv-rs#240,
+/// [`deferred`](Self::deferred)).
 ///
 /// The tables are keyed by digests a stranger chose (a BUMP's leaves are not
 /// hashed here), so they keep the standard library's keyed hasher.
@@ -1845,9 +1849,11 @@ impl BeefIndex {
     }
 
     /// The transactions held for a parent not read yet (bsv-rs#240), and
-    /// their raw bytes: none for a BEEF in BRC-62's order (parents before
-    /// children); for one written children first, at most every unproven
-    /// transaction read, whole, until its parents are in.
+    /// the bytes their index entries hold: none for a BEEF in BRC-62's order
+    /// (parents before children); for one written children first, at most
+    /// every unproven transaction read, by its entry (56 bytes, 48 per
+    /// input, and with spends checked 8, the unlocking scripts and 16 per
+    /// output with its script), until its parents are in.
     pub fn deferred(&self) -> (u64, u64) {
         (self.deferred.held.len() as u64, self.deferred.bytes)
     }
@@ -1938,29 +1944,64 @@ impl BeefIndex {
         work_limit: Option<u64>,
         tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
-        let txid = match self.fold_one(element, from, spent, work_limit, tip)? {
+        match self.fold_one(element, from, spent, work_limit, tip)? {
             Folded::Paused(input) => return Ok(Some(input)),
-            Folded::Held | Folded::In { new: false, .. } => return Ok(None),
-            Folded::In { txid, new: true } => txid,
-        };
-        if self.deferred.waiting.is_empty() {
-            return Ok(None);
+            Folded::In { txid, new: true } => self.deferred.wake(&txid),
+            Folded::Held | Folded::In { new: false, .. } => {}
         }
-        // The transactions released, in wire order: an
-        // explicit heap, so a chain held newest first unwinds on no stack.
-        let mut ready = BinaryHeap::new();
-        self.deferred.wake(&txid, &mut ready);
-        while let Some(Reverse(at)) = ready.pop() {
-            let Some(released) = self.deferred.take(at) else {
-                continue;
-            };
-            if let Folded::In { txid, new: true } =
-                self.fold_one(&released, 0, &mut || false, work_limit, tip)?
-            {
-                self.deferred.wake(&txid, &mut ready);
+        // The transactions released, in wire order.
+        while self
+            .release_one(0, &mut || false, work_limit, tip)?
+            .is_some()
+        {}
+        Ok(None)
+    }
+
+    /// The earliest ready transaction of the held set folded in, its scripts
+    /// run from input `from` with `spent` asked between inputs: `None` when
+    /// none is ready. A pause or a refusal leaves it held and the index
+    /// unchanged; folded in, its txid wakes what waits on it.
+    fn release_one(
+        &mut self,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
+        tip: Option<ChainTip>,
+    ) -> Result<Option<Folded>, Stop> {
+        let Some((at, _)) = self.deferred.next_ready() else {
+            return Ok(None);
+        };
+        let Some(held) = self.deferred.take_ready(at) else {
+            return Ok(None);
+        };
+        let folded = self.fold_tx(
+            held.offset,
+            &held.txid,
+            None,
+            false,
+            &held,
+            from,
+            spent,
+            work_limit,
+            tip,
+        );
+        match folded {
+            Ok(Folded::Paused(input)) => {
+                self.deferred.put_back(held);
+                Ok(Some(Folded::Paused(input)))
+            }
+            Ok(folded) => {
+                self.deferred.folded(at, &held);
+                if let Folded::In { txid, new: true } = folded {
+                    self.deferred.wake(&txid);
+                }
+                Ok(Some(folded))
+            }
+            Err(stop) => {
+                self.deferred.put_back(held);
+                Err(stop)
             }
         }
-        Ok(None)
     }
 
     /// One element folded in, or held ([`Folded`]).
@@ -2036,142 +2077,169 @@ impl BeefIndex {
                             .collect();
                         if !missing.is_empty() {
                             self.note_raw(txid, *offset);
-                            self.deferred.hold(element.clone(), missing);
+                            let held = HeldTx::of(*offset, *txid, body, self.check_spends);
+                            self.deferred.hold(held, missing);
                             return Ok(Folded::Held);
                         }
                     }
                 }
-
-                // A transaction read before was judged then; its bytes are
-                // the same bytes.
-                let seen = self.txs.get(txid).is_some_and(|e| e.raw);
-                if self.check_spends && !seen {
-                    if bump_index.is_none() {
-                        // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204.
-                        let after_genesis = tip
-                            .is_none_or(|t| u64::from(t.height) + 1 >= u64::from(t.genesis_height));
-                        if after_genesis {
-                            for (vout, output) in body.outputs.iter().enumerate() {
-                                let script = &body.raw[output.script.clone()];
-                                if script.len() == 23
-                                    && script[0] == 0xa9
-                                    && script[1] == 0x14
-                                    && script[22] == 0x87
-                                {
-                                    return Err(Stop::Spend {
-                                        offset: output.at,
-                                        txid: *txid,
-                                        input: None,
-                                        why: SpendRefusal::P2shOutput { vout: vout as u32 },
-                                    });
-                                }
-                            }
-                        }
-                        // [SRC] sibling@87f0461 BLOCK-CONSENSUS.md:83-88,
-                        // node@879fc8b42 validation.cpp:228-248 as cited there.
-                        if body.lock_time != 0 && body.inputs.iter().any(|i| i.sequence != u32::MAX)
-                        {
-                            let unavailable = || Stop::Unverifiable {
-                                offset: *offset,
-                                txid: *txid,
-                                input: None,
-                                check: MiningCheck::Finality,
-                            };
-                            let context = tip.ok_or_else(unavailable)?;
-                            let next_height = u64::from(context.height) + 1;
-                            let limit = if body.lock_time < 500_000_000 {
-                                next_height
-                            } else if next_height >= u64::from(context.csv_height) {
-                                u64::from(context.median_time_past)
-                            } else {
-                                u64::from(context.next_block_time.ok_or_else(unavailable)?)
-                            };
-                            if u64::from(body.lock_time) >= limit {
-                                return Err(Stop::Spend {
-                                    offset: *offset,
-                                    txid: *txid,
-                                    input: None,
-                                    why: SpendRefusal::NonFinal {
-                                        lock_time: body.lock_time,
-                                    },
-                                });
-                            }
-                        }
-                        if let Some(next) =
-                            self.check_spends_of(*offset, txid, body, from, spent, work_limit, tip)?
-                        {
-                            return Ok(Folded::Paused(next));
-                        }
-                    }
-                    for input in &body.inputs {
-                        self.spend_output(&input.prev, input.vout);
-                    }
-                }
-                self.inputs += body.inputs.len() as u64;
-                let atomic = self.atomic;
-                let prevs = move || -> Box<[Hash32]> {
-                    if atomic {
-                        body.inputs.iter().map(|input| input.prev).collect()
-                    } else {
-                        Box::default()
-                    }
-                };
-                let keep = |vout: usize| match &self.wanted {
-                    Some(wanted) => u32::try_from(vout).is_ok_and(|v| wanted.contains(&(*txid, v))),
-                    None => true,
-                };
-                let outputs = (self.check_spends && !seen)
-                    .then(|| {
-                        body.outputs
-                            .iter()
-                            .enumerate()
-                            .map(|(vout, o)| {
-                                keep(vout).then(|| Retained {
-                                    satoshis: o.satoshis,
-                                    script: body.raw[o.script.clone()].into(),
-                                })
-                            })
-                            .collect::<Box<[_]>>()
-                    })
-                    .filter(|outputs| outputs.iter().any(Option::is_some));
-                let coinbase_height = if is_coinbase(&body.inputs) {
-                    bump_index.map(|index| self.bumps[index as usize].0)
-                } else {
-                    None
-                };
-                let new = !self.txs.contains_key(txid);
-                match self.txs.get_mut(txid) {
-                    Some(entry) => {
-                        if !entry.raw {
-                            entry.raw = true;
-                            entry.prevs = prevs();
-                            entry.coinbase_height = coinbase_height;
-                            entry.live = live_of(&outputs);
-                            entry.outputs = outputs;
-                        }
-                    }
-                    None => {
-                        let prevs = prevs();
-                        self.txs.insert(
-                            *txid,
-                            TxEntry {
-                                at: *offset,
-                                prevs,
-                                raw: true,
-                                reached: false,
-                                coinbase_height,
-                                live: live_of(&outputs),
-                                outputs,
-                            },
-                        );
-                    }
-                }
-                self.note_raw(txid, *offset);
-                self.steps += 1;
-                self.work += body.raw.len() as u64 + 5 + 2 * body.inputs.len() as u64;
-                Ok(Folded::In { txid: *txid, new })
+                let coinbase = is_coinbase(&body.inputs);
+                self.fold_tx(
+                    *offset,
+                    txid,
+                    *bump_index,
+                    coinbase,
+                    body,
+                    from,
+                    spent,
+                    work_limit,
+                    tip,
+                )
             }
         }
+    }
+
+    /// An unproven transaction whose inputs resolve, or a proven one, folded
+    /// in from its fields: read in order ([`TxBody`]) or released from the
+    /// held set ([`HeldTx`]), one fold for both.
+    #[allow(clippy::too_many_arguments)] // The element's frame fields and its resumed spend.
+    fn fold_tx<T: TxFields>(
+        &mut self,
+        offset: u64,
+        txid: &Hash32,
+        bump_index: Option<u64>,
+        coinbase: bool,
+        body: &T,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
+        tip: Option<ChainTip>,
+    ) -> Result<Folded, Stop> {
+        // A transaction read before was judged then; its bytes are the same
+        // bytes.
+        let seen = self.txs.get(txid).is_some_and(|e| e.raw);
+        let n_inputs = body.input_count();
+        if self.check_spends && !seen {
+            if bump_index.is_none() {
+                // [SRC] sibling@87f0461 Properties/P2SH.lean:198-204.
+                let after_genesis =
+                    tip.is_none_or(|t| u64::from(t.height) + 1 >= u64::from(t.genesis_height));
+                if after_genesis {
+                    for vout in 0..body.output_count() {
+                        let (at, _, script) = body.output(vout);
+                        if script.len() == 23
+                            && script[0] == 0xa9
+                            && script[1] == 0x14
+                            && script[22] == 0x87
+                        {
+                            return Err(Stop::Spend {
+                                offset: at,
+                                txid: *txid,
+                                input: None,
+                                why: SpendRefusal::P2shOutput { vout: vout as u32 },
+                            });
+                        }
+                    }
+                }
+                // [SRC] sibling@87f0461 BLOCK-CONSENSUS.md:83-88,
+                // node@879fc8b42 validation.cpp:228-248 as cited there.
+                let lock_time = body.lock_time();
+                if lock_time != 0 && (0..n_inputs).any(|i| body.input(i).sequence != u32::MAX) {
+                    let unavailable = || Stop::Unverifiable {
+                        offset,
+                        txid: *txid,
+                        input: None,
+                        check: MiningCheck::Finality,
+                    };
+                    let context = tip.ok_or_else(unavailable)?;
+                    let next_height = u64::from(context.height) + 1;
+                    let limit = if lock_time < 500_000_000 {
+                        next_height
+                    } else if next_height >= u64::from(context.csv_height) {
+                        u64::from(context.median_time_past)
+                    } else {
+                        u64::from(context.next_block_time.ok_or_else(unavailable)?)
+                    };
+                    if u64::from(lock_time) >= limit {
+                        return Err(Stop::Spend {
+                            offset,
+                            txid: *txid,
+                            input: None,
+                            why: SpendRefusal::NonFinal { lock_time },
+                        });
+                    }
+                }
+                if let Some(next) =
+                    self.check_spends_of(offset, txid, body, from, spent, work_limit, tip)?
+                {
+                    return Ok(Folded::Paused(next));
+                }
+            }
+            for i in 0..n_inputs {
+                let input = body.input(i);
+                self.spend_output(&input.prev, input.vout);
+            }
+        }
+        self.inputs += n_inputs as u64;
+        let prevs = if self.atomic {
+            (0..n_inputs).map(|i| body.input(i).prev).collect()
+        } else {
+            Box::default()
+        };
+        let keep = |vout: usize| match &self.wanted {
+            Some(wanted) => u32::try_from(vout).is_ok_and(|v| wanted.contains(&(*txid, v))),
+            None => true,
+        };
+        let outputs = (self.check_spends && !seen)
+            .then(|| {
+                (0..body.output_count())
+                    .map(|vout| {
+                        keep(vout).then(|| {
+                            let (_, satoshis, script) = body.output(vout);
+                            Retained {
+                                satoshis,
+                                script: script.into(),
+                            }
+                        })
+                    })
+                    .collect::<Box<[_]>>()
+            })
+            .filter(|outputs| outputs.iter().any(Option::is_some));
+        let coinbase_height = if coinbase {
+            bump_index.map(|index| self.bumps[index as usize].0)
+        } else {
+            None
+        };
+        let new = !self.txs.contains_key(txid);
+        match self.txs.get_mut(txid) {
+            Some(entry) => {
+                if !entry.raw {
+                    entry.raw = true;
+                    entry.prevs = prevs;
+                    entry.coinbase_height = coinbase_height;
+                    entry.live = live_of(&outputs);
+                    entry.outputs = outputs;
+                }
+            }
+            None => {
+                self.txs.insert(
+                    *txid,
+                    TxEntry {
+                        at: offset,
+                        prevs,
+                        raw: true,
+                        reached: false,
+                        coinbase_height,
+                        live: live_of(&outputs),
+                        outputs,
+                    },
+                );
+            }
+        }
+        self.note_raw(txid, offset);
+        self.steps += 1;
+        self.work += body.wire_len() + 5 + 2 * n_inputs as u64;
+        Ok(Folded::In { txid: *txid, new })
     }
 
     /// The last raw transaction on the wire, a held one included.
@@ -2213,11 +2281,11 @@ impl BeefIndex {
     /// input `i`, at least one input after `from` having run.
     #[allow(clippy::too_many_arguments)] // One resumed spend and its caller's mining context.
     #[allow(clippy::expect_used)] // #134: the reader indexed every parent before its spend; a SpendRefusal for a broken invariant is a public enum change
-    fn check_spends_of(
+    fn check_spends_of<T: TxFields>(
         &self,
         offset: u64,
         txid: &Hash32,
-        body: &TxBody,
+        body: &T,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
         work_limit: Option<u64>,
@@ -2229,9 +2297,11 @@ impl BeefIndex {
             input,
             why,
         };
-        let mut sources: Vec<&Retained> = Vec::with_capacity(body.inputs.len());
+        let n_inputs = body.input_count();
+        let mut sources: Vec<&Retained> = Vec::with_capacity(n_inputs);
         let mut input_total: u64 = 0;
-        for (vin, input) in body.inputs.iter().enumerate() {
+        for vin in 0..n_inputs {
+            let input = body.input(vin);
             let vin = Some(vin as u32);
             let vout = input.vout;
             let parent = self
@@ -2279,9 +2349,9 @@ impl BeefIndex {
             sources.push(source);
         }
         let mut output_total: u64 = 0;
-        for output in &body.outputs {
+        for vout in 0..body.output_count() {
             // check_transaction bounded every prefix by MAX_MONEY.
-            output_total += output.satoshis;
+            output_total += body.output(vout).1;
             debug_assert!(output_total <= MAX_MONEY);
         }
 
@@ -2290,37 +2360,37 @@ impl BeefIndex {
         // hashSequence and hashOutputs are computed at most once per scope
         // class here, never once per input (bsv-low #591). The digest reads
         // no input's script, so the shared inputs carry none.
-        let outputs: Vec<TxOutput> = body
-            .outputs
-            .iter()
-            .map(|o| TxOutput {
-                satoshis: o.satoshis,
-                script: body.raw[o.script.clone()].to_vec(),
+        // A transaction released from the held set (bsv-rs#240) builds the
+        // same lists from the fields it held: the midstates, and the
+        // original digest's serialization, are the ones it would have had.
+        let outputs: Vec<TxOutput> = (0..body.output_count())
+            .map(|vout| {
+                let (_, satoshis, script) = body.output(vout);
+                TxOutput {
+                    satoshis,
+                    script: script.to_vec(),
+                }
             })
             .collect();
-        let inputs: Vec<TxInput> = body
-            .inputs
-            .iter()
-            .map(|i| TxInput {
-                txid: i.prev,
-                output_index: i.vout,
-                script: Vec::new(),
-                sequence: i.sequence,
+        let inputs: Vec<TxInput> = (0..n_inputs)
+            .map(|i| {
+                let input = body.input(i);
+                TxInput {
+                    txid: input.prev,
+                    output_index: input.vout,
+                    script: Vec::new(),
+                    sequence: input.sequence,
+                }
             })
             .collect();
         let shared = Arc::new(TxSighashCache::new(
-            body.version as i32,
+            body.version() as i32,
             inputs,
             outputs,
-            body.lock_time,
+            body.lock_time(),
         ));
-        for (vin, (input, source)) in body
-            .inputs
-            .iter()
-            .zip(sources)
-            .enumerate()
-            .skip(from as usize)
-        {
+        for (vin, source) in sources.into_iter().enumerate().skip(from as usize) {
+            let input = body.input(vin);
             // The clock between inputs (bsv-low #591): one transaction of
             // many inputs is no longer one uninterruptible step.
             if vin > from as usize && spent() {
@@ -2330,7 +2400,7 @@ impl BeefIndex {
                 |message: String| refuse(input.at, Some(vin as u32), SpendRefusal::Script(message));
             let locking_script = LockingScript::from_binary(&source.script)
                 .map_err(|e| script_error(e.to_string()))?;
-            let unlocking_script = UnlockingScript::from_binary(&body.raw[input.script.clone()])
+            let unlocking_script = UnlockingScript::from_binary(body.unlocking(vin))
                 .map_err(|e| script_error(e.to_string()))?;
             let mut spend = Spend::with_transaction(TxSpendParams {
                 transaction: shared.clone(),
@@ -2378,12 +2448,12 @@ impl BeefIndex {
     /// earliest input that names no transaction of the index,
     /// [`Kind::InputNamesNoElement`].
     pub fn finish(&mut self, subject: Option<&Hash32>, subject_at: u64) -> Result<(), Refusal> {
-        if let Some((_, Element::Tx { offset, body, .. })) = self.deferred.held.iter().next() {
-            let input = body
+        if let Some(held) = self.deferred.held.values().next() {
+            let input = held
                 .inputs
                 .iter()
                 .find(|input| !self.txs.contains_key(&input.prev));
-            let (at, txid) = input.map_or((*offset, [0u8; 32]), |i| (i.at, i.prev));
+            let (at, txid) = input.map_or((held.offset, [0u8; 32]), |i| (i.at, i.prev));
             return Err(Refusal::new(at, Reason::InputNamesNoElement { txid }));
         }
         let Some(subject) = subject else {
@@ -2656,7 +2726,8 @@ impl Cursor {
     /// raw transaction's prevs, by txid strictly ascending. A cursor taken
     /// while a transaction is held for a parent (bsv-rs#240) is BSC4: BSC3,
     /// then after the outputs named the held transactions by offset, each
-    /// its raw bytes; a cursor that holds nothing keeps BSC3's bytes.
+    /// its index entry (`deferred.rs`, `write_held`), never its raw bytes; a
+    /// cursor that holds nothing keeps BSC3's bytes.
     /// [`from_binary`](Self::from_binary) reads a BSC2 cursor as BSC3 with no
     /// edge for a transaction read before it: the walk reaches less, so it
     /// only refuses more, never accepts wrongly. BSC1 is refused: restart
@@ -2796,16 +2867,9 @@ impl Cursor {
                 }
             }
         }
-        // The transactions held (BSC4): by offset, each its raw bytes, read
-        // again as the decoder read them.
+        // The transactions held (BSC4): by offset, each its index entry.
         if !held.is_empty() {
-            w.write_var_int(held.len() as u64);
-            for (at, element) in held {
-                if let Element::Tx { body, .. } = element {
-                    w.write_u64_le(*at);
-                    w.write_var_bytes(&body.raw);
-                }
-            }
+            write_held(&mut w, &self.index.deferred);
         }
         if let Some(pending) = &self.pending {
             w.write_u8(1);
@@ -2977,7 +3041,11 @@ impl Cursor {
             _ => return Err(bad("a presence byte")),
         };
         if bsc4 {
-            read_held(&mut r, &mut index).map_err(bad)?;
+            let BeefIndex { deferred, txs, .. } = &mut index;
+            read_held(&mut r, deferred, check_spends, frame.pos, |txid| {
+                txs.contains_key(txid)
+            })
+            .map_err(bad)?;
         }
         let pending = if r.is_empty() {
             None
