@@ -5,7 +5,9 @@
 //! is the network (an overlay door) must never read the evaluator's budget as
 //! the network's verdict.
 use bsv_rs::script::op::*;
-use bsv_rs::script::{LockingScript, Script, ScriptResource, Spend, SpendParams, UnlockingScript};
+use bsv_rs::script::{
+    LockingScript, Script, ScriptResource, ScriptResourceLimit, Spend, SpendParams, UnlockingScript,
+};
 use std::time::Instant;
 
 fn spend(lock: Script, unlock: Script, memory_limit: usize) -> Spend {
@@ -110,4 +112,73 @@ fn a_script_verdict_is_never_a_resource_limit() {
         err.message
     );
     assert!(err.resource_limit.is_none());
+}
+
+// ---------------------------------------------------------------------------
+// The limit's sentence (#228): the interpreter's words, from one place
+// ---------------------------------------------------------------------------
+
+fn limit_text(resource: ScriptResource, work_spent: Option<u64>) -> String {
+    ScriptResourceLimit {
+        resource,
+        limit: 1_000,
+        attempted: 1_001,
+        work_spent,
+    }
+    .to_string()
+}
+
+#[test]
+fn a_stack_limit_prints_the_interpreters_sentence() {
+    assert_eq!(
+        limit_text(ScriptResource::Stack, None),
+        "Stack memory usage has exceeded 1000 bytes"
+    );
+}
+
+#[test]
+fn an_alt_stack_limit_prints_the_interpreters_sentence() {
+    assert_eq!(
+        limit_text(ScriptResource::AltStack, None),
+        "Alt stack memory usage has exceeded 1000 bytes"
+    );
+}
+
+#[test]
+fn an_element_size_limit_prints_the_interpreters_sentence() {
+    assert_eq!(
+        limit_text(ScriptResource::ElementSize, None),
+        "Script element allocation has exceeded 1000 bytes"
+    );
+}
+
+#[test]
+fn a_work_limit_prints_the_interpreters_sentence() {
+    assert_eq!(
+        limit_text(ScriptResource::Work, Some(990)),
+        "Work budget exhausted: spent 990 units, budget 1000"
+    );
+}
+
+#[test]
+fn a_work_limit_with_no_work_recorded_names_the_budget_alone() {
+    // The interpreter never builds one (`work_error` records the work
+    // spent); a hand-built limit with none does not claim 0 units spent.
+    assert_eq!(
+        limit_text(ScriptResource::Work, None),
+        "Work budget exhausted: budget 1000"
+    );
+}
+
+#[test]
+fn the_interpreters_message_is_the_limits_sentence() {
+    let mut lock = Script::new();
+    lock.write_opcode(OP_1)
+        .write_bin(&1_000_000_000i64.to_le_bytes()[..4])
+        .write_opcode(OP_NUM2BIN);
+    let err = spend(lock, Script::new(), 64 * 1024)
+        .validate()
+        .expect_err("a 1 GB element exceeds the budget");
+    let limit = err.resource_limit.expect("a resource limit");
+    assert!(err.message.starts_with(&limit.to_string()));
 }

@@ -74,6 +74,37 @@ pub struct ScriptResourceLimit {
     pub work_spent: Option<u64>,
 }
 
+/// The interpreter's sentence for the limit (#228), the one place its words
+/// live: the interpreter's message (`src/script/spend/limits.rs`,
+/// `resource_error` and `work_error`) and `SpendRefusal::Resource` both print
+/// it. A memory resource prints `<label> has exceeded <limit> bytes` (the
+/// reference's `ScriptResourceLimitError` shape); `Work` prints `Work budget
+/// exhausted: spent <work_spent> units, budget <limit>`, or `Work budget
+/// exhausted: budget <limit>` for a limit with no work recorded (the
+/// interpreter always records it; a hand-built one is not said to have spent
+/// 0). Pinned in `tests/resource_limits.rs`.
+impl fmt::Display for ScriptResourceLimit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let limit = self.limit;
+        match self.resource {
+            ScriptResource::Stack => write!(f, "Stack memory usage has exceeded {limit} bytes"),
+            ScriptResource::AltStack => {
+                write!(f, "Alt stack memory usage has exceeded {limit} bytes")
+            }
+            ScriptResource::ElementSize => {
+                write!(f, "Script element allocation has exceeded {limit} bytes")
+            }
+            ScriptResource::Work => match self.work_spent {
+                Some(spent) => write!(
+                    f,
+                    "Work budget exhausted: spent {spent} units, budget {limit}"
+                ),
+                None => write!(f, "Work budget exhausted: budget {limit}"),
+            },
+        }
+    }
+}
+
 /// A script evaluation that failed: the message, the spend it was evaluating
 /// and the interpreter's state at the failure.
 #[derive(Debug, Clone)]
