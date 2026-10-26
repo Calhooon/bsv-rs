@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the nightly's heavy work holds at most six concurrent slots
+
+The mutant shards run six at a time (`max-parallel: 6`, twenty before) and
+the fuzz targets six at a time after them (`needs: [source, mutants]`, run
+whatever the shards' result), so the night's heavy work never holds more
+than six of the account's twenty concurrent slots and a pull request's run
+at 03:00 UTC starts within minutes; the shards finish later in the night
+and decide the same (the owner's balance rule of 2026-10-26, the keeper's
+reading, as the nightly goes live with main's copy of the schedule).
+
+### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
+
+`Certificate::from_binary` refused a revocation outpoint index above
+`u32::MAX` in #122's words (`invalid revocation outpoint index: expected at
+most 4294967295, got 4294967296`). It now refuses it through the wire's
+helper (`integer_refusal`, `src/wallet/wire/mod.rs`, #255), the one form of
+every bound refusal: `Invalid revocation outpoint index: expected an integer
+from 0 to 4294967295, received 4294967296`, still
+`Error::CertificateValidationError`. The name `revocation outpoint index`
+is this crate's: the reference has no words for this bound. The bound
+stands under #122 (a refusal, never a cast; BRC-12's outpoint index is four
+bytes on the wire). No behavior beyond the words. Pinned by
+`a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bound_refusals_form`
+(`src/auth/certificates/certificate.rs`, RED on the pre-fix tree). No vector
+or recording carried these words.
+
+### Notes: cross-SDK parity (#258)
+
+The reference's `Certificate.fromBinary` reads the index with
+`readVarIntNumStrict(false)` and no `#requireInteger` (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts:353`), so it accepts an
+index above `0xffffffff` up to `2^53 - 1` (`readVarIntNumStrict.ts`'s
+precision bound) into the outpoint string; its `toBinary` refuses one above
+`0xffffffff` (`Certificate.ts:263-270`). Go's reader casts the varint to
+`uint32` (`go-sdk@2ca481c` `wallet/serializer/serializer.go:82-96`, a
+truncation above the bound) and its writer writes a `uint32` (`:20-25`).
+This crate's reader refuses it: no SDK writer produces the oversized index,
+so the bound meets the north star's "accept what the reference accepts".
+
 ### Changed: the secrets scan covers the commits the event brings (#272)
 
 CI's `secrets` job ran gitleaks over every ref of the checkout (gitleaks's
