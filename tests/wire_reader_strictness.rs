@@ -1101,7 +1101,7 @@ fn a_certificate_field_value_past_a_mebibyte_is_refused_by_the_writer() {
 }
 
 /// `Certificate.toBinary` refuses a frame over 16 MiB before it returns it
-/// (`Certificate.ts:316-320`, in its words), as `fromBinary` refuses one
+/// (`Certificate.ts:315-319`, in its words), as `fromBinary` refuses one
 /// (`snapshotCertificateBinary`, `:87-91`); this writer wrote it unchecked
 /// until #246. Fifteen values of 1 MiB and one padded to 16 MiB exactly.
 #[test]

@@ -76,7 +76,7 @@ byte reaches the caller's writer:
   words and the reference's;
 - a field value over 1 MiB (`:76-79`): `Certificate field <name> exceeds
   the maximum of 1048576 bytes`, the reader's words and the reference's;
-- a frame over 16 MiB (`:316-320`): `Certificate binary exceeds the maximum
+- a frame over 16 MiB (`:315-319`): `Certificate binary exceeds the maximum
   of 16777216 bytes`, the reference writer's words (the reader's, from
   `snapshotCertificateBinary` `:87-91`, are `Certificate binary must be a
   byte array of at most 16777216 bytes`, a different sentence for the
