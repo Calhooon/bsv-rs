@@ -1032,7 +1032,6 @@ for a BRC-207 module inventory record (`0100.md:1963`, `:1974-1980`);
 nothing this crate serves is a module inventory, and a field that carries no
 verdict here does not move ahead of a consumer that asks (the owner's word,
 2026-10-26).
-### Changed: a BEEF is valid whatever its order on the wire; the whole path sorts before judging, the stream holds a child until its parent is in (#240)
 ### Changed: a BEEF is valid whatever its order on the wire; the whole path sorts before judging, the stream holds a child by its index entry until its parent is in, under no bound (#240)
 
 0.9.0-beta.1 (bsv-rs#86) judged a BEEF's transactions in the order written:
@@ -1055,8 +1054,9 @@ a transaction of the BEEF or a proven txid, whatever the order. BRC-62 at
 the order has streaming validation in mind; `:72-74`, a transaction's inputs
 above it; `:172-191`, the validation process); this crate's writer still
 writes parents before children. Whether BRC-62's order is normative for
-validity goes upstream to `bsv-blockchain/BRCs`, so the strict reading can
-return if its maintainers say so.
+validity goes upstream to `bsv-blockchain/BRCs` (filed as BRCs #359 under the
+owner's name, 2026-10-26, with the seven BEEFs and the reference's verdicts at
+`9f09472`), so the strict reading can return if its maintainers say so.
 
 - **The whole path** (`verify_structure`, `verify_valid`): the entries are
   judged one by one as before (content, txid-only proof, BUMP index), then
