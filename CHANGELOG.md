@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the secrets scan covers the commits the event brings (#272)
+
+CI's `secrets` job ran gitleaks over every ref of the checkout (gitleaks's
+`git` mode with no range, the checkout fetching every branch), so a
+key-looking test literal on any pushed branch failed every pull request's
+scan: PR #257 at 2026-10-26 16:46Z, the two findings being the #105
+branch's witnesses, with no location printed. On a pull request the scan
+now covers the PR's own commits (the base sha to `HEAD`, what decides the
+merge; an empty base sha falls back to the line's history), on a push and
+on a dispatch the line's full history, and `-v` prints a finding's location
+with the value redacted. `tests/arch_secrets_scan_scope.rs` pins the step
+(red on the old one). `.gitleaks.toml` judges the two literals by reason:
+secp256k1's generator point in compressed form (the public key of the
+private key 1, the #105 witnesses' identity key, also in the EC, sighash
+and cross-SDK tests and the auth and overlay vectors) and the old revealer
+shape's test key of `tests/wallet_http_json_shapes_105.rs` (the Go SDK's
+test public key, also across the wallet-wire vectors), beside the BRC-56
+vectors and the corpus-gen nonce.
+
 ### Added: what `auth_certificate.json` vector 0 is, and the test that says so (#252)
 
 Vector 0 of `tests/vectors/auth_certificate.json` (added by 91dacc5,
