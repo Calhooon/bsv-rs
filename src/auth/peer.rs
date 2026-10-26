@@ -441,7 +441,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         msg.nonce = Some(to_base64(&random_bytes));
 
         msg.your_nonce = session.peer_nonce.clone();
-        msg.requested_certificates = Some(requested);
+        msg.set_requested_certificates(requested);
 
         self.sign_message(&mut msg, &session).await?;
         self.transport.send(&msg).await
@@ -473,7 +473,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         msg.nonce = Some(to_base64(&random_bytes));
 
         msg.your_nonce = session.peer_nonce.clone();
-        msg.certificates = Some(certificates);
+        msg.set_certificates(certificates);
 
         self.sign_message(&mut msg, &session).await?;
         self.transport.send(&msg).await
@@ -703,7 +703,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let mut msg = AuthMessage::new(MessageType::InitialRequest, my_identity);
         msg.initial_nonce = Some(session_nonce.clone());
         if let Some(ref req) = self.certificates_to_request {
-            msg.requested_certificates = Some(req.clone());
+            msg.set_requested_certificates(req.clone());
         }
 
         // Create oneshot channel for response
