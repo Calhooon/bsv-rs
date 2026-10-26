@@ -98,7 +98,8 @@ impl WireReader<'_> {
     ///
     /// Each is a `u32` by the transaction format or by BRC-100's
     /// `PositiveIntegerOrZero` (at most `2^32 - 1`), so a value above
-    /// `u32::MAX` is refused with the field named, never truncated.
+    /// `u32::MAX` is refused, never truncated, in `#requireInteger`'s words
+    /// with the reference's name for the field (bsv-rs#255).
     pub(crate) fn read_var_int_u32(&mut self, field: &str) -> Result<u32, Error> {
         let value = self.read_var_int()?;
         var_int_u32(field, value)
@@ -114,14 +115,19 @@ impl WireReader<'_> {
 }
 
 fn var_int_u32(field: &str, value: u64) -> Result<u32, Error> {
-    u32::try_from(value).map_err(|_| {
-        Error::WalletError(format!(
-            "invalid {}: expected at most {}, got {}",
-            field,
-            u32::MAX,
-            value
-        ))
-    })
+    u32::try_from(value).map_err(|_| refused(integer_refusal(field, value, 0, u32::MAX.into())))
+}
+
+/// The words of the reference's `#requireInteger(value, fieldName, minimum,
+/// maximum)` (`ts-stack@edf6e03` `WalletWireTransceiver.ts:2018-2025`,
+/// `WalletWireProcessor.ts:138-148`), every integer bound's on this wire.
+pub(crate) fn integer_refusal(
+    field: &str,
+    value: impl std::fmt::Display,
+    minimum: u64,
+    maximum: u64,
+) -> String {
+    format!("Invalid {field}: expected an integer from {minimum} to {maximum}, received {value}")
 }
 
 // The reference's readers of a certificate and its records (bsv-rs#183):
@@ -535,9 +541,7 @@ pub(crate) fn header_result(header: &str) -> Result<Vec<u8>, Error> {
 /// `:2018-2025`), the reader's check and the writer's.
 pub(crate) fn require_discovery_trust(trust: u8) -> Result<u8, Error> {
     if !(1..=10).contains(&trust) {
-        return Err(refused(format!(
-            "Invalid discovery trust: expected an integer from 1 to 10, received {trust}"
-        )));
+        return Err(refused(integer_refusal("discovery trust", trust, 1, 10)));
     }
     Ok(trust)
 }

@@ -778,7 +778,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let total_actions = reader.read_var_int_u32("totalActions")?;
+        let total_actions = reader.read_var_int_u32("listActions totalActions")?;
         let mut actions = Vec::with_capacity(bounded_capacity(
             total_actions as usize,
             reader.remaining(),
@@ -913,7 +913,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let total_outputs = reader.read_var_int_u32("totalOutputs")?;
+        let total_outputs = reader.read_var_int_u32("listOutputs totalOutputs")?;
         // Go uses VarInt(MaxUint64) for nil BEEF, VarInt(len) for present
         let beef_len = reader.read_var_int()?;
         let beef = if beef_len == u64::MAX {
@@ -1125,7 +1125,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         // The total of every page, then this page's entries to the end of
         // the frame (`WalletWireTransceiver.ts:1501-1550`; bsv-rs#190)
-        let total_certificates = reader.read_var_int_u32("totalCertificates")?;
+        let total_certificates = reader.read_var_int_u32("listCertificates totalCertificates")?;
         let mut certificates = Vec::with_capacity(bounded_capacity(
             total_certificates as usize,
             reader.remaining(),
@@ -1405,7 +1405,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<DiscoverCertificatesResult, Error> {
         let mut reader = WireReader::new(data);
 
-        let total_certificates = reader.read_var_int_u32("totalCertificates")?;
+        let total_certificates = reader.read_var_int_u32("discovery totalCertificates")?;
         let mut certificates = Vec::with_capacity(bounded_capacity(
             total_certificates as usize,
             reader.remaining(),

@@ -309,7 +309,7 @@ fn a_sign_action_spend_reads_nine_ff_as_absent_and_the_bound_exactly() {
 fn a_sign_action_spend_sequence_number_above_the_bound_is_refused_naming_it() {
     let over = [0xFF, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00];
     let err = read_spend(&ts_spend(&over)).unwrap_err();
-    let text = "invalid sequenceNumber: expected at most 4294967295, got 4294967296";
+    let text = "Invalid signAction spend sequenceNumber: expected an integer from 0 to 4294967295, received 4294967296";
     assert_eq!(err, Error::WalletError(text.to_string()));
 }
 

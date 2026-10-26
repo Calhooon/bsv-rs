@@ -294,9 +294,11 @@ pub(super) fn read_header_height(reader: &mut WireReader<'_>) -> Result<u32, Ref
     let height = reader.read_var_int_num_strict()?;
     match u32::try_from(height) {
         Ok(height) if height >= 1 => Ok(height),
-        _ => Err(Refusal::plain(format!(
-            "Invalid getHeaderForHeight height: expected an integer from 1 to {}, received {height}",
-            u32::MAX
+        _ => Err(Refusal::plain(super::integer_refusal(
+            "getHeaderForHeight height",
+            height,
+            1,
+            u32::MAX.into(),
         ))),
     }
 }
