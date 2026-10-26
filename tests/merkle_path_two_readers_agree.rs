@@ -467,14 +467,14 @@ fn repeated_sibling(flag: u8) -> (Vec<u8>, u64) {
 /// A BUMP of four levels and two paths (txids at 4 and 8) whose level 2
 /// carries a duplicate at offset 0, the left sibling of the node on the path
 /// from the txid at 4, and level 3 nothing: the path from the txid at 8
-/// computes level 3's offset 0 from that duplicate and the node on the path
-/// from the txid at 4. The duplicate flag duplicates the working hash, the
-/// left node already in hand (BRC-74 at `5119a9b`,
-/// `transactions/0074.md:41,71,76`); at an even offset it has no meaning in
-/// the tree, and both readers refuse its flag (bsv-rs#167). Through 0.9.0 the
-/// standalone reader hashed an empty left hash there and refused `Mismatched
-/// roots`, the two txids climbing to two roots; the lane's draft paired the
-/// right child with itself and accepted it.
+/// needs level 3's offset 0, computed from that duplicate on its left, where
+/// the reference's walk gives up (`ts-stack@edf6e03` `MerklePath.ts:58`,
+/// `:628-631`), and both readers refuse `LeftDuplicateBelow` (bsv-rs#167;
+/// the vector `two-paths-level-3-computed-from-the-left-duplicate` of
+/// `tests/vectors/merkle_path_even_offset_duplicate_167.json`). Through
+/// 0.9.0 the standalone reader hashed an empty left hash there and refused
+/// `Mismatched roots`, the two txids climbing to two roots; until the re-read
+/// of 2026-10-26 both readers refused the duplicate's flag, `BadFlag`.
 fn even_offset_duplicate() -> Vec<u8> {
     let leaf = |offset: u8, flag: u8, hash: Option<u64>| {
         let mut b = vec![offset, flag];
@@ -502,6 +502,11 @@ fn even_offset_duplicate() -> Vec<u8> {
 /// height, the tree height, level 0 (its count and four leaves of 34 bytes),
 /// level 1 (its count and two), level 2's count and the duplicate's offset.
 const EVEN_DUPLICATE_FLAG_AT: u64 = 1 + 1 + (1 + 4 * 34) + (1 + 2 * 34) + 1 + 1;
+
+/// The offset varint of the txid at 8 in [`even_offset_duplicate`], whose
+/// path needs the node computed from the duplicate: the height, the tree
+/// height, level 0's count and two leaves of 34 bytes.
+const TXID_8_AT: u64 = 1 + 1 + 1 + 2 * 34;
 
 /// A hash of [`leaf_hash`] in display hex, as the in-memory form holds it.
 fn display(i: u64) -> String {
@@ -615,35 +620,55 @@ fn inputs() -> Vec<(String, Vec<u8>)> {
     inputs
 }
 
-/// A duplicate at an even offset is refused by both readers at its flag,
-/// `BadFlag { byte: 1 }`: at level 2, a computed node's left child (the
-/// shape through which 0.9.0 gave two roots), and at level 0, the txid's
-/// left sibling.
+/// A duplicate at an even offset is read by both readers as the reference
+/// reads it (bsv-rs#167, the re-read of 2026-10-26): at level 0, the txid's
+/// left sibling, it pairs the txid with itself (`ts-stack@edf6e03`
+/// `MerklePath.ts:60`) and both accept, one root; at level 2, a computed
+/// node's left child (the shape through which 0.9.0 gave two roots), the
+/// path from the txid at 8 needs that node and both refuse
+/// `LeftDuplicateBelow { level: 3, offset: 0 }` at that txid's offset
+/// varint, where the reference throws `Missing hash for index 8 at height 3`.
+/// Until the re-read both refused the flag, `BadFlag { byte: 1 }`, at both.
 #[test]
-fn an_even_offset_duplicate_is_refused_by_both_readers_at_its_flag() {
+fn an_even_offset_duplicate_is_read_by_both_readers_as_the_reference_reads_it() {
     let mut level_0 = vec![0x01, 0x01, 0x02, 0x00, 0x01, 0x01, 0x02];
     level_0.extend_from_slice(&leaf_hash(1));
-    let bytes = even_offset_duplicate();
-    assert_eq!(bytes[EVEN_DUPLICATE_FLAG_AT as usize], 1);
-    for (bytes, at) in [(bytes, EVEN_DUPLICATE_FLAG_AT), (level_0, 4)] {
-        for answer in [standalone(&bytes), beef_reader(&bytes)] {
-            assert!(
-                matches!(
-                    answer,
-                    Answer::Refused {
-                        kind: Some(Kind::BadFlag),
-                        offset: Some(o),
-                        ..
-                    } if o == at
-                ),
-                "{answer:?}"
-            );
-        }
-        assert_eq!(
-            MerklePath::from_binary(&bytes).unwrap_err().to_string(),
-            format!("merkle path error: invalid BUMP at byte {at}: BadFlag {{ byte: 1 }}")
+    let mut paired = leaf_hash(1).to_vec();
+    paired.extend_from_slice(&leaf_hash(1));
+    let mut root = bsv_rs::primitives::sha256d(&paired);
+    root.reverse();
+    let roots = BTreeSet::from([Some(to_hex(&root))]);
+    for answer in [standalone(&level_0), beef_reader(&level_0)] {
+        assert!(
+            matches!(&answer, Answer::Valid { roots: r, used: 39, .. } if *r == roots),
+            "{answer:?}"
         );
     }
+    let path = MerklePath::from_binary(&level_0).unwrap();
+    assert_eq!(path.compute_root(Some(&display(1))).unwrap(), to_hex(&root));
+
+    let bytes = even_offset_duplicate();
+    assert_eq!(bytes[EVEN_DUPLICATE_FLAG_AT as usize], 1);
+    for answer in [standalone(&bytes), beef_reader(&bytes)] {
+        assert!(
+            matches!(
+                answer,
+                Answer::Refused {
+                    kind: Some(Kind::LeftDuplicateBelow),
+                    offset: Some(TXID_8_AT),
+                    ..
+                }
+            ),
+            "{answer:?}"
+        );
+    }
+    assert_eq!(
+        MerklePath::from_binary(&bytes).unwrap_err().to_string(),
+        format!(
+            "merkle path error: invalid BUMP at byte {TXID_8_AT}: \
+             LeftDuplicateBelow {{ level: 3, offset: 0 }}"
+        )
+    );
 }
 
 /// A second leaf at an offset is refused by both readers as
@@ -709,14 +734,18 @@ fn a_byte_after_the_bump_is_refused_by_the_slice_and_left_by_the_reader() {
 }
 
 /// The same shape held in memory: `MerklePath::new` and `new_unchecked`
-/// refuse it ahead of the walk, `Beef::verify_structure` in
-/// `merkle_path_root`'s pre-pass as the decoder refuses its flag, and
-/// `compute_root` on the struct as a caller may build it does not compute a
-/// node from it (the reference's walk gives up there, `ts-stack@edf6e03`
-/// `MerklePath.ts:437`); through the lane's draft the right child was
-/// paired with itself and the struct had one root.
+/// refuse it where their walk (`RootWalker`, the reference's
+/// `computeRootCached`) gives up as the reference's does, `Missing hash` for
+/// the node on the left (`ts-stack@edf6e03` `MerklePath.ts:628-631`);
+/// `Beef::verify_structure` refuses it `LeftDuplicateBelow`, as the decoder's
+/// walk does on the wire; and `compute_root` on the struct as a caller may
+/// build it gives the root from the txid at 4, whose walk meets the
+/// duplicate as its sibling, and computes no node from it for the txid at 8.
+/// Until the re-read of 2026-10-26 `new` and `new_unchecked` refused it
+/// ahead of the walk (`Duplicate at an even offset: 0, at height: 2`) and
+/// `verify_structure` in a pre-pass, `Kind::BadFlag` (bsv-rs#167).
 #[test]
-fn an_even_offset_duplicate_held_in_memory_is_refused() {
+fn an_even_offset_duplicate_held_in_memory_is_read_as_the_reference_reads_it() {
     let path = vec![
         vec![
             MerklePathLeaf::new_txid(4, display(4)),
@@ -734,7 +763,7 @@ fn an_even_offset_duplicate_held_in_memory_is_refused() {
         ],
         vec![],
     ];
-    let refusal = "merkle path error: Duplicate at an even offset: 0, at height: 2";
+    let refusal = "merkle path error: Missing hash at height 2, offset 0";
     let checked = MerklePath::new(1, path.clone()).unwrap_err();
     assert_eq!(checked.to_string(), refusal);
     let unchecked = MerklePath::new_unchecked(1, path.clone()).unwrap_err();
@@ -745,14 +774,14 @@ fn an_even_offset_duplicate_held_in_memory_is_refused() {
         block_height: 1,
         path,
     });
-    assert_eq!(beef.verify_structure(), Err(Kind::BadFlag));
+    assert_eq!(beef.verify_structure(), Err(Kind::LeftDuplicateBelow));
     let held = &beef.bumps[0];
     assert!(held.compute_root(Some(&display(4))).is_ok());
     assert_eq!(
         held.compute_root(Some(&display(8)))
             .unwrap_err()
             .to_string(),
-        "merkle path error: Missing hash at height 2, offset 0"
+        refusal
     );
 }
 

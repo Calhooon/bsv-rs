@@ -1,0 +1,404 @@
+{
+  "description": "bsv-rs#167: a duplicate-flagged leaf at an even offset as @bsv/sdk reads it. Each shape is the BUMP the reference writes (hex), its leaves in display hex, and the reference's verdict on fromHex with its defaults: the root computeRoot gives from every hash of level 0, or the words it throws; unchecked is the verdict with legalOffsetsOnly false. Written by tests/support/even_offset_duplicate_167.mjs.",
+  "reference": "ts-stack@edf6e03 packages/sdk/src/transaction/MerklePath.ts",
+  "node": "v22.18.0",
+  "shapes": [
+    {
+      "name": "level-0-duplicate-left-of-the-txid",
+      "note": "the txid at offset 1, the duplicate at 0: its sibling, paired with itself",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+            "txid": true
+          }
+        ]
+      ],
+      "hex": "0101020001010254f215815633211f91de84ed7aa8b8b06be17312c17538a204b7ce940c54dc47",
+      "verdict": {
+        "accepted": true,
+        "root": "bba2fc8179a5b5200958ece626f9db742ef3bf161cb62d14506d4d0182d85315",
+        "roots": {
+          "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254": "bba2fc8179a5b5200958ece626f9db742ef3bf161cb62d14506d4d0182d85315"
+        }
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "bba2fc8179a5b5200958ece626f9db742ef3bf161cb62d14506d4d0182d85315",
+        "roots": {
+          "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254": "bba2fc8179a5b5200958ece626f9db742ef3bf161cb62d14506d4d0182d85315"
+        }
+      }
+    },
+    {
+      "name": "level-1-duplicate-left-of-the-path",
+      "note": "the txid at 3, its sibling at 2; level 1 carries the duplicate at 0, the path node at 1",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 2,
+            "hash": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9",
+            "txid": true
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          }
+        ]
+      ],
+      "hex": "0102020200e8c4489a411c9cbad870fa9afe685424d542fd35b04e8ebd1320ca88fb5ebe990302f928a64802dc91b98753c32c39976b02bfcd63823972e230881d6ddd4eb24f9b010001",
+      "verdict": {
+        "accepted": true,
+        "root": "54efb44137557905a1f3eb8c33c52d86bb55165105427d97d966d72ec06ee9c6",
+        "roots": {
+          "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8": "54efb44137557905a1f3eb8c33c52d86bb55165105427d97d966d72ec06ee9c6",
+          "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9": "54efb44137557905a1f3eb8c33c52d86bb55165105427d97d966d72ec06ee9c6"
+        }
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "54efb44137557905a1f3eb8c33c52d86bb55165105427d97d966d72ec06ee9c6",
+        "roots": {
+          "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8": "54efb44137557905a1f3eb8c33c52d86bb55165105427d97d966d72ec06ee9c6",
+          "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9": "54efb44137557905a1f3eb8c33c52d86bb55165105427d97d966d72ec06ee9c6"
+        }
+      }
+    },
+    {
+      "name": "level-2-duplicate-left-of-the-path",
+      "note": "the txid at 5; level 1 carries 3; level 2 the duplicate at 0, the path node at 1",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 4,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7"
+          },
+          {
+            "offset": 5,
+            "hash": "2921a11f25dadaa24aa79a548e4e81508c2e5e56af2d833d65e2bcce448ce2f5",
+            "txid": true
+          }
+        ],
+        [
+          {
+            "offset": 3,
+            "hash": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          }
+        ]
+      ],
+      "hex": "0103020400e73ac502c4a97f3ef2e1862bac80b8466cf5b6fb4d98f5bf4af467ac338abac00502f5e28c44cebce2653d832daf565e2e8c50814e8e549aa74aa2dada251fa1212901030042a84a52bcdcf474f76f66ff0952f8806f7d3acfac97015c3657c6cc6fcc66f5010001",
+      "verdict": {
+        "accepted": true,
+        "root": "d03deaac1c2951c493bd9b6f0d55d30c465dfb590afc941f126b662f8938d23c",
+        "roots": {
+          "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7": "d03deaac1c2951c493bd9b6f0d55d30c465dfb590afc941f126b662f8938d23c",
+          "2921a11f25dadaa24aa79a548e4e81508c2e5e56af2d833d65e2bcce448ce2f5": "d03deaac1c2951c493bd9b6f0d55d30c465dfb590afc941f126b662f8938d23c"
+        }
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "d03deaac1c2951c493bd9b6f0d55d30c465dfb590afc941f126b662f8938d23c",
+        "roots": {
+          "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7": "d03deaac1c2951c493bd9b6f0d55d30c465dfb590afc941f126b662f8938d23c",
+          "2921a11f25dadaa24aa79a548e4e81508c2e5e56af2d833d65e2bcce448ce2f5": "d03deaac1c2951c493bd9b6f0d55d30c465dfb590afc941f126b662f8938d23c"
+        }
+      }
+    },
+    {
+      "name": "two-txids-the-left-duplicate-node-carried-above",
+      "note": "txids at 1 and 2, the duplicate at 0; level 1 carries the node over 0 and 1, so the txid at 2 needs no node computed from the duplicate",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+            "txid": true
+          },
+          {
+            "offset": 2,
+            "hash": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8",
+            "txid": true
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "hash": "bba2fc8179a5b5200958ece626f9db742ef3bf161cb62d14506d4d0182d85315"
+          }
+        ]
+      ],
+      "hex": "0102040001010254f215815633211f91de84ed7aa8b8b06be17312c17538a204b7ce940c54dc470202e8c4489a411c9cbad870fa9afe685424d542fd35b04e8ebd1320ca88fb5ebe990300f928a64802dc91b98753c32c39976b02bfcd63823972e230881d6ddd4eb24f9b0100001553d882014d6d50142db61c16bff32e74dbf926e6ec580920b5a57981fca2bb",
+      "verdict": {
+        "accepted": true,
+        "root": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc",
+        "roots": {
+          "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc",
+          "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc",
+          "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc"
+        }
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc",
+        "roots": {
+          "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc",
+          "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc",
+          "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9": "03f9b573aefa8100fb7258117142de8006ff954dc5c50f1259731395a9a317fc"
+        }
+      }
+    },
+    {
+      "name": "two-txids-the-left-duplicate-node-carried-wrong",
+      "note": "the same, level 1 carrying another hash at 0: the two txids climb to two roots",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+            "txid": true
+          },
+          {
+            "offset": 2,
+            "hash": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8",
+            "txid": true
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "hash": "ec49f17f2c205644d3a0d242eb5a82ec222ed01fbd8fd6b55d0f2f6ef651e484"
+          }
+        ]
+      ],
+      "hex": "0102040001010254f215815633211f91de84ed7aa8b8b06be17312c17538a204b7ce940c54dc470202e8c4489a411c9cbad870fa9afe685424d542fd35b04e8ebd1320ca88fb5ebe990300f928a64802dc91b98753c32c39976b02bfcd63823972e230881d6ddd4eb24f9b01000084e451f66e2f0f5db5d68fbd1fd02e22ec825aeb42d2a0d34456202c7ff149ec",
+      "verdict": {
+        "accepted": false,
+        "refusal": "Mismatched roots"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Mismatched roots"
+      }
+    },
+    {
+      "name": "two-txids-a-node-computed-from-the-left-duplicate",
+      "note": "txids at 1 and 2, the duplicate at 0, level 1 empty: the txid at 2 needs level 1 offset 0, computed from the duplicate on its left",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+            "txid": true
+          },
+          {
+            "offset": 2,
+            "hash": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8",
+            "txid": true
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9"
+          }
+        ],
+        []
+      ],
+      "hex": "0102040001010254f215815633211f91de84ed7aa8b8b06be17312c17538a204b7ce940c54dc470202e8c4489a411c9cbad870fa9afe685424d542fd35b04e8ebd1320ca88fb5ebe990300f928a64802dc91b98753c32c39976b02bfcd63823972e230881d6ddd4eb24f9b00",
+      "verdict": {
+        "accepted": false,
+        "refusal": "Missing hash for index 2 at height 1"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Missing hash for index 2 at height 1"
+      }
+    },
+    {
+      "name": "two-paths-level-3-computed-from-the-left-duplicate",
+      "note": "txids at 4 and 8; level 2 carries the duplicate at 0 and level 3 nothing: the path from 8 needs level 3 offset 0, whose left child is the duplicate (the differential seed of #167)",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 4,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "txid": true
+          },
+          {
+            "offset": 5,
+            "hash": "2921a11f25dadaa24aa79a548e4e81508c2e5e56af2d833d65e2bcce448ce2f5"
+          },
+          {
+            "offset": 8,
+            "hash": "e545d395bb3fd971f91bf9a2b6722831df704efae6c1aa9da0989ed0970b77bb",
+            "txid": true
+          },
+          {
+            "offset": 9,
+            "hash": "a2c4aed1cf757cd9a509734a267ffc7b1166b55f4c8f9c3e3550c56e743328fc"
+          }
+        ],
+        [
+          {
+            "offset": 3,
+            "hash": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+          },
+          {
+            "offset": 5,
+            "hash": "46e04d129d7b45d054469ce34e24069a1426b3e34f1b68a3d1bff1e070aee192"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 3,
+            "hash": "009bcd40e9707180cd0f5b0a16f497a82ece54d6fe538d5861b47c49ffd91773"
+          }
+        ],
+        []
+      ],
+      "hex": "0104040402e73ac502c4a97f3ef2e1862bac80b8466cf5b6fb4d98f5bf4af467ac338abac00500f5e28c44cebce2653d832daf565e2e8c50814e8e549aa74aa2dada251fa121290802bb770b97d09e98a09daac1e6fa4e70df312872b6a2f91bf971d93fbb95d345e50900fc2833746ec550353e9c8f4c5fb566117bfc7f264a7309a5d97c75cfd1aec4a202030042a84a52bcdcf474f76f66ff0952f8806f7d3acfac97015c3657c6cc6fcc66f5050092e1ae70e0f1bfd1a3681b4fe3b326149a06244ee39c4654d0457b9d124de04602000103007317d9ff497cb461588d53fed654ce2ea897f4160a5b0fcd807170e940cd9b0000",
+      "verdict": {
+        "accepted": false,
+        "refusal": "Missing hash for index 8 at height 3"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Missing hash for index 8 at height 3"
+      }
+    },
+    {
+      "name": "two-paths-a-right-child-computed-from-the-left-duplicate",
+      "note": "txids at 3 and 4, the duplicate at 2; level 1 carries 0 and 3: the path from 4 needs level 2 offset 0, whose right child (level 1 offset 1) is computed from the duplicate",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 2,
+            "duplicate": true
+          },
+          {
+            "offset": 3,
+            "hash": "9b4fb24edd6d1d8830e272398263cdbf026b97392cc35387b991dc0248a628f9",
+            "txid": true
+          },
+          {
+            "offset": 4,
+            "hash": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "txid": true
+          },
+          {
+            "offset": 5,
+            "hash": "2921a11f25dadaa24aa79a548e4e81508c2e5e56af2d833d65e2bcce448ce2f5"
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "hash": "102b51b9765a56a3e899f7cf0ee38e5251f9c503b357b330a49183eb7b155604"
+          },
+          {
+            "offset": 3,
+            "hash": "f566cc6fccc657365c0197accf3a7d6f80f85209ff666ff774f4dcbc524aa842"
+          }
+        ],
+        []
+      ],
+      "hex": "01030402010302f928a64802dc91b98753c32c39976b02bfcd63823972e230881d6ddd4eb24f9b0402e73ac502c4a97f3ef2e1862bac80b8466cf5b6fb4d98f5bf4af467ac338abac00500f5e28c44cebce2653d832daf565e2e8c50814e8e549aa74aa2dada251fa121290200000456157beb8391a430b357b303c5f951528ee30ecff799e8a3565a76b9512b10030042a84a52bcdcf474f76f66ff0952f8806f7d3acfac97015c3657c6cc6fcc66f500",
+      "verdict": {
+        "accepted": false,
+        "refusal": "Missing hash for index 4 at height 2"
+      },
+      "unchecked": {
+        "accepted": false,
+        "refusal": "Missing hash for index 4 at height 2"
+      }
+    },
+    {
+      "name": "a-duplicate-at-the-path-nodes-own-offset",
+      "note": "the txid at 1; level 1 carries the duplicate at 0, the path node's own offset, and the sibling at 1",
+      "block_height": 1,
+      "path": [
+        [
+          {
+            "offset": 0,
+            "hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+          },
+          {
+            "offset": 1,
+            "hash": "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254",
+            "txid": true
+          }
+        ],
+        [
+          {
+            "offset": 0,
+            "duplicate": true
+          },
+          {
+            "offset": 1,
+            "hash": "cbe2268747c9c8072c7f9926f2288f270637dc55bb9d14d3368361d5e47d25be"
+          }
+        ]
+      ],
+      "hex": "0102020000c7cf090a63780b417eb8c55da3daf05791308a0fc393ee7bc685f224d296a296010254f215815633211f91de84ed7aa8b8b06be17312c17538a204b7ce940c54dc470200010100be257de4d5618336d3149dbb55dc3706278f28f226997f2c07c8c9478726e2cb",
+      "verdict": {
+        "accepted": false,
+        "refusal": "Invalid offset: 0, at height: 1, with legal offsets: 1"
+      },
+      "unchecked": {
+        "accepted": true,
+        "root": "0fafc5f7a30a2827e3327c0b5c8a173f7da9dbb4965bf6fad3d4797f9144bad1",
+        "roots": {
+          "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7": "0fafc5f7a30a2827e3327c0b5c8a173f7da9dbb4965bf6fad3d4797f9144bad1",
+          "47dc540c94ceb704a23875c11273e16bb0b8a87aed84de911f2133568115f254": "0fafc5f7a30a2827e3327c0b5c8a173f7da9dbb4965bf6fad3d4797f9144bad1"
+        }
+      }
+    }
+  ]
+}

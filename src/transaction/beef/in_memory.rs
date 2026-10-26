@@ -127,24 +127,6 @@ impl MerklePath {
         }
         Ok((path, used))
     }
-
-    /// A duplicate at an even offset refused (bsv-rs#167): the flag
-    /// duplicates the working hash, the left node already in hand (BRC-74 at
-    /// `5119a9b`, `transactions/0074.md:41,71,76`), and an even offset is a
-    /// left node, so the shape has no meaning in the tree. The decoder
-    /// refuses its flag (`BadFlag`); `new` and `new_unchecked` refuse it here,
-    /// ahead of the walk, so no path this crate builds or reads holds it.
-    pub(crate) fn even_offset_duplicate(path: &[Vec<MerklePathLeaf>]) -> crate::Result<()> {
-        for (height, leaves) in path.iter().enumerate() {
-            if let Some(leaf) = leaves.iter().find(|l| l.duplicate && l.offset % 2 == 0) {
-                return Err(crate::Error::MerklePathError(format!(
-                    "Duplicate at an even offset: {}, at height: {}",
-                    leaf.offset, height
-                )));
-            }
-        }
-        Ok(())
-    }
 }
 
 /// The root of an in-memory BUMP by the same walk ([`bump_root`]): the one
@@ -153,10 +135,10 @@ impl MerklePath {
 /// The levels keep their in-memory order; a hash that is not 32 bytes of hex
 /// (only a BUMP built by hand holds one) is a node the BUMP does not carry.
 /// A second leaf at an offset of a level is refused ahead of the walk, as
-/// the decoder refuses it on the wire (`DuplicateOffset`, bsv-rs#86), and a
-/// duplicate at an even offset, a left node, as the decoder refuses its flag
-/// (`BadFlag`, bsv-rs#167). A refusal names the kind; its offset is 0, there
-/// being no stream.
+/// the decoder refuses it on the wire (`DuplicateOffset`, bsv-rs#86); a
+/// duplicate at an even offset is the walk's to read, as on the wire
+/// (bsv-rs#167). A refusal names the kind; its offset is 0, there being no
+/// stream.
 pub(super) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
     for (level, leaves) in path.path.iter().enumerate() {
         let mut seen = HashSet::with_capacity(leaves.len());
@@ -166,10 +148,6 @@ pub(super) fn merkle_path_root(path: &MerklePath) -> Result<Hash32, Refusal> {
                 level,
                 offset: repeated.offset,
             };
-            return Err(Refusal { offset: 0, reason });
-        }
-        if leaves.iter().any(|l| l.duplicate && l.offset % 2 == 0) {
-            let reason = Reason::BadFlag { byte: 1 };
             return Err(Refusal { offset: 0, reason });
         }
     }

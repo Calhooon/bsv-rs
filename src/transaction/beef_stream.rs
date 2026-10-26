@@ -2,7 +2,7 @@
 //!
 //! A valid BEEF is never refused for its size or its counts. A refusal is for
 //! invalid bytes only, and names them: the offset of the byte and one of
-//! twenty-five kinds, none of which is a size or a count.
+//! twenty-six kinds, none of which is a size or a count.
 //!
 //! The specification is the Lean definition `BeefOfAnySize` of bsv-stack-lean
 //! (`lean/BeefOfAnySize.lean`, its report `docs/p0/nl-1.md`), which states six
@@ -46,13 +46,13 @@
 //!
 //! # What is and is not the Lean's
 //!
-//! The twenty-five [`Kind`]s, the offsets and the order of the checks inside one
+//! The twenty-six [`Kind`]s, the offsets and the order of the checks inside one
 //! element are the Lean's. Two things are outside it and say so in the type:
 //!
 //! - Script execution and the value rule are the interpreter's verdict on a
 //!   spend, not a rule about the BEEF's bytes (the Lean leaves them to the
 //!   node). A spend that fails is [`Verdict::SpendRefused`], never one of the
-//!   twenty-five kinds. [`StreamVerifier::structure_only`] turns the spend
+//!   twenty-six kinds. [`StreamVerifier::structure_only`] turns the spend
 //!   checks off and leaves exactly the Lean's validity.
 //! - Next-block mining context: P2SH's Genesis era, finality and coinbase
 //!   maturity are spend checks. Missing finality or maturity context yields
@@ -342,11 +342,14 @@ fn pair(left: &Hash32, right: &Hash32) -> Hash32 {
 }
 
 /// A node on a hashed leaf's path: its offset at the current level, its hash,
-/// and the stream offset of the level-0 leaf whose path it is on.
+/// the stream offset of the level-0 leaf whose path it is on, and whether the
+/// reference's walk can compute it as another path's sibling: not when it
+/// rests on a duplicate at an even offset (bsv-rs#167).
 struct PathNode {
     offset: u64,
     hash: Hash32,
     at: u64,
+    whole: bool,
 }
 
 /// The root of a BUMP, bottom up, one level at a time (the Lean's `Bump.root`
@@ -354,8 +357,12 @@ struct PathNode {
 /// level 0 climb through; each one's sibling is the leaf the level carries at
 /// `offset ^ 1` or, when the level carries none there, the path node computed
 /// at that offset from the level below; every path node agrees with whatever
-/// the level carries at its own offset. Two map operations per leaf and a
-/// constant number per path node per level: linear in the BUMP.
+/// the level carries at its own offset. A duplicate sibling, at either
+/// offset, pairs the node with itself (`ts-stack@edf6e03` `MerklePath.ts:60`);
+/// a computed sibling that rests on a duplicate at an even offset, a left
+/// node with no hash, is `LeftDuplicateBelow`, where the reference's walk
+/// gives up (`:58`, `:628-631`; bsv-rs#167). Two map operations per leaf and
+/// a constant number per path node per level: linear in the BUMP.
 ///
 /// The maps are keyed by offsets a stranger chose, so they keep the standard
 /// library's keyed hasher.
@@ -370,6 +377,7 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
                 offset: l.offset,
                 hash,
                 at: l.at,
+                whole: true,
             }),
             Node::Duplicate => None,
         })
@@ -402,15 +410,17 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
             given.entry(l.offset).or_insert(l.node);
         }
         // The path nodes of this level by offset.
-        let mut computed: HashMap<u64, Hash32> = HashMap::with_capacity(needed.len());
+        let mut computed: HashMap<u64, (Hash32, bool)> = HashMap::with_capacity(needed.len());
         for n in &needed {
-            computed.insert(n.offset, n.hash);
+            computed.insert(n.offset, (n.hash, n.whole));
         }
         let mut parents: HashMap<u64, Hash32> = HashMap::with_capacity(needed.len());
         let mut next: Vec<PathNode> = Vec::with_capacity(needed.len());
         for n in &needed {
+            // A node the level carries is found, not computed.
+            let mut whole = n.whole;
             match given.get(&n.offset) {
-                Some(Node::Hash(g)) if *g == n.hash => {}
+                Some(Node::Hash(g)) if *g == n.hash => whole = true,
                 Some(_) => {
                     return Err(Refusal::new(
                         n.at,
@@ -425,9 +435,19 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
             let s = n.offset ^ 1;
             let sibling: Option<Hash32> = match given.get(&s) {
                 Some(Node::Hash(h)) => Some(*h),
-                Some(Node::Duplicate) => None,
+                Some(Node::Duplicate) => {
+                    // On the left it is no hash: the node above is not whole.
+                    whole &= s % 2 == 1;
+                    None
+                }
                 None => match computed.get(&s) {
-                    Some(h) => Some(*h),
+                    Some((h, true)) => Some(*h),
+                    Some((_, false)) => {
+                        return Err(Refusal::new(
+                            n.at,
+                            Reason::LeftDuplicateBelow { level, offset: s },
+                        ))
+                    }
                     None => {
                         return Err(Refusal::new(
                             n.at,
@@ -459,6 +479,7 @@ pub(crate) fn bump_root(offset: u64, levels: &[Vec<Leaf>]) -> Result<Hash32, Ref
                         offset: up,
                         hash: parent,
                         at: n.at,
+                        whole,
                     });
                 }
             }
@@ -997,8 +1018,10 @@ impl BeefDecoder {
             St::LeafFlag => {
                 let flag = self.scratch[0];
                 let bump = self.bump.as_mut().expect("a BUMP is in hand");
-                match (flag, bump.leaf_offset % 2) {
-                    (1, 1) => {
+                // A duplicate at either offset (bsv-rs#167): the walk pairs the
+                // working hash with itself where it is the sibling.
+                match flag {
+                    1 => {
                         let leaf = Leaf {
                             at: bump.leaf_at,
                             offset: bump.leaf_offset,
@@ -1007,11 +1030,11 @@ impl BeefDecoder {
                         };
                         return self.leaf_done(leaf);
                     }
-                    (0 | 2, _) => {
+                    0 | 2 => {
                         bump.leaf_client = flag == 2;
                         self.st = St::LeafHash;
                     }
-                    (byte, _) => return Err(Refusal::new(self.field_at, Reason::BadFlag { byte })),
+                    byte => return Err(Refusal::new(self.field_at, Reason::BadFlag { byte })),
                 }
             }
             St::LeafHash => {
@@ -1513,7 +1536,7 @@ fn live_of(outputs: &Option<Box<[Option<Retained>]>>) -> usize {
 
 /// Why a spend was refused. This is the interpreter's verdict on a
 /// transaction, not a rule about the BEEF's bytes, and it is not one of the
-/// twenty-five [`Kind`]s.
+/// twenty-six [`Kind`]s.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SpendRefusal {
     /// The parent is a txid-only entry: its output is not in the BEEF.
@@ -2380,7 +2403,7 @@ pub enum Verdict {
         /// order).
         roots: Vec<(u64, Hash32)>,
     },
-    /// The bytes are invalid: the offset of the byte and one of the twenty-five
+    /// The bytes are invalid: the offset of the byte and one of the twenty-six
     /// kinds.
     Invalid {
         /// The stream offset of the byte the refusal names.
@@ -2391,7 +2414,7 @@ pub enum Verdict {
         reason: Reason,
     },
     /// The BEEF's bytes are well formed up to here and the interpreter
-    /// refused a spend. Not one of the twenty-five kinds: the verdict is the
+    /// refused a spend. Not one of the twenty-six kinds: the verdict is the
     /// script's, on a transaction. `SpendRefusal::Resource` is a LOCAL
     /// evaluator decline: this spend was not judged invalid.
     SpendRefused {
