@@ -8,7 +8,7 @@
 //
 // It runs the reference's `Validation.validateCreateActionArgs`
 // (`validationHelpers.ts:749-758`, each input through
-// `validateCreateActionInput` at `:587-614`) on one-input arguments and
+// `validateCreateActionInput` at `:587-613`) on one-input arguments and
 // prints, for each case, the verdict and the thrown message.
 import { pathToFileURL } from 'url'
 
