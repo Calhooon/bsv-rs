@@ -701,11 +701,14 @@ mod base64_32_bytes {
 /// (`ts-stack@edf6e03` `Certificate.ts:261-262`, `MasterCertificate.ts:112-123`):
 /// its default issuance writes the txid alone (`MasterCertificate.ts:442`).
 /// go-sdk@2ca481c refuses the txid alone (`transaction/outpoint.go:50`).
+/// Only exactly 64 hex characters read as a txid alone (the reference's own
+/// case, `MasterCertificate.ts:117`); every other text is `Outpoint`'s, with
+/// its words.
 pub(crate) fn revocation_outpoint_from_str(text: &str) -> Result<Outpoint> {
-    if text.contains('.') {
-        Outpoint::from_string(text)
-    } else {
+    if text.len() == 64 && text.bytes().all(|b| b.is_ascii_hexdigit()) {
         Outpoint::from_string(&format!("{text}.0"))
+    } else {
+        Outpoint::from_string(text)
     }
 }
 
@@ -714,14 +717,45 @@ pub(crate) fn revocation_outpoint_from_str(text: &str) -> Result<Outpoint> {
 /// txid alone read as index 0 (`revocation_outpoint_from_str`).
 mod revocation_outpoint_json {
     use crate::wallet::types::Outpoint;
+    use serde::de::value::MapAccessDeserializer;
+    use serde::de::{self, MapAccess, Visitor};
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    /// The text the reference writes, or the object form `Outpoint` reads.
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Read {
-        Text(String),
-        Object(Outpoint),
+    /// The text the reference writes, the object form `Outpoint` reads, or
+    /// nothing; a refusal in `Outpoint`'s own words.
+    struct Read;
+
+    impl<'de> Visitor<'de> for Read {
+        type Value = Option<Outpoint>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("a string like 'txid.vout' or an object with txid and vout fields")
+        }
+
+        fn visit_str<E: de::Error>(self, text: &str) -> Result<Self::Value, E> {
+            super::revocation_outpoint_from_str(text)
+                .map(Some)
+                .map_err(de::Error::custom)
+        }
+
+        fn visit_map<M: MapAccess<'de>>(self, map: M) -> Result<Self::Value, M::Error> {
+            Outpoint::deserialize(MapAccessDeserializer::new(map)).map(Some)
+        }
+
+        fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_unit<E: de::Error>(self) -> Result<Self::Value, E> {
+            Ok(None)
+        }
+
+        fn visit_some<D: Deserializer<'de>>(
+            self,
+            deserializer: D,
+        ) -> Result<Self::Value, D::Error> {
+            deserializer.deserialize_any(Read)
+        }
     }
 
     pub fn serialize<S>(outpoint: &Option<Outpoint>, serializer: S) -> Result<S::Ok, S::Error>
@@ -738,13 +772,7 @@ mod revocation_outpoint_json {
     where
         D: Deserializer<'de>,
     {
-        let outpoint = match Option::<Read>::deserialize(deserializer)? {
-            Some(Read::Text(text)) => {
-                Some(super::revocation_outpoint_from_str(&text).map_err(serde::de::Error::custom)?)
-            }
-            Some(Read::Object(outpoint)) => Some(outpoint),
-            None => None,
-        };
+        let outpoint = deserializer.deserialize_any(Read)?;
         Ok(outpoint.filter(|o| o.txid != [0u8; 32] || o.vout != 0))
     }
 }

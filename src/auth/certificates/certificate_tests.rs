@@ -127,3 +127,18 @@ fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bou
         )
     );
 }
+
+#[test]
+fn a_dotless_outpoint_of_64_non_hex_characters_is_a_wallet_error() {
+    let text = "z".repeat(64);
+    assert_eq!(
+        revocation_outpoint_from_str(&text),
+        Err(crate::Error::WalletError(format!(
+            "Invalid outpoint format: expected 'txid.vout', got '{text}'"
+        )))
+    );
+    assert_eq!(
+        revocation_outpoint_from_str(&"Ab".repeat(32)).unwrap(),
+        Outpoint::new([0xab; 32], 0)
+    );
+}

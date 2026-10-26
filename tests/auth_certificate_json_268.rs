@@ -269,6 +269,73 @@ async fn the_reference_default_txid_alone_revocation_outpoint_reads_as_index_zer
     );
 }
 
+/// The words a certificate's JSON is refused with when its
+/// `revocationOutpoint` is `outpoint`.
+fn refusal_of(outpoint: serde_json::Value) -> String {
+    let v = vectors();
+    let mut value: serde_json::Value =
+        serde_json::from_str(&v.reference_issued[2].json.certificate).unwrap();
+    value["revocationOutpoint"] = outpoint;
+    match serde_json::from_value::<Certificate>(value) {
+        Ok(read) => panic!("read as {:?}", read.revocation_outpoint),
+        Err(e) => e.to_string(),
+    }
+}
+
+/// Only exactly 64 hex characters read as the txid alone: a dotless text of
+/// another length is refused in `Outpoint`'s words, as before #268.
+#[test]
+fn a_dotless_outpoint_not_a_txid_keeps_the_outpoint_words() {
+    let words = refusal_of("garbage".into());
+    assert!(
+        words.contains("Invalid outpoint format: expected 'txid.vout', got 'garbage'"),
+        "{words}"
+    );
+}
+
+/// 64 characters that are not hex are not a txid alone: `Outpoint`'s
+/// format words, not the hex decoder's.
+#[test]
+fn a_dotless_outpoint_of_64_non_hex_characters_keeps_the_outpoint_words() {
+    let text = "z".repeat(64);
+    let words = refusal_of(text.clone().into());
+    assert!(
+        words.contains(&format!(
+            "Invalid outpoint format: expected 'txid.vout', got '{text}'"
+        )),
+        "{words}"
+    );
+}
+
+/// The empty text is refused in `Outpoint`'s format words.
+#[test]
+fn an_empty_outpoint_keeps_the_outpoint_words() {
+    let words = refusal_of("".into());
+    assert!(
+        words.contains("Invalid outpoint format: expected 'txid.vout', got ''"),
+        "{words}"
+    );
+}
+
+/// A number is refused by `Outpoint`'s visitor, in its words.
+#[test]
+fn a_numeric_outpoint_keeps_the_outpoint_visitor_words() {
+    let words = refusal_of(5.into());
+    assert!(
+        words.contains(
+            "invalid type: integer `5`, expected a string like 'txid.vout' or an object with txid and vout fields"
+        ),
+        "{words}"
+    );
+}
+
+/// The object form with a short txid is refused in `Outpoint`'s words.
+#[test]
+fn an_object_outpoint_with_a_short_txid_keeps_the_outpoint_words() {
+    let words = refusal_of(serde_json::json!({ "txid": "ab", "vout": 0 }));
+    assert!(words.contains("txid must be 32 bytes"), "{words}");
+}
+
 /// A certificateResponse from a reference peer carries the certificate's
 /// JSON as the reference writes it: the txid alone is read inside an
 /// `AuthMessage` as in a certificate.
