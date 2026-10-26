@@ -1142,7 +1142,9 @@ impl WireWriter {
     /// (bsv-rs#189): a subject or certifier that is not a compressed point
     /// (`:241-253`), a field name outside 1 to 50 bytes or unsafe (`:289`), a
     /// signature that is not DER (`:300-312`); the DER it accepts is written as
-    /// given (`:311`).
+    /// given (`:311`). Since bsv-rs#246 the reference's three bounds too: more
+    /// than 100,000 fields (`:57-58`), a value over 1 MiB (`:76-79`), a frame
+    /// over 16 MiB (`:316-320`).
     pub fn write_wallet_certificate(
         &mut self,
         cert: &WalletCertificate,
@@ -1397,12 +1399,26 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
     // Revocation outpoint
     w.write_outpoint_string(&cert.revocation_outpoint)?;
 
-    // Fields: sorted string map, each name 1 to 50 bytes and safe
+    // Fields: at most 100,000 (`Certificate.ts:57-58`), each name 1 to 50
+    // bytes and safe, each value at most 1 MiB (`:76-79`), in the readers'
+    // words (bsv-rs#246)
+    if cert.fields.len() > super::MAX_CERTIFICATE_FIELDS {
+        return Err(super::refused(format!(
+            "Certificate field count exceeds the maximum of {}",
+            super::MAX_CERTIFICATE_FIELDS
+        )));
+    }
     let mut names: Vec<&String> = cert.fields.keys().collect();
     names.sort();
     for name in names {
         super::require_certificate_field_name_length(name.len())?;
         super::require_safe_certificate_field_name(name)?;
+        if cert.fields[name].len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+            return Err(super::refused(format!(
+                "Certificate field {name} exceeds the maximum of {} bytes",
+                super::MAX_CERTIFICATE_FIELD_VALUE_BYTES
+            )));
+        }
     }
     w.write_string_map(&cert.fields);
 
@@ -1412,6 +1428,15 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
         super::certificate_signature_der(&sig_bytes)?;
     }
     w.write_bytes(&sig_bytes);
+
+    // The frame: at most 16 MiB (`Certificate.ts:316-320`), in the
+    // reference writer's words (the reader's are `snapshotCertificateBinary`'s)
+    if w.as_bytes().len() > super::MAX_CERTIFICATE_BINARY_BYTES {
+        return Err(super::refused(format!(
+            "Certificate binary exceeds the maximum of {} bytes",
+            super::MAX_CERTIFICATE_BINARY_BYTES
+        )));
+    }
 
     Ok(w.into_bytes())
 }
