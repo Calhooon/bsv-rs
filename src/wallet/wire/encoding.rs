@@ -1145,7 +1145,7 @@ impl WireWriter {
     /// signature that is not DER (`:300-312`); the DER it accepts is written as
     /// given (`:311`). Since bsv-rs#246 the reference's three bounds too: more
     /// than 100,000 fields (`:57-58`), a value over 1 MiB (`:76-79`), a frame
-    /// over 16 MiB (`:316-320`).
+    /// over 16 MiB (`:315-319`).
     pub fn write_wallet_certificate(
         &mut self,
         cert: &WalletCertificate,
@@ -1437,7 +1437,7 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
     }
     w.write_bytes(&sig_bytes);
 
-    // The frame: at most 16 MiB (`Certificate.ts:316-320`), in the
+    // The frame: at most 16 MiB (`Certificate.ts:315-319`), in the
     // reference writer's words (the reader's are `snapshotCertificateBinary`'s)
     if w.as_bytes().len() > super::MAX_CERTIFICATE_BINARY_BYTES {
         return Err(super::refused(format!(
