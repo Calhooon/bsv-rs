@@ -3,9 +3,10 @@
 //! A verifiable certificate includes a keyring that allows a specific
 //! verifier to decrypt selected fields.
 
-use super::{Certificate, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL};
-use crate::primitives::PublicKey;
-use crate::wallet::{Counterparty, DecryptArgs, Protocol, SecurityLevel, WalletInterface};
+use super::master::{decrypt_field_value, field_protocol};
+use super::Certificate;
+use crate::primitives::{PublicKey, SymmetricKey};
+use crate::wallet::{Counterparty, DecryptArgs, WalletInterface};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -60,7 +61,12 @@ impl VerifiableCertificate {
         self.keyring.keys().collect()
     }
 
-    /// Decrypts a single field using the verifier keyring.
+    /// Decrypts a single field using the verifier keyring, as the
+    /// reference's `VerifiableCertificate.decryptFields` does
+    /// (`ts-stack@edf6e03` `VerifiableCertificate.ts:152-219`): the keyring
+    /// entry is the field's revelation key encrypted to the verifier under
+    /// key ID `"<serial base64> <field>"`; the field's base64 text is decoded
+    /// and decrypted with that key here, and nowhere earlier (#261).
     ///
     /// # Arguments
     /// * `verifier_wallet` - Verifier's wallet for decryption
@@ -74,18 +80,16 @@ impl VerifiableCertificate {
         field_name: &str,
         originator: &str,
     ) -> Result<String> {
-        // Get the encrypted value from the keyring
         let encrypted_key = self.keyring.get(field_name).ok_or_else(|| {
             Error::AuthError(format!(
                 "Field '{}' not in keyring (not revealed for this verifier)",
                 field_name
             ))
         })?;
+        let field_value = self.certificate.fields.get(field_name).ok_or_else(|| {
+            Error::AuthError(format!("Field '{}' not found in certificate", field_name))
+        })?;
 
-        let protocol = Protocol::new(
-            SecurityLevel::Counterparty,
-            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
-        );
         let key_id = Certificate::get_field_encryption_key_id_verifiable(
             field_name,
             &self.certificate.serial_number,
@@ -95,7 +99,7 @@ impl VerifiableCertificate {
             .decrypt(
                 DecryptArgs {
                     ciphertext: encrypted_key.clone(),
-                    protocol_id: protocol,
+                    protocol_id: field_protocol(),
                     key_id,
                     counterparty: Some(Counterparty::Other(subject.clone())),
                     ..Default::default()
@@ -104,7 +108,8 @@ impl VerifiableCertificate {
             )
             .await?;
 
-        String::from_utf8(decrypted.plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
+        let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
+        decrypt_field_value(field_name, &key, field_value)
     }
 
     /// Decrypts all fields that have keys in the keyring.
@@ -171,7 +176,9 @@ impl VerifiableCertificate {
         &self.certificate.serial_number
     }
 
-    /// Converts to a JSON-serializable format with base64-encoded values.
+    /// Converts to a JSON-serializable format: each field value its held
+    /// base64 text (#261; a value that is not UTF-8 written with U+FFFD in
+    /// place of its invalid bytes), the keyring's values base64-encoded.
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "type": self.certificate.type_base64(),
@@ -180,7 +187,7 @@ impl VerifiableCertificate {
             "certifier": self.certificate.certifier.to_hex(),
             "revocationOutpoint": self.certificate.revocation_outpoint.as_ref().map(|o| o.to_string()),
             "fields": self.certificate.fields.iter()
-                .map(|(k, v)| (k.clone(), crate::primitives::to_base64(v)))
+                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(v).into_owned()))
                 .collect::<HashMap<String, String>>(),
             "signature": self.certificate.signature.as_ref().map(|s| crate::primitives::to_base64(s)),
             "keyring": self.keyring.iter()

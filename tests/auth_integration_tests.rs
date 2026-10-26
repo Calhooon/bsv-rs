@@ -1211,6 +1211,7 @@ async fn test_master_certificate_create_keyring_for_verifier() {
         &verifier_key.public_key(),
         &fields_to_reveal,
         &master_cert.certificate.fields,
+        &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
         "test-app",
     )
@@ -1279,6 +1280,7 @@ async fn test_verifiable_certificate_full_chain() {
         &verifier_key.public_key(),
         &all_field_names,
         &master_cert.certificate.fields,
+        &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
         "test-app",
     )
@@ -1356,6 +1358,7 @@ async fn test_verifiable_certificate_selective_disclosure() {
         &verifier_key.public_key(),
         &fields_to_reveal,
         &master_cert.certificate.fields,
+        &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
         "test-app",
     )
@@ -1428,6 +1431,7 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
         &verifier_a_key.public_key(),
         &fields_to_reveal,
         &master_cert.certificate.fields,
+        &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
         "test-app",
     )
@@ -1518,6 +1522,7 @@ async fn test_full_issuance_to_verification_chain() {
         &verifier_key.public_key(),
         &fields_to_reveal,
         &master_cert.certificate.fields,
+        &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
         "test-app",
     )
@@ -1637,16 +1642,10 @@ fn test_wallet_certificate_conversion_roundtrip() {
     assert_eq!(outpoint.txid, [0xCC; 32]);
     assert_eq!(outpoint.vout, 7);
 
-    // Verify fields are base64-encoded in WalletCertificate
+    // The fields are the held text in WalletCertificate, never re-encoded (#261)
     assert_eq!(wallet_cert.fields.len(), 2);
-    let name_b64 = wallet_cert.fields.get("name").unwrap();
-    let email_b64 = wallet_cert.fields.get("email").unwrap();
-
-    // Decode base64 fields back and verify they match original bytes
-    let name_bytes = bsv_rs::primitives::from_base64(name_b64).unwrap();
-    assert_eq!(name_bytes, b"encrypted_name");
-    let email_bytes = bsv_rs::primitives::from_base64(email_b64).unwrap();
-    assert_eq!(email_bytes, b"encrypted_email");
+    assert_eq!(wallet_cert.fields.get("name").unwrap(), "encrypted_name");
+    assert_eq!(wallet_cert.fields.get("email").unwrap(), "encrypted_email");
 }
 
 #[test]
