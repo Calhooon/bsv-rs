@@ -98,7 +98,7 @@ Test vectors in `tests/vectors/` are shared with the TypeScript and Go SDKs:
 
 | Vector File | Contents |
 |-------------|----------|
-| `auth_certificate.json` | Auth certificate serialization vectors (4 vectors); vector 0's signature verifies over its bytes under no reading (#252) |
+| `auth_certificate.json` | Auth certificate serialization vectors (4 vectors). Vectors 0 and 1 are `@bsv/sdk`'s `fromObject` fixtures (ts-sdk@27a93752) copied by 91dacc5 with the type and serial changed, so neither is the reference's bytes; vector 0's signature verifies over its bytes under no reading (#252, `auth_certificate_origin_252.json`) |
 | `auth_certificate_origin_252.json` | Vector 0's provenance (#252): `@bsv/sdk`'s `fromObject` fixture as added at ts-sdk@27a93752 (type `CommonSource identity`, 21 bytes; the serial vector 0 changed at one character), the two values vector 0 changed, and the verdicts of `verify()` and the raw key at ts-sdk@27a93752 and `ts-stack@edf6e03` under Node v22.18.0, recorded by `tests/support/certificate_origin_252.mjs` |
 | `auth_certificate_signature_251.json` | BRC-52 certificate signature witnesses (#251, 4): the reference-signed `email` certificate, one signed here, a wrong signature, 0.9.0-beta.1's raw-key signature, each with the reference's `verify()` verdict at `ts-stack@edf6e03` under Node v22.18.0 |
 | `brc42_private.json` | BRC-42 private key derivation vectors (5 vectors) |
