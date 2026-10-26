@@ -13,9 +13,9 @@ categories = ["cryptography", "encoding", "parser-implementations"]
 # the workflows and the repository process files are not part of the crate
 exclude = ["/.github/", "/RELEASING.md", "/CLAUDE.md", "/.gitleaksignore"]
 
-# primeorder is named for a feature, never imported (the k256 and p256 lines' comment below)
+# primeorder and crypto-bigint are named for a feature and a floor, never imported (the comments below)
 [package.metadata.cargo-machete]
-ignored = ["primeorder"]
+ignored = ["primeorder", "crypto-bigint"]
 
 [dependencies]
 # Hashing
@@ -34,6 +34,9 @@ p256 = { version = "0.14", default-features = false, features = ["alloc", "ecdsa
 # Named only for its `std` feature: the curves' `precomputed-tables` (the basepoint table) need
 # `std` or `critical-section` in it, and the curves' own `std` is the one that brings `getrandom`.
 primeorder = { version = "0.14", default-features = false, features = ["std"] }
+# Named only for its floor: 0.7.6 to 0.7.9 run P-256's Montgomery multiplication about twice
+# as slow as 0.7.10 does (crypto-bigint#1376, #1377); a lock left on them keeps the slow one (#126).
+crypto-bigint = { version = "0.7.10", default-features = false }
 
 # Symmetric Encryption (for later phases)
 aes-gcm = "0.10"
