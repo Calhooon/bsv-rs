@@ -181,15 +181,15 @@ async fn a_reference_issued_certificate_from_a_wallet_json_result_verifies_and_d
         .and(path("/listCertificates"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "totalCertificates": 1,
-            "certificates": [{ "certificate": {
-                "certificateType": c.cert_type,
+            "certificates": [{
+                "type": c.cert_type,
                 "serialNumber": c.serial_number,
                 "subject": c.subject,
                 "certifier": c.certifier,
                 "revocationOutpoint": c.revocation_outpoint,
                 "signature": c.signature,
                 "fields": c.fields,
-            }}],
+            }],
         })))
         .mount(&server)
         .await;
