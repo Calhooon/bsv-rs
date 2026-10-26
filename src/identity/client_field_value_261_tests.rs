@@ -1,7 +1,7 @@
 //! The identity client's intake of a certificate published for anyone (#261):
 //! the reference's JSON (`{...certificate, keyring}`, `ts-stack@edf6e03`
 //! `IdentityClient.ts:503`) carries each field as its base64 text and the
-//! signature as hex; both parsers hold the text's bytes as BRC-52 signs them
+//! signature as hex; both parsers hold the text as BRC-52 signs them
 //! (`brcs@5119a9b` `peer-to-peer/0052.md:97`), so the reference-issued
 //! certificate of `tests/vectors/certificate_field_value_261.json` verifies
 //! here and decrypts with the anyone keyring to the reference's plaintexts.

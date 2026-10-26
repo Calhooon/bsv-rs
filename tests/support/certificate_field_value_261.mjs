@@ -1,4 +1,4 @@
-// The #261 witnesses: a certificate's field value is the base64 text's bytes.
+// The #261 witnesses: a certificate's field value is its base64 text, its UTF-8 bytes on the wire.
 //
 // Run against @bsv/sdk at ts-stack@edf6e03 bundled with bun (no node_modules):
 //   git -C ~/bsv/ts-stack archive edf6e03 packages/sdk | tar -x -C "$W"
