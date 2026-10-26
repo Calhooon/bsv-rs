@@ -1,7 +1,10 @@
 name: Nightly oracles
 
-# The night's oracle runs (docs/NIGHTLY.md): the mutation floor (#81) and the
-# fuzz matrix (#82). Never on a push or a PR: the gate is ci.yml.
+# The night's oracle runs (docs/NIGHTLY.md): the mutation floor (#81), the
+# fuzz matrix (#82), and ci.yml's full set on beta and on main, dispatched on
+# each line (a pull request runs only its line's required set; the owner's word
+# of 2026-10-26). Never on a push or a PR: the gate is ci.yml. GitHub loads a
+# schedule from the default branch, so the cron fires main's copy of this file.
 on:
   schedule:
     - cron: '0 3 * * *'
@@ -28,6 +31,28 @@ env:
   CARGO_FUZZ_VERSION: 0.13.2
 
 jobs:
+  # The full matrix once a day on each line, pushed to or not. A dispatch runs
+  # the line's own ci.yml at the line's tip, its github.ref the line, so no job
+  # of ci.yml changes for it; a workflow_call from here would run this run's ref
+  # (main's on a schedule) and share its concurrency group with main's pushes.
+  # A dispatch made with the GITHUB_TOKEN starts a run, as the sync's does.
+  ci-full:
+    name: CI full set (${{ matrix.line }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [beta, main]
+    steps:
+      - name: Dispatch ci.yml on the line
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINE: ${{ matrix.line }}
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
+
   source:
     name: Pin the run to one source commit
     runs-on: ubuntu-latest

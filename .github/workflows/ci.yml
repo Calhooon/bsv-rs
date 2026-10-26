@@ -8,6 +8,11 @@ on:
   # sync-main-into-beta.yml starts the suite on its PR's branch: a PR or a push made with the
   # GITHUB_TOKEN starts no workflow, a workflow_dispatch does
   workflow_dispatch:
+    inputs:
+      bench_baseline_record:
+        description: The benchmarks job proposes a baseline (benches/README.md) instead of comparing
+        type: boolean
+        default: false
   # release.yml runs these same jobs on a version tag before it publishes
   workflow_call:
     secrets:
@@ -21,6 +26,13 @@ on:
 permissions:
   contents: read
 
+# Two sets by event (the owner's word of 2026-10-26): a pull request runs exactly the required
+# contexts of its base line's protection (and the jobs `dependents` needs to decide), one test
+# cell and one wasm32 consumer among them; every other event (a push to beta or main, the
+# nightly's dispatch on each line, the sync's dispatch, a tag's call from release.yml) runs every
+# job. Each condition is on the event and the base ref, so the one file serves both lines;
+# tests/arch_ci_pr_runs_the_required_set.rs pins the exact set both ways.
+#
 # a newer push to the same branch or PR cancels the run it supersedes; a tag's run is never cancelled
 concurrency:
   group: ci-${{ github.ref }}
@@ -31,8 +43,10 @@ env:
   RUSTFLAGS: -Dwarnings
 
 jobs:
+  # dependents is required on main alone: a pull request into beta skips the three jobs
   dependents-plan:
     name: Plan pinned dependents
+    if: github.event_name != 'pull_request' || github.base_ref == 'main'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -106,7 +120,7 @@ jobs:
   dependents:
     name: dependents
     needs: [dependents-plan, dependent-check]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || github.base_ref == 'main')
     runs-on: ubuntu-latest
     steps:
       - name: Require every eligible consumer check
@@ -177,9 +191,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
+      # a pull request runs the required cell alone, Test Suite (ubuntu-latest, stable); every
+      # other event the six. GitHub names a cell by its values in the keys' order, so no name moves
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        rust: [stable, beta]
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
+        rust: ${{ fromJSON(github.event_name == 'pull_request' && '["stable"]' || '["stable", "beta"]') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -410,6 +426,7 @@ jobs:
 
   docs:
     name: Documentation
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -440,6 +457,7 @@ jobs:
   # is pinned by a commit sha with its version beside it (#144)
   actionlint:
     name: actionlint
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       ACTIONLINT_VERSION: 1.7.12
@@ -611,6 +629,7 @@ jobs:
   # wasm32, on that toolchain, the dependencies resolved to versions it supports
   msrv:
     name: msrv
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     env:
       CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
@@ -637,6 +656,7 @@ jobs:
   # Each feature must build without dev-dependency feature unification (#80).
   features:
     name: features
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -662,32 +682,35 @@ jobs:
   # These are the six library slices consumed by Workers, not full applications.
   # Keep dead code in a diagnostic cdylib so the size is not an empty module.
   # #96 will define the deployment artifact and its size budget.
+  # A pull request builds the combined slice alone (the required wasm32 (combined), the slice
+  # CLAUDE.md rule 6 names); every other event the six. An `include` row naming a consumer the
+  # list lacks would add a cell, so each consumer's features are the step's table, not the matrix's
   wasm32:
     name: wasm32 (${{ matrix.consumer }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - consumer: combined
-            features: auth,wallet,transaction,overlay,socketio,wasm
-          - consumer: watchtower
-            features: wallet,auth,transaction,wasm
-          - consumer: monitor
-            features: transaction,wasm
-          - consumer: chaintracks
-            features: block
-          - consumer: overlay
-            features: overlay,wasm
-          - consumer: relay
-            features: auth,socketio,wasm
+        consumer: ${{ fromJSON(github.event_name == 'pull_request' && '["combined"]' || '["combined", "watchtower", "monitor", "chaintracks", "overlay", "relay"]') }}
     env:
-      SLICE_FEATURES: ${{ matrix.features }}
       SLICE_NAME: ${{ matrix.consumer }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
+
+      - name: Select the consumer's features
+        run: |
+          case "$SLICE_NAME" in
+            combined) features=auth,wallet,transaction,overlay,socketio,wasm ;;
+            watchtower) features=wallet,auth,transaction,wasm ;;
+            monitor) features=transaction,wasm ;;
+            chaintracks) features=block ;;
+            overlay) features=overlay,wasm ;;
+            relay) features=auth,socketio,wasm ;;
+            *) echo "::error::no feature slice for consumer $SLICE_NAME"; exit 1 ;;
+          esac
+          echo "SLICE_FEATURES=$features" >> "$GITHUB_ENV"
 
       - name: Put build output in runner scratch
         run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-wasm32" >> "$GITHUB_ENV"
@@ -724,6 +747,7 @@ jobs:
   # installed by version from crates.io with its own lock, without the workflow's -Dwarnings
   machete:
     name: unused dependencies
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     continue-on-error: true
     steps:
@@ -780,7 +804,9 @@ jobs:
   benchmarks:
     name: Benchmark Regression Check
     runs-on: ubuntu-24.04
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/beta')
+    # beta's push and nightly; a dispatch on any branch that asks for a baseline record (no
+    # pull request: the job is not a required context)
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/beta' || inputs.bench_baseline_record)
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -837,13 +863,13 @@ jobs:
           cargo clippy --locked --all-targets --manifest-path tools/bench-compare/Cargo.toml -- -D warnings
           cargo test --locked --manifest-path tools/bench-compare/Cargo.toml
 
-      # Record mode is explicit in the PR's description. Its artifact must be
-      # reviewed and committed, then the marker removed for the comparison run.
+      # Record mode is explicit: a dispatch with bench_baseline_record. Its
+      # artifact must be reviewed and committed, then compared by a plain run.
       # Exit 3 is a runner whose platform/CPU/cores key has no baseline entry
       # yet: a warning naming the key, not a failure.
       - name: Compare p99, or record an explicitly requested baseline
         env:
-          RECORD_BASELINE: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.body, '[bench-baseline-record]') }}
+          RECORD_BASELINE: ${{ inputs.bench_baseline_record == true }}
         run: |
           args=()
           if [ -n "${BENCH_SKIP:-}" ]; then
@@ -860,7 +886,7 @@ jobs:
           set -e
           if [ "$status" -eq 3 ]; then
             key=$(sed -n 's/^NO BASELINE ENTRY: //p' "$RUNNER_TEMP/bench-compare.out")
-            echo "::warning::no baseline entry for $key: record one with [bench-baseline-record]"
+            echo "::warning::no baseline entry for $key: record one with gh workflow run ci.yml -f bench_baseline_record=true"
             exit 0
           fi
           exit "$status"
@@ -880,8 +906,8 @@ jobs:
   benchmarks-build:
     name: Benchmarks Build
     runs-on: ubuntu-latest
-    # Keep a build-only check on pushes, including every feature-gated bench.
-    if: github.event_name == 'push'
+    # Keep a build-only check on every event but a pull request, every feature-gated bench.
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -909,10 +935,12 @@ jobs:
           cargo bench --no-run --all-features --locked
 
   # Add each new producer job to needs when it lands (#77, #78, #80).
-  # Missing producers are reported by name; this job never invents measurements.
+  # Missing producers are reported by name; this job never invents measurements. It reads
+  # artifacts, never the needs' results, so a producer its condition skipped (benchmarks off beta)
+  # is "not yet measured", not red. Not a required context: no pull request runs it.
   scoreboard:
     name: scoreboard
-    if: ${{ always() }}
+    if: always() && github.event_name != 'pull_request'
     needs: [test, clippy, fmt, vectors, docs, actionlint, secrets, msrv, machete, benchmarks, benchmarks-build]
     runs-on: ubuntu-latest
     steps:
