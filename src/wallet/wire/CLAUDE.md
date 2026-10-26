@@ -203,9 +203,9 @@ pub mod status_codes {
 `WalletWireProcessor<W: WalletInterface>` handles incoming binary messages, dispatches to wallet methods, and returns serialized responses.
 
 **Configuration:**
-- `new(wallet)` - default (mainnet, version "0.1.0")
-- `with_config(wallet, network, version)` - custom network/version
-- `wallet()`, `network()`, `version()` - accessors
+- `new(wallet)` - the processor over its wallet
+- `with_config(wallet, network, version)` - deprecated (#222): the network and version reach no frame, getNetwork and getVersion answering the wallet's
+- `wallet()` - accessor; `network()`, `version()` deprecated with `with_config`, returning what it was given
 
 **Fully implemented handlers (delegated to wallet):**
 - getPublicKey, encrypt, decrypt, createHmac, verifyHmac
@@ -214,10 +214,7 @@ pub mod status_codes {
 - createSignature, verifySignature: the results as the reference writes them (`results.rs`, #197): encrypt, decrypt, createHmac and createSignature the error byte then the ciphertext, plaintext, 32 HMAC bytes or DER alone, no length (`WalletWireProcessor.ts:1443-1444`, `:1470-1471`, `:1495-1496`, `:1559-1560`); verifyHmac and verifySignature the error byte alone, a false verdict the reference's error frame (`HMAC is not valid`, `Signature is not valid`; `:1520-1525`, `:1597-1602`)
 - revealCounterpartyKeyLinkage, revealSpecificKeyLinkage: the request in the reference's order (`requests.rs`, #191): counterparty linkage the privileged flag (`i8`) and reason (`i8` length, -1 absent) then the two keys (`WalletWireProcessor.ts:1739-1747`); specific linkage the protocol, key ID, counterparty, privileged flag and reason, then the verifier (`:1790-1797`, `:2564-2583`); both passed through into the args. The responses in the reference's order (`results.rs`, #194): the prover, verifier and counterparty, then revelationTime, encryptedLinkage, encryptedLinkageProof (`WalletWireProcessor.ts:1761-1781`); or the protocol, keyID, encryptedLinkage, encryptedLinkageProof, proofType (`:1811-1841`)
 - isAuthenticated, waitForAuthentication, getHeight, getHeaderForHeight: waitForAuthentication's result the error byte alone, a false verdict an error frame (`Wallet did not affirmatively authenticate`, `:1636-1643`, #197); isAuthenticated keeps its verdict byte (`:1618-1622`)
-
-**Processor-local handlers:**
-- getNetwork (uses processor's configured network, single byte: 0x00=mainnet, 0x01=testnet)
-- getVersion (uses processor's configured version, raw UTF-8 bytes, no length prefix)
+- getNetwork, getVersion: the wallet's `get_network` and `get_version` forwarded through `invoke_wallet`, never the processor's own (`WalletWireProcessor.ts:1701-1705`, `:1721-1725` at `ts-stack@edf6e03`, #222); the network one byte, 0 mainnet, 1 testnet (`:1710`), its rule (`mainnet or testnet`, `WalletResultValidation.ts:2298-2301`) the `Network` type's; the version its UTF-8 bytes with no length prefix (`:1730`), refused outside 7 to 30 bytes, code 1, `Invalid getVersion result version: expected 7–30 UTF-8 bytes` (`:2302-2304`). `ProtoWallet` answers mainnet and `bsv-rs-<CARGO_PKG_VERSION>`
 
 **Stub handlers (return error, require full wallet implementation):**
 - createAction, signAction, abortAction, listActions, internalizeAction
@@ -229,7 +226,7 @@ All 28 call codes are dispatched in the match statement. Stub handlers return de
 
 **Error codes:** 0=success; 6 (invalidParameter) for an argument the reference's `validateWalletArgs` refuses, `The <parameter> parameter must be <mustBe>`, the wallet never called (#216); 1 (unknownError) for every other frame: a result the reference's `validateWalletResult` refuses (`Invalid <call> result <field>: expected <expectation>`, #216), the processor's own reading, and a wallet's error, the reference taking 2 to 8 from an explicit wallet error's `code`, which this crate's `Error` does not carry (#137); a wallet's un-coded error is `Wallet operation failed` (#202).
 
-**Validation (#216, `validation.rs`):** ahead of the wallet, the protocol name 5 to 400 bytes and the key ID 1 to 800 (the eight calls that carry them), the privileged reason 5 to 50 bytes and required when `privileged` (those eight, getPublicKey for the identity key, revealCounterpartyKeyLinkage), verifySignature's signature at most 72 bytes and canonical DER, the byte arrays at most 256 MiB, getHeaderForHeight's height 1 to 2^32-1; after it, getPublicKey's key, createSignature's signature, getHeight's height, the byte results' bound, both linkages' bytes, revelation time, key ID and protocol name, and the requested verifier, counterparty, protocol and key ID. A rule the reader already enforces (the security level, a key that is no point, the data-type flag, a 32-byte field) or a type carries is not repeated, and keeps the reader's words.
+**Validation (#216, `validation.rs`):** ahead of the wallet, the protocol name 5 to 400 bytes and the key ID 1 to 800 (the eight calls that carry them), the privileged reason 5 to 50 bytes and required when `privileged` (those eight, getPublicKey for the identity key, revealCounterpartyKeyLinkage), verifySignature's signature at most 72 bytes and canonical DER, the byte arrays at most 256 MiB, getHeaderForHeight's height 1 to 2^32-1; after it, getPublicKey's key, createSignature's signature, getHeight's height, getVersion's version (#222), the byte results' bound, both linkages' bytes, revelation time, key ID and protocol name, and the requested verifier, counterparty, protocol and key ID. A rule the reader already enforces (the security level, a key that is no point, the data-type flag, a 32-byte field) or a type carries is not repeated, and keeps the reader's words.
 
 ## Transceiver (Client-Side)
 
@@ -294,7 +291,7 @@ impl WalletWire for LoopbackWire {
 **Test coverage:**
 - encoding.rs: Roundtrip tests for all primitive and complex types (signed varint, strings, optional values, outpoints, counterparty, protocol IDs, action status, query mode, output include, string maps, optional string arrays, send-with-results, sign-action-spends, wallet certificates, wallet payments, basket insertions, internalize outputs, wallet action inputs/outputs/actions, wallet outputs). Edge cases include unicode strings, large data, empty collections, negative satoshis, and all enum variants.
 - `tests/wire_identity_certificate_writer.rs` and `tests/wire_identity_certificate_roundtrip.rs`: the identity certificate's writer and readers against the reference's bytes and the shared discovery vector (#182, #184).
-- processor.rs: Tests for getPublicKey, getNetwork, getVersion, isAuthenticated, invalid call codes, and createAction error.
+- processor.rs: Tests for getPublicKey, getNetwork and getVersion (ProtoWallet's answers forwarded, #222), isAuthenticated, invalid call codes, and createAction error.
 - transceiver.rs: End-to-end loopback tests for get_public_key, encrypt/decrypt roundtrip, create/verify HMAC, create/verify signature, is_authenticated, get_network, get_version.
 
 Run tests:
