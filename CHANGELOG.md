@@ -1789,8 +1789,8 @@ layout, which `write_identity_certificate` writes (the deprecated pair
 still writes the old bytes). None in LOW (the keeper's reading
 on #182: no LOW worker reads this crate's binary wallet wire). The public
 signatures are unchanged. TS's reader refuses trust 0 (the parity note under
-#182 above); these readers, like Go's, accepted it (the transceiver refuses
-it since #183, these readers since #247).
+#182 above); these readers, like the transceiver and Go's, accept it (as of
+#184; the transceiver refuses it since #183, these readers since #247).
 `write_identity_certifier` (whose bytes are the reference's only when iconUrl
 and description are present), `write_optional_identity_certifier` and
 `write_optional_string_map` have no caller in the crate and no frame of the
