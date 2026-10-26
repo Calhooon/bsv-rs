@@ -17,7 +17,9 @@
 //! the direct hashes arrays of byte numbers, getPublicKey's `identityKey`
 //! written only when true (`0100.md:980-982`, `:1037-1038`, `:1182-1184`,
 //! `:1213-1216`; `Wallet.interfaces.ts:665-667`, `:683`, `:798`, `:813`).
-//! The action cases' transactions are this crate's writer's
+//! listOutputs' result names its aggregated BEEF `BEEF`, an array of byte
+//! numbers (`0100.md:933`; `Wallet.interfaces.ts:644`). The action cases'
+//! transactions are this crate's writer's
 //! (`the_action_witnesses_are_this_crates_bytes`).
 //!
 //! The witnesses are `tests/vectors/wallet_http_json_shapes_105.json`,
@@ -76,8 +78,9 @@ fn record(test: &str, patches: Vec<Value>) {
 /// (the reference's internalizeAction asks for a complete atomic BEEF), and
 /// its child spending it to one 900-satoshi `OP_1` output, unsigned (an empty
 /// unlocking script) and signed (`OP_1`).
-/// `inputBEEF` is the parent's BEEF; `signable` and `signed` the child's
-/// atomic BEEF with the parent.
+/// `inputBEEF` is the parent's BEEF (also listOutputs' `BEEF`, the parent's
+/// output listed); `signable` and `signed` the child's atomic BEEF with the
+/// parent.
 fn witness_bytes() -> Vec<(&'static str, Vec<u8>)> {
     let op_1 = || LockingScript::from_binary(&[0x51]).unwrap();
     let mut parent = Transaction::new();
@@ -126,6 +129,11 @@ const WITNESS_PLACES: &[(&str, &str, &str)] = &[
     ("createAction-completed", "/result/tx", "signed"),
     ("signAction", "/result/tx", "signed"),
     ("internalizeAction", "/args/tx", "signed"),
+    (
+        "listOutputs-entire-transactions",
+        "/result/BEEF",
+        "inputBEEF",
+    ),
 ];
 
 fn txid_of(atomic: &[u8]) -> String {
@@ -155,6 +163,26 @@ fn the_action_witnesses_are_this_crates_bytes() {
                 "{case_name} {pointer}"
             );
         }
+    }
+    // listOutputs' output is the parent's, which its `BEEF` carries (the
+    // reference's reader asks the output of it, `WalletResultValidation.ts:2116-2121`)
+    let parent = Beef::from_binary(bytes("inputBEEF")).unwrap().txs[0].txid();
+    let outpoint = serde_json::json!(format!("{parent}.0"));
+    let pointer = "/result/outputs/0/outpoint";
+    let listed = vector["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "listOutputs-entire-transactions")
+        .unwrap();
+    if recording().is_some() {
+        patches.push(serde_json::json!([
+            "listOutputs-entire-transactions",
+            pointer,
+            outpoint
+        ]));
+    } else {
+        assert_eq!(listed.pointer(pointer), Some(&outpoint), "{pointer}");
     }
     // The results' txid is the signed child's
     let signed = txid_of(bytes("signed"));
@@ -236,6 +264,11 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
         "internalizeAction" => written(
             wallet
                 .internalize_action(parsed::<InternalizeActionArgs>(case), ORIGINATOR)
+                .await,
+        ),
+        "listOutputs" => written(
+            wallet
+                .list_outputs(parsed::<ListOutputsArgs>(case), ORIGINATOR)
                 .await,
         ),
         "discoverByIdentityKey" => written(
@@ -500,6 +533,8 @@ fn the_go_vectors_action_and_entry_json_read_as_this_crates_types() {
     reads_and_writes_back::<DiscoverCertificatesResult>("discoverByAttributes-simple-result.json");
     reads_and_writes_back::<CreateActionArgs>("createAction-1-out-args.json");
     reads_and_writes_back::<SignActionArgs>("signAction-simple-args.json");
+    // listOutputs' `BEEF` an array of byte numbers, under the uppercase name
+    reads_and_writes_back::<ListOutputsResult>("listOutputs-simple-result.json");
     let args: AcquireCertificateArgs =
         serde_json::from_value(go_vector("acquireCertificate-simple-args.json")).unwrap();
     assert!(matches!(

@@ -1,6 +1,6 @@
-// The #105 witnesses: the HTTP JSON bodies of the four certificate calls and
-// the two key-linkage calls, as the reference's HTTPWalletJSON sends and reads
-// them.
+// The #105 witnesses: the HTTP JSON bodies of the certificate, key-linkage,
+// action, key-related and listOutputs calls, as the reference's
+// HTTPWalletJSON sends and reads them.
 //
 // Run against @bsv/sdk at ts-stack@edf6e03 bundled with bun (no node_modules):
 //   git -C ~/bsv/ts-stack archive edf6e03 packages/sdk | tar -x -C "$W"
