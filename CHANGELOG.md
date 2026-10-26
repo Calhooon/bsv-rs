@@ -397,6 +397,43 @@ go-sdk reads the satoshis as an unsigned varint with no bound; the reference
 and this crate refuse the same values with the same words (a negative below
 `-(2^53 - 1)` in `BigNumber.toNumber`'s words, `BigNumber.ts:625-630`, ahead of
 the bound).
+### Notes: cross-SDK parity (#240)
+
+A BEEF is judged in the order held, parents before children, by all three
+readers: the stream (`verify_stream`, `verify_stream_structure`),
+`Beef::from_binary` then `verify_structure`, and `Beef::verify_valid`. A
+child written ahead of the parent it spends is `InputNamesNoElement` at the
+child's input, the stream naming the parent's txid at that input's offset.
+No behavior moves here; the keeper's reading of #240 (2026-10-26) states
+it. BRC-62 (`5119a9b` `transactions/0062.md:43`) orders the data with
+streaming validation in mind, later bytes relying on earlier ones "for
+their validation to even begin"; `:72-74` makes the order important, a
+transaction's inputs above it and theirs above that; the validation
+process (`:172-191`) parses the transactions in sequence, and its step
+2.4.1 asks that a transaction without a path name a txid that "exists in
+memory, and is marked as valid". The stack's charter holds the same
+clause: "every input of a transaction names an earlier element or a proven
+txid" (bsv-stack-lean `docs/charters/beef-of-any-size.md:14`).
+
+The reference sorts ahead of judging: `@bsv/sdk`'s `Beef.verifyValid`
+calls `sortTxs()` before its checks (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Beef.ts:1054-1065`, the call at `:1065`) and
+accepts a children-first BEEF. Its writer sorts before it serializes
+(`#ensureSortedForSerialization`, `:354-358`), so every BEEF the reference
+writes is in BRC-62 order and the read-side sort is a leniency beside its
+own writer. This crate's `Beef::to_binary` sorts as well; `to_writer`
+writes the entries in the order held.
+
+0.8's `verify_valid` sorted ahead of judging, the reference's leniency, and
+accepted a children-first BEEF; 0.9.0 (#86) reads the wire as BRC-62
+writes it, one reading across the three readers. A consumer that wrote
+children-first BEEFs (the toolbox did, and has corrected to BRC-62 order)
+sees `InputNamesNoElement` from 0.9.0 and writes parents before children.
+Pinned by `tests/beef_order_held.rs`: one BEEF, parent then child, passes
+the three readers in V1 and V2; the same entries child then parent are
+refused by each (`a_child_written_ahead_of_its_parent_is_refused_by_the_three_readers`,
+red in a scratch copy with 0.8's sort restored ahead of the in-order
+judgement).
 
 ## [0.9.0-beta.1] - 2026-10-26
 
