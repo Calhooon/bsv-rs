@@ -10,7 +10,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
-| `types.rs` | Core types (AuthMessage, PeerSession, MessageType) | 457 |
+| `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType) | 654 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
 | `peer.rs` | Core Peer implementation with `start()` transport setup | 996 |
 | `certificates/` | Certificate submodule | - |
@@ -32,6 +32,7 @@ Transport layer implementations for auth messages:
 - `mod.rs` - Transport trait and re-exports (conditionally exports WebSocket types)
 - `http.rs` - SimplifiedFetchTransport for HTTP (BRC-104), MockTransport for testing, HttpRequest/HttpResponse types
 - `websocket_transport.rs` - WebSocketTransport for full-duplex WebSocket communication (requires `websocket` feature)
+- `socketio/` - SocketIoTransport (`socketio` feature) and the Engine.IO/Socket.IO codec: send writes the message's text through `SocketIoSink::send_socketio_text` (default: decode and `send_socketio`, whose `Value` sorts keys; a sink that writes text overrides it), the dispatch reads the event argument's text (`codec::decode_event_args_text`), so the signed certificate texts pass through unchanged (#280)
 - See `transports/CLAUDE.md` for detailed transport documentation
 - A transport fault (a connection error, a timeout, a handshake answered 429, 502, 503 or 504, a Socket.IO sink failure) is `Error::TransportFault { fault, status, detail }`, never `AuthError(String)` (#87); the WebSocket transport keeps `TransportError`
 
@@ -93,10 +94,14 @@ pub struct AuthMessage {
     pub requested_certificates: Option<RequestedCertificateSet>,
     pub payload: Option<Vec<u8>>,
     pub signature: Option<Vec<u8>>,         // DER
+    pub certificates_text: Option<Box<RawValue>>,           // as received, or as sent (#280)
+    pub requested_certificates_text: Option<Box<RawValue>>, // as received, or as sent (#280)
 }
 
 impl AuthMessage {
     pub fn new(message_type: MessageType, identity_key: PublicKey) -> Self
+    pub fn set_certificates(&mut self, certificates: Vec<VerifiableCertificate>)  // the value and its compact text
+    pub fn set_requested_certificates(&mut self, requested: RequestedCertificateSet)
     pub fn signing_data(&self) -> Vec<u8>
     pub fn get_key_id(&self, peer_session_nonce: Option<&str>) -> String
     pub fn validate(&self) -> Result<()>
@@ -114,8 +119,10 @@ impl AuthMessage {
 - `InitialRequest` - Empty (not signed, starts handshake)
 - `InitialResponse` - `your_nonce || initial_nonce` (base64-decoded, initiator nonce then responder nonce; matches Go/TS)
 - `General` - The payload bytes
-- `CertificateRequest` - JSON-serialized `requested_certificates`
-- `CertificateResponse` - JSON-serialized `certificates`
+- `CertificateRequest` - the `requestedCertificates` JSON text as transmitted (`requested_certificates_text`)
+- `CertificateResponse` - the `certificates` JSON text as transmitted (`certificates_text`)
+
+The signed certificate texts (#280): BRC-103 names no serialization (`0103.md:133-137`, `:172`); the reference signs `JSON.stringify` of the member it sends and verifies `JSON.stringify` of the member it parsed (`Peer.ts:453`, `:1068`, `:1140`, `:1203`), the received text when it is compact. `AuthMessage`'s serde is hand-written (JSON only, `serde_json` raw values): the deserializer keeps each member's text as received and parses the value from it; the serializer writes a carried text as it stands while it reads back to the value (parsed as the type, the same `serde_json::Value`), the value otherwise; `signing_data` signs the same bytes. A member changed after receipt is serialized afresh. `Peer` builds with the setters, so it signs the compact text it sends. Reading an `AuthMessage` from a `serde_json::Value` (`from_value`) still parses, but the text is then the `Value`'s key-sorted re-serialization: read a certificate message from its text. A struct literal adds `certificates_text: None, requested_certificates_text: None`.
 
 **get_key_id()** behavior by message type:
 - `InitialResponse` - `"{your_nonce} {initial_nonce}"` (uses the message's own fields, ignoring `peer_session_nonce` param)
