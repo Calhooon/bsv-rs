@@ -47,6 +47,42 @@ step "The slice with http is refused at the build script": red on the base
 reopens #152 as the fix (`#[async_trait(?Send)]` on wasm32, the builder's
 timeout behind `cfg(not(target_arch = "wasm32"))`). Public shape: nothing
 moves; native builds run a build script that does nothing.
+### Fixed: two residual leniencies of the wire readers: a repeated keyring key, a length cut on wasm32 (#192)
+
+Left by the cold review of #184. `WireReader::read_identity_certificate`
+kept the later value of a repeated key in the public keyring and the
+decrypted fields; the reference's discovery reader refuses one
+(`ts-stack@edf6e03` `WalletWireTransceiver.ts:1718-1752` through
+`#setUniqueWireRecordEntry`, `:1992-2002`; `Certificate.ts:373-374` refuses a
+certificate's repeated field name the same way), and this crate's transceiver
+has refused one since #183. Both readers now go through one helper, in the
+transceiver's words: `Duplicate discovery public keyring key: <k>`,
+`Duplicate discovery decrypted fields key: <k>`, a `WalletError`. The reader's
+other differences from the transceiver's on the same bytes (a key outside 1
+to 50 bytes, an unsafe key, a non-strict count) are outside this change.
+
+`WireReader::read_string` cast its varint length `as usize`: lossless on a
+64-bit host, on wasm32 a length at or above 2^32 kept its low 32 bits and read
+a shorter value in silence (CLAUDE.md rule 5). A length of 2^32 + 3 before
+three bytes read `Ok("abc")` under `wasm-bindgen-test-runner` on the pre-fix
+tree. Every wire byte length is now compared with the bytes remaining before
+it is narrowed and refused as `ReaderUnderflow`, the error a length past the
+bytes already gave on the host, so every target refuses it alike (`needed`
+saturating at `usize::MAX` where it cannot fit): `read_string`,
+`read_optional_string`, `read_optional_bytes`, `read_sign_action_spend`,
+`read_identity_certificate`'s certificate length and keyring values, and the
+transceiver's error-frame stack, createAction's and signAction's tx, the
+signable transaction and its reference, listOutputs' BEEF, the
+listCertificates and discovery certificate lengths and proveCertificate's
+keyring values; proveCertificate's keyring count is counted as a `u64`.
+
+The tests that pin it, in `tests/wire_reader_strictness.rs`:
+`an_identity_certificate_with_a_repeated_record_key_is_refused_as_discovery_refuses_it`
+(red on `060e7e0`: the reader read `Ok`) and
+`a_wire_length_past_u32_is_refused_on_every_target_not_cut_to_its_low_bits`
+(the error the wasm32 run gives, asserted on the host, where the cast was
+already lossless; its red is the wasm32 run's). No public shape moves: no new
+`Error` variant, the new length helpers `pub(crate)`.
 
 ## [0.9.0-beta.1] - 2026-10-26
 
