@@ -18,7 +18,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
 | `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
 | `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl; reads neither `privileged` nor `seek_permission`, as the reference's ProtoWallet does not | ~1284 |
-| `validation.rs` | 40+ input validation helpers + validated structs | ~1170 |
+| `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282) and `validation/internalize.rs` (#117) re-exported from it | ~1130 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
 | `substrates/` | Transport substrate implementations | - |
 | `wire/` | Wire protocol encoding/decoding | - |
@@ -176,7 +176,7 @@ The `validation` module (`validation.rs`) provides 40+ validation functions for 
 | Identifiers | `validate_basket`, `validate_optional_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase, trim whitespace) |
 | Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string`, `validate_optional_outpoint_string` |
 | Descriptions | `validate_description_5_2000`, `validate_description_5_50` |
-| Actions | `validate_create_action_args`, `validate_create_action_input`, `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend`; an input's empty `unlockingScript` refused in the reference's words (`The unlockingScript parameter must be hexadecimal string.`, `validationHelpers.ts:595` at `ts-stack@edf6e03`) and an `unlockingScriptLength` of 0 as BRC-100's positive integer (`0100.md:649`; the reference permits it, `:598`), both `WalletRefusal` of class `InvalidParameter` (#282) |
+| Actions | `validate_create_action_args`, `validate_create_action_input` (`validation/create_action_input.rs`), `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend`; an input's empty `unlockingScript` refused in the reference's words (`The unlockingScript parameter must be hexadecimal string.`, `validationHelpers.ts:595` at `ts-stack@edf6e03`) and an `unlockingScriptLength` of 0 as BRC-100's positive integer (`0100.md:649`; the reference permits it, `:598`), both `WalletRefusal` of class `InvalidParameter` (#282) |
 | Internalize | `validate_internalize_action_args` (`validation/internalize.rs`): each output's `insertionRemittance.customInstructions` at most 1,000 UTF-8 bytes (BRC-100 at `5119a9b`, TS's `validateBasketInsertion`; #117), called by `ProtoWallet`, `WalletClient`, `HttpWalletJson` and `WalletWireTransceiver` before they act or send; the createAction output's copy stays unbounded |
 | Certificates | `validate_certificate_fields` (1-50 byte field names), `validate_keyring_revealer` ("certifier" or 66-char hex pubkey) |
 | Protocol | `validate_protocol_tuple`, `validate_query_mode` |
