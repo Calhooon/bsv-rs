@@ -1,3 +1,4 @@
+#![cfg(test)]
 //! The identity client's intake of a certificate published for anyone (#261):
 //! the reference's JSON (`{...certificate, keyring}`, `ts-stack@edf6e03`
 //! `IdentityClient.ts:503`) carries each field as its base64 text and the
