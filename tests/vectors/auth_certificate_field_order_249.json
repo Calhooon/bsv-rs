@@ -1,0 +1,41 @@
+{
+  "description": "A certificate's field order (#249): the reference orders the names by localeCompare under Node's default collation (Certificate.ts:282), which gives a_b, a0, age, éa, f, Name where UTF-8 byte order gives Name, a0, a_b, age, f, éa; this crate verifies a binary certificate over the unsigned prefix as received and signs in the reference's order",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), run under Node v22.18.0 (ICU 77.1, locale en-US) by tests/support/certificate_field_order_249.mjs",
+  "brc": "BRC-52 at brcs@5119a9b peer-to-peer/0052.md:99-103",
+  "localeCompare": [
+    "a_b",
+    "a0",
+    "age",
+    "éa",
+    "f",
+    "Name"
+  ],
+  "byte_order": [
+    "Name",
+    "a0",
+    "a_b",
+    "age",
+    "f",
+    "éa"
+  ],
+  "witnesses": [
+    {
+      "name": "reference_signed_mixed_names",
+      "origin": "signed by the reference's Certificate.sign (certifier key 21, subject key 23, type 32 x 0x06, serial 32 x 0x07, no revocation outpoint, six fields Name, a_b, age, a0, éa, f, each the base64 text of \"v-<name>\")",
+      "reference_verify": true,
+      "hex": "06060606060606060606060606060606060606060606060606060606060606060707070707070707070707070707070707070707070707070707070707070707032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d50000000000000000000000000000000000000000000000000000000000000000000603615f6208646931685832493d02613008646931684d413d3d0361676508646931685a32553d03c3a96108646933447157453d0166046469316d044e616d65086469314f5957316c3045022100a5fb55c1d24d35cd79fc2745194f16896acb27d54e2317a11bcd53b1c90d675b022038ca7f860a206773057c994ab50fbfe0446442485b7dac6ea1faa296911d18bc"
+    },
+    {
+      "name": "byte_order_signed_mixed_names",
+      "origin": "the same certificate, the names written in UTF-8 byte order and the preimage signed by the reference's ProtoWallet.createSignature under protocol [2, \"certificate signature\"] and key ID \"<type> <serial>\" (an issuer that sorts by bytes, as this crate did until #249); the reference's fromBinary(...).verify() re-sorts and refuses it, this crate verifies the bytes received",
+      "reference_verify": false,
+      "hex": "06060606060606060606060606060606060606060606060606060606060606060707070707070707070707070707070707070707070707070707070707070707032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d500000000000000000000000000000000000000000000000000000000000000000006044e616d65086469314f5957316c02613008646931684d413d3d03615f6208646931685832493d0361676508646931685a32553d0166046469316d03c3a96108646933447157453d3045022100e484d1984c36cec74fc6d28d1fba8df31b347ea734e7acf0021c6f61453d5f3802203323caec0ee2d3c50f4d198feb1779ccf74b4e0b9e9a650a4e58e0bfa2a56a1b"
+    },
+    {
+      "name": "repeated_field_name",
+      "origin": "the certificate's prefix with two fields named x, unsigned; the reference's fromBinary refuses it (Certificate.ts:374)",
+      "reference_from_binary": "Duplicate certificate field name: x",
+      "hex": "06060606060606060606060606060606060606060606060606060606060606060707070707070707070707070707070707070707070707070707070707070707032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d500000000000000000000000000000000000000000000000000000000000000000002017804646a453d017804646a493d"
+    }
+  ]
+}

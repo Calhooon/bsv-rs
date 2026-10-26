@@ -87,7 +87,10 @@ pub struct Certificate {
 
     /// The unsigned prefix as the issuer wrote it: set by
     /// [`from_binary`](Self::from_binary) and by [`sign`](Self::sign), never
-    /// carried in JSON.
+    /// carried in JSON. `verify`, `signing_hash` and `to_binary` use these
+    /// bytes while they read back to the certificate's current values and
+    /// the serializer's order otherwise; the `set_*` methods that change a
+    /// value in the preimage clear it (#249).
     #[serde(skip)]
     pub received_unsigned: Option<Vec<u8>>,
 }
@@ -132,11 +135,13 @@ impl Certificate {
 
     /// Sets the revocation outpoint.
     pub fn set_revocation_outpoint(&mut self, revocation_outpoint: Option<Outpoint>) {
+        self.received_unsigned = None;
         self.revocation_outpoint = revocation_outpoint;
     }
 
     /// Replaces every field (already encrypted).
     pub fn set_fields(&mut self, fields: HashMap<String, Vec<u8>>) {
+        self.received_unsigned = None;
         self.fields = fields;
     }
 
@@ -166,13 +171,62 @@ impl Certificate {
     /// [revocation_txid: 32 bytes]
     /// [revocation_index: varint]
     /// [field_count: varint]
-    /// [fields: sorted by name, each with varint-prefixed name and value]
+    /// [fields: each with varint-prefixed name and value]
     /// [signature: raw DER bytes if included and present]
     /// ```
+    ///
+    /// The unsigned prefix is [`received_unsigned`](Self::received_unsigned)
+    /// while those bytes read back to this certificate's values (the bytes
+    /// the issuer signed, BRC-52 `0052.md:103`; #249), and the serializer's
+    /// field order otherwise.
     ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
     pub fn to_binary(&self, include_signature: bool) -> Vec<u8> {
+        let mut buf = self.unsigned_bytes();
+
+        // Signature: raw bytes, no length prefix (matches TypeScript SDK)
+        if include_signature {
+            if let Some(ref sig) = self.signature {
+                buf.extend_from_slice(sig);
+            }
+            // If no signature, write nothing (not even a marker byte)
+        }
+
+        buf
+    }
+
+    /// The unsigned prefix: the retained bytes when they bind to the
+    /// current values, the serializer's otherwise.
+    fn unsigned_bytes(&self) -> Vec<u8> {
+        match self.received_unsigned {
+            Some(ref bytes) if self.binds(bytes) => bytes.clone(),
+            _ => self.serialize_unsigned(),
+        }
+    }
+
+    /// Whether `bytes` parse, whole, to exactly this certificate's values:
+    /// a value changed after the bytes were retained (through a public
+    /// field as well as a setter) unbinds them, so they never authenticate
+    /// values they do not carry (BRC-52 `0052.md:103`).
+    fn binds(&self, bytes: &[u8]) -> bool {
+        let mut reader = BinaryReader::new(bytes);
+        match read_unsigned(&mut reader) {
+            Ok(u) => {
+                reader.remaining() == 0
+                    && u.cert_type == self.cert_type
+                    && u.serial_number == self.serial_number
+                    && u.subject == self.subject
+                    && u.certifier == self.certifier
+                    && u.revocation_outpoint == self.revocation_outpoint
+                    && u.fields == self.fields
+            }
+            Err(_) => false,
+        }
+    }
+
+    /// The serializer's unsigned prefix.
+    fn serialize_unsigned(&self) -> Vec<u8> {
         let mut buf = Vec::new();
 
         // Type (32 bytes)
@@ -216,14 +270,6 @@ impl Certificate {
             buf.extend_from_slice(value);
         }
 
-        // Signature: raw bytes, no length prefix (matches TypeScript SDK)
-        if include_signature {
-            if let Some(ref sig) = self.signature {
-                buf.extend_from_slice(sig);
-            }
-            // If no signature, write nothing (not even a marker byte)
-        }
-
         buf
     }
 
@@ -238,54 +284,20 @@ impl Certificate {
     /// [revocation_txid: 32 bytes]
     /// [revocation_index: varint]
     /// [field_count: varint]
-    /// [fields: sorted by name, each with varint-prefixed name and value]
+    /// [fields: in the issuer's order, each with varint-prefixed name and value]
     /// [signature: remaining bytes if present]
     /// ```
+    ///
+    /// The unsigned prefix is kept as received in
+    /// [`received_unsigned`](Self::received_unsigned), so `verify` and
+    /// `to_binary` use the issuer's bytes whatever order its fields came in
+    /// (BRC-52 `0052.md:103`; #249). A repeated field name is refused, as
+    /// the reference refuses it (`ts-stack@edf6e03` `Certificate.ts:374`):
+    /// retaining bytes must not make one acceptable.
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let mut reader = BinaryReader::new(data);
-
-        // Type (32 bytes)
-        let mut cert_type = [0u8; 32];
-        cert_type.copy_from_slice(reader.read_bytes(32)?);
-
-        // Serial number (32 bytes)
-        let mut serial_number = [0u8; 32];
-        serial_number.copy_from_slice(reader.read_bytes(32)?);
-
-        // Subject pubkey (33 bytes)
-        let subject = PublicKey::from_bytes(reader.read_bytes(33)?)?;
-
-        // Certifier pubkey (33 bytes)
-        let certifier = PublicKey::from_bytes(reader.read_bytes(33)?)?;
-
-        // Revocation outpoint: TXID (32 bytes) + index (varint)
-        // No marker byte - matches TypeScript SDK format
-        // All-zeros TXID with index 0 is treated as "no outpoint"
-        let mut txid = [0u8; 32];
-        txid.copy_from_slice(reader.read_bytes(32)?);
-        let vout = reader.read_varint_index("revocation outpoint index")?;
-
-        // Treat all-zeros TXID with index 0 as "no outpoint"
-        let revocation_outpoint = if txid == [0u8; 32] && vout == 0 {
-            None
-        } else {
-            Some(Outpoint::new(txid, vout))
-        };
-
-        // Fields
-        let field_count = reader.read_len()?;
-        // Each field is >= 2 bytes (name len varint + value len varint); bound
-        // the pre-allocation so a bogus count cannot OOM-abort before any read.
-        let mut fields =
-            HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 2));
-        for _ in 0..field_count {
-            let name_len = reader.read_len()?;
-            let name = String::from_utf8(reader.read_bytes(name_len)?.to_vec())
-                .map_err(|e| Error::InvalidUtf8(e.to_string()))?;
-            let value_len = reader.read_len()?;
-            let value = reader.read_bytes(value_len)?.to_vec();
-            fields.insert(name, value);
-        }
+        let unsigned = read_unsigned(&mut reader)?;
+        let received_unsigned = data.get(..reader.pos).unwrap_or_default().to_vec();
 
         // Signature: remaining bytes (no length prefix) - matches TypeScript SDK
         let signature = if reader.remaining() > 0 {
@@ -295,20 +307,20 @@ impl Certificate {
         };
 
         Ok(Self {
-            cert_type,
-            serial_number,
-            subject,
-            certifier,
-            revocation_outpoint,
-            fields,
+            cert_type: unsigned.cert_type,
+            serial_number: unsigned.serial_number,
+            subject: unsigned.subject,
+            certifier: unsigned.certifier,
+            revocation_outpoint: unsigned.revocation_outpoint,
+            fields: unsigned.fields,
             signature,
-            received_unsigned: None,
+            received_unsigned: Some(received_unsigned),
         })
     }
 
     /// Gets the hash to sign (SHA-256 of binary without signature).
     pub fn signing_hash(&self) -> [u8; 32] {
-        sha256(&self.to_binary(false))
+        sha256(&self.unsigned_bytes())
     }
 
     /// The BRC-52 signature key ID: `"<type> <serialNumber>"`, the two
@@ -323,6 +335,8 @@ impl Certificate {
     /// (BRC-52 `0052.md:77,115-117`; the reference's `Certificate.sign`,
     /// `ts-stack@edf6e03` `Certificate.ts:458-462`; go-sdk@2ca481c
     /// `certificate.go:227-240`), over the SHA-256 of `to_binary(false)`.
+    /// The preimage it signed is kept in
+    /// [`received_unsigned`](Self::received_unsigned) (#249).
     pub fn sign(&mut self, certifier_key: &PrivateKey) -> Result<()> {
         // Verify the certifier key matches
         if certifier_key.public_key() != self.certifier {
@@ -336,9 +350,10 @@ impl Certificate {
             &self.signature_key_id(),
             &Counterparty::Anyone,
         )?;
-        let hash = self.signing_hash();
-        let sig = child.sign(&hash)?;
+        let preimage = self.unsigned_bytes();
+        let sig = child.sign(&sha256(&preimage))?;
         self.signature = Some(sig.to_der());
+        self.received_unsigned = Some(preimage);
         Ok(())
     }
 
@@ -346,7 +361,9 @@ impl Certificate {
     /// under BRC-52's derivation, derived with the anyone key as the
     /// reference derives it (`ts-stack@edf6e03` `Certificate.ts:428-431`;
     /// go-sdk@2ca481c `certificate.go:176-186`). A signature by the
-    /// certifier's raw key is `Ok(false)` (#251).
+    /// certifier's raw key is `Ok(false)` (#251). The preimage is
+    /// [`received_unsigned`](Self::received_unsigned) while it binds to the
+    /// current values, never a re-sort of the issuer's fields (#249).
     pub fn verify(&self) -> Result<bool> {
         let sig_bytes = self
             .signature
@@ -391,6 +408,7 @@ impl Certificate {
 
     /// Sets a field value (already encrypted).
     pub fn set_field(&mut self, name: impl Into<String>, encrypted_value: Vec<u8>) {
+        self.received_unsigned = None;
         self.fields.insert(name.into(), encrypted_value);
     }
 
@@ -428,6 +446,76 @@ fn signature_protocol() -> Protocol {
         SecurityLevel::Counterparty,
         super::CERTIFICATE_SIGNATURE_PROTOCOL,
     )
+}
+
+/// The values of a certificate's unsigned prefix.
+struct Unsigned {
+    cert_type: [u8; 32],
+    serial_number: [u8; 32],
+    subject: PublicKey,
+    certifier: PublicKey,
+    revocation_outpoint: Option<Outpoint>,
+    fields: HashMap<String, Vec<u8>>,
+}
+
+/// Reads a certificate's unsigned prefix, the reader left at the signature.
+fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
+    // Type (32 bytes)
+    let mut cert_type = [0u8; 32];
+    cert_type.copy_from_slice(reader.read_bytes(32)?);
+
+    // Serial number (32 bytes)
+    let mut serial_number = [0u8; 32];
+    serial_number.copy_from_slice(reader.read_bytes(32)?);
+
+    // Subject pubkey (33 bytes)
+    let subject = PublicKey::from_bytes(reader.read_bytes(33)?)?;
+
+    // Certifier pubkey (33 bytes)
+    let certifier = PublicKey::from_bytes(reader.read_bytes(33)?)?;
+
+    // Revocation outpoint: TXID (32 bytes) + index (varint)
+    // No marker byte - matches TypeScript SDK format
+    // All-zeros TXID with index 0 is treated as "no outpoint"
+    let mut txid = [0u8; 32];
+    txid.copy_from_slice(reader.read_bytes(32)?);
+    let vout = reader.read_varint_index("revocation outpoint index")?;
+
+    // Treat all-zeros TXID with index 0 as "no outpoint"
+    let revocation_outpoint = if txid == [0u8; 32] && vout == 0 {
+        None
+    } else {
+        Some(Outpoint::new(txid, vout))
+    };
+
+    // Fields
+    let field_count = reader.read_len()?;
+    // Each field is >= 2 bytes (name len varint + value len varint); bound
+    // the pre-allocation so a bogus count cannot OOM-abort before any read.
+    let mut fields = HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 2));
+    for _ in 0..field_count {
+        let name_len = reader.read_len()?;
+        let name = String::from_utf8(reader.read_bytes(name_len)?.to_vec())
+            .map_err(|e| Error::InvalidUtf8(e.to_string()))?;
+        if fields.contains_key(&name) {
+            return Err(Error::CertificateValidationError(format!(
+                "Duplicate certificate field name: {}",
+                name
+            )));
+        }
+        let value_len = reader.read_len()?;
+        let value = reader.read_bytes(value_len)?.to_vec();
+        fields.insert(name, value);
+    }
+
+    Ok(Unsigned {
+        cert_type,
+        serial_number,
+        subject,
+        certifier,
+        revocation_outpoint,
+        fields,
+    })
 }
 
 /// Writes a Bitcoin-style varint.
