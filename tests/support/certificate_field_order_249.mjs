@@ -12,7 +12,10 @@
 // the names in UTF-8 byte order with the reference's own `createSignature`
 // (the preimage an issuer sorting by bytes writes) and prints those bytes,
 // prints the reference's refusal of a repeated field name
-// (`fromBinary`), then runs the reference's `verify` (`Certificate.ts:428-431`)
+// (`fromBinary`), prints a corpus of names in `localeCompare` order (every
+// printable ASCII and Latin-1 character alone, then strings drawn from a
+// fixed seed: the order `src/auth/certificates/collation.rs` must give),
+// then runs the reference's `verify` (`Certificate.ts:428-431`)
 // on every witness the vector file carries and prints the verdicts the file
 // records.
 import fs from 'fs'
@@ -90,6 +93,33 @@ try {
 } catch (e) {
   console.log('repeated_field_name fromBinary', e.message)
 }
+
+// The corpus: every printable character of U+0020..U+007E and U+00A0..U+00FF
+// alone, the expansions and the contraction beside their spellings, and
+// 1,200 strings of 1 to 8 characters from a fixed seed, half of their
+// characters from a set the two orders disagree on.
+const printable = []
+for (let c = 0x20; c <= 0xff; c++) if (c < 0x7f || c >= 0xa0) printable.push(String.fromCharCode(c))
+const tricky = [...'aAeEbB_0-éÉlL·sßæÆ \t']
+let seed = 249
+const rnd = () => {
+  seed = (Math.imul(seed, 1103515245) + 12345) >>> 0
+  return seed / 0x100000000
+}
+const corpus = new Set([...printable, 'ss', 'sr', 'st', 'ae', 'ad', 'af', 'l·', 'L·', 'l', 'lz', 'k'])
+while (corpus.size < printable.length + 11 + 1200) {
+  let s = ''
+  const n = 1 + Math.floor(rnd() * 8)
+  for (let i = 0; i < n; i++) {
+    s += rnd() < 0.5 ? tricky[Math.floor(rnd() * tricky.length)] : printable[Math.floor(rnd() * printable.length)]
+  }
+  corpus.add(s)
+}
+const ordered = [...corpus].sort((a, b) => a.localeCompare(b))
+for (let i = 0; i + 1 < ordered.length; i++) {
+  if (ordered[i].localeCompare(ordered[i + 1]) === 0) throw new Error(`a tie in the corpus: ${ordered[i]}`)
+}
+console.log('collation_corpus', JSON.stringify(ordered))
 
 if (vectorPath) {
   const v = JSON.parse(fs.readFileSync(vectorPath, 'utf8'))

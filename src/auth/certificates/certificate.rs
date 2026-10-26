@@ -256,9 +256,11 @@ impl Certificate {
         // Fields count (varint)
         write_varint(&mut buf, self.fields.len() as u64);
 
-        // Fields (sorted by name for deterministic serialization)
-        let mut field_names: Vec<_> = self.fields.keys().collect();
-        field_names.sort();
+        // Fields in the reference's order: `localeCompare` under Node's
+        // default collation (`ts-stack@edf6e03` `Certificate.ts:282`), not
+        // the bytes (#249; the residual is `collation.rs`'s)
+        let mut field_names: Vec<&String> = self.fields.keys().collect();
+        field_names.sort_by_cached_key(|&name| (super::collation::sort_key(name), name.as_bytes()));
 
         for name in field_names {
             let value = &self.fields[name];
