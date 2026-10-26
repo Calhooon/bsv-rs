@@ -6,6 +6,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Changed: the BRCs pin of record moves from `ed1b015` to `5119a9b` (#154)
+
+The keeper's word of 2026-10-24 on the owner's (bsv-stack-lean DECISIONS
+15.3): the line's pin of `bsv-blockchain/BRCs` moves from `ed1b015`
+(2026-10-05) to `5119a9b` (2026-10-19), and this crate's citations move with
+it ahead of 0.9.0-beta.1. `BRC_PIN` names the new commit and the 65 fixture
+files were re-recorded by `docs/FIXTURES.md`'s procedure: 67 lines moved, each
+a reference's commit line; no fixture byte under test moved. Every line range
+cited at the old pin carries its number at the new one (`wallet/0100.md`'s
+edits above a range shift it by 1, 7, 9 or 23 lines; the BEEF, BUMP, atomic
+BEEF and raw transaction ranges keep theirs), and `docs/lanes/README.md` rule
+4 names the new pin. Public shape: nothing moves.
+
+Three wire-shape differences of `5119a9b` are on the line by the owner's word
+and change nothing here:
+
+- listOutputs' `totalOutputs` is a decimal string (`ExactModuleBalance`) for
+  a BRC-112 P-basket balance query (`wallet/0100.md:932`, `:1968-1972`;
+  #105);
+- listOutputs' `spendable` may be `false` (wire `0`) in a BRC-207 module
+  inventory view (`:939`, `:1963`, `:1974-1980`; #105);
+- internalizeAction's `insertionRemittance.customInstructions` is at most
+  1,000 UTF-8 bytes (`:867`; #117, already enforced).
+
 ### Added: `SpendRefusal` prints its rule, its text pinned (#213)
 
 `beef_stream::SpendRefusal` implements `Display`, so a host prints the
