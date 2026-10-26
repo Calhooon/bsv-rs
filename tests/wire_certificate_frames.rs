@@ -272,16 +272,16 @@ fn assert_discovered(read: &DiscoverCertificatesResult, icon_url: &str) {
     assert_eq!(json(&entry.certificate), json(&certificate()));
     let certifier = IdentityCertifier {
         name: "Fixture Certifier".into(),
-        icon_url: Some(icon_url.into()),
-        description: Some("fixture only".into()),
+        icon_url: icon_url.into(),
+        description: "fixture only".into(),
         trust: 5,
     };
-    assert_eq!(json(&entry.certifier_info), json(&Some(certifier)));
+    assert_eq!(json(&entry.certifier_info), json(&certifier));
     assert_eq!(
         entry.publicly_revealed_keyring,
-        Some(map(&[("name", &to_base64(b"Fixture"))]))
+        map(&[("name", &to_base64(b"Fixture"))])
     );
-    assert_eq!(entry.decrypted_fields, Some(map(&[("role", "reader")])));
+    assert_eq!(entry.decrypted_fields, map(&[("role", "reader")]));
 }
 
 #[tokio::test]

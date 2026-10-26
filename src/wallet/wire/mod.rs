@@ -256,18 +256,14 @@ impl WireReader<'_> {
     /// A discovery entry's two maps (`WalletWireTransceiver.ts:1711-1752`), read
     /// by the transceiver's discovery reader and `read_identity_certificate`
     /// alike (bsv-rs#236): the public keyring's values raw bytes as base64, the
-    /// decrypted fields' values UTF-8; an empty map `None`.
-    pub(crate) fn read_discovery_maps(
-        &mut self,
-    ) -> Result<(Option<Record>, Option<Record>), Error> {
+    /// decrypted fields' values UTF-8; an empty map empty, as the reference's
+    /// entry carries it (#105).
+    pub(crate) fn read_discovery_maps(&mut self) -> Result<(Record, Record), Error> {
         let keyring =
             self.read_counted_wire_record("discovery public keyring", Self::read_base64_value)?;
         let fields =
             self.read_counted_wire_record("discovery decrypted fields", Self::read_utf8_value)?;
-        Ok((
-            Some(keyring).filter(|m| !m.is_empty()),
-            Some(fields).filter(|m| !m.is_empty()),
-        ))
+        Ok((keyring, fields))
     }
 
     /// A record of `count` entries (`#readRecordKey`, `:1979-1990`;

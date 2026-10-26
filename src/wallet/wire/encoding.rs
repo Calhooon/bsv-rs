@@ -505,7 +505,7 @@ impl<'a> WireReader<'a> {
     /// (`WalletWireTransceiver.ts:1704-1710` at `ts-stack@edf6e03`; go-sdk@2ca481c
     /// `wallet/serializer/identity_certificate.go:63-66`): name, iconUrl and
     /// description as plain varint-length strings, trust a byte. An empty
-    /// iconUrl or description is `Some("")`, as the transceiver reads it; a
+    /// iconUrl or description is `""`, as the transceiver reads it; a
     /// trust outside 1 to 10 is refused in the reference's words,
     /// `#requireInteger(readUInt8(), 'discovery trust', 1, 10)` (`:1710`,
     /// `:2018-2025`; bsv-rs#247), where go-sdk reads any byte (`:66`). The
@@ -513,16 +513,17 @@ impl<'a> WireReader<'a> {
     pub fn read_identity_certifier(&mut self) -> Result<IdentityCertifier, Error> {
         Ok(IdentityCertifier {
             name: self.read_string()?,
-            icon_url: Some(self.read_string()?),
-            description: Some(self.read_string()?),
+            icon_url: self.read_string()?,
+            description: self.read_string()?,
             trust: super::require_discovery_trust(self.read_u8()?)?,
         })
     }
 
     /// Reads a discovery entry's certifier info: no present flag, the reference
-    /// having no absent case, so never `None` (bsv-rs#184). Go's zero value,
-    /// which go-sdk writes for an absent certifier info (empty strings, trust
-    /// 0), is refused at its trust as the transceiver refuses it (bsv-rs#247).
+    /// having no absent case (the members are required, bsv-rs#105). Go's zero
+    /// value, which go-sdk writes for an absent certifier info (empty strings,
+    /// trust 0), is refused at its trust as the transceiver refuses it
+    /// (bsv-rs#247).
     pub fn read_optional_identity_certifier(&mut self) -> Result<Option<IdentityCertifier>, Error> {
         self.read_identity_certifier().map(Some)
     }
@@ -532,8 +533,9 @@ impl<'a> WireReader<'a> {
     /// at `ts-stack@edf6e03`; go-sdk@2ca481c `identity_certificate.go:51-100`):
     /// the certificate behind a varint length, the certifier info, the public
     /// keyring as varint-length keys and raw-byte values (base64 in the struct),
-    /// the decrypted fields as string pairs. An empty map is `None` (bsv-rs#184);
-    /// a repeated key in either map is refused in the transceiver's words
+    /// the decrypted fields as string pairs. Every member is present, as the
+    /// reference's entry has it (an empty map empty, #105); a repeated key in
+    /// either map is refused in the transceiver's words
     /// (`#setUniqueWireRecordEntry`, `:1992-2002`; bsv-rs#192). The maps are
     /// the transceiver's own reading (`read_discovery_maps`, bsv-rs#236): a
     /// strict count, at most 100,000 and no more than the bytes left
@@ -542,7 +544,7 @@ impl<'a> WireReader<'a> {
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
         let cert_len = self.read_length()?;
         let certificate = WireReader::new(self.read_bytes(cert_len)?).read_wallet_certificate()?;
-        let certifier_info = self.read_optional_identity_certifier()?;
+        let certifier_info = self.read_identity_certifier()?;
         let (publicly_revealed_keyring, decrypted_fields) = self.read_discovery_maps()?;
 
         Ok(IdentityCertificate {
@@ -1173,16 +1175,14 @@ impl WireWriter {
     /// `wallet/serializer/identity_certificate.go:12-49`): the certificate behind
     /// a varint length, certifierInfo's name, iconUrl and description as plain
     /// strings and trust a byte, the public keyring's values as raw bytes, the
-    /// decrypted fields as strings. Absent is Go's zero value: empty, 0.
+    /// decrypted fields as strings. Every member is required by the type (#105).
     pub fn write_identity_certificate(
         &mut self,
         cert: &IdentityCertificate,
     ) -> Result<&mut Self, Error> {
         // The reference's reader refuses a trust outside 1 to 10 (bsv-rs#183):
         // no frame is written that it refuses.
-        let info = cert.certifier_info.as_ref().ok_or_else(|| {
-            Error::WalletError("an identity certificate needs its certifierInfo".into())
-        })?;
+        let info = &cert.certifier_info;
         super::require_discovery_trust(info.trust)?;
         let mut cert_writer = WireWriter::new();
         cert_writer.write_wallet_certificate(&cert.certificate)?;
@@ -1191,12 +1191,11 @@ impl WireWriter {
         self.write_bytes(&cert_bytes);
 
         self.write_string(&info.name);
-        self.write_string(info.icon_url.as_deref().unwrap_or(""));
-        self.write_string(info.description.as_deref().unwrap_or(""));
+        self.write_string(&info.icon_url);
+        self.write_string(&info.description);
         self.write_u8(info.trust);
 
-        let empty = HashMap::new();
-        let keyring = cert.publicly_revealed_keyring.as_ref().unwrap_or(&empty);
+        let keyring = &cert.publicly_revealed_keyring;
         let mut keys: Vec<&String> = keyring.keys().collect();
         keys.sort();
         self.write_var_int(keys.len() as u64);
@@ -1207,7 +1206,7 @@ impl WireWriter {
             self.write_var_int(value.len() as u64);
             self.write_bytes(&value);
         }
-        self.write_string_map(cert.decrypted_fields.as_ref().unwrap_or(&empty));
+        self.write_string_map(&cert.decrypted_fields);
         Ok(self)
     }
 

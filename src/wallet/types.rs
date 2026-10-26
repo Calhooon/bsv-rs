@@ -1494,12 +1494,10 @@ pub struct RelinquishCertificateResult {
 pub struct IdentityCertifier {
     /// Name of the certifier.
     pub name: String,
-    /// URL to the certifier's icon.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub icon_url: Option<String>,
-    /// Description of the certifier.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
+    /// URL to the certifier's icon; required, as BRC-100 has it (#105).
+    pub icon_url: String,
+    /// Description of the certifier; required, as BRC-100 has it (#105).
+    pub description: String,
     /// Trust level (1-10).
     pub trust: u8,
 }
@@ -1512,14 +1510,12 @@ pub struct IdentityCertificate {
     #[serde(flatten)]
     pub certificate: WalletCertificate,
     /// Information about the certifier.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub certifier_info: Option<IdentityCertifier>,
-    /// Publicly revealed keyring for field decryption.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub publicly_revealed_keyring: Option<HashMap<String, String>>,
-    /// Decrypted field values.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub decrypted_fields: Option<HashMap<String, String>>,
+    pub certifier_info: IdentityCertifier,
+    /// Publicly revealed keyring for field decryption (base64 values); an
+    /// empty map when nothing is revealed.
+    pub publicly_revealed_keyring: HashMap<String, String>,
+    /// Decrypted field values; an empty map when none.
+    pub decrypted_fields: HashMap<String, String>,
 }
 
 /// Arguments for discovering certificates by identity key.

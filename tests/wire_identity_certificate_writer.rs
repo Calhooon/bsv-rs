@@ -65,17 +65,17 @@ fn certificate() -> WalletCertificate {
 fn identity_certificate() -> IdentityCertificate {
     IdentityCertificate {
         certificate: certificate(),
-        certifier_info: Some(IdentityCertifier {
+        certifier_info: IdentityCertifier {
             name: "Fixture Certifier".into(),
-            icon_url: Some("https://certifier.invalid/icon".into()),
-            description: Some("fixture only".into()),
+            icon_url: "https://certifier.invalid/icon".into(),
+            description: "fixture only".into(),
             trust: 5,
-        }),
-        publicly_revealed_keyring: Some(map(&[
+        },
+        publicly_revealed_keyring: map(&[
             ("role", &to_base64(b"key-2")),
             ("name", &to_base64(b"key-1")),
-        ])),
-        decrypted_fields: Some(map(&[("role", "reader"), ("name", "Fixture")])),
+        ]),
+        decrypted_fields: map(&[("role", "reader"), ("name", "Fixture")]),
     }
 }
 
@@ -173,41 +173,31 @@ fn the_shared_discovery_vector_entry_is_the_writers_bytes() {
             signature: s("signature"),
             fields: strings(&e["fields"]),
         },
-        certifier_info: Some(serde_json::from_value(e["certifierInfo"].clone()).unwrap()),
-        publicly_revealed_keyring: Some(strings(&e["publiclyRevealedKeyring"])),
-        decrypted_fields: Some(strings(&e["decryptedFields"])),
+        certifier_info: serde_json::from_value(e["certifierInfo"].clone()).unwrap(),
+        publicly_revealed_keyring: strings(&e["publiclyRevealedKeyring"]),
+        decrypted_fields: strings(&e["decryptedFields"]),
     };
     assert_eq!(written(&cert), &wire[2..]);
 }
 
-/// An absent certifierInfo is refused before a byte is written: the
-/// reference's writer would write a trust byte of Go's zero value unchecked
-/// (`WalletWireProcessor.ts:2520`) and its reader refuses it
-/// (`WalletWireTransceiver.ts:1710`, trust 1 to 10; bsv-rs#183). An absent
-/// iconUrl or description is the empty string, an absent map a count of 0,
-/// and the transceiver reads them back as it reads the reference's.
+/// Every member of an entry is required by the type, as the reference's
+/// `IdentityCertificate` has it (#105): the certifier info always written,
+/// an empty iconUrl or description the empty string, an empty map a count
+/// of 0, and the transceiver reads them back as it reads the reference's.
 #[tokio::test]
-async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_counts() {
-    let mut cert = IdentityCertificate {
-        certificate: certificate(),
-        certifier_info: None,
-        publicly_revealed_keyring: None,
-        decrypted_fields: None,
-    };
-    let mut w = WireWriter::new();
-    assert!(matches!(
-        w.write_identity_certificate(&cert),
-        Err(Error::WalletError(m)) if m == "an identity certificate needs its certifierInfo"
-    ));
-    assert!(w.is_empty(), "no byte written");
-
+async fn an_identity_certificate_with_empty_members_writes_empty_strings_and_counts() {
     let certifier = IdentityCertifier {
         name: String::new(),
-        icon_url: None,
-        description: None,
+        icon_url: String::new(),
+        description: String::new(),
         trust: 1,
     };
-    cert.certifier_info = Some(certifier);
+    let cert = IdentityCertificate {
+        certificate: certificate(),
+        certifier_info: certifier.clone(),
+        publicly_revealed_keyring: HashMap::new(),
+        decrypted_fields: HashMap::new(),
+    };
     let bytes = written(&cert);
     let mut certificate_bytes = WireWriter::new();
     certificate_bytes
@@ -220,15 +210,9 @@ async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_
 
     let read = discovered(discovery_frame(&cert)).await;
     let entry = &read.certificates[0];
-    let certifier = IdentityCertifier {
-        name: String::new(),
-        icon_url: Some(String::new()),
-        description: Some(String::new()),
-        trust: 1,
-    };
-    assert_eq!(json(&entry.certifier_info), json(&Some(certifier)));
-    assert_eq!(entry.publicly_revealed_keyring, None);
-    assert_eq!(entry.decrypted_fields, None);
+    assert_eq!(json(&entry.certifier_info), json(&certifier));
+    assert!(entry.publicly_revealed_keyring.is_empty());
+    assert!(entry.decrypted_fields.is_empty());
 }
 
 /// A keyring value crosses as its raw bytes, so one that is not base64 is
@@ -236,7 +220,7 @@ async fn an_identity_certificate_with_nothing_optional_writes_empty_strings_and_
 #[test]
 fn a_keyring_value_that_is_not_base64_is_refused() {
     let mut cert = identity_certificate();
-    cert.publicly_revealed_keyring = Some(map(&[("name", "not base64!")]));
+    cert.publicly_revealed_keyring = map(&[("name", "not base64!")]);
     let mut w = WireWriter::new();
     assert!(matches!(
         w.write_identity_certificate(&cert),
