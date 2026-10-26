@@ -265,8 +265,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     /// outside this call and framed in their own words, as the reference's
     /// throws outside the wrapper are. With the `tracing` feature the words
     /// the frame drops go to one `warn` event here, with the call's name
-    /// (bsv-rs#212), and a refusal kept with its code to one `warn` event with
-    /// the call's name and its class (#137); the wire is the same with the
+    /// (bsv-rs#212), with the class too for a refusal whose class has no SDK
+    /// code, and a refusal kept with its code to one `warn` event with the
+    /// call's name and its class (#137); the wire is the same with the
     /// feature on or off.
     async fn invoke_wallet<T>(
         &self,
@@ -291,11 +292,19 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
                 }
                 None => {
                     #[cfg(feature = "tracing")]
-                    tracing::warn!(
-                        call = call.method_name(),
-                        error = %error,
-                        "wallet error framed as Wallet operation failed"
-                    );
+                    match &error {
+                        Error::WalletRefusal { class, message } => tracing::warn!(
+                            call = call.method_name(),
+                            class = class.name(),
+                            error = %message,
+                            "wallet error framed as Wallet operation failed"
+                        ),
+                        _ => tracing::warn!(
+                            call = call.method_name(),
+                            error = %error,
+                            "wallet error framed as Wallet operation failed"
+                        ),
+                    }
                     Error::WalletError(WALLET_OPERATION_FAILED.to_string())
                 }
             })

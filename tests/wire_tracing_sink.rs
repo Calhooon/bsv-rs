@@ -201,10 +201,37 @@ async fn a_wallet_refusal_raises_one_event_with_the_call_and_its_class() {
     let event = &events[0];
     assert_eq!(event.level, Level::WARN);
     assert_eq!(event.fields["call"], "getHeight");
-    assert_eq!(event.fields["class"], "insufficientFunds");
+    assert_eq!(event.fields["class"], "WERR_INSUFFICIENT_FUNDS");
     assert_eq!(
         event.fields["message"],
         "wallet refusal framed with its code"
     );
     assert_eq!(event.fields.len(), 3, "{:?}", event.fields);
+}
+
+/// #137: a refusal whose class has no SDK code is framed as `Wallet operation
+/// failed` (`:2417`), so its class and its words go to the one `warn` event
+/// beside the call's name.
+#[tokio::test]
+async fn an_uncoded_refusal_raises_one_event_with_its_class_and_words() {
+    let error = Error::WalletRefusal {
+        class: WalletRefusalClass::Unauthorized,
+        message: "Access is denied due to an authorization error.".into(),
+    };
+    let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
+    assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.level, Level::WARN);
+    assert_eq!(event.fields["call"], "getHeight");
+    assert_eq!(event.fields["class"], "WERR_UNAUTHORIZED");
+    assert_eq!(
+        event.fields["error"],
+        "Access is denied due to an authorization error."
+    );
+    assert_eq!(
+        event.fields["message"],
+        "wallet error framed as Wallet operation failed"
+    );
+    assert_eq!(event.fields.len(), 4, "{:?}", event.fields);
 }
