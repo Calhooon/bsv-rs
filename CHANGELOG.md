@@ -95,6 +95,45 @@ both 0.7.6 and 0.7.10 pass, and the CI bench job runs on ubuntu-24.04, where
 this today. The re-record of the M1 Max entry and a Linux entry (`--record`,
 `[bench-baseline-record]`) is a separate baseline PR, the captain's (#245). A
 fresh resolve already takes 0.7.10, so the floor is for the locks that exist.
+### Fixed: `write_wallet_certificate` refuses what the reference's writer refuses (#189)
+
+Left by #183, which made the readers refuse a certificate the reference's
+`Certificate.fromBinary` refuses (`ts-stack@edf6e03` `Certificate.ts:329-408`)
+and left `WireWriter::write_wallet_certificate` writing it unchecked, so this
+crate could make a certificate frame its own readers and the reference's
+refuse. `Certificate.toBinary` refuses each before it writes; this writer now
+does too, before a byte is written, a `WalletError` in the readers' words
+(one check for both, `src/wallet/wire/mod.rs`):
+
+- a subject or certifier that is not 33 bytes decompressing to a point
+  (`Certificate.ts:241-253`, `assertCompressedPublicKey` `:136-142`):
+  `Invalid certificate subject: expected a compressed secp256k1 public key`,
+  and the same for `certifier`;
+- a field name outside 1 to 50 bytes (`:289`, `assertCertificateFieldName`
+  `:117-126`): `Invalid certificate field name length: received <n>`, the
+  readers' words (`:369`), where the reference's writer says `expected 1–50
+  bytes, received <n>` (`:120`);
+- an unsafe field name (`__proto__`, `constructor`, `prototype`; the same
+  lines): `Unsafe certificate field name: <name>`;
+- a signature past 72 bytes or not DER (`:300-312`, `Signature.fromDER`):
+  the readers' words (`Certificate signature exceeds the DER size limit`,
+  `:393`, where the reference's writer says `Invalid certificate signature
+  encoding`, `:307`; then `fromDER`'s own). The DER it accepts is written as
+  given (`:311`), not re-encoded.
+
+A repeated field name cannot reach this writer: its fields are a `HashMap`.
+The whole certificate is built before a byte goes to the caller's writer, so
+a refusal leaves it as it was, `write_optional_wallet_certificate`'s present
+flag included; `write_identity_certificate` inherits the checks. go-sdk@2ca481c
+holds the keys and the signature as types (`*ec.PublicKey`, `*ec.Signature`:
+`wallet/serializer/certificate.go:36-37`, `:61-63` write `Compressed()` and
+`Serialize()`, so neither can be other than a point and DER) and writes the
+field names unchecked (`:43-58`). Pinned by
+`a_certificate_subject_or_certifier_that_is_not_a_compressed_key_is_refused_by_the_writer`,
+`a_certificate_field_name_outside_1_to_50_bytes_or_unsafe_is_refused_by_the_writer`
+and `a_certificate_signature_that_is_not_der_is_refused_by_the_writer`
+(`tests/wire_reader_strictness.rs`), red on `15b48d4`; no recording or vector
+moves. Public shape: nothing moves (the writer returned a `Result` already).
 
 ### Added: `ScriptResourceLimit` prints the interpreter's sentence, from one place (#228)
 
