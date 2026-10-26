@@ -9,8 +9,9 @@ This module implements identity certificates for the BSV authentication system, 
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, re-exports, protocol constants | ~42 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | ~516 |
+| `mod.rs` | Module root, re-exports, protocol constants | ~43 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | ~786 |
+| `collation.rs` | The reference's field-name order: `localeCompare` under ICU root for U+0000..U+00FF (#249) | ~425 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | ~336 |
 | `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | ~287 |
 
@@ -36,7 +37,7 @@ The module implements a three-stage certificate lifecycle:
 
 ### Types
 
-**Certificate** - Base certificate structure (BRC-52):
+**Certificate** - Base certificate structure (BRC-52), `#[non_exhaustive]` since #249 (build with `new()` and the `with_*` methods):
 ```rust
 pub struct Certificate {
     pub cert_type: [u8; 32],           // Certificate schema identifier
@@ -46,6 +47,8 @@ pub struct Certificate {
     pub revocation_outpoint: Option<Outpoint>,  // On-chain revocation
     pub fields: HashMap<String, Vec<u8>>,       // Encrypted field values
     pub signature: Option<Vec<u8>>,    // DER-encoded signature
+    #[serde(skip)]
+    pub received_unsigned: Option<Vec<u8>>,  // the unsigned prefix as read or signed (#249)
 }
 ```
 
@@ -93,15 +96,17 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | Method | Purpose |
 |--------|---------|
 | `new()` | Create unsigned certificate with type, serial, subject, certifier |
+| `with_revocation_outpoint()`, `with_fields()`, `with_signature()` | Chain onto `new()` for the fields a struct literal set (#249) |
+| `set_revocation_outpoint()`, `set_fields()`, `set_signature()` | Change one after construction; the two that change the preimage clear `received_unsigned` (#249) |
 | `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251) |
-| `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251) |
+| `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249) |
 | `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
-| `to_binary()` | Serialize to deterministic binary format |
-| `from_binary()` | Parse from binary format |
+| `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249) |
+| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249) |
 | `signing_hash()` | Get SHA-256 hash for signing |
 | `type_base64()` | Get certificate type as base64 string |
 | `serial_number_base64()` | Get serial number as base64 string |
-| `set_field()` | Set an encrypted field value |
+| `set_field()` | Set an encrypted field value; clears `received_unsigned` |
 | `get_field()` | Get an encrypted field value |
 | `field_names()` | Get all field names |
 | `get_field_encryption_key_id_master()` | Key ID for master encryption |
@@ -151,7 +156,7 @@ The `Certificate::to_binary()` method produces a deterministic binary representa
 [revocation_txid: 32 bytes]     # All zeros if no outpoint
 [revocation_index: varint]       # 0 if no outpoint
 [field_count: varint]
-[for each field (sorted by name):
+[for each field (the reference's order, or as received):
     [name_len: varint][name: bytes]
     [value_len: varint][value: bytes]
 ]
@@ -161,7 +166,8 @@ The `Certificate::to_binary()` method produces a deterministic binary representa
 **Notes:**
 - Revocation outpoint uses a sentinel value: all-zeros TXID with index 0 means "no outpoint"
 - Signature is appended as raw bytes without length prefix (matches TypeScript SDK)
-- Fields are sorted alphabetically by name for deterministic serialization across implementations
+- Fields are written in the reference's order, `a.localeCompare(b)` under Node's default ICU collation (`ts-stack@edf6e03` `Certificate.ts:282`), not by bytes: `a_b, a0, age, éa, f, Name` (`collation.rs`, U+0000..U+00FF; above that, code point order after the table, the residual). Go sorts by bytes (`go-sdk@2ca481c` `wallet/serializer/certificate.go:48`)
+- A certificate read by `from_binary` (or signed by `sign`) keeps its unsigned prefix in `received_unsigned`; `verify`, `signing_hash` and `to_binary` use those bytes while they parse to the current values, so the issuer's order is kept (BRC-52 `0052.md:103`; #249). A value changed afterwards unbinds them
 
 ## Usage Examples
 
