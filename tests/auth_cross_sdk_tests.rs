@@ -87,15 +87,10 @@ fn vector_to_certificate(v: &CertificateVector) -> Certificate {
         .as_ref()
         .map(|s| from_hex(s).expect("Invalid signature hex"));
 
-    Certificate {
-        cert_type,
-        serial_number,
-        subject,
-        certifier,
-        revocation_outpoint,
-        fields,
-        signature,
-    }
+    Certificate::new(cert_type, serial_number, subject, certifier)
+        .with_revocation_outpoint(revocation_outpoint)
+        .with_fields(fields)
+        .with_signature(signature)
 }
 
 // =================
@@ -597,15 +592,9 @@ fn test_certificate_binary_format_structure() {
     let subject_compressed = subject.to_compressed();
     let certifier_compressed = certifier.to_compressed();
 
-    let cert = Certificate {
-        cert_type,
-        serial_number,
-        subject,
-        certifier,
-        revocation_outpoint: Some(outpoint),
-        fields: std::collections::HashMap::new(), // No fields for simpler verification
-        signature: None,
-    };
+    // No fields for simpler verification
+    let cert = Certificate::new(cert_type, serial_number, subject, certifier)
+        .with_revocation_outpoint(Some(outpoint));
 
     let binary = cert.to_binary(false);
 
@@ -661,15 +650,8 @@ fn test_certificate_no_outpoint_sentinel_value() {
         PublicKey::from_hex("02f9308a019258c31049344f85f89d5229b531c845836f99b08601f113bce036f9")
             .unwrap();
 
-    let cert = Certificate {
-        cert_type,
-        serial_number,
-        subject,
-        certifier,
-        revocation_outpoint: None, // No outpoint
-        fields: std::collections::HashMap::new(),
-        signature: None,
-    };
+    // No outpoint
+    let cert = Certificate::new(cert_type, serial_number, subject, certifier);
 
     let binary = cert.to_binary(false);
 

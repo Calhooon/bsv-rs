@@ -239,24 +239,22 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
             crate::primitives::from_hex(&cert_result.certificate.signature).ok()
         };
 
-        let base_cert = crate::auth::certificates::Certificate {
-            cert_type: type_arr,
-            serial_number: serial_arr,
-            subject,
-            certifier,
-            revocation_outpoint,
-            fields: cert_result
-                .certificate
-                .fields
-                .iter()
-                .filter_map(|(k, v)| {
-                    crate::primitives::from_base64(v)
-                        .ok()
-                        .map(|decoded| (k.clone(), decoded))
-                })
-                .collect(),
-            signature,
-        };
+        let base_cert =
+            crate::auth::certificates::Certificate::new(type_arr, serial_arr, subject, certifier)
+                .with_revocation_outpoint(revocation_outpoint)
+                .with_fields(
+                    cert_result
+                        .certificate
+                        .fields
+                        .iter()
+                        .filter_map(|(k, v)| {
+                            crate::primitives::from_base64(v)
+                                .ok()
+                                .map(|decoded| (k.clone(), decoded))
+                        })
+                        .collect(),
+                )
+                .with_signature(signature);
 
         // Convert keyring
         let keyring: std::collections::HashMap<String, Vec<u8>> = prove_result
