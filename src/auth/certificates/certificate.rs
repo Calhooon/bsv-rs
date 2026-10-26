@@ -756,7 +756,8 @@ mod tests {
     }
 
     #[test]
-    fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated() {
+    fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bound_refusals_form(
+    ) {
         let certifier = PrivateKey::random();
         let subject = PrivateKey::random().public_key();
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
