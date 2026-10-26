@@ -383,7 +383,7 @@ pub(crate) fn require_response_length(
 
 /// `#requirePageCapacity` (`WalletWireTransceiver.ts:1948-1953`), called
 /// before each listCertificates or discovery entry is read (`:1509`,
-/// `:1701`): `returned` entries already read may not reach the requested
+/// `:1700`): `returned` entries already read may not reach the requested
 /// limit, 10 when none was requested (bsv-rs#190).
 pub(crate) fn require_page_capacity(
     returned: usize,
