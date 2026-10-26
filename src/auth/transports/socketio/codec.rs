@@ -57,6 +57,17 @@
 //! by [`SocketIoTransport`](super::SocketIoTransport), but the parser
 //! handles arbitrary namespaces correctly so non-standard clients still
 //! parse.
+//!
+//! # Numbers
+//!
+//! A packet's JSON goes through `serde_json` with its `float_roundtrip`
+//! feature (the crate's `Cargo.toml`): a number reads to the correctly
+//! rounded double, as the reference's `JSON.parse` reads it, and is written
+//! as the shortest text that reads back to it, so every finite `f64`
+//! survives a decode and an encode and a frame's encoding is a fixed point
+//! (bsv-rs#285). The text may differ from `JSON.stringify`'s (`100.0` for
+//! `100`, `-0.0` for `0`, an integer within `u64` kept exact); a number past
+//! the double range is a `Malformed` refusal.
 
 use serde_json::Value;
 

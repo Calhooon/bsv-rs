@@ -1,0 +1,260 @@
+{
+  "issue": "Calhooon/bsv-rs#285",
+  "description": "Socket.IO EVENT frames carrying a JSON number; the reference's verdict on each (the number socket.io-parser reads, as JSON.stringify writes it and as the double's bits, its re-encoding and whether that is a fixed point), written by tests/support/socketio_float_285.mjs",
+  "reference": "socket.io-parser 4.2.7 under Node v22.18.0",
+  "cases": [
+    {
+      "name": "the #280 fuzz crash input",
+      "frame": "2[\"authMessage\",{\"identityKey\":\"02531fe6068134503d272q83vEjRWeJA=\",\"payload\":[112,97,121,108,44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444111,97,100],\"requestedCertificatesnature\":[48.6],\"version\":\"0.1\",\"yourNonce\":\"q83vEjRW6666eJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA=\"}]",
+      "number_at": [
+        1,
+        "payload",
+        4
+      ],
+      "reference_text": "4.444444444444445e+106",
+      "reference_bits": "561360e1fd8531d4",
+      "reference_encoding": "2[\"authMessage\",{\"identityKey\":\"02531fe6068134503d272q83vEjRWeJA=\",\"payload\":[112,97,121,108,4.444444444444445e+106,97,100],\"requestedCertificatesnature\":[48.6],\"version\":\"0.1\",\"yourNonce\":\"q83vEjRW6666eJCrze8SNFZ4kKvN7xI0VniQq83vEjRWeJA=\"}]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444111",
+      "frame": "2[\"n\",[44444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444444111]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "4.444444444444445e+106",
+      "reference_bits": "561360e1fd8531d4",
+      "reference_encoding": "2[\"n\",[4.444444444444445e+106]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "0.1000000000000000055511151231257827021181583404541015625",
+      "frame": "2[\"n\",[0.1000000000000000055511151231257827021181583404541015625]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "0.1",
+      "reference_bits": "3fb999999999999a",
+      "reference_encoding": "2[\"n\",[0.1]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "2.4703282292062327208828439643411068618252990130716238221279284125033775364e-324",
+      "frame": "2[\"n\",[2.4703282292062327208828439643411068618252990130716238221279284125033775364e-324]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "5e-324",
+      "reference_bits": "0000000000000001",
+      "reference_encoding": "2[\"n\",[5e-324]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "1.00000000000000011102230246251565404236316680908203125",
+      "frame": "2[\"n\",[1.00000000000000011102230246251565404236316680908203125]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "1",
+      "reference_bits": "3ff0000000000000",
+      "reference_encoding": "2[\"n\",[1]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "7.2057594037927933e16",
+      "frame": "2[\"n\",[7.2057594037927933e16]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "72057594037927940",
+      "reference_bits": "4370000000000000",
+      "reference_encoding": "2[\"n\",[72057594037927940]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "179769313486231580793728971405301e276",
+      "frame": "2[\"n\",[179769313486231580793728971405301e276]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "1.7976931348623157e+308",
+      "reference_bits": "7fefffffffffffff",
+      "reference_encoding": "2[\"n\",[1.7976931348623157e+308]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "-0.0",
+      "frame": "2[\"n\",[-0.0]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "0",
+      "reference_bits": "8000000000000000",
+      "reference_encoding": "2[\"n\",[0]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "0.1",
+      "frame": "2[\"n\",[0.1]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "0.1",
+      "reference_bits": "3fb999999999999a",
+      "reference_encoding": "2[\"n\",[0.1]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "1e308",
+      "frame": "2[\"n\",[1e308]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "1e+308",
+      "reference_bits": "7fe1ccf385ebc8a0",
+      "reference_encoding": "2[\"n\",[1e+308]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "1e21",
+      "frame": "2[\"n\",[1e21]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "1e+21",
+      "reference_bits": "444b1ae4d6e2ef50",
+      "reference_encoding": "2[\"n\",[1e+21]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "1e-7",
+      "frame": "2[\"n\",[1e-7]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "1e-7",
+      "reference_bits": "3e7ad7f29abcaf48",
+      "reference_encoding": "2[\"n\",[1e-7]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "5e-324",
+      "frame": "2[\"n\",[5e-324]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "5e-324",
+      "reference_bits": "0000000000000001",
+      "reference_encoding": "2[\"n\",[5e-324]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "2.2250738585072011e-308",
+      "frame": "2[\"n\",[2.2250738585072011e-308]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "2.225073858507201e-308",
+      "reference_bits": "000fffffffffffff",
+      "reference_encoding": "2[\"n\",[2.225073858507201e-308]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "1.7976931348623157e308",
+      "frame": "2[\"n\",[1.7976931348623157e308]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "1.7976931348623157e+308",
+      "reference_bits": "7fefffffffffffff",
+      "reference_encoding": "2[\"n\",[1.7976931348623157e+308]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "123456789012345680000",
+      "frame": "2[\"n\",[123456789012345680000]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "123456789012345680000",
+      "reference_bits": "441ac53a7e04bcda",
+      "reference_encoding": "2[\"n\",[123456789012345680000]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "9007199254740993",
+      "frame": "2[\"n\",[9007199254740993]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "9007199254740992",
+      "reference_bits": "4340000000000000",
+      "reference_encoding": "2[\"n\",[9007199254740992]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "18446744073709551616",
+      "frame": "2[\"n\",[18446744073709551616]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "18446744073709552000",
+      "reference_bits": "43f0000000000000",
+      "reference_encoding": "2[\"n\",[18446744073709552000]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "100.0",
+      "frame": "2[\"n\",[100.0]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "100",
+      "reference_bits": "4059000000000000",
+      "reference_encoding": "2[\"n\",[100]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "1E2",
+      "frame": "2[\"n\",[1E2]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "100",
+      "reference_bits": "4059000000000000",
+      "reference_encoding": "2[\"n\",[100]]",
+      "reference_fixed_point": true
+    },
+    {
+      "name": "48.6",
+      "frame": "2[\"n\",[48.6]]",
+      "number_at": [
+        1,
+        0
+      ],
+      "reference_text": "48.6",
+      "reference_bits": "40484ccccccccccd",
+      "reference_encoding": "2[\"n\",[48.6]]",
+      "reference_fixed_point": true
+    }
+  ]
+}
