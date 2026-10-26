@@ -505,21 +505,24 @@ impl<'a> WireReader<'a> {
     /// (`WalletWireTransceiver.ts:1704-1710` at `ts-stack@edf6e03`; go-sdk@2ca481c
     /// `wallet/serializer/identity_certificate.go:63-66`): name, iconUrl and
     /// description as plain varint-length strings, trust a byte. An empty
-    /// iconUrl or description is `Some("")`, as the transceiver reads it; trust
-    /// is not bounded here (TS refuses one outside 1 to 10, `:1710`).
+    /// iconUrl or description is `Some("")`, as the transceiver reads it; a
+    /// trust outside 1 to 10 is refused in the reference's words,
+    /// `#requireInteger(readUInt8(), 'discovery trust', 1, 10)` (`:1710`,
+    /// `:2018-2025`; bsv-rs#247), where go-sdk reads any byte (`:66`). The
+    /// transceiver's discovery reader reads its certifier info here.
     pub fn read_identity_certifier(&mut self) -> Result<IdentityCertifier, Error> {
         Ok(IdentityCertifier {
             name: self.read_string()?,
             icon_url: Some(self.read_string()?),
             description: Some(self.read_string()?),
-            trust: self.read_u8()?,
+            trust: super::require_discovery_trust(self.read_u8()?)?,
         })
     }
 
     /// Reads a discovery entry's certifier info: no present flag, the reference
-    /// having no absent case. Go's zero value, which `write_identity_certificate`
-    /// writes for `None`, reads as `Some` with empty strings and trust 0, as the
-    /// transceiver reads it, never as `None` (bsv-rs#184).
+    /// having no absent case, so never `None` (bsv-rs#184). Go's zero value,
+    /// which go-sdk writes for an absent certifier info (empty strings, trust
+    /// 0), is refused at its trust as the transceiver refuses it (bsv-rs#247).
     pub fn read_optional_identity_certifier(&mut self) -> Result<Option<IdentityCertifier>, Error> {
         self.read_identity_certifier().map(Some)
     }

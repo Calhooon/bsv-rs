@@ -1419,18 +1419,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
 
             // Certifier info: three plain strings, an empty one length 0
-            // (`#serializeDiscoveryResult`, `WalletWireProcessor.ts:2507-2518`)
-            let name = reader.read_string()?;
-            let icon_url = Some(reader.read_string()?);
-            let description = Some(reader.read_string()?);
-            let trust = super::require_discovery_trust(reader.read_u8()?)?;
-
-            let certifier_info = crate::wallet::IdentityCertifier {
-                name,
-                icon_url,
-                description,
-                trust,
-            };
+            // (`#serializeDiscoveryResult`, `WalletWireProcessor.ts:2507-2518`),
+            // the trust 1 to 10 (`WalletWireTransceiver.ts:1710`; #183, #247)
+            let certifier_info = reader.read_identity_certifier()?;
 
             // The maps: strict counts, record keys (`WalletWireTransceiver.ts:1711-1752`)
             let (publicly_revealed_keyring, decrypted_fields) = reader.read_discovery_maps()?;

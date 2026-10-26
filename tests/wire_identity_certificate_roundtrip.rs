@@ -10,7 +10,8 @@
 //! the public keyring as a count of varint-length key and varint-length raw-byte
 //! pairs (rendered base64), the decrypted fields as a count of string pairs.
 //! The reader reads as the transceiver's `parse_discovery_result` reads: an
-//! empty string is `Some("")`, an empty map `None`, trust 0 as written.
+//! empty string is `Some("")`, an empty map `None`, a trust outside 1 to 10
+//! refused (`WalletWireTransceiver.ts:1710`; bsv-rs#247).
 #![cfg(feature = "wallet")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
@@ -106,17 +107,17 @@ async fn discovered(entry: &[u8]) -> Result<IdentityCertificate, Error> {
     Ok(result.certificates.remove(0))
 }
 
-/// Go's zero value for an entry with no certifier info and no maps, as
-/// `SerializeIdentityCertificate` writes it (`identity_certificate.go:23-46`):
-/// the certificate behind its length, three empty strings, trust 0, two counts
-/// of 0. Hand-assembled: this crate's writer refuses to write it since #183.
-fn zero_value_entry() -> Vec<u8> {
+/// An entry with three empty strings, `trust` and two counts of 0. At trust 0
+/// it is Go's zero value for an entry with no certifier info and no maps, as
+/// `SerializeIdentityCertificate` writes it (`identity_certificate.go:23-46`).
+/// Hand-assembled: this crate's writer refuses to write it since #183.
+fn empty_entry(trust: u8) -> Vec<u8> {
     let mut c = WireWriter::new();
     c.write_wallet_certificate(&certificate()).unwrap();
     let mut w = WireWriter::new();
     w.write_var_int(c.as_bytes().len() as u64);
     w.write_bytes(c.as_bytes());
-    w.write_bytes(&[0, 0, 0, 0, 0, 0]);
+    w.write_bytes(&[0, 0, 0, trust, 0, 0]);
     w.into_bytes()
 }
 
@@ -126,26 +127,40 @@ fn an_identity_certificate_the_writer_writes_reads_back_through_the_reader() {
     assert_eq!(json(&read(&written(&cert))), json(&cert));
 }
 
-/// Go's zero value for an absent certifierInfo or map (which Go's writer
-/// writes and this crate's refuses to, #183) reads back through the reader as
-/// `Some` with empty strings and trust 0, the maps `None`; never `None` for
-/// the certifier. The transceiver refuses the same bytes as the reference's
-/// reader does (`WalletWireTransceiver.ts:1710`, trust 1 to 10; #183).
+/// Go's zero value for an absent certifierInfo (which Go's writer writes and
+/// this crate's refuses to, #183) is refused by the reader as the transceiver
+/// refuses it, in the same words: trust 0 is outside the reference's 1 to 10
+/// (`WalletWireTransceiver.ts:1710`, `:2018-2025`; bsv-rs#247). Until #247 the
+/// reader read it as `Some` with empty strings and trust 0 (#184). The same
+/// bytes at trust 1 read as the transceiver reads them: `Some` with empty
+/// strings, the maps `None`, never `None` for the certifier.
 #[tokio::test]
-async fn the_zero_value_entry_reads_back_as_the_transceiver_reads_it() {
-    let bytes = zero_value_entry();
+async fn the_zero_value_entry_is_refused_as_the_transceiver_refuses_it() {
+    let words = "Invalid discovery trust: expected an integer from 1 to 10, received 0";
+    let bytes = empty_entry(0);
+    assert_eq!(
+        WireReader::new(&bytes)
+            .read_identity_certificate()
+            .map(drop),
+        Err(Error::WalletError(words.into()))
+    );
+    assert_eq!(
+        discovered(&bytes).await.map(drop),
+        Err(Error::WalletError(words.into()))
+    );
+
+    let bytes = empty_entry(1);
     let entry = read(&bytes);
-    let zero = IdentityCertifier {
+    let empty = IdentityCertifier {
         name: String::new(),
         icon_url: Some(String::new()),
         description: Some(String::new()),
-        trust: 0,
+        trust: 1,
     };
-    assert_eq!(json(&entry.certifier_info), json(&Some(zero)));
+    assert_eq!(json(&entry.certifier_info), json(&Some(empty)));
     assert_eq!(entry.publicly_revealed_keyring, None);
     assert_eq!(entry.decrypted_fields, None);
-    let error = discovered(&bytes).await.unwrap_err().to_string();
-    assert!(error.contains("Invalid discovery trust"), "{error:?}");
+    assert_eq!(json(&discovered(&bytes).await.unwrap()), json(&entry));
 }
 
 /// The shared vector's entry (the bytes TS and Go exchange) reads to the
@@ -203,7 +218,7 @@ fn a_keyring_value_whose_bytes_are_not_utf8_round_trips_as_base64() {
 /// `ReaderUnderflow`.
 #[test]
 fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
-    let zero = zero_value_entry();
+    let zero = empty_entry(1);
     let huge = [0xff, 0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f];
     let at = |tail: usize| -> Vec<u8> {
         let mut bytes = zero[..zero.len() - tail].to_vec();
@@ -281,7 +296,8 @@ fn the_layout_before_182_is_refused() {
     }
 }
 
-/// `read_identity_certifier` reads the three strings and the byte; the layout
+/// `read_identity_certifier` reads the three strings and the byte, a trust
+/// outside 1 to 10 refused in the transceiver's words (bsv-rs#247); the layout
 /// before #182 is the same bytes when iconUrl and description are present, and
 /// a NIL sentinel for an absent one, which is now a length past the bytes,
 /// refused.
@@ -309,4 +325,26 @@ fn the_certifier_reader_reads_three_plain_strings_and_the_trust_byte() {
         WireReader::new(nil.as_bytes()).read_identity_certifier(),
         Err(Error::ReaderUnderflow { .. })
     ));
+
+    for trust in [0u8, 11] {
+        let mut w = WireWriter::new();
+        w.write_string(&info.name);
+        w.write_string("");
+        w.write_string("");
+        w.write_u8(trust);
+        let words =
+            format!("Invalid discovery trust: expected an integer from 1 to 10, received {trust}");
+        assert_eq!(
+            WireReader::new(w.as_bytes())
+                .read_identity_certifier()
+                .map(drop),
+            Err(Error::WalletError(words.clone()))
+        );
+        assert_eq!(
+            WireReader::new(w.as_bytes())
+                .read_optional_identity_certifier()
+                .map(drop),
+            Err(Error::WalletError(words))
+        );
+    }
 }
