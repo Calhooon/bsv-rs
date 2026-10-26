@@ -357,7 +357,8 @@ byte is `1-255`, "predefined error types or ... custom error categorization"
 message alone; the class is the typed field.
 
 The collision is the reference's: the toolbox gives `WERR_INVALID_MERKLE_ROOT`
-the code 8 (`WERR_errors.ts:136`), the SDK's `abortRefused` (`WalletError.ts:79`).
+the code 8 (`WERR_errors.ts:136`), the SDK's `abortRefused` (`WalletError.ts:79`; filed upstream as
+bsv-blockchain/ts-stack#1372).
 This crate reads a code 8 by the SDK's table: `from_code(8)` is `AbortRefused`;
 on abortAction a code-8 frame stays `aborted: false` (#206), elsewhere it is
 the `AbortRefused` class; an HTTP JSON body naming `WERR_INVALID_MERKLE_ROOT`
