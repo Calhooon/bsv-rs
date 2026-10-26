@@ -26,6 +26,48 @@ shape's test key of `tests/wallet_http_json_shapes_105.rs` (the Go SDK's
 test public key, also across the wallet-wire vectors), beside the BRC-56
 vectors and the corpus-gen nonce.
 
+### Changed: a pull request runs exactly its line's required set; the full matrix on a push and nightly
+
+The owner's word of 2026-10-26, through the keeper: CI must pass and must not
+put needless load on GitHub. The keeper's count that day: 215 workflow runs on
+the account in 24 hours, 99 of them this crate's CI at 32 jobs each, 79
+cancelled by concurrency. The merge queue already gives one CI run per PR, so
+the jobs per run were what remained.
+
+On a pull request a job of `ci.yml` now runs if and only if its context is
+required on the base line's protection (beta's eleven, main's twelve): the
+Test Suite matrix produces its `(ubuntu-latest, stable)` cell alone, `wasm32`
+its `combined` consumer alone (the six consumers' features moved from
+`include` rows to a step's table, so no row can add a cell), `dependents` with
+`Plan pinned dependents` and each `dependent (<id>)` (the jobs it needs to
+decide) only into `main`; `main-in-beta`, `beta-born` and `semver` as before.
+`docs`, `actionlint`, `msrv`, `features`, `unused dependencies`, the other
+five test cells, the other four wasm32 slices, `Benchmark Regression Check`,
+`Benchmarks Build` and `scoreboard` no longer run on a pull request: a PR into
+`beta` runs 11 jobs (32 before), into `main` 13 plus one per consumer the plan
+admits. A push to `beta` or `main`, the sync's dispatch and a tag's call run
+every job as before; `nightly.yml`'s new `ci-full` job dispatches `ci.yml` on
+`beta` and on `main` each night (`nightly.yml` comes to `main` with it, as
+`beta` writes it: GitHub fires a schedule from the default branch, `main`, so
+its mutation and fuzz jobs start too, on `beta`'s sources), so each line's
+own workflow runs its whole matrix at its tip whether or not anything was
+pushed (a `workflow_call` from
+the nightly would run the caller's ref, `main`'s on a schedule, and share its
+concurrency group; a schedule on `ci.yml` fires on `main` alone).
+`cancel-in-progress` is unchanged. On `main` the benchmarks job keeps its
+body (`critcmp` of a pull request's base and head, which no other event
+carries) and runs on `beta`'s ref alone, which `main`'s file never sees;
+`beta`'s baseline record input is `beta`'s.
+
+`tests/arch_ci_pr_runs_the_required_set.rs` pins it: the two lines' required
+contexts as constants (read by `gh api
+repos/Calhooon/bsv-rs/branches/<line>/protection/required_status_checks`), a
+string-level reader of each job's `if:`, `needs:` and matrix, and the rule
+both ways on each line (every required context proven to run on a PR into
+it, no job outside the set and its needs able to run there), plus every job
+on a push and on the nightly's dispatch save five named exceptions. A context
+added to or dropped from a protection is a change to the test's constants.
+
 ### Fixed: a dead function under every slice without `script` (#115)
 
 `after_last_code_separator` (`primitives/bsv/sighash.rs`) has one caller, the

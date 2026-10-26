@@ -169,7 +169,7 @@ cargo bench -- --baseline main
 
 ## CI Benchmark Regression Detection
 
-The CI workflow performs relative benchmarking on pull requests:
+The CI workflow's `Benchmark Regression Check` compares a pull request's base and head. It is not a required context, so since 2026-10-26 no pull request runs it (a pull request runs exactly its line's required set); on `main`'s line it does not run:
 
 1. Checks out the base branch (main) and runs benchmarks
 2. Checks out the PR branch and runs benchmarks
