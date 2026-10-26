@@ -24,6 +24,55 @@ and the eight `a_spend_refusal_prints_*` beside it), and the script
 refusal's text on the verifier's path in
 `a_spend_the_script_allows_is_valid_and_one_it_refuses_is_a_spend_refusal`. Additive: the enum's shape and arms do
 not move; it gains no `std::error::Error`, as `Reason` has none.
+### Changed: the linkage keys and revealSpecificKeyLinkage's absent counterparty refused by validation, code 6; the security level in the reference's words (#226)
+
+The keeper's rule on #216: a refused argument carries the reference's code
+and words. The reference reads revealCounterpartyKeyLinkage's counterparty
+and verifier and revealSpecificKeyLinkage's verifier as 33 raw bytes
+(`ts-stack@edf6e03` `WalletWireProcessor.ts:1742-1747`, `:1796`) and
+`validateWalletArgs` refuses a key that is no point
+(`validationHelpers.ts:1734-1750`, `validatePublicKey` `:182-188`,
+`isValidCompressedPublicKey` `Secp256k1Validation.ts:15-22`: an `02` or `03`
+prefix, x below the field prime, a point on the curve), code 6, `The
+counterparty parameter must be a valid compressed secp256k1 public key`, the
+same words for `verifier`; revealSpecificKeyLinkage's counterparty flag 0 is
+absent and `validateCounterparty` hands it to `validateHexString`
+(`:190-193`, `:523`): `The counterparty parameter must be a hexadecimal
+string`, code 6. This crate refused all four at its request reader, code 1,
+in its own words (the parse error's `Display`, `counterparty is required`).
+The readers now carry the 33 bytes raw in a private request type;
+`validation.rs` judges them in the reference's order (the counterparty, the
+verifier, then the protocol, the key ID and the privilege) and builds the
+args the wallet is called with. `RevealCounterpartyKeyLinkageArgs` and
+`RevealSpecificKeyLinkageArgs` keep their shape: no public API changes.
+
+The security level outside 0 to 2 is refused by the reader in the
+reference's words, `Invalid security level: expected 0, 1, or 2, received N`
+(`#decodeProtocolID`, `WalletWireProcessor.ts:2440-2443`), code 1, where this
+crate said `invalid security level: N`; both of `WireReader`'s protocol
+readers.
+
+The tests that pin it, each red on the pre-fix tree, in
+`tests/wire_processor_validation.rs`:
+`a_counterparty_linkage_key_that_is_no_point_is_refused_with_code_6`,
+`a_specific_linkage_verifier_that_is_no_point_is_refused_with_code_6`,
+`a_specific_linkage_with_no_counterparty_is_refused_with_code_6`,
+`a_security_level_outside_0_to_2_is_refused_in_the_reference_words`; and
+`linkage_keys_that_are_points_reach_the_wallet` for the keys that pass.
+`tests/wire_reader_strictness.rs`'s
+`the_processor_refuses_a_linkage_key_that_is_not_a_compressed_point`, which
+asserted only an error frame, pins the reference's code-6 frame. No
+recording changes (`tests/fixtures_replay.rs` replays unchanged); the
+every-args-vector allowlist stays 14 (the two linkage vectors passed before).
+
+### Notes: cross-SDK parity (#226)
+
+The divergence #216 recorded (the four refusals at the reader, code 1) is
+withdrawn: the frames are the reference's. go-sdk@2ca481c refuses a non-point
+key in its deserializer (`wallet/serializer/reveal_counterparty_key_linkage.go:40-51`,
+`reveal_specific_key_linkage.go:53-57`), accepts an absent counterparty, and
+reads the security level unchecked (`wallet/serializer/serializer.go:167`);
+its processor writes no error frame (stated with #202).
 
 ### Fixed: getNetwork and getVersion are the wallet's answers forwarded, the version checked as the reference checks it (#222)
 
@@ -432,13 +481,20 @@ Results, a plain `Error`, code 1, `Invalid <call> result <field>: expected
 - encrypt's ciphertext and decrypt's plaintext at most 256 MiB (`:2210-2215`).
 
 Not repeated where the reader or a type already refuses: the security level
-(`read_protocol_id`), a key-related counterparty that is no point (`read_counterparty`, as the reference's decoder refuses it at `:2460`), revealSpecificKeyLinkage's
-absent counterparty, the data-type flag and the 32-byte hash and HMAC
+(`read_protocol_id`), a key-related counterparty that is no point (`read_counterparty`, as the reference's decoder refuses it at `:2460`), the data-type flag and the 32-byte hash and HMAC
 (`requests.rs`), the booleans, the `PublicKey`, `u8` and `[u8; 32]` result
-fields; those refusals keep this crate's words, code 1. The thirteen stubs
+fields; those refusals keep the reader's words, code 1. The two linkage
+calls' keys and revealSpecificKeyLinkage's absent counterparty moved from
+the reader to this step with #226 (the entry above). The thirteen stubs
 are untouched (`the_thirteen_stubs_are_untouched`). getNetwork and getVersion
 were answered by the processor from its own configuration and not checked;
 #222 forwards and checks them (the entry above). The two linkage keys of revealCounterpartyKeyLinkage, revealSpecificKeyLinkage's verifier and its absent counterparty are refused at this crate's reader, code 1, where the reference refuses them in `validateWalletArgs`, code 6 (`validationHelpers.ts:1736-1738`, `:1744-1745`); #226 moves them.
+are answered by the processor from its own configuration, not asked of the
+wallet, and are not checked, where the reference asks its wallet and checks the
+answer (`WalletWireProcessor.ts:1694-1730`; the network `mainnet` or `testnet`,
+the version 7 to 30 bytes, `WalletResultValidation.ts:2299-2306`): the
+processor's default version `0.1.0` is 5 bytes, a result the reference refuses,
+and is neither this crate's version nor its wallet's (a follow-up issue).
 
 `ProtoWallet` answers revealSpecificKeyLinkage for anyone with `PrivateKey(1)`'s
 key, as the reference's does (`ProtoWallet.ts:235-240`), where it answered its
