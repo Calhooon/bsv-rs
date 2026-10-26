@@ -26,8 +26,11 @@
 // reference's args, which the reference validates and sends again
 // (`reference_resends_crate_request`), and the crate's result body served to
 // the reference's client (`reference_reads_crate_result`, or the reference's
-// error in `reference_refuses_crate_result`). Without `--write` it compares
-// what it computed with the file and exits 1 on a difference.
+// error in `reference_refuses_crate_result`). For a discovery case it also
+// serves the case's result with each member BRC-100 requires of the entry
+// removed in turn (`DISCOVERY_MEMBERS`) and records the reference's refusal
+// in `reference_refuses_without`. Without `--write` it compares what it
+// computed with the file and exits 1 on a difference.
 import fs from 'fs'
 import { pathToFileURL } from 'url'
 
@@ -35,6 +38,26 @@ const [sdkPath, vectorPath, ...flags] = process.argv.slice(2)
 const flag = flags.includes('--write') ? '--write' : undefined
 const patches = flags.filter((f, i) => flags[i - 1] === '--patch')
 const { HTTPWalletJSON } = await import(pathToFileURL(sdkPath).href)
+
+// The discovery entry's members BRC-100 requires (`wallet/0100.md:1401-1411`
+// at `5119a9b`; `Wallet.interfaces.ts:870-882`), as paths into the entry.
+const DISCOVERY_MEMBERS = [
+  'certifierInfo',
+  'certifierInfo.iconUrl',
+  'certifierInfo.description',
+  'publiclyRevealedKeyring',
+  'decryptedFields'
+]
+
+function without (result, member) {
+  const copy = JSON.parse(JSON.stringify(result))
+  const keys = member.split('.')
+  const last = keys.pop()
+  let target = copy.certificates[0]
+  for (const key of keys) target = target[key]
+  delete target[last]
+  return copy
+}
 
 function applyPatch (vector, [name, pointer, value]) {
   const c = vector.cases.find(c => c.name === name)
@@ -86,6 +109,13 @@ for (const c of vector.cases) {
       computed.reference_refuses_crate_result = read.error
     } else {
       computed.reference_reads_crate_result = JSON.parse(JSON.stringify(read.result))
+    }
+  }
+  if (c.call.startsWith('discoverBy')) {
+    computed.reference_refuses_without = {}
+    for (const member of DISCOVERY_MEMBERS) {
+      const read = await run(c.call, c.args, JSON.stringify(without(c.result, member)))
+      computed.reference_refuses_without[member] = read.error ?? null
     }
   }
   for (const [key, value] of Object.entries(computed)) {
