@@ -1,0 +1,50 @@
+{
+  "description": "The createAction argument gate on an input's unlockingScript and unlockingScriptLength (#282): one input (outpoint 32 x 0x11 .0, inputDescription \"spend the coin\") in arguments with description \"pay the invoice\" and no output",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), Validation.validateCreateActionArgs run under Node v22.18.0 by tests/support/create_action_unlocking_script_282.mjs",
+  "reference_lines": "validationHelpers.ts:595 (validateOptionalHexString, :522-530, one or more hex characters), :598 (validateInteger with a minimum of 0)",
+  "brc": "BRC-100 at brcs@5119a9b wallet/0100.md:649: unlockingScriptLength a PositiveInteger",
+  "witnesses": [
+    {
+      "name": "empty_unlocking_script",
+      "input": {
+        "unlockingScript": ""
+      },
+      "reference_accepted": false,
+      "reference_error": "WERR_INVALID_PARAMETER",
+      "reference_code": 6,
+      "reference_message": "The unlockingScript parameter must be hexadecimal string."
+    },
+    {
+      "name": "empty_unlocking_script_with_length_zero",
+      "input": {
+        "unlockingScript": "",
+        "unlockingScriptLength": 0
+      },
+      "reference_accepted": false,
+      "reference_error": "WERR_INVALID_PARAMETER",
+      "reference_code": 6,
+      "reference_message": "The unlockingScript parameter must be hexadecimal string."
+    },
+    {
+      "name": "zero_unlocking_script_length",
+      "input": {
+        "unlockingScriptLength": 0
+      },
+      "reference_accepted": true
+    },
+    {
+      "name": "one_byte_unlocking_script",
+      "input": {
+        "unlockingScript": "51"
+      },
+      "reference_accepted": true
+    },
+    {
+      "name": "unlocking_script_length_one",
+      "input": {
+        "unlockingScriptLength": 1
+      },
+      "reference_accepted": true
+    }
+  ]
+}
