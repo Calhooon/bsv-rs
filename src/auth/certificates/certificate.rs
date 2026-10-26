@@ -258,9 +258,10 @@ impl Certificate {
 
         // Fields in the reference's order: `localeCompare` under Node's
         // default collation (`ts-stack@edf6e03` `Certificate.ts:282`), not
-        // the bytes (#249; the residual is `collation.rs`'s)
-        let mut field_names: Vec<&String> = self.fields.keys().collect();
-        field_names.sort_by_cached_key(|&name| (super::collation::sort_key(name), name.as_bytes()));
+        // the bytes (#249; the residual is `collation.rs`'s), the wire
+        // writer's order too (#246)
+        let mut field_names: Vec<&str> = self.fields.keys().map(String::as_str).collect();
+        crate::wallet::collation::sort_field_names(&mut field_names);
 
         for name in field_names {
             let value = &self.fields[name];

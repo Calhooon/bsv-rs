@@ -1,5 +1,9 @@
 //! The reference's field-name order (#249).
 //!
+//! It lives under `wallet` because both of a certificate's writers use it:
+//! `auth::Certificate`'s serializer, which signs over it, and the wire's
+//! `write_wallet_certificate`, which `wallet` builds without `auth` (#246).
+//!
 //! The reference serializer sorts a certificate's field names with
 //! `a.localeCompare(b)` and no locale or options (`ts-stack@edf6e03`
 //! `Certificate.ts:282`): under Node's default ICU data and an `en` or root
@@ -190,7 +194,7 @@ const fn parse(text: &'static str) -> Table {
 /// A name's sort key: its primary, secondary and tertiary weights in turn,
 /// compared level by level.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct SortKey {
+struct SortKey {
     primary: Vec<u32>,
     secondary: Vec<u8>,
     tertiary: Vec<u8>,
@@ -210,8 +214,16 @@ impl SortKey {
     }
 }
 
+/// Sorts a certificate's field names in the reference's order
+/// (`ts-stack@edf6e03` `Certificate.ts:282`), equal sort keys by their
+/// bytes: the one order `auth::Certificate`'s serializer signs and
+/// `WireWriter::write_wallet_certificate` writes (#249, #246).
+pub(crate) fn sort_field_names(names: &mut [&str]) {
+    names.sort_by_cached_key(|&name| (sort_key(name), name.as_bytes()));
+}
+
 /// The sort key of `name` under the reference's order.
-pub(crate) fn sort_key(name: &str) -> SortKey {
+fn sort_key(name: &str) -> SortKey {
     let mut key = SortKey {
         primary: Vec::with_capacity(name.len()),
         secondary: Vec::with_capacity(name.len()),

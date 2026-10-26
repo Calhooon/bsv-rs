@@ -12,4 +12,4 @@ src/compat/bip39/wordlists/*.txt -text
 # The certificate collation table is parsed at compile time, one DUCET row per
 # LF-terminated line; a CRLF checkout puts a CR in every line and the parser
 # refuses it (#249, the same rule as the wordlists).
-src/auth/certificates/collation_latin1.txt -text
+src/wallet/collation_latin1.txt -text

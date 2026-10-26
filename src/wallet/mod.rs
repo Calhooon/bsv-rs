@@ -110,6 +110,7 @@
 mod cached_key_deriver;
 #[cfg(feature = "http")]
 mod client;
+pub(crate) mod collation;
 pub mod interface;
 mod key_args;
 mod key_deriver;
