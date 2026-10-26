@@ -64,10 +64,7 @@ fn signed_here(
 ) -> Certificate {
     let fields = NAMES
         .iter()
-        .map(|n| {
-            let value = to_base64(format!("v-{n}").as_bytes());
-            (n.to_string(), value.into_bytes())
-        })
+        .map(|n| (n.to_string(), to_base64(format!("v-{n}").as_bytes())))
         .collect();
     let mut cert = Certificate::new(
         cert_type,
@@ -96,11 +93,7 @@ fn wallet_certificate(cert: &Certificate) -> WalletCertificate {
         certifier: cert.certifier.to_hex(),
         revocation_outpoint: format!("{}.{index}", to_hex(&txid)),
         signature: to_hex(cert.signature.as_ref().unwrap()),
-        fields: cert
-            .fields
-            .iter()
-            .map(|(k, v)| (k.clone(), String::from_utf8(v.clone()).unwrap()))
-            .collect(),
+        fields: cert.fields.clone(),
     }
 }
 
