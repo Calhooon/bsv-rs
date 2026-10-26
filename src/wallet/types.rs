@@ -295,6 +295,32 @@ impl Protocol {
     }
 }
 
+/// Serde helper for a [`Protocol`] as BRC-100's `WalletProtocol`, the pair
+/// `[securityLevel, protocolName]` with the level a number (`wallet/0100.md`
+/// at `5119a9b`; `Wallet.interfaces.ts:227` at `ts-stack@edf6e03`).
+mod protocol_tuple {
+    use super::{Protocol, SecurityLevel};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(protocol: &Protocol, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        protocol.to_tuple().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Protocol, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let (level, name) = <(u8, String)>::deserialize(deserializer)?;
+        let security_level = SecurityLevel::from_u8(level).ok_or_else(|| {
+            serde::de::Error::custom(format!("security level {level} is not 0, 1 or 2"))
+        })?;
+        Ok(Protocol::new(security_level, name))
+    }
+}
+
 // =============================================================================
 // Counterparty
 // =============================================================================
@@ -902,14 +928,15 @@ pub struct WalletOutput {
 // =============================================================================
 
 /// Result of revealing key linkage.
+///
+/// In JSON its fields sit flat in the two linkage results, the linkage and
+/// its proof as arrays of byte numbers, as BRC-100's `Byte[]` (#105).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct KeyLinkageResult {
-    /// Encrypted linkage data (hex encoded).
-    #[serde(with = "hex_bytes")]
+    /// Encrypted linkage data.
     pub encrypted_linkage: Vec<u8>,
-    /// Proof of encrypted linkage (hex encoded).
-    #[serde(with = "hex_bytes")]
+    /// Proof of encrypted linkage.
     pub encrypted_linkage_proof: Vec<u8>,
     /// The prover's public key.
     pub prover: PublicKey,
@@ -923,7 +950,8 @@ pub struct KeyLinkageResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RevealCounterpartyKeyLinkageResult {
-    /// Base key linkage result.
+    /// Base key linkage result; its fields flat in JSON (#105).
+    #[serde(flatten)]
     pub linkage: KeyLinkageResult,
     /// Time of revelation (ISO timestamp).
     pub revelation_time: String,
@@ -933,11 +961,14 @@ pub struct RevealCounterpartyKeyLinkageResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RevealSpecificKeyLinkageResult {
-    /// Base key linkage result.
+    /// Base key linkage result; its fields flat in JSON (#105).
+    #[serde(flatten)]
     pub linkage: KeyLinkageResult,
-    /// The protocol ID.
+    /// The protocol ID; `protocolID` in JSON, the `[level, name]` pair.
+    #[serde(rename = "protocolID", with = "protocol_tuple")]
     pub protocol: Protocol,
-    /// The key ID.
+    /// The key ID; `keyID` in JSON.
+    #[serde(rename = "keyID")]
     pub key_id: String,
     /// The proof type.
     pub proof_type: u8,
@@ -1357,7 +1388,8 @@ pub struct RelinquishOutputResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WalletCertificate {
-    /// Certificate type (base64 encoded).
+    /// Certificate type (base64 encoded); `type` in JSON, as BRC-100 names it (#105).
+    #[serde(rename = "type")]
     pub certificate_type: String,
     /// Subject's public key (hex).
     pub subject: String,
@@ -1377,7 +1409,8 @@ pub struct WalletCertificate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AcquireCertificateArgs {
-    /// Certificate type (base64 encoded).
+    /// Certificate type (base64 encoded); `type` in JSON, as BRC-100 names it (#105).
+    #[serde(rename = "type")]
     pub certificate_type: String,
     /// Certifier's public key (hex).
     pub certifier: String,
@@ -1493,7 +1526,8 @@ pub struct ProveCertificateResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RelinquishCertificateArgs {
-    /// Certificate type (base64 encoded).
+    /// Certificate type (base64 encoded); `type` in JSON, as BRC-100 names it (#105).
+    #[serde(rename = "type")]
     pub certificate_type: String,
     /// Serial number (base64 encoded).
     pub serial_number: String,

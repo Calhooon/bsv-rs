@@ -1409,32 +1409,6 @@ const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 12] = [
     ),
 ];
 
-/// A Go result vector's json in the shape the fixture stub answers with: the
-/// linkage results nest the keys and the bytes under `linkage` (the Rust
-/// type's serde form), every other call's json is the stub's own.
-#[cfg(feature = "http")]
-fn stub_reply(call: &str, json: &Value) -> Value {
-    let bytes = |name: &str| -> String {
-        let list: Vec<u8> = serde_json::from_value(json[name].clone()).unwrap();
-        hex::encode(list)
-    };
-    let linkage = || {
-        serde_json::json!({"prover": json["prover"], "verifier": json["verifier"],
-            "counterparty": json["counterparty"], "encryptedLinkage": bytes("encryptedLinkage"),
-            "encryptedLinkageProof": bytes("encryptedLinkageProof")})
-    };
-    match call {
-        "revealCounterpartyKeyLinkage" => {
-            serde_json::json!({"linkage": linkage(), "revelationTime": json["revelationTime"]})
-        }
-        "revealSpecificKeyLinkage" => serde_json::json!({"linkage": linkage(),
-            "protocol": {"securityLevel": json["protocolID"][0].to_string(),
-                "protocolName": json["protocolID"][1]},
-            "keyId": json["keyID"], "proofType": json["proofType"]}),
-        _ => json.clone(),
-    }
-}
-
 /// Sends the call's recorded request (`tests/fixtures/wire/<call>.json`, its
 /// case 0: a frame the processor reads) to a wallet that answers with the
 /// Go result vector's json, and compares the processor's whole response, the
@@ -1466,7 +1440,9 @@ async fn processor_writes_the_vector_wire(filename: &str) -> Result<(), String> 
         )
         .unwrap()
     };
-    let stub = fixtures::wallet::Stub::new(stub_reply(call, &json));
+    // The vector's json is the result types' serde form, the linkage
+    // results flat with byte arrays since #105
+    let stub = fixtures::wallet::Stub::new(json.clone());
     let observed = stub.observed.clone();
     // The stub's reply decoder panics on a json its type does not read: a
     // spawned task turns that into a row of the table.
