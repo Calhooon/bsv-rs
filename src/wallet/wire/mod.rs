@@ -381,6 +381,36 @@ pub(crate) fn require_response_length(
     Ok(())
 }
 
+/// `#requirePageCapacity` (`WalletWireTransceiver.ts:1948-1953`), called
+/// before each listCertificates or discovery entry is read (`:1509`,
+/// `:1701`): `returned` entries already read may not reach the requested
+/// limit, 10 when none was requested (bsv-rs#190).
+pub(crate) fn require_page_capacity(
+    returned: usize,
+    requested_limit: Option<u32>,
+    call: &str,
+) -> Result<(), Error> {
+    let maximum = requested_limit.unwrap_or(10);
+    if returned >= maximum as usize {
+        return Err(refused(format!(
+            "Wallet Wire {call} response exceeds the requested page limit of {maximum}"
+        )));
+    }
+    Ok(())
+}
+
+/// `#assertPageCount` (`WalletWireTransceiver.ts:1940-1946`), after the page
+/// is read (`:1550`, `:1759`): no more entries than the declared total, the
+/// total of every page (bsv-rs#190).
+pub(crate) fn assert_page_count(returned: usize, total: u32, call: &str) -> Result<(), Error> {
+    if returned > total as usize {
+        return Err(refused(format!(
+            "Wallet Wire {call} response returned {returned} records but declared a total of {total}"
+        )));
+    }
+    Ok(())
+}
+
 /// The processor's getHeaderForHeight result: the wallet's header as its 80
 /// bytes, another length refused as `validateWalletResult` refuses it
 /// (`WalletResultValidation.ts:2296-2297`, `hex(result.header, call, 'header', 80)`).

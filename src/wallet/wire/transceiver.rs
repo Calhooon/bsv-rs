@@ -1123,6 +1123,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
+        // The total of every page, then this page's entries to the end of
+        // the frame (`WalletWireTransceiver.ts:1501-1550`; bsv-rs#190)
         let total_certificates = reader.read_var_int_u32("totalCertificates")?;
         let mut certificates = Vec::with_capacity(bounded_capacity(
             total_certificates as usize,
@@ -1130,12 +1132,12 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             1,
         ));
 
-        for _ in 0..total_certificates {
+        while !reader.is_empty() {
+            super::require_page_capacity(certificates.len(), args.limit, "listCertificates")?;
             let cert_len = reader.read_length()?;
             let cert_bytes = reader.read_bytes(cert_len)?;
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
 
-            // Keyring
             // Keyring (`WalletWireTransceiver.ts:1513-1531` at `ts-stack@edf6e03`)
             let keyring = if reader.read_boolean_flag("listCertificates keyring present")? {
                 let name = "listCertificates keyring";
@@ -1163,6 +1165,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 verifier,
             });
         }
+        super::assert_page_count(certificates.len(), total_certificates, "listCertificates")?;
 
         Ok(ListCertificatesResult {
             total_certificates,
@@ -1310,7 +1313,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             )
             .await?;
 
-        self.parse_discovery_result(&response)
+        self.parse_discovery_result(&response, args.limit)
     }
 
     /// Discovers certificates by attributes.
@@ -1340,7 +1343,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             )
             .await?;
 
-        self.parse_discovery_result(&response)
+        self.parse_discovery_result(&response, args.limit)
     }
 
     // =========================================================================
@@ -1390,8 +1393,15 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         WireReader::new(data).read_wallet_certificate()
     }
 
-    /// Parses a discovery result.
-    fn parse_discovery_result(&self, data: &[u8]) -> Result<DiscoverCertificatesResult, Error> {
+    /// Parses a discovery result: the total of every page, then this page's
+    /// entries to the end of the frame, no more than `requested_limit` (10
+    /// when none) nor the total (`#parseDiscoveryResult`,
+    /// `WalletWireTransceiver.ts:1652-1764`; bsv-rs#190).
+    fn parse_discovery_result(
+        &self,
+        data: &[u8],
+        requested_limit: Option<u32>,
+    ) -> Result<DiscoverCertificatesResult, Error> {
         let mut reader = WireReader::new(data);
 
         let total_certificates = reader.read_var_int_u32("totalCertificates")?;
@@ -1401,7 +1411,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             1,
         ));
 
-        for _ in 0..total_certificates {
+        while !reader.is_empty() {
+            super::require_page_capacity(certificates.len(), requested_limit, "discover")?;
             let cert_len = reader.read_length()?;
             let cert_bytes = reader.read_bytes(cert_len)?;
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
@@ -1437,6 +1448,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 decrypted_fields,
             });
         }
+        super::assert_page_count(certificates.len(), total_certificates, "discover")?;
 
         Ok(DiscoverCertificatesResult {
             total_certificates,
