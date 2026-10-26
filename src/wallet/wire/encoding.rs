@@ -125,9 +125,31 @@ impl<'a> WireReader<'a> {
     // Wire protocol types
     // =========================================================================
 
+    /// A varint byte length narrowed to `usize`, refused as `ReaderUnderflow`
+    /// when the bytes remaining cannot hold it, before it is narrowed: on
+    /// wasm32 `as usize` keeps a length's low 32 bits and reads a shorter
+    /// value in silence (CLAUDE.md rule 5; bsv-rs#192). The same error on
+    /// every target, `needed` saturating at `usize::MAX` where it cannot fit.
+    pub(crate) fn wire_length(&self, length: u64) -> Result<usize, Error> {
+        let available = self.remaining();
+        match usize::try_from(length) {
+            Ok(needed) if needed <= available => Ok(needed),
+            needed => Err(Error::ReaderUnderflow {
+                needed: needed.unwrap_or(usize::MAX),
+                available,
+            }),
+        }
+    }
+
+    /// Reads a varint byte length ([`Self::wire_length`]).
+    pub(crate) fn read_length(&mut self) -> Result<usize, Error> {
+        let length = self.read_var_int()?;
+        self.wire_length(length)
+    }
+
     /// Reads a length-prefixed string.
     pub fn read_string(&mut self) -> Result<String, Error> {
-        let len = self.read_var_int()? as usize;
+        let len = self.read_length()?;
         let bytes = self.read_bytes(len)?;
         String::from_utf8(bytes.to_vec())
             .map_err(|e| Error::WalletError(format!("invalid UTF-8: {}", e)))
@@ -139,7 +161,7 @@ impl<'a> WireReader<'a> {
         if len == NIL_SENTINEL {
             Ok(None)
         } else {
-            let bytes = self.read_bytes(len as usize)?;
+            let bytes = self.read_bytes(self.wire_length(len)?)?;
             let s = String::from_utf8(bytes.to_vec())
                 .map_err(|e| Error::WalletError(format!("invalid UTF-8: {}", e)))?;
             Ok(Some(s))
@@ -152,7 +174,7 @@ impl<'a> WireReader<'a> {
         if len == NIL_SENTINEL {
             Ok(None)
         } else {
-            let bytes = self.read_bytes(len as usize)?;
+            let bytes = self.read_bytes(self.wire_length(len)?)?;
             Ok(Some(bytes.to_vec()))
         }
     }
@@ -419,7 +441,7 @@ impl<'a> WireReader<'a> {
 
     /// Reads a SignActionSpend.
     pub fn read_sign_action_spend(&mut self) -> Result<SignActionSpend, Error> {
-        let unlocking_script_len = self.read_var_int()? as usize;
+        let unlocking_script_len = self.read_length()?;
         let unlocking_script = self.read_bytes(unlocking_script_len)?.to_vec();
         let sequence_number = self.read_optional_var_int_u32("sequenceNumber")?;
         Ok(SignActionSpend {
@@ -512,7 +534,7 @@ impl<'a> WireReader<'a> {
     /// a repeated key in either map is refused in the transceiver's words
     /// (`#setUniqueWireRecordEntry`, `:1992-2002`; bsv-rs#192).
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
-        let cert_len = self.inner.read_var_int_num()?;
+        let cert_len = self.read_length()?;
         let certificate = WireReader::new(self.read_bytes(cert_len)?).read_wallet_certificate()?;
         let certifier_info = self.read_optional_identity_certifier()?;
 
@@ -521,7 +543,7 @@ impl<'a> WireReader<'a> {
             HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
         for _ in 0..count {
             let key = self.read_string()?;
-            let len = self.inner.read_var_int_num()?;
+            let len = self.read_length()?;
             let value = to_base64(self.read_bytes(len)?);
             set_unique_record_entry(&mut keyring, "discovery public keyring", key, value)?;
         }

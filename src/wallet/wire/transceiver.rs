@@ -113,7 +113,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             // Skip stack trace (Go uses VarInt(len) + bytes)
             let stack_len = reader.read_var_int()?;
             if stack_len > 0 && stack_len != u64::MAX {
-                let _stack = reader.read_bytes(stack_len as usize)?;
+                let _stack = reader.read_bytes(reader.wire_length(stack_len)?)?;
             }
 
             Err(Error::WalletError(format!(
@@ -574,7 +574,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse tx
         let tx_flag = reader.read_i8()?;
         let tx = if tx_flag == 1 {
-            let len = reader.read_var_int()? as usize;
+            let len = reader.read_length()?;
             Some(reader.read_bytes(len)?.to_vec())
         } else {
             None
@@ -602,9 +602,9 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse signable_transaction
         let signable_flag = reader.read_i8()?;
         let signable_transaction = if signable_flag == 1 {
-            let tx_len = reader.read_var_int()? as usize;
+            let tx_len = reader.read_length()?;
             let tx_bytes = reader.read_bytes(tx_len)?.to_vec();
-            let ref_len = reader.read_var_int()? as usize;
+            let ref_len = reader.read_length()?;
             let reference = reader.read_bytes(ref_len)?.to_vec();
             Some(SignableTransaction {
                 tx: tx_bytes,
@@ -683,7 +683,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Parse tx
         let tx_flag = reader.read_i8()?;
         let tx = if tx_flag == 1 {
-            let len = reader.read_var_int()? as usize;
+            let len = reader.read_length()?;
             Some(reader.read_bytes(len)?.to_vec())
         } else {
             None
@@ -890,7 +890,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let beef = if beef_len == u64::MAX {
             None
         } else {
-            Some(reader.read_bytes(beef_len as usize)?.to_vec())
+            Some(reader.read_bytes(reader.wire_length(beef_len)?)?.to_vec())
         };
 
         let mut outputs = Vec::with_capacity(bounded_capacity(
@@ -1102,7 +1102,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         ));
 
         for _ in 0..total_certificates {
-            let cert_len = reader.read_var_int()? as usize;
+            let cert_len = reader.read_length()?;
             let cert_bytes = reader.read_bytes(cert_len)?;
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
 
@@ -1201,15 +1201,15 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         let mut reader = WireReader::new(&response);
 
-        let num_fields = reader.read_var_int()? as usize;
+        let num_fields = reader.read_var_int()?;
         let mut keyring_for_verifier = std::collections::HashMap::with_capacity(bounded_capacity(
-            num_fields,
+            usize::try_from(num_fields).unwrap_or(usize::MAX),
             reader.remaining(),
             1,
         ));
         for _ in 0..num_fields {
             let key = reader.read_string()?;
-            let value_len = reader.read_var_int()? as usize;
+            let value_len = reader.read_length()?;
             let value_bytes = reader.read_bytes(value_len)?;
             keyring_for_verifier.insert(key, to_base64(value_bytes));
         }
@@ -1373,7 +1373,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         ));
 
         for _ in 0..total_certificates {
-            let cert_len = reader.read_var_int()? as usize;
+            let cert_len = reader.read_length()?;
             let cert_bytes = reader.read_bytes(cert_len)?;
             let certificate = self.parse_certificate_from_binary(cert_bytes)?;
 
