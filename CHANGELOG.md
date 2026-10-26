@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a JSON number reads to the correctly rounded double, so a Socket.IO frame round-trips every finite `f64` (#285)
+
+The Socket.IO codec (`src/auth/transports/socketio/codec.rs`) reads and
+writes a packet's JSON with `serde_json`, whose default number reader is not
+correctly rounded: a long decimal could read one bit off the nearest double,
+and the shortest text written for that double could read back another bit
+off, so a frame's encoding was not a fixed point. The #280 lane's fuzz run
+on `fuzz_auth_messages` crashed on it (a 107-digit integer in an
+`authMessage` event: `4.444444444444445e+106` read as
+`4.4444444444444455e+106` on the re-read). The fix turns on `serde_json`'s
+`float_roundtrip` feature (`Cargo.toml`), the correctly rounded reader, as
+`JSON.parse` is; the writer already printed the shortest text that reads
+back to the same double. The feature is crate-wide, so every JSON number
+this crate reads (the HTTP and WebSocket transports' `AuthMessage`, the
+HTTP JSON wallet substrate, the overlay bodies) is read to the nearest
+double, and cargo's feature unification turns it on for a downstream's own
+`serde_json` in the same build: a number reads differently only where the
+old reader was wrong. A number past the double range (`1e400`) stays a
+refusal with `serde_json`'s reason, never a panic. Pinned by
+`tests/socketio_float_round_trip.rs` (the crash input, a set of awkward
+doubles against `serde_json`'s own round trip, long decimal texts against
+Rust's correctly rounded `str::parse`, and the vector below; four of its
+five tests RED on the pre-fix tree), the vector
+`tests/vectors/socketio_float_round_trip_285.json` (21 frames, the
+reference's verdict on each, written by
+`tests/support/socketio_float_285.mjs`), and the crash input in the fuzz
+corpus (`fuzz/corpus/fuzz_auth_messages/socketio-event-long-float`).
+
+### Notes: cross-SDK parity (#285)
+
+The reference's Socket.IO codec is `socket.io-parser`, which
+`ts-stack@edf6e03`'s `@bsv/authsocket-client` reaches through
+`socket.io-client` (`packages/messaging/authsocket-client/package.json:72`;
+the lockfile resolves `socket.io-parser@4.2.7`); its Encoder writes a
+packet's data with `JSON.stringify` and its Decoder reads it with
+`JSON.parse`. Run under Node v22.18.0 on the 21 frames, it reads the double
+this crate now reads in every case (bits recorded), and its encoding is a
+fixed point in every case. The text this crate writes back differs in 8 of
+them, the double the same: `serde_json` writes an integral float with a
+fraction or an exponent (`100.0`, `1.2345678901234568e+20`) where
+JavaScript writes an integral double below `1e21` as an integer (`100`,
+`123456789012345680000`), keeps negative zero's sign (`-0.0`) where
+`JSON.stringify` writes `0`, and keeps an integer within `u64` exact
+(`9007199254740993`) where `JSON.parse` reads the nearest double
+(`9007199254740992`). The last was so before this fix; the enumeration is
+pinned (`TEXT_DIFFERS`).
+
 ### Changed: the nightly's heavy work holds at most six concurrent slots
 
 The mutant shards run six at a time (`max-parallel: 6`, twenty before) and
