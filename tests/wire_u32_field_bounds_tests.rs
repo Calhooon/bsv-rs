@@ -5,7 +5,8 @@
 //! `PositiveIntegerOrZero`, at most `2^32 - 1` (`5119a9b` `wallet/0100.md:394-402`;
 //! the height is `PositiveInteger`, `:410-418`). The frame's tables write each
 //! as a VarInt. `u32::MAX` reads back; `u32::MAX + 1` is refused with the field
-//! named, where the reader once cast it to 0.
+//! named, where the reader once cast it to 0; the words are the reference's
+//! `#requireInteger`'s, the name its own per site (#255).
 
 #![cfg(feature = "wallet")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -19,9 +20,11 @@ use std::sync::Mutex;
 
 const OVER: u64 = u32::MAX as u64 + 1;
 
+/// The reference's `#requireInteger` words (`ts-stack@edf6e03`
+/// `WalletWireTransceiver.ts:2018-2025`) with its name for the field (#255).
 fn refusal(field: &str) -> Error {
     Error::WalletError(format!(
-        "invalid {}: expected at most 4294967295, got 4294967296",
+        "Invalid {}: expected an integer from 0 to 4294967295, received 4294967296",
         field
     ))
 }
@@ -71,7 +74,7 @@ fn a_sign_action_spend_sequence_number_above_u32_max_is_refused_not_truncated() 
     writer.write_optional_var_int(Some(OVER));
     let over = writer.into_bytes();
     let err = WireReader::new(&over).read_sign_action_spend().unwrap_err();
-    assert_eq!(err, refusal("sequenceNumber"));
+    assert_eq!(err, refusal("signAction spend sequenceNumber"));
 }
 
 fn action_input(sequence_number: u32) -> WalletActionInput {
@@ -99,7 +102,7 @@ fn an_action_input_sequence_number_above_u32_max_is_refused_not_truncated() {
     let err = WireReader::new(&over)
         .read_wallet_action_input()
         .unwrap_err();
-    assert_eq!(err, refusal("sequenceNumber"));
+    assert_eq!(err, refusal("listActions input sequenceNumber"));
 }
 
 fn action(version: u32, lock_time: u32) -> WalletAction {
@@ -133,7 +136,7 @@ fn an_action_version_above_u32_max_is_refused_not_truncated() {
 
     let over = widen_past_u32(&frame);
     let err = WireReader::new(&over).read_wallet_action().unwrap_err();
-    assert_eq!(err, refusal("version"));
+    assert_eq!(err, refusal("listActions version"));
 }
 
 /// listActions' action object: `lockTime`, VarInt
@@ -146,7 +149,7 @@ fn an_action_lock_time_above_u32_max_is_refused_not_truncated() {
 
     let over = widen_past_u32(&frame);
     let err = WireReader::new(&over).read_wallet_action().unwrap_err();
-    assert_eq!(err, refusal("lockTime"));
+    assert_eq!(err, refusal("listActions lockTime"));
 }
 
 // ============================================================================
@@ -320,7 +323,7 @@ async fn a_list_actions_total_above_u32_max_is_refused_not_truncated() {
     assert_read_past_total(list_actions(u32::MAX as u64).await.unwrap_err());
     assert_eq!(
         list_actions(OVER).await.unwrap_err(),
-        refusal("totalActions")
+        refusal("listActions totalActions")
     );
 }
 
@@ -353,7 +356,7 @@ async fn a_list_outputs_total_above_u32_max_is_refused_not_truncated() {
     assert_read_past_total(list_outputs(u32::MAX as u64).await.unwrap_err());
     assert_eq!(
         list_outputs(OVER).await.unwrap_err(),
-        refusal("totalOutputs")
+        refusal("listOutputs totalOutputs")
     );
 }
 
@@ -385,7 +388,7 @@ async fn a_list_certificates_total_above_u32_max_is_refused_not_truncated() {
     );
     assert_eq!(
         list_certificates(OVER).await.unwrap_err(),
-        refusal("totalCertificates")
+        refusal("listCertificates totalCertificates")
     );
 }
 
@@ -414,6 +417,6 @@ async fn a_discovered_certificates_total_above_u32_max_is_refused_not_truncated(
     );
     assert_eq!(
         discover_by_identity_key(OVER).await.unwrap_err(),
-        refusal("totalCertificates")
+        refusal("discovery totalCertificates")
     );
 }

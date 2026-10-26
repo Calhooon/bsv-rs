@@ -3040,7 +3040,7 @@ mod index_bounds_tests {
         assert_eq!(
             err,
             Error::WalletError(format!(
-                "invalid {}: expected at most 4294967295, got 4294967296",
+                "Invalid {}: expected an integer from 0 to 4294967295, received 4294967296",
                 field
             ))
         );
@@ -3133,7 +3133,7 @@ mod index_bounds_tests {
         let err = WireReader::new(&over)
             .read_wallet_action_output()
             .unwrap_err();
-        assert_index_refused(err, "action output index");
+        assert_index_refused(err, "listActions output outputIndex");
     }
 }
 

@@ -442,7 +442,7 @@ impl<'a> WireReader<'a> {
     pub fn read_sign_action_spend(&mut self) -> Result<SignActionSpend, Error> {
         let unlocking_script_len = self.read_length()?;
         let unlocking_script = self.read_bytes(unlocking_script_len)?.to_vec();
-        let sequence_number = self.read_optional_var_int_u32("sequenceNumber")?;
+        let sequence_number = self.read_optional_var_int_u32("signAction spend sequenceNumber")?;
         Ok(SignActionSpend {
             unlocking_script,
             sequence_number,
@@ -624,7 +624,7 @@ impl<'a> WireReader<'a> {
         let unlocking_script = self.read_optional_bytes()?;
         let input_description = self.read_string()?;
         // Go uses VarInt for sequence_number (not u32_le)
-        let sequence_number = self.read_var_int_u32("sequenceNumber")?;
+        let sequence_number = self.read_var_int_u32("listActions input sequenceNumber")?;
 
         Ok(WalletActionInput {
             source_outpoint,
@@ -641,7 +641,7 @@ impl<'a> WireReader<'a> {
     /// Go order: OutputIndex → Satoshis → LockingScript → Spendable
     ///          → OutputDescription → Basket → Tags → CustomInstructions
     pub fn read_wallet_action_output(&mut self) -> Result<WalletActionOutput, Error> {
-        let output_index = self.read_var_int_u32("action output index")?;
+        let output_index = self.read_var_int_u32("listActions output outputIndex")?;
         let satoshis = self.read_var_int()?;
         let locking_script = self.read_optional_bytes()?;
         let spendable = self.read_optional_bool()?.unwrap_or(false);
@@ -687,8 +687,8 @@ impl<'a> WireReader<'a> {
             }
         };
         // Go uses VarInt for version/lockTime (not u32_le)
-        let version = self.read_var_int_u32("version")?;
-        let lock_time = self.read_var_int_u32("lockTime")?;
+        let version = self.read_var_int_u32("listActions version")?;
+        let lock_time = self.read_var_int_u32("listActions lockTime")?;
 
         // Read optional inputs array (Go uses VarInt(MaxUint64) for nil)
         let inputs_count = self.read_var_int()?;
