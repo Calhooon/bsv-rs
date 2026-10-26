@@ -233,8 +233,9 @@ shape (`index 8 at height 3`; `level: 3`), a right child computed from it
 wrong (`Mismatched roots`; `MismatchedNode { level: 1, offset: 0 }`), and a
 duplicate at a path node's own offset (`Invalid offset: 0, at height: 1`;
 `MismatchedNode`, below). `an_even_offset_duplicate_reads_as_the_reference_reads_it`
-was red on the base (`level-0-duplicate-left-of-the-txid: here
-Err("BadFlag { byte: 1 }"), the reference accepts`).
+was red on the base (`level-0-duplicate-left-of-the-txid: new refuses merkle
+path error: Duplicate at an even offset: 0, at height: 0`: the in-memory
+constructor, which the test asks ahead of the readers, refused the shape).
 
 The refusals that moved, by test:
 
@@ -270,8 +271,9 @@ an offset outside its level, a cut). The lists and both readers' verdicts
 are kept under `/Volumes/Lanes/out/bsv-rs/fix-167-even-offset-duplicate/`.
 The differential's count moves by those 2: 54,763 inputs, 18,129 accepted by
 the BEEF reader on the base and 18,131 now, 0 disagreements on both; the
-BEEF differential (`tests/beef_two_readers_agree.rs`) reads 68,222 inputs,
-0 disagreements, as before. `tests/conformance_beef.rs` with the corpus:
+BEEF differential (`tests/beef_two_readers_agree.rs`) reads 68,675 inputs,
+0 disagreements (68,222 before: the committed seed adds 453, the seed itself,
+114 cuts, 337 single-byte changes and one appended byte). `tests/conformance_beef.rs` with the corpus:
 every total unchanged (merklepath 16 total, 12 run, 11 passed, 4
 unsupported, 1 known failure; serialization 15, 12, 12, 3; regressions 16,
 15, 15, 1 skipped; atomic-beef 8, 8, 8): no corpus vector carries the
@@ -2223,7 +2225,9 @@ path), and pairs the working hash with itself where the duplicate is the
 working hash's sibling (`:60`); Go's reader accepts the bytes and
 `ComputeRoot` errors for the txid whose walk computes a node from it
 (`go-sdk@2ca481c` `transaction/merklepath.go:47-50`, `:396-397`), pairing it
-met as a sibling (`:399-400`); this crate refuses the parse on both paths.
+met as a sibling (`:399-400`); this crate refuses the parse on both paths. (Reversed in
+Unreleased by the re-read of #167 on 2026-10-26: read as the reference reads
+it, `LeftDuplicateBelow` where its walk gives up.)
 BRC-74's own walk (`transactions/0074.md:326-345`) synthesizes no node and
 throws for one the level does not carry (`:335`): it is silent on a computed
 node, it does not rule it. The refusal is a tightening past the BRC's silence consistent with the reference. The stack's Lean has the self-pair today (`climb`,
