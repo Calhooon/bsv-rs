@@ -21,7 +21,7 @@ This module integrates with the `auth` module for certificate handling and the `
 | `mod.rs` | Module root with re-exports (111 lines) |
 | `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (886 lines) |
 | `client.rs` | IdentityClient for identity resolution, revelation, and management |
-| `client_field_value_261_tests.rs` | The intake witnesses of #261 (`#[cfg(test)]`, included from `client.rs`): the reference-issued certificate of `tests/vectors/certificate_field_value_261.json`, published for anyone as the reference publishes it, parses, verifies and decrypts through both parsers |
+| `client_field_value_261_tests.rs` | The intake witnesses of #261 (`#[cfg(test)]`, included from `client.rs`): the reference-issued certificate of `tests/vectors/certificate_field_value_261.json`, published for anyone as the reference publishes it, parses, verifies and decrypts through both parsers; one output with a malformed signature among good ones is skipped and the resolution goes on (`IdentityClient.ts:823-825`) |
 | `contacts.rs` | ContactsManager for encrypted contact storage with caching (1276 lines) |
 
 ## Feature Flag
@@ -197,7 +197,8 @@ reference's `publiclyRevealAttributes` publishes (`{...certificate, keyring}`,
 text's bytes, never decoded, as BRC-52 signs it (`brcs@5119a9b`
 `peer-to-peer/0052.md:41,97`); the signature is hex, as the reference's
 `WalletCertificate.signature` and this crate's `publicly_reveal_attributes`
-write it; the keyring's values are base64, decoded to the encrypted
+write it, and one that is not skips its output, never the resolution
+(`IdentityClient.ts:823-825`); the keyring's values are base64, decoded to the encrypted
 revelation keys. `decrypted_fields` comes from
 `VerifiableCertificate::decrypt_fields` with `ProtoWallet::anyone()`: each
 field's text is decoded and decrypted there and nowhere earlier.
