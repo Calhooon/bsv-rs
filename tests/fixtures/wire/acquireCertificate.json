@@ -5,13 +5,13 @@
       "expected": {
         "client_result": {
           "ok": {
-            "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
             "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
             "fields": {},
             "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
             "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
             "signature": "3006020101020101",
-            "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+            "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "type": "ERERERERERERERERERERERERERERERERERERERERERE="
           }
         },
         "processor_observed": null,
@@ -23,19 +23,19 @@
       "input": {
         "args": {
           "acquisitionProtocol": "issuance",
-          "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
           "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
           "certifierUrl": "https://certifier.invalid",
-          "fields": {}
+          "fields": {},
+          "type": "ERERERERERERERERERERERERERERERERERERERERERE="
         },
         "result": {
-          "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
           "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
           "fields": {},
           "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
           "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
           "signature": "3006020101020101",
-          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "type": "ERERERERERERERERERERERERERERERERERERERERERE="
         }
       },
       "name": "minimal",
@@ -46,7 +46,6 @@
       "expected": {
         "client_result": {
           "ok": {
-            "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
             "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
             "fields": {
               "name": "Fixture"
@@ -54,7 +53,8 @@
             "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
             "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
             "signature": "3006020101020101",
-            "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+            "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "type": "ERERERERERERERERERERERERERERERERERERERERERE="
           }
         },
         "processor_observed": null,
@@ -66,7 +66,6 @@
       "input": {
         "args": {
           "acquisitionProtocol": "direct",
-          "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
           "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
           "fields": {
             "name": "Fixture"
@@ -79,10 +78,10 @@
           "privilegedReason": "fixture reason",
           "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
           "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
-          "signature": "3006020101020101"
+          "signature": "3006020101020101",
+          "type": "ERERERERERERERERERERERERERERERERERERERERERE="
         },
         "result": {
-          "certificateType": "ERERERERERERERERERERERERERERERERERERERERERE=",
           "certifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5",
           "fields": {
             "name": "Fixture"
@@ -90,7 +89,8 @@
           "revocationOutpoint": "3333333333333333333333333333333333333333333333333333333333333333.1",
           "serialNumber": "IiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiIiI=",
           "signature": "3006020101020101",
-          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+          "subject": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "type": "ERERERERERERERERERERERERERERERERERERERERERE="
         }
       },
       "name": "full",

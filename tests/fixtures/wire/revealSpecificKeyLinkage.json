@@ -5,19 +5,21 @@
       "expected": {
         "client_result": {
           "ok": {
-            "keyId": "fixture",
-            "linkage": {
-              "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-              "encryptedLinkage": "00",
-              "encryptedLinkageProof": "00",
-              "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-              "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
-            },
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "encryptedLinkage": [
+              0
+            ],
+            "encryptedLinkageProof": [
+              0
+            ],
+            "keyID": "fixture",
             "proofType": 0,
-            "protocol": {
-              "protocolName": "fixture keys",
-              "securityLevel": "1"
-            }
+            "protocolID": [
+              1,
+              "fixture keys"
+            ],
+            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
           }
         },
         "processor_observed": {
@@ -53,19 +55,21 @@
           "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
         },
         "result": {
-          "keyId": "fixture",
-          "linkage": {
-            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-            "encryptedLinkage": "00",
-            "encryptedLinkageProof": "00",
-            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
-          },
+          "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "encryptedLinkage": [
+            0
+          ],
+          "encryptedLinkageProof": [
+            0
+          ],
+          "keyID": "fixture",
           "proofType": 0,
-          "protocol": {
-            "protocolName": "fixture keys",
-            "securityLevel": "1"
-          }
+          "protocolID": [
+            1,
+            "fixture keys"
+          ],
+          "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
         }
       },
       "name": "minimal",
@@ -76,19 +80,31 @@
       "expected": {
         "client_result": {
           "ok": {
-            "keyId": "fixture",
-            "linkage": {
-              "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-              "encryptedLinkage": "00017f80feff",
-              "encryptedLinkageProof": "00017f80feff",
-              "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-              "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
-            },
+            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "encryptedLinkage": [
+              0,
+              1,
+              127,
+              128,
+              254,
+              255
+            ],
+            "encryptedLinkageProof": [
+              0,
+              1,
+              127,
+              128,
+              254,
+              255
+            ],
+            "keyID": "fixture",
             "proofType": 1,
-            "protocol": {
-              "protocolName": "fixture keys",
-              "securityLevel": "1"
-            }
+            "protocolID": [
+              1,
+              "fixture keys"
+            ],
+            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
           }
         },
         "processor_observed": {
@@ -124,19 +140,31 @@
           "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
         },
         "result": {
-          "keyId": "fixture",
-          "linkage": {
-            "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-            "encryptedLinkage": "00017f80feff",
-            "encryptedLinkageProof": "00017f80feff",
-            "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
-            "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
-          },
+          "counterparty": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "encryptedLinkage": [
+            0,
+            1,
+            127,
+            128,
+            254,
+            255
+          ],
+          "encryptedLinkageProof": [
+            0,
+            1,
+            127,
+            128,
+            254,
+            255
+          ],
+          "keyID": "fixture",
           "proofType": 1,
-          "protocol": {
-            "protocolName": "fixture keys",
-            "securityLevel": "1"
-          }
+          "protocolID": [
+            1,
+            "fixture keys"
+          ],
+          "prover": "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
+          "verifier": "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5"
         }
       },
       "name": "full",
