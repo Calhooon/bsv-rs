@@ -621,7 +621,7 @@ fn test_beef_stream_memory_on_a_reversed_chain() {
         // the lock time, the empty unlock and the one output's 16 bytes and
         // its script; and the tables beside it (the held set by offset, the
         // txid waited on, the count). Holding the element as read (its raw
-        // bytes and the places of its fields, 0.9.0-beta's first fold) was
+        // bytes and the places of its fields, 0.9.0-beta's earlier fold) was
         // 321 to 349 bytes a link.
         assert!(structure < 250.0, "N={n}: {structure:.1} B per held link");
         assert!(scripts < 290.0, "N={n}: {scripts:.1} B per held link");
