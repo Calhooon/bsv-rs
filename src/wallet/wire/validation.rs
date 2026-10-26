@@ -79,11 +79,13 @@ impl From<Error> for Refusal {
 
 /// The code of an explicit wallet error, 2 to 8 (`WalletWireProcessor.ts:2405-2416`:
 /// a `WalletError`, or a `WERR_` error, whose `code` lies in unsupportedAction
-/// to abortRefused): a [`Error::WalletRefusal`]'s class (#137), which keeps
-/// its words and its code on the wire. Every other error has none.
+/// to abortRefused): a [`Error::WalletRefusal`]'s class with an SDK code
+/// (`WalletRefusalClass::wire_code`, #137), which keeps its words and its
+/// code on the wire. Every other error has none, a class whose code is its
+/// name among them (the toolbox's `WERR_*`, whose `code` is no integer).
 pub(super) fn explicit_wallet_code(error: &Error) -> Option<u8> {
     match error {
-        Error::WalletRefusal { class, .. } => Some(class.code()),
+        Error::WalletRefusal { class, .. } => class.wire_code(),
         _ => None,
     }
 }
