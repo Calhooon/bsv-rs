@@ -1135,7 +1135,7 @@ mod status_tests {
         );
     }
 
-    /// Tests getNetwork roundtrip (processor returns configured network).
+    /// Tests getNetwork roundtrip (the wallet's answer, ProtoWallet's mainnet; #222).
     #[tokio::test]
     async fn test_roundtrip_get_network_mainnet() {
         let transceiver = create_loopback();
@@ -1143,9 +1143,11 @@ mod status_tests {
         assert_eq!(result, Network::Mainnet);
     }
 
-    /// Tests getNetwork with testnet configuration.
+    /// A processor configured for testnet still answers the wallet's network:
+    /// the configuration reaches no frame (#222).
     #[tokio::test]
-    async fn test_roundtrip_get_network_testnet() {
+    #[allow(deprecated)]
+    async fn test_roundtrip_get_network_ignores_the_processor_configuration() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
         let processor = Arc::new(WalletWireProcessor::with_config(
             wallet,
@@ -1155,22 +1157,21 @@ mod status_tests {
         let wire = LoopbackWire { processor };
         let transceiver = WalletWireTransceiver::new(wire);
         let result = transceiver.get_network("test").await.unwrap();
-        assert_eq!(result, Network::Testnet);
+        assert_eq!(result, Network::Mainnet);
     }
 
-    /// Tests getVersion roundtrip.
+    /// Tests getVersion roundtrip (the wallet's answer; #222).
     #[tokio::test]
     async fn test_roundtrip_get_version() {
         let transceiver = create_loopback();
         let result = transceiver.get_version("test").await.unwrap();
-        assert!(!result.is_empty());
-        // Default processor version
-        assert_eq!(result, "0.1.0");
+        assert_eq!(result, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
     }
 
-    /// Tests getVersion with custom version.
+    /// A processor configured with a version still answers the wallet's (#222).
     #[tokio::test]
-    async fn test_roundtrip_get_version_custom() {
+    #[allow(deprecated)]
+    async fn test_roundtrip_get_version_ignores_the_processor_configuration() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
         let processor = Arc::new(WalletWireProcessor::with_config(
             wallet,
@@ -1180,7 +1181,7 @@ mod status_tests {
         let wire = LoopbackWire { processor };
         let transceiver = WalletWireTransceiver::new(wire);
         let result = transceiver.get_version("test").await.unwrap();
-        assert_eq!(result, "2.5.1-beta");
+        assert_eq!(result, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
     }
 
     /// Tests getHeaderForHeight roundtrip. ProtoWallet doesn't support this,
@@ -2867,7 +2868,7 @@ mod request_frame_tests {
         assert_eq!(error, 0);
         // Go wire format: raw UTF-8 bytes (no length prefix)
         let version = std::str::from_utf8(reader.read_remaining()).unwrap();
-        assert_eq!(version, "0.1.0");
+        assert_eq!(version, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
     }
 
     /// Tests that empty originator works.

@@ -1356,9 +1356,10 @@ const RESULT_VECTORS: [&str; 27] = [
 
 /// The result vectors the processor cannot write as their wire, with the
 /// reason. A vector that leaves this list, or joins it, moves the count (19
-/// at #194; the seven result writers of #197 left it).
+/// at #194; the seven result writers of #197 left it; getVersion's joined it
+/// with #222).
 #[cfg(feature = "http")]
-const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 12] = [
+const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 13] = [
     (
         "abortAction-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
@@ -1374,6 +1375,12 @@ const PROCESSOR_RESULTS_UNSUPPORTED: [(&str, &str); 12] = [
     (
         "discoverByIdentityKey-simple-result.json",
         "a processor refusal stub (docs/FIXTURES.md F1): the wallet is never called",
+    ),
+    (
+        "getVersion-simple-result.json",
+        "Go's version \"1.0.0\" is 5 bytes: the processor forwards the wallet's answer and \
+         refuses it as the reference's result check does (7 to 30 UTF-8 bytes, \
+         WalletResultValidation.ts:2302-2304; bsv-rs#222)",
     ),
     (
         "internalizeAction-simple-result.json",
@@ -1442,7 +1449,6 @@ fn stub_reply(call: &str, json: &Value) -> Value {
 #[cfg(feature = "http")]
 async fn processor_writes_the_vector_wire(filename: &str) -> Result<(), String> {
     use bsv_rs::wallet::wire::WalletWireProcessor;
-    use bsv_rs::wallet::Network;
     let call = filename.split('-').next().unwrap();
     let (json, wire) = load_vector(filename);
     let recording: Value = serde_json::from_str(
@@ -1467,28 +1473,19 @@ async fn processor_writes_the_vector_wire(filename: &str) -> Result<(), String> 
         )
         .unwrap()
     };
-    let network = if json["network"] == "testnet" {
-        Network::Testnet
-    } else {
-        Network::Mainnet
-    };
-    let version = json["version"]
-        .as_str()
-        .unwrap_or("fixture-0.0.0")
-        .to_string();
     let stub = fixtures::wallet::Stub::new(stub_reply(call, &json));
     let observed = stub.observed.clone();
     // The stub's reply decoder panics on a json its type does not read: a
     // spawned task turns that into a row of the table.
     let response = tokio::spawn(async move {
-        WalletWireProcessor::with_config(stub, network, &version)
+        WalletWireProcessor::new(stub)
             .process_message(&request)
             .await
     })
     .await
     .map_err(|_| "the vector's json is not the result type's".to_string())?
     .map_err(|e| format!("no response: {e}"))?;
-    if observed.lock().unwrap().is_none() && !matches!(call, "getNetwork" | "getVersion") {
+    if observed.lock().unwrap().is_none() {
         let mut reader = WireReader::new(&response[1..]);
         return Err(format!(
             "the wallet was not called: {}",
@@ -1533,7 +1530,7 @@ async fn every_go_result_vector_is_the_processors_wire_for_its_json() {
         .map(|(f, _)| *f)
         .collect();
     assert_eq!(failing, allowed, "the vectors the processor cannot write");
-    assert_eq!(RESULT_VECTORS.len() - failing.len(), 15, "passing rows");
+    assert_eq!(RESULT_VECTORS.len() - failing.len(), 14, "passing rows");
 }
 
 /// #194: revealCounterpartyKeyLinkage's response is the error byte, the
