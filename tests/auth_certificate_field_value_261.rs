@@ -93,12 +93,6 @@ fn bytes32(b64: &str) -> [u8; 32] {
     from_base64(b64).unwrap().try_into().unwrap()
 }
 
-fn keyring(map: &HashMap<String, String>) -> HashMap<String, Vec<u8>> {
-    map.iter()
-        .map(|(k, v)| (k.clone(), from_base64(v).unwrap()))
-        .collect()
-}
-
 /// The reference's JSON of the certificate, carried verbatim: since #268
 /// this crate's serde shape is the reference's (`type`, the signature hex).
 fn reference_json(c: &CertificateJson) -> serde_json::Value {
@@ -141,7 +135,7 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
     let cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
     let certifier = key(r.keys.certifier).public_key();
 
-    let master = MasterCertificate::new(cert.clone(), keyring(&r.master_keyring));
+    let master = MasterCertificate::new(cert.clone(), r.master_keyring.clone());
     let subject_wallet = ProtoWallet::new(Some(key(r.keys.subject)));
     let decrypted = master
         .decrypt_fields(&subject_wallet, &certifier, None, None, "test")
@@ -149,7 +143,7 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
 
-    let mut verifiable = VerifiableCertificate::new(cert.clone(), keyring(&r.verifier_keyring));
+    let mut verifiable = VerifiableCertificate::new(cert.clone(), r.verifier_keyring.clone());
     let verifier_wallet = ProtoWallet::new(Some(key(r.keys.verifier)));
     let decrypted = verifiable
         .decrypt_fields(&verifier_wallet, None, None, "test")
@@ -157,7 +151,7 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
 
-    let mut public = VerifiableCertificate::new(cert, keyring(&r.anyone_keyring));
+    let mut public = VerifiableCertificate::new(cert, r.anyone_keyring.clone());
     let decrypted = public
         .decrypt_fields(&ProtoWallet::anyone(), None, None, "test")
         .await
@@ -398,9 +392,6 @@ async fn print_a_certificate_issued_here_for_the_reference() {
     )
     .await
     .unwrap();
-    let b64 = |m: &HashMap<String, Vec<u8>>| -> HashMap<String, String> {
-        m.iter().map(|(k, v)| (k.clone(), to_base64(v))).collect()
-    };
     let out = serde_json::json!({
         "origin": "issued by this crate's MasterCertificate::issue_for_subject (certifier key 43, subject key 47, type 32 x 0x08, serial 32 x 0x09, no revocation outpoint) with a keyring for verifier key 41 by create_keyring_for_verifier",
         "keys": { "certifier": 43, "subject": 47, "verifier": 41 },
@@ -414,8 +405,8 @@ async fn print_a_certificate_issued_here_for_the_reference() {
             "fields": master.to_wallet_certificate().fields,
             "signature": to_hex(master.signature.as_ref().unwrap()),
         },
-        "master_keyring": b64(&master.master_keyring),
-        "verifier_keyring": b64(&verifier_keyring),
+        "master_keyring": master.master_keyring,
+        "verifier_keyring": verifier_keyring,
         "binary_hex": to_hex(&master.to_binary(true)),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap());

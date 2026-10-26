@@ -1262,13 +1262,13 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             certificate.signature = from_hex(sig_str).ok();
         }
 
-        // Step 6: Parse the keyring from JSON
-        let mut keyring: HashMap<String, Vec<u8>> = HashMap::new();
+        // Step 6: Parse the keyring from JSON, each entry held as its base64
+        // text and decoded only where the wallet decrypts (#268)
+        let mut keyring: HashMap<String, String> = HashMap::new();
         if let Some(keyring_obj) = cert_data["keyring"].as_object() {
             for (field_name, key_value) in keyring_obj {
                 if let Some(key_str) = key_value.as_str() {
-                    let key_bytes = from_base64(key_str)?;
-                    keyring.insert(field_name.clone(), key_bytes);
+                    keyring.insert(field_name.clone(), key_str.to_string());
                 }
             }
         }
@@ -1436,14 +1436,13 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             certificate.signature = from_hex(sig_str).ok();
         }
 
-        // Parse the keyring from JSON
-        let mut keyring: HashMap<String, Vec<u8>> = HashMap::new();
+        // Parse the keyring from JSON, each entry held as its base64 text and
+        // decoded only where the wallet decrypts (#268)
+        let mut keyring: HashMap<String, String> = HashMap::new();
         if let Some(keyring_obj) = cert_data["keyring"].as_object() {
             for (field_name, key_value) in keyring_obj {
                 if let Some(key_str) = key_value.as_str() {
-                    if let Ok(key_bytes) = from_base64(key_str) {
-                        keyring.insert(field_name.clone(), key_bytes);
-                    }
+                    keyring.insert(field_name.clone(), key_str.to_string());
                 }
             }
         }

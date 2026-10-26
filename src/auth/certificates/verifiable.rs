@@ -5,7 +5,7 @@
 
 use super::master::{decrypt_field_value, field_protocol};
 use super::Certificate;
-use crate::primitives::{PublicKey, SymmetricKey};
+use crate::primitives::{from_base64, PublicKey, SymmetricKey};
 use crate::wallet::{Counterparty, DecryptArgs, WalletInterface};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -22,10 +22,16 @@ pub struct VerifiableCertificate {
     #[serde(flatten)]
     pub certificate: Certificate,
 
-    /// Keyring for this verifier: field_name -> encrypted_key.
-    /// Only fields in the keyring can be decrypted.
+    /// Keyring for this verifier: field_name -> the base64 text of the
+    /// field's revelation key encrypted to the verifier, held as the
+    /// reference's `Record<CertificateFieldNameUnder50Bytes, string>`
+    /// (`ts-stack@edf6e03` `VerifiableCertificate.ts:90`) and Go's
+    /// `map[..]wallet.StringBase64` (`go-sdk@2ca481c`
+    /// `auth/certificates/verifiable.go:23`) hold it, and written so in JSON;
+    /// decoded only where the wallet decrypts (#268). Only fields in the
+    /// keyring can be decrypted.
     #[serde(default)]
-    pub keyring: HashMap<String, Vec<u8>>,
+    pub keyring: HashMap<String, String>,
 
     /// Cached decrypted field values.
     #[serde(skip)]
@@ -34,7 +40,7 @@ pub struct VerifiableCertificate {
 
 impl VerifiableCertificate {
     /// Creates a verifiable certificate from a base certificate and keyring.
-    pub fn new(certificate: Certificate, keyring: HashMap<String, Vec<u8>>) -> Self {
+    pub fn new(certificate: Certificate, keyring: HashMap<String, String>) -> Self {
         Self {
             certificate,
             keyring,
@@ -65,8 +71,10 @@ impl VerifiableCertificate {
     /// reference's `VerifiableCertificate.decryptFields` does
     /// (`ts-stack@edf6e03` `VerifiableCertificate.ts:152-219`): the keyring
     /// entry is the field's revelation key encrypted to the verifier under
-    /// key ID `"<serial base64> <field>"`; the field's base64 text is decoded
-    /// and decrypted with that key here, and nowhere earlier (#261). The
+    /// key ID `"<serial base64> <field>"`, its base64 text decoded for the
+    /// wallet's decrypt here and nowhere earlier (#268); the field's base64
+    /// text is decoded and decrypted with that key here, and nowhere earlier
+    /// (#261). The
     /// counterparty is the certificate's subject, read from the certificate
     /// as the reference reads `this.subject` (`:196`) and Go `vc.Subject`
     /// (`go-sdk@2ca481c` `auth/certificates/verifiable.go:76-99`).
@@ -104,7 +112,7 @@ impl VerifiableCertificate {
         let decrypted = verifier_wallet
             .decrypt(
                 DecryptArgs {
-                    ciphertext: encrypted_key.clone(),
+                    ciphertext: from_base64(encrypted_key)?,
                     protocol_id: field_protocol(),
                     key_id,
                     counterparty: Some(Counterparty::Other(self.certificate.subject.clone())),
@@ -194,22 +202,10 @@ impl VerifiableCertificate {
     }
 
     /// Converts to a JSON-serializable format, the reference's shape: each
-    /// field value its held base64 text (#261), the signature hex (#268),
-    /// the keyring's values base64-encoded.
+    /// field value its held base64 text (#261), the signature hex and the
+    /// keyring's values their held base64 text (#268): the type's serde.
     pub fn to_json_value(&self) -> serde_json::Value {
-        serde_json::json!({
-            "type": self.certificate.type_base64(),
-            "serialNumber": self.certificate.serial_number_base64(),
-            "subject": self.certificate.subject.to_hex(),
-            "certifier": self.certificate.certifier.to_hex(),
-            "revocationOutpoint": self.certificate.revocation_outpoint.clone()
-                .unwrap_or_else(|| crate::wallet::types::Outpoint::new([0u8; 32], 0)).to_string(),
-            "fields": self.certificate.fields,
-            "signature": self.certificate.signature.as_ref().map(|s| crate::primitives::to_hex(s)),
-            "keyring": self.keyring.iter()
-                .map(|(k, v)| (k.clone(), crate::primitives::to_base64(v)))
-                .collect::<HashMap<String, String>>(),
-        })
+        serde_json::to_value(self).unwrap_or_default()
     }
 }
 
@@ -246,7 +242,7 @@ mod tests {
         cert.sign(&certifier).unwrap();
 
         let mut keyring = HashMap::new();
-        keyring.insert("name".to_string(), vec![1, 2, 3]);
+        keyring.insert("name".to_string(), "AQID".to_string());
 
         let verifiable = VerifiableCertificate::new(cert, keyring);
 
@@ -299,7 +295,7 @@ mod tests {
         cert.sign(&certifier).unwrap();
 
         let mut keyring = HashMap::new();
-        keyring.insert("email".to_string(), vec![7, 8, 9]);
+        keyring.insert("email".to_string(), "BwgJ".to_string());
 
         let verifiable = VerifiableCertificate::new(cert, keyring);
         let json = verifiable.to_json_value();
