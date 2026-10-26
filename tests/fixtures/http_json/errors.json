@@ -178,8 +178,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 6): fixture refused",
-          "error": "WalletError(\"wallet error (code 6): fixture refused\")"
+          "display": "fixture refused",
+          "error": "WalletRefusal { class: InvalidParameter, message: \"fixture refused\" }"
         },
         "request": {
           "headers": {
@@ -213,8 +213,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: wallet error (code 6): fixture refused",
-          "error": "WalletError(\"wallet error (code 6): fixture refused\")"
+          "display": "fixture refused",
+          "error": "WalletRefusal { class: InvalidParameter, message: \"fixture refused\" }"
         },
         "request": {
           "headers": {
