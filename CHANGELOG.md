@@ -939,7 +939,7 @@ return if its maintainers say so.
   a refusal after a held child is the later element's (a raw transaction
   with no output written after a held child is `NoOutputs` on both).
 - **What a held transaction holds** (`beef_stream/deferred.rs`): its txid,
-  offset and wire length (56 bytes); per input the outpoint, the sequence
+  offset, wire length and the held set's key (56 bytes); per input the outpoint, the sequence
   and the input's offset (48 bytes); with spends checked, the version and
   the lock time (8), each unlocking script, and the outputs (16 bytes and
   the script each). The outputs stay because a signature whose hash type
@@ -950,22 +950,33 @@ return if its maintainers say so.
   needs nothing per input beyond the 48 bytes held (the template's slot for
   the input is its outpoint and sequence, the other slots' scripts empty);
   the outputs are per transaction, what the one-pass index retains for it
-  once folded anyway (`BeefIndex::retaining` keeps only the outputs a first
+  once folded anyway (`BeefIndex::retaining` keeps only the outputs an earlier
   pass named, so there the unreferenced outputs of a held transaction are
-  held beyond the index). The FORKID midstates are computed from the held
-  fields when the scripts run, as for a transaction read in order: every
-  field they cover is held to resolve the parents, so holding them would add
-  bytes and save none. The whole reader's structure-only judge holds the
-  same entry (56 bytes and 48 per input) beside the `Beef` it collects, not
-  a copy of the bytes the `Beef` already holds.
+  held beyond the index). The outputs resolve no parent: they are held for the original digest
+  alone. Under a word that refuses the CHRONICLE bit (STRICTENC without
+  CHRONICLE, the previous era's) a 32-byte `hashOutputs` and one hash per
+  input for SINGLE could stand in for them, and still not for the unlocking
+  scripts; the stream runs the default mode, which admits the bit at every
+  version, and mainnet is past Chronicle, so the original digest is
+  reachable for every deferred transaction and the outputs stay. The
+  unlocking scripts are the part beyond the index in every mode; the
+  unreferenced outputs are beyond it in `retaining` mode, that mode's
+  purpose.
 - **No bound** (the stack's charter, `bsv-stack-lean
   docs/charters/beef-of-any-size.md`, the owner's ruling of 2026-10-09: a
   valid BEEF is never refused for its size or its counts; the keeper's stop
   on #240, 2026-10-26): a BEEF in BRC-62's order holds nothing; one written
   children first holds, at most, the entry of every unproven transaction
-  read. 0.9.0-beta.1's first fold of #240 (never released) had a
+  read. 0.9.0-beta.1's earlier fold of #240 (never released) had a
   `DeferredLimit` the caller could set and a decline past it
-  (`DeferredOverLimit`, an `io::Error`); both are gone. A platform whose
+  (`DeferredOverLimit`, an `io::Error`); both are gone. The charter's clause
+  (the keeper's ruling of 2026-10-26): the one-element bound holds for a BEEF
+  in wire order; for one out of order the state grows by the deferred
+  transactions' outputs and unlocking scripts until their parents arrive,
+  linear in the out-of-order bytes (1,000,000 links on the scripts reader:
+  441 MB parents first, 837 MB newest first, the verdicts equal), never a
+  count refusal; past the platform's bound the answer is not judged here,
+  resume with the cursor. A platform whose
   memory cannot hold a BEEF stops between steps and resumes from the
   cursor; that is not a verdict. `BeefIndex::deferred()` answers the
   transactions held and the bytes their entries hold.
@@ -984,7 +995,9 @@ box shared with other lanes (load 17 to 45). Memory (dhat,
 `BEEF_REVERSED_DEPTHS=10000,100000`): held per link over the parents-first
 peak, 187 and 196 bytes (structure), 212 and 234 (scripts) at 10,000 and
 100,000 links; holding the element as read was 321 and 349; the whole
-path's peak equals the parents-first peak. Peak RSS in fresh processes
+path's live-heap peak equals the parents-first peak (its RSS runs above
+it at 1,000,000 links by the arenas the allocator keeps after the entries
+are freed, the two numbers printed below). Peak RSS in fresh processes
 (release; the reversed builder's own vectors in its baseline), parents
 first then newest first, over the bytes alone: the stream's structure 3.8
 and 7.9 MB, 28.1 and 58.1 MB, 441 and 728 MB at 10,000, 100,000 and
@@ -1042,7 +1055,7 @@ against beta) reports `enum_marked_non_exhaustive` on the three and nothing
 else. Migration: a `match` on one of them outside the crate ends in a
 wildcard arm (`_ => ...`). On disk, overlay-engine's `structure_roots`
 (`crates/overlay-engine/src/beef_limits.rs:240-255`, on bsv-rs 0.6.0) and
-rust-message-box's `refusal_word` (`src/beef_door.rs:543-595`, on bsv-rs
+rust-message-box's `refusal_word` (`src/beef_door.rs:543-592`, on bsv-rs
 =0.4.5) match `Verdict` exhaustively and take the arm when they move to
 0.9.
 

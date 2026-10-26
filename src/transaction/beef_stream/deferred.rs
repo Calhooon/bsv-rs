@@ -15,9 +15,14 @@
 //! the parent arrives stands in for them, and the default mode admits the bit
 //! at every version. That template is one per transaction, not one per input:
 //! the input's slot in it is the outpoint and sequence already held. The
-//! FORKID midstates (`hashPrevouts`, `hashSequence`, `hashOutputs`) are
-//! computed from the held fields when the scripts run, as for a transaction
-//! read in order, so the work charged is the same whatever the order.
+//! outputs resolve no parent: they are held for the original digest alone.
+//! Under a word that refuses the CHRONICLE bit (STRICTENC without CHRONICLE,
+//! the previous era's) a 32-byte `hashOutputs` and one hash per input for
+//! SINGLE could stand in for them, and still not for the unlocking scripts;
+//! the stream runs the default mode, which admits the bit at every version,
+//! and mainnet is past Chronicle, so the outputs stay. The FORKID midstates
+//! are computed from the held fields when the scripts run, as for a
+//! transaction read in order.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
@@ -114,7 +119,8 @@ impl HeldTx {
         }
     }
 
-    /// The bytes it holds: 56 for its offset, txid and wire length, 48 per
+    /// The bytes it holds: 56 for its offset, txid, wire length and the held
+    /// set's key, 48 per
     /// input, and with spends 8 for the version and lock time, each
     /// unlocking script, 16 per output and each locking script.
     pub(super) fn held_bytes(&self) -> u64 {
@@ -387,7 +393,7 @@ impl BeefIndex {
 impl Judge {
     /// Folds in the earliest held transaction that waits on nothing
     /// (bsv-rs#240), its scripts run under `spent` from the input a paused
-    /// reading reached in it, else the first: `None` when none waits on
+    /// reading reached in it, else from its input 0: `None` when none waits on
     /// nothing, `Some(Ok(true))` a pause, which `resume_at` then names.
     pub(super) fn release_next(
         &mut self,
