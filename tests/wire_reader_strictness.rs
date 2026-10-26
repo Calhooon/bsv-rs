@@ -685,7 +685,7 @@ async fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_as_disc
         let frame = discovery_frame(&cert, trust, &[0], &[0]);
         let mut reader = WireReader::new(&frame[1..]);
         let read = reader.read_identity_certificate().unwrap();
-        assert_eq!(read.certifier_info.unwrap().trust, trust);
+        assert_eq!(read.certifier_info.trust, trust);
         assert_eq!(reader.remaining(), 0);
     }
 }
@@ -953,7 +953,7 @@ fn refused_by_every_writer(certificate: &WalletCertificate, words: &str) {
         refused
     );
     assert!(w.is_empty(), "{words}: no present flag written");
-    let mut entry = identity_certificate(Some(certifier(5)));
+    let mut entry = identity_certificate(certifier(5));
     entry.certificate = certificate.clone();
     assert_eq!(w.write_identity_certificate(&entry).map(drop), refused);
     assert!(w.is_empty(), "{words}: no discovery byte written");
