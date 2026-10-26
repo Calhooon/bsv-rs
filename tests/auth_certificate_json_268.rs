@@ -386,15 +386,15 @@ async fn a_wallet_certificate_with_a_txid_alone_revocation_outpoint_verifies() {
         .and(path("/listCertificates"))
         .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
             "totalCertificates": 1,
-            "certificates": [{ "certificate": {
-                "certificateType": to_base64(&cert.cert_type),
+            "certificates": [{
+                "type": to_base64(&cert.cert_type),
                 "serialNumber": to_base64(&cert.serial_number),
                 "subject": cert.subject.to_hex(),
                 "certifier": cert.certifier.to_hex(),
                 "revocationOutpoint": txid,
                 "signature": to_hex(cert.signature.as_ref().unwrap()),
                 "fields": cert.fields,
-            }}],
+            }],
         })))
         .mount(&server)
         .await;
