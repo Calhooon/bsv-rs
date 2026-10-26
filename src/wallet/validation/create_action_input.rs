@@ -1,7 +1,7 @@
 //! Validation of a `createAction` input.
 //!
 //! The reference's `validateCreateActionInput` (`ts-stack@edf6e03`
-//! `validationHelpers.ts:587-614`): an `unlockingScript` of one or more hex
+//! `validationHelpers.ts:587-613`): an `unlockingScript` of one or more hex
 //! characters (`:595`, `:522-530`), and BRC-100's positive integer for
 //! `unlockingScriptLength` (`brcs@5119a9b` `wallet/0100.md:649`), which the
 //! reference's helper does not enforce (`:598`; bsv-rs#282).
@@ -24,7 +24,7 @@ use crate::error::{Error, Result};
 /// unlockingScriptLength: expected an integer from 1 to 4294967295, received
 /// 0`, the same class; the reference's helper permits 0 (`:598`, a minimum
 /// of 0, though its `ValidCreateActionInput` types the field `PositiveInteger`
-/// at `:577`; bsv-rs#282).
+/// at `:574`; bsv-rs#282).
 ///
 /// [`WalletRefusalClass::InvalidParameter`]: crate::error::WalletRefusalClass::InvalidParameter
 pub fn validate_create_action_input(

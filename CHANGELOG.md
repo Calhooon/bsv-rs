@@ -54,14 +54,14 @@ at `ts-stack@edf6e03` under Node v22.18.0
 test RED on the pre-fix tree. No public shape changes; a caller that
 passed an empty script or a zero length now gets the refusal. The
 toolbox's create door (its #212), which refuses both in its own code, can
-ask this validator instead, as it does for internalizeAction (#117).
+ask this validator instead, as it does for internalizeAction (#117); until it does, the toolbox's own words for the zero length differ from these (its PR #215, `named_input_tests.rs:258`).
 
 ### Notes: cross-SDK parity (#282)
 
 The reference's helper permits a zero length: `validateCreateActionInput`
 runs `validateInteger(unlockingScriptLength, 'unlockingScriptLength',
 undefined, 0)`, a minimum of 0 (`validationHelpers.ts:598`), though its
-`ValidCreateActionInput` types the field `PositiveInteger` (`:577`); the
+`ValidCreateActionInput` types the field `PositiveInteger` (`:574`); the
 run records `{ unlockingScriptLength: 0 }` accepted. This crate takes
 BRC-100's positive integer (the keeper's reading of 2026-10-26); the
 upstream filing against ts-stack is the keeper's to carry. go-sdk at
