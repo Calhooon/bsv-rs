@@ -1,0 +1,19 @@
+# Lane: fix-282-create-action-gate. The create-action validator refuses an empty unlockingScript and a zero unlockingScriptLength, as the reference's gate and BRC-100 do (#282)
+
+You are a code lane of bsv-rs (`~/bsv/bsv-rs`), in the worktree cca gives you on a branch from `origin/beta`. Read issue #282 with every comment (the toolbox captain's finding; the keeper's reading of 2026-10-26: BRC-100's positive integer is the bound this crate takes, the reference's two refusals' words; no owner's word needed), `CLAUDE.md` (rules 1, 2, 3, 4, 5, 7), `src/wallet/CLAUDE.md`, `docs/DEPENDENTS.md`, `docs/lanes/README.md` (the lane rules; everything foreground, under ten minutes; never `~/bsv/bsv-low/` or `~/vault/`). You never push, tag or open a PR; you commit on your branch and end with the REPORT. `CARGO_TARGET_DIR=$HOME/bsv/targets/bsv-rs-lanes/fix-282` (`mkdir -p` it before the run).
+
+## The reading
+
+The reference at `~/bsv/ts-stack` `edf6e03`: `packages/sdk/src/wallet/validationHelpers.ts:595` validates a create-action input's `unlockingScript` through `validateOptionalHexString` (`:522-530`: one or more hex characters), refusing the empty string with "The inputs.N.unlockingScript parameter must be hexadecimal string."; read what it does with `unlockingScriptLength` (the helper the toolbox captain says permits 0: cite the lines) and BRC-100 at `5119a9b` (`git -C ~/bsv/brcs show 5119a9b:wallet/0100.md`, line 649: `unlockingScriptLength` a positive integer). This crate's `wallet::validation::validate_create_action_args` (`src/wallet/validation.rs`) accepts `Some(vec![])` and a length of 0. The change: an empty `unlockingScript` refused with the reference's words (the field path with the input's index as the reference writes it); a zero `unlockingScriptLength` refused as BRC-100's positive integer (the words in the reference's `#requireInteger` form for a bound the reference does not enforce: read #255's `integer_refusal` and its name convention; the parity note says the reference's helper permits 0 and names the ts-stack filing the keeper carries). The toolbox's create door (its #212) delegates to this validator once landed, as it does for internalizeAction (#117): its captain is told at landing. Rule 2: unit tests red on the tip for each refusal (the validator is pure: no wiremock needed), a wiremock-free witness of the reference's words from its own run (the Node bundle at `edf6e03`: `validateCreateActionArgs` on the same args, the thrown message recorded in the vector under `tests/vectors/` for #282). The changelog entry; `src/wallet/CLAUDE.md`; the divergence list only if a difference remains.
+
+## The gate (foreground, each under ten minutes), named by glob
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `for f in $(ls tests | grep -E '^(wallet_|wire_|http_|fixtures_replay)' | sed 's/\.rs$//'); do cargo test --features "full,http,tracing" --test $f || exit 1; done`; `cargo test --lib wallet --features "full,http"`; `cargo test --doc --features full -- wallet`; the wasm32 build `cargo build --target wasm32-unknown-unknown --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm"`; `cargo semver-checks check-release --baseline-rev origin/beta --features full --release-type minor` (no shape change: the line); `mkdir -p "$CARGO_TARGET_DIR" && tools/ratchet/run --check --against origin/beta` (never re-record a baseline).
+
+## Rules
+
+No em dash; never "first" as an ordinal; never "conformant" without a run. Commit subjects name `(#282)`; bodies say what and why; end with the Co-Authored-By line the session gives you.
+
+## REPORT (the last thing you print)
+
+`REPORT` then: the base sha, the tip sha and each commit; the two refusals' words beside the reference's and BRC-100's line; the RED run then green; the green run (every gate command with its result line); anything you could not do and why.
