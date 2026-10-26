@@ -10,7 +10,8 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with feature-gated exports and re-exports | ~253 |
-| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers) | ~1936 |
+| `types.rs` | Core wallet type definitions (70+ types, hex serde helpers) | ~1917 |
+| `types/linkage.rs` | The two key-linkage results and `KeyLinkageResult`, re-exported from `types`; their JSON flat with byte arrays, `protocolID` through the private `protocol_tuple` helper, `keyID` (#105) | ~83 |
 | `interface.rs` | WalletInterface async trait (28 methods) + marker traits | ~297 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
@@ -194,7 +195,7 @@ The `types.rs` module includes serde helper modules for cross-SDK JSON compatibi
 
 These serialize the byte fields that carry them as hex strings (e.g., `"76a914"`) rather than JSON arrays (e.g., `[118, 169, 20]`). All types use `#[serde(rename_all = "camelCase")]` for JSON field naming consistency, with the BRC-100 names where camelCase is not it.
 
-The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWalletJSON`'s (#105; `wallet/0100.md` at `5119a9b`, `Wallet.interfaces.ts` at `ts-stack@edf6e03`): `WalletCertificate`, `AcquireCertificateArgs` and `RelinquishCertificateArgs` write and read the Rust `certificate_type` as `type`; `RevealCounterpartyKeyLinkageResult` and `RevealSpecificKeyLinkageResult` flatten their `linkage` (`KeyLinkageResult`'s `encryptedLinkage` and `encryptedLinkageProof` as arrays of byte numbers, the reference's `Byte[]`), and the specific result writes `protocol` as `protocolID`, the `[level, name]` pair (a private `protocol_tuple` helper; a level other than 0, 1 or 2 refused), and `key_id` as `keyID`. Pinned against the reference's bodies in both directions by `tests/wallet_http_json_shapes_105.rs`. What #105 leaves (the key-related requests' `protocolId`/`keyId`, the list and discovery results' nested `certificate`, the action calls' byte encodings, a public-key `keyringRevealer`) is in the changelog's #105 parity note and `docs/FIXTURES.md` F5 to F7. `wallet::Certificate`, which the JSON substrate does not carry, keeps `certificateType`.
+The certificate and key-linkage shapes are BRC-100's and the reference's `HTTPWalletJSON`'s (#105; `wallet/0100.md` at `5119a9b`, `Wallet.interfaces.ts` at `ts-stack@edf6e03`): `WalletCertificate`, `AcquireCertificateArgs` and `RelinquishCertificateArgs` write and read the Rust `certificate_type` as `type`; `RevealCounterpartyKeyLinkageResult` and `RevealSpecificKeyLinkageResult` flatten their `linkage` (`KeyLinkageResult`'s `encryptedLinkage` and `encryptedLinkageProof` as arrays of byte numbers, the reference's `Byte[]`), and the specific result writes `protocol` as `protocolID`, the `[level, name]` pair (the private `protocol_tuple` helper in `types/linkage.rs`; a level other than 0, 1 or 2 refused), and `key_id` as `keyID`. Pinned against the reference's bodies in both directions by `tests/wallet_http_json_shapes_105.rs`. What #105 leaves (the key-related requests' `protocolId`/`keyId`, the list and discovery results' nested `certificate`, the action calls' byte encodings, a public-key `keyringRevealer`) is in the changelog's #105 parity note and `docs/FIXTURES.md` F5 to F7. `wallet::Certificate`, which the JSON substrate does not carry, keeps `certificateType`.
 
 ### Core Types
 
