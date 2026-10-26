@@ -105,7 +105,7 @@ pub struct WebSocketTransportOptions {
 Features:
 - Lazy connection: WebSocket connection established on first `send()` call
 - Background receive loop: spawns a tokio task that reads incoming messages and dispatches to all registered callbacks
-- JSON-serialized `AuthMessage` payloads over WebSocket text frames (also accepts binary frames)
+- JSON-serialized `AuthMessage` payloads over WebSocket text frames (also accepts binary frames); written with `to_string` and read with `from_str`, so the signed certificate texts pass through as transmitted (#280)
 - Connection dropped on send/receive errors (matches Go SDK behavior)
 - Requires at least one callback registered before sending (returns `TransportError` otherwise)
 - URL validation: rejects non-`ws://`/`wss://` schemes and empty hosts

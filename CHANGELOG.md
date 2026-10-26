@@ -224,6 +224,93 @@ a processor with `with_config` under `#[allow(deprecated)]`
 `test_roundtrip_get_network_is_the_wallets_answer` and
 `test_roundtrip_get_version_is_the_wallets_answer`: the transceiver's
 answer equals the wallet's `get_network` and `get_version`.
+### Fixed: a certificate message is signed over the JSON text it sends and verified over the text it received (#280)
+
+BRC-103 signs a certificateRequest over its requested certificates and a
+certificateResponse over its certificates, "the payload plus nonces", and
+names no serialization (`5119a9b` `peer-to-peer/0103.md:133-137`, `:172`).
+The reference fixes the reading (`ts-stack@edf6e03`
+`packages/sdk/src/auth/Peer.ts`): `:453` signs
+`utf8(JSON.stringify(policy))`, the `requestedCertificates` member alone,
+and `:1140` `utf8(JSON.stringify(certificates))`, the `certificates` array
+alone (the nonces are in the key ID, not the bytes); `:1068` and `:1203`
+verify the `JSON.stringify` of what they parsed, which is the received
+text whenever that text is compact (`JSON.parse` keeps key order). This
+crate's `AuthMessage::signing_data` re-serialized the parsed values, whose
+`HashMap`s (`RequestedCertificateSet::types`, a certificate's `fields` and
+`keyring`) reorder keys: a reference peer's request naming several types,
+or a certificate with several fields or keyring entries, failed
+verification here at the map's whim (the #268 review measured 5 of 6 runs
+on a 3-field certificate), and a sender's `decryptedFields` were dropped
+from the bytes checked.
+
+Two rules now. This crate sends compact JSON and signs its bytes: a
+message carries the text it sends (`AuthMessage::set_certificates`,
+`set_requested_certificates`; `Peer` builds with them), and the reference's
+re-stringify of that text reproduces it, since `JSON.parse` keeps the order
+and `JSON.stringify` writes it compact. On receipt the certificates' and
+the requested certificates' text is kept as received
+(`AuthMessage::certificates_text`, `requested_certificates_text`,
+`serde_json` raw values) and `signing_data` returns those bytes while they
+read back to the parsed value; a member changed since is serialized afresh,
+once, and that is what is signed and sent. The HTTP and WebSocket
+transports already wrote and read the message with `to_string`/`from_str`;
+the Socket.IO transport went through a `serde_json::Value`, which sorts
+keys: its send writes the message's text through a new provided method,
+`SocketIoSink::send_socketio_text` (the default decodes and forwards to
+`send_socketio` as before; a sink that writes text overrides it), and its
+dispatch reads the event argument's text (`codec::decode_event_args_text`).
+
+`tests/auth_signed_text_280.rs` with `tests/vectors/auth_signed_text_280.json`
+(new), recorded by `tests/support/auth_signed_text_280.mjs` driving two
+reference `Peer`s over an in-memory transport carrying `JSON.stringify`
+text under Node v22.18.0: the reference's certificateRequest naming five
+types verifies here over its received text (red on `0266ba2`); the bytes
+the reference signed for its certificateResponse are the `certificates`
+text it sent; a received certificateResponse carrying `decryptedFields`, in
+an order no serializer here writes, verifies over its text (red on
+`0266ba2`); a member changed after receipt is signed afresh; this crate's
+certificateRequest text, handed to a reference `Peer` holding the session,
+is verified there over the bytes sent, `true`. The Socket.IO send and
+dispatch keep the text (`tests/socketio_signed_text_280.rs`, red with the
+text path reversed); `fuzz_auth_messages` reads the argument as text and checks the
+signed bytes survive a write and a read.
+
+What this does not reach: the reference's certificate JSON is not this
+crate's yet (`type` where this crate writes `certType`, base64 field values
+and keyrings and a hex signature where it writes number arrays; #261,
+#268). A reference certificateResponse does not parse here (pinned by
+`a_reference_certificate_response_is_refused_by_its_certificate_shape_until_268`),
+and the reference refuses this crate's: it rebuilds each certificate as its
+class before it verifies (`Peer.ts:341-357`, `:768`), so `certType` drops
+out of the bytes it checks (recorded in the vector). The signed bytes are
+the text either way; when the shape lands both directions verify.
+
+Migration: `AuthMessage` gains two public members, so a struct literal
+adds `certificates_text: None, requested_certificates_text: None` (0.9.0's
+line; `AuthMessage::new` and field assignment need no change). The message
+box (`rust-message-box`) deserializes `AuthMessage` from a `serde_json::Value`
+(`src/engineio/auth.rs:208`, `:344`); that still parses, with the members'
+text the `Value`'s key-sorted re-serialization, so a certificate message it
+ever verifies must be read from the frame's text (`from_str`), never from a
+`Value`; it no-ops certificate messages today.
+
+### Notes: cross-SDK parity (#280)
+
+The reference verifies the `JSON.stringify` of what it parsed after
+rebuilding each certificate as its class (`Peer.ts:341-357`), so for a
+text whose certificate members are out of the class's order, or that is
+not compact, or that carries an integer-like object key (a JavaScript
+object moves it first), it checks other bytes than it received; this
+crate checks the bytes received. On every text the reference or this
+crate writes the two are the same bytes. Go re-serializes on both sides
+(`json.Marshal`, `go-sdk@2ca481c` `auth/peer.go:829`, `:898` to verify,
+`:1109`, `:1189` to sign), and a Go map writes its keys sorted: a text Go
+sends verifies here as received, and a text whose map keys are not sorted
+(the reference's, this crate's) fails verification in Go. The gap is
+BRC-103's (`0103.md:133-137`, `:172`); the sentence for upstream, "the
+signature is over the UTF-8 bytes of the JSON text as transmitted", is
+the keeper's filing.
 
 ### Changed: the secrets scan covers the commits the event brings (#272)
 
