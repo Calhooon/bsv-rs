@@ -386,6 +386,15 @@ fn result_string(value: &str, call: &str, field: &str, min: usize, max: usize) -
     Ok(())
 }
 
+/// getVersion's version (`:2302-2304`): 7 to 30 UTF-8 bytes, BRC-100's
+/// "wallet's version string (e.g., `vendor-1.0.0`)" (`wallet/0100.md:2517`
+/// at `5119a9b`). getNetwork's rule (`:2298-2301`, mainnet or testnet) is
+/// the `Network` type's: a wallet answers one of its two values, so the
+/// processor has no third to refuse (bsv-rs#222).
+pub(super) fn version_result(version: &str) -> Checked {
+    result_string(version, "getVersion", "version", 7, 30)
+}
+
 /// The two linkages' bytes (`validateKeyLinkage`, `:2165-2177`; the three
 /// keys are `PublicKey`s by their type).
 fn linkage_bytes(linkage: &crate::wallet::KeyLinkageResult, call: &str) -> Checked {
