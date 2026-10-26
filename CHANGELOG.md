@@ -459,7 +459,7 @@ let cert = Certificate::new(cert_type, serial_number, subject, certifier)
 
 No dependent builds one by literal: `bsv-wallet-toolbox-rs` (`6317222`) calls
 `Certificate::new` and `set_field` and writes `revocation_outpoint` and
-`signature` in place (`src/wallet/certificate_issuance.rs:533-561`), which
+`signature` in place (`src/wallet/certificate_issuance.rs:533-562`), which
 compiles unchanged;
 `bsv-wallet-cli` and the other dependents do not use the type.
 
@@ -501,8 +501,12 @@ bytes (built, or rebuilt from JSON), now orders by the Unicode Collation
 Algorithm at tertiary strength, punctuation non-ignorable, over the DUCET
 rows (13.0.0) of U+0000..U+00FF and the two contractions in that range
 (`l` and `L` before U+00B7), with no new dependency
-(`src/auth/certificates/collation.rs`; the table written by
-`tests/support/certificate_collation_table_249.mjs`). Go orders by bytes
+(`src/auth/certificates/collation.rs`). The table is data, not code:
+`src/auth/certificates/collation_latin1.txt`, one line per code point and
+the two contraction lines, written by
+`tests/support/certificate_collation_table_249.mjs` from the DUCET 13.0.0
+and parsed at compile time by a `const fn` that fails the build on a line
+out of order or malformed, as #89's wordlists are. Go orders by bytes
 (`go-sdk@2ca481c` `wallet/serializer/certificate.go:48`, `sort.Strings`) and
 re-serializes to verify; a certificate Go signs over names the two orders
 disagree on verifies here (its bytes are kept) and not in the reference.
@@ -549,9 +553,15 @@ reference's bytes (red on the half (b) commit, whose `sign` kept the
 received order); a repeated name is refused in the reference's words (red);
 a field changed after `from_binary` unbinds the bytes (red); and the
 serializer orders a 1,402-name corpus of printable ASCII and Latin-1 names as
-`localeCompare` orders it under Node v22.18.0, v20.19.5 and v24.11.1 (red).
-The table's comparison agreed with `localeCompare` on 1,065,536 pairs before
-it was committed.
+`localeCompare` orders it (red). The three Nodes the corpus was checked
+under, v22.18.0, v20.19.5 and v24.11.1, are one collation data set, each
+ICU 77.1, CLDR 47.0, Unicode 16.0; the table's rows are the DUCET 13.0.0's,
+checked against that ICU. The pair check,
+`tests/support/certificate_collation_pairs_249.mjs`, compares the table's
+sort key with `localeCompare` on every ordered pair of the 256
+one-character names, of the corpus's names, and of the 65,536 two-character
+names with the one-character ones: 18,808,356 pairs, 0 disagreements under
+each of the three (its header records the run).
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
