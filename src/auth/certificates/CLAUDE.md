@@ -48,7 +48,7 @@ pub struct Certificate {
     pub subject: PublicKey,            // Subject's identity key
     pub certifier: PublicKey,          // Certifier's public key
     pub revocation_outpoint: Option<Outpoint>,  // On-chain revocation
-    pub fields: HashMap<String, Vec<u8>>,       // UTF-8 bytes of each value's base64 text
+    pub fields: HashMap<String, String>,        // each value's base64 text; its UTF-8 bytes signed and written
     pub signature: Option<Vec<u8>>,    // DER-encoded signature
     #[serde(skip)]
     pub received_unsigned: Option<Vec<u8>>,  // the unsigned prefix as read or signed (#249)
@@ -114,8 +114,8 @@ time and nowhere earlier (#261):
 | `signing_hash()` | Get SHA-256 hash for signing |
 | `type_base64()` | Get certificate type as base64 string |
 | `serial_number_base64()` | Get serial number as base64 string |
-| `set_field()` | Set a field value: the bytes of its base64 text; `Result`, a value that is not UTF-8 refused (#261); clears `received_unsigned` |
-| `get_field()` | Get a field value as held (its base64 text's bytes) |
+| `set_field()` | Set a field value: its base64 text (`impl Into<String>`), any string accepted as the reference accepts it (#261); clears `received_unsigned` |
+| `get_field()` | Get a field value as held (its base64 text) |
 | `field_names()` | Get all field names |
 | `get_field_encryption_key_id_master()` | Key ID for master encryption |
 | `get_field_encryption_key_id_verifiable()` | Key ID for verifiable encryption |
@@ -265,8 +265,8 @@ let verifiable: VerifiableCertificate = cert.into();
 
 All certificate types support JSON serialization via serde:
 - `cert_type` and `serial_number` are base64-encoded
-- `fields` values are the strings held (each the base64 text of a ciphertext), never re-encoded; a held value that is not UTF-8 is refused (#261)
-- `signature`, `master_keyring` and `keyring` are arrays of numbers (the reference writes hex and base64 strings; a stated divergence)
+- `fields` is the plain map of strings (each the base64 text of a ciphertext), never re-encoded (#261)
+- `signature`, `master_keyring` and `keyring` are arrays of numbers (the reference writes hex and base64 strings; a stated divergence, #268)
 - Uses camelCase field naming
 
 ## Related Documentation
