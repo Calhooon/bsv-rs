@@ -16,7 +16,7 @@
 mod fixtures;
 
 use bsv_rs::wallet::wire::{WalletCall, WalletWireProcessor};
-use bsv_rs::Error;
+use bsv_rs::{Error, WalletRefusalClass};
 use fixtures::wallet::Stub;
 use serde_json::json;
 use std::collections::BTreeMap;
@@ -184,4 +184,27 @@ async fn the_frame_is_the_same_with_and_without_a_listener() {
         .unwrap();
     assert_eq!(heard, unheard);
     assert_eq!(hex::encode(&unheard), WALLET_OPERATION_FAILED_FRAME);
+}
+
+/// #137: a wallet's refusal keeps its words and its class's code on the wire,
+/// so the event carries no words: the call's name and the class's reference
+/// name, one `warn` event; the frame the coded one (`07`, the words, `00`).
+#[tokio::test]
+async fn a_wallet_refusal_raises_one_event_with_the_call_and_its_class() {
+    let error = Error::WalletRefusal {
+        class: WalletRefusalClass::InsufficientFunds,
+        message: "short".into(),
+    };
+    let (frame, events) = frame_and_events(refusing(error), &request(WalletCall::GetHeight)).await;
+    assert_eq!(hex::encode(&frame), "070573686f727400");
+    assert_eq!(events.len(), 1, "{events:?}");
+    let event = &events[0];
+    assert_eq!(event.level, Level::WARN);
+    assert_eq!(event.fields["call"], "getHeight");
+    assert_eq!(event.fields["class"], "insufficientFunds");
+    assert_eq!(
+        event.fields["message"],
+        "wallet refusal framed with its code"
+    );
+    assert_eq!(event.fields.len(), 3, "{:?}", event.fields);
 }

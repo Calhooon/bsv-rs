@@ -57,11 +57,13 @@ const WALLET_OPERATION_FAILED: &str = "Wallet operation failed";
 
 /// The code of an explicit wallet error, 2 to 8 (`WalletWireProcessor.ts:2405-2416`:
 /// a `WalletError`, or a `WERR_` error, whose `code` lies in unsupportedAction
-/// to abortRefused). This crate's `Error` carries no wallet code (#137), so no
-/// error is explicit today; a coded variant, when one exists, answers here and
-/// keeps its words and its code on the wire.
-fn explicit_wallet_code(_error: &Error) -> Option<u8> {
-    None
+/// to abortRefused): a [`Error::WalletRefusal`]'s class (#137), which keeps
+/// its words and its code on the wire. Every other error has none.
+fn explicit_wallet_code(error: &Error) -> Option<u8> {
+    match error {
+        Error::WalletRefusal { class, .. } => Some(class.code()),
+        _ => None,
+    }
 }
 
 /// The words an error frame carries: the reference writes `error.message`
@@ -71,7 +73,7 @@ fn explicit_wallet_code(_error: &Error) -> Option<u8> {
 /// is this crate's own sentence, written as its `Display` reads.
 fn wire_message(error: &Error) -> String {
     match error {
-        Error::WalletError(words) => words.clone(),
+        Error::WalletError(words) | Error::WalletRefusal { message: words, .. } => words.clone(),
         other => other.to_string(),
     }
 }
@@ -300,7 +302,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     /// outside this call and framed in their own words, as the reference's
     /// throws outside the wrapper are. With the `tracing` feature the words
     /// the frame drops go to one `warn` event here, with the call's name
-    /// (bsv-rs#212); the wire is the same with the feature on or off.
+    /// (bsv-rs#212), and a refusal kept with its code to one `warn` event with
+    /// the call's name and its class (#137); the wire is the same with the
+    /// feature on or off.
     async fn invoke_wallet<T>(
         &self,
         call: WalletCall,
@@ -311,7 +315,17 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         operation
             .await
             .map_err(|error| match explicit_wallet_code(&error) {
-                Some(_) => error,
+                Some(_) => {
+                    #[cfg(feature = "tracing")]
+                    if let Error::WalletRefusal { class, .. } = &error {
+                        tracing::warn!(
+                            call = call.method_name(),
+                            class = class.name(),
+                            "wallet refusal framed with its code"
+                        );
+                    }
+                    error
+                }
                 None => {
                     #[cfg(feature = "tracing")]
                     tracing::warn!(
@@ -336,8 +350,8 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
             Err(e) => {
                 // The reference's outer catch (`WalletWireProcessor.ts:2370-2396`
                 // at `ts-stack@edf6e03`, bsv-rs#202): the refusal's code (6 for
-                // an argument the reference's validator refuses, #216; else 1,
-                // this crate's `Error` carrying no code, #137) and its words,
+                // an argument the reference's validator refuses, #216; a
+                // wallet refusal's class, #137; else 1) and its words,
                 // cut at 4096 bytes; the stack an empty string.
                 writer.write_u8(e.code);
                 let bytes = e.words.as_bytes();

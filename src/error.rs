@@ -185,6 +185,27 @@ pub enum Error {
     #[error("wallet error: {0}")]
     WalletError(String),
 
+    /// A wallet's refusal with its class: the reference's coded wallet error.
+    ///
+    /// The reference's `WalletError` carries a numeric code beside its
+    /// message (`ts-stack@edf6e03` `packages/sdk/src/wallet/WalletError.ts:3`,
+    /// the table at `:71-80`); this is that error, the class the code and the
+    /// words the message. A wallet raises it where the caller should learn
+    /// why (a bad argument, too few funds, a refused abort); every other
+    /// failure stays [`Error::WalletError`], the reference's `unknownError`.
+    /// The wire processor frames it with the class's code and its words
+    /// (`WalletWireProcessor.ts:2402-2418`), and the transceiver reads a
+    /// frame coded 2 to 8 back as this variant (`WalletWireTransceiver.ts:153`).
+    /// `Display` is the message alone: the class is the typed field.
+    #[cfg(feature = "wallet")]
+    #[error("{message}")]
+    WalletRefusal {
+        /// The reference's class of the refusal, and its code.
+        class: WalletRefusalClass,
+        /// The refusal in the wallet's words, as the frame carries them.
+        message: String,
+    },
+
     /// The wallet is busy: a refusal before acting, in the wallet's word.
     ///
     /// The wallet answered that it refused the call before acting (a
@@ -514,6 +535,98 @@ impl TransportFault {
 impl std::fmt::Display for TransportFault {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.code())
+    }
+}
+
+/// The class of a wallet's refusal: the reference's wallet error codes 2 to 8
+/// (`walletErrors`, `ts-stack@edf6e03`
+/// `packages/sdk/src/wallet/WalletError.ts:71-80`), the ones its wire
+/// processor keeps on the wire with the wallet's words
+/// (`WalletWireProcessor.ts:2379-2384`, `:2407-2416`). Code 1,
+/// `unknownError`, is no class here: it is [`Error::WalletError`], framed as
+/// `Wallet operation failed` (`:2417`). BRC-100 (`5119a9b`
+/// `wallet/0100.md:289-319`) asks a machine-readable code of every error and
+/// leaves its naming to the implementation; its wire's error byte is
+/// `1-255`, "predefined error types or ... custom error categorization"
+/// (`:1609`): these are the predefined ones.
+#[cfg(feature = "wallet")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum WalletRefusalClass {
+    /// `unsupportedAction`, code 2: the wallet does not perform the call.
+    UnsupportedAction,
+    /// `invalidHmac`, code 3: an HMAC that does not verify.
+    InvalidHmac,
+    /// `invalidSignature`, code 4: a signature that does not verify.
+    InvalidSignature,
+    /// `reviewActions`, code 5: an undelayed createAction or signAction whose
+    /// results require review (`WERR_REVIEW_ACTIONS.ts:24-25`).
+    ReviewActions,
+    /// `invalidParameter`, code 6: an argument the wallet refuses
+    /// (`WERR_INVALID_PARAMETER.ts:14-15`).
+    InvalidParameter,
+    /// `insufficientFunds`, code 7: the inputs cannot cover the outputs and
+    /// the fee (`WERR_INSUFFICIENT_FUNDS.ts:19-20`).
+    InsufficientFunds,
+    /// `abortRefused`, code 8: the wallet refused to abort the action
+    /// (`WalletWireProcessor.ts:801-804`).
+    AbortRefused,
+}
+
+#[cfg(feature = "wallet")]
+impl WalletRefusalClass {
+    /// Every class, in the order of its code.
+    pub const ALL: [Self; 7] = [
+        Self::UnsupportedAction,
+        Self::InvalidHmac,
+        Self::InvalidSignature,
+        Self::ReviewActions,
+        Self::InvalidParameter,
+        Self::InsufficientFunds,
+        Self::AbortRefused,
+    ];
+
+    /// The reference's code, the error byte of a wire frame (a `UInt8`,
+    /// `WalletError.ts:70`).
+    #[must_use]
+    pub fn code(&self) -> u8 {
+        match self {
+            Self::UnsupportedAction => 2,
+            Self::InvalidHmac => 3,
+            Self::InvalidSignature => 4,
+            Self::ReviewActions => 5,
+            Self::InvalidParameter => 6,
+            Self::InsufficientFunds => 7,
+            Self::AbortRefused => 8,
+        }
+    }
+
+    /// The reference's name of the code (`walletErrors`' key).
+    #[must_use]
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::UnsupportedAction => "unsupportedAction",
+            Self::InvalidHmac => "invalidHmac",
+            Self::InvalidSignature => "invalidSignature",
+            Self::ReviewActions => "reviewActions",
+            Self::InvalidParameter => "invalidParameter",
+            Self::InsufficientFunds => "insufficientFunds",
+            Self::AbortRefused => "abortRefused",
+        }
+    }
+
+    /// The class of a code, 2 to 8; `None` for every other byte (1 is
+    /// `unknownError`, 9 and above no class of the reference's).
+    #[must_use]
+    pub fn from_code(code: u8) -> Option<Self> {
+        Self::ALL.into_iter().find(|class| class.code() == code)
+    }
+}
+
+#[cfg(feature = "wallet")]
+impl std::fmt::Display for WalletRefusalClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
     }
 }
 
