@@ -1498,6 +1498,97 @@ and this crate refuse the same values with the same words (a negative below
 `-(2^53 - 1)` in `BigNumber.toNumber`'s words, `BigNumber.ts:625-630`, ahead of
 the bound).
 
+### Fixed: a certificate's field value is held, written and signed as its base64 text, and decrypted as the reference encrypts it (#261)
+
+BRC-52 at `5119a9b` carries a field value as a base64 string
+(`peer-to-peer/0052.md:41`) and is a MUST on its bytes (`:97`: "Field values
+in `CertificateBinary` are the UTF-8 bytes of the Base64 string, not the
+Base64-decoded ciphertext bytes. Serializers and verifiers MUST preserve the
+field-name strings and Base64 text used in the signed representation. They
+MUST NOT apply ... Base64 decoding and re-encoding to an existing signed field
+while reconstructing its preimage."). The reference at `ts-stack@edf6e03`
+writes `UtilsToArray(fieldValue, 'utf8')` (`packages/sdk/src/auth/certificates/Certificate.ts:294-296`)
+and stores `toBase64(ciphertext)` as the field (`MasterCertificate.ts:283`);
+Go holds `Fields map[string]string` (`go-sdk@2ca481c` `wallet/interfaces.go:122`)
+and writes `[]byte(fieldValue)` (`wallet/serializer/certificate.go:58-60`).
+`Certificate.fields` (`HashMap<String, Vec<u8>>`) and its writer already held
+and wrote bytes as given; the sites that put the decoded ciphertext there:
+
+- `get_verifiable_certificates` (`src/auth/utils/validation.rs`) decoded each
+  field of the wallet's `listCertificates` result before building the
+  certificate; it now holds the text's bytes.
+- The identity client's two parsers (`parse_output_to_certificate`,
+  `parse_output_to_verifiable_certificate`, `src/identity/client.rs`) decoded
+  each field; they now hold the text's bytes. They also read the signature as
+  base64, where the reference's `WalletCertificate.signature` is hex and this
+  crate's own `publicly_reveal_attributes` writes hex, so no published
+  certificate parsed; they read hex now.
+- `MasterCertificate` stored the wallet's ciphertext raw. It now encrypts as
+  the reference does (`MasterCertificate.ts:254-310`): a random symmetric key
+  per field, the field the base64 text of that key's ciphertext, the master
+  keyring the key encrypted by the certifier's wallet to the subject (protocol
+  `[2, "certificate field encryption"]`, key ID the field name).
+  `create_keyring_for_verifier` decrypts that key and encrypts it to the
+  verifier under `"<serial base64> <field>"` (`:325-414`); `decrypt_field(s)`
+  (`:564-625`) and `VerifiableCertificate::decrypt_field(s)`
+  (`VerifiableCertificate.ts:152-219`) decrypt the key, then decode the field's
+  base64 text and decrypt it, at decrypt time and nowhere earlier. Before,
+  the wallet encrypted the plaintext directly and the master keyring held a
+  copy of that ciphertext, so no certificate the reference issued decrypted
+  here and none issued here decrypted there.
+- `Certificate`'s serde: `fields` had no `with`, so a value went out as an
+  array of numbers. It now goes out as the string it holds and a string comes
+  in as its UTF-8 bytes; a held value that is not UTF-8 is refused on the way
+  out (`certificate field <name> is not UTF-8 base64 text: ...`), and serde_json
+  refuses bytes that are not UTF-8 on the way in. `to_wallet_certificate` and
+  `VerifiableCertificate::to_json_value` write the held text where they wrote
+  its base64 (a non-UTF-8 value, which no certificate this crate or the
+  reference issues carries, is written with U+FFFD in place of its invalid
+  bytes there; those two return no `Result`).
+
+The keyrings (outside the signature, `0052.md:75,143`) keep their
+representation: raw ciphertext bytes, base64 at the JSON intakes as before.
+
+One public signature moves: `MasterCertificate::create_keyring_for_verifier`
+takes the master keyring after the fields
+(`create_keyring_for_verifier(wallet, certifier, verifier, fields_to_reveal, &cert.fields, &cert.master_keyring, &serial, originator)`),
+which the reference's takes too and the decrypt needs. A certificate issued by
+this crate's `MasterCertificate` before this release does not decrypt under
+the reference's scheme: re-issue it.
+
+Pinned by `tests/auth_certificate_field_value_261.rs` and
+`src/identity/client_field_value_261_tests.rs` on the witnesses
+`tests/vectors/certificate_field_value_261.json`, recorded by
+`tests/support/certificate_field_value_261.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` (bundled with bun) under Node v22.18.0, its randomness a
+SHA-256 counter stream so the run reproduces byte for byte: a certificate the
+reference issued with three encrypted fields, read through `Certificate`'s
+JSON, through `get_verifiable_certificates` over the HTTP JSON substrate and
+through both identity parsers, verifies here and signs the reference's
+preimage hash (on the base: a JSON refusal, a different preimage hash, and
+`None` from both parsers); it decrypts here to the reference's plaintexts
+under the master, verifier and anyone keyrings (`DecryptionFailed` on the
+base); a certificate issued here holds canonical base64 text, its bytes are
+the reference's `toBinary(true)` of its JSON, and the reference verifies it
+(`true`) and decrypts it to its plaintexts; a value that is not UTF-8 is
+refused at the JSON intake and the JSON writer.
+
+### Notes: cross-SDK parity (#261)
+
+The JSON shape of `Certificate.fields` moves from arrays of numbers to the
+reference's strings (`Wallet.interfaces.ts` `WalletCertificate.fields:
+Record<CertificateFieldNameUnder50Bytes, string>`); `AuthMessage`'s
+certificates carry it so on the auth wire. A Rust caller that read a field as
+ciphertext decodes it at the decrypt site:
+`from_base64(std::str::from_utf8(&cert.fields[name])?)?`. The rest of this
+crate's `Certificate` serde stays where it was and is not the reference's
+JSON: `certType` where the reference writes `type`, the signature an array of
+numbers where it writes hex, the keyrings arrays of numbers where it writes
+base64 (a line in `CLAUDE.md`'s list). `bsv-wallet-toolbox-rs` decodes each
+field on intake (`src/wallet/certificate_issuance.rs:553-556`,
+`BASE64.decode` then `set_field`) and must pass the string's bytes through
+with this release.
+
 ## [0.9.0-beta.1] - 2026-10-26
 
 The 0.9.0 line's canary prerelease (RELEASING.md point 14), cut from `beta` for the toolbox's and the CLI's beta lines to build against; the entries below are 0.9.0's, unreleased on `main` until the minor merges at the phase exit.

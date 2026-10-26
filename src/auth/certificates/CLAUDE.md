@@ -21,8 +21,10 @@ This module implements identity certificates for the BSV authentication system, 
 The module implements a three-stage certificate lifecycle:
 
 1. **Issuance**: Certifier creates a `MasterCertificate` for the subject
-   - Fields are encrypted from certifier to subject using BRC-42
-   - Master keyring stores encryption keys for all fields
+   - Each field is encrypted under its own random symmetric key; the field
+     value is the base64 text of that ciphertext, held as its UTF-8 bytes
+     (BRC-52 `0052.md:41,97`; the reference's `MasterCertificate.ts:254-310`; #261)
+   - Master keyring stores each field's key encrypted from certifier to subject (BRC-2)
    - Certificate is signed by the certifier
 
 2. **Storage**: Subject stores the `MasterCertificate`
@@ -46,7 +48,7 @@ pub struct Certificate {
     pub subject: PublicKey,            // Subject's identity key
     pub certifier: PublicKey,          // Certifier's public key
     pub revocation_outpoint: Option<Outpoint>,  // On-chain revocation
-    pub fields: HashMap<String, Vec<u8>>,       // Encrypted field values
+    pub fields: HashMap<String, Vec<u8>>,       // UTF-8 bytes of each value's base64 text
     pub signature: Option<Vec<u8>>,    // DER-encoded signature
     #[serde(skip)]
     pub received_unsigned: Option<Vec<u8>>,  // the unsigned prefix as read or signed (#249)
@@ -57,7 +59,7 @@ pub struct Certificate {
 ```rust
 pub struct MasterCertificate {
     pub certificate: Certificate,
-    pub master_keyring: HashMap<String, Vec<u8>>,  // field -> encrypted key
+    pub master_keyring: HashMap<String, Vec<u8>>,  // field -> encrypted revelation key (raw)
 }
 ```
 
@@ -78,7 +80,12 @@ pub const CERTIFICATE_SIGNATURE_PROTOCOL: &str = "certificate signature";
 
 ## Field Encryption
 
-Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterparty-specific):
+Each field is encrypted with `SymmetricKey` (AES-256-GCM, 32-byte IV) under a
+random 32-byte revelation key; the field value held, signed and written is
+the base64 text of `IV || ciphertext || tag`. The revelation keys are
+encrypted by the wallet (BRC-2) with BRC-42 key derivation, Security Level 2
+(counterparty-specific). Decryption decodes the field's text at decrypt
+time and nowhere earlier (#261):
 
 **Master Certificate Key IDs:**
 - Protocol: `"certificate field encryption"`
@@ -107,12 +114,12 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | `signing_hash()` | Get SHA-256 hash for signing |
 | `type_base64()` | Get certificate type as base64 string |
 | `serial_number_base64()` | Get serial number as base64 string |
-| `set_field()` | Set an encrypted field value; clears `received_unsigned` |
-| `get_field()` | Get an encrypted field value |
+| `set_field()` | Set a field value: the bytes of its base64 text; clears `received_unsigned` |
+| `get_field()` | Get a field value as held (its base64 text's bytes) |
 | `field_names()` | Get all field names |
 | `get_field_encryption_key_id_master()` | Key ID for master encryption |
 | `get_field_encryption_key_id_verifiable()` | Key ID for verifiable encryption |
-| `to_wallet_certificate()` | Convert to wallet certificate format |
+| `to_wallet_certificate()` | Convert to wallet certificate format (fields the held text) |
 
 ### MasterCertificate
 
@@ -121,7 +128,7 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | `new()` | Create from base certificate and keyring |
 | `issue_for_subject()` | Issue new certificate (async) |
 | `create_certificate_fields()` | Encrypt fields and create keyring (async) |
-| `create_keyring_for_verifier()` | Create verifier-specific keyring (async) |
+| `create_keyring_for_verifier()` | Create verifier-specific keyring from the master keyring (async) |
 | `decrypt_field()` | Decrypt single field (async) |
 | `decrypt_fields()` | Decrypt all fields (async) |
 | `verify()` | Verify underlying certificate signature |
@@ -143,7 +150,7 @@ Fields are encrypted using BRC-42 key derivation with Security Level 2 (counterp
 | `certifier()` | Get certifier's public key |
 | `cert_type()` | Get certificate type |
 | `serial_number()` | Get serial number |
-| `to_json_value()` | Convert to JSON with base64 encoding |
+| `to_json_value()` | Convert to JSON: fields the held text, keyring base64 |
 
 ## Binary Format
 
@@ -204,6 +211,7 @@ let keyring = MasterCertificate::create_keyring_for_verifier(
     &verifier_public_key,
     &["name".to_string()],  // Only reveal name, not email
     &master_cert.certificate.fields,
+    &master_cert.master_keyring,
     &master_cert.certificate.serial_number,
     "app_originator",
 ).await?;
@@ -254,8 +262,8 @@ let verifiable: VerifiableCertificate = cert.into();
 
 All certificate types support JSON serialization via serde:
 - `cert_type` and `serial_number` are base64-encoded
-- `fields` values are base64-encoded
-- `signature` is base64-encoded when present
+- `fields` values are the strings held (each the base64 text of a ciphertext), never re-encoded; a held value that is not UTF-8 is refused (#261)
+- `signature`, `master_keyring` and `keyring` are arrays of numbers (the reference writes hex and base64 strings; a stated divergence)
 - Uses camelCase field naming
 
 ## Related Documentation
