@@ -15,7 +15,7 @@ it ahead of 0.9.0-beta.1. `BRC_PIN` names the new commit and the 65 fixture
 files were re-recorded by `docs/FIXTURES.md`'s procedure: 67 lines moved, each
 a reference's commit line; no fixture byte under test moved. Every line range
 cited at the old pin carries its number at the new one (`wallet/0100.md`'s
-edits above a range shift it by 1, 7, 9 or 23 lines; the BEEF, BUMP, atomic
+edits above a range shift it by 1, 7, 8, 9 or 23 lines; the BEEF, BUMP, atomic
 BEEF and raw transaction ranges keep theirs), and `docs/lanes/README.md` rule
 4 names the new pin. Public shape: nothing moves.
 
