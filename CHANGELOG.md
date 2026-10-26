@@ -368,6 +368,110 @@ signed again with another key, the signature refusal ahead of the key check
 (the base's `CryptoError` for the key); cleared with `set_signature(None)`,
 it signs to a single signing's bytes, the reference's after
 `signature = undefined`; an empty signature signs.
+### Fixed: the three certificate types' JSON is the reference's: `type`, the signature hex, the keyrings base64 strings (#268)
+
+`Certificate`, `MasterCertificate` and `VerifiableCertificate` wrote a JSON the
+reference does not read and read none it writes. The reference's at
+`ts-stack@edf6e03` (`packages/sdk/src/auth/certificates/Certificate.ts:150-212`,
+`MasterCertificate.ts:164-237`, `VerifiableCertificate.ts:80-118`; the JSON
+being `JSON.stringify` of the instance and `Certificate.fromObject`,
+`Certificate.ts:505-525`, or the subclasses' constructors, as `Peer`'s
+`#restoreOwnedCertificates` reads a peer's, `Peer.ts:341-357`) and Go's at
+`2ca481c` (`auth/certificates/certificate.go:32-52`, `master.go:28-35`,
+`verifiable.go:16-29`) agree on every key and encoding. The moves, old and new:
+
+| Key | Before | Now |
+|---|---|---|
+| the type | `certType` (base64) | `type` (base64), `Certificate.ts:150-153`, `certificate.go:34` |
+| `signature` | an array of numbers (the DER bytes) | the DER bytes in hex, `Certificate.ts:184`, `certificate.go:52` (`util.ByteString`) |
+| `revocationOutpoint` when `None` | no key | the binary form's sentinel, `"<64 zeros>.0"`: the reference's is always a string (`Certificate.ts:174`) and its `toBinary` refuses another type (`:257-258`); read back from the sentinel, `null` (Go's nil) or no key as `None` |
+| `masterKeyring` | an array of numbers per field | the base64 string, `MasterCertificate.ts:173`, `master.go:34` |
+| `keyring` | an array of numbers per field | the base64 string, `VerifiableCertificate.ts:90`, `verifiable.go:23` |
+| `to_json_value()`'s `signature` | base64 | hex; the absent outpoint the sentinel, where it wrote `null`; the method is now the type's serde |
+
+`MasterCertificate` and `VerifiableCertificate` flatten `Certificate`, so the
+auth messages' `certificates` (`AuthMessage.certificates`, a
+certificateResponse's JSON on every transport) carry the same keys; before,
+a reference peer's certificateResponse did not deserialize here. The identity
+client's publish (`publicly_reveal_attributes`) and the HTTP JSON substrate's
+`WalletCertificate` already wrote the reference's shape and do not move.
+
+The keyrings' type (the owner's word of 2026-10-26 on #261: base64 strings
+held, decoded only where the wallet decrypts): `MasterCertificate.master_keyring`
+and `VerifiableCertificate.keyring` move from `HashMap<String, Vec<u8>>` of
+wallet ciphertext to `HashMap<String, String>` of its base64 text, as the
+reference's `Record<CertificateFieldNameUnder50Bytes, Base64String>` and Go's
+`map[..]wallet.StringBase64` hold them. `MasterCertificate::new`,
+`VerifiableCertificate::new`, `create_certificate_fields` (its second map) and
+`create_keyring_for_verifier` (its master keyring and its result) take and
+return the text, as the reference's `toBase64` writes it (`MasterCertificate.ts:292-298`,
+`:405`); `from_base64` runs at the wallet's `decrypt` in `decrypt_field(s)` of
+both types and nowhere earlier. `IdentityCertificate.publicly_revealed_keyring`
+moves the same way (the reference's `Record<..., Base64String>`,
+`Wallet.interfaces.ts:879`). The holders: `get_verifiable_certificates` holds
+the wallet's `keyringForVerifier` strings as given
+(`getVerifiableCertificates.ts:92-104`), where it dropped an entry that did not
+decode; the identity client's two parsers hold the published keyring's
+strings, where one refused the whole output on an entry that did not decode
+and the other dropped the entry. No setter is added: the fields are public
+and the constructors take the map. Migration for a Rust caller:
+
+```text
+keyring.insert(name, ciphertext_bytes);
+keyring.insert(name, to_base64(&ciphertext_bytes));
+
+let bytes: &Vec<u8> = &verifiable.keyring[name];
+let bytes: Vec<u8> = from_base64(&verifiable.keyring[name])?;  // at its decrypt site
+```
+
+A persisted JSON of the old shape is refused by the new reader (`missing
+field type`, or the signature `expected a string`), never misread. The
+reference's reader ignores a key it does not know (`fromObject` picks its
+seven keys), so an old JSON read there is a certificate with no type, refused
+at its `toBinary`; this crate's reader ignores an unknown key too and asks for
+`type`, so no alias of `certType` is kept: a stored old JSON is migrated once,
+by reading it as `serde_json::Value` and renaming `certType` to `type`,
+writing `signature` as `to_hex(&bytes)` and each keyring entry as
+`to_base64(&bytes)`.
+
+`cargo semver-checks check-release --baseline-rev origin/lane/fix-261-field-value-bytes
+--features full --release-type minor`: no lint for the two keyrings' type, the
+`IdentityCertificate` field's type, or the serde shapes; semver-checks 0.51.0
+has none for a field's type or a serialization. 0.9.0 is the minor that takes
+the break.
+
+Pinned by `tests/auth_certificate_json_268.rs` on the witnesses
+`tests/vectors/certificate_json_268.json`, recorded by
+`tests/support/certificate_json_268.mjs` against `@bsv/sdk` at
+`ts-stack@edf6e03` (bundled with bun) under Node v22.18.0, its randomness a
+SHA-256 counter stream: the reference's `JSON.stringify` of the three types
+for a certificate it issued with three fields and with one, each read here
+and written back equal by value, and byte for byte where every map has one
+key, verified, written to the reference's `toBinary(true)` and decrypted to
+its plaintexts under the master and verifier keyrings; this crate's JSON of
+the three types for a certificate it issued, read by the reference
+(`verify()` true on the three, its `toBinary(true)` this crate's bytes, the
+plaintexts decrypted under both keyrings, its `JSON.stringify` of what it read
+this crate's text byte for byte); a fresh issuance's keys and encodings; an
+absent outpoint read from the sentinel, `null` and no key. Red on the base
+(4 of 4: the hex signature refused, `expected a sequence`; the absent outpoint
+`null`; the keys `certType` and no `revocationOutpoint`); the reference refuses
+the base's JSON (`Master certificate keyring.city must be an own string data
+property`). The #261 test read the reference's JSON through a helper that
+renamed `type` and decoded the signature; it passes the JSON as given, its
+vector unchanged.
+
+### Notes: cross-SDK parity (#268)
+
+`VerifiableCertificate`'s cached plaintexts are not in its JSON in either
+direction: the reference writes `decryptedFields` when its constructor was
+given them and its `#restoreOwnedCertificates` passes a peer's through
+(`Peer.ts:354`; Go writes `decryptedFields,omitempty`, `verifiable.go:28`);
+here a peer's `decryptedFields` is ignored, since a cache read from the wire
+would answer `decrypt_fields` with the sender's plaintexts. An absent
+`revocationOutpoint` (Go's `null` for nil, `certificate.go:46`) reads as
+`None` here; the reference keeps it and refuses it at `toBinary`
+(`Certificate.ts:257-258`).
 
 ### Added: what `auth_certificate.json` vector 0 is, and the test that says so (#252)
 
@@ -1849,7 +1953,8 @@ before. #249's `with_fields` and `set_fields`, unreleased, take the same
   (`IdentityClient.ts:823-825`).
 
 The keyrings (outside the signature, `0052.md:75,143`) keep their
-representation: raw ciphertext bytes, base64 at the JSON intakes as before.
+representation: raw ciphertext bytes, base64 at the JSON intakes as before
+(until #268, above: the base64 text).
 
 The certificate methods take the reference's parameters (the owner's word of
 2026-10-26, option A: the signature breaks once, in 0.9.0, and never again).

@@ -180,7 +180,7 @@ Enriched certificate with decrypted fields and certifier information:
 pub struct IdentityCertificate {
     pub certificate: VerifiableCertificate,
     pub certifier_info: CertifierInfo,
-    pub publicly_revealed_keyring: HashMap<String, Vec<u8>>,
+    pub publicly_revealed_keyring: HashMap<String, String>,  // base64 text (#268)
     pub decrypted_fields: HashMap<String, String>,
 }
 
@@ -198,8 +198,8 @@ text, never decoded, as BRC-52 signs it (`brcs@5119a9b`
 `peer-to-peer/0052.md:41,97`); the signature is hex, as the reference's
 `WalletCertificate.signature` and this crate's `publicly_reveal_attributes`
 write it, and one that is not skips its output, never the resolution
-(`IdentityClient.ts:823-825`); the keyring's values are base64, decoded to the encrypted
-revelation keys. `decrypted_fields` comes from
+(`IdentityClient.ts:823-825`); the keyring's values are held as their base64
+text (#268), decoded only where the anyone wallet decrypts. `decrypted_fields` comes from
 `VerifiableCertificate::decrypt_fields` with `ProtoWallet::anyone()`: each
 field's text is decoded and decrypted there and nowhere earlier.
 

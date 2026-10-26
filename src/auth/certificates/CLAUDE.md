@@ -58,7 +58,7 @@ pub struct Certificate {
 ```rust
 pub struct MasterCertificate {
     pub certificate: Certificate,
-    pub master_keyring: HashMap<String, Vec<u8>>,  // field -> encrypted revelation key (raw)
+    pub master_keyring: HashMap<String, String>,  // field -> encrypted revelation key, base64 text (#268)
 }
 ```
 
@@ -66,7 +66,7 @@ pub struct MasterCertificate {
 ```rust
 pub struct VerifiableCertificate {
     pub certificate: Certificate,
-    pub keyring: HashMap<String, Vec<u8>>,  // field -> encrypted key for verifier
+    pub keyring: HashMap<String, String>,  // field -> encrypted key for verifier, base64 text (#268)
 }
 ```
 
@@ -149,7 +149,7 @@ time and nowhere earlier (#261):
 | `certifier()` | Get certifier's public key |
 | `cert_type()` | Get certificate type |
 | `serial_number()` | Get serial number |
-| `to_json_value()` | Convert to JSON: fields the held text, keyring base64 |
+| `to_json_value()` | The type's serde as a `serde_json::Value`: the reference's JSON (#268) |
 
 ## Binary Format
 
@@ -262,11 +262,16 @@ let verifiable: VerifiableCertificate = cert.into();
 
 ## Serialization
 
-All certificate types support JSON serialization via serde:
-- `cert_type` and `serial_number` are base64-encoded
-- `fields` is the plain map of strings (each the base64 text of a ciphertext), never re-encoded (#261)
-- `signature`, `master_keyring` and `keyring` are arrays of numbers (the reference writes hex and base64 strings; a stated divergence, #268)
-- Uses camelCase field naming
+All certificate types' JSON is the reference's (`ts-stack@edf6e03`
+`Certificate.ts:150-212`, `MasterCertificate.ts:164-237`,
+`VerifiableCertificate.ts:80-118`; go-sdk@2ca481c `auth/certificates/*.go`;
+#268), pinned by `tests/auth_certificate_json_268.rs`:
+- `type` (`cert_type`) and `serialNumber` base64; `subject` and `certifier` hex
+- `revocationOutpoint` `<txid>.<index>`; `None` written as the sentinel `"<64 zeros>.0"`, read from it, `null` or no key
+- `fields` the plain map of strings (each the base64 text of a ciphertext), never re-encoded (#261)
+- `signature` the DER bytes in hex, omitted when `None`
+- `masterKeyring` and `keyring` maps of base64 strings, held as given and decoded only at the wallet's decrypt
+- an unknown key ignored, as the reference's `fromObject` ignores it; `VerifiableCertificate`'s decrypted cache neither written nor read
 
 ## Related Documentation
 
