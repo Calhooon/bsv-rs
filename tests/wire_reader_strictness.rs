@@ -910,7 +910,7 @@ fn a_wire_length_past_u32_is_refused_on_every_target_not_cut_to_its_low_bits() {
 }
 
 /// A page of `entries` copies of one valid entry behind the declared `total`:
-/// the first frame's total byte replaced, its entry repeated.
+/// the one frame's total byte replaced, its entry repeated.
 fn page(one: &[u8], total: u64, entries: usize) -> Vec<u8> {
     let mut out = Vec::new();
     var_int(&mut out, total);
@@ -989,7 +989,7 @@ async fn every_page_reader(
     [listed, by_key, by_attributes]
 }
 
-/// `WalletWireTransceiver.ts:1507` (listCertificates) and `:1700`
+/// `WalletWireTransceiver.ts:1508` (listCertificates) and `:1699`
 /// (discovery): the entries are read `while (!resultReader.eof())`, so a byte
 /// after the last entry is read as the start of another and refused by the
 /// entry's reader (bsv-rs#190). A one-byte `00` is an entry whose certificate
@@ -1050,7 +1050,7 @@ async fn a_certificates_total_above_the_page_is_read() {
 }
 
 /// `#requirePageCapacity` (`WalletWireTransceiver.ts:1948-1953`), called
-/// before each entry (`:1509`, `:1701`): a page past the requested limit, or
+/// before each entry (`:1509`, `:1700`): a page past the requested limit, or
 /// past 10 when none was requested (`requestedLimit ?? 10`), is refused; a
 /// page at the limit is read (bsv-rs#190).
 #[tokio::test]

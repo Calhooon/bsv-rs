@@ -105,8 +105,8 @@ page, not the page's length: the reference's processor writes
 `certificatesPage.total` ahead of the page's records (`ts-stack@edf6e03`
 `WalletWireProcessor.ts:2052-2053` listCertificates, `:2486-2487`
 `#serializeDiscoveryResult`), and its transceiver reads the records
-`while (!resultReader.eof())` (`WalletWireTransceiver.ts:1507`
-listCertificates, `:1700` `#parseDiscoveryResult`). This crate's transceiver
+`while (!resultReader.eof())` (`WalletWireTransceiver.ts:1508`
+listCertificates, `:1699` `#parseDiscoveryResult`). This crate's transceiver
 read `total` records and dropped the bytes after them, so it refused a page
 shorter than the total and read a longer one cut to it. Both readers now read
 the reference's way, each refusal in its words, a `WalletError`:
@@ -121,7 +121,7 @@ the reference's way, each refusal in its words, a `WalletError`:
 - An entry past the requested limit, 10 when none was requested: `Wallet Wire
   listCertificates response exceeds the requested page limit of <m>`
   (`discover` for both discovery calls), `#requirePageCapacity`
-  (`:1948-1953`, `requestedLimit ?? 10`) before each entry (`:1509`, `:1701`).
+  (`:1948-1953`, `requestedLimit ?? 10`) before each entry (`:1509`, `:1700`).
   The 10 is the reference's default page size, BRC-100's
   `PositiveIntegerDefault10Max10000` for the request's `limit`.
 
