@@ -25,7 +25,8 @@ HTTP JSON wallet substrate, the overlay bodies) is read to the nearest
 double, and cargo's feature unification turns it on for a downstream's own
 `serde_json` in the same build: a number reads differently only where the
 old reader was wrong. A number past the double range (`1e400`) stays a
-refusal with `serde_json`'s reason, never a panic. Pinned by
+refusal with `serde_json`'s reason, never a panic, where the reference
+reads it as `Infinity` and writes `null` back (the parity note). Pinned by
 `tests/socketio_float_round_trip.rs` (the crash input, a set of awkward
 doubles against `serde_json`'s own round trip, long decimal texts against
 Rust's correctly rounded `str::parse`, and the vector below; four of its
@@ -52,7 +53,12 @@ JavaScript writes an integral double below `1e21` as an integer (`100`,
 `JSON.stringify` writes `0`, and keeps an integer within `u64` exact
 (`9007199254740993`) where `JSON.parse` reads the nearest double
 (`9007199254740992`). The last was so before this fix; the enumeration is
-pinned (`TEXT_DIFFERS`).
+pinned (`TEXT_DIFFERS`). A number past the double range is where the two
+part: `JSON.parse` reads `1e400` as `Infinity` and `JSON.stringify` writes
+it back as `null`, so the reference's encoding of such a frame is not a
+fixed point (its data changes); this crate refuses the frame as
+`Malformed` with `serde_json`'s reason (rule 5: the exact value back or a
+refusal), pinned by `a_number_past_the_double_range_is_refused_with_a_reason`.
 
 ### Changed: the nightly's heavy work holds at most six concurrent slots
 
