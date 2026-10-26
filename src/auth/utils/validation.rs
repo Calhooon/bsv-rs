@@ -650,7 +650,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.set_field("name", b"encrypted_value".to_vec());
+        cert.set_field("name", b"encrypted_value".to_vec()).unwrap();
         cert.sign(&certifier).unwrap();
 
         validate_certificate_encoding(&cert).unwrap();
@@ -774,9 +774,10 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.set_field("name", b"alice".to_vec());
-        cert.set_field("email", b"alice@example.com".to_vec());
-        cert.set_field("phone", b"+1234567890".to_vec());
+        cert.set_field("name", b"alice".to_vec()).unwrap();
+        cert.set_field("email", b"alice@example.com".to_vec())
+            .unwrap();
+        cert.set_field("phone", b"+1234567890".to_vec()).unwrap();
         cert.sign(&certifier).unwrap();
 
         validate_certificate_encoding(&cert).unwrap();

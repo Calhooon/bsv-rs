@@ -108,7 +108,7 @@ fn a_field_changed_after_from_binary_unbinds_the_received_bytes() {
 
     // A setter that changes a value in the preimage clears them, even to
     // the same value.
-    cert.set_field("f", original);
+    cert.set_field("f", original).unwrap();
     assert_eq!(cert.received_unsigned, None);
 
     // The signature is outside the preimage: its setter keeps them.

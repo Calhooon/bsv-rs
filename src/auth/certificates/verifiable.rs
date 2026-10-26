@@ -195,8 +195,10 @@ impl VerifiableCertificate {
     }
 
     /// Converts to a JSON-serializable format: each field value its held
-    /// base64 text (#261; a value that is not UTF-8 written with U+FFFD in
-    /// place of its invalid bytes), the keyring's values base64-encoded.
+    /// base64 text (#261), the keyring's values base64-encoded. A value that
+    /// is not UTF-8 reaches here only written into the public `fields` map
+    /// directly (`from_binary`, `set_field` and the JSON reader refuse it),
+    /// and is written with U+FFFD in place of its invalid bytes.
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "type": self.certificate.type_base64(),

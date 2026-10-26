@@ -1251,14 +1251,16 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
-                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec());
+                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec())?;
                 }
             }
         }
 
-        // The signature is hex, as the reference's WalletCertificate carries it
+        // The signature is hex, as the reference's WalletCertificate carries it;
+        // one that is not skips the output at the verify below, as the sibling
+        // parser and the reference skip it (`IdentityClient.ts:823-825`)
         if let Some(sig_str) = cert_data["signature"].as_str() {
-            certificate.signature = Some(from_hex(sig_str)?);
+            certificate.signature = from_hex(sig_str).ok();
         }
 
         // Step 6: Parse the keyring from JSON
@@ -1425,7 +1427,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
-                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec());
+                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec())?;
                 }
             }
         }

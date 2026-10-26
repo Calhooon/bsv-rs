@@ -20,6 +20,7 @@
 use bsv_rs::auth::certificates::{Certificate, MasterCertificate, VerifiableCertificate};
 use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, to_hex, PrivateKey};
 use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::Error;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -294,8 +295,50 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
     assert_eq!(decrypted, w.plaintexts);
 }
 
+/// The reference's certificate read from its bytes, one field's value
+/// replaced in the public map by bytes that are not UTF-8.
+fn with_a_value_not_utf8() -> Certificate {
+    let r = vectors().reference_issued;
+    let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
+    cert.fields
+        .insert("email".to_string(), vec![0xff, 0xfe, 0x41]);
+    cert
+}
+
 #[test]
-fn a_certificate_field_value_that_is_not_utf8_is_refused_at_the_json_intake_and_writer() {
+fn from_binary_refuses_a_field_value_that_is_not_utf8_the_field_named() {
+    // The reference's fromBinary reads each value with toUTF8Strict
+    // (`Certificate.ts:384`); BRC-52: malformed UTF-8 MUST NOT be made
+    // acceptable by retaining bytes (`0052.md:103`).
+    let bytes = with_a_value_not_utf8().to_binary(true);
+    match Certificate::from_binary(&bytes) {
+        Err(Error::InvalidUtf8(m)) => assert!(
+            m.contains("certificate field email is not UTF-8 base64 text"),
+            "{m}"
+        ),
+        other => panic!("expected InvalidUtf8, got {other:?}"),
+    }
+}
+
+#[test]
+fn set_field_refuses_a_value_that_is_not_utf8_and_holds_nothing() {
+    let r = vectors().reference_issued;
+    let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
+    let before = cert.fields.clone();
+    match cert.set_field("email", vec![0xff, 0xfe, 0x41]) {
+        Err(Error::InvalidUtf8(m)) => assert!(
+            m.contains("certificate field email is not UTF-8 base64 text"),
+            "{m}"
+        ),
+        other => panic!("expected InvalidUtf8, got {other:?}"),
+    }
+    assert_eq!(cert.fields, before);
+    cert.set_field("email", b"AAAA".to_vec()).unwrap();
+    assert_eq!(cert.fields["email"], b"AAAA");
+}
+
+#[test]
+fn the_json_reader_refuses_a_field_value_that_is_not_utf8() {
     let r = vectors().reference_issued;
     let json = serde_json::to_string(&crate_serde_json(&r.certificate)).unwrap();
     let text = r.certificate.fields.values().next().unwrap();
@@ -309,11 +352,13 @@ fn a_certificate_field_value_that_is_not_utf8_is_refused_at_the_json_intake_and_
     // A lone surrogate escape, which no UTF-8 string carries.
     let surrogate = json.replacen(text.as_str(), "\\ud800", 1);
     assert!(serde_json::from_str::<Certificate>(&surrogate).is_err());
+}
 
-    // A held value that is not UTF-8 is refused on the way out, the field named.
-    let mut cert: Certificate = serde_json::from_str(&json).unwrap();
-    cert.set_field("email", vec![0xff, 0xfe]);
-    let err = serde_json::to_string(&cert).unwrap_err().to_string();
+#[test]
+fn the_json_writer_refuses_a_held_field_value_that_is_not_utf8_the_field_named() {
+    let err = serde_json::to_string(&with_a_value_not_utf8())
+        .unwrap_err()
+        .to_string();
     assert!(
         err.contains("certificate field email is not UTF-8 base64 text"),
         "{err}"
