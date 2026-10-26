@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: `ScriptResourceLimit` prints the interpreter's sentence, from one place (#228)
+
+`script::ScriptResourceLimit` implements `Display`, carrying the
+interpreter's resource sentences byte for byte (`Stack memory usage`, `Alt
+stack memory usage`, `Script element allocation` `has exceeded <limit>
+bytes`; `Work budget exhausted: spent <n> units, budget <limit>`). The
+interpreter's message (`src/script/spend/limits.rs`, `resource_error` and
+`work_error`) and `SpendRefusal::Resource` (#213, which copied the words)
+both print through it, so the words live in one place. A `Work` limit with
+`work_spent: None`, which the interpreter never builds, prints `Work budget
+exhausted: budget <limit>` where #213's arm printed `spent 0 units`: a limit
+with no work recorded is not said to have spent none. No other text moves:
+the interpreter's resource tests and #213's `a_spend_refusal_prints_*` pass
+unchanged; each kind's text is pinned in `tests/resource_limits.rs`
+(`a_stack_limit_prints_the_interpreters_sentence` and the five beside it).
+Additive: a trait impl on an existing public type.
+
 ## [0.9.0-beta.1] - 2026-10-26
 
 The 0.9.0 line's canary prerelease (RELEASING.md point 14), cut from `beta` for the toolbox's and the CLI's beta lines to build against; the entries below are 0.9.0's, unreleased on `main` until the minor merges at the phase exit.

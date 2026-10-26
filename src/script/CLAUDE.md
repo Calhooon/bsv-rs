@@ -30,7 +30,7 @@ Compatible with the TypeScript and Go SDKs through shared opcode values, seriali
 | `address.rs` | `Address` type for P2PKH address parsing, creation, and Base58Check encoding |
 | `bip276.rs` | BIP-276 typed script encoding (`encode_bip276` / `decode_bip276`) |
 | `script_num.rs` | `ScriptNum` utilities for Bitcoin script number encoding |
-| `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging |
+| `evaluation_error.rs` | `ScriptEvaluationError` with full execution context for debugging; `ScriptResource`, `ScriptResourceLimit` and its `Display`, the one place the resource sentences live (#228) |
 | `spend/` | `Spend` interpreter for validating transaction spends, one module per opcode group (the map: "The interpreter's layout" below) |
 | `flags.rs` | `ScriptFlags` (the node's 32-bit verification flag word, bitcoin-sv v1.2.2's bit values and names; `block(era)` the consensus word, `standard(era)` the mempool word), `ProtocolEra`, `ScriptFlagsError` |
 | `template.rs` | `ScriptTemplate` trait, `SigningContext`, and signing utilities |
@@ -428,7 +428,7 @@ direct call (no trait object, no table of function pointers, no clone added).
 | `arithmetic.rs` | The unary and binary number opcodes (`truth` for a comparison's 1 or 0), `OP_WITHIN` |
 | `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the signature encoding (DER, LOW_S at the order, STRICTENC's defined base type and CHRONICLE bit, FORKID), the public key encoding (COMPRESSED_PUBKEYTYPE), the scriptCode (`build_subscript`, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
 | `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
-| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `DEFAULT_MEMORY_LIMIT`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`) |
+| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `DEFAULT_MEMORY_LIMIT`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
 | `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number`, `read_count` (CHECKMULTISIG's 4-byte counts), `push_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
 | `tests.rs`, `flag_tests.rs`, `chronicle_tests.rs`, `low_s_order_tests.rs`, `script_num_length_tests.rs`, `fixed_width_operand_tests.rs` | The unit tests, one file per former inline module; their paths (`script::spend::flag_tests::...`) are unchanged |
 
