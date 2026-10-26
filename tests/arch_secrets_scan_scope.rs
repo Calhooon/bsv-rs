@@ -2,59 +2,69 @@
 //! (bsv-rs#272): on a pull request the PR's own commits (`<base sha>..HEAD`), on a push or a
 //! dispatch the line's full history (`HEAD`), the findings' locations printed (`-v`) with the
 //! values redacted. gitleaks's default is every ref, so a key-looking literal on any pushed
-//! branch failed every pull request's scan until this pin.
+//! branch failed every pull request's scan until this pin. Read at the string level as
+//! `arch_ci_runs_every_test.rs` reads ci.yml; no network, no environment.
+#![allow(clippy::expect_used, clippy::panic)]
 
 fn ci_yml() -> String {
+    // A Windows checkout converts the workflows to CRLF (`.gitattributes` keeps only the
+    // vectors, fixtures and corpora byte for byte); the needles are written with `\n`.
     std::fs::read_to_string(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/.github/workflows/ci.yml"
     ))
     .expect("ci.yml")
+    .replace("\r\n", "\n")
 }
 
-fn secrets_job(ci: &str) -> &str {
-    let start = ci.find("\n  secrets:\n").expect("the secrets job");
-    let rest = &ci[start + 1..];
-    let end = rest[1..]
-        .find("\n  ")
-        .map(|i| {
-            // the next top-level job: a line that starts a two-space key after this job's steps
-            let mut off = i + 1;
-            while let Some(j) = rest[off + 1..].find("\n  ") {
-                if rest[off + 1 + j + 3..].starts_with(' ')
-                    || rest[off + 1 + j + 3..].starts_with('#')
-                {
-                    off = off + 1 + j;
-                } else {
-                    return off + 1 + j;
-                }
-            }
-            rest.len()
-        })
-        .unwrap_or(rest.len());
-    &rest[..end]
+/// The scan step's lines: from its `- name:` line to the next step or the next top-level job.
+fn scan_step(ci: &str) -> String {
+    let start = ci
+        .find("- name: Scan the commits the event brings")
+        .expect("the secrets job's scan step");
+    let mut lines = Vec::new();
+    for (i, line) in ci[start..].lines().enumerate() {
+        let next_step = i > 0 && line.trim_start().starts_with("- name:");
+        let next_job =
+            line.starts_with("  ") && !line.starts_with("   ") && !line.trim().is_empty();
+        if next_step || next_job {
+            break;
+        }
+        lines.push(line);
+    }
+    lines.join("\n")
 }
 
 #[test]
 fn the_secrets_scan_covers_the_commits_the_event_brings() {
     let ci = ci_yml();
-    let job = secrets_job(&ci);
+    let step = scan_step(&ci);
     assert!(
-        job.contains("--log-opts=\"${log_opts}\""),
-        "the secrets job's scan takes its range from the event"
+        step.contains("--log-opts=\"${log_opts}\""),
+        "the secrets job's scan takes its range from the event:\n{step}"
     );
     assert!(
-        job.contains("log_opts=\"${PR_BASE_SHA}..HEAD\""),
-        "a pull request's scan covers the PR's own commits"
+        step.contains("log_opts=\"${PR_BASE_SHA}..HEAD\""),
+        "a pull request's scan covers the PR's own commits:\n{step}"
     );
     assert!(
-        job.contains("log_opts=\"HEAD\""),
-        "a push's scan covers the line's history"
+        step.contains("log_opts=\"HEAD\""),
+        "a push's scan covers the line's history:\n{step}"
     );
     assert!(
-        job.contains("PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}"),
-        "the base sha comes from the pull request event"
+        step.contains("-n \"${PR_BASE_SHA}\""),
+        "an empty base sha falls back to the line's history, never a vacuous range:\n{step}"
     );
-    assert!(job.contains(" -v "), "a finding's location is printed");
-    assert!(job.contains("--redact"), "a finding's value stays redacted");
+    assert!(
+        step.contains("PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}"),
+        "the base sha comes from the pull request event:\n{step}"
+    );
+    assert!(
+        step.contains(" -v "),
+        "a finding's location is printed:\n{step}"
+    );
+    assert!(
+        step.contains("--redact"),
+        "a finding's value stays redacted:\n{step}"
+    );
 }
