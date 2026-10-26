@@ -285,7 +285,7 @@ fn canned(total: u64, rest: &[u8]) -> WalletWireTransceiver<CannedWire> {
     WalletWireTransceiver::new(CannedWire { body })
 }
 
-/// The reader reads as many entries as the total names, so `u32::MAX` with no
+/// A reader that reads as many entries as the total names: `u32::MAX` with no
 /// entry after it passes the bound and stops at the read of the entry after it.
 fn assert_read_past_total(err: Error) {
     assert!(
@@ -375,7 +375,14 @@ async fn list_certificates(total: u64) -> bsv_rs::Result<ListCertificatesResult>
 async fn a_list_certificates_total_above_u32_max_is_refused_not_truncated() {
     let read = list_certificates(0).await.unwrap();
     assert_eq!(read.total_certificates, 0);
-    assert_read_past_total(list_certificates(u32::MAX as u64).await.unwrap_err());
+    // The page is read to the end of the frame, not to the total (#190;
+    // `ts-stack@edf6e03` `WalletWireTransceiver.ts:1501-1506,1508,1550`):
+    // `u32::MAX` with no entry after it reads back as an empty page.
+    let read = list_certificates(u32::MAX as u64).await.unwrap();
+    assert_eq!(
+        (read.total_certificates, read.certificates.len()),
+        (u32::MAX, 0)
+    );
     assert_eq!(
         list_certificates(OVER).await.unwrap_err(),
         refusal("totalCertificates")
@@ -398,7 +405,13 @@ async fn discover_by_identity_key(total: u64) -> bsv_rs::Result<DiscoverCertific
 async fn a_discovered_certificates_total_above_u32_max_is_refused_not_truncated() {
     let read = discover_by_identity_key(0).await.unwrap();
     assert_eq!(read.total_certificates, 0);
-    assert_read_past_total(discover_by_identity_key(u32::MAX as u64).await.unwrap_err());
+    // The page is read to the end of the frame, not to the total (#190;
+    // `WalletWireTransceiver.ts:1676-1681,1699,1759`).
+    let read = discover_by_identity_key(u32::MAX as u64).await.unwrap();
+    assert_eq!(
+        (read.total_certificates, read.certificates.len()),
+        (u32::MAX, 0)
+    );
     assert_eq!(
         discover_by_identity_key(OVER).await.unwrap_err(),
         refusal("totalCertificates")
