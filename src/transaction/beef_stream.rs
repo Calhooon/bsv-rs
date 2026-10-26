@@ -1651,7 +1651,11 @@ enum Folded {
 }
 
 /// What stops a step: invalid bytes, or a spend the interpreter refused.
+///
+/// `#[non_exhaustive]` since 0.9.0 (bsv-rs#240), as [`Kind`] and [`Reason`]
+/// are: a `match` outside the crate ends in a wildcard arm.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Stop {
     /// The reader declined: missing context is never invalid bytes or an invalid spend.
     Unverifiable {
@@ -2558,7 +2562,11 @@ impl AtomicNode for TxEntry {
 // ---------------------------------------------------------------------------
 
 /// The verdict of a reading.
+///
+/// `#[non_exhaustive]` since 0.9.0 (bsv-rs#240), as [`Kind`] and [`Reason`]
+/// are: a `match` outside the crate ends in a wildcard arm.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Verdict {
     /// A decline for missing mining context, never a transaction verdict.
     Unverifiable {
@@ -3530,7 +3538,11 @@ pub trait AsyncByteSource {
 
 /// What stops an asynchronous reading short of a verdict. Neither says
 /// anything about the bytes, and neither is an acceptance.
+///
+/// `#[non_exhaustive]` since 0.9.0 (bsv-rs#240), as [`Kind`] and [`Reason`]
+/// are: a `match` outside the crate ends in a wildcard arm.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum AsyncVerifyError {
     /// The source failed.
     Source(std::io::Error),
