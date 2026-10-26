@@ -103,27 +103,21 @@ impl Spend {
     }
 
     /// A LOCAL resource-limit error (the reference's `ScriptResourceLimitError`):
-    /// the same message shape (`<label> has exceeded <limit> bytes`) plus the
-    /// structured `resource_limit` a caller can branch on.
+    /// the same message shape (`<label> has exceeded <limit> bytes`, the
+    /// limit's `Display`) plus the structured `resource_limit` a caller can
+    /// branch on.
     pub(super) fn resource_error(
         &self,
         resource: ScriptResource,
         attempted: usize,
     ) -> ScriptEvaluationError {
-        let label = match resource {
-            ScriptResource::Stack => "Stack memory usage",
-            ScriptResource::AltStack => "Alt stack memory usage",
-            ScriptResource::ElementSize => "Script element allocation",
-            ScriptResource::Work => "Work",
+        let limit = ScriptResourceLimit {
+            resource,
+            limit: self.memory_limit() as u64,
+            attempted: attempted as u64,
+            work_spent: None,
         };
-        let limit = self.memory_limit();
-        self.error(&format!("{label} has exceeded {limit} bytes"))
-            .with_resource_limit(ScriptResourceLimit {
-                resource,
-                limit: limit as u64,
-                attempted: attempted as u64,
-                work_spent: None,
-            })
+        self.error(&limit.to_string()).with_resource_limit(limit)
     }
 
     /// Work charged in this evaluation when a work budget is configured.
@@ -149,17 +143,15 @@ impl Spend {
         }
     }
 
+    /// The work budget's decline: `Work budget exhausted: spent <n> units,
+    /// budget <limit>` (the limit's `Display`).
     pub(super) fn work_error(&self, attempted: u64) -> ScriptEvaluationError {
-        let limit = self.work_limit.unwrap_or(u64::MAX);
-        self.error(&format!(
-            "Work budget exhausted: spent {} units, budget {limit}",
-            self.work_spent
-        ))
-        .with_resource_limit(ScriptResourceLimit {
+        let limit = ScriptResourceLimit {
             resource: ScriptResource::Work,
-            limit,
+            limit: self.work_limit.unwrap_or(u64::MAX),
             attempted,
             work_spent: Some(self.work_spent),
-        })
+        };
+        self.error(&limit.to_string()).with_resource_limit(limit)
     }
 }
