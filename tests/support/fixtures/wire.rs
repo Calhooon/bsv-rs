@@ -152,8 +152,9 @@ pub async fn specific<T: WalletWire>(
     })
 }
 
-// These 13 processor handlers currently return "requires a full wallet
-// implementation" even for a WalletInterface implementation. Keep that answer
+// These 12 processor handlers currently return "requires a full wallet
+// implementation" even for a WalletInterface implementation (abortAction
+// calls its wallet since bsv-rs#206). Keep that answer
 // in processor_response_hex. Exercise their client decoders with WireWriter's
 // public type encoders, without altering or hiding the processor's response.
 fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
@@ -191,7 +192,7 @@ fn type_writer_reply(call: WalletCall, value: &Value) -> Option<Vec<u8>> {
             optional_tx(&mut w, r.txid, r.tx.as_deref());
             w.write_send_with_result_array(r.send_with_results.as_deref());
         }
-        AbortAction | InternalizeAction | RelinquishOutput | RelinquishCertificate => {}
+        InternalizeAction | RelinquishOutput | RelinquishCertificate => {}
         ListActions => {
             let r = ListActionsResult::from_fixture(value.clone());
             w.write_var_int(r.total_actions.into());
@@ -391,16 +392,31 @@ async fn error_frames() -> Vec<Value> {
     let mut entries = Vec::new();
     for (name, input, bytes) in inputs {
         let mut expected = None;
+        let mut by_call = serde_json::Map::new();
         for call in calls() {
             let client = WireWallet(WalletWireTransceiver::new(ReplyWire(bytes.clone())));
             let result = outcome(invoke(&client, call, cases::cases(call).remove(0).input).await);
-            if let Some(ref expected) = expected {
-                assert_eq!(&result, expected, "{call} error frame {name}");
-            } else {
-                expected = Some(result);
+            match expected {
+                Some(ref expected) if &result != expected => {
+                    // abortAction reads code 8 (`abortRefused`) as
+                    // `aborted: false` (`WalletWireTransceiver.ts:337`, bsv-rs#206);
+                    // every other call reads every frame alike
+                    assert_eq!(
+                        (call, name.as_str()),
+                        (WalletCall::AbortAction, "status_8"),
+                        "{call} error frame {name}"
+                    );
+                    by_call.insert(call.method_name().into(), result);
+                }
+                Some(_) => {}
+                None => expected = Some(result),
             }
         }
-        entries.push(json!({"name": name, "input": input, "expected": {"response_hex": hex::encode(bytes), "client_result": expected}}));
+        let mut entry = json!({"name": name, "input": input, "expected": {"response_hex": hex::encode(bytes), "client_result": expected}});
+        if !by_call.is_empty() {
+            entry["expected"]["client_result_by_call"] = Value::Object(by_call);
+        }
+        entries.push(entry);
     }
     entries
 }

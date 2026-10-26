@@ -8,10 +8,16 @@
             "aborted": true
           }
         },
-        "processor_observed": null,
-        "processor_response_hex": "013161626f7274416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "processor_observed": {
+          "args": {
+            "reference": "Zml4dHVyZQ=="
+          },
+          "method": "abort_action",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "00",
         "request_hex": "031066697874757265732e696e76616c696466697874757265",
-        "response_encoder": "WireWriter",
+        "response_encoder": "WalletWireProcessor",
         "response_hex": "00"
       },
       "input": {
@@ -33,10 +39,16 @@
             "aborted": true
           }
         },
-        "processor_observed": null,
-        "processor_response_hex": "013161626f7274416374696f6e20726571756972657320612066756c6c2077616c6c657420696d706c656d656e746174696f6e00",
+        "processor_observed": {
+          "args": {
+            "reference": "Zml4dHVyZSBmdWxs"
+          },
+          "method": "abort_action",
+          "originator": "fixtures.invalid"
+        },
+        "processor_response_hex": "00",
         "request_hex": "031066697874757265732e696e76616c6964666978747572652066756c6c",
-        "response_encoder": "WireWriter",
+        "response_encoder": "WalletWireProcessor",
         "response_hex": "00"
       },
       "input": {
