@@ -147,6 +147,62 @@ or `merge_txid_only` of the renamed transaction adds a second entry under the
 new txid, and `find_atomic_transaction` of the new txid answers `None`, until a
 whole-BEEF reader runs (the review's reading; a scan per merge would double
 the merge loop, so the window is stated, not closed). Nothing on the wire differs.
+### Fixed: a refused abort is code 8 and the client reads 8 as `aborted: false` (#206)
+
+The keeper's reading on #206 (2026-10-25), the rule of #197 and #202: the
+reference's bytes are the wire. This processor answered abortAction with a
+refusal stub (code 1, `abortAction requires a full wallet implementation`)
+and never called its wallet, and the transceiver read any success frame as
+`aborted: true` and any error frame as an error, so a wallet's refusal never
+reached a consumer as `aborted: false`. The reference's processor reads the
+rest of the request as the reference's bytes, hands them to the wallet as
+base64 after `validateAbortActionArgs` (`ts-stack@edf6e03`
+`WalletWireProcessor.ts:783-796`; `validationHelpers.ts:488-498`,
+`:893-899`) and frames a wallet's `aborted: false` as `WalletError('The
+wallet refused to abort this action because it has already been broadcast',
+abortRefused)` (`:797-804`), code 8 (`WalletError.ts:79`), thrown after the
+wrapper and so in its own words; an abort is the error byte alone
+(`:806-809`). Its client wants an empty success frame (`#requireEmptyResponse`,
+`WalletWireTransceiver.ts:334`), reads code 8 as `{ aborted: false }` on the
+code alone (`:336-339`), the one code it acts on, and throws every other
+frame (`:340`).
+
+`handle_abort_action` now goes through `invoke_wallet` to the wallet's
+`abort_action`: an empty reference is refused ahead of it, code 6, `The
+reference parameter must be valid base64 string`; a wallet's error is
+`Wallet operation failed`, code 1 (#202); `aborted: false` is
+`08 4d <the reference's 77 bytes> 00`; `aborted: true` is `00`. The
+transceiver reads code 8 as `Ok(AbortActionResult { aborted: false })`,
+refuses a byte after a success frame's error byte (`Wallet Wire abortAction
+response has an invalid length`), and reads every other error frame as
+before (`wallet error (code N): <message>`). Public shape: nothing moves.
+
+The tests that pin it, in `tests/wire_error_frames.rs`:
+`a_wallets_refused_abort_is_framed_code_8_in_the_references_words`,
+`an_aborted_action_is_the_success_frame_and_reads_aborted_true` and
+`an_empty_abort_reference_is_refused_code_6`, red on `cd4bb96` (the stub's
+code 1 frame); `the_transceiver_reads_code_8_as_aborted_false` and
+`every_other_abort_frame_is_the_error_it_was`, red on `6f5941d` (code 8 read
+as an error; a trailing byte read as `aborted: true`). abortAction's rows
+leave both every-vector allowlists in `tests/wallet_wire_cross_sdk_tests.rs`
+(args 14 to 13, passing rows 13 to 14; results 13 to 12, passing rows 14 to
+15), and `the_twelve_stubs_are_untouched` counts twelve. Two recordings moved
+(F19 in `docs/FIXTURES.md`): `abortAction.json`'s processor frame `00` and
+the wallet's observed call where the stub's frame and `null` stood;
+`error_frames.json`'s `status_8` records abortAction's `aborted: false`.
+
+Migration: a processor over a wallet that answers abortAction now calls it;
+over `ProtoWallet`, whose `abort_action` errs, the frame is `Wallet operation
+failed`, code 1, where it was the stub's words. A client that matched the
+error `wallet error (code 8)` on abortAction reads `aborted: false` instead.
+
+### Notes: cross-SDK parity (#206)
+
+go-sdk neither writes nor reads the code: its processor writes nothing for an
+`AbortActionResult` whatever `Aborted` says (`go-sdk@2ca481c`
+`wallet/serializer/abort_action.go:33-36`), so a refusal is a success frame,
+and its client answers `Aborted: true` for any success (`:38-43`). This crate
+follows the reference.
 
 ## [0.9.0-beta.1] - 2026-10-26
 
