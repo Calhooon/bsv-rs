@@ -4,7 +4,10 @@
 [bsv-rs #81](https://github.com/Calhooon/bsv-rs/issues/81) and the fuzz matrix
 for [bsv-rs #82](https://github.com/Calhooon/bsv-rs/issues/82), part of
 [the north-star programme](https://github.com/Calhooon/bsv-rs/issues/101).
-Never on a push or a PR: the gate is `ci.yml`.
+Never on a push or a PR: the gate is `ci.yml`. Its `ci-full` job dispatches
+`ci.yml` on `beta` and on `main`, so each line's whole matrix runs once a day
+at its tip whether or not anything was pushed (a pull request runs only its
+line's required set). GitHub loads the schedule from `main`'s copy of this file.
 Its cron requests 03:00 UTC daily; `workflow_dispatch` supports a manual run.
 The scheduled run resolves `beta` once, then every mutation shard, the score
 job and every fuzz job check out that same commit. A manual run tests the

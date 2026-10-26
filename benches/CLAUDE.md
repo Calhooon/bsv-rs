@@ -178,7 +178,7 @@ cargo bench -- --baseline main
 reads Criterion samples, and fails a p99 increase greater than 5% against
 `benches/baseline.json` on matching hardware. It refuses missing samples,
 missing corpus input, changed workload inventory and different hardware.
-`--record` is an explicit baseline update for a PR that requests it.
+`--record` is an explicit baseline update for a run that requests it (a dispatch of `ci.yml` with `bench_baseline_record`; the job runs on no pull request).
 `--skip <bench>` leaves one of the five added benches unmeasured and reports
 it as skipped, never as a pass or a regression; the job uses it for
 `script_spend`, with a warning, when `BSV_SCRIPT_CORPUS_TOKEN` is absent.

@@ -138,14 +138,16 @@ cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- --record
 
 This replaces only the measured machine's entry in `benches/baseline.json`,
 keyed by platform, CPU model and core count.
-Use it only in a PR whose description requests a baseline update. The table
+Use it only in a run that requests a baseline update (the dispatch input below). The table
 and retained run show exactly what changed. Ordinary comparisons never write
 the baseline. A run on a CPU model or core count with no entry exits 3 and names
 the recorded entries; hosted runners draw from several CPUs, so each one the
 job lands on needs its own reviewed entry.
 
-The CI `benchmarks` job runs on every PR and on pushes to `beta`.
-`benchmarks-build` also compiles every bench with all features on pushes.
+The CI `benchmarks` job runs on a push to `beta` and on the nightly's dispatch
+on `beta`; no pull request runs it (it is not a required check, 2026-10-26).
+`benchmarks-build` compiles every bench with all features on every event but
+a pull request.
 The seed repository `Calgooon/bsv-script-lean` is private. The captain must
 provision `BSV_SCRIPT_CORPUS_TOKEN` with read access; CI downloads only
 `corpus/seed/seed.jsonl` at the named commit. No wallet or network request is
@@ -154,13 +156,14 @@ repository without the secret) the job warns
 `script_spend skipped: BSV_SCRIPT_CORPUS_TOKEN not set (the script corpus is private)`
 and compares the other eight benches with `--skip script_spend`. Where the
 runner's platform/CPU/cores key has no entry (exit 3) the job warns
-`no baseline entry for <key>: record one with [bench-baseline-record]` and
+`no baseline entry for <key>: record one with gh workflow run ci.yml -f bench_baseline_record=true` and
 does not fail.
 
-The lane can record the local machine only. To record Linux in the second CI
-run, the captain adds `[bench-baseline-record]` to the baseline PR's description
-and pushes a commit to trigger a new PR run with that description.
-That run proposes `linux-baseline.json` as an artifact; it does not commit or
+The lane can record the local machine only. To record Linux, the captain
+dispatches CI on the baseline PR's branch with the record input:
+`gh workflow run ci.yml --ref <branch> -f bench_baseline_record=true` (until
+2026-10-26 a `[bench-baseline-record]` marker in the PR's description did this;
+no pull request runs the job now). That run proposes `linux-baseline.json` as an artifact; it does not commit or
 publish it. Review the machine line and measurements, commit the Linux entry,
 remove the marker, and rerun to exercise the comparison path. Record that
 run's URL in the landing report. If three Linux repeats demonstrate noise
