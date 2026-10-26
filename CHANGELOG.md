@@ -16,6 +16,56 @@ than six of the account's twenty concurrent slots and a pull request's run
 at 03:00 UTC starts within minutes; the shards finish later in the night
 and decide the same (the owner's balance rule of 2026-10-26, the keeper's
 reading, as the nightly goes live with main's copy of the schedule).
+### Fixed: the createAction validator refuses an empty `unlockingScript` and a zero `unlockingScriptLength` (#282)
+
+`wallet::validation::validate_create_action_args` (through
+`validate_create_action_input`) accepted an input with an empty
+`unlockingScript` (`Some("")`, or whitespace alone) and an
+`unlockingScriptLength` of 0. It now refuses both, as
+`Error::WalletRefusal` of class `WalletRefusalClass::InvalidParameter`
+(`WERR_INVALID_PARAMETER`, code 6):
+
+- an empty `unlockingScript` in the reference's words, `The unlockingScript
+  parameter must be hexadecimal string.`: its `validateOptionalHexString`
+  asks one or more hex characters (`ts-stack@edf6e03`
+  `packages/sdk/src/wallet/validationHelpers.ts:595`, `:522-530`), ahead of
+  the length, so an empty script with a length of 0 takes these words too.
+  The words carry no input index: the reference names the field
+  `unlockingScript` alone (the run below), not `inputs.N.unlockingScript`
+  as the issue quoted it;
+- an `unlockingScriptLength` of 0 as BRC-100's positive integer
+  (`brcs@5119a9b` `wallet/0100.md:649`), in `#requireInteger`'s form with
+  this crate's name (`integer_refusal`, #255): `Invalid createAction input
+  unlockingScriptLength: expected an integer from 1 to 4294967295, received
+  0`.
+
+A one-byte script and a length of 1 are accepted as before. Pinned by
+`an_empty_create_action_unlocking_script_is_refused_in_the_reference_words`,
+`a_zero_create_action_unlocking_script_length_is_refused_as_brc100_positive_integer`
+and `the_create_action_args_refuse_an_empty_unlocking_script_and_a_zero_length`
+(`src/wallet/validation.rs`) and by
+`tests/wallet_create_action_unlocking_script_282.rs` against
+`tests/vectors/wallet_create_action_unlocking_script_282.json`, the
+reference's verdicts and words from `Validation.validateCreateActionArgs`
+at `ts-stack@edf6e03` under Node v22.18.0
+(`tests/support/create_action_unlocking_script_282.mjs`); each refusal's
+test RED on the pre-fix tree. No public shape changes; a caller that
+passed an empty script or a zero length now gets the refusal. The
+toolbox's create door (its #212), which refuses both in its own code, can
+ask this validator instead, as it does for internalizeAction (#117).
+
+### Notes: cross-SDK parity (#282)
+
+The reference's helper permits a zero length: `validateCreateActionInput`
+runs `validateInteger(unlockingScriptLength, 'unlockingScriptLength',
+undefined, 0)`, a minimum of 0 (`validationHelpers.ts:598`), though its
+`ValidCreateActionInput` types the field `PositiveInteger` (`:577`); the
+run records `{ unlockingScriptLength: 0 }` accepted. This crate takes
+BRC-100's positive integer (the keeper's reading of 2026-10-26); the
+upstream filing against ts-stack is the keeper's to carry. go-sdk at
+`2ca481c` has no createAction argument validator (its
+`UnlockingScriptLength` is read and written by `wallet/serializer` alone)
+and judges neither.
 
 ### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
 
