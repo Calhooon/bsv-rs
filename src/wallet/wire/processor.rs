@@ -30,8 +30,8 @@ use super::requests::{
     read_reveal_specific_key_linkage_args, read_verify_hmac_args, read_verify_signature_args,
 };
 use super::results::{
-    write_create_hmac_result, write_create_signature_result, write_decrypt_result,
-    write_encrypt_result, write_reveal_counterparty_key_linkage_result,
+    write_abort_action_result, write_create_hmac_result, write_create_signature_result,
+    write_decrypt_result, write_encrypt_result, write_reveal_counterparty_key_linkage_result,
     write_reveal_specific_key_linkage_result, write_verify_hmac_result,
     write_verify_signature_result, write_wait_for_authentication_result,
 };
@@ -46,13 +46,6 @@ use std::marker::PhantomData;
 
 /// `walletErrors.unknownError` (`WalletError.ts:72` at `ts-stack@edf6e03`).
 const UNKNOWN_ERROR: u8 = 1;
-
-/// `walletErrors.abortRefused` (`WalletError.ts:79` at `ts-stack@edf6e03`).
-const ABORT_REFUSED: u8 = 8;
-
-/// The words of the reference's refused abort (`WalletWireProcessor.ts:801-804`).
-const ABORT_REFUSED_WORDS: &str =
-    "The wallet refused to abort this action because it has already been broadcast";
 
 /// `MAX_WIRE_ERROR_MESSAGE_BYTES` (`WalletWireProcessor.ts:25`).
 const MAX_WIRE_ERROR_MESSAGE_BYTES: usize = 4096;
@@ -589,8 +582,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Action Operation Handlers
     // NOTE: These require a full wallet implementation. When args parsing
     // is implemented in encoding.rs, these can be updated to call the wallet.
-    // For now, they return early errors since ProtoWallet doesn't support them;
-    // abortAction calls the wallet (bsv-rs#206).
+    // For now, they return early errors since ProtoWallet doesn't support them.
     // =========================================================================
 
     async fn handle_create_action(
@@ -612,30 +604,13 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     }
 
     async fn handle_abort_action(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
-        // The reference's bytes are the rest of the request, handed to the
-        // wallet as base64 (`WalletWireProcessor.ts:785-786` at
-        // `ts-stack@edf6e03`), validated ahead of it (`:790`; #216)
+        // The rest of the request as base64 (`WalletWireProcessor.ts:785-790`; #206)
         let reference = to_base64(reader.read_remaining());
         validation::abort_action_args(&reference)?;
-        let result = self
-            .invoke_wallet(
-                WalletCall::AbortAction,
-                self.wallet
-                    .abort_action(AbortActionArgs { reference }, originator),
-            )
-            .await?;
-
-        // A refusal is the reference's error frame, code 8 (`:797-804`),
-        // raised after the wallet answers and so outside the wrapper; its
-        // client reads 8 as `aborted: false` (`WalletWireTransceiver.ts:337`).
-        // An abort is the error byte alone (`:806-809`; bsv-rs#206)
-        if !result.aborted {
-            return Err(Refusal {
-                code: ABORT_REFUSED,
-                words: ABORT_REFUSED_WORDS.to_string(),
-            });
-        }
-        Ok(Vec::new())
+        let args = AbortActionArgs { reference };
+        let call = self.wallet.abort_action(args, originator);
+        let result = self.invoke_wallet(WalletCall::AbortAction, call).await?;
+        write_abort_action_result(&result)
     }
 
     async fn handle_list_actions(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
