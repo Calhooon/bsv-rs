@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.9.0-beta.1] - 2026-10-26
+
+The 0.9.0 line's canary prerelease (RELEASING.md point 14), cut from `beta` for the toolbox's and the CLI's beta lines to build against; the entries below are 0.9.0's, unreleased on `main` until the minor merges at the phase exit.
 ### Changed: the BRCs pin of record moves from `ed1b015` to `5119a9b` (#154)
 
 The keeper's word of 2026-10-24 on the owner's (bsv-stack-lean DECISIONS

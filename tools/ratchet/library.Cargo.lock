@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "bsv-rs"
-version = "0.9.0"
+version = "0.9.0-beta.1"
 dependencies = [
  "aes",
  "aes-gcm",
