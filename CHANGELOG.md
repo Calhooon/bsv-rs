@@ -1581,10 +1581,10 @@ master.decrypt_fields(w, certifier, originator)
 master.decrypt_fields(w, certifier, None, None, originator)
 
 verifiable.decrypt_field(w, subject, name, originator)
-verifiable.decrypt_field(w, subject, name, None, None, originator)
+verifiable.decrypt_field(w, name, None, None, originator)
 
 verifiable.decrypt_fields(w, subject, originator)
-verifiable.decrypt_fields(w, subject, None, None, originator)
+verifiable.decrypt_fields(w, None, None, originator)
 
 cert.set_field(name, value)
 cert.set_field(name, value)?
@@ -1608,6 +1608,13 @@ cert.set_field(name, value)?
   (`VerifiableCertificate.ts:152-156`, `:197-198`) and `decrypt_field`, which
   it calls. `issue_for_subject` takes none, as `issueCertificateForSubject`
   takes none (`:437-444`).
+- `VerifiableCertificate::decrypt_field` and `decrypt_fields` drop their
+  `subject` parameter: the reference reads the counterparty from the
+  certificate (`this.subject`, `VerifiableCertificate.ts:152-156`, `:196`), as
+  Go does (`vc.Subject`, `go-sdk@2ca481c` `auth/certificates/verifiable.go:76-99`).
+  Option A (the reference's parameters in the reference's order) applied to
+  the one parameter the reference does not have; every caller in the tree
+  passed the certificate's own subject. Migration: drop the argument.
 
 A certificate issued by this crate's `MasterCertificate` before this release
 does not decrypt under the reference's scheme: re-issue it.
@@ -1645,7 +1652,8 @@ ciphertext decodes it at the decrypt site:
 crate's `Certificate` serde stays where it was and is not the reference's
 JSON: `certType` where the reference writes `type`, the signature an array of
 numbers where it writes hex, the keyrings arrays of numbers where it writes
-base64 (a line in `CLAUDE.md`'s list). `bsv-wallet-toolbox-rs` (at `6317222`) moves in three
+base64 (a line in `CLAUDE.md`'s list; the keyrings and the rest of the JSON
+shape follow on the owner's same word in #268). `bsv-wallet-toolbox-rs` (at `6317222`) moves in three
 places with this release: its intake decodes each field
 (`src/wallet/certificate_issuance.rs:553-556`, `BASE64.decode` then
 `set_field`) and must pass the string's bytes through, `set_field` now a
