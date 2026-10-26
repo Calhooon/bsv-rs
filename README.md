@@ -27,7 +27,9 @@ module features (`block`, `transaction`, `wallet`, `messages`, `compat`,
 event at the wallet wire processor carrying a wallet's error words that the
 frame replaces with `Wallet operation failed`), and `dhat-profiling` for the
 heap profiling tests. `transaction` enables `block`. A Worker should select the
-features it needs and enable `wasm`; native HTTP transports are separate. The
+features it needs and enable `wasm`; native HTTP transports are separate:
+`http` is native-only, and a wasm32 build with it stops at `build.rs` with one
+message (#152). The
 declared minimum Rust is 1.88 (`rust-version`).
 
 ## The signing digest (0.7.0)

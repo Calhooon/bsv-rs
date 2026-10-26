@@ -153,6 +153,9 @@ identity = ["auth", "overlay"]
 # `futures-timer` to its `gloo-timers`/`setTimeout` backend, which works there.
 wasm = ["getrandom/js", "dep:futures-timer", "futures-timer/wasm-bindgen", "dep:js-sys"]
 full = ["primitives", "block", "script", "transaction", "wallet", "messages", "compat", "totp", "auth", "overlay", "storage", "registry", "kvstore", "identity", "socketio"]
+# Native-only (#152): reqwest's futures are not `Send` on wasm32 and its wasm
+# backend has no `ClientBuilder::timeout`, so `build.rs` refuses `http` on a
+# wasm32 target with one message. No Worker asks for it (docs/DEPENDENTS.md).
 http = ["dep:reqwest"]
 websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
 # Socket.IO 5 / Engine.IO 4 + BRC-103 transport. Substrate-agnostic:

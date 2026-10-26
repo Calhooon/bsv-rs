@@ -689,6 +689,17 @@ jobs:
       - name: Build the library slice
         run: cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES"
 
+      # `http` is native-only (#152): the slice with it stops at build.rs, one message
+      - name: The slice with http is refused at the build script
+        if: matrix.consumer == 'combined'
+        run: |
+          if cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES,http" 2> "$RUNNER_TEMP/http.log"; then
+            echo '::error::the wasm32 build with http succeeded; build.rs no longer refuses it (#152)'
+            exit 1
+          fi
+          grep -F 'bsv-rs: the `http` feature is native-only and does not build for wasm32' "$RUNNER_TEMP/http.log"
+          ! grep -E '^error\[E[0-9]+\]|could not compile `bsv-rs` \(lib\)' "$RUNNER_TEMP/http.log"
+
       - name: Measure the diagnostic wasm artifact
         run: |
           cargo rustc --lib --crate-type cdylib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES" -- -C link-dead-code=yes

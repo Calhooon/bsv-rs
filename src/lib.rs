@@ -17,7 +17,8 @@
 //! `wallet`, `messages`, `compat`, `totp`, `auth`, `overlay`, `storage`,
 //! `registry`, `kvstore`, `identity`, `socketio`; `full` turns every module
 //! on. Transports and platforms: `http` (reqwest: ARC, WhatsOnChain, the
-//! HTTP wallet substrate, overlay hosts), `websocket` (a tokio-tungstenite
+//! HTTP wallet substrate, overlay hosts; native-only, refused on wasm32 by
+//! the build script, #152), `websocket` (a tokio-tungstenite
 //! auth transport, opt-in), `wasm` (the JS RNG, runtime-agnostic timers,
 //! `js_sys::Date` for wall-clock reads).
 //!
