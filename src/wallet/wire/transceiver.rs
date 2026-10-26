@@ -274,8 +274,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         write_key_related!(writer, args)?;
 
         // The 32 bytes of the HMAC, then the data behind its length
-        // (`WalletWireTransceiver.ts:1048-1050`; BRC-100 `wallet/0100.md:2149-2151`
-        // at `ed1b015`; #199). `VerifyHmacArgs::hmac` is 32 bytes by its type,
+        // (`WalletWireTransceiver.ts:1048-1050`; BRC-100 `wallet/0100.md:2172-2174`
+        // at `5119a9b`; #199). `VerifyHmacArgs::hmac` is 32 bytes by its type,
         // the length `validateVerifyHmacArgs` asks (`validationHelpers.ts:1774`).
         writer.write_bytes(&args.hmac);
         writer.write_var_int(args.data.len() as u64);

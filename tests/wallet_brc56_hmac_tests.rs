@@ -1,8 +1,7 @@
 //! BRC-56's HMAC key vectors and the minimal-length-key refusal (#148).
 //!
-//! The vectors are `bsv-blockchain/BRCs` at `5119a9b` (upstream, not on the
-//! line's pin `ed1b015`, which carries no BRC-56 vectors), `wallet/0056.md`,
-//! read with `git -C ~/bsv/brcs show 5119a9b:wallet/0056.md`: the key is the
+//! The vectors are `bsv-blockchain/BRCs` at `5119a9b` (the line's pin since
+//! #154), `wallet/0056.md`, read with `git -C ~/bsv/brcs show 5119a9b:wallet/0056.md`: the key is the
 //! shared point's X coordinate as exactly 32 bytes (line 66); a sender that
 //! drops its leading zero bytes makes another tag (line 73); the inputs at
 //! lines 81-85 and the six rows at lines 91-96.

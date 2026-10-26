@@ -1,12 +1,12 @@
 //! The wallet wire's optional and signed varints in the reference's form (#149).
 //!
 //! BRC-100 writes each of these fields as a `VarInt` with `-1` for absence
-//! (`ed1b015` `wallet/0100.md:1646-1647` lockTime and version, `:1661` and
-//! `:1741` the two sequence numbers, `:1799-1800`, `:2258-2259`, `:2341-2342`,
-//! `:2382-2383` the limits and offsets, `:1931` listOutputs' offset a "Signed
-//! integer"; `5119a9b` the same nine lines later) and says nothing of a
-//! negative's bytes: its `VarInt` (`:1620-1628`) is unsigned. The TypeScript
-//! writer gives the bytes (`ts-sdk@9e3ede6` `utils.ts:546-549`,
+//! (`5119a9b` `wallet/0100.md:1655-1656` lockTime and version, `:1670` and
+//! `:1750` the two sequence numbers, `:1808-1809`, `:2281-2282`, `:2364-2365`,
+//! `:2405-2406` the limits and offsets, `:1940` listOutputs' offset a "Signed
+//! integer") and says nothing of a negative's bytes: its `VarInt`
+//! (`:1629-1637`) is unsigned. The TypeScript writer gives the bytes
+//! (`ts-sdk@9e3ede6` `utils.ts:546-549`,
 //! `writeVarIntNum`: `10` is `0x0A`, `-1` goes through `varIntBn` at `:586`,
 //! `-1 + 2^64`, nine `0xFF`), and Go writes the same (`go-sdk@2ca481c`
 //! `util/writer.go:66-71`, `WriteNegativeOne`). This crate wrote ZigZag:
@@ -244,7 +244,7 @@ async fn a_u32_field_at_its_bound_leaves_as_the_plain_five_byte_varint() {
     }
 }
 
-/// listOutputs' offset is an `i32` here (BRC-100 `:904`, `:1931`: negative
+/// listOutputs' offset is an `i32` here (BRC-100 `:911`, `:1940`: negative
 /// counts from the newest); `-1`, the newest, has absence's bytes, as TS's
 /// writer gives it, and TS's processor reads it as absent (`WalletWireProcessor.ts`
 /// `:966-979`, any negative). Below `-1` there is no form any reader keeps.
@@ -281,7 +281,7 @@ fn write_signed_var_int_writes_the_plain_varint_and_refuses_below_minus_one() {
 // ============================================================================
 
 /// `[unlockingScript: VarInt length + bytes][sequenceNumber: VarInt]`, the
-/// spend as TS writes it (`WalletWireTransceiver.ts:414-423`; BRC-100 `:1740-1741`).
+/// spend as TS writes it (`WalletWireTransceiver.ts:414-423`; BRC-100 `:1749-1750`).
 fn ts_spend(sequence_number: &[u8]) -> Vec<u8> {
     [&[0x01, 0x51][..], sequence_number].concat()
 }

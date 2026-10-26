@@ -35,7 +35,7 @@
 //!
 //! # The format, at the pin
 //!
-//! BEEF: `BRCs@ed1b015 transactions/0062.md:63-69` (the version word, nBUMPs,
+//! BEEF: `BRCs@5119a9b transactions/0062.md:63-69` (the version word, nBUMPs,
 //! the BUMPs, nTransactions, each raw transaction then the has-BUMP byte and
 //! the index), `:172-191` (the validation; the soonest failure stops). BUMP:
 //! `transactions/0074.md:50-68` (block height, tree height "max 64", the

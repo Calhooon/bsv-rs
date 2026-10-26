@@ -396,8 +396,8 @@ pub(crate) fn require_discovery_trust(trust: u8) -> Result<u8, Error> {
 /// The signature calls' data or hash (bsv-rs#199): the data-type flag `1`
 /// then the data behind its varint length, or `2` then the 32 bytes of the
 /// hash (`WalletWireTransceiver.ts:1082-1090` createSignature, `:1137-1144`
-/// verifySignature; BRC-100 `wallet/0100.md:2168-2170`, `:2194-2196` at
-/// `ed1b015`). Exactly one of the two is given, as `validateWalletArgs`
+/// verifySignature; BRC-100 `wallet/0100.md:2191-2193`, `:2217-2219` at
+/// `5119a9b`). Exactly one of the two is given, as `validateWalletArgs`
 /// refuses otherwise before the reference writes (`validationHelpers.ts:1777-1787`).
 pub(crate) fn write_data_or_hash(
     writer: &mut WireWriter,

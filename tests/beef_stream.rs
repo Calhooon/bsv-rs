@@ -816,7 +816,7 @@ fn a_cursor_at_every_k_resumes_to_the_whole_verdict() {
 }
 
 // ---------------------------------------------------------------------------
-// The BRC-62 example at the pin (BRCs@ed1b015 transactions/0062.md:150-154)
+// The BRC-62 example at the pin (BRCs@5119a9b transactions/0062.md:150-154)
 // ---------------------------------------------------------------------------
 
 const BRC62_EXAMPLE: &str = concat!(

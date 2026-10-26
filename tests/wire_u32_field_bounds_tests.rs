@@ -2,8 +2,8 @@
 //!
 //! Each field below is a `u32` by the transaction format (the sequence
 //! numbers, the version, the lock time) or by BRC-100's
-//! `PositiveIntegerOrZero`, at most `2^32 - 1` (`ed1b015` `wallet/0100.md:393-401`;
-//! the height is `PositiveInteger`, `:403-411`). The frame's tables write each
+//! `PositiveIntegerOrZero`, at most `2^32 - 1` (`5119a9b` `wallet/0100.md:394-402`;
+//! the height is `PositiveInteger`, `:410-418`). The frame's tables write each
 //! as a VarInt. `u32::MAX` reads back; `u32::MAX + 1` is refused with the field
 //! named, where the reader once cast it to 0.
 
@@ -51,7 +51,7 @@ fn widen_past_u32(frame: &[u8]) -> Vec<u8> {
 // ============================================================================
 
 /// signAction's spend: `sequenceNumber`, VarInt, `-1` for absent
-/// (`wallet/0100.md:1741`; `5119a9b` `:1750` the same).
+/// (`wallet/0100.md:1750`).
 #[test]
 fn a_sign_action_spend_sequence_number_above_u32_max_is_refused_not_truncated() {
     let spend = SignActionSpend {
@@ -86,7 +86,7 @@ fn action_input(sequence_number: u32) -> WalletActionInput {
 }
 
 /// listActions' input object: `sequenceNumber`, VarInt
-/// (`wallet/0100.md:1852`; `5119a9b` `:1861` the same).
+/// (`wallet/0100.md:1861`).
 #[test]
 fn an_action_input_sequence_number_above_u32_max_is_refused_not_truncated() {
     let mut writer = WireWriter::new();
@@ -124,7 +124,7 @@ fn action_frame(action: &WalletAction) -> Vec<u8> {
 }
 
 /// listActions' action object: `version`, VarInt
-/// (`wallet/0100.md:1825`; `5119a9b` `:1834` the same).
+/// (`wallet/0100.md:1834`).
 #[test]
 fn an_action_version_above_u32_max_is_refused_not_truncated() {
     let frame = action_frame(&action(u32::MAX, 0));
@@ -137,7 +137,7 @@ fn an_action_version_above_u32_max_is_refused_not_truncated() {
 }
 
 /// listActions' action object: `lockTime`, VarInt
-/// (`wallet/0100.md:1826`; `5119a9b` `:1835` the same).
+/// (`wallet/0100.md:1835`).
 #[test]
 fn an_action_lock_time_above_u32_max_is_refused_not_truncated() {
     let frame = action_frame(&action(1, u32::MAX));
@@ -234,7 +234,7 @@ fn get_header_frame(height: u64) -> Vec<u8> {
 }
 
 /// getHeaderForHeight's argument: `height`, VarInt
-/// (`wallet/0100.md:2448`, `PositiveInteger` at `:1489`; `5119a9b` `:2471` the same).
+/// (`wallet/0100.md:2471`, `PositiveInteger` at `:1498`).
 #[tokio::test]
 async fn a_header_height_above_u32_max_is_refused_not_truncated() {
     let processor = WalletWireProcessor::new(HeightWallet::default());
@@ -312,7 +312,7 @@ async fn list_actions(total: u64) -> bsv_rs::Result<ListActionsResult> {
 }
 
 /// listActions' result: `totalActions`, VarInt
-/// (`wallet/0100.md:1810`, `PositiveIntegerOrZero` at `:807`; `5119a9b` `:1819` the same).
+/// (`wallet/0100.md:1819`, `PositiveIntegerOrZero` at `:814`).
 #[tokio::test]
 async fn a_list_actions_total_above_u32_max_is_refused_not_truncated() {
     let read = list_actions(0).await.unwrap();
@@ -343,10 +343,9 @@ async fn list_outputs(total: u64) -> bsv_rs::Result<ListOutputsResult> {
         .await
 }
 
-/// listOutputs' result: `totalOutputs`, VarInt (`wallet/0100.md:1941`,
-/// `PositiveIntegerOrZero` at `:924`; `5119a9b` `:1950` the same row, its
-/// interface `PositiveIntegerOrZero | ExactModuleBalance` at `:932`, upstream,
-/// not on the line).
+/// listOutputs' result: `totalOutputs`, VarInt (`wallet/0100.md:1950`,
+/// `PositiveIntegerOrZero | ExactModuleBalance` at `:932`; the decimal string
+/// is a BRC-112 balance query's, #105, and this test reads the count).
 #[tokio::test]
 async fn a_list_outputs_total_above_u32_max_is_refused_not_truncated() {
     let read = list_outputs(0).await.unwrap();
@@ -371,7 +370,7 @@ async fn list_certificates(total: u64) -> bsv_rs::Result<ListCertificatesResult>
 }
 
 /// listCertificates' result: `totalCertificates`, VarInt
-/// (`wallet/0100.md:2271`, `PositiveIntegerOrZero` at `:1289`; `5119a9b` `:2294` the same).
+/// (`wallet/0100.md:2294`, `PositiveIntegerOrZero` at `:1298`).
 #[tokio::test]
 async fn a_list_certificates_total_above_u32_max_is_refused_not_truncated() {
     let read = list_certificates(0).await.unwrap();
@@ -394,7 +393,7 @@ async fn discover_by_identity_key(total: u64) -> bsv_rs::Result<DiscoverCertific
 }
 
 /// discoverByIdentityKey's result: `totalCertificates`, VarInt
-/// (`wallet/0100.md:2355`, `PositiveIntegerOrZero` at `:1383`; `5119a9b` `:2378` the same).
+/// (`wallet/0100.md:2378`, `PositiveIntegerOrZero` at `:1392`).
 #[tokio::test]
 async fn a_discovered_certificates_total_above_u32_max_is_refused_not_truncated() {
     let read = discover_by_identity_key(0).await.unwrap();
