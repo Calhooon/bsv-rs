@@ -96,8 +96,11 @@ lock; new feature/target shapes also update the architecture lane's matrix.
 
 ## How the checks work
 
-`dependents-plan` validates the lock and selects admitted requirements on PRs,
-branch pushes and release workflow calls, before publication.
+`dependents-plan` validates the lock and selects admitted requirements on pull
+requests into `main` (where `dependents` is required), on pushes to `beta` and
+`main`, in the nightly and on release workflow calls, before publication; a pull
+request into `beta` does not run it (the set a pull request runs is its line's
+required set, 2026-10-26).
 Each `dependent` matrix entry checks out its immutable revision, verifies its declared SDK
 requirement/features, applies Cargo's `patch.crates-io.bsv-rs.path` override,
 updates an admitted locked registry copy, and inspects Cargo metadata to prove
