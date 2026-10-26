@@ -97,6 +97,56 @@ step "The slice with http is refused at the build script": red on the base
 reopens #152 as the fix (`#[async_trait(?Send)]` on wasm32, the builder's
 timeout behind `cfg(not(target_arch = "wasm32"))`). Public shape: nothing
 moves; native builds run a build script that does nothing.
+### Fixed: listCertificates and discovery results are read to the end of the frame, the page limit enforced (#190)
+
+Left by the lane of #183, in the keeper's reading there: a reader refuses what
+the reference's reader refuses. `totalCertificates` is the total of every
+page, not the page's length: the reference's processor writes
+`certificatesPage.total` ahead of the page's records (`ts-stack@edf6e03`
+`WalletWireProcessor.ts:2052-2053` listCertificates, `:2486-2487`
+`#serializeDiscoveryResult`), and its transceiver reads the records
+`while (!resultReader.eof())` (`WalletWireTransceiver.ts:1507`
+listCertificates, `:1700` `#parseDiscoveryResult`). This crate's transceiver
+read `total` records and dropped the bytes after them, so it refused a page
+shorter than the total and read a longer one cut to it. Both readers now read
+the reference's way, each refusal in its words, a `WalletError`:
+
+- A byte after the last entry is read as the start of another and refused by
+  the entry's reader (a `00` is a certificate of no bytes,
+  `ReaderUnderflow { needed: 32, available: 0 }` at its type).
+- More entries than the declared total: `Wallet Wire listCertificates response
+  returned <n> records but declared a total of <t>` (`discover` for both
+  discovery calls), `#assertPageCount` (`:1940-1946`) after the page (`:1550`,
+  `:1759`).
+- An entry past the requested limit, 10 when none was requested: `Wallet Wire
+  listCertificates response exceeds the requested page limit of <m>`
+  (`discover` for both discovery calls), `#requirePageCapacity`
+  (`:1948-1953`, `requestedLimit ?? 10`) before each entry (`:1509`, `:1701`).
+  The 10 is the reference's default page size, BRC-100's
+  `PositiveIntegerDefault10Max10000` for the request's `limit`.
+
+A total above the page is read as given (`total_certificates` the wallet's,
+`certificates` the page). The total's own bound, 0 to `u32::MAX`
+(`#requireInteger(..., 0, 0xffffffff)`, `:1501-1506`, `:1676-1681`), was
+already the reader's (`read_var_int_u32`), in this crate's words. The tests
+that pin it, in `tests/wire_reader_strictness.rs`, each red on `9457125`:
+`a_byte_after_the_last_certificates_entry_is_refused` (read `Ok((1, 1))`),
+`a_certificates_page_past_its_declared_total_is_refused` (read `Ok((1, 1))`),
+`a_certificates_page_past_the_requested_limit_is_refused` and
+`a_certificates_total_above_the_page_is_read` (both refused a page shorter
+than its total as `ReaderUnderflow`). No recording or vector moves; no public
+shape moves, the two helpers `pub(crate)`.
+
+### Notes: cross-SDK parity (#190)
+
+go-sdk reads `TotalCertificates` records and refuses bytes after them
+(`go-sdk@2ca481c` `wallet/serializer/list_certificates.go:132-164`,
+`discover_certificates_result.go:37-51`, `CheckComplete`), and its writers
+refuse a total other than the page's length (`list_certificates.go:86-88`,
+`discover_certificates_result.go:13-15`): it refuses a page the reference's
+processor writes for a wallet whose total exceeds the page, and enforces no
+page limit. This crate follows the reference.
+
 ### Fixed: two residual leniencies of the wire readers: a repeated keyring key, a length cut on wasm32 (#192)
 
 Left by the cold review of #184. `WireReader::read_identity_certificate`
