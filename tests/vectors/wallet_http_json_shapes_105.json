@@ -635,6 +635,13 @@
             }
           }
         ]
+      },
+      "reference_refuses_without": {
+        "certifierInfo": "Invalid discoverByIdentityKey result certificates[0].certifierInfo: expected an object",
+        "certifierInfo.iconUrl": "Invalid discoverByIdentityKey result certificates[0].certifierInfo.iconUrl: expected a string",
+        "certifierInfo.description": "Invalid discoverByIdentityKey result certificates[0].certifierInfo.description: expected a string",
+        "publiclyRevealedKeyring": "Invalid discoverByIdentityKey result certificates[0].publiclyRevealedKeyring: expected an object",
+        "decryptedFields": "Invalid discoverByIdentityKey result certificates[0].decryptedFields: expected an object"
       }
     },
     {
