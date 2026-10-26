@@ -10,7 +10,8 @@ This module implements identity certificates for the BSV authentication system, 
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, re-exports, protocol constants | ~43 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 800 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 682 |
+| `certificate_tests.rs` | `certificate.rs`'s unit tests (`#![cfg(test)]`, included by `#[path]`; the file-size ratchet) | 129 |
 | `collation.rs` | The reference's field-name order: `localeCompare` under ICU root for U+0000..U+00FF (#249); the table parsed at compile time from `collation_latin1.txt` | ~308 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | 421 |
