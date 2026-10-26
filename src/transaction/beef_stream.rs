@@ -120,7 +120,7 @@ pub fn display_hex(hash: &Hash32) -> String {
 
 mod deferred;
 mod reason;
-use deferred::{read_held, write_held, Deferred, HeldTx, TxFields};
+use deferred::{read_held, write_held, Deferred, TxFields};
 pub use reason::{Kind, Reason};
 
 /// A refusal: the offset of the byte it names, and the reason.
@@ -1959,53 +1959,6 @@ impl BeefIndex {
         Ok(None)
     }
 
-    /// The earliest ready transaction of the held set folded in, its scripts
-    /// run from input `from` with `spent` asked between inputs: `None` when
-    /// none is ready. A pause or a refusal leaves it held and the index
-    /// unchanged; folded in, its txid wakes what waits on it.
-    fn release_one(
-        &mut self,
-        from: u32,
-        spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
-        tip: Option<ChainTip>,
-    ) -> Result<Option<Folded>, Stop> {
-        let Some((at, _)) = self.deferred.next_ready() else {
-            return Ok(None);
-        };
-        let Some(held) = self.deferred.take_ready(at) else {
-            return Ok(None);
-        };
-        let folded = self.fold_tx(
-            held.offset,
-            &held.txid,
-            None,
-            false,
-            &held,
-            from,
-            spent,
-            work_limit,
-            tip,
-        );
-        match folded {
-            Ok(Folded::Paused(input)) => {
-                self.deferred.put_back(held);
-                Ok(Some(Folded::Paused(input)))
-            }
-            Ok(folded) => {
-                self.deferred.folded(at, &held);
-                if let Folded::In { txid, new: true } = folded {
-                    self.deferred.wake(&txid);
-                }
-                Ok(Some(folded))
-            }
-            Err(stop) => {
-                self.deferred.put_back(held);
-                Err(stop)
-            }
-        }
-    }
-
     /// One element folded in, or held ([`Folded`]).
     fn fold_one(
         &mut self,
@@ -2017,24 +1970,7 @@ impl BeefIndex {
     ) -> Result<Folded, Stop> {
         match element {
             Element::Bump(_) => unreachable!("a BUMP is folded with its header answer"),
-            Element::TxidOnly { offset, txid } => {
-                if !self.proven.contains_key(txid) {
-                    return Err(Refusal::new(*offset, Reason::StubNotProven { txid: *txid }).into());
-                }
-                let new = !self.txs.contains_key(txid);
-                self.txs.entry(*txid).or_insert(TxEntry {
-                    at: *offset,
-                    prevs: Box::default(),
-                    raw: false,
-                    reached: false,
-                    coinbase_height: None,
-                    outputs: None,
-                    live: 0,
-                });
-                self.steps += 1;
-                self.work += 32 + 3;
-                Ok(Folded::In { txid: *txid, new })
-            }
+            Element::TxidOnly { offset, txid } => self.fold_txid_only(*offset, txid),
             Element::Tx {
                 offset,
                 txid,
@@ -2051,39 +1987,9 @@ impl BeefIndex {
                 // until the parent is in, and refused at the end if it never
                 // is).
                 match bump_index {
-                    Some(index) => {
-                        if *index >= self.bumps.len() as u64 {
-                            return Err(Refusal::new(
-                                *offset,
-                                Reason::BumpIndexNamesNoBump { index: *index },
-                            )
-                            .into());
-                        }
-                        if !self.bump_carries(*index, txid) {
-                            return Err(Refusal::new(
-                                *offset,
-                                Reason::TxidNotInBump {
-                                    index: *index,
-                                    txid: *txid,
-                                },
-                            )
-                            .into());
-                        }
-                    }
-                    None => {
-                        let missing: HashSet<Hash32> = body
-                            .inputs
-                            .iter()
-                            .map(|input| input.prev)
-                            .filter(|prev| !self.txs.contains_key(prev))
-                            .collect();
-                        if !missing.is_empty() {
-                            self.note_raw(txid, *offset);
-                            let held = HeldTx::of(*offset, *txid, body, self.check_spends);
-                            self.deferred.hold(held, missing);
-                            return Ok(Folded::Held);
-                        }
-                    }
+                    Some(index) => self.check_bump_index(*offset, txid, *index)?,
+                    None if self.held_for_a_parent(*offset, txid, body) => return Ok(Folded::Held),
+                    None => {}
                 }
                 let coinbase = is_coinbase(&body.inputs);
                 self.fold_tx(
@@ -2099,6 +2005,38 @@ impl BeefIndex {
                 )
             }
         }
+    }
+
+    /// A txid-only entry: a BUMP of the BEEF proves it.
+    fn fold_txid_only(&mut self, offset: u64, txid: &Hash32) -> Result<Folded, Stop> {
+        if !self.proven.contains_key(txid) {
+            return Err(Refusal::new(offset, Reason::StubNotProven { txid: *txid }).into());
+        }
+        let new = !self.txs.contains_key(txid);
+        self.txs.entry(*txid).or_insert(TxEntry {
+            at: offset,
+            prevs: Box::default(),
+            raw: false,
+            reached: false,
+            coinbase_height: None,
+            outputs: None,
+            live: 0,
+        });
+        self.steps += 1;
+        self.work += 32 + 3;
+        Ok(Folded::In { txid: *txid, new })
+    }
+
+    /// A proven transaction's BUMP index names a BUMP that carries its txid.
+    fn check_bump_index(&self, offset: u64, txid: &Hash32, index: u64) -> Result<(), Stop> {
+        let reason = if index >= self.bumps.len() as u64 {
+            Reason::BumpIndexNamesNoBump { index }
+        } else if !self.bump_carries(index, txid) {
+            Reason::TxidNotInBump { index, txid: *txid }
+        } else {
+            return Ok(());
+        };
+        Err(Refusal::new(offset, reason).into())
     }
 
     /// An unproven transaction whose inputs resolve, or a proven one, folded
@@ -2450,12 +2388,7 @@ impl BeefIndex {
     /// earliest input that names no transaction of the index,
     /// [`Kind::InputNamesNoElement`].
     pub fn finish(&mut self, subject: Option<&Hash32>, subject_at: u64) -> Result<(), Refusal> {
-        if let Some(held) = self.deferred.held.values().next() {
-            let input = held
-                .inputs
-                .iter()
-                .find(|input| !self.txs.contains_key(&input.prev));
-            let (at, txid) = input.map_or((held.offset, [0u8; 32]), |i| (i.at, i.prev));
+        if let Some((at, txid)) = self.deferred.unresolved(|t| self.txs.contains_key(t)) {
             return Err(Refusal::new(at, Reason::InputNamesNoElement { txid }));
         }
         let Some(subject) = subject else {
@@ -3146,38 +3079,6 @@ impl Judge {
             }
             _ => 0,
         }
-    }
-
-    /// Folds in the earliest held transaction that waits on nothing
-    /// (bsv-rs#240), its scripts run under `spent` from the input a paused
-    /// reading reached in it, else the first: `None` when none waits on
-    /// nothing, `Some(Ok(true))` a pause, which `resume_at` then names.
-    fn release_next(
-        &mut self,
-        spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
-        tip: Option<ChainTip>,
-    ) -> Option<Result<bool, Stop>> {
-        let (at, txid) = self.index.deferred.next_ready()?;
-        let from = match self.resume_at {
-            Some(p) if p.offset == at && p.txid == txid => {
-                self.resume_at = None;
-                p.input
-            }
-            _ => 0,
-        };
-        Some(match self.index.release_one(from, spent, work_limit, tip) {
-            Ok(Some(Folded::Paused(input))) => {
-                self.resume_at = Some(Pending {
-                    offset: at,
-                    txid,
-                    input,
-                });
-                Ok(true)
-            }
-            Ok(_) => Ok(false),
-            Err(stop) => Err(stop),
-        })
     }
 
     /// A subject the caller named and a prefix that names another: the 32
