@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added: what `auth_certificate.json` vector 0 is, and the test that says so (#252)
+
+Vector 0 of `tests/vectors/auth_certificate.json` (added by 91dacc5,
+2026-01-26, which names no SDK or commit) is `@bsv/sdk`'s `fromObject`
+parse fixture (`Certificate.test.ts`, added at ts-sdk@27a93752, 2025-11-19,
+package 1.9.10, `:336-362`; the same object at `ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/__tests/Certificate.test.ts:311-339`),
+copied with two values changed: the type `Q29tbW9uU291cmNlIGlkZW50aXR5`
+(`CommonSource identity`, 21 bytes, which this crate's `[u8; 32]` cannot
+hold) replaced by 32 x 0x01, and the serial's 37th base64 character changed
+from `h` to `+`; the subject, certifier, outpoint, five fields and signature
+are the fixture's. Vector 1 is the fixture's unsigned sibling (`:364`), its
+type and serial replaced. The reference's test parses the object and never
+verifies it; Go carries none of its bytes. The signature is the certifier's
+BRC-52 signature (the derived key, keyID `"<type> <serial>"`, counterparty
+anyone, each field value the UTF-8 bytes of its base64 text) over the
+fixture's ORIGINAL type and serial: `@bsv/sdk` at 27a93752 verifies the
+original `true` and any of the three other combinations of the two values
+not (`Signature is not valid`); the raw key verifies none. At `ts-stack@edf6e03`
+`toBinary` refuses a type that is not 32 bytes (`Certificate.ts:233`, since
+`b3155fa2e`, 2026-09-22), so the reference at the pin verifies the original
+`false` too, as #251 measured. Over vector 0's own bytes the signature
+verifies under no reading, in this crate or in either reference. No
+reference regenerates the certificate (no private key is published), so no
+regenerated vector is added; the vector stays as it is (rule 3).
+
+`tests/auth_cross_sdk_tests.rs` now asserts both:
+`vector_0_signature_verifies_under_no_known_reading` (`verify()` is
+`Ok(false)`, the certifier's raw key `false`), and
+`vector_0_signature_is_the_reference_fixture_signed_over_its_original_type_and_serial`
+(the fixture's other values equal vector 0's, and the signature verifies
+under the derived key over this crate's writer's bytes of vector 0 with the
+leading 64 bytes replaced by the original type and serial, and under none of
+the other three combinations). The original and the verdicts are in
+`tests/vectors/auth_certificate_origin_252.json` (new), recorded by
+`tests/support/certificate_origin_252.mjs` under Node v22.18.0 against both
+references bundled with bun. No `src/` change.
+
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
 `Certificate::sign` signed with the certifier's raw key and `verify` checked
