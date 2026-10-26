@@ -72,14 +72,12 @@ fn vector_to_certificate(v: &CertificateVector) -> Certificate {
     // Parse revocation outpoint
     let revocation_outpoint = v.revocation_outpoint.as_ref().map(|s| parse_outpoint(s));
 
-    // Parse fields (base64 encoded values)
+    // A field value is the UTF-8 bytes of its base64 text, never the
+    // decoded ciphertext (BRC-52 `0052.md:97`; #251)
     let fields: HashMap<String, Vec<u8>> = v
         .fields
         .iter()
-        .map(|(k, v)| {
-            let value = from_base64(v).expect("Invalid field value base64");
-            (k.clone(), value)
-        })
+        .map(|(k, v)| (k.clone(), v.as_bytes().to_vec()))
         .collect();
 
     // Parse signature if present

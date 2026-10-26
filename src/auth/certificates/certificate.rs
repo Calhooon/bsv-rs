@@ -5,6 +5,7 @@
 
 use crate::primitives::{bounded_capacity, sha256, PrivateKey, PublicKey, Signature};
 use crate::wallet::types::Outpoint;
+use crate::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -231,7 +232,18 @@ impl Certificate {
         sha256(&self.to_binary(false))
     }
 
-    /// Signs the certificate with the certifier's private key.
+    /// The BRC-52 signature key ID: `"<type> <serialNumber>"`, the two
+    /// base64 strings separated by one space (BRC-52 `0052.md:116`).
+    pub fn signature_key_id(&self) -> String {
+        format!("{} {}", self.type_base64(), self.serial_number_base64())
+    }
+
+    /// Signs the certificate with the certifier's child key under BRC-52's
+    /// derivation: protocol `[2, "certificate signature"]`, key ID
+    /// [`signature_key_id`](Self::signature_key_id), counterparty anyone
+    /// (BRC-52 `0052.md:77,115-117`; the reference's `Certificate.sign`,
+    /// `ts-stack@edf6e03` `Certificate.ts:458-462`; go-sdk@2ca481c
+    /// `certificate.go:227-240`), over the SHA-256 of `to_binary(false)`.
     pub fn sign(&mut self, certifier_key: &PrivateKey) -> Result<()> {
         // Verify the certifier key matches
         if certifier_key.public_key() != self.certifier {
@@ -240,13 +252,22 @@ impl Certificate {
             ));
         }
 
+        let child = KeyDeriver::new(Some(certifier_key.clone())).derive_private_key(
+            &signature_protocol(),
+            &self.signature_key_id(),
+            &Counterparty::Anyone,
+        )?;
         let hash = self.signing_hash();
-        let sig = certifier_key.sign(&hash)?;
+        let sig = child.sign(&hash)?;
         self.signature = Some(sig.to_der());
         Ok(())
     }
 
-    /// Verifies the certificate signature.
+    /// Verifies the certificate signature against the certifier's child key
+    /// under BRC-52's derivation, derived with the anyone key as the
+    /// reference derives it (`ts-stack@edf6e03` `Certificate.ts:428-431`;
+    /// go-sdk@2ca481c `certificate.go:176-186`). A signature by the
+    /// certifier's raw key is `Ok(false)` (#251).
     pub fn verify(&self) -> Result<bool> {
         let sig_bytes = self
             .signature
@@ -256,7 +277,13 @@ impl Certificate {
         let hash = self.signing_hash();
         let sig = Signature::from_der(sig_bytes)?;
 
-        Ok(self.certifier.verify(&hash, &sig))
+        let child = KeyDeriver::new(None).derive_public_key(
+            &signature_protocol(),
+            &self.signature_key_id(),
+            &Counterparty::Other(self.certifier.clone()),
+            false,
+        )?;
+        Ok(child.verify(&hash, &sig))
     }
 
     /// Gets the encryption protocol details for a certificate field.
@@ -314,6 +341,14 @@ impl Certificate {
             signature: self.signature.clone(),
         }
     }
+}
+
+/// BRC-52's signature protocol: `[2, "certificate signature"]`.
+fn signature_protocol() -> Protocol {
+    Protocol::new(
+        SecurityLevel::Counterparty,
+        super::CERTIFICATE_SIGNATURE_PROTOCOL,
+    )
 }
 
 /// Writes a Bitcoin-style varint.
