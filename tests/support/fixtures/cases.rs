@@ -135,7 +135,7 @@ fn sample(call: WalletCall, full: bool) -> (Value, Value) {
                 json!({"basket": "fixtures"})
             },
             if full {
-                json!({"totalOutputs": 1, "beef": "0100beef0000", "outputs": [{"satoshis": 1234, "lockingScript": "51",
+                json!({"totalOutputs": 1, "BEEF": [1, 0, 190, 239, 0, 0], "outputs": [{"satoshis": 1234, "lockingScript": "51",
                 "spendable": false, "customInstructions": "keep", "tags": ["alpha", "omega"], "outpoint": outpoint, "labels": ["alpha", "omega"]}]})
             } else {
                 json!({"totalOutputs": 0, "outputs": []})

@@ -32,7 +32,14 @@
       "expected": {
         "client_result": {
           "ok": {
-            "beef": "0100beef0000",
+            "BEEF": [
+              1,
+              0,
+              190,
+              239,
+              0,
+              0
+            ],
             "outputs": [
               {
                 "customInstructions": "keep",
@@ -76,7 +83,14 @@
           ]
         },
         "result": {
-          "beef": "0100beef0000",
+          "BEEF": [
+            1,
+            0,
+            190,
+            239,
+            0,
+            0
+          ],
           "outputs": [
             {
               "customInstructions": "keep",
