@@ -6,8 +6,9 @@
 #![cfg(feature = "auth")]
 
 use bsv_rs::auth::certificates::Certificate;
-use bsv_rs::primitives::{from_base64, from_hex, to_base64, to_hex, PublicKey};
+use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, to_hex, PublicKey, Signature};
 use bsv_rs::wallet::types::Outpoint;
+use bsv_rs::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -280,6 +281,131 @@ fn test_certificate_with_signature_has_valid_format() {
             println!("Vector {}: signature format valid", i);
         }
     }
+}
+
+// =================
+// Vector 0's Provenance (#252)
+// =================
+
+#[derive(Debug, Deserialize)]
+struct OriginFile {
+    original: OriginalCertificate,
+    vector_0: ChangedValues,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct OriginalCertificate {
+    #[serde(rename = "type")]
+    cert_type: String,
+    subject: String,
+    serial_number: String,
+    certifier: String,
+    revocation_outpoint: String,
+    signature: String,
+    fields: HashMap<String, String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ChangedValues {
+    #[serde(rename = "type")]
+    cert_type: String,
+    serial_number: String,
+}
+
+fn load_origin() -> OriginFile {
+    let data = fs::read_to_string("tests/vectors/auth_certificate_origin_252.json")
+        .expect("Failed to read auth_certificate_origin_252.json");
+    serde_json::from_str(&data).expect("Failed to parse auth_certificate_origin_252.json")
+}
+
+/// Verifies vector 0's signature under BRC-52's derivation over vector 0's
+/// preimage with its leading 64 bytes (type and serial) replaced by the
+/// given type and serial, the keyID their base64 text. The rest of the
+/// preimage is this crate's writer's.
+fn verifies_derived_with(cert: &Certificate, type_b64: &str, serial_b64: &str) -> bool {
+    let mut preimage = from_base64(type_b64).unwrap();
+    preimage.extend(from_base64(serial_b64).unwrap());
+    preimage.extend_from_slice(&cert.to_binary(false)[64..]);
+    let child = KeyDeriver::new(None)
+        .derive_public_key(
+            &Protocol::new(SecurityLevel::Counterparty, "certificate signature"),
+            &format!("{type_b64} {serial_b64}"),
+            &Counterparty::Other(cert.certifier.clone()),
+            false,
+        )
+        .unwrap();
+    let sig = Signature::from_der(cert.signature.as_ref().unwrap()).unwrap();
+    child.verify(&sha256(&preimage), &sig)
+}
+
+/// `auth_certificate.json` vector 0 is `@bsv/sdk`'s `fromObject` parse
+/// fixture (`Certificate.test.ts`, added at ts-sdk@27a93752, 2025-11-19;
+/// `ts-stack@edf6e03` `packages/sdk/src/auth/certificates/__tests/Certificate.test.ts:311-339`),
+/// copied by 91dacc5 with its type replaced by 32 x 0x01 and its serial's
+/// 37th base64 character changed from `h` to `+`. Its signature is the
+/// certifier's BRC-52 signature over the ORIGINAL type and serial, so over
+/// vector 0's bytes it verifies under no reading: not under the derived key
+/// (`verify`), not under the certifier's raw key, here or in the reference
+/// at `ts-stack@edf6e03` (`tests/vectors/auth_certificate_origin_252.json`,
+/// recorded by `tests/support/certificate_origin_252.mjs`). The vector is
+/// shared and stays as it is (rule 3).
+#[test]
+fn vector_0_signature_verifies_under_no_known_reading() {
+    let vectors = load_certificate_vectors();
+    let cert = vector_to_certificate(&vectors[0]);
+    assert!(cert.signature.is_some());
+
+    assert_eq!(cert.verify(), Ok(false));
+    let sig = Signature::from_der(cert.signature.as_ref().unwrap()).unwrap();
+    assert!(!cert.certifier.verify(&cert.signing_hash(), &sig));
+}
+
+/// The signature vector 0 carries is the reference fixture's, and it
+/// verifies under BRC-52's derivation over the fixture's own type (21 bytes,
+/// `CommonSource identity`) and serial, the rest of the preimage vector 0's,
+/// as `@bsv/sdk` 1.9.10's `verify()` at ts-sdk@27a93752 reads it (`true`).
+/// Either change alone breaks it. `ts-stack@edf6e03` refuses the 21-byte
+/// type in `toBinary` (`Certificate.ts:233`), so the reference at the pin
+/// verifies the original under no reading either: no reference regenerates
+/// this certificate (no private key is published) and this crate's
+/// `[u8; 32]` type cannot hold the original (#252).
+#[test]
+fn vector_0_signature_is_the_reference_fixture_signed_over_its_original_type_and_serial() {
+    let origin = load_origin();
+    let o = &origin.original;
+    let vectors = load_certificate_vectors();
+    let v0 = &vectors[0];
+    assert_eq!(origin.vector_0.cert_type, v0.cert_type);
+    assert_eq!(origin.vector_0.serial_number, v0.serial_number);
+    assert_eq!(o.subject, v0.subject);
+    assert_eq!(o.certifier, v0.certifier);
+    assert_eq!(
+        Some(&o.revocation_outpoint),
+        v0.revocation_outpoint.as_ref()
+    );
+    assert_eq!(Some(&o.signature), v0.signature.as_ref());
+    assert_eq!(o.fields, v0.fields);
+    assert_eq!(from_base64(&o.cert_type).unwrap(), b"CommonSource identity");
+
+    let cert = vector_to_certificate(v0);
+    assert!(verifies_derived_with(&cert, &o.cert_type, &o.serial_number));
+    assert!(!verifies_derived_with(
+        &cert,
+        &o.cert_type,
+        &v0.serial_number
+    ));
+    assert!(!verifies_derived_with(
+        &cert,
+        &v0.cert_type,
+        &o.serial_number
+    ));
+    assert!(!verifies_derived_with(
+        &cert,
+        &v0.cert_type,
+        &v0.serial_number
+    ));
 }
 
 // =================
