@@ -471,7 +471,9 @@ adapter SHOULD retain the original unsigned prefix and signature bytes so
 verification does not depend on local reordering", binding every accepted
 value to the bytes it parsed, a duplicate name never made acceptable by
 retaining bytes. `from_binary` keeps the unsigned prefix in
-`received_unsigned`, `sign` keeps the preimage it signed there, and `verify`,
+`received_unsigned`, `sign` writes its preimage afresh in the serializer's
+order (as the reference's `sign` does, `Certificate.ts:458`, never a kept
+prefix in another order) and keeps it there, and `verify`,
 `signing_hash` and `to_binary` use those bytes while they parse, whole, to
 the certificate's current values: a received certificate verifies over the
 bytes its issuer signed whatever order the issuer's fields came in, and
@@ -505,6 +507,12 @@ rows (13.0.0) of U+0000..U+00FF and the two contractions in that range
 re-serializes to verify; a certificate Go signs over names the two orders
 disagree on verifies here (its bytes are kept) and not in the reference.
 
+**Parity: signing over a signature.** The reference's `sign` refuses a
+certificate that already carries a signature (`ts-stack@edf6e03`
+`Certificate.ts:450-453`, `Certificate has already been signed!`); this
+crate's `sign` signs over it and replaces it. Not changed here; the behavior
+waits on its own issue.
+
 **The residual.** A name with a character above U+00FF sorts after every
 Latin-1 name, in code point order, which is ICU's order for none of them in
 general (U+0101 sorts before `z` there); a host whose default locale is not
@@ -536,7 +544,9 @@ the base); a certificate signed here is the one the reference verifies
 (`rust_signed_mixed_names`, `verify()` true; red on the base); the
 reference's certificate rebuilt from JSON verifies and signs again to the
 reference's bytes (red); a byte-order certificate (reference `false`)
-verifies here; a repeated name is refused in the reference's words (red);
+verifies here, and its signature cleared and signed again is the
+reference's bytes (red on the half (b) commit, whose `sign` kept the
+received order); a repeated name is refused in the reference's words (red);
 a field changed after `from_binary` unbinds the bytes (red); and the
 serializer orders a 1,402-name corpus of printable ASCII and Latin-1 names as
 `localeCompare` orders it under Node v22.18.0, v20.19.5 and v24.11.1 (red).
