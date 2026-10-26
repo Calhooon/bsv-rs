@@ -226,8 +226,11 @@ impl<'a> WireReader<'a> {
     /// Reads a protocol ID (security level + protocol name).
     pub fn read_protocol_id(&mut self) -> Result<Protocol, Error> {
         let level = self.read_u8()?;
-        let security_level = SecurityLevel::from_u8(level)
-            .ok_or_else(|| Error::WalletError(format!("invalid security level: {}", level)))?;
+        let security_level = SecurityLevel::from_u8(level).ok_or_else(|| {
+            Error::WalletError(format!(
+                "Invalid security level: expected 0, 1, or 2, received {level}"
+            ))
+        })?;
         let protocol_name = self.read_string()?;
         Ok(Protocol::new(security_level, protocol_name))
     }
@@ -242,8 +245,11 @@ impl<'a> WireReader<'a> {
             let _ = self.read_string()?;
             return Ok(None);
         }
-        let security_level = SecurityLevel::from_u8(level)
-            .ok_or_else(|| Error::WalletError(format!("invalid security level: {}", level)))?;
+        let security_level = SecurityLevel::from_u8(level).ok_or_else(|| {
+            Error::WalletError(format!(
+                "Invalid security level: expected 0, 1, or 2, received {level}"
+            ))
+        })?;
         let protocol_name = self.read_string()?;
         Ok(Some(Protocol::new(security_level, protocol_name)))
     }

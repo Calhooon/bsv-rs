@@ -824,6 +824,33 @@ async fn linkage_keys_that_are_points_reach_the_wallet() {
     }
 }
 
+/// `#decodeProtocolID` (`WalletWireProcessor.ts:2440-2443`): a security level
+/// other than 0, 1, 2 is refused by the reader in the reference's words, a
+/// plain `Error`, code 1, on each of the eight calls that carry one (#226).
+#[tokio::test]
+async fn a_security_level_outside_0_to_2_is_refused_in_the_reference_words() {
+    for level in [3u8, 255] {
+        let key = Key {
+            level,
+            ..Key::default()
+        };
+        let frame = refusal(
+            1,
+            &format!("Invalid security level: expected 0, 1, or 2, received {level}"),
+        );
+        for (call, request) in every_key_request(&key) {
+            let (answer, calls) = answer(&request).await;
+            assert_eq!(
+                answer,
+                frame,
+                "{call}: {:?}",
+                String::from_utf8_lossy(&answer)
+            );
+            assert_eq!(calls, 0, "{call}: the wallet is not called");
+        }
+    }
+}
+
 /// The thirteen calls this processor refuses as needing a full wallet keep
 /// their words and code 1: no validation runs ahead of them.
 #[tokio::test]
