@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 
 use bsv_rs::primitives::{from_hex, sha256, sha256d};
-use bsv_rs::script::{LockingScript, UnlockingScript};
+use bsv_rs::script::{LockingScript, ScriptResource, ScriptResourceLimit, UnlockingScript};
 use bsv_rs::transaction::beef_stream::{
     display_hex, AsyncByteSource, BeefDecoder, Hash32, HeadersFn, Progress, SpendRefusal, Step,
 };
@@ -1121,11 +1121,16 @@ fn a_spend_the_script_allows_is_valid_and_one_it_refuses_is_a_spend_refusal() {
             offset,
             txid: spender,
             input,
-            why: SpendRefusal::Script(_),
+            why: why @ SpendRefusal::Script(_),
         } => {
             assert_eq!(offset, offsets[1] + 5);
             assert_eq!(spender, txid(&bad));
             assert_eq!(input, Some(0));
+            // The interpreter's sentence, verbatim (#213).
+            let SpendRefusal::Script(reason) = &why else {
+                unreachable!()
+            };
+            assert_eq!(why.to_string(), *reason);
         }
         other => panic!("a spend refusal expected, got {other:?}"),
     }
@@ -2875,4 +2880,102 @@ fn mining_lean_rows_have_the_same_wire_offsets() {
         let (bytes, _) = wire(V1, None, &[], &[Entry::Raw(raw, None)]);
         mining_invalid(&bytes, &HashMap::new(), at, name);
     }
+}
+
+// ---------------------------------------------------------------------------
+// The refusal's sentence (#213): one text per arm, pinned (a host matches on it)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_a_txid_only_parent() {
+    assert_eq!(
+        SpendRefusal::ParentIsTxidOnly.to_string(),
+        "the parent is a txid-only entry: its output is not in the BEEF"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_an_output_not_available() {
+    assert_eq!(
+        SpendRefusal::OutputNotAvailable { vout: 2 }.to_string(),
+        "the parent has no unspent output at vout 2"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_the_interpreters_sentence_for_a_script() {
+    assert_eq!(
+        SpendRefusal::Script("OP_EQUALVERIFY requires the top two stack items to be equal".into())
+            .to_string(),
+        "OP_EQUALVERIFY requires the top two stack items to be equal"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_the_interpreters_sentence_for_a_resource() {
+    let limit = |resource, work_spent| {
+        SpendRefusal::Resource(ScriptResourceLimit {
+            resource,
+            limit: 1_000,
+            attempted: 1_001,
+            work_spent,
+        })
+        .to_string()
+    };
+    assert_eq!(
+        limit(ScriptResource::Stack, None),
+        "Stack memory usage has exceeded 1000 bytes"
+    );
+    assert_eq!(
+        limit(ScriptResource::AltStack, None),
+        "Alt stack memory usage has exceeded 1000 bytes"
+    );
+    assert_eq!(
+        limit(ScriptResource::ElementSize, None),
+        "Script element allocation has exceeded 1000 bytes"
+    );
+    assert_eq!(
+        limit(ScriptResource::Work, Some(990)),
+        "Work budget exhausted: spent 990 units, budget 1000"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_a_spend_creating_value() {
+    assert_eq!(
+        SpendRefusal::CreatesValue.to_string(),
+        "the transaction's outputs are worth more than its inputs"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_an_input_value_out_of_range() {
+    assert_eq!(
+        SpendRefusal::InputValueOutOfRange.to_string(),
+        "an input value or running input total is outside MoneyRange"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_a_p2sh_output() {
+    assert_eq!(
+        SpendRefusal::P2shOutput { vout: 3 }.to_string(),
+        "an exact P2SH output template at vout 3 in a regular transaction mined after Genesis"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_a_non_final_transaction() {
+    assert_eq!(
+        SpendRefusal::NonFinal { lock_time: 500_000 }.to_string(),
+        "the transaction is not final for mining in the next block under the supplied headers: lock_time 500000"
+    );
+}
+
+#[test]
+fn a_spend_refusal_prints_its_rule_for_a_premature_coinbase() {
+    assert_eq!(
+        SpendRefusal::PrematureCoinbase { height: 800_000 }.to_string(),
+        "a proven coinbase output at height 800000 has not matured for the next block"
+    );
 }
