@@ -354,11 +354,10 @@ shape moves: no new `Error` variant, the helpers `pub(crate)`.
 
 ### Notes: cross-SDK parity (#236)
 
-The satoshis refusal prints the received value as the `i64` it is; the
-reference prints a JavaScript number (`String(value)`), which for a magnitude
-past `2^53` is the nearest double (`i64::MIN` reads
-`-9223372036854776000` there, `-9223372036854775808` here). The verdict is
-the same. go-sdk reads the satoshis as an unsigned varint with no bound.
+go-sdk reads the satoshis as an unsigned varint with no bound; the reference
+and this crate refuse the same values with the same words (a negative below
+`-(2^53 - 1)` in `BigNumber.toNumber`'s words, `BigNumber.ts:625-630`, ahead of
+the bound).
 
 ## [0.9.0-beta.1] - 2026-10-26
 
