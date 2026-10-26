@@ -39,7 +39,10 @@ use bsv_rs::messages;
 use bsv_rs::primitives::bsv::shamir::split_private_key_with;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
 use bsv_rs::primitives::{from_hex, to_base64, PrivateKey};
-use bsv_rs::transaction::{verify_stream, verify_stream_structure, Beef, Headers, Kind, Verdict};
+use bsv_rs::transaction::{
+    verify_stream, verify_stream_structure, Beef, Headers, Kind, MerklePath, MerklePathLeaf,
+    Verdict,
+};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
@@ -177,9 +180,12 @@ fn kind_of(data: &[u8]) -> Option<Kind> {
     }
 }
 
-/// The two doors a byte mutation does not reach: an input spent twice in one
-/// transaction, a null outpoint in one that is not a coinbase. Each is a Lean
-/// row's raw transaction with one input more, written by `Beef::to_binary`.
+/// The doors a byte mutation does not reach: an input spent twice in one
+/// transaction, a null outpoint in one that is not a coinbase (each a Lean
+/// row's raw transaction with one input more), and a node computed from a
+/// duplicate at an even offset (bsv-rs#167: the vector
+/// `two-txids-a-node-computed-from-the-left-duplicate`'s shape as a BEEF of
+/// one BUMP), each written by `Beef::to_binary`.
 fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
     let mut out = Vec::new();
     for (name, data) in rows {
@@ -217,6 +223,21 @@ fn written_doors(rows: &[(String, Vec<u8>)]) -> Vec<(String, Vec<u8>)> {
             }
         }
     }
+    let hash = |i: u8| hex::encode([i; 32]);
+    let mut beef = Beef::new();
+    beef.bumps.push(MerklePath {
+        block_height: 1,
+        path: vec![
+            vec![
+                MerklePathLeaf::new_duplicate(0),
+                MerklePathLeaf::new_txid(1, hash(1)),
+                MerklePathLeaf::new_txid(2, hash(2)),
+                MerklePathLeaf::new(3, hash(3)),
+            ],
+            vec![],
+        ],
+    });
+    out.push(("door-LeftDuplicateBelow-hand".into(), beef.to_binary()));
     out
 }
 
@@ -338,6 +359,7 @@ fn beef_corpora(base: &Path) {
         "MissingSibling",
         "MismatchedNode",
         "DuplicateOffset",
+        "LeftDuplicateBelow",
         "RootNotCarried",
         "BumpIndexNamesNoBump",
         "TxidNotInBump",

@@ -3,7 +3,7 @@
 
 use super::Hash32;
 
-/// The twenty-five kinds of refusal, the Lean's `Kind`. None is a size or a
+/// The twenty-six kinds of refusal, the Lean's `Kind`. None is a size or a
 /// count: no byte is wrong by being one of many.
 ///
 /// Non-exhaustive (bsv-rs#86, #167, the owner's word of 2026-10-25): a
@@ -62,6 +62,10 @@ pub enum Kind {
     MismatchedNode,
     /// A second leaf at an offset its level already carries, agreeing or not.
     DuplicateOffset,
+    /// A path needs a node the BUMP does not carry, and computing it meets a
+    /// duplicate at an even offset: a left node with no hash to pair, where
+    /// the reference's walk gives up (bsv-rs#167).
+    LeftDuplicateBelow,
     /// A BUMP's root is not the root the headers carry at its height.
     RootNotCarried,
     /// A transaction's BUMP index names no BUMP.
@@ -101,8 +105,8 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// The twenty-five kinds, each once, in the Lean's order (`Kind.all`).
-    pub const ALL: [Kind; 25] = [
+    /// The twenty-six kinds, each once, in the Lean's order (`Kind.all`).
+    pub const ALL: [Kind; 26] = [
         Kind::BadVersion,
         Kind::BadVarint,
         Kind::Truncated,
@@ -114,6 +118,7 @@ impl Kind {
         Kind::MissingSibling,
         Kind::MismatchedNode,
         Kind::DuplicateOffset,
+        Kind::LeftDuplicateBelow,
         Kind::RootNotCarried,
         Kind::BumpIndexNamesNoBump,
         Kind::TxidNotInBump,
@@ -169,8 +174,8 @@ pub enum Reason {
         /// The bytes that were due.
         needed: u64,
     },
-    /// A BUMP leaf flag not `00`, `01` or `02`, or `01` at an even offset; a
-    /// has-BUMP byte not `00` or `01`; a V2 format byte not 0, 1 or 2.
+    /// A BUMP leaf flag not `00`, `01` or `02`; a has-BUMP byte not `00` or
+    /// `01`; a V2 format byte not 0, 1 or 2.
     BadFlag {
         /// The byte read.
         byte: u8,
@@ -214,6 +219,19 @@ pub enum Reason {
         /// The level.
         level: u8,
         /// The offset repeated.
+        offset: u64,
+    },
+    /// The node a path needs, not carried, whose computation meets a
+    /// duplicate at an even offset below it (as its left child, or under a
+    /// child computed in turn), at the offset varint of the level-0 leaf whose
+    /// path needs it (bsv-rs#167). The reference's walk gives up there: its
+    /// `cachedFindLeaf` finds no hash on the left (`ts-stack@edf6e03`
+    /// `MerklePath.ts:628-631`) and `nextCachedHash` throws `Missing hash for
+    /// index N at height N` (`:58`).
+    LeftDuplicateBelow {
+        /// The level.
+        level: u8,
+        /// The node's offset at that level.
         offset: u64,
     },
     /// The root computed and the height the BUMP claims.
@@ -300,6 +318,7 @@ impl Reason {
             Reason::MissingSibling { .. } => Kind::MissingSibling,
             Reason::MismatchedNode { .. } => Kind::MismatchedNode,
             Reason::DuplicateOffset { .. } => Kind::DuplicateOffset,
+            Reason::LeftDuplicateBelow { .. } => Kind::LeftDuplicateBelow,
             Reason::RootNotCarried { .. } => Kind::RootNotCarried,
             Reason::BumpIndexNamesNoBump { .. } => Kind::BumpIndexNamesNoBump,
             Reason::TxidNotInBump { .. } => Kind::TxidNotInBump,

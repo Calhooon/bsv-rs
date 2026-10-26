@@ -201,7 +201,6 @@ impl MerklePath {
             }
         }
 
-        Self::even_offset_duplicate(&path)?;
         let merkle_path = Self { block_height, path };
 
         // Verify all txids compute to the same root. The walks share every
@@ -974,8 +973,6 @@ mod linear_root_equivalence_tests {
             }
         }
 
-        // The ruling of #167: a duplicate at an even offset is refused.
-        MerklePath::even_offset_duplicate(&path)?;
         let merkle_path = MerklePath { block_height, path };
 
         // Verify all txids compute to the same root
@@ -1063,9 +1060,10 @@ mod linear_root_equivalence_tests {
         let h = height - 1;
         let l = offset << 1;
 
-        // The ruling of #167, as `expected_after_lone_leaf_ruling` carries the
-        // offset-0 one: a duplicate on the left is no hash to pair; 0.3.34
-        // hashed an empty left hash, and a path's walks could disagree.
+        // The reference's walk (#167), as `expected_after_lone_leaf_ruling`
+        // carries the offset-0 ruling: a duplicate on the left is no hash to
+        // pair; 0.3.34 hashed an empty left hash, and a path's walks could
+        // disagree.
         let leaf0 = legacy_find_or_compute_leaf(mp, h, l)?;
         if leaf0.hash.is_none() {
             return Err(crate::Error::MerklePathError(format!(
@@ -1438,7 +1436,7 @@ mod linear_root_equivalence_tests {
             // accepts the 0.3.34 parse accepted, to the same roots and bytes;
             // every refusal is the decoder's, in its words, and it refuses
             // more (an offset outside its level, a carried node its children
-            // contradict, a level 0 with no hash, an even-offset duplicate).
+            // contradict, a level 0 with no hash).
             match (&new, &old) {
                 (Ok(new), Ok(old)) => {
                     assert_eq!(
