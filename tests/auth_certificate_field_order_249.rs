@@ -97,7 +97,7 @@ fn a_field_changed_after_from_binary_unbinds_the_received_bytes() {
 
     // Through the public field: the retained bytes no longer carry the
     // value, so they authenticate nothing and are not written.
-    cert.fields.insert("f".into(), b"dGFtcGVyZWQ=".to_vec());
+    cert.fields.insert("f".into(), "dGFtcGVyZWQ=".to_string());
     assert_eq!(cert.verify(), Ok(false));
     assert_ne!(to_hex(&cert.to_binary(true)), w.hex);
 
@@ -108,7 +108,7 @@ fn a_field_changed_after_from_binary_unbinds_the_received_bytes() {
 
     // A setter that changes a value in the preimage clears them, even to
     // the same value.
-    cert.set_field("f", original).unwrap();
+    cert.set_field("f", original);
     assert_eq!(cert.received_unsigned, None);
 
     // The signature is outside the preimage: its setter keeps them.
@@ -251,10 +251,10 @@ fn the_serializer_orders_names_as_local_compare_does_on_the_latin_1_corpus() {
     let corpus: Corpus = serde_json::from_str(&data).unwrap();
     assert_eq!(corpus.collation_corpus.len(), 1402);
 
-    let fields: HashMap<String, Vec<u8>> = corpus
+    let fields: HashMap<String, String> = corpus
         .collation_corpus
         .iter()
-        .map(|n| (n.clone(), Vec::new()))
+        .map(|n| (n.clone(), String::new()))
         .collect();
     let cert = Certificate::new(
         [1u8; 32],

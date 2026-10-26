@@ -66,10 +66,7 @@ async fn a_reference_issued_certificate_published_for_anyone_parses_verifies_and
         r["preimage_sha256"].as_str().unwrap()
     );
     for (name, text) in r["certificate"]["fields"].as_object().unwrap() {
-        assert_eq!(
-            parsed.certificate.fields[name],
-            text.as_str().unwrap().as_bytes()
-        );
+        assert_eq!(&parsed.certificate.fields[name], text.as_str().unwrap());
     }
     assert_eq!(parsed.decrypted_fields, plaintexts(&r));
 }

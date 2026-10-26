@@ -116,7 +116,7 @@ impl VerifiableCertificate {
             .await?;
 
         let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
-        decrypt_field_value(field_name, &key, field_value)
+        decrypt_field_value(&key, field_value)
     }
 
     /// Decrypts all fields that have keys in the keyring, `privileged` and
@@ -195,10 +195,7 @@ impl VerifiableCertificate {
     }
 
     /// Converts to a JSON-serializable format: each field value its held
-    /// base64 text (#261), the keyring's values base64-encoded. A value that
-    /// is not UTF-8 reaches here only written into the public `fields` map
-    /// directly (`from_binary`, `set_field` and the JSON reader refuse it),
-    /// and is written with U+FFFD in place of its invalid bytes.
+    /// base64 text (#261), the keyring's values base64-encoded.
     pub fn to_json_value(&self) -> serde_json::Value {
         serde_json::json!({
             "type": self.certificate.type_base64(),
@@ -206,9 +203,7 @@ impl VerifiableCertificate {
             "subject": self.certificate.subject.to_hex(),
             "certifier": self.certificate.certifier.to_hex(),
             "revocationOutpoint": self.certificate.revocation_outpoint.as_ref().map(|o| o.to_string()),
-            "fields": self.certificate.fields.iter()
-                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(v).into_owned()))
-                .collect::<HashMap<String, String>>(),
+            "fields": self.certificate.fields,
             "signature": self.certificate.signature.as_ref().map(|s| crate::primitives::to_base64(s)),
             "keyring": self.keyring.iter()
                 .map(|(k, v)| (k.clone(), crate::primitives::to_base64(v)))
@@ -299,7 +294,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.fields.insert("email".to_string(), vec![4, 5, 6]);
+        cert.set_field("email", "BAUG");
         cert.sign(&certifier).unwrap();
 
         let mut keyring = HashMap::new();

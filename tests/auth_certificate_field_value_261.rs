@@ -1,5 +1,5 @@
-//! A certificate's field value is the base64 text's bytes (#261): held,
-//! written and signed as BRC-52 asks ("Field values in CertificateBinary are
+//! A certificate's field value is its base64 text (#261): held as that
+//! string, its UTF-8 bytes written and signed as BRC-52 asks ("Field values in CertificateBinary are
 //! the UTF-8 bytes of the Base64 string, not the Base64-decoded ciphertext
 //! bytes", `brcs@5119a9b` `peer-to-peer/0052.md:41,97`), as the reference
 //! writes them (`ts-stack@edf6e03` `Certificate.ts:294-296`) and stores them
@@ -120,11 +120,7 @@ fn a_reference_issued_encrypted_field_certificate_read_from_json_signs_the_refer
 
     let cert: Certificate = serde_json::from_value(crate_serde_json(&r.certificate)).unwrap();
     for (name, text) in &r.certificate.fields {
-        assert_eq!(
-            cert.fields[name],
-            text.as_bytes(),
-            "field {name} held as its text"
-        );
+        assert_eq!(&cert.fields[name], text, "field {name} held as its text");
     }
     assert_eq!(to_hex(&cert.signing_hash()), r.preimage_sha256);
     assert_eq!(to_hex(&cert.to_binary(true)), r.binary_hex);
@@ -265,11 +261,10 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
     .await
     .unwrap();
     assert_eq!(master.fields.len(), w.plaintexts.len());
-    for (name, value) in &master.fields {
-        let text = std::str::from_utf8(value).unwrap();
+    for (name, text) in &master.fields {
         let ciphertext = from_base64(text).unwrap();
         assert_eq!(
-            to_base64(&ciphertext),
+            &to_base64(&ciphertext),
             text,
             "field {name} is canonical base64 text"
         );
@@ -278,7 +273,8 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
     }
     let preimage = master.to_binary(false);
     for value in master.fields.values() {
-        assert!(preimage.windows(value.len()).any(|win| win == &value[..]));
+        let value = value.as_bytes();
+        assert!(preimage.windows(value.len()).any(|win| win == value));
     }
     assert_eq!(sha256(&preimage), master.signing_hash());
     assert!(master.verify().unwrap());
@@ -295,22 +291,20 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
     assert_eq!(decrypted, w.plaintexts);
 }
 
-/// The reference's certificate read from its bytes, one field's value
-/// replaced in the public map by bytes that are not UTF-8.
-fn with_a_value_not_utf8() -> Certificate {
-    let r = vectors().reference_issued;
-    let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
-    cert.fields
-        .insert("email".to_string(), vec![0xff, 0xfe, 0x41]);
-    cert
-}
-
 #[test]
 fn from_binary_refuses_a_field_value_that_is_not_utf8_the_field_named() {
     // The reference's fromBinary reads each value with toUTF8Strict
     // (`Certificate.ts:384`); BRC-52: malformed UTF-8 MUST NOT be made
     // acceptable by retaining bytes (`0052.md:103`).
-    let bytes = with_a_value_not_utf8().to_binary(true);
+    let r = vectors().reference_issued;
+    let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
+    cert.set_field("email", "AAAA");
+    let mut bytes = cert.to_binary(true);
+    let at = bytes
+        .windows(11)
+        .position(|w| w == b"\x05email\x04AAAA")
+        .unwrap();
+    bytes[at + 7..at + 10].copy_from_slice(&[0xff, 0xfe, 0x41]);
     match Certificate::from_binary(&bytes) {
         Err(Error::InvalidUtf8(m)) => assert!(
             m.contains("certificate field email is not UTF-8 base64 text"),
@@ -321,20 +315,18 @@ fn from_binary_refuses_a_field_value_that_is_not_utf8_the_field_named() {
 }
 
 #[test]
-fn set_field_refuses_a_value_that_is_not_utf8_and_holds_nothing() {
+fn set_field_holds_any_string_and_writes_its_bytes_as_the_reference_does() {
+    // The reference's `fields` record takes any string and writes its UTF-8
+    // (`Certificate.ts:294-296`): no base64 check at the setter.
     let r = vectors().reference_issued;
     let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
-    let before = cert.fields.clone();
-    match cert.set_field("email", vec![0xff, 0xfe, 0x41]) {
-        Err(Error::InvalidUtf8(m)) => assert!(
-            m.contains("certificate field email is not UTF-8 base64 text"),
-            "{m}"
-        ),
-        other => panic!("expected InvalidUtf8, got {other:?}"),
-    }
-    assert_eq!(cert.fields, before);
-    cert.set_field("email", b"AAAA".to_vec()).unwrap();
-    assert_eq!(cert.fields["email"], b"AAAA");
+    cert.set_field("email", "not base64 ✓");
+    assert_eq!(cert.fields["email"], "not base64 ✓");
+    let bytes = cert.to_binary(false);
+    let text = "not base64 ✓".as_bytes();
+    assert!(bytes.windows(text.len()).any(|w| w == text));
+    let read = Certificate::from_binary(&bytes).unwrap();
+    assert_eq!(read.fields, cert.fields);
 }
 
 #[test]
@@ -352,17 +344,6 @@ fn the_json_reader_refuses_a_field_value_that_is_not_utf8() {
     // A lone surrogate escape, which no UTF-8 string carries.
     let surrogate = json.replacen(text.as_str(), "\\ud800", 1);
     assert!(serde_json::from_str::<Certificate>(&surrogate).is_err());
-}
-
-#[test]
-fn the_json_writer_refuses_a_held_field_value_that_is_not_utf8_the_field_named() {
-    let err = serde_json::to_string(&with_a_value_not_utf8())
-        .unwrap_err()
-        .to_string();
-    assert!(
-        err.contains("certificate field email is not UTF-8 base64 text"),
-        "{err}"
-    );
 }
 
 #[test]

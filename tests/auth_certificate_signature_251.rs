@@ -71,8 +71,7 @@ fn a_certificate_signed_here_is_the_reference_signed_bytes() {
         key(9).public_key(),
         certifier.public_key(),
     );
-    cert.fields
-        .insert("email".into(), to_base64(b"v-email").into_bytes());
+    cert.set_field("email", to_base64(b"v-email"));
     cert.sign(&certifier).unwrap();
     assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
 }
@@ -89,8 +88,7 @@ fn a_certificate_signed_here_verifies_in_the_reference() {
         certifier.public_key(),
     );
     cert.revocation_outpoint = Some(Outpoint::new([5u8; 32], 1));
-    cert.fields
-        .insert("name".into(), to_base64(b"v-name").into_bytes());
+    cert.set_field("name", to_base64(b"v-name"));
     cert.sign(&certifier).unwrap();
     assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
     assert_eq!(certificate(&w).verify(), Ok(true));
