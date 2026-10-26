@@ -37,7 +37,7 @@ nothing to check. The reference's processor calls
 writes the network as one byte, 0 for mainnet (`:1710`), and the version's
 UTF-8 bytes with no length (`:1730`); its result check wants the network
 `mainnet` or `testnet` and the version a string of 7 to 30 UTF-8 bytes
-(`WalletResultValidation.ts:2298-2304`, `string` `:908-915`). BRC-100 names
+(`WalletResultValidation.ts:2299-2306`, `string` `:908-915`). BRC-100 names
 the version "the wallet's version string (e.g., `vendor-1.0.0`)" (section 28,
 `wallet/0100.md:2517` at `5119a9b`). go-sdk forwards both too and checks
 neither (`go-sdk@2ca481c` `wallet/substrates/wallet_wire_processor.go:400-414`;

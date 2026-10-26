@@ -1012,7 +1012,7 @@ async fn get_network_and_get_version_forward_the_wallets_answers_byte_for_byte()
     }
 }
 
-/// getVersion's version (`WalletResultValidation.ts:2302-2304`, `string`
+/// getVersion's version (`WalletResultValidation.ts:2304-2306`, `string`
 /// `:908-915`): 7 to 30 UTF-8 bytes, the refusal in the reference's words
 /// with its en dash; the bounds themselves pass.
 #[tokio::test]
@@ -1041,7 +1041,7 @@ async fn a_version_result_outside_7_to_30_bytes_is_refused_with_code_1() {
     }
 }
 
-/// getNetwork's network (`WalletResultValidation.ts:2298-2301`): mainnet or
+/// getNetwork's network (`WalletResultValidation.ts:2299-2303`): mainnet or
 /// testnet, else `Invalid getNetwork result network: expected mainnet or
 /// testnet`. A wallet here answers a `Network`, which has the two values and
 /// no third, so the processor has no network to refuse; the reference's rule

@@ -567,7 +567,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
 
     async fn handle_get_version(&self, originator: &str) -> Answer {
         // The wallet's answer forwarded (`:1721-1725`), 7 to 30 UTF-8 bytes
-        // (`WalletResultValidation.ts:2302-2304`), written with no length
+        // (`WalletResultValidation.ts:2304-2306`), written with no length
         // prefix (`:1730`)
         let result = self
             .invoke_wallet(WalletCall::GetVersion, self.wallet.get_version(originator))
