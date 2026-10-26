@@ -142,7 +142,11 @@ TS 3 synchronizes on every `findTxid` (`Beef.ts:497-499`) as on its other
 readers. Here the lookups do not refresh (`find_txid` takes `&self`, and a
 scan of every entry per lookup would make a loop of lookups quadratic): until
 the next whole-BEEF reader runs, a lookup by the new txid misses, and one by
-the old txid finds nothing. Nothing on the wire differs.
+the old txid finds nothing; in that window a `merge_raw_tx`, `merge_transaction`
+or `merge_txid_only` of the renamed transaction adds a second entry under the
+new txid, and `find_atomic_transaction` of the new txid answers `None`, until a
+whole-BEEF reader runs (the review's reading; a scan per merge would double
+the merge loop, so the window is stated, not closed). Nothing on the wire differs.
 
 ## [0.9.0-beta.1] - 2026-10-26
 
