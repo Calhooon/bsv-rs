@@ -22,9 +22,9 @@
 //! `:72-74`, a transaction's inputs above it; `:172-191`, the validation
 //! process): this crate's writer still writes parents before children, and
 //! a BEEF so written holds nothing for a parent. The stream's holding is
-//! bounded at the caller's word (`StreamVerifier::set_deferred_limit`, no
-//! bound by default): past it the reading is declined
-//! (`DeferredOverLimit`, an `io::Error`), never judged.
+//! under no bound: a valid BEEF is never refused for its size or its counts
+//! (the stack's charter, `bsv-stack-lean docs/charters/beef-of-any-size.md`),
+//! so a reversed BEEF of any size is judged as a parents-first one is.
 //!
 //! Through 0.9.0-beta.1 (bsv-rs#86) the three readers refused a child
 //! written ahead of its parent (`InputNamesNoElement` at its input); 0.8's
@@ -39,8 +39,8 @@ use std::io::Read;
 use bsv_rs::primitives::{sha256d, to_hex, Writer};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_async, verify_stream_structure, AsyncByteSource, Beef, BeefTx,
-    Cursor, DeferredLimit, DeferredOverLimit, Kind, MerklePath, MockChainTracker, Progress, Reason,
-    StreamVerifier, Verdict, ATOMIC_BEEF, BEEF_V1, BEEF_V2,
+    Cursor, Kind, MerklePath, MockChainTracker, Progress, Reason, StreamVerifier, Verdict,
+    ATOMIC_BEEF, BEEF_V1, BEEF_V2,
 };
 
 #[path = "support/beef_chain.rs"]
@@ -234,10 +234,11 @@ fn a_beef_in_brc62_order_passes_the_three_readers_and_holds_nothing() {
     for version in [BEEF_V1, BEEF_V2] {
         let bytes = brc62_order(version);
         assert_valid(&bytes, None, &format!("version {version:#x}"));
-        // Nothing is held at any step: a bound of none passes it.
+        // Nothing is held at any step.
         let mut reader = StreamVerifier::new(bytes.as_slice(), headers(), None);
-        reader.set_deferred_limit(Some(DeferredLimit::new(0, 0)));
-        assert!(reader.run().unwrap().is_valid());
+        while let Progress::Stepped = reader.step().unwrap() {
+            assert_eq!(reader.index().deferred().0, 0);
+        }
     }
 }
 
@@ -323,44 +324,39 @@ fn a_refusal_after_a_held_child_is_the_later_elements() {
     assert_eq!(readers.whole, Err(Kind::NoOutputs));
 }
 
-/// The bound: a chain of 10 newest first holds 9 links until the funding
-/// transaction arrives. Under a bound of 4 the reading is declined at the
-/// fifth held link: an `io::Error` carrying `DeferredOverLimit`, no verdict.
-/// The same under a byte bound; with a bound of 9 it is valid.
+/// No bound (the charter: a valid BEEF is never refused for its size or its
+/// counts): a chain of 2,000 newest first holds every unproven link until
+/// the funding transaction arrives, 1,999 at the peak, and is judged, on
+/// both modes of the stream, never declined (RED on the base `df6fb8a`:
+/// `InputNamesNoElement` at the newest link's input; on `66eb2cc` a bound
+/// the caller set declined it as an `io::Error`).
 #[test]
-fn a_reading_past_the_deferred_bound_is_declined_not_judged() {
-    let n = 10;
+fn a_reversed_beef_is_judged_whatever_its_size() {
+    let n = 2_000;
     let bytes = reversed_chain(n);
-    let raws = chain_raws(n);
-    let fifth = bytes
-        .windows(raws[4].len())
-        .position(|w| w == raws[4].as_slice())
-        .unwrap() as u64;
-    let link = raws[0].len() as u64;
-    for (limit, held) in [
-        (DeferredLimit::new(4, u64::MAX), (5, 5 * link)),
-        (DeferredLimit::new(u64::MAX, 4 * link), (5, 5 * link)),
-    ] {
-        for structure in [false, true] {
-            let mut reader = if structure {
-                StreamVerifier::structure_only(bytes.as_slice(), headers(), None)
-            } else {
-                StreamVerifier::new(bytes.as_slice(), headers(), None)
-            };
-            reader.set_deferred_limit(Some(limit));
-            let error = reader.run().expect_err("declined");
-            assert_eq!(error.kind(), std::io::ErrorKind::OutOfMemory);
-            let declined = DeferredOverLimit::of(&error).expect("the decline");
-            assert_eq!(
-                (declined.offset, declined.transactions, declined.bytes),
-                (fifth, held.0, held.1)
-            );
-            assert_eq!(declined.limit, limit);
-        }
+    for structure in [false, true] {
+        let mut reader = if structure {
+            StreamVerifier::structure_only(bytes.as_slice(), headers(), None)
+        } else {
+            StreamVerifier::new(bytes.as_slice(), headers(), None)
+        };
+        let mut peak = 0;
+        let verdict = loop {
+            match reader.step().expect("never declined") {
+                Progress::Stepped => peak = peak.max(reader.index().deferred().0),
+                Progress::Verdict(verdict) => break verdict,
+            }
+        };
+        assert_eq!(peak, n as u64 - 1, "structure {structure}");
+        assert_eq!(
+            verdict,
+            Verdict::Valid {
+                subject: None,
+                roots: roots()
+            },
+            "structure {structure}"
+        );
     }
-    let mut reader = StreamVerifier::new(bytes.as_slice(), headers(), None);
-    reader.set_deferred_limit(Some(DeferredLimit::new(9, 9 * link)));
-    assert!(reader.run().unwrap().is_valid());
 }
 
 /// A cursor taken while children are held carries them (BSC4) and resumes

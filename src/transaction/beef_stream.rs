@@ -33,9 +33,9 @@
 //!   the two give one verdict. A BEEF in BRC-62's order (parents before
 //!   children, `BRCs@5119a9b transactions/0062.md:72-74`, as every writer
 //!   writes it) holds nothing; one written children first holds at most the
-//!   bytes read, with no bound unless the caller sets one
-//!   ([`DeferredLimit`]), past which the reading is declined
-//!   ([`DeferredOverLimit`]), never judged.
+//!   bytes read, under no bound: a valid BEEF is never refused for its size
+//!   or its counts (the stack's charter, `bsv-stack-lean
+//!   docs/charters/beef-of-any-size.md`).
 //! - [`verify_stream`] is one pass: one step per element, each BUMP's root
 //!   checked against the [`Headers`] as it streams, each unproven
 //!   transaction's inputs resolved against the index (or held until they
@@ -119,7 +119,6 @@ pub fn display_hex(hash: &Hash32) -> String {
 mod deferred;
 mod reason;
 use deferred::{read_held, Deferred};
-pub use deferred::{DeferredLimit, DeferredOverLimit};
 pub use reason::{Kind, Reason};
 
 /// A refusal: the offset of the byte it names, and the reason.
@@ -3147,9 +3146,6 @@ pub struct StreamVerifier<R, H> {
     /// The transaction a pause left in hand and the input it reached.
     held: Option<(Element, u32)>,
     work_limit: Option<u64>,
-    deferred_limit: Option<DeferredLimit>,
-    /// The reading was declined for its deferred limit.
-    declined: Option<DeferredOverLimit>,
 }
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
@@ -3172,16 +3168,6 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
     /// cursor state: reapply it after `resume`, including a decoded cursor.
     pub fn set_work_limit(&mut self, limit: Option<u64>) {
         self.work_limit = limit;
-    }
-
-    /// Bounds what the reading holds for a parent not read yet (bsv-rs#240,
-    /// [`DeferredLimit`]). Past it the reading is declined: [`step`](Self::step)
-    /// and [`run`](Self::run) return the [`std::io::Error`] that carries
-    /// [`DeferredOverLimit`], never a verdict. `None`, no bound, is the
-    /// default. This configuration is not cursor state: reapply it after
-    /// `resume`.
-    pub fn set_deferred_limit(&mut self, limit: Option<DeferredLimit>) {
-        self.deferred_limit = limit;
     }
 
     /// The same reader for the BEEF's structure alone: no script is run and
@@ -3232,8 +3218,6 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             verdict: None,
             held: None,
             work_limit: None,
-            deferred_limit: None,
-            declined: None,
         }
     }
 
@@ -3278,9 +3262,6 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
         if let Some(verdict) = &self.verdict {
             return Ok(Timed::Progress(Progress::Verdict(verdict.clone())));
         }
-        if let Some(declined) = self.declined {
-            return Err(declined.to_io());
-        }
         let (element, from) = match self.held.take() {
             Some(held) => held,
             None => {
@@ -3317,15 +3298,6 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
         match folded {
             Ok(None) => {
                 self.boundary = self.source.decoder.frame.clone();
-                let over = DeferredOverLimit::check(
-                    &self.judge.index,
-                    self.deferred_limit,
-                    element.offset(),
-                );
-                if let Some(declined) = over {
-                    self.declined = Some(declined);
-                    return Err(declined.to_io());
-                }
                 Ok(Timed::Progress(Progress::Stepped))
             }
             Ok(Some(next)) => {
@@ -3359,8 +3331,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
 /// Memory is the one element in hand and the index, and the transactions
 /// held for a parent not read yet (none for a BEEF in BRC-62's order);
 /// nothing is refused for its size or its counts. `Err` is the source's
-/// failure, or a [`DeferredOverLimit`] decline under a bound the caller set
-/// on a [`StreamVerifier`], and says nothing about the bytes.
+/// failure and says nothing about the bytes.
 pub fn verify_stream<R: Read, H: Headers>(
     source: R,
     headers: H,
@@ -3467,7 +3438,6 @@ pub struct AsyncStreamVerifier {
     decoder: BeefDecoder,
     judge: Judge,
     work_limit: Option<u64>,
-    deferred_limit: Option<DeferredLimit>,
 }
 
 impl AsyncStreamVerifier {
@@ -3477,7 +3447,6 @@ impl AsyncStreamVerifier {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::new()),
             work_limit: None,
-            deferred_limit: None,
         }
     }
 
@@ -3489,22 +3458,12 @@ impl AsyncStreamVerifier {
         self.work_limit = limit;
     }
 
-    /// Bounds what the reading holds for a parent not read yet (see
-    /// [`StreamVerifier::set_deferred_limit`]). Past it [`run`](Self::run)
-    /// returns [`AsyncVerifyError::Source`] with the [`std::io::Error`] that
-    /// carries [`DeferredOverLimit`], never a verdict. `None` is the default;
-    /// reapply it after `resume`.
-    pub fn set_deferred_limit(&mut self, limit: Option<DeferredLimit>) {
-        self.deferred_limit = limit;
-    }
-
     /// The same for the BEEF's structure alone.
     pub fn structure_only(subject: Option<Hash32>) -> Self {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::structure_only()),
             work_limit: None,
-            deferred_limit: None,
         }
     }
 
@@ -3516,7 +3475,6 @@ impl AsyncStreamVerifier {
             decoder: BeefDecoder::at(frame),
             judge,
             work_limit: None,
-            deferred_limit: None,
         }
     }
 
@@ -3553,10 +3511,6 @@ impl AsyncStreamVerifier {
                 if let Err(r) = self.judge.check_named_subject(&self.decoder) {
                     return Ok(r.into());
                 }
-                let at = match &step {
-                    Step::Element(element) => element.offset(),
-                    _ => 0,
-                };
                 let folded = match step {
                     Step::NeedMore | Step::Done => break,
                     Step::Element(Element::Bump(bump)) => {
@@ -3598,11 +3552,6 @@ impl AsyncStreamVerifier {
                 };
                 if let Err(stop) = folded {
                     return Ok(stop.into());
-                }
-                if let Some(declined) =
-                    DeferredOverLimit::check(&self.judge.index, self.deferred_limit, at)
-                {
-                    return Err(AsyncVerifyError::Source(declined.to_io()));
                 }
             }
         }
