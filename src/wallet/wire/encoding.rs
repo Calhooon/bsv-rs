@@ -1361,27 +1361,12 @@ impl Default for WireWriter {
 fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
     let mut w = WireWriter::new();
 
-    // Type: decode from base64, write 32 raw bytes
-    let type_bytes = from_base64(&cert.certificate_type)
-        .map_err(|e| Error::WalletError(format!("invalid certificate_type base64: {}", e)))?;
-    if type_bytes.len() != 32 {
-        return Err(Error::WalletError(format!(
-            "certificate_type must be 32 bytes, got {}",
-            type_bytes.len()
-        )));
-    }
-    w.write_bytes(&type_bytes);
-
-    // Serial: decode from base64, write 32 raw bytes
-    let serial_bytes = from_base64(&cert.serial_number)
-        .map_err(|e| Error::WalletError(format!("invalid serial_number base64: {}", e)))?;
-    if serial_bytes.len() != 32 {
-        return Err(Error::WalletError(format!(
-            "serial_number must be 32 bytes, got {}",
-            serial_bytes.len()
-        )));
-    }
-    w.write_bytes(&serial_bytes);
+    // Type and serial: each decoded from base64, 32 raw bytes
+    w.write_bytes(&decoded_32_bytes(
+        &cert.certificate_type,
+        "certificate_type",
+    )?);
+    w.write_bytes(&decoded_32_bytes(&cert.serial_number, "serial_number")?);
 
     // Subject and certifier: 33-byte compressed points from hex
     for (hex, what) in [
@@ -1400,30 +1385,11 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
     // Revocation outpoint
     w.write_outpoint_string(&cert.revocation_outpoint)?;
 
-    // Fields: at most 100,000 (`Certificate.ts:57-58`), each name 1 to 50
-    // bytes and safe, each value at most 1 MiB (`:76-79`), in the readers'
-    // words (bsv-rs#246)
-    if cert.fields.len() > super::MAX_CERTIFICATE_FIELDS {
-        return Err(super::refused(format!(
-            "Certificate field count exceeds the maximum of {}",
-            super::MAX_CERTIFICATE_FIELDS
-        )));
-    }
-    let mut names: Vec<&str> = cert.fields.keys().map(String::as_str).collect();
-    crate::wallet::collation::sort_field_names(&mut names);
-    for &name in &names {
-        super::require_certificate_field_name_length(name.len())?;
-        super::require_safe_certificate_field_name(name)?;
-        if cert.fields[name].len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
-            return Err(super::refused(format!(
-                "Certificate field {name} exceeds the maximum of {} bytes",
-                super::MAX_CERTIFICATE_FIELD_VALUE_BYTES
-            )));
-        }
-    }
-    // In the order the signature is made over, `localeCompare`'s
-    // (`Certificate.ts:282`), not the bytes: a byte-ordered frame of a
-    // certificate signed here does not verify over the bytes received (#246)
+    // Fields, checked and in the order the signature is made over,
+    // `localeCompare`'s (`Certificate.ts:282`), not the bytes: a byte-ordered
+    // frame of a certificate signed here does not verify over the bytes
+    // received (#246)
+    let names = checked_field_names(&cert.fields)?;
     w.write_var_int(names.len() as u64);
     for name in names {
         w.write_string(name);
@@ -1447,6 +1413,46 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
     }
 
     Ok(w.into_bytes())
+}
+
+/// A certificate type or serial number: base64 text decoding to 32 bytes,
+/// refused in the words the writer always used.
+fn decoded_32_bytes(text: &str, what: &str) -> Result<Vec<u8>, Error> {
+    let bytes = from_base64(text)
+        .map_err(|e| Error::WalletError(format!("invalid {what} base64: {}", e)))?;
+    if bytes.len() != 32 {
+        return Err(Error::WalletError(format!(
+            "{what} must be 32 bytes, got {}",
+            bytes.len()
+        )));
+    }
+    Ok(bytes)
+}
+
+/// The certificate's field names in the signed order, every bound checked
+/// first: at most 100,000 fields (`Certificate.ts:57-58`), each name 1 to 50
+/// bytes and safe, each value at most 1 MiB (`:76-79`), in the readers' words
+/// (bsv-rs#246).
+fn checked_field_names(fields: &HashMap<String, String>) -> Result<Vec<&str>, Error> {
+    if fields.len() > super::MAX_CERTIFICATE_FIELDS {
+        return Err(super::refused(format!(
+            "Certificate field count exceeds the maximum of {}",
+            super::MAX_CERTIFICATE_FIELDS
+        )));
+    }
+    let mut names: Vec<&str> = fields.keys().map(String::as_str).collect();
+    crate::wallet::collation::sort_field_names(&mut names);
+    for &name in &names {
+        super::require_certificate_field_name_length(name.len())?;
+        super::require_safe_certificate_field_name(name)?;
+        if fields[name].len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+            return Err(super::refused(format!(
+                "Certificate field {name} exceeds the maximum of {} bytes",
+                super::MAX_CERTIFICATE_FIELD_VALUE_BYTES
+            )));
+        }
+    }
+    Ok(names)
 }
 
 #[cfg(test)]
