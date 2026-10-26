@@ -196,8 +196,11 @@ fn a_keyring_value_whose_bytes_are_not_utf8_round_trips_as_base64() {
     assert_eq!(json(&read(&bytes)), json(&cert));
 }
 
-/// A count or a length past the bytes is `ReaderUnderflow`, no panic and no
-/// allocation of the count (`bounded_capacity`, CLAUDE.md rule 5).
+/// A count or a length past the bytes is refused, no panic and no allocation
+/// of the count (CLAUDE.md rule 5): a map's count past `2^53 - 1` in the
+/// strict reader's words, as the transceiver refuses it (bsv-rs#236; until
+/// then `ReaderUnderflow` when the entries ran out), the certificate's length
+/// `ReaderUnderflow`.
 #[test]
 fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
     let zero = zero_value_entry();
@@ -210,10 +213,12 @@ fn a_count_that_overruns_the_bytes_is_refused_without_a_panic() {
     // The keyring's count, then the decrypted fields' count.
     for bytes in [at(2), at(1)] {
         let mut reader = WireReader::new(&bytes);
-        assert!(matches!(
-            reader.read_identity_certificate(),
-            Err(Error::ReaderUnderflow { .. })
-        ));
+        assert_eq!(
+            reader.read_identity_certificate().map(drop),
+            Err(Error::WalletError(
+                "number too large to retain precision - use readVarIntBn".into()
+            ))
+        );
     }
     // The certificate's length.
     let mut reader = WireReader::new(&huge);

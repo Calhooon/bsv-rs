@@ -138,6 +138,9 @@ const MAX_WIRE_RESPONSE_COLLECTION_ITEMS: usize = 100_000;
 /// `Number.MAX_SAFE_INTEGER`, the strict varint reader's bound.
 const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
+/// A wire record: a key to its value.
+type Record = HashMap<String, String>;
+
 fn refused(words: impl Into<String>) -> Error {
     Error::WalletError(words.into())
 }
@@ -153,6 +156,18 @@ impl WireReader<'_> {
             ));
         }
         usize::try_from(value).map_err(|_| refused("Wallet Wire count exceeds the platform"))
+    }
+
+    /// `readVarIntNumStrict(false)` as a byte length: the strict bound, then
+    /// the bytes remaining before it is narrowed (`wire_length`, bsv-rs#192).
+    fn read_strict_length(&mut self) -> Result<usize, Error> {
+        let value = self.read_var_int()?;
+        if value > MAX_SAFE_INTEGER {
+            return Err(refused(
+                "number too large to retain precision - use readVarIntBn",
+            ));
+        }
+        self.wire_length(value)
     }
 
     /// A count, then `#requireResponseCollectionLength` (`:1955-1969`) with a
@@ -195,9 +210,38 @@ impl WireReader<'_> {
         Ok(crate::primitives::to_hex(bytes))
     }
 
+    /// A counted record, the one reading of the transceiver's records and
+    /// `read_identity_certificate`'s maps (bsv-rs#236): the count
+    /// (`read_collection_count`), then its entries (`read_wire_record`).
+    pub(crate) fn read_counted_wire_record(
+        &mut self,
+        name: &str,
+        value: impl FnMut(&mut Self) -> Result<String, Error>,
+    ) -> Result<HashMap<String, String>, Error> {
+        let count = self.read_collection_count(name)?;
+        self.read_wire_record(name, count, value)
+    }
+
+    /// A discovery entry's two maps (`WalletWireTransceiver.ts:1711-1752`), read
+    /// by the transceiver's discovery reader and `read_identity_certificate`
+    /// alike (bsv-rs#236): the public keyring's values raw bytes as base64, the
+    /// decrypted fields' values UTF-8; an empty map `None`.
+    pub(crate) fn read_discovery_maps(
+        &mut self,
+    ) -> Result<(Option<Record>, Option<Record>), Error> {
+        let keyring =
+            self.read_counted_wire_record("discovery public keyring", Self::read_base64_value)?;
+        let fields =
+            self.read_counted_wire_record("discovery decrypted fields", Self::read_utf8_value)?;
+        Ok((
+            Some(keyring).filter(|m| !m.is_empty()),
+            Some(fields).filter(|m| !m.is_empty()),
+        ))
+    }
+
     /// A record of `count` entries (`#readRecordKey`, `:1979-1990`;
     /// `#setUniqueWireRecordEntry`, `:1992-2002`), each value read by `value`.
-    pub(crate) fn read_wire_record(
+    fn read_wire_record(
         &mut self,
         name: &str,
         count: usize,
@@ -223,13 +267,13 @@ impl WireReader<'_> {
 
     /// A varint-length value as UTF-8 (`toUTF8Strict`).
     pub(crate) fn read_utf8_value(&mut self) -> Result<String, Error> {
-        let length = self.read_var_int_num_strict()?;
+        let length = self.read_strict_length()?;
         utf8(self.read_bytes(length)?)
     }
 
     /// A varint-length value as the base64 of its bytes.
     pub(crate) fn read_base64_value(&mut self) -> Result<String, Error> {
-        let length = self.read_var_int_num_strict()?;
+        let length = self.read_strict_length()?;
         Ok(crate::primitives::to_base64(self.read_bytes(length)?))
     }
 
@@ -294,7 +338,7 @@ impl WireReader<'_> {
 
 /// `#setUniqueWireRecordEntry` (`:1992-2002`): a repeated key refused, never
 /// kept over the earlier one.
-pub(crate) fn set_unique_record_entry(
+fn set_unique_record_entry(
     record: &mut HashMap<String, String>,
     name: &str,
     key: String,
