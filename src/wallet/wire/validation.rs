@@ -11,12 +11,14 @@
 //! a code in 2 to 8 (`WalletWireProcessor.ts:2379-2384`). A result refused is
 //! a plain `Error` (`WalletResultValidation.ts:510-512`), code 1,
 //! `Invalid <call> result <field>: expected <expectation>`. A rule the
-//! processor's reader already enforces (the security level, a counterparty
-//! that is no point, the data-type flag, a 32-byte hash or HMAC read as 32
-//! bytes) or the crate's types carry (a boolean, a `PublicKey`, a `u8`) is not
-//! repeated here.
+//! processor's reader already enforces, as the reference's reader does (the
+//! security level, a key-related counterparty that is no point, the
+//! data-type flag, a 32-byte hash or HMAC read as 32 bytes), or the crate's
+//! types carry (a boolean, a `u8`) is not repeated here; the two linkage
+//! calls' keys, read raw as the reference reads them, are judged here (#226).
 
 use super::encoding::WireReader;
+use super::requests::{RevealCounterpartyRequest, RevealSpecificRequest};
 use crate::primitives::PublicKey;
 use crate::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
 use crate::wallet::types::{Counterparty, Protocol};
@@ -216,18 +218,60 @@ pub(super) fn verify_signature_args(args: &VerifySignatureArgs) -> Checked {
     Ok(())
 }
 
-/// `validateRevealCounterpartyKeyLinkageArgs` (`:1734-1741`): the two keys
-/// are points by the reader; the privilege without seekPermission.
-pub(super) fn reveal_counterparty_args(args: &RevealCounterpartyKeyLinkageArgs) -> Checked {
-    privilege(args.privileged, args.privileged_reason.as_deref())
+/// `isValidCompressedPublicKey` (`Secp256k1Validation.ts:15-22`): a `02` or
+/// `03` prefix, x below the field prime, a point on the curve.
+fn compressed_key(bytes: &[u8]) -> Option<PublicKey> {
+    if !matches!(bytes.first(), Some(0x02 | 0x03)) {
+        return None;
+    }
+    PublicKey::from_bytes(bytes).ok()
+}
+
+/// `validatePublicKey` (`:182-188`) on 33 bytes the reader read raw: their
+/// hex is 66 characters, so the point check is what can fail.
+fn public_key(bytes: &[u8; 33], name: &str) -> Checked<PublicKey> {
+    compressed_key(bytes).ok_or_else(|| invalid(name, "a valid compressed secp256k1 public key"))
+}
+
+/// `validateRevealCounterpartyKeyLinkageArgs` (`:1734-1741`): the
+/// counterparty, the verifier, then the privilege without seekPermission;
+/// the args the wallet is called with (#226).
+pub(super) fn reveal_counterparty_args(
+    request: RevealCounterpartyRequest,
+) -> Checked<RevealCounterpartyKeyLinkageArgs> {
+    let counterparty = public_key(&request.counterparty, "counterparty")?;
+    let verifier = public_key(&request.verifier, "verifier")?;
+    privilege(request.privileged, request.privileged_reason.as_deref())?;
+    Ok(RevealCounterpartyKeyLinkageArgs {
+        counterparty,
+        verifier,
+        privileged: request.privileged,
+        privileged_reason: request.privileged_reason,
+    })
 }
 
 /// `validateRevealSpecificKeyLinkageArgs` (`:1743-1750`): the counterparty
-/// and the verifier by the reader, the protocol, the key ID, the privilege.
-pub(super) fn reveal_specific_args(args: &RevealSpecificKeyLinkageArgs) -> Checked {
-    protocol(&args.protocol_id)?;
-    string_length(&args.key_id, "keyID", 1, 800)?;
-    privilege(args.privileged, args.privileged_reason.as_deref())
+/// (`validateCounterparty` `:190-193`: absent, it reaches `validateHexString`
+/// `:523`, a point by the reader otherwise), the verifier, the protocol, the
+/// key ID, the privilege; the args the wallet is called with (#226).
+pub(super) fn reveal_specific_args(
+    request: RevealSpecificRequest,
+) -> Checked<RevealSpecificKeyLinkageArgs> {
+    let counterparty = request
+        .counterparty
+        .ok_or_else(|| invalid("counterparty", "a hexadecimal string"))?;
+    let verifier = public_key(&request.verifier, "verifier")?;
+    protocol(&request.protocol_id)?;
+    string_length(&request.key_id, "keyID", 1, 800)?;
+    privilege(request.privileged, request.privileged_reason.as_deref())?;
+    Ok(RevealSpecificKeyLinkageArgs {
+        counterparty,
+        verifier,
+        protocol_id: request.protocol_id,
+        key_id: request.key_id,
+        privileged: request.privileged,
+        privileged_reason: request.privileged_reason,
+    })
 }
 
 /// getHeaderForHeight's height (`WalletWireProcessor.ts:1670-1675`): read by
@@ -332,7 +376,7 @@ pub(super) fn public_key_result(public_key: &str) -> Checked<Vec<u8>> {
         return Err(invalid_result(CALL, "publicKey", "33 hexadecimal bytes"));
     }
     let bytes = crate::primitives::from_hex(public_key)?;
-    if !matches!(bytes[0], 0x02 | 0x03) || PublicKey::from_bytes(&bytes).is_err() {
+    if compressed_key(&bytes).is_none() {
         return Err(invalid_result(
             CALL,
             "publicKey",

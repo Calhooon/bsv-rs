@@ -462,9 +462,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Answer {
-        let args = read_reveal_counterparty_key_linkage_args(reader)?;
+        let request = read_reveal_counterparty_key_linkage_args(reader)?;
         assert_request_consumed(reader, "revealCounterpartyKeyLinkage")?;
-        validation::reveal_counterparty_args(&args)?;
+        let args = validation::reveal_counterparty_args(request)?;
         let request = args.clone();
         let result = self
             .invoke_wallet(
@@ -483,9 +483,9 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         reader: &mut WireReader<'_>,
         originator: &str,
     ) -> Answer {
-        let args = read_reveal_specific_key_linkage_args(reader)?;
+        let request = read_reveal_specific_key_linkage_args(reader)?;
         assert_request_consumed(reader, "revealSpecificKeyLinkage")?;
-        validation::reveal_specific_args(&args)?;
+        let args = validation::reveal_specific_args(request)?;
         let request = args.clone();
         let result = self
             .invoke_wallet(
