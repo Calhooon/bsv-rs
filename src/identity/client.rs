@@ -16,7 +16,7 @@ use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{from_base64, to_hex, PrivateKey, PublicKey, Signature};
+use crate::primitives::{from_base64, from_hex, to_hex, PrivateKey, PublicKey, Signature};
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Broadcaster, Transaction};
 use crate::wallet::{
@@ -1247,19 +1247,20 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Parse encrypted fields
+        // Parse the fields: each value held as its base64 text's bytes, never
+        // decoded, as BRC-52 signs it (`0052.md:97`; #261)
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
-                    let encrypted_value = from_base64(value_str)?;
-                    certificate.set_field(field_name.clone(), encrypted_value);
+                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec());
                 }
             }
         }
 
-        // Parse signature if present
+        // Parse signature if present: hex, as the reference's
+        // `WalletCertificate.signature` (`HexString`) is written
         if let Some(sig_str) = cert_data["signature"].as_str() {
-            certificate.signature = Some(from_base64(sig_str)?);
+            certificate.signature = Some(from_hex(sig_str)?);
         }
 
         // Step 6: Parse the keyring from JSON
@@ -1422,20 +1423,20 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Parse encrypted fields
+        // Parse the fields: each value held as its base64 text's bytes, never
+        // decoded, as BRC-52 signs it (`0052.md:97`; #261)
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
-                    if let Ok(encrypted_value) = from_base64(value_str) {
-                        certificate.set_field(field_name.clone(), encrypted_value);
-                    }
+                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec());
                 }
             }
         }
 
-        // Parse signature if present
+        // Parse signature if present: hex, as the reference's
+        // `WalletCertificate.signature` (`HexString`) is written
         if let Some(sig_str) = cert_data["signature"].as_str() {
-            if let Ok(sig_bytes) = from_base64(sig_str) {
+            if let Ok(sig_bytes) = from_hex(sig_str) {
                 certificate.signature = Some(sig_bytes);
             }
         }

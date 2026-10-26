@@ -4,7 +4,7 @@
 //! allowing the subject to create keyrings for specific verifiers.
 
 use super::{Certificate, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL};
-use crate::primitives::PublicKey;
+use crate::primitives::{from_base64, to_base64, PublicKey, SymmetricKey};
 use crate::wallet::{
     Counterparty, DecryptArgs, EncryptArgs, Protocol, SecurityLevel, WalletInterface,
 };
@@ -38,7 +38,15 @@ impl MasterCertificate {
         }
     }
 
-    /// Creates encrypted certificate fields and master keyring.
+    /// Creates encrypted certificate fields and master keyring, as the
+    /// reference's `MasterCertificate.createCertificateFields` does
+    /// (`ts-stack@edf6e03` `MasterCertificate.ts:254-310`): each field is
+    /// encrypted under a fresh random symmetric key, the field value held is
+    /// the base64 text of that ciphertext (its UTF-8 bytes, as BRC-52 signs
+    /// and writes it, `0052.md:97`; #261), and the master keyring holds the
+    /// symmetric key encrypted by the creator's wallet to the subject under
+    /// protocol `[2, "certificate field encryption"]` and key ID the field
+    /// name, as the raw ciphertext.
     ///
     /// # Arguments
     /// * `creator_wallet` - Wallet for encryption (certifier's wallet)
@@ -56,102 +64,87 @@ impl MasterCertificate {
         _serial_number: &[u8; 32],
         originator: &str,
     ) -> Result<(HashMap<String, Vec<u8>>, HashMap<String, Vec<u8>>)> {
-        let protocol = Protocol::new(
-            SecurityLevel::Counterparty,
-            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
-        );
-
         let mut encrypted_fields = HashMap::new();
         let mut master_keyring = HashMap::new();
 
         for (field_name, plain_value) in fields {
-            // Key ID for master encryption is just the field name
-            let key_id = Certificate::get_field_encryption_key_id_master(&field_name);
+            let field_key = SymmetricKey::random();
+            let encrypted_value = field_key.encrypt(plain_value.as_bytes())?;
+            encrypted_fields.insert(field_name.clone(), to_base64(&encrypted_value).into_bytes());
 
-            // Encrypt the field value
+            // The revelation key, encrypted to the subject under the field name.
             let encrypt_result = creator_wallet
                 .encrypt(
                     EncryptArgs {
-                        plaintext: plain_value.as_bytes().to_vec(),
-                        protocol_id: protocol.clone(),
-                        key_id: key_id.clone(),
+                        plaintext: field_key.as_bytes().to_vec(),
+                        protocol_id: field_protocol(),
+                        key_id: Certificate::get_field_encryption_key_id_master(&field_name),
                         counterparty: Some(Counterparty::Other(subject.clone())),
                         ..Default::default()
                     },
                     originator,
                 )
                 .await?;
-
-            encrypted_fields.insert(field_name.clone(), encrypt_result.ciphertext.clone());
-
-            // The master keyring stores the encryption key info
-            // For the subject to later create verifier keyrings
             master_keyring.insert(field_name, encrypt_result.ciphertext);
         }
 
         Ok((encrypted_fields, master_keyring))
     }
 
-    /// Creates a keyring for a specific verifier.
-    ///
-    /// Enables selective disclosure by creating field-specific keys
-    /// that the verifier can use to decrypt only revealed fields.
+    /// Creates a keyring for a specific verifier, as the reference's
+    /// `MasterCertificate.createKeyringForVerifier` does
+    /// (`MasterCertificate.ts:325-414`): for each revealed field the subject
+    /// decrypts the field's revelation key from the master keyring, checks
+    /// that it decrypts the field, and encrypts it to the verifier under key
+    /// ID `"<serial base64> <field>"`.
     ///
     /// # Arguments
     /// * `subject_wallet` - Subject's wallet for re-encryption
     /// * `certifier` - Certifier's public key
     /// * `verifier` - Verifier's public key
     /// * `fields_to_reveal` - List of field names to reveal
-    /// * `encrypted_fields` - The encrypted field values
+    /// * `encrypted_fields` - The certificate's field values (base64 text)
+    /// * `master_keyring` - The master keyring (encrypted revelation keys)
     /// * `serial_number` - Certificate serial number
     /// * `originator` - Application originator
     ///
     /// # Returns
-    /// Keyring for the verifier: field_name -> encrypted_key
+    /// Keyring for the verifier: field_name -> encrypted revelation key
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_keyring_for_verifier<W: WalletInterface>(
         subject_wallet: &W,
         certifier: &PublicKey,
         verifier: &PublicKey,
         fields_to_reveal: &[String],
         encrypted_fields: &HashMap<String, Vec<u8>>,
+        master_keyring: &HashMap<String, Vec<u8>>,
         serial_number: &[u8; 32],
         originator: &str,
     ) -> Result<HashMap<String, Vec<u8>>> {
-        let protocol = Protocol::new(
-            SecurityLevel::Counterparty,
-            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
-        );
-
         let mut keyring = HashMap::new();
 
         for field_name in fields_to_reveal {
-            let encrypted_value = encrypted_fields.get(field_name).ok_or_else(|| {
+            let field_value = encrypted_fields.get(field_name).ok_or_else(|| {
                 Error::AuthError(format!("Field '{}' not found in certificate", field_name))
             })?;
 
-            // Decrypt the field using the master key
-            let master_key_id = Certificate::get_field_encryption_key_id_master(field_name);
-            let decrypted = subject_wallet
-                .decrypt(
-                    DecryptArgs {
-                        ciphertext: encrypted_value.clone(),
-                        protocol_id: protocol.clone(),
-                        key_id: master_key_id,
-                        counterparty: Some(Counterparty::Other(certifier.clone())),
-                        ..Default::default()
-                    },
-                    originator,
-                )
-                .await?;
+            let (revelation_key, _) = Self::decrypt_with_master_keyring(
+                subject_wallet,
+                master_keyring,
+                certifier,
+                field_name,
+                field_value,
+                originator,
+            )
+            .await?;
 
-            // Re-encrypt for the verifier with the verifiable key ID
             let verifiable_key_id =
                 Certificate::get_field_encryption_key_id_verifiable(field_name, serial_number);
             let re_encrypted = subject_wallet
                 .encrypt(
                     EncryptArgs {
-                        plaintext: decrypted.plaintext,
-                        protocol_id: protocol.clone(),
+                        plaintext: revelation_key,
+                        protocol_id: field_protocol(),
                         key_id: verifiable_key_id,
                         counterparty: Some(Counterparty::Other(verifier.clone())),
                         ..Default::default()
@@ -164,6 +157,43 @@ impl MasterCertificate {
         }
 
         Ok(keyring)
+    }
+
+    /// Decrypts a field's revelation key from the master keyring and the
+    /// field value with it (the reference's `MasterCertificate.decryptField`,
+    /// `MasterCertificate.ts:564-625`). Returns the revelation key, 32 bytes,
+    /// and the plaintext.
+    async fn decrypt_with_master_keyring<W: WalletInterface>(
+        wallet: &W,
+        master_keyring: &HashMap<String, Vec<u8>>,
+        counterparty: &PublicKey,
+        field_name: &str,
+        field_value: &[u8],
+        originator: &str,
+    ) -> Result<(Vec<u8>, String)> {
+        let encrypted_key = master_keyring.get(field_name).ok_or_else(|| {
+            Error::AuthError(format!(
+                "Field '{}' not found in master keyring",
+                field_name
+            ))
+        })?;
+
+        let decrypted = wallet
+            .decrypt(
+                DecryptArgs {
+                    ciphertext: encrypted_key.clone(),
+                    protocol_id: field_protocol(),
+                    key_id: Certificate::get_field_encryption_key_id_master(field_name),
+                    counterparty: Some(Counterparty::Other(counterparty.clone())),
+                    ..Default::default()
+                },
+                originator,
+            )
+            .await?;
+
+        let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
+        let plaintext = decrypt_field_value(field_name, &key, field_value)?;
+        Ok((key.as_bytes().to_vec(), plaintext))
     }
 
     /// Issues a new certificate for a subject.
@@ -221,7 +251,10 @@ impl MasterCertificate {
         })
     }
 
-    /// Decrypts a single field using the master keyring.
+    /// Decrypts a single field using the master keyring: the field's
+    /// revelation key decrypted from `master_keyring`, then the field's base64
+    /// text decoded and decrypted with it (decoded here and nowhere earlier,
+    /// #261).
     ///
     /// # Arguments
     /// * `subject_wallet` - Subject's wallet for decryption
@@ -235,30 +268,20 @@ impl MasterCertificate {
         field_name: &str,
         originator: &str,
     ) -> Result<String> {
-        let encrypted_value = self.certificate.fields.get(field_name).ok_or_else(|| {
+        let field_value = self.certificate.fields.get(field_name).ok_or_else(|| {
             Error::AuthError(format!("Field '{}' not found in certificate", field_name))
         })?;
 
-        let protocol = Protocol::new(
-            SecurityLevel::Counterparty,
-            CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
-        );
-        let key_id = Certificate::get_field_encryption_key_id_master(field_name);
-
-        let decrypted = subject_wallet
-            .decrypt(
-                DecryptArgs {
-                    ciphertext: encrypted_value.clone(),
-                    protocol_id: protocol,
-                    key_id,
-                    counterparty: Some(Counterparty::Other(certifier.clone())),
-                    ..Default::default()
-                },
-                originator,
-            )
-            .await?;
-
-        String::from_utf8(decrypted.plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
+        let (_, plaintext) = Self::decrypt_with_master_keyring(
+            subject_wallet,
+            &self.master_keyring,
+            certifier,
+            field_name,
+            field_value,
+            originator,
+        )
+        .await?;
+        Ok(plaintext)
     }
 
     /// Decrypts all fields using the master keyring.
@@ -284,6 +307,34 @@ impl MasterCertificate {
     pub fn verify(&self) -> Result<bool> {
         self.certificate.verify()
     }
+}
+
+/// BRC-52's field encryption protocol: `[2, "certificate field encryption"]`.
+pub(crate) fn field_protocol() -> Protocol {
+    Protocol::new(
+        SecurityLevel::Counterparty,
+        CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
+    )
+}
+
+/// Decrypts a field value with its revelation key: the value held is the
+/// UTF-8 bytes of the ciphertext's base64 text (BRC-52 `0052.md:97`), decoded
+/// here, at decrypt time, and nowhere earlier (#261); the plaintext is UTF-8,
+/// as the reference's `toUTF8Strict` asks (`MasterCertificate.ts:619`).
+pub(crate) fn decrypt_field_value(
+    field_name: &str,
+    key: &SymmetricKey,
+    field_value: &[u8],
+) -> Result<String> {
+    let text = std::str::from_utf8(field_value).map_err(|e| {
+        Error::InvalidUtf8(format!(
+            "certificate field {} is not UTF-8 base64 text: {}",
+            field_name, e
+        ))
+    })?;
+    let ciphertext = from_base64(text)?;
+    let plaintext = key.decrypt(&ciphertext)?;
+    String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
 }
 
 impl std::ops::Deref for MasterCertificate {

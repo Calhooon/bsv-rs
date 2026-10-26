@@ -242,16 +242,14 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         let base_cert =
             crate::auth::certificates::Certificate::new(type_arr, serial_arr, subject, certifier)
                 .with_revocation_outpoint(revocation_outpoint)
+                // Each value is held as its base64 text's bytes, never decoded:
+                // BRC-52 signs that text (`0052.md:97`; #261).
                 .with_fields(
                     cert_result
                         .certificate
                         .fields
                         .iter()
-                        .filter_map(|(k, v)| {
-                            crate::primitives::from_base64(v)
-                                .ok()
-                                .map(|decoded| (k.clone(), decoded))
-                        })
+                        .map(|(k, v)| (k.clone(), v.as_bytes().to_vec()))
                         .collect(),
                 )
                 .with_signature(signature);
