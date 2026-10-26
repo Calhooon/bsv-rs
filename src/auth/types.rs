@@ -197,7 +197,9 @@ impl AuthMessage {
     ///
     /// The signing data varies by message type:
     /// - InitialResponse: yourNonce || initialNonce (initiator's nonce || responder's session nonce, decoded from base64)
-    /// - General/CertificateRequest/CertificateResponse: payload or serialized requested_certificates
+    /// - General: the payload
+    /// - CertificateRequest: the `requestedCertificates` JSON text as transmitted
+    /// - CertificateResponse: the `certificates` JSON text as transmitted
     pub fn signing_data(&self) -> Vec<u8> {
         match self.message_type {
             MessageType::InitialResponse => {
@@ -221,19 +223,25 @@ impl AuthMessage {
                 self.payload.clone().unwrap_or_default()
             }
             MessageType::CertificateRequest => {
-                // For CertificateRequest, sign the serialized requested_certificates
-                if let Some(ref req) = self.requested_certificates {
-                    serde_json::to_vec(req).unwrap_or_default()
-                } else {
-                    Vec::new()
+                // The requestedCertificates text as transmitted (Peer.ts:453, :1068)
+                match self.current_requested_certificates_text() {
+                    Some(text) => text.get().as_bytes().to_vec(),
+                    None => self
+                        .requested_certificates
+                        .as_ref()
+                        .and_then(|req| serde_json::to_vec(req).ok())
+                        .unwrap_or_default(),
                 }
             }
             MessageType::CertificateResponse => {
-                // For CertificateResponse, sign serialized certificates
-                if let Some(ref certs) = self.certificates {
-                    serde_json::to_vec(certs).unwrap_or_default()
-                } else {
-                    Vec::new()
+                // The certificates text as transmitted (Peer.ts:1140, :1203)
+                match self.current_certificates_text() {
+                    Some(text) => text.get().as_bytes().to_vec(),
+                    None => self
+                        .certificates
+                        .as_ref()
+                        .and_then(|certs| serde_json::to_vec(certs).ok())
+                        .unwrap_or_default(),
                 }
             }
             MessageType::InitialRequest => {
