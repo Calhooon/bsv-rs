@@ -128,6 +128,8 @@ fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bou
     );
 }
 
+/// 64 characters that are not hex are `Outpoint`'s format refusal, a
+/// `WalletError`, not the hex decoder's error (#268).
 #[test]
 fn a_dotless_outpoint_of_64_non_hex_characters_is_a_wallet_error() {
     let text = "z".repeat(64);
