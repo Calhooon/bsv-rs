@@ -807,11 +807,14 @@ written back without it. Now:
 A breaking change of 0.9.0 (rule 9), stated here because no tool states
 it: `cargo semver-checks` 0.51.0 has no lint for a public field's type and
 reports 202 of 202 checks passing against `0906111`. Migration, one line: a caller that built the entry with
-`None` writes the value the reference writes for nothing,
-`certifier_info: IdentityCertifier { name, icon_url: String::new(),
-description: String::new(), trust }`, `publicly_revealed_keyring:
-HashMap::new()`, `decrypted_fields: HashMap::new()`; a reader of
-`Some(x)` reads `x`.
+`None` fills `certifier_info: IdentityCertifier { name, icon_url,
+description, trust }` with the certifier's real values (the reference's
+client refuses an empty `iconUrl` or `description`: 1 to 500 and 5 to 50
+bytes, `EntityIconURLStringMax500Bytes` and `DescriptionString5to50Bytes`
+in `Wallet.interfaces.ts`, probed on the bundle at `edf6e03`; an empty
+string is not a value the reference writes for nothing), and
+`publicly_revealed_keyring: HashMap::new()`, `decrypted_fields:
+HashMap::new()` when it has none; a reader of `Some(x)` reads `x`.
 
 On intake a missing member is a refusal naming it (serde's `missing field
 `certifierInfo``, `iconUrl`, `description`, `publiclyRevealedKeyring`,
