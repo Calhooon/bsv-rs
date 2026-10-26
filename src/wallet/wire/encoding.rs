@@ -1128,58 +1128,26 @@ impl WireWriter {
         self
     }
 
-    /// Writes a WalletCertificate (Go-compatible field order).
-    ///
-    /// Go order: type(32 raw base64) → serial(32 raw base64) → subject(33 hex pubkey)
-    ///          → certifier(33 hex pubkey) → outpoint → fields(sorted map) → signature(raw, no length prefix)
+    /// Writes a WalletCertificate as `Certificate.toBinary` writes it
+    /// (`ts-stack@edf6e03` `Certificate.ts:229-321`; go-sdk@2ca481c
+    /// `wallet/serializer/certificate.go:27-66`): type(32), serial(32),
+    /// subject(33), certifier(33), the outpoint, the fields (sorted), then the
+    /// signature's bytes with no length prefix. What the reference's writer
+    /// refuses is refused before a byte is written, in the readers' words
+    /// (bsv-rs#189): a subject or certifier that is not a compressed point
+    /// (`:241-253`), a field name outside 1 to 50 bytes or unsafe (`:289`), a
+    /// signature that is not DER (`:300-312`); the DER it accepts is written as
+    /// given (`:311`).
     pub fn write_wallet_certificate(
         &mut self,
         cert: &WalletCertificate,
     ) -> Result<&mut Self, Error> {
-        // Type: decode from base64, write 32 raw bytes
-        let type_bytes = from_base64(&cert.certificate_type)
-            .map_err(|e| Error::WalletError(format!("invalid certificate_type base64: {}", e)))?;
-        if type_bytes.len() != 32 {
-            return Err(Error::WalletError(format!(
-                "certificate_type must be 32 bytes, got {}",
-                type_bytes.len()
-            )));
-        }
-        self.write_bytes(&type_bytes);
-
-        // Serial: decode from base64, write 32 raw bytes
-        let serial_bytes = from_base64(&cert.serial_number)
-            .map_err(|e| Error::WalletError(format!("invalid serial_number base64: {}", e)))?;
-        if serial_bytes.len() != 32 {
-            return Err(Error::WalletError(format!(
-                "serial_number must be 32 bytes, got {}",
-                serial_bytes.len()
-            )));
-        }
-        self.write_bytes(&serial_bytes);
-
-        // Subject: 33-byte pubkey from hex
-        let subject_bytes = from_hex(&cert.subject)?;
-        self.write_bytes(&subject_bytes);
-
-        // Certifier: 33-byte pubkey from hex
-        let certifier_bytes = from_hex(&cert.certifier)?;
-        self.write_bytes(&certifier_bytes);
-
-        // Revocation outpoint
-        self.write_outpoint_string(&cert.revocation_outpoint)?;
-
-        // Fields: sorted string map (Go writes fields BEFORE signature)
-        self.write_string_map(&cert.fields);
-
-        // Signature: raw bytes, no length prefix (Go writes remaining bytes)
-        let sig_bytes = from_hex(&cert.signature)?;
-        self.write_bytes(&sig_bytes);
-
-        Ok(self)
+        let bytes = certificate_bytes(cert)?;
+        Ok(self.write_bytes(&bytes))
     }
 
-    /// Writes an optional WalletCertificate.
+    /// Writes an optional WalletCertificate: no present flag for one the
+    /// certificate writer refuses.
     pub fn write_optional_wallet_certificate(
         &mut self,
         cert: Option<&WalletCertificate>,
@@ -1190,8 +1158,9 @@ impl WireWriter {
                 Ok(self)
             }
             Some(cert) => {
+                let bytes = certificate_bytes(cert)?;
                 self.write_i8(1);
-                self.write_wallet_certificate(cert)
+                Ok(self.write_bytes(&bytes))
             }
         }
     }
@@ -1380,6 +1349,69 @@ impl Default for WireWriter {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// The certificate's bytes, every part checked before the frame is built, so
+/// a refusal leaves the caller's writer as it was.
+fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
+    let mut w = WireWriter::new();
+
+    // Type: decode from base64, write 32 raw bytes
+    let type_bytes = from_base64(&cert.certificate_type)
+        .map_err(|e| Error::WalletError(format!("invalid certificate_type base64: {}", e)))?;
+    if type_bytes.len() != 32 {
+        return Err(Error::WalletError(format!(
+            "certificate_type must be 32 bytes, got {}",
+            type_bytes.len()
+        )));
+    }
+    w.write_bytes(&type_bytes);
+
+    // Serial: decode from base64, write 32 raw bytes
+    let serial_bytes = from_base64(&cert.serial_number)
+        .map_err(|e| Error::WalletError(format!("invalid serial_number base64: {}", e)))?;
+    if serial_bytes.len() != 32 {
+        return Err(Error::WalletError(format!(
+            "serial_number must be 32 bytes, got {}",
+            serial_bytes.len()
+        )));
+    }
+    w.write_bytes(&serial_bytes);
+
+    // Subject and certifier: 33-byte compressed points from hex
+    for (hex, what) in [
+        (&cert.subject, "certificate subject"),
+        (&cert.certifier, "certificate certifier"),
+    ] {
+        let key = from_hex(hex).map_err(|_| {
+            Error::WalletError(format!(
+                "Invalid {what}: expected a compressed secp256k1 public key"
+            ))
+        })?;
+        super::require_compressed_key(&key, what)?;
+        w.write_bytes(&key);
+    }
+
+    // Revocation outpoint
+    w.write_outpoint_string(&cert.revocation_outpoint)?;
+
+    // Fields: sorted string map, each name 1 to 50 bytes and safe
+    let mut names: Vec<&String> = cert.fields.keys().collect();
+    names.sort();
+    for name in names {
+        super::require_certificate_field_name_length(name.len())?;
+        super::require_safe_certificate_field_name(name)?;
+    }
+    w.write_string_map(&cert.fields);
+
+    // Signature: raw bytes, no length prefix (the bytes remaining)
+    let sig_bytes = from_hex(&cert.signature)?;
+    if !sig_bytes.is_empty() {
+        super::certificate_signature_der(&sig_bytes)?;
+    }
+    w.write_bytes(&sig_bytes);
+
+    Ok(w.into_bytes())
 }
 
 #[cfg(test)]

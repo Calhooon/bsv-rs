@@ -916,6 +916,127 @@ fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_before_a_byte
     }
 }
 
+/// Every certificate writer refuses `certificate` in `words` and writes no
+/// byte: `write_wallet_certificate`, `write_optional_wallet_certificate` (no
+/// present flag either) and the discovery writer (bsv-rs#189).
+fn refused_by_every_writer(certificate: &WalletCertificate, words: &str) {
+    let refused = Err(Error::WalletError(words.into()));
+    let mut w = WireWriter::new();
+    assert_eq!(w.write_wallet_certificate(certificate).map(drop), refused);
+    assert!(w.is_empty(), "{words}: no byte written");
+    assert_eq!(
+        w.write_optional_wallet_certificate(Some(certificate))
+            .map(drop),
+        refused
+    );
+    assert!(w.is_empty(), "{words}: no present flag written");
+    let mut entry = identity_certificate(Some(certifier(5)));
+    entry.certificate = certificate.clone();
+    assert_eq!(w.write_identity_certificate(&entry).map(drop), refused);
+    assert!(w.is_empty(), "{words}: no discovery byte written");
+}
+
+/// `Certificate.toBinary` refuses a subject or certifier that is not a
+/// compressed point before it writes (`Certificate.ts:241-253`,
+/// `assertCompressedPublicKey`, `:136-142`), as `fromBinary` refuses it
+/// (`:342`, `:347`); this writer wrote the hex's bytes unchecked until #189.
+#[test]
+fn a_certificate_subject_or_certifier_that_is_not_a_compressed_key_is_refused_by_the_writer() {
+    let valid = read_certificate(&Parts::valid().bytes()).unwrap();
+    let uncompressed = format!("04{}", &G[2..]);
+    let short = G[..64].to_string();
+    for bad in [uncompressed, hex::encode(off_curve()), short] {
+        let mut cert = valid.clone();
+        cert.subject = bad.clone();
+        refused_by_every_writer(
+            &cert,
+            "Invalid certificate subject: expected a compressed secp256k1 public key",
+        );
+        let mut cert = valid.clone();
+        cert.certifier = bad;
+        refused_by_every_writer(
+            &cert,
+            "Invalid certificate certifier: expected a compressed secp256k1 public key",
+        );
+    }
+}
+
+/// `Certificate.toBinary` refuses a field name outside 1 to 50 bytes or
+/// unsafe (`Certificate.ts:289`, `assertCertificateFieldName`, `:117-126`; and
+/// `snapshotCertificateFields`, `:74`), as `fromBinary` refuses it (`:367-373`).
+/// A repeated name cannot reach this writer: its fields are a `HashMap`.
+#[test]
+fn a_certificate_field_name_outside_1_to_50_bytes_or_unsafe_is_refused_by_the_writer() {
+    let valid = read_certificate(&Parts::valid().bytes()).unwrap();
+    let long = "n".repeat(51);
+    for (name, words) in [
+        ("", "Invalid certificate field name length: received 0"),
+        (
+            long.as_str(),
+            "Invalid certificate field name length: received 51",
+        ),
+        // 17 three-byte characters: 51 bytes in 17 chars.
+        (
+            &"\u{20ac}".repeat(17)[..],
+            "Invalid certificate field name length: received 51",
+        ),
+        ("__proto__", "Unsafe certificate field name: __proto__"),
+        ("constructor", "Unsafe certificate field name: constructor"),
+        ("prototype", "Unsafe certificate field name: prototype"),
+    ] {
+        let mut cert = valid.clone();
+        cert.fields.insert(name.to_string(), "v".to_string());
+        refused_by_every_writer(&cert, words);
+    }
+    let mut cert = valid;
+    cert.fields.insert("n".repeat(50), "v".to_string());
+    let mut w = WireWriter::new();
+    w.write_wallet_certificate(&cert).unwrap();
+    assert_eq!(read_certificate(w.as_bytes()).unwrap().fields, cert.fields);
+}
+
+/// `Certificate.toBinary` refuses a signature `Signature.fromDER` refuses
+/// before it writes (`Certificate.ts:300-312`), as `fromBinary` refuses one
+/// past 72 bytes or not DER (`:390-397`); the bytes it accepts are written as
+/// given (`:311`), and no signature is no signature.
+#[test]
+fn a_certificate_signature_that_is_not_der_is_refused_by_the_writer() {
+    let valid = read_certificate(&Parts::valid().bytes()).unwrap();
+    for (signature, words) in [
+        (
+            vec![0x30; 73],
+            "Certificate signature exceeds the DER size limit",
+        ),
+        (vec![0xdd; 72], "Signature DER must start with 0x30"),
+        (
+            vec![0x30, 0x05, 0x02, 0x01, 0x01, 0x02, 0x01, 0x01],
+            "Signature DER invalid",
+        ),
+        (
+            vec![0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x02, 0x01],
+            "Invalid R-length in signature DER",
+        ),
+        (
+            vec![0x30, 0x07, 0x02, 0x02, 0x00, 0x01, 0x02, 0x01, 0x01],
+            "Invalid R-value in signature DER",
+        ),
+    ] {
+        let mut cert = valid.clone();
+        cert.signature = hex::encode(signature);
+        refused_by_every_writer(&cert, words);
+    }
+    // An R with its high bit set and no zero byte before it is DER to
+    // `fromDER`, and written as given.
+    for signature in ["", "3006020181020101"] {
+        let mut cert = valid.clone();
+        cert.signature = signature.to_string();
+        let mut w = WireWriter::new();
+        w.write_wallet_certificate(&cert).unwrap();
+        assert!(w.as_bytes().ends_with(&hex::decode(signature).unwrap()));
+        read_certificate(w.as_bytes()).unwrap();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 6. The processor's reads
 // ---------------------------------------------------------------------------
