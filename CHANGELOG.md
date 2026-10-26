@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the nightly's heavy work holds at most six concurrent slots
+
+The mutant shards run six at a time (`max-parallel: 6`, twenty before) and
+the fuzz targets six at a time after them (`needs: [source, mutants]`, run
+whatever the shards' result), so the night's heavy work never holds more
+than six of the account's twenty concurrent slots and a pull request's run
+at 03:00 UTC starts within minutes; the shards finish later in the night
+and decide the same (the owner's balance rule of 2026-10-26, the keeper's
+reading, as the nightly goes live with main's copy of the schedule).
+
 ### Changed: a certificate's revocation outpoint index above `u32::MAX` is refused in the bound refusal's form (#258)
 
 `Certificate::from_binary` refused a revocation outpoint index above
