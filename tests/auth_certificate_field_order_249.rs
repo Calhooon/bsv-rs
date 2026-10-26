@@ -193,6 +193,23 @@ fn a_certificate_rebuilt_from_json_signs_in_the_reference_order() {
     assert_eq!(to_hex(&rebuilt.to_binary(true)), w.hex);
 }
 
+#[test]
+fn a_byte_order_certificate_signed_again_signs_in_the_reference_order() {
+    // A certificate read in byte order (Go's, or this crate's before #249),
+    // its signature cleared and signed again: the reference's `sign`
+    // serializes afresh (`ts-stack@edf6e03` `Certificate.ts:458`), so the
+    // received byte order is not the preimage.
+    let mut cert =
+        Certificate::from_binary(&bytes(&witness("byte_order_signed_mixed_names"))).unwrap();
+    cert.set_signature(None);
+    cert.sign(&key(21)).unwrap();
+    assert_eq!(
+        to_hex(&cert.to_binary(true)),
+        witness("reference_signed_mixed_names").hex
+    );
+    assert_eq!(cert.verify(), Ok(true));
+}
+
 /// The field names of an unsigned prefix, in the order written.
 fn names_written(unsigned: &[u8]) -> Vec<String> {
     fn varint(b: &[u8], at: &mut usize) -> usize {

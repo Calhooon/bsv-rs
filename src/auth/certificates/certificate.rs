@@ -336,9 +336,11 @@ impl Certificate {
     /// [`signature_key_id`](Self::signature_key_id), counterparty anyone
     /// (BRC-52 `0052.md:77,115-117`; the reference's `Certificate.sign`,
     /// `ts-stack@edf6e03` `Certificate.ts:458-462`; go-sdk@2ca481c
-    /// `certificate.go:227-240`), over the SHA-256 of `to_binary(false)`.
-    /// The preimage it signed is kept in
-    /// [`received_unsigned`](Self::received_unsigned) (#249).
+    /// `certificate.go:227-240`), over the SHA-256 of the serializer's
+    /// unsigned prefix, written afresh in the reference's field order as the
+    /// reference's `sign` writes it (`Certificate.ts:458`): a received
+    /// prefix in another order is not re-signed. The preimage it signed is
+    /// kept in [`received_unsigned`](Self::received_unsigned) (#249).
     pub fn sign(&mut self, certifier_key: &PrivateKey) -> Result<()> {
         // Verify the certifier key matches
         if certifier_key.public_key() != self.certifier {
@@ -352,7 +354,7 @@ impl Certificate {
             &self.signature_key_id(),
             &Counterparty::Anyone,
         )?;
-        let preimage = self.unsigned_bytes();
+        let preimage = self.serialize_unsigned();
         let sig = child.sign(&sha256(&preimage))?;
         self.signature = Some(sig.to_der());
         self.received_unsigned = Some(preimage);
