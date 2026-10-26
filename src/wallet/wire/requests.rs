@@ -114,7 +114,7 @@ pub(super) struct RevealSpecificRequest {
 
 /// Reads revealCounterpartyKeyLinkage's parameters in the reference's order
 /// (`WalletWireProcessor.ts:1739-1747`, `WalletWireTransceiver.ts:809-811`;
-/// BRC-100 `wallet/0100.md:2016-2019` at `ed1b015`, `:2039-2042` at `5119a9b`):
+/// BRC-100 `wallet/0100.md:2039-2042` at `5119a9b`):
 /// the privileged flag and reason, then the counterparty and the verifier,
 /// 33 raw bytes each (#191), a non-point refused by validation (#226).
 pub(super) fn read_reveal_counterparty_key_linkage_args(
@@ -134,7 +134,7 @@ pub(super) fn read_reveal_counterparty_key_linkage_args(
 /// Reads revealSpecificKeyLinkage's parameters in the reference's order
 /// (`#decodeKeyRelatedParams` then the verifier, `WalletWireProcessor.ts:1790-1797`
 /// and `:2564-2583`; `WalletWireTransceiver.ts:874-883`; BRC-100
-/// `wallet/0100.md:2045-2055` at `ed1b015`): the protocol, the key ID, the
+/// `wallet/0100.md:2068-2078` at `5119a9b`): the protocol, the key ID, the
 /// counterparty, the privileged flag and reason, then the verifier (#191);
 /// an absent counterparty and a verifier that is no point are refused by
 /// validation (#226).
@@ -180,8 +180,8 @@ type DataOrHash = (Option<Vec<u8>>, Option<[u8; 32]>);
 /// The signature calls' data-type flag (bsv-rs#199): `1` then the data behind
 /// its length, `2` then the 32 bytes of the hash, any other value refused in
 /// the reference's words (`WalletWireProcessor.ts:1533-1543` createSignature,
-/// `:1576-1586` verifySignature; BRC-100 `wallet/0100.md:2168-2170`,
-/// `:2194-2196` at `ed1b015`).
+/// `:1576-1586` verifySignature; BRC-100 `wallet/0100.md:2191-2193`,
+/// `:2217-2219` at `5119a9b`).
 fn read_data_or_hash(reader: &mut WireReader<'_>, call: &str) -> Result<DataOrHash, Error> {
     match reader.read_u8()? {
         1 => Ok((Some(read_length_prefixed(reader)?), None)),
@@ -252,7 +252,7 @@ pub(super) fn read_create_hmac_args(reader: &mut WireReader<'_>) -> Result<Creat
 
 /// Reads verifyHmac's parameters in the reference's order
 /// (`WalletWireProcessor.ts:1500-1512`, `WalletWireTransceiver.ts:1038-1052`;
-/// BRC-100 `wallet/0100.md:2149-2151` at `ed1b015`): the key-related
+/// BRC-100 `wallet/0100.md:2172-2174` at `5119a9b`): the key-related
 /// parameters, the 32 raw bytes of the HMAC, the data behind its length
 /// (#199), then seekPermission (#193).
 pub(super) fn read_verify_hmac_args(reader: &mut WireReader<'_>) -> Result<VerifyHmacArgs, Error> {
@@ -283,8 +283,8 @@ pub(super) fn read_create_signature_args(
 }
 
 /// Reads verifySignature's parameters in the reference's order
-/// (`WalletWireProcessor.ts:1564-1589`; BRC-100 `wallet/0100.md:2192-2196`
-/// at `ed1b015`): the key-related parameters, forSelf, the signature behind
+/// (`WalletWireProcessor.ts:1564-1589`; BRC-100 `wallet/0100.md:2215-2219`
+/// at `5119a9b`): the key-related parameters, forSelf, the signature behind
 /// its length, the data-type flag and the data or the hash (#199), then
 /// seekPermission (#193).
 pub(super) fn read_verify_signature_args(
