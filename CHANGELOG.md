@@ -298,6 +298,78 @@ and with `legalOffsetsOnly` false reads it, its walk never reading the
 node at the path's own offset (`MerklePath::new_unchecked` reads it as that
 does). Through 0.9.0-beta.1 this crate refused every even-offset duplicate
 (the published section's #167 entry); the BRC-74 question is upstream.
+### Added: a wallet refusal carries its class, `Error::WalletRefusal` (#137)
+
+Every refusal a wallet returned reached this crate as
+`Error::WalletError(String)`: words, no class. The wire processor framed it
+as `Wallet operation failed`, code 1 (#202), and a host serving BRC-100 over
+HTTP could not tell a bad argument from too few funds without matching the
+words. The reference's `WalletError` carries a numeric code beside its
+message (`ts-stack@edf6e03` `packages/sdk/src/wallet/WalletError.ts:3-8`),
+and its processor keeps a code 2 to 8 and the words on the wire
+(`#invokeWallet`, `WalletWireProcessor.ts:2407-2416`).
+
+`Error::WalletRefusal { class: WalletRefusalClass, message: String }` (new
+variant, `wallet` feature) is that error. `WalletRefusalClass` (new,
+`#[non_exhaustive]`, `Copy + Eq + Hash`, re-exported at the crate root) has one
+variant per code of the reference's table `walletErrors` (`WalletError.ts:71-80`)
+that the processor keeps; `code()` is the frame's byte, `name()` the
+reference's key, `from_code` the inverse, `ALL` the seven in code order:
+
+| Class | `code()` | `name()` | Reference |
+|---|---:|---|---|
+| `UnsupportedAction` | 2 | `unsupportedAction` | `WalletError.ts:73` |
+| `InvalidHmac` | 3 | `invalidHmac` | `:74` |
+| `InvalidSignature` | 4 | `invalidSignature` | `:75` |
+| `ReviewActions` | 5 | `reviewActions` | `:76`; `WERR_REVIEW_ACTIONS.ts:24-25` |
+| `InvalidParameter` | 6 | `invalidParameter` | `:77`; `WERR_INVALID_PARAMETER.ts:14-15` |
+| `InsufficientFunds` | 7 | `insufficientFunds` | `:78`; `WERR_INSUFFICIENT_FUNDS.ts:19-20` |
+| `AbortRefused` | 8 | `abortRefused` | `:79`; `WalletWireProcessor.ts:801-804` |
+
+Code 1, `unknownError` (`:72`), is no class: it is `Error::WalletError`, which
+the processor frames as `Wallet operation failed` (`:2417`). BRC-100 (`5119a9b`
+`wallet/0100.md:289-319`) asks a machine-readable code of every error and
+leaves its naming to the implementation; its wire's error byte is
+`1-255`, "predefined error types or ... custom error categorization"
+(`:1609`): these are the reference's predefined ones, no class of this crate's
+own. `Display` of the variant is the message alone; the class is the typed
+field.
+
+The processor frames a refusal with its class's code and its words, cut at
+4096 bytes as every frame is (`explicit_wallet_code`; the #202 reading: a
+coded error keeps its code and words); an un-coded `WalletError` stays
+`Wallet operation failed`, code 1. With `tracing` a refusal raises one `warn`
+event, `call` and `class` (the reference's name), `wallet refusal framed with
+its code`; its words are on the wire, so the event does not repeat them. The
+transceiver reads a frame coded 2 to 8 back as `WalletRefusal` with that
+class and the frame's words, as the reference's client throws
+`new WalletError(errorMessage, errorByte, stackTrace)`
+(`WalletWireTransceiver.ts:153`); code 8 on abortAction stays
+`aborted: false` (#206); code 1 and a code above 8 stay
+`WalletError("wallet error (code N): <words>")`. `HttpWalletJson` serves no
+error body (it is a client), so it is unchanged; its reading of a numeric
+code stays `WalletError` (the reference's client builds a typed error from
+a 400 body's `code` 5, 6, 7, `HTTPWalletJSON.ts:199-267`, `:336-338`: a
+follow-up, not this entry).
+
+Migration: `Error` is `#[non_exhaustive]`, so no downstream `match` on it is
+exhaustive and nothing breaks; a consumer that matched the transceiver's
+`"wallet error (code N): "` text for N from 2 to 8 matches the variant
+instead (none of the downstreams in `docs/DEPENDENTS.md` does). Consumer
+note: `bsv-wallet-toolbox-rs`'s `From<Error>` maps each of its error variants
+to a class (its `Error::InsufficientFunds` to `InsufficientFunds`, for one),
+and `bsv-wallet-cli` deletes its message-prefix matching (`toolbox_words.rs`,
+named on #137) for the class; both are their captains' work, told on #137
+with the owner's word of 2026-10-26.
+
+Pinned by `tests/wire_wallet_refusal_class.rs` (the class table against the
+reference's; `Display`, `Clone`, `Eq`; each class's frame byte for byte the
+reference's, read back as the class end to end; codes 1, 9, 255 read as
+before; the 4096-byte cut) and `tests/wire_tracing_sink.rs`'s
+`a_wallet_refusal_raises_one_event_with_the_call_and_its_class`, each red on
+the pre-fix processor. `tests/fixtures/wire/error_frames.json` re-recorded in
+its own commit: cases `status_2` to `status_8` read back as the class, their
+bytes unchanged.
 
 ### Fixed: `Certificate::sign` and `verify` use BRC-52's derived key, as the reference does (#251)
 
