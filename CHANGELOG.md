@@ -304,6 +304,62 @@ go-sdk neither writes nor reads the code: its processor writes nothing for an
 and its client answers `Aborted: true` for any success (`:38-43`). This crate
 follows the reference.
 
+### Fixed: `read_identity_certificate` takes the transceiver's three readings; a listActions satoshis value in the reference's bound (#236)
+
+`WireReader::read_identity_certificate` read a discovery entry's two maps
+with a plain varint count and plain strings, where the reference's discovery
+reader (`ts-stack@edf6e03` `WalletWireTransceiver.ts:1711-1752`) and this
+crate's transceiver since #183 read a strict count, at most 100,000 and no
+more than the bytes left (`readVarIntNumStrict(false)`,
+`#requireResponseCollectionLength`, `:1955-1969`), and each key 1 to 50 bytes
+and not `__proto__`, `constructor` or `prototype` (`#readRecordKey`,
+`:1979-1990`; `isUnsafeRecordKey`, `SafeRecord.ts:2-4`; the certificate's own
+field names the same, `Certificate.ts:365-378`). Both readers now read the
+maps through one crate-private helper (`read_discovery_maps`, over
+`read_counted_wire_record`, which listCertificates' keyring reads through
+too), with the transceiver's errors, which are the reference's words:
+`Invalid discovery public keyring key length: expected 1–50 bytes, received
+<n>`, `Unsafe discovery decrypted fields key: <k>`, `Wallet Wire discovery
+public keyring count exceeds the remaining response data`, `Wallet Wire
+<record> exceeds the maximum collection size of 100000`, `number too large
+to retain precision - use readVarIntBn`. A count that stops short of its
+entries is refused at the count; one that runs long leaves an entry the next
+reading meets and refuses. The record values' lengths go through
+`wire_length` after the strict bound, so a length past the bytes stays
+`ReaderUnderflow` on every target (#192). No reading loosens. The certifier's
+trust byte stays unbounded in this reader, as #184 chose (Go's zero value
+reads as trust 0); the transceiver refuses one outside 1 to 10.
+
+`read_wallet_action` cast the satoshis varint `as i64`. The reference reads
+the signed net amount as `#readActionSatoshis` does (`:400-416`): `0xff` and
+a signed int64 with the sign bit set, any other value
+`readVarIntNumStrict(false)`, then `#requireInteger(value, 'listActions
+satoshis', -21e14, 21e14)` (`:2018-2025`). The cast read the negatives the
+same and stated no bound; the read is now the reference's, in its words
+(`Invalid listActions satoshis: expected an integer from -2100000000000000
+to 2100000000000000, received <v>`), and the transceiver's listActions reads
+through it.
+
+The tests that pin it, in `tests/wire_reader_strictness.rs`:
+`an_identity_certificate_refuses_the_record_keys_and_counts_discovery_refuses`
+(nine frames; on the pre-fix tree the reader read `Ok` for the five key
+cases and gave `ReaderUnderflow` for the four count cases, the transceiver
+the words in each) and
+`a_list_actions_satoshis_value_outside_the_reference_bound_is_refused` (on
+the pre-fix tree `2100000000000001`, `-2100000000000001`, `i64::MIN` and
+`2^60` read `Ok`). `a_count_that_overruns_the_bytes_is_refused_without_a_panic`
+(`tests/wire_identity_certificate_roundtrip.rs`) pinned `ReaderUnderflow` for
+a map count past `2^53 - 1` and now pins the strict reader's words. No public
+shape moves: no new `Error` variant, the helpers `pub(crate)`.
+
+### Notes: cross-SDK parity (#236)
+
+The satoshis refusal prints the received value as the `i64` it is; the
+reference prints a JavaScript number (`String(value)`), which for a magnitude
+past `2^53` is the nearest double (`i64::MIN` reads
+`-9223372036854776000` there, `-9223372036854775808` here). The verdict is
+the same. go-sdk reads the satoshis as an unsigned varint with no bound.
+
 ## [0.9.0-beta.1] - 2026-10-26
 
 The 0.9.0 line's canary prerelease (RELEASING.md point 14), cut from `beta` for the toolbox's and the CLI's beta lines to build against; the entries below are 0.9.0's, unreleased on `main` until the minor merges at the phase exit.
