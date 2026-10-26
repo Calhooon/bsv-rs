@@ -345,9 +345,9 @@ fn test_certificate_creation_and_signing() {
 
     // Add encrypted fields
     cert.fields
-        .insert("name".to_string(), b"encrypted_name".to_vec());
+        .insert("name".to_string(), "encrypted_name".to_string());
     cert.fields
-        .insert("email".to_string(), b"encrypted_email".to_vec());
+        .insert("email".to_string(), "encrypted_email".to_string());
 
     // Sign the certificate
     cert.sign(&certifier_key).unwrap();
@@ -371,7 +371,7 @@ fn test_certificate_binary_roundtrip() {
         certifier_key.public_key(),
     );
 
-    cert.fields.insert("field1".to_string(), b"value1".to_vec());
+    cert.set_field("field1", "value1");
     cert.sign(&certifier_key).unwrap();
 
     // Binary roundtrip
@@ -416,7 +416,7 @@ fn test_verifiable_certificate_creation() {
         certifier_key.public_key(),
     );
     cert.fields
-        .insert("name".to_string(), b"encrypted".to_vec());
+        .insert("name".to_string(), "encrypted".to_string());
     cert.sign(&certifier_key).unwrap();
 
     // Create verifiable certificate with keyring
@@ -634,7 +634,7 @@ fn test_certificate_json_roundtrip() {
         subject_key,
         certifier_key.public_key(),
     );
-    cert.fields.insert("name".to_string(), b"test".to_vec());
+    cert.set_field("name", "test");
     cert.sign(&certifier_key).unwrap();
 
     let json = serde_json::to_string(&cert).unwrap();
@@ -686,9 +686,9 @@ fn test_tampered_certificate_field_fails_verification() {
         certifier_key.public_key(),
     );
     cert.fields
-        .insert("name".to_string(), b"encrypted_name".to_vec());
+        .insert("name".to_string(), "encrypted_name".to_string());
     cert.fields
-        .insert("email".to_string(), b"encrypted_email".to_vec());
+        .insert("email".to_string(), "encrypted_email".to_string());
 
     // Sign the certificate
     cert.sign(&certifier_key).unwrap();
@@ -699,7 +699,7 @@ fn test_tampered_certificate_field_fails_verification() {
 
     // Tamper with a field value after signing
     cert.fields
-        .insert("email".to_string(), b"attacker@evil.com".to_vec());
+        .insert("email".to_string(), "attacker@evil.com".to_string());
 
     // Verify should now return false (signature does not match modified content)
     let result = cert.verify().unwrap();
@@ -721,7 +721,7 @@ fn test_tampered_certificate_subject_fails_verification() {
         certifier_key.public_key(),
     );
     cert.fields
-        .insert("name".to_string(), b"encrypted_name".to_vec());
+        .insert("name".to_string(), "encrypted_name".to_string());
 
     cert.sign(&certifier_key).unwrap();
     assert!(
@@ -1041,10 +1041,9 @@ async fn test_master_certificate_issue_for_subject() {
             field_name
         );
         // Encrypted values should not equal the plaintext
-        let plain_value = plain_fields[field_name].as_bytes();
+        let plain_value = &plain_fields[field_name];
         assert_ne!(
-            encrypted_value,
-            &plain_value.to_vec(),
+            encrypted_value, plain_value,
             "Field '{}' should be encrypted, not plaintext",
             field_name
         );
@@ -1648,9 +1647,9 @@ fn test_wallet_certificate_conversion_roundtrip() {
         certifier_key.public_key(),
     );
     cert.fields
-        .insert("name".to_string(), b"encrypted_name".to_vec());
+        .insert("name".to_string(), "encrypted_name".to_string());
     cert.fields
-        .insert("email".to_string(), b"encrypted_email".to_vec());
+        .insert("email".to_string(), "encrypted_email".to_string());
     cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xCC; 32], 7));
     cert.sign(&certifier_key).unwrap();
 
@@ -1710,7 +1709,7 @@ fn test_wallet_certificate_conversion_without_signature() {
         certifier_key.public_key(),
     );
     cert.fields
-        .insert("status".to_string(), b"approved".to_vec());
+        .insert("status".to_string(), "approved".to_string());
 
     // Do NOT sign - test unsigned conversion
     let wallet_cert = cert.to_wallet_certificate();
@@ -1910,10 +1909,9 @@ async fn test_self_signed_master_certificate() {
     // Verify fields are encrypted (not plaintext)
     assert_eq!(master_cert.certificate.fields.len(), 3);
     for (field_name, encrypted_value) in &master_cert.certificate.fields {
-        let plain_value = plain_fields[field_name].as_bytes();
+        let plain_value = &plain_fields[field_name];
         assert_ne!(
-            encrypted_value,
-            &plain_value.to_vec(),
+            encrypted_value, plain_value,
             "Field '{}' should be encrypted, not plaintext",
             field_name
         );
@@ -1964,7 +1962,7 @@ fn test_tampered_revocation_outpoint_fails_verification() {
     );
     cert.revocation_outpoint = Some(bsv_rs::wallet::types::Outpoint::new([0xAA; 32], 0));
     cert.fields
-        .insert("name".to_string(), b"encrypted_name".to_vec());
+        .insert("name".to_string(), "encrypted_name".to_string());
 
     cert.sign(&certifier_key).unwrap();
     assert!(
@@ -1997,7 +1995,7 @@ fn test_verifiable_certificate_with_garbage_keyring() {
         certifier_key.public_key(),
     );
     cert.fields
-        .insert("name".to_string(), b"encrypted_name".to_vec());
+        .insert("name".to_string(), "encrypted_name".to_string());
     cert.sign(&certifier_key).unwrap();
 
     // Create VerifiableCertificate with garbage keyring

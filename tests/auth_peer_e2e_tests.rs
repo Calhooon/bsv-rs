@@ -693,8 +693,7 @@ async fn test_certificate_response_flow() {
     // Create a certificate for Bob (signed by certifier)
     let bob_pub = bob.get_identity_key().await.unwrap();
     let mut cert = Certificate::new([1u8; 32], [2u8; 32], bob_pub, certifier_key.public_key());
-    cert.fields
-        .insert("name".to_string(), b"encrypted_bob".to_vec());
+    cert.set_field("name", "encrypted_bob");
     cert.sign(&certifier_key).unwrap();
 
     let keyring = HashMap::new();

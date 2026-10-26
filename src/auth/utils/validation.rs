@@ -242,16 +242,9 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         let base_cert =
             crate::auth::certificates::Certificate::new(type_arr, serial_arr, subject, certifier)
                 .with_revocation_outpoint(revocation_outpoint)
-                // Each value is held as its base64 text's bytes, never decoded:
-                // BRC-52 signs that text (`0052.md:97`; #261).
-                .with_fields(
-                    cert_result
-                        .certificate
-                        .fields
-                        .iter()
-                        .map(|(k, v)| (k.clone(), v.as_bytes().to_vec()))
-                        .collect(),
-                )
+                // Each value is its base64 text, never decoded: BRC-52 signs
+                // that text (`0052.md:97`; #261).
+                .with_fields(cert_result.certificate.fields.clone())
                 .with_signature(signature);
 
         // Convert keyring
@@ -644,7 +637,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.set_field("name", b"encrypted_value".to_vec()).unwrap();
+        cert.set_field("name", "encrypted_value");
         cert.sign(&certifier).unwrap();
 
         validate_certificate_encoding(&cert).unwrap();
@@ -667,7 +660,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.fields.insert("".to_string(), vec![1, 2, 3]);
+        cert.fields.insert("".to_string(), "AQID".to_string());
 
         let result = validate_certificate_encoding(&cert);
         assert!(matches!(result, Err(Error::CertificateValidationError(_))));
@@ -684,7 +677,7 @@ mod tests {
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
         let long_name = "a".repeat(51);
-        cert.fields.insert(long_name, vec![1, 2, 3]);
+        cert.fields.insert(long_name, "AQID".to_string());
 
         let result = validate_certificate_encoding(&cert);
         assert!(matches!(result, Err(Error::CertificateValidationError(_))));
@@ -756,7 +749,7 @@ mod tests {
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
         let exactly_50 = "a".repeat(50);
-        cert.fields.insert(exactly_50, vec![1, 2, 3]);
+        cert.fields.insert(exactly_50, "AQID".to_string());
 
         // Exactly 50 bytes should be valid
         validate_certificate_encoding(&cert).unwrap();
@@ -768,10 +761,9 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.set_field("name", b"alice".to_vec()).unwrap();
-        cert.set_field("email", b"alice@example.com".into())
-            .unwrap();
-        cert.set_field("phone", b"+1234567890".to_vec()).unwrap();
+        cert.set_field("name", "alice");
+        cert.set_field("email", "alice@example.com");
+        cert.set_field("phone", "+1234567890");
         cert.sign(&certifier).unwrap();
 
         validate_certificate_encoding(&cert).unwrap();

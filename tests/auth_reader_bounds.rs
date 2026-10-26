@@ -161,7 +161,7 @@ fn a_valid_certificate_and_http_payloads_still_parse() {
     let subject = PrivateKey::from_bytes(&[1u8; 32]).unwrap().public_key();
     let certifier = PrivateKey::from_bytes(&[2u8; 32]).unwrap().public_key();
     let mut cert = Certificate::new([3u8; 32], [4u8; 32], subject, certifier);
-    cert.fields.insert("name".into(), b"value".to_vec());
+    cert.set_field("name", "value");
     let bytes = cert.to_binary(false);
     assert_eq!(
         Certificate::from_binary(&bytes).unwrap().to_binary(false),

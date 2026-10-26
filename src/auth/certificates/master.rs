@@ -65,14 +65,14 @@ impl MasterCertificate {
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: &str,
-    ) -> Result<(HashMap<String, Vec<u8>>, HashMap<String, Vec<u8>>)> {
+    ) -> Result<(HashMap<String, String>, HashMap<String, Vec<u8>>)> {
         let mut encrypted_fields = HashMap::new();
         let mut master_keyring = HashMap::new();
 
         for (field_name, plain_value) in fields {
             let field_key = SymmetricKey::random();
             let encrypted_value = field_key.encrypt(plain_value.as_bytes())?;
-            encrypted_fields.insert(field_name.clone(), to_base64(&encrypted_value).into_bytes());
+            encrypted_fields.insert(field_name.clone(), to_base64(&encrypted_value));
 
             // The revelation key, encrypted to the subject under the field name.
             let encrypt_result = creator_wallet
@@ -123,7 +123,7 @@ impl MasterCertificate {
         subject_wallet: &W,
         certifier: &PublicKey,
         verifier: &PublicKey,
-        fields: &HashMap<String, Vec<u8>>,
+        fields: &HashMap<String, String>,
         fields_to_reveal: &[String],
         master_keyring: &HashMap<String, Vec<u8>>,
         serial_number: &[u8; 32],
@@ -183,7 +183,7 @@ impl MasterCertificate {
         master_keyring: &HashMap<String, Vec<u8>>,
         counterparty: &PublicKey,
         field_name: &str,
-        field_value: &[u8],
+        field_value: &str,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: &str,
@@ -211,7 +211,7 @@ impl MasterCertificate {
             .await?;
 
         let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
-        let plaintext = decrypt_field_value(field_name, &key, field_value)?;
+        let plaintext = decrypt_field_value(&key, field_value)?;
         Ok((key.as_bytes().to_vec(), plaintext))
     }
 
@@ -358,16 +358,11 @@ pub(crate) fn field_protocol() -> Protocol {
 }
 
 /// Decrypts a field value with its revelation key: the value held is the
-/// UTF-8 bytes of the ciphertext's base64 text (BRC-52 `0052.md:97`), decoded
-/// here, at decrypt time, and nowhere earlier (#261); the plaintext is UTF-8,
-/// as the reference's `toUTF8Strict` asks (`MasterCertificate.ts:619`).
-pub(crate) fn decrypt_field_value(
-    field_name: &str,
-    key: &SymmetricKey,
-    field_value: &[u8],
-) -> Result<String> {
-    let text = super::certificate::field_value_text(field_name, field_value)?;
-    let ciphertext = from_base64(text)?;
+/// ciphertext's base64 text (BRC-52 `0052.md:97`), decoded here, at decrypt
+/// time, and nowhere earlier (#261); the plaintext is UTF-8, as the
+/// reference's `toUTF8Strict` asks (`MasterCertificate.ts:619`).
+pub(crate) fn decrypt_field_value(key: &SymmetricKey, field_value: &str) -> Result<String> {
+    let ciphertext = from_base64(field_value)?;
     let plaintext = key.decrypt(&ciphertext)?;
     String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
 }

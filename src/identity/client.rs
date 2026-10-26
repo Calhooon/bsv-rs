@@ -1247,11 +1247,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Each field held as its base64 text's bytes, as BRC-52 signs it (#261)
+        // Each field held as its base64 text, as BRC-52 signs it (#261)
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
-                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec())?;
+                    certificate.set_field(field_name.clone(), value_str);
                 }
             }
         }
@@ -1422,11 +1422,11 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             }
         }
 
-        // Each field held as its base64 text's bytes, as BRC-52 signs it (#261)
+        // Each field held as its base64 text, as BRC-52 signs it (#261)
         if let Some(fields_obj) = cert_data["fields"].as_object() {
             for (field_name, field_value) in fields_obj {
                 if let Some(value_str) = field_value.as_str() {
-                    certificate.set_field(field_name.clone(), value_str.as_bytes().to_vec())?;
+                    certificate.set_field(field_name.clone(), value_str);
                 }
             }
         }

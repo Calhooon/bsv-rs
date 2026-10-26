@@ -112,12 +112,7 @@ fn assert_codec_reads(bytes: &[u8], cert: &WalletCertificate) {
         format!("{}.{}", to_hex(&outpoint.txid), outpoint.vout),
         cert.revocation_outpoint
     );
-    let fields: HashMap<String, String> = parsed
-        .fields
-        .into_iter()
-        .map(|(k, v)| (k, String::from_utf8(v).unwrap()))
-        .collect();
-    assert_eq!(fields, cert.fields);
+    assert_eq!(parsed.fields, cert.fields);
     assert_eq!(to_hex(&parsed.signature.unwrap()), cert.signature);
 }
 

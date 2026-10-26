@@ -28,7 +28,7 @@ use std::collections::HashMap;
 ///
 /// let certifier = PrivateKey::random();
 /// let subject = PrivateKey::random().public_key();
-/// let fields = HashMap::from([("email".to_string(), b"ZW1haWw=".to_vec())]);
+/// let fields = HashMap::from([("email".to_string(), "ZW1haWw=".to_string())]);
 /// let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key())
 ///     .with_revocation_outpoint(Some(Outpoint::new([3u8; 32], 0)))
 ///     .with_fields(fields);
@@ -76,14 +76,16 @@ pub struct Certificate {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub revocation_outpoint: Option<Outpoint>,
 
-    /// Field values (field_name -> the UTF-8 bytes of the value's base64
-    /// text). BRC-52 carries a field value as a base64 string and signs and
-    /// writes that text's bytes, never the ciphertext it encodes
-    /// (`brcs@5119a9b` `peer-to-peer/0052.md:41,97`; the reference's
-    /// `Certificate.ts:294-296` at `ts-stack@edf6e03`). In JSON each value is
-    /// that string; a value that is not UTF-8 is refused (#261).
-    #[serde(default, with = "field_value_text")]
-    pub fields: HashMap<String, Vec<u8>>,
+    /// Field values (field_name -> the value's base64 text). BRC-52 carries
+    /// a field value as a base64 string and signs and writes that text's
+    /// UTF-8 bytes, never the ciphertext it encodes (`brcs@5119a9b`
+    /// `peer-to-peer/0052.md:41,97`); the reference's
+    /// `Record<CertificateFieldNameUnder50Bytes, Base64String>`
+    /// (`ts-stack@edf6e03` `Certificate.ts:294-296`) and Go's
+    /// `map[string]string` (`go-sdk@2ca481c` `wallet/interfaces.go:122`).
+    /// In JSON each value is that string (#261).
+    #[serde(default)]
+    pub fields: HashMap<String, String>,
 
     /// Certificate signature (DER-encoded).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -126,7 +128,7 @@ impl Certificate {
     }
 
     /// Returns the certificate with its fields replaced.
-    pub fn with_fields(mut self, fields: HashMap<String, Vec<u8>>) -> Self {
+    pub fn with_fields(mut self, fields: HashMap<String, String>) -> Self {
         self.set_fields(fields);
         self
     }
@@ -143,8 +145,8 @@ impl Certificate {
         self.revocation_outpoint = revocation_outpoint;
     }
 
-    /// Replaces every field (already encrypted).
-    pub fn set_fields(&mut self, fields: HashMap<String, Vec<u8>>) {
+    /// Replaces every field, each value its base64 text (#261).
+    pub fn set_fields(&mut self, fields: HashMap<String, String>) {
         self.received_unsigned = None;
         self.fields = fields;
     }
@@ -273,7 +275,7 @@ impl Certificate {
             buf.extend_from_slice(name.as_bytes());
             // Field value (length-prefixed bytes)
             write_varint(&mut buf, value.len() as u64);
-            buf.extend_from_slice(value);
+            buf.extend_from_slice(value.as_bytes());
         }
 
         buf
@@ -414,20 +416,29 @@ impl Certificate {
         format!("{} {}", serial_b64, field_name)
     }
 
-    /// Sets a field value: the UTF-8 bytes of its base64 text, as signed
-    /// and written (BRC-52 `0052.md:97`), never the ciphertext it encodes.
-    /// A value that is not UTF-8 is refused as `InvalidUtf8`, the field
-    /// named, as `from_binary` refuses it (#261).
-    pub fn set_field(&mut self, name: impl Into<String>, encrypted_value: Vec<u8>) -> Result<()> {
-        let name = name.into();
-        field_value_text(&name, &encrypted_value)?;
+    /// Sets a field value: its base64 text, whose UTF-8 bytes are signed and
+    /// written (BRC-52 `0052.md:97`), never the ciphertext it encodes. Any
+    /// string is accepted, as the reference's `fields` record accepts any
+    /// string (#261).
+    ///
+    /// ```
+    /// use bsv_rs::auth::certificates::Certificate;
+    /// use bsv_rs::primitives::{to_base64, PrivateKey};
+    ///
+    /// let key = PrivateKey::random().public_key();
+    /// let mut cert = Certificate::new([1; 32], [2; 32], key.clone(), key);
+    /// cert.set_field("email", to_base64(&[0xff, 0xfe, 0x41]));
+    /// let wire = cert.to_binary(false);
+    /// let text = b"\x05email\x04//5B";
+    /// assert!(wire.windows(text.len()).any(|w| w == text));
+    /// ```
+    pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<String>) {
         self.received_unsigned = None;
-        self.fields.insert(name, encrypted_value);
-        Ok(())
+        self.fields.insert(name.into(), value.into());
     }
 
-    /// Gets a field value: the bytes of its base64 text, as held.
-    pub fn get_field(&self, name: &str) -> Option<&Vec<u8>> {
+    /// Gets a field value: its base64 text, as held.
+    pub fn get_field(&self, name: &str) -> Option<&String> {
         self.fields.get(name)
     }
 
@@ -437,10 +448,7 @@ impl Certificate {
     }
 
     /// Converts to wallet certificate format. Each field value is its held
-    /// base64 text (#261). `from_binary`, `set_field` and the JSON reader
-    /// refuse a value that is not UTF-8; one written into the public `fields`
-    /// map directly, the one way left to hold it, is written here with U+FFFD
-    /// in place of its invalid bytes (the JSON writer refuses it).
+    /// base64 text (#261).
     pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate {
         crate::wallet::types::Certificate {
             certificate_type: self.type_base64(),
@@ -448,11 +456,7 @@ impl Certificate {
             serial_number: self.serial_number_base64(),
             certifier: self.certifier.clone(),
             revocation_outpoint: self.revocation_outpoint.clone(),
-            fields: self
-                .fields
-                .iter()
-                .map(|(k, v)| (k.clone(), String::from_utf8_lossy(v).into_owned()))
-                .collect(),
+            fields: self.fields.clone(),
             signature: self.signature.clone(),
         }
     }
@@ -473,7 +477,7 @@ struct Unsigned {
     subject: PublicKey,
     certifier: PublicKey,
     revocation_outpoint: Option<Outpoint>,
-    fields: HashMap<String, Vec<u8>>,
+    fields: HashMap<String, String>,
 }
 
 /// Reads a certificate's unsigned prefix, the reader left at the signature.
@@ -526,9 +530,13 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
         // `toUTF8Strict` refuses it (`ts-stack@edf6e03` `Certificate.ts:384`)
         // and BRC-52 asks (`0052.md:103`: malformed UTF-8 MUST NOT be made
         // acceptable by retaining bytes; #261).
-        let value = reader.read_bytes(value_len)?;
-        field_value_text(&name, value)?;
-        fields.insert(name, value.to_vec());
+        let value = std::str::from_utf8(reader.read_bytes(value_len)?).map_err(|e| {
+            Error::InvalidUtf8(format!(
+                "certificate field {} is not UTF-8 base64 text: {}",
+                name, e
+            ))
+        })?;
+        fields.insert(name, value.to_string());
     }
 
     Ok(Unsigned {
@@ -648,50 +656,6 @@ impl<'a> BinaryReader<'a> {
     }
 }
 
-/// A field value as the UTF-8 text it must be, refused as `InvalidUtf8` with
-/// the field named otherwise (#261).
-pub(crate) fn field_value_text<'a>(name: &str, value: &'a [u8]) -> Result<&'a str> {
-    std::str::from_utf8(value).map_err(|e| {
-        Error::InvalidUtf8(format!(
-            "certificate field {} is not UTF-8 base64 text: {}",
-            name, e
-        ))
-    })
-}
-
-/// Serde module for the field values: each held value goes out as the UTF-8
-/// string it is and a string comes in as its UTF-8 bytes, never decoded
-/// (BRC-52 `0052.md:97`; the reference's `WalletCertificate.fields`,
-/// `Record<CertificateFieldNameUnder50Bytes, string>`). A held value that is
-/// not UTF-8 is refused with the field named (#261).
-mod field_value_text {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-    use std::collections::{BTreeMap, HashMap};
-
-    pub fn serialize<S>(fields: &HashMap<String, Vec<u8>>, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut text = BTreeMap::new();
-        for (name, value) in fields {
-            let value = super::field_value_text(name, value).map_err(serde::ser::Error::custom)?;
-            text.insert(name.as_str(), value);
-        }
-        text.serialize(serializer)
-    }
-
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<String, Vec<u8>>, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let text = HashMap::<String, String>::deserialize(deserializer)?;
-        Ok(text
-            .into_iter()
-            .map(|(name, value)| (name, value.into_bytes()))
-            .collect())
-    }
-}
-
 /// Serde module for base64 encoding of 32-byte arrays.
 mod base64_32_bytes {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -754,8 +718,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.fields
-            .insert("name".to_string(), b"encrypted_value".to_vec());
+        cert.set_field("name", "encrypted_value");
         cert.sign(&certifier).unwrap();
 
         let binary = cert.to_binary(true);
@@ -793,8 +756,7 @@ mod tests {
         let subject = PrivateKey::random().public_key();
 
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
-        cert.fields
-            .insert("name".to_string(), b"encrypted_value".to_vec());
+        cert.set_field("name", "encrypted_value");
         cert.sign(&certifier).unwrap();
 
         let json = serde_json::to_string(&cert).unwrap();
