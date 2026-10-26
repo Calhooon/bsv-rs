@@ -258,7 +258,7 @@ pub struct PeerOptions<W: WalletInterface, T: Transport> {
 
 See `certificates/CLAUDE.md` for full API details. Key types:
 
-- **Certificate** - Base certificate (BRC-52): `cert_type`, `serial_number`, `subject`, `certifier`, `fields` (encrypted), `signature`. Methods: `new()`, `sign()`, `verify()`, `to_binary()`/`from_binary()`, field encryption key ID helpers.
+- **Certificate** - Base certificate (BRC-52): `cert_type`, `serial_number`, `subject`, `certifier`, `fields` (encrypted), `signature`. Methods: `new()`, `sign()`, `verify()`, `signature_key_id()`, `to_binary()`/`from_binary()`, field encryption key ID helpers. `sign` and `verify` use BRC-52's derived key (#251): the certifier's child under protocol `[2, "certificate signature"]`, keyID `"<type> <serial>"` (the base64 strings, one space), counterparty anyone; `verify` derives the certifier's public child with the anyone key, as the reference's `Certificate.ts:428-431` does. A raw-key signature (this crate's before #251) is `Ok(false)`.
 - **MasterCertificate** - Wraps `Certificate` + `master_keyring`. Methods: `create_certificate_fields()`, `create_keyring_for_verifier()`, `issue_for_subject()`, `decrypt_field()`/`decrypt_fields()`. Derefs to `Certificate`.
 - **VerifiableCertificate** - Wraps `Certificate` + verifier `keyring`. Methods: `decrypt_field()`/`decrypt_fields()`, `revealable_fields()`, `to_json_value()`, accessor methods (`subject()`, `certifier()`, etc.). Derefs to `Certificate`.
 
