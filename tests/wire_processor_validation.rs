@@ -35,6 +35,8 @@ struct Answers {
     counterparty: Option<PublicKey>,
     key_id: Option<String>,
     protocol: Option<Protocol>,
+    network: Option<Network>,
+    version: Option<String>,
 }
 
 /// A ProtoWallet that counts the calls it receives and answers with the
@@ -190,11 +192,21 @@ macro_rules! wallet {
                 self.called()?;
                 Ok(GetHeaderResult { header: "00".repeat(80) })
             }
-            async fn get_network(&self, _: &str) -> bsv_rs::Result<GetNetworkResult> {
-                unreachable!()
+            async fn get_network(&self, o: &str) -> bsv_rs::Result<GetNetworkResult> {
+                self.called()?;
+                let mut result = WalletInterface::get_network(&self.inner, o).await?;
+                if let Some(network) = self.answers.lock().unwrap().network {
+                    result.network = network;
+                }
+                Ok(result)
             }
-            async fn get_version(&self, _: &str) -> bsv_rs::Result<GetVersionResult> {
-                unreachable!()
+            async fn get_version(&self, o: &str) -> bsv_rs::Result<GetVersionResult> {
+                self.called()?;
+                let mut result = WalletInterface::get_version(&self.inner, o).await?;
+                if let Some(version) = self.answers.lock().unwrap().version.clone() {
+                    result.version = version;
+                }
+                Ok(result)
             }
         }
     };
@@ -966,4 +978,105 @@ async fn the_proto_wallet_linkages_pass_the_result_checks() {
     }
     let (answer, _) = answer(&reveal_counterparty_request(-1, &None)).await;
     assert_eq!(answer[0], 0, "{:?}", String::from_utf8_lossy(&answer));
+}
+
+// ============================================================================
+// getNetwork and getVersion: the wallet's answers forwarded (bsv-rs#222)
+// ============================================================================
+
+/// The reference's processor calls `this.wallet.getNetwork({}, originator)`
+/// and `this.wallet.getVersion({}, originator)` (`WalletWireProcessor.ts:1701-1705`,
+/// `:1721-1725` at `ts-stack@edf6e03`) and writes the network as one byte, 0
+/// for mainnet (`:1710`), and the version's UTF-8 bytes with no length
+/// (`:1730`): the wallet's answers, never the processor's own.
+#[tokio::test]
+async fn get_network_and_get_version_forward_the_wallets_answers_byte_for_byte() {
+    for (network, byte) in [(Network::Mainnet, 0u8), (Network::Testnet, 1)] {
+        let answers = Answers {
+            network: Some(network),
+            ..Answers::default()
+        };
+        let (answer, calls) = answer_with(answers, &bare_request(WalletCall::GetNetwork)).await;
+        assert_eq!(answer, [0, byte], "{network:?}");
+        assert_eq!(calls, 1, "the wallet answered");
+    }
+    for version in ["vendor-1.0.0", "wallet-7.8.9-rc.1+\u{e9}t\u{e9}"] {
+        let answers = Answers {
+            version: Some(version.to_string()),
+            ..Answers::default()
+        };
+        let (answer, calls) = answer_with(answers, &bare_request(WalletCall::GetVersion)).await;
+        assert_eq!(answer[0], 0, "{:?}", String::from_utf8_lossy(&answer));
+        assert_eq!(&answer[1..], version.as_bytes());
+        assert_eq!(calls, 1, "the wallet answered");
+    }
+}
+
+/// getVersion's version (`WalletResultValidation.ts:2302-2304`, `string`
+/// `:908-915`): 7 to 30 UTF-8 bytes, the refusal in the reference's words
+/// with its en dash; the bounds themselves pass.
+#[tokio::test]
+async fn a_version_result_outside_7_to_30_bytes_is_refused_with_code_1() {
+    let refused_frame = invalid_result("getVersion", "version", "7\u{2013}30 UTF-8 bytes");
+    for version in ["0.1.0".to_string(), "v1.0.0".to_string(), "v".repeat(31)] {
+        let answers = Answers {
+            version: Some(version.clone()),
+            ..Answers::default()
+        };
+        result_refused(
+            answers,
+            &bare_request(WalletCall::GetVersion),
+            &refused_frame,
+        )
+        .await;
+    }
+    // Bytes, not characters: six two-byte characters are 12 bytes
+    for version in ["v1.0.00".to_string(), "v".repeat(30), "\u{e9}".repeat(6)] {
+        let answers = Answers {
+            version: Some(version.clone()),
+            ..Answers::default()
+        };
+        let (answer, _) = answer_with(answers, &bare_request(WalletCall::GetVersion)).await;
+        assert_eq!(answer[0], 0, "{version:?}");
+    }
+}
+
+/// getNetwork's network (`WalletResultValidation.ts:2298-2301`): mainnet or
+/// testnet, else `Invalid getNetwork result network: expected mainnet or
+/// testnet`. A wallet here answers a `Network`, which has the two values and
+/// no third, so the processor has no network to refuse; the reference's rule
+/// is the type's, and a third read from JSON (the HTTP substrate's answer) is
+/// refused where it is read.
+#[test]
+fn a_network_outside_mainnet_and_testnet_is_no_network_result() {
+    for network in ["regtest", "Mainnet", "", "stn"] {
+        let read: Result<GetNetworkResult, _> =
+            serde_json::from_value(serde_json::json!({ "network": network }));
+        assert!(
+            read.is_err(),
+            "{network:?} read as {:?}",
+            read.unwrap().network
+        );
+    }
+    for (network, value) in [("mainnet", Network::Mainnet), ("testnet", Network::Testnet)] {
+        let read: GetNetworkResult =
+            serde_json::from_value(serde_json::json!({ "network": network })).unwrap();
+        assert_eq!(read.network, value);
+    }
+}
+
+/// `ProtoWallet` answers mainnet and `bsv-rs-<version>`, BRC-100's
+/// vendor-1.0.0 shape (`wallet/0100.md:2517` at `5119a9b`), and both pass
+/// the reference's result checks through a processor built with `new`.
+#[tokio::test]
+async fn the_proto_wallet_network_and_version_pass_the_result_checks() {
+    let (network, calls) = answer(&bare_request(WalletCall::GetNetwork)).await;
+    assert_eq!(network, [0, 0]);
+    assert_eq!(calls, 1);
+    let (frame, calls) = answer(&bare_request(WalletCall::GetVersion)).await;
+    let version = concat!("bsv-rs-", env!("CARGO_PKG_VERSION"));
+    assert_eq!(frame[0], 0, "{:?}", String::from_utf8_lossy(&frame));
+    assert_eq!(&frame[1..], version.as_bytes());
+    assert!((7..=30).contains(&version.len()));
+    assert_eq!(calls, 1);
 }

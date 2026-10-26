@@ -279,12 +279,6 @@ fn keyring_bytes(w: &mut WireWriter, map: &std::collections::HashMap<String, Str
 async fn run_case(call: WalletCall, case: Case) -> Value {
     let stub = Stub::new(case.result.clone());
     let observed = stub.observed.clone();
-    let network = if case.result["network"] == "testnet" {
-        Network::Testnet
-    } else {
-        Network::Mainnet
-    };
-    let version = case.result["version"].as_str().unwrap_or("fixture-0.0.0");
     let writer_reply = type_writer_reply(call, &case.result);
     let encoder = if writer_reply.is_some() {
         "WireWriter"
@@ -292,7 +286,7 @@ async fn run_case(call: WalletCall, case: Case) -> Value {
         "WalletWireProcessor"
     };
     let wire = RecordingWire {
-        processor: WalletWireProcessor::with_config(stub, network, version),
+        processor: WalletWireProcessor::new(stub),
         reply: writer_reply,
         tape: Mutex::default(),
     };
