@@ -510,3 +510,123 @@ fn test_beef_stream_memory_on_proven_transactions_with_many_inputs() {
         "{per_input:.1} B per input, its edge"
     );
 }
+
+/// The deep chain written newest first, the proven funding transaction last
+/// (bsv-rs#240): every unproven link is read ahead of its parent and held
+/// until the funding transaction arrives. A held link is held by its index
+/// entry, never its raw bytes: its txid and offset; per input the outpoint,
+/// the sequence and the input's offset; with spends checked, the unlocking
+/// script, the version, the lock time and the outputs (the index retains
+/// every output in one pass, and the original digest of a CHRONICLE-bit
+/// signature hashes them after the scriptCode the parent supplies). The
+/// whole-BEEF reader's judge holds the same entry beside the `Beef` it
+/// collects, an index into the bytes the `Beef` already holds, never a
+/// second copy of them.
+///
+/// `BEEF_REVERSED_DEPTHS` (comma-separated) replaces the depths measured
+/// (CHANGELOG 0.9.0's numbers: `10000,100000,1000000`).
+#[cfg(feature = "transaction")]
+#[test]
+fn test_beef_stream_memory_on_a_reversed_chain() {
+    use beef_chain::{funding, funding_root, spend, varint, ChainSource, HEIGHT};
+    use bsv_rs::primitives::sha256d;
+    use bsv_rs::transaction::{verify_stream, verify_stream_structure, Beef};
+    use std::collections::HashMap;
+    use std::io::Read;
+    use std::time::Instant;
+
+    let _serial = serial();
+
+    fn peak(f: impl FnOnce()) -> u64 {
+        let _profiler = dhat::Profiler::builder().testing().build();
+        f();
+        dhat::HeapStats::get().max_bytes as u64
+    }
+    /// The chain of `n` written newest first: V2, the funding BUMP, the
+    /// unproven links, then the funding transaction under BUMP 0.
+    fn reversed(n: usize) -> Vec<u8> {
+        let mut raws = Vec::with_capacity(n - 1);
+        let mut prev = funding_root();
+        for _ in 1..n {
+            let raw = spend(&prev, 1);
+            prev = sha256d(&raw);
+            raws.push(raw);
+        }
+        let mut bytes = 0xEFBE_0002u32.to_le_bytes().to_vec();
+        bytes.push(1);
+        bytes.extend(varint(HEIGHT));
+        bytes.extend_from_slice(&[1, 1, 0, 2]);
+        bytes.extend_from_slice(&funding_root());
+        bytes.extend(varint(n as u64));
+        for raw in raws.iter().rev() {
+            bytes.push(0);
+            bytes.extend_from_slice(raw);
+        }
+        bytes.extend_from_slice(&[1, 0]);
+        bytes.extend_from_slice(&funding());
+        bytes
+    }
+
+    let depths: Vec<usize> = std::env::var("BEEF_REVERSED_DEPTHS")
+        .map(|v| v.split(',').map(|d| d.trim().parse().unwrap()).collect())
+        .unwrap_or_else(|_| vec![10_000]);
+    let headers = HashMap::from([(HEIGHT, funding_root())]);
+    println!("\n=== BEEF readers on the deep chain, parents first and newest first ===");
+    let mut rows = Vec::new();
+    for n in depths {
+        let mut ordered = Vec::new();
+        ChainSource::new(n).read_to_end(&mut ordered).unwrap();
+        let newest_first = reversed(n);
+        assert_eq!(ordered.len(), newest_first.len());
+        let mut row = Vec::new();
+        for (what, bytes) in [("parents first", &ordered), ("newest first", &newest_first)] {
+            let t = Instant::now();
+            let structure = peak(|| {
+                let v = verify_stream_structure(bytes.as_slice(), &headers, None).unwrap();
+                assert!(v.is_valid(), "{what}: {v:?}");
+            });
+            let t_structure = t.elapsed();
+            let t = Instant::now();
+            let scripts = peak(|| {
+                let v = verify_stream(bytes.as_slice(), &headers, None).unwrap();
+                assert!(v.is_valid(), "{what}: {v:?}");
+            });
+            let t_scripts = t.elapsed();
+            let t = Instant::now();
+            let whole = peak(|| {
+                let mut beef = Beef::from_binary(bytes).unwrap();
+                assert!(beef.verify_structure().is_ok(), "{what}");
+            });
+            let t_whole = t.elapsed();
+            println!(
+                "  N={n} {what} ({} B): stream structure {structure} B in {t_structure:?}, \
+                 stream scripts {scripts} B in {t_scripts:?}, whole path {whole} B in {t_whole:?}",
+                bytes.len()
+            );
+            row.push((structure, scripts, whole));
+        }
+        rows.push((n, row[0], row[1]));
+    }
+    for (n, (s0, f0, w0), (s1, f1, w1)) in rows {
+        let held = (n - 1) as f64;
+        let per = |reversed: u64, ordered: u64| reversed.saturating_sub(ordered) as f64 / held;
+        let (structure, scripts, whole) = (per(s1, s0), per(f1, f0), per(w1, w0));
+        println!(
+            "  N={n}: held per link over parents first: structure {structure:.1} B, \
+             scripts {scripts:.1} B, whole path {whole:.1} B (a link is {} B on the wire)",
+            spend(&[0; 32], 1).len()
+        );
+        // The entry: 56 bytes for the txid, the offset and the wire length,
+        // 48 for the one input; with spends checked 8 for the version and
+        // the lock time, the empty unlock and the one output's 16 bytes and
+        // its script; and the tables beside it (the held set by offset, the
+        // txid waited on, the count). Holding the element as read (its raw
+        // bytes and the places of its fields, 0.9.0-beta's first fold) was
+        // 321 to 349 bytes a link.
+        assert!(structure < 250.0, "N={n}: {structure:.1} B per held link");
+        assert!(scripts < 290.0, "N={n}: {scripts:.1} B per held link");
+        // The whole path's judge holds the entry, not a second copy of the
+        // bytes the `Beef` holds: the peak is the parents-first peak.
+        assert!(whole < 64.0, "N={n}: {whole:.1} B per held link");
+    }
+}
