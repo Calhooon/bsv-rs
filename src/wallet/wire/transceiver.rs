@@ -22,7 +22,7 @@ use crate::wallet::{
     SignActionResult, SignableTransaction, TrustSelf, VerifyHmacArgs, VerifyHmacResult,
     VerifySignatureArgs, VerifySignatureResult, WalletCertificate,
 };
-use crate::Error;
+use crate::{Error, WalletRefusalClass};
 
 /// The key-related parameters of an args value with a protocol and a key ID
 /// (`super::write_key_related_params`, #193).
@@ -41,6 +41,18 @@ macro_rules! write_key_related {
 
 /// `walletErrors.abortRefused` (`WalletError.ts:79` at `ts-stack@edf6e03`).
 const ABORT_REFUSED: u8 = 8;
+
+/// The error an error frame carries: a code 2 to 8 the reference's class and
+/// the words, as its client throws `new WalletError(message, code)`
+/// (`WalletWireTransceiver.ts:153` at `ts-stack@edf6e03`; #137); code 1
+/// (`unknownError`) and a code no class names the un-coded error, its code in
+/// the words.
+fn frame_error(code: u8, message: String) -> Error {
+    match WalletRefusalClass::from_code(code) {
+        Some(class) => Error::WalletRefusal { class, message },
+        None => Error::WalletError(format!("wallet error (code {}): {}", code, message)),
+    }
+}
 
 /// Client-side wallet wire protocol implementation.
 ///
@@ -89,9 +101,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     ) -> Result<Vec<u8>, Error> {
         self.exchange(call, originator, params)
             .await?
-            .map_err(|(code, message)| {
-                Error::WalletError(format!("wallet error (code {}): {}", code, message))
-            })
+            .map_err(|(code, message)| frame_error(code, message))
     }
 
     /// Transmits a message and reads the response frame: the result's bytes,
@@ -736,10 +746,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 Ok(AbortActionResult { aborted: true })
             }
             Err((ABORT_REFUSED, _)) => Ok(AbortActionResult { aborted: false }),
-            Err((code, message)) => Err(Error::WalletError(format!(
-                "wallet error (code {}): {}",
-                code, message
-            ))),
+            Err((code, message)) => Err(frame_error(code, message)),
         }
     }
 

@@ -8,8 +8,9 @@
 //! A wallet's error passes through `#invokeWallet` ahead of the catch (`:2402-2418`): an
 //! explicit wallet error with a code 2 to 8 keeps its words and code, every
 //! other is replaced by `Wallet operation failed`, code 1 (`:2417`). This
-//! crate's `Error` carries no wallet code (#137), so every frame is 1 and
-//! every wallet error the constant; the processor's own errors (its reading,
+//! crate's coded wallet error is `Error::WalletRefusal` (#137,
+//! `tests/wire_wallet_refusal_class.rs`); every other wallet error is the
+//! constant; the processor's own errors (its reading,
 //! the three false verdicts, raised outside the wrapper) keep their words. A
 //! wallet's `aborted: false` is the reference's refusal, code 8 (`:797-804`),
 //! read back as `aborted: false` (`WalletWireTransceiver.ts:337`; #206).
@@ -24,7 +25,7 @@ mod fixtures;
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::wallet::wire::{WalletCall, WalletWire, WalletWireProcessor, WalletWireTransceiver};
 use bsv_rs::wallet::{Counterparty, Protocol, SecurityLevel, VerifyHmacArgs, VerifySignatureArgs};
-use bsv_rs::{Error, TransportFault};
+use bsv_rs::{Error, TransportFault, WalletRefusalClass};
 use fixtures::wallet::Stub;
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
@@ -106,7 +107,7 @@ async fn an_uncoded_wallet_error_is_framed_as_wallet_operation_failed() {
 /// #202: every variant a wallet returns is the same constant: the words that
 /// once chose 6 and 7, a busy or transport answer, a crate sentence, a
 /// validation refusal raised inside the wallet, a 5000-byte message. None
-/// carries a code 2 to 8 (#137), so none is explicit.
+/// is a `WalletRefusal` (#137), so none is explicit.
 #[tokio::test]
 async fn every_wallet_error_variant_is_framed_as_the_same_constant() {
     for error in [
@@ -432,24 +433,28 @@ async fn every_other_abort_frame_is_the_error_it_was() {
     let args = || bsv_rs::wallet::AbortActionArgs {
         reference: "Zml4dHVyZQ==".into(),
     };
-    for (frame, words) in [
+    for (frame, error) in [
         (
             hex::decode(WALLET_OPERATION_FAILED_FRAME).unwrap(),
-            "wallet error (code 1): Wallet operation failed",
+            Error::WalletError("wallet error (code 1): Wallet operation failed".into()),
         ),
         (
             reference_frame(7, b"insufficient"),
-            "wallet error (code 7): insufficient",
+            // a class's code read as the class (#137)
+            Error::WalletRefusal {
+                class: WalletRefusalClass::InsufficientFunds,
+                message: "insufficient".into(),
+            },
         ),
         (
             vec![0, 1],
-            "Wallet Wire abortAction response has an invalid length",
+            Error::WalletError("Wallet Wire abortAction response has an invalid length".into()),
         ),
     ] {
         let result = WalletWireTransceiver::new(ReplyWire(frame))
             .abort_action(args(), "test")
             .await
             .map(|r| r.aborted);
-        assert_eq!(result, Err(Error::WalletError(words.into())), "{words}");
+        assert_eq!(result, Err(error.clone()), "{error}");
     }
 }

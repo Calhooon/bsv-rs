@@ -38,6 +38,8 @@
 pub mod error;
 #[cfg(feature = "transaction")]
 pub use error::TransportFault;
+#[cfg(feature = "wallet")]
+pub use error::WalletRefusalClass;
 pub use error::{Error, Result};
 
 // Internal utilities (wasm32-safe time helpers, etc.). Not part of the
