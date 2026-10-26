@@ -56,8 +56,8 @@ pub mod base64_bytes {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        crate::primitives::from_base64(&s).map_err(serde::de::Error::custom)
+        crate::primitives::from_base64(&String::deserialize(deserializer)?)
+            .map_err(serde::de::Error::custom)
     }
 }
 
@@ -79,16 +79,15 @@ impl<'de> Deserialize<'de> for KeyringRevealer {
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        if s == "certifier" {
-            return Ok(KeyringRevealer::Certifier);
+        match String::deserialize(deserializer)?.as_str() {
+            "certifier" => Ok(KeyringRevealer::Certifier),
+            key => PublicKey::from_hex(key)
+                .map(KeyringRevealer::PublicKey)
+                .map_err(|e| {
+                    serde::de::Error::custom(format!(
+                        "keyringRevealer is 'certifier' or a public key: {e}"
+                    ))
+                }),
         }
-        PublicKey::from_hex(&s)
-            .map(KeyringRevealer::PublicKey)
-            .map_err(|e| {
-                serde::de::Error::custom(format!(
-                    "keyringRevealer is 'certifier' or a public key: {e}"
-                ))
-            })
     }
 }

@@ -34,6 +34,31 @@ macro_rules! permission {
 }
 pub(super) use permission;
 
+/// The protocol, key and counterparty of the six key-related requests that
+/// require them, in BRC-100's names: `protocolID` the `[level, name]` pair,
+/// `keyID` (#105).
+#[derive(Serialize)]
+pub(super) struct JsonKeyParams {
+    #[serde(rename = "protocolID")]
+    pub(super) protocol_id: (u8, String),
+    #[serde(rename = "keyID")]
+    pub(super) key_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) counterparty: Option<String>,
+}
+
+/// The key parameters of an args value, moved out of it.
+macro_rules! key_params {
+    ($args:expr) => {
+        JsonKeyParams {
+            protocol_id: protocol_to_json(&$args.protocol_id),
+            key_id: $args.key_id,
+            counterparty: $args.counterparty.as_ref().map(counterparty_to_string),
+        }
+    };
+}
+pub(super) use key_params;
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonGetPublicKeyRequest {
@@ -62,12 +87,8 @@ pub(super) struct JsonGetPublicKeyResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonEncryptRequest {
-    #[serde(rename = "protocolID")]
-    pub(super) protocol_id: (u8, String),
-    #[serde(rename = "keyID")]
-    pub(super) key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) counterparty: Option<String>,
+    #[serde(flatten)]
+    pub(super) key: JsonKeyParams,
     pub(super) plaintext: Vec<u8>,
     #[serde(flatten)]
     pub(super) permission: JsonPermission,
@@ -82,12 +103,8 @@ pub(super) struct JsonEncryptResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonDecryptRequest {
-    #[serde(rename = "protocolID")]
-    pub(super) protocol_id: (u8, String),
-    #[serde(rename = "keyID")]
-    pub(super) key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) counterparty: Option<String>,
+    #[serde(flatten)]
+    pub(super) key: JsonKeyParams,
     pub(super) ciphertext: Vec<u8>,
     #[serde(flatten)]
     pub(super) permission: JsonPermission,
@@ -102,12 +119,8 @@ pub(super) struct JsonDecryptResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonCreateHmacRequest {
-    #[serde(rename = "protocolID")]
-    pub(super) protocol_id: (u8, String),
-    #[serde(rename = "keyID")]
-    pub(super) key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) counterparty: Option<String>,
+    #[serde(flatten)]
+    pub(super) key: JsonKeyParams,
     pub(super) data: Vec<u8>,
     #[serde(flatten)]
     pub(super) permission: JsonPermission,
@@ -122,12 +135,8 @@ pub(super) struct JsonCreateHmacResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonVerifyHmacRequest {
-    #[serde(rename = "protocolID")]
-    pub(super) protocol_id: (u8, String),
-    #[serde(rename = "keyID")]
-    pub(super) key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) counterparty: Option<String>,
+    #[serde(flatten)]
+    pub(super) key: JsonKeyParams,
     pub(super) data: Vec<u8>,
     pub(super) hmac: Vec<u8>,
     #[serde(flatten)]
@@ -143,12 +152,8 @@ pub(super) struct JsonVerifyHmacResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonCreateSignatureRequest {
-    #[serde(rename = "protocolID")]
-    pub(super) protocol_id: (u8, String),
-    #[serde(rename = "keyID")]
-    pub(super) key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) counterparty: Option<String>,
+    #[serde(flatten)]
+    pub(super) key: JsonKeyParams,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) data: Option<Vec<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -166,12 +171,8 @@ pub(super) struct JsonCreateSignatureResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct JsonVerifySignatureRequest {
-    #[serde(rename = "protocolID")]
-    pub(super) protocol_id: (u8, String),
-    #[serde(rename = "keyID")]
-    pub(super) key_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(super) counterparty: Option<String>,
+    #[serde(flatten)]
+    pub(super) key: JsonKeyParams,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) for_self: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]

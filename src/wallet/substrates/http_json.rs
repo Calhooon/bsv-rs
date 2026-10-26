@@ -30,11 +30,12 @@ use serde::{Deserialize, Serialize};
 
 mod key_requests;
 use key_requests::{
-    permission, JsonCreateHmacRequest, JsonCreateHmacResponse, JsonCreateSignatureRequest,
-    JsonCreateSignatureResponse, JsonDecryptRequest, JsonDecryptResponse, JsonEncryptRequest,
-    JsonEncryptResponse, JsonGetPublicKeyRequest, JsonGetPublicKeyResponse, JsonPermission,
-    JsonRevealCounterpartyRequest, JsonRevealSpecificRequest, JsonVerifyHmacRequest,
-    JsonVerifyHmacResponse, JsonVerifySignatureRequest, JsonVerifySignatureResponse,
+    key_params, permission, JsonCreateHmacRequest, JsonCreateHmacResponse,
+    JsonCreateSignatureRequest, JsonCreateSignatureResponse, JsonDecryptRequest,
+    JsonDecryptResponse, JsonEncryptRequest, JsonEncryptResponse, JsonGetPublicKeyRequest,
+    JsonGetPublicKeyResponse, JsonKeyParams, JsonPermission, JsonRevealCounterpartyRequest,
+    JsonRevealSpecificRequest, JsonVerifyHmacRequest, JsonVerifyHmacResponse,
+    JsonVerifySignatureRequest, JsonVerifySignatureResponse,
 };
 
 /// HTTP substrate using JSON payloads.
@@ -236,9 +237,7 @@ impl HttpWalletJson {
         originator: &str,
     ) -> Result<EncryptResult, Error> {
         let request = JsonEncryptRequest {
-            protocol_id: protocol_to_json(&args.protocol_id),
-            key_id: args.key_id,
-            counterparty: args.counterparty.as_ref().map(counterparty_to_string),
+            key: key_params!(args),
             plaintext: args.plaintext,
             permission: permission!(args),
         };
@@ -257,9 +256,7 @@ impl HttpWalletJson {
         originator: &str,
     ) -> Result<DecryptResult, Error> {
         let request = JsonDecryptRequest {
-            protocol_id: protocol_to_json(&args.protocol_id),
-            key_id: args.key_id,
-            counterparty: args.counterparty.as_ref().map(counterparty_to_string),
+            key: key_params!(args),
             ciphertext: args.ciphertext,
             permission: permission!(args),
         };
@@ -278,9 +275,7 @@ impl HttpWalletJson {
         originator: &str,
     ) -> Result<CreateHmacResult, Error> {
         let request = JsonCreateHmacRequest {
-            protocol_id: protocol_to_json(&args.protocol_id),
-            key_id: args.key_id,
-            counterparty: args.counterparty.as_ref().map(counterparty_to_string),
+            key: key_params!(args),
             data: args.data,
             permission: permission!(args),
         };
@@ -308,9 +303,7 @@ impl HttpWalletJson {
         originator: &str,
     ) -> Result<VerifyHmacResult, Error> {
         let request = JsonVerifyHmacRequest {
-            protocol_id: protocol_to_json(&args.protocol_id),
-            key_id: args.key_id,
-            counterparty: args.counterparty.as_ref().map(counterparty_to_string),
+            key: key_params!(args),
             data: args.data,
             hmac: args.hmac.to_vec(),
             permission: permission!(args),
@@ -331,9 +324,7 @@ impl HttpWalletJson {
         originator: &str,
     ) -> Result<CreateSignatureResult, Error> {
         let request = JsonCreateSignatureRequest {
-            protocol_id: protocol_to_json(&args.protocol_id),
-            key_id: args.key_id,
-            counterparty: args.counterparty.as_ref().map(counterparty_to_string),
+            key: key_params!(args),
             data: args.data,
             hash_to_directly_sign: args.hash_to_directly_sign.map(|h| h.to_vec()),
             permission: permission!(args),
@@ -355,9 +346,7 @@ impl HttpWalletJson {
         originator: &str,
     ) -> Result<VerifySignatureResult, Error> {
         let request = JsonVerifySignatureRequest {
-            protocol_id: protocol_to_json(&args.protocol_id),
-            key_id: args.key_id,
-            counterparty: args.counterparty.as_ref().map(counterparty_to_string),
+            key: key_params!(args),
             for_self: args.for_self,
             data: args.data,
             hash_to_directly_verify: args.hash_to_directly_verify.map(|h| h.to_vec()),
