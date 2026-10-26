@@ -23,6 +23,30 @@ the interpreter's resource tests and #213's `a_spend_refusal_prints_*` pass
 unchanged; each kind's text is pinned in `tests/resource_limits.rs`
 (`a_stack_limit_prints_the_interpreters_sentence` and the five beside it).
 Additive: a trait impl on an existing public type.
+### Changed: `http` is native-only, refused on wasm32 at the build script (#152)
+
+`cargo build --target wasm32-unknown-unknown --no-default-features --features
+"transaction,http,wasm"` failed on beta with 8 errors (the HTTP chain
+trackers' `async_trait` methods await a reqwest future that is not `Send` on
+wasm32), and CLAUDE.md rule 6's slice with `http` added with 69 (the same in
+the broadcasters, the HTTP substrate, the overlay facilitators and the auth
+transport, and `ClientBuilder::timeout`, which reqwest's wasm backend lacks).
+Rule 6's slice and the `wasm32` CI job's six consumer slices carry no `http`,
+so nothing showed it. No consumer asks for `http` on wasm32: the two `http`
+rows of `docs/dependents.lock` (`bsv-wallet-toolbox-rs`, `full,http`;
+`bsv-storage-parity`, `auth,http,overlay`) are native, as is the relay's
+`tests/load_gen`; every wasm32 row and every CI slice omits it. So this is a
+stated bound, not a port: a new `build.rs` stops a wasm32 build with `http`
+before rustc reads the crate, with one message ("bsv-rs: the http feature is native-only
+and does not build for wasm32 ...", the feature name in backticks there). A `compile_error!` in the
+library was tried and is not enough: rustc reports it and then the eight
+awaits too. README, `Cargo.toml`'s feature comment, the crate docs and rule 6
+say why `http` is absent from the slice. Pinned by the `wasm32 (combined)` CI
+step "The slice with http is refused at the build script": red on the base
+(69 errors, no message), green here. A consumer that asks for `http` on wasm32
+reopens #152 as the fix (`#[async_trait(?Send)]` on wasm32, the builder's
+timeout behind `cfg(not(target_arch = "wasm32"))`). Public shape: nothing
+moves; native builds run a build script that does nothing.
 
 ## [0.9.0-beta.1] - 2026-10-26
 
