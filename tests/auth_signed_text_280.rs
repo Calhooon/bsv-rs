@@ -137,10 +137,15 @@ fn policy(certifier: &PublicKey) -> RequestedCertificateSet {
 /// A certificate built here with three fields and a three-key keyring
 fn certificate(subject: &PublicKey, certifier: &PrivateKey) -> VerifiableCertificate {
     let names = ["name", "email", "country"];
-    let fields: HashMap<String, Vec<u8>> = names
+    let fields: HashMap<String, String> = names
         .iter()
         .enumerate()
-        .map(|(i, n)| (n.to_string(), vec![i as u8 + 1; 40]))
+        .map(|(i, n)| {
+            (
+                n.to_string(),
+                bsv_rs::primitives::to_base64(&[i as u8 + 1; 40]),
+            )
+        })
         .collect();
     let mut certificate =
         Certificate::new([3; 32], [9; 32], subject.clone(), certifier.public_key())
