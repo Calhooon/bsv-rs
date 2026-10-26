@@ -2051,3 +2051,7 @@ mod tests {
         assert_eq!(cert.fields.get("name"), Some(&"Alice".to_string()));
     }
 }
+
+#[cfg(test)]
+#[path = "client_field_value_261_tests.rs"]
+mod field_value_261_tests;
