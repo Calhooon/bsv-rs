@@ -147,14 +147,38 @@ impl Beef {
         }
     }
 
+    /// Reads each entry mutated through [`BeefTx::tx_mut`] again: its input
+    /// list from the mutated transaction, the index by its new txid, the
+    /// order to be sorted (bsv-rs#171). The whole-BEEF readers call it ahead
+    /// of their walk.
+    fn refresh_mutated(&mut self) {
+        let mut refreshed = false;
+        for tx in &mut self.txs {
+            refreshed |= tx.refresh();
+        }
+        if refreshed {
+            self.rebuild_index();
+            self.mark_mutated();
+        }
+    }
+
+    /// The position of the entry named `txid`: an index entry whose
+    /// transaction has been renamed by [`BeefTx::tx_mut`] since is no hit.
+    fn index_of(&self, txid: &str) -> Option<usize> {
+        self.txid_index
+            .get(txid)
+            .copied()
+            .filter(|&i| self.txs.get(i).is_some_and(|tx| tx.has_txid(txid)))
+    }
+
     /// Finds a BeefTx by txid.
     pub fn find_txid(&self, txid: &str) -> Option<&BeefTx> {
-        self.txid_index.get(txid).map(|&i| &self.txs[i])
+        self.index_of(txid).map(|i| &self.txs[i])
     }
 
     /// Finds a BeefTx by txid (mutable).
     pub fn find_txid_mut(&mut self, txid: &str) -> Option<&mut BeefTx> {
-        self.txid_index.get(txid).map(|&i| &mut self.txs[i])
+        self.index_of(txid).map(|i| &mut self.txs[i])
     }
 
     /// Finds a MerklePath that contains the given txid.
@@ -399,7 +423,10 @@ impl Beef {
 
         let bump_index = None; // Could be set if tx has merklePath
 
-        let idx = self.push_tx(BeefTx::from_tx(tx, bump_index), txid);
+        let idx = self.push_tx(
+            BeefTx::from_tx(tx, bump_index).with_txid(txid.clone()),
+            txid,
+        );
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
@@ -412,7 +439,7 @@ impl Beef {
         let txid = new_tx.txid();
         self.remove_existing_txid(&txid);
 
-        let idx = self.push_tx(new_tx, txid);
+        let idx = self.push_tx(new_tx.with_txid(txid.clone()), txid);
         self.try_to_validate_bump_index(idx);
         self.mark_mutated();
 
@@ -421,7 +448,7 @@ impl Beef {
 
     /// Merges a txid-only entry into this BEEF.
     pub fn merge_txid_only(&mut self, txid: String) -> &BeefTx {
-        if let Some(&idx) = self.txid_index.get(&txid) {
+        if let Some(idx) = self.index_of(&txid) {
             return &self.txs[idx];
         }
 
@@ -439,7 +466,7 @@ impl Beef {
     ///
     /// Returns the modified BeefTx if found, None if txid not in BEEF.
     pub fn make_txid_only(&mut self, txid: &str) -> Option<&BeefTx> {
-        let idx = *self.txid_index.get(txid)?;
+        let idx = self.index_of(txid)?;
 
         // If already txid-only, just return it
         if self.txs[idx].is_txid_only() {
@@ -456,7 +483,7 @@ impl Beef {
 
     /// Removes an existing transaction by txid.
     fn remove_existing_txid(&mut self, txid: &str) {
-        if let Some(&idx) = self.txid_index.get(txid) {
+        if let Some(idx) = self.index_of(txid) {
             self.txs.remove(idx);
             self.rebuild_index();
             self.mark_mutated();
@@ -546,6 +573,7 @@ impl Beef {
     pub fn trim_known_proven(&mut self) {
         use std::collections::{HashSet, VecDeque};
 
+        self.refresh_mutated();
         let all_txids: HashSet<String> = self.txs.iter().map(|tx| tx.txid()).collect();
 
         // Find which txids are referenced as inputs by other txs in the BEEF.
@@ -555,7 +583,7 @@ impl Beef {
         for tx in &mut self.txs {
             let input_refs: Vec<String> = if !tx.input_txids.is_empty() {
                 tx.input_txids.clone()
-            } else if let Some(parsed) = tx.tx_mut() {
+            } else if let Some(parsed) = tx.parsed() {
                 parsed
                     .inputs
                     .iter()
@@ -711,6 +739,7 @@ impl Beef {
     /// A byte after the frame (NL-8 W3) is refused by [`from_binary`](Self::from_binary)
     /// before this runs.
     pub fn verify_structure(&mut self) -> std::result::Result<HashMap<u32, String>, Kind> {
+        self.refresh_mutated();
         // The atomic rule is answered after the rest, where the reader's
         // `finish` answers it.
         let atomic = match self.atomic_txid.clone() {
@@ -839,6 +868,7 @@ impl Beef {
         use std::cmp::Reverse;
         use std::collections::{BinaryHeap, HashSet};
 
+        self.refresh_mutated();
         let mut result = SortResult::default();
         let mut valid_txids: HashMap<String, bool> = HashMap::new();
         let txids: Vec<String> = self.txs.iter().map(|tx| tx.txid()).collect();
@@ -1016,6 +1046,7 @@ impl Beef {
 
     /// Serializes this BEEF to binary.
     pub fn to_binary(&mut self) -> Vec<u8> {
+        self.refresh_mutated();
         if self.needs_sort {
             self.sort_txs();
         }
@@ -1058,6 +1089,7 @@ impl Beef {
     /// 0.8.0, of TS 2, TS 3 and Go. [`to_binary`](Self::to_binary) still
     /// writes every entry.
     pub fn to_binary_atomic(&mut self, txid: &str) -> Result<Vec<u8>> {
+        self.refresh_mutated();
         if self.needs_sort {
             self.sort_txs();
         }

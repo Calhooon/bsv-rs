@@ -7,11 +7,14 @@
 //! only by its fields: no transaction's hash can be in its own ancestry.
 //! Such a ring names at least one entry that is not held ahead of it, which
 //! BRC-62's order (`transactions/0062.md:172` step 2.4.1) and both readers
-//! refuse as `InputNamesNoElement` before any walk. In memory a ring is
-//! real: an entry read from bytes keeps the txid it was read with, and
-//! `BeefTx::tx_mut` can point its input at its own descendant. There the
-//! linker's memo (`Beef::add_input_proof`, a stub memoized before it
-//! descends), `to_binary_atomic`'s closure and `sort_txs` must each stop.
+//! refuse as `InputNamesNoElement` before any walk. In memory the same
+//! holds of the parsed transactions since #171: an entry mutated through
+//! `BeefTx::tx_mut` is renamed by its new hash, so pointing an input at a
+//! descendant leaves a chain. A ring is left only in the public
+//! `input_txids` cache, written by hand: there `sort_txs`, the whole-path
+//! judge and the trim must each stop. The linker's memo
+//! (`Beef::add_input_proof`, a stub memoized before it descends) and
+//! `to_binary_atomic`'s closure keep their seen sets.
 //! The termination these mirror is the stack's: `BeefOfAnySize.lean`
 //! `walk` (`:944`) takes one unit of fuel per txid and keeps a `seen` set,
 //! `budget` (`:956`) bounds the fuel by the entries and the edges.
@@ -297,11 +300,9 @@ fn the_atomic_form_of_a_ring_is_refused_by_the_readers_and_from_atomic_beef_stop
     }
 }
 
-/// An in-memory BEEF holding a real ring of `n`: a chain `T0 <- T1 <- ..`
-/// read from bytes, then `T0`'s input pointed at the last link's txid.
-/// Each entry keeps the txid it was read with, so the names form a cycle,
-/// in the parsed input and in the entry's cached `input_txids` alike.
-fn in_memory_ring(n: usize) -> (Beef, Vec<String>) {
+/// A chain `T0 <- T1 <- ..` of `n` read from bytes into an in-memory BEEF,
+/// with the txids of its links.
+fn in_memory_chain(n: usize) -> (Beef, Vec<String>) {
     let mut chain = vec![tx(&["e5".repeat(32).as_str()])];
     for i in 1..n {
         let parent = chain[i - 1].id();
@@ -310,14 +311,7 @@ fn in_memory_ring(n: usize) -> (Beef, Vec<String>) {
     let raws: Vec<Vec<u8>> = chain.iter().map(Transaction::to_binary).collect();
     let entries: Vec<&[u8]> = raws.iter().map(Vec::as_slice).collect();
     let ids: Vec<String> = chain.iter().map(Transaction::id).collect();
-    let mut beef = Beef::from_binary(&write(None, &[], &entries)).unwrap();
-    let last = ids[n - 1].clone();
-    let entry = beef.find_txid_mut(&ids[0]).unwrap();
-    entry.tx_mut().unwrap().inputs[0].source_txid = Some(last.clone());
-    // `tx_mut` leaves the cached input list as it was read; the sort and the
-    // whole-path judge read that list, so it names the ring's link too.
-    entry.input_txids = vec![last];
-    (beef, ids)
+    (Beef::from_binary(&write(None, &[], &entries)).unwrap(), ids)
 }
 
 /// The links below `tx`, following the source of input 0: the depth of
@@ -337,31 +331,77 @@ fn linked_depth(tx: &Transaction) -> usize {
 }
 
 #[test]
-fn a_ring_held_in_memory_links_each_entry_once_and_every_walk_stops() {
+fn a_ring_closed_through_tx_mut_renames_the_entry_and_is_a_chain() {
+    // Since #171 an entry mutated through `tx_mut` is named by the mutated
+    // transaction's hash, so pointing `T0`'s input at the last link renames
+    // `T0` and the names cannot close: `T0'` spends the last link, `T1`
+    // spends the `T0` that is no longer held. In memory as on the wire, no
+    // transaction's hash is in its own ancestry.
     for n in [1, 2, 3] {
-        // `n = 1`: a transaction whose input names its own txid.
-        let (beef, ids) = in_memory_ring(n);
-        let subject = ids[n - 1].clone();
-        // The linker: the subject's ancestry walks the ring once and meets
-        // the subject's memoized stub, so the shape is `n` links deep.
-        let (depth, _) = bounded(&format!("in-memory ring of {n}: link"), {
-            let (beef, subject) = (beef.clone(), subject.clone());
-            move || linked_depth(&beef.find_atomic_transaction(&subject).unwrap())
+        let (mut beef, ids) = in_memory_chain(n);
+        let last = ids[n - 1].clone();
+        let entry = beef.find_txid_mut(&ids[0]).unwrap();
+        entry.tx_mut().unwrap().inputs[0].source_txid = Some(last.clone());
+        let renamed = entry.txid();
+        assert_ne!(renamed, ids[0], "chain of {n}: the entry is renamed");
+        assert!(beef.find_txid(&ids[0]).is_none(), "chain of {n}");
+        // The linker walks the chain under the new name and stops at the
+        // missing `T0`: `n - 1` links.
+        let (depth, _) = bounded(&format!("renamed chain of {n}: link"), {
+            let (mut beef, renamed) = (beef.clone(), renamed.clone());
+            move || {
+                beef.sort_txs();
+                linked_depth(&beef.find_atomic_transaction(&renamed).unwrap())
+            }
+        });
+        assert_eq!(depth, n - 1, "chain of {n}: the links held");
+        let (closure, _) = bounded(&format!("renamed chain of {n}: to_binary_atomic"), {
+            let (mut beef, renamed) = (beef.clone(), renamed.clone());
+            move || beef.to_binary_atomic(&renamed).map(|b| b.len())
+        });
+        assert!(closure.is_ok(), "chain of {n}: the closure is written");
+        let (sorted, _) = bounded(&format!("renamed chain of {n}: sort_txs"), {
+            let mut beef = beef.clone();
+            move || beef.sort_txs().missing_inputs
+        });
+        assert_eq!(sorted, vec![ids[0].clone()], "chain of {n}: `T0` missing");
+        let (whole, _) = bounded(&format!("renamed chain of {n}: verify_structure"), {
+            let mut beef = beef.clone();
+            move || beef.verify_structure().err()
+        });
+        assert_eq!(whole, Some(Kind::InputNamesNoElement), "chain of {n}");
+        // The writer emits the mutated bytes: read back, the entry is the
+        // renamed one and the whole path refuses the same.
+        let (reread, _) = bounded(&format!("renamed chain of {n}: round trip"), {
+            let (mut beef, renamed) = (beef.clone(), renamed.clone());
+            move || {
+                let mut back = Beef::from_binary(&beef.to_binary()).unwrap();
+                (
+                    back.find_txid(&renamed).is_some(),
+                    back.verify_structure().err(),
+                )
+            }
         });
         assert_eq!(
-            depth,
-            n + 1,
-            "ring of {n}: each entry linked once, then the stub"
+            reread,
+            (true, Some(Kind::InputNamesNoElement)),
+            "chain of {n}"
         );
-        // The atomic closure and the sort stop; the sort finds every input
-        // in the BEEF and holds each link of the ring not valid, and the
-        // judge refuses the ring.
-        let (closure, _) = bounded(&format!("in-memory ring of {n}: to_binary_atomic"), {
-            let (mut beef, subject) = (beef.clone(), subject.clone());
-            move || beef.to_binary_atomic(&subject).map(|b| b.len())
-        });
-        assert!(closure.is_ok(), "ring of {n}: the closure is written");
-        let (sorted, _) = bounded(&format!("in-memory ring of {n}: sort_txs"), {
+    }
+}
+
+#[test]
+fn a_ring_written_in_the_input_cache_stops_the_sort_and_the_judge() {
+    // `BeefTx::input_txids` is a public field: set by hand on an entry
+    // `tx_mut` never touched, it names a ring the sort, the whole-path judge
+    // and the trim read (the linker and the atomic closure read the parsed
+    // transaction, where no ring can be). Each stops.
+    for n in [1, 2, 3] {
+        // `n = 1`: a transaction whose cached input names its own txid.
+        let (mut beef, ids) = in_memory_chain(n);
+        let last = ids[n - 1].clone();
+        beef.find_txid_mut(&ids[0]).unwrap().input_txids = vec![last];
+        let (sorted, _) = bounded(&format!("cached ring of {n}: sort_txs"), {
             let mut beef = beef.clone();
             move || {
                 let sr = beef.sort_txs();
@@ -373,15 +413,19 @@ fn a_ring_held_in_memory_links_each_entry_once_and_every_walk_stops() {
             (0, n),
             "ring of {n}: no input missing, every link not valid"
         );
-        let (whole, _) = bounded(&format!("in-memory ring of {n}: verify_structure"), {
+        let (whole, _) = bounded(&format!("cached ring of {n}: verify_structure"), {
             let mut beef = beef.clone();
             move || beef.verify_structure().err()
         });
         assert_eq!(whole, Some(Kind::InputNamesNoElement), "ring of {n}");
-        // The writer emits the bytes each entry was read with, so the wire
-        // carries the chain, not the ring: read back, `T0` spends the
-        // placeholder again and the whole path refuses it.
-        let (reread, _) = bounded(&format!("in-memory ring of {n}: round trip"), {
+        // The trim stops (a ring has no tip to walk from).
+        bounded(&format!("cached ring of {n}: trim_known_proven"), {
+            let mut beef = beef.clone();
+            move || beef.trim_known_proven()
+        });
+        // The writer emits the bytes each entry was read with: read back,
+        // `T0` spends the placeholder again and the whole path refuses it.
+        let (reread, _) = bounded(&format!("cached ring of {n}: round trip"), {
             let mut beef = beef.clone();
             move || {
                 let bytes = beef.to_binary();
