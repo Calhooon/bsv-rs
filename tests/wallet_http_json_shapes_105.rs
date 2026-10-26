@@ -14,8 +14,9 @@
 //! txids as hex, `returnTXIDOnly` and the signable reference as base64
 //! (`0100.md:674-720`, `:744-763`, `:876-877`; `Wallet.interfaces.ts:340-445`,
 //! `:601-602`); the eight key-related requests name `protocolID` and `keyID`,
-//! the direct hashes arrays of byte numbers (`0100.md:1037-1038`,
-//! `:1182-1184`, `:1213-1216`; `Wallet.interfaces.ts:665-667`, `:798`, `:813`).
+//! the direct hashes arrays of byte numbers, getPublicKey's `identityKey`
+//! written only when true (`0100.md:980-982`, `:1037-1038`, `:1182-1184`,
+//! `:1213-1216`; `Wallet.interfaces.ts:665-667`, `:683`, `:798`, `:813`).
 //! The action cases' transactions are this crate's writer's
 //! (`the_action_witnesses_are_this_crates_bytes`).
 //!

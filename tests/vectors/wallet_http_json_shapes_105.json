@@ -1,7 +1,7 @@
 {
   "description": "The HTTP JSON substrate's bodies (#105): the certificate calls (the type field `type`, a list or discovery entry flat, `keyringRevealer` 'certifier' or the key's hex), the two key-linkage calls (flat, byte arrays, `protocolID`/`keyID`), the action calls (transactions as byte arrays, txids as hex, `returnTXIDOnly`, the signable reference base64) and the key-related calls (`protocolID`/`keyID`, the direct hashes as byte arrays), as BRC-100 and the reference have them",
   "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), HTTPWalletJSON over a recording fetch, run by tests/support/http_json_shapes_105.mjs",
-  "brc": "BRC-100 at brcs@5119a9b wallet/0100.md:674-720,744-763,876-877 (the action calls), :1011-1018,1043-1052 (the linkage results), :1037-1038,1182-1184,1213-1216 (protocolID, keyID, the direct hashes), :1247,1255,1265,1299-1307,1332,1365,1393-1411,1436-1454 (the certificate shapes)",
+  "brc": "BRC-100 at brcs@5119a9b wallet/0100.md:674-720,744-763,876-877 (the action calls), :1011-1018,1043-1052 (the linkage results), :980-982,1037-1038,1182-1184,1213-1216 (identityKey, protocolID, keyID, the direct hashes), :1247,1255,1265,1299-1307,1332,1365,1393-1411,1436-1454 (the certificate shapes)",
   "node": "v22.18.0",
   "cases": [
     {
