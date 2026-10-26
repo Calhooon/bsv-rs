@@ -1567,7 +1567,8 @@ The certificate methods take the reference's parameters (the owner's word of
 `cargo semver-checks check-release --baseline-rev origin/beta --features full
 --release-type minor` reports `method_parameter_count_changed` for the six
 below, 0.9.0's; the type of the public field `Certificate.fields` and
-`set_field`'s value parameter move too. Migration, the old call and the new:
+`set_field`'s value parameter and return move too, which semver-checks 0.51.0
+has no lint for. Migration, the old call and the new:
 
 ```text
 create_keyring_for_verifier(w, certifier, verifier, &reveal, &cert.fields, &cert.master_keyring, &serial, originator)
