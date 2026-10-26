@@ -1100,7 +1100,13 @@ async fn test_master_certificate_decrypt_fields() {
 
     // Subject decrypts all fields using their wallet
     let decrypted = master_cert
-        .decrypt_fields(&subject_wallet, &certifier_key.public_key(), "test-app")
+        .decrypt_fields(
+            &subject_wallet,
+            &certifier_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await
         .unwrap();
 
@@ -1154,6 +1160,8 @@ async fn test_master_certificate_decrypt_single_field() {
             &subject_wallet,
             &certifier_key.public_key(),
             "name",
+            None,
+            None,
             "test-app",
         )
         .await
@@ -1165,6 +1173,8 @@ async fn test_master_certificate_decrypt_single_field() {
             &subject_wallet,
             &certifier_key.public_key(),
             "email",
+            None,
+            None,
             "test-app",
         )
         .await
@@ -1209,10 +1219,12 @@ async fn test_master_certificate_create_keyring_for_verifier() {
         &subject_wallet,
         &certifier_key.public_key(),
         &verifier_key.public_key(),
-        &fields_to_reveal,
         &master_cert.certificate.fields,
+        &fields_to_reveal,
         &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
+        None,
+        None,
         "test-app",
     )
     .await
@@ -1278,10 +1290,12 @@ async fn test_verifiable_certificate_full_chain() {
         &subject_wallet,
         &certifier_key.public_key(),
         &verifier_key.public_key(),
-        &all_field_names,
         &master_cert.certificate.fields,
+        &all_field_names,
         &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
+        None,
+        None,
         "test-app",
     )
     .await
@@ -1298,7 +1312,13 @@ async fn test_verifiable_certificate_full_chain() {
 
     // Step 4: Verifier decrypts fields
     let decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .decrypt_fields(
+            &verifier_wallet,
+            &subject_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await
         .unwrap();
 
@@ -1356,10 +1376,12 @@ async fn test_verifiable_certificate_selective_disclosure() {
         &subject_wallet,
         &certifier_key.public_key(),
         &verifier_key.public_key(),
-        &fields_to_reveal,
         &master_cert.certificate.fields,
+        &fields_to_reveal,
         &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
+        None,
+        None,
         "test-app",
     )
     .await
@@ -1369,7 +1391,13 @@ async fn test_verifiable_certificate_selective_disclosure() {
 
     // Verifier can only decrypt revealed fields
     let decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .decrypt_fields(
+            &verifier_wallet,
+            &subject_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await
         .unwrap();
 
@@ -1429,10 +1457,12 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
         &subject_wallet,
         &certifier_key.public_key(),
         &verifier_a_key.public_key(),
-        &fields_to_reveal,
         &master_cert.certificate.fields,
+        &fields_to_reveal,
         &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
+        None,
+        None,
         "test-app",
     )
     .await
@@ -1442,7 +1472,13 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
 
     // Try to decrypt with verifier B's wallet (wrong key) -- should fail
     let result = verifiable
-        .decrypt_fields(&wrong_wallet, &subject_key.public_key(), "test-app")
+        .decrypt_fields(
+            &wrong_wallet,
+            &subject_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await;
 
     assert!(
@@ -1504,7 +1540,13 @@ async fn test_full_issuance_to_verification_chain() {
 
     // === Phase 2: Subject verifies they can decrypt all fields ===
     let all_decrypted = master_cert
-        .decrypt_fields(&subject_wallet, &certifier_key.public_key(), "test-app")
+        .decrypt_fields(
+            &subject_wallet,
+            &certifier_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await
         .unwrap();
 
@@ -1520,10 +1562,12 @@ async fn test_full_issuance_to_verification_chain() {
         &subject_wallet,
         &certifier_key.public_key(),
         &verifier_key.public_key(),
-        &fields_to_reveal,
         &master_cert.certificate.fields,
+        &fields_to_reveal,
         &master_cert.master_keyring,
         &master_cert.certificate.serial_number,
+        None,
+        None,
         "test-app",
     )
     .await
@@ -1550,7 +1594,13 @@ async fn test_full_issuance_to_verification_chain() {
 
     // === Phase 5: Verifier decrypts only revealed fields ===
     let verifier_decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .decrypt_fields(
+            &verifier_wallet,
+            &subject_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await
         .unwrap();
 
@@ -1792,7 +1842,13 @@ async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
 
     // Try to decrypt with wrong wallet (not the subject)
     let result = master_cert
-        .decrypt_fields(&wrong_wallet, &certifier_key.public_key(), "test-app")
+        .decrypt_fields(
+            &wrong_wallet,
+            &certifier_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await;
 
     assert!(result.is_err(), "Decrypting with wrong wallet should fail");
@@ -1865,7 +1921,7 @@ async fn test_self_signed_master_certificate() {
 
     // Subject can decrypt its own fields (same wallet used for both roles)
     let decrypted = master_cert
-        .decrypt_fields(&self_wallet, &self_key.public_key(), "test-app")
+        .decrypt_fields(&self_wallet, &self_key.public_key(), None, None, "test-app")
         .await
         .unwrap();
 
@@ -1876,7 +1932,14 @@ async fn test_self_signed_master_certificate() {
 
     // Also test single-field decrypt
     let name_val = master_cert
-        .decrypt_field(&self_wallet, &self_key.public_key(), "name", "test-app")
+        .decrypt_field(
+            &self_wallet,
+            &self_key.public_key(),
+            "name",
+            None,
+            None,
+            "test-app",
+        )
         .await
         .unwrap();
     assert_eq!(name_val, "Self-Certifier");
@@ -2029,7 +2092,13 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
 
     // Attempting to decrypt with garbage keyring should fail
     let result = verifiable
-        .decrypt_fields(&verifier_wallet, &subject_key.public_key(), "test-app")
+        .decrypt_fields(
+            &verifier_wallet,
+            &subject_key.public_key(),
+            None,
+            None,
+            "test-app",
+        )
         .await;
 
     assert!(

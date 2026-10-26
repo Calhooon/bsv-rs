@@ -148,7 +148,7 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
     let master = MasterCertificate::new(cert.clone(), keyring(&r.master_keyring));
     let subject_wallet = ProtoWallet::new(Some(key(r.keys.subject)));
     let decrypted = master
-        .decrypt_fields(&subject_wallet, &certifier, "test")
+        .decrypt_fields(&subject_wallet, &certifier, None, None, "test")
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
@@ -156,14 +156,14 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
     let mut verifiable = VerifiableCertificate::new(cert.clone(), keyring(&r.verifier_keyring));
     let verifier_wallet = ProtoWallet::new(Some(key(r.keys.verifier)));
     let decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, &subject, "test")
+        .decrypt_fields(&verifier_wallet, &subject, None, None, "test")
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
 
     let mut public = VerifiableCertificate::new(cert, keyring(&r.anyone_keyring));
     let decrypted = public
-        .decrypt_fields(&ProtoWallet::anyone(), &subject, "test")
+        .decrypt_fields(&ProtoWallet::anyone(), &subject, None, None, "test")
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
@@ -223,7 +223,13 @@ async fn a_reference_issued_certificate_from_a_wallet_json_result_verifies_and_d
 
     let subject = key(r.keys.subject).public_key();
     let decrypted = cert
-        .decrypt_fields(&ProtoWallet::new(Some(verifier)), &subject, "test")
+        .decrypt_fields(
+            &ProtoWallet::new(Some(verifier)),
+            &subject,
+            None,
+            None,
+            "test",
+        )
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
@@ -279,6 +285,8 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
         .decrypt_fields(
             &ProtoWallet::new(Some(subject)),
             &certifier.public_key(),
+            None,
+            None,
             "test",
         )
         .await
@@ -362,10 +370,12 @@ async fn print_a_certificate_issued_here_for_the_reference() {
         &ProtoWallet::new(Some(subject.clone())),
         &certifier.public_key(),
         &verifier.public_key(),
-        &names,
         &master.fields,
+        &names,
         &master.master_keyring,
         &master.serial_number,
+        None,
+        None,
         "test",
     )
     .await

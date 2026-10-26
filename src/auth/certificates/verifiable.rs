@@ -72,12 +72,17 @@ impl VerifiableCertificate {
     /// * `verifier_wallet` - Verifier's wallet for decryption
     /// * `subject` - Subject's public key (the counterparty)
     /// * `field_name` - Name of the field to decrypt
+    /// * `privileged` - The reference's `privileged`, passed to the `decrypt`
+    ///   (`:154`, `:197`)
+    /// * `privileged_reason` - The reference's `privilegedReason`, likewise
     /// * `originator` - Application originator
     pub async fn decrypt_field<W: WalletInterface>(
         &self,
         verifier_wallet: &W,
         subject: &PublicKey,
         field_name: &str,
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<String> {
         let encrypted_key = self.keyring.get(field_name).ok_or_else(|| {
@@ -102,6 +107,8 @@ impl VerifiableCertificate {
                     protocol_id: field_protocol(),
                     key_id,
                     counterparty: Some(Counterparty::Other(subject.clone())),
+                    privileged,
+                    privileged_reason: privileged_reason.map(str::to_owned),
                     ..Default::default()
                 },
                 originator,
@@ -112,13 +119,17 @@ impl VerifiableCertificate {
         decrypt_field_value(field_name, &key, field_value)
     }
 
-    /// Decrypts all fields that have keys in the keyring.
+    /// Decrypts all fields that have keys in the keyring, `privileged` and
+    /// `privileged_reason` passed to each `decrypt` as the reference's
+    /// `VerifiableCertificate.decryptFields` passes them (`:152-198`).
     ///
     /// Results are cached for subsequent calls.
     pub async fn decrypt_fields<W: WalletInterface>(
         &mut self,
         verifier_wallet: &W,
         subject: &PublicKey,
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<HashMap<String, String>> {
         // Return cached result if available
@@ -130,7 +141,14 @@ impl VerifiableCertificate {
 
         for field_name in self.keyring.keys() {
             let value = self
-                .decrypt_field(verifier_wallet, subject, field_name, originator)
+                .decrypt_field(
+                    verifier_wallet,
+                    subject,
+                    field_name,
+                    privileged,
+                    privileged_reason,
+                    originator,
+                )
                 .await?;
             decrypted.insert(field_name.clone(), value);
         }
