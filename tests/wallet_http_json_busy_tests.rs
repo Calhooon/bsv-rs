@@ -12,7 +12,7 @@
 
 use bsv_rs::wallet::substrates::HttpWalletJson;
 use bsv_rs::wallet::CreateActionArgs;
-use bsv_rs::Error;
+use bsv_rs::{Error, WalletRefusalClass};
 use std::io::Read;
 use std::net::TcpListener;
 use std::time::Duration;
@@ -358,6 +358,9 @@ async fn a_503_with_a_numeric_code_keeps_the_coded_wallet_error() {
     );
 }
 
+/// A numeric code 2 to 8 names the SDK's class since #137
+/// (`tests/wallet_http_json_refusal_class.rs`); the body's words are its
+/// `description` when it carries no `message`.
 #[tokio::test]
 async fn every_other_status_keeps_the_wallet_error_mapping() {
     let err = create_action_against(
@@ -368,7 +371,10 @@ async fn every_other_status_keeps_the_wallet_error_mapping() {
     .await;
     assert_eq!(
         err,
-        Error::WalletError("wallet error (code 6): bad args".into())
+        Error::WalletRefusal {
+            class: WalletRefusalClass::InvalidParameter,
+            message: "bad args".into(),
+        }
     );
 
     let err = create_action_against(
@@ -378,7 +384,10 @@ async fn every_other_status_keeps_the_wallet_error_mapping() {
     .await;
     assert_eq!(
         err,
-        Error::WalletError("wallet error (code 7): internal".into())
+        Error::WalletRefusal {
+            class: WalletRefusalClass::InsufficientFunds,
+            message: "internal".into(),
+        }
     );
 
     let err = create_action_against(ResponseTemplate::new(500).set_body_string("boom")).await;

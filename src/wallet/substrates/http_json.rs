@@ -23,7 +23,7 @@ use crate::wallet::{
 };
 
 use crate::transaction::broadcasters::transport_fault::{self as fault, delta_seconds_ms};
-use crate::{Error, TransportFault};
+use crate::{Error, TransportFault, WalletRefusalClass};
 use async_trait::async_trait;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -177,12 +177,10 @@ impl HttpWalletJson {
                 });
             }
 
-            // Try to parse error response
-            if let Ok(error_response) = serde_json::from_str::<JsonErrorResponse>(&text) {
-                return Err(wallet_error_from_code(
-                    error_response.code,
-                    &error_response.description,
-                ));
+            // The wallet's error body: its class by name or code (#137), else
+            // a numeric code with its description
+            if let Some(error) = wallet_error_from_body(&text) {
+                return Err(error);
             }
 
             // A gateway status without the wallet's word is the edge's
@@ -883,10 +881,23 @@ impl WalletInterface for HttpWalletJson {
 // JSON Request/Response Types
 // =============================================================================
 
+/// A wallet's error body, every field optional: the reference's envelope
+/// (`isError`, `name`, `message`, a numeric `code` for 5 to 8:
+/// `ts-stack@edf6e03` `packages/sdk/src/wallet/WalletError.ts:29-67`, the
+/// toolbox's `toJson`, `packages/wallet/wallet-toolbox/src/sdk/WalletError.ts:143-151`
+/// and `WERR_errors.ts:110,136,225,278`), the toolbox's status form (`code`
+/// the `WERR_*` name, `description`; `asStatus`, `WalletError.ts:126-132`
+/// there), and this substrate's older form (a numeric `code`, `description`).
 #[derive(Deserialize)]
-struct JsonErrorResponse {
-    code: u8,
-    description: String,
+struct JsonErrorBody {
+    #[serde(default)]
+    code: Option<serde_json::Value>,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default)]
+    message: Option<String>,
+    #[serde(default)]
+    description: Option<String>,
 }
 
 /// The body codes that answer busy: bsv-wallet-cli's `STORE_BUSY` (a
@@ -950,6 +961,42 @@ fn request_error(e: reqwest::Error, context: &str) -> Error {
 /// Creates a wallet error from an error code.
 fn wallet_error_from_code(code: u8, description: &str) -> Error {
     Error::WalletError(format!("wallet error (code {}): {}", code, description))
+}
+
+/// Creates the error a wallet's error body names (#137): an
+/// [`Error::WalletRefusal`] when its `name`, else its `code` (a
+/// `WalletRefusalClass` name, or an SDK code 2 to 8), names a class, the
+/// words its `message`, else its `description`, else the name; a numeric
+/// `code` naming no class with a `description` the coded wallet error, as
+/// before; any other body `None`. The name decides before the number, so
+/// the toolbox's `WERR_INVALID_MERKLE_ROOT` with its JSON code 8 is that
+/// class and a bare 8 the SDK's `abortRefused`.
+fn wallet_error_from_body(body: &str) -> Option<Error> {
+    let body = serde_json::from_str::<JsonErrorBody>(body).ok()?;
+    let code_name = body.code.as_ref().and_then(serde_json::Value::as_str);
+    let code_number = body
+        .code
+        .as_ref()
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|code| u8::try_from(code).ok());
+    let class = body
+        .name
+        .as_deref()
+        .and_then(WalletRefusalClass::from_name)
+        .or_else(|| code_number.and_then(WalletRefusalClass::from_code))
+        .or_else(|| code_name.and_then(WalletRefusalClass::from_name));
+    let Some(class) = class else {
+        return Some(wallet_error_from_code(
+            code_number?,
+            body.description.as_deref()?,
+        ));
+    };
+    let message = body
+        .message
+        .filter(|m| !m.is_empty())
+        .or(body.description.filter(|d| !d.is_empty()))
+        .unwrap_or_else(|| class.name().to_string());
+    Some(Error::WalletRefusal { class, message })
 }
 
 /// Creates [`Error::WalletBusy`] from an error answer whose body's `code` is
