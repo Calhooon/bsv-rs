@@ -8,7 +8,11 @@
             "version": "fixture-0.0.0"
           }
         },
-        "processor_observed": null,
+        "processor_observed": {
+          "args": {},
+          "method": "get_version",
+          "originator": "fixtures.invalid"
+        },
         "processor_response_hex": "00666978747572652d302e302e30",
         "request_hex": "1c1066697874757265732e696e76616c6964",
         "response_encoder": "WalletWireProcessor",
@@ -31,7 +35,11 @@
             "version": "fixture-1.2.3"
           }
         },
-        "processor_observed": null,
+        "processor_observed": {
+          "args": {},
+          "method": "get_version",
+          "originator": "fixtures.invalid"
+        },
         "processor_response_hex": "00666978747572652d312e322e33",
         "request_hex": "1c1066697874757265732e696e76616c6964",
         "response_encoder": "WalletWireProcessor",

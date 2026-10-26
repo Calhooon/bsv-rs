@@ -8,7 +8,11 @@
             "network": "mainnet"
           }
         },
-        "processor_observed": null,
+        "processor_observed": {
+          "args": {},
+          "method": "get_network",
+          "originator": "fixtures.invalid"
+        },
         "processor_response_hex": "0000",
         "request_hex": "1b1066697874757265732e696e76616c6964",
         "response_encoder": "WalletWireProcessor",
@@ -31,7 +35,11 @@
             "network": "testnet"
           }
         },
-        "processor_observed": null,
+        "processor_observed": {
+          "args": {},
+          "method": "get_network",
+          "originator": "fixtures.invalid"
+        },
         "processor_response_hex": "0001",
         "request_hex": "1b1066697874757265732e696e76616c6964",
         "response_encoder": "WalletWireProcessor",
