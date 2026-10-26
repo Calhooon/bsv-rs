@@ -89,10 +89,12 @@ change (0.7.10), medians:
 
 k256 has its own field arithmetic and moves 1.5 percent: no k256 feature
 changes. `benches/baseline.json` keeps its 0.13-era record (P-256 verify p50
-249 µs), and the CI bench job (`cargo generate-lockfile`, then the p99 gate on
-`primitives_bench`) measures `Verification/P256PublicKey::verify` against it
-from now on; a fresh resolve already takes 0.7.10, so the floor is for the
-locks that exist.
+249 µs, p99 1,825 µs on the one platform key it carries, Apple M1 Max), which
+both 0.7.6 and 0.7.10 pass, and the CI bench job runs on ubuntu-24.04, where
+`tools/bench-compare` finds no entry, exits 3 and warns: CI does not measure
+this today. The re-record of the M1 Max entry and a Linux entry (`--record`,
+`[bench-baseline-record]`) is a separate baseline PR, the captain's (#245). A
+fresh resolve already takes 0.7.10, so the floor is for the locks that exist.
 
 ### Added: `ScriptResourceLimit` prints the interpreter's sentence, from one place (#228)
 
