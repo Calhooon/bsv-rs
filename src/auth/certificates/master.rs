@@ -366,12 +366,7 @@ pub(crate) fn decrypt_field_value(
     key: &SymmetricKey,
     field_value: &[u8],
 ) -> Result<String> {
-    let text = std::str::from_utf8(field_value).map_err(|e| {
-        Error::InvalidUtf8(format!(
-            "certificate field {} is not UTF-8 base64 text: {}",
-            field_name, e
-        ))
-    })?;
+    let text = super::certificate::field_value_text(field_name, field_value)?;
     let ciphertext = from_base64(text)?;
     let plaintext = key.decrypt(&ciphertext)?;
     String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))

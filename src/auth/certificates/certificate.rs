@@ -416,9 +416,14 @@ impl Certificate {
 
     /// Sets a field value: the UTF-8 bytes of its base64 text, as signed
     /// and written (BRC-52 `0052.md:97`), never the ciphertext it encodes.
-    pub fn set_field(&mut self, name: impl Into<String>, encrypted_value: Vec<u8>) {
+    /// A value that is not UTF-8 is refused as `InvalidUtf8`, the field
+    /// named, as `from_binary` refuses it (#261).
+    pub fn set_field(&mut self, name: impl Into<String>, encrypted_value: Vec<u8>) -> Result<()> {
+        let name = name.into();
+        field_value_text(&name, &encrypted_value)?;
         self.received_unsigned = None;
-        self.fields.insert(name.into(), encrypted_value);
+        self.fields.insert(name, encrypted_value);
+        Ok(())
     }
 
     /// Gets a field value: the bytes of its base64 text, as held.
@@ -432,9 +437,10 @@ impl Certificate {
     }
 
     /// Converts to wallet certificate format. Each field value is its held
-    /// base64 text (#261); a value that is not UTF-8, which no certificate
-    /// this crate or the reference issues carries, is written with U+FFFD in
-    /// place of its invalid bytes (the JSON serde refuses it).
+    /// base64 text (#261). `from_binary`, `set_field` and the JSON reader
+    /// refuse a value that is not UTF-8; one written into the public `fields`
+    /// map directly, the one way left to hold it, is written here with U+FFFD
+    /// in place of its invalid bytes (the JSON writer refuses it).
     pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate {
         crate::wallet::types::Certificate {
             certificate_type: self.type_base64(),
@@ -516,8 +522,13 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
             )));
         }
         let value_len = reader.read_len()?;
-        let value = reader.read_bytes(value_len)?.to_vec();
-        fields.insert(name, value);
+        // The value is UTF-8 text, refused otherwise, as the reference's
+        // `toUTF8Strict` refuses it (`ts-stack@edf6e03` `Certificate.ts:384`)
+        // and BRC-52 asks (`0052.md:103`: malformed UTF-8 MUST NOT be made
+        // acceptable by retaining bytes; #261).
+        let value = reader.read_bytes(value_len)?;
+        field_value_text(&name, value)?;
+        fields.insert(name, value.to_vec());
     }
 
     Ok(Unsigned {
@@ -637,6 +648,17 @@ impl<'a> BinaryReader<'a> {
     }
 }
 
+/// A field value as the UTF-8 text it must be, refused as `InvalidUtf8` with
+/// the field named otherwise (#261).
+pub(crate) fn field_value_text<'a>(name: &str, value: &'a [u8]) -> Result<&'a str> {
+    std::str::from_utf8(value).map_err(|e| {
+        Error::InvalidUtf8(format!(
+            "certificate field {} is not UTF-8 base64 text: {}",
+            name, e
+        ))
+    })
+}
+
 /// Serde module for the field values: each held value goes out as the UTF-8
 /// string it is and a string comes in as its UTF-8 bytes, never decoded
 /// (BRC-52 `0052.md:97`; the reference's `WalletCertificate.fields`,
@@ -652,12 +674,7 @@ mod field_value_text {
     {
         let mut text = BTreeMap::new();
         for (name, value) in fields {
-            let value = std::str::from_utf8(value).map_err(|e| {
-                serde::ser::Error::custom(format!(
-                    "certificate field {} is not UTF-8 base64 text: {}",
-                    name, e
-                ))
-            })?;
+            let value = super::field_value_text(name, value).map_err(serde::ser::Error::custom)?;
             text.insert(name.as_str(), value);
         }
         text.serialize(serializer)

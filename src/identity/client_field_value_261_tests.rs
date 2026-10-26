@@ -24,9 +24,14 @@ fn reference_issued() -> serde_json::Value {
 fn published(r: &serde_json::Value) -> OutputListItem {
     let mut json = r["certificate"].clone();
     json["keyring"] = r["anyone_keyring"].clone();
+    publish(&json)
+}
+
+/// One output whose PushDrop carries `json`.
+fn publish(json: &serde_json::Value) -> OutputListItem {
     let locking = PushDrop::new(
         PrivateKey::from_bytes(&[3u8; 32]).unwrap().public_key(),
-        vec![serde_json::to_vec(&json).unwrap()],
+        vec![serde_json::to_vec(json).unwrap()],
     )
     .lock();
     let mut tx = Transaction::new();
@@ -86,4 +91,56 @@ async fn a_reference_issued_certificate_published_for_anyone_parses_to_a_verifyi
         .await
         .unwrap();
     assert_eq!(decrypted, plaintexts(&r));
+}
+
+/// A lookup host that answers every question with the outputs it holds.
+struct Outputs(Vec<OutputListItem>);
+
+#[async_trait::async_trait(?Send)]
+impl crate::overlay::OverlayLookupFacilitator for Outputs {
+    async fn lookup(
+        &self,
+        _url: &str,
+        _question: &LookupQuestion,
+        _timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
+        Ok(LookupAnswer::OutputList {
+            outputs: self.0.clone(),
+        })
+    }
+}
+
+#[tokio::test]
+async fn a_malformed_signature_skips_its_output_and_the_resolution_goes_on() {
+    let r = reference_issued();
+    // The signature in base64 where the reference's JSON carries hex.
+    let mut malformed = r["certificate"].clone();
+    malformed["keyring"] = r["anyone_keyring"].clone();
+    let signature = from_hex(malformed["signature"].as_str().unwrap()).unwrap();
+    malformed["signature"] = crate::primitives::to_base64(&signature).into();
+
+    let mut host_overrides = HashMap::new();
+    host_overrides.insert(
+        "ls_identity".to_string(),
+        vec!["http://identity-lookup.invalid".to_string()],
+    );
+    let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
+        facilitator: Some(Arc::new(Outputs(vec![publish(&malformed), published(&r)]))),
+        slap_trackers: Some(vec![]),
+        host_overrides: Some(host_overrides),
+        ..Default::default()
+    }));
+    let client =
+        IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
+
+    let attributes = HashMap::from([("email".to_string(), "x".to_string())]);
+    let identities = client
+        .resolve_by_attributes(attributes, false)
+        .await
+        .expect("a malformed output is skipped, never the resolution's error");
+    assert_eq!(identities.len(), 1);
+    assert_eq!(
+        identities[0].identity_key,
+        r["certificate"]["subject"].as_str().unwrap()
+    );
 }
