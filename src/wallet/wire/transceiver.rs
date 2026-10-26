@@ -1140,9 +1140,10 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
             // Keyring (`WalletWireTransceiver.ts:1513-1531` at `ts-stack@edf6e03`)
             let keyring = if reader.read_boolean_flag("listCertificates keyring present")? {
-                let name = "listCertificates keyring";
-                let count = reader.read_collection_count(name)?;
-                Some(reader.read_wire_record(name, count, WireReader::read_base64_value)?)
+                Some(reader.read_counted_wire_record(
+                    "listCertificates keyring",
+                    WireReader::read_base64_value,
+                )?)
             } else {
                 None
             };
@@ -1432,14 +1433,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
             };
 
             // The maps: strict counts, record keys (`WalletWireTransceiver.ts:1711-1752`)
-            let name = "discovery public keyring";
-            let count = reader.read_collection_count(name)?;
-            let keyring = reader.read_wire_record(name, count, WireReader::read_base64_value)?;
-            let name = "discovery decrypted fields";
-            let count = reader.read_collection_count(name)?;
-            let fields = reader.read_wire_record(name, count, WireReader::read_utf8_value)?;
-            let publicly_revealed_keyring = Some(keyring).filter(|m| !m.is_empty());
-            let decrypted_fields = Some(fields).filter(|m| !m.is_empty());
+            let (publicly_revealed_keyring, decrypted_fields) = reader.read_discovery_maps()?;
 
             certificates.push(crate::wallet::IdentityCertificate {
                 certificate,

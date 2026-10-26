@@ -787,6 +787,86 @@ async fn an_identity_certificate_with_a_repeated_record_key_is_refused_as_discov
     }
 }
 
+/// `WireReader::read_identity_certificate` reads each map as the transceiver
+/// reads it, through one helper (bsv-rs#236): the count `readVarIntNumStrict`
+/// and `#requireResponseCollectionLength` (`WalletWireTransceiver.ts:1711-1716`,
+/// `:1955-1969`), each key `#readRecordKey` (`:1979-1990`): 1 to 50 bytes, not
+/// `__proto__`, `constructor` or `prototype` (`SafeRecord.ts:2-4`). Until #236
+/// it read a key of any length or name and a count past the bytes as far as the
+/// bytes went. A count that stops short of its entries is refused at the count;
+/// one that runs long leaves an entry the next count's reading meets, the
+/// decrypted-field key length here `n` (110).
+#[tokio::test]
+async fn an_identity_certificate_refuses_the_record_keys_and_counts_discovery_refuses() {
+    let cert = Parts::valid().bytes();
+    let long = [b'k'; 51];
+    let one = |key: &[u8]| record(&[(key, b"v")]);
+    let mut short = Vec::new();
+    var_int(&mut short, 200);
+    short.extend_from_slice(&record(&[(b"name", b"1")])[1..]);
+    let mut over_max = Vec::new();
+    var_int(&mut over_max, 100_001);
+    let mut long_run = vec![1];
+    long_run.extend_from_slice(&record(&[(b"name", b"1"), (b"nick", b"2")])[1..]);
+    let empty = vec![0u8];
+    for (keyring, decrypted, words) in [
+        (
+            one(b""),
+            empty.clone(),
+            "Invalid discovery public keyring key length: expected 1\u{2013}50 bytes, received 0",
+        ),
+        (
+            one(&long),
+            empty.clone(),
+            "Invalid discovery public keyring key length: expected 1\u{2013}50 bytes, received 51",
+        ),
+        (
+            empty.clone(),
+            one(&long),
+            "Invalid discovery decrypted fields key length: expected 1\u{2013}50 bytes, received 51",
+        ),
+        (
+            one(b"__proto__"),
+            empty.clone(),
+            "Unsafe discovery public keyring key: __proto__",
+        ),
+        (
+            empty.clone(),
+            one(b"constructor"),
+            "Unsafe discovery decrypted fields key: constructor",
+        ),
+        (
+            short,
+            empty.clone(),
+            "Wallet Wire discovery public keyring count exceeds the remaining response data",
+        ),
+        (
+            over_max,
+            empty.clone(),
+            "Wallet Wire discovery public keyring exceeds the maximum collection size of 100000",
+        ),
+        (
+            empty.clone(),
+            vec![0xff; 9],
+            "number too large to retain precision - use readVarIntBn",
+        ),
+        (
+            long_run,
+            empty.clone(),
+            "Invalid discovery decrypted fields key length: expected 1\u{2013}50 bytes, received 110",
+        ),
+    ] {
+        let frame = discovery_frame(&cert, 5, &keyring, &decrypted);
+        let read = WireReader::new(&frame[1..]).read_identity_certificate();
+        assert_eq!(read.map(drop), Err(Error::WalletError(words.into())), "{words}");
+        assert_eq!(
+            discover(frame).await.map(drop),
+            Err(Error::WalletError(words.into())),
+            "{words}"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 5. The writer: no frame the reference's reader refuses
 // ---------------------------------------------------------------------------

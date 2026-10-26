@@ -4,7 +4,6 @@
 //! primitives Reader/Writer with signed varint support and convenience methods
 //! for the WalletWire protocol.
 
-use super::set_unique_record_entry;
 use crate::primitives::encoding::{Reader, Writer};
 use crate::primitives::{bounded_capacity, from_base64, from_hex, to_base64, to_hex, PublicKey};
 use crate::wallet::types::{
@@ -532,35 +531,22 @@ impl<'a> WireReader<'a> {
     /// keyring as varint-length keys and raw-byte values (base64 in the struct),
     /// the decrypted fields as string pairs. An empty map is `None` (bsv-rs#184);
     /// a repeated key in either map is refused in the transceiver's words
-    /// (`#setUniqueWireRecordEntry`, `:1992-2002`; bsv-rs#192).
+    /// (`#setUniqueWireRecordEntry`, `:1992-2002`; bsv-rs#192). The maps are
+    /// the transceiver's own reading (`read_discovery_maps`, bsv-rs#236): a
+    /// strict count, at most 100,000 and no more than the bytes left
+    /// (`:1711-1716`, `:1955-1969`), each key 1 to 50 bytes and not an unsafe
+    /// name (`#readRecordKey`, `:1979-1990`), refused in its words.
     pub fn read_identity_certificate(&mut self) -> Result<IdentityCertificate, Error> {
         let cert_len = self.read_length()?;
         let certificate = WireReader::new(self.read_bytes(cert_len)?).read_wallet_certificate()?;
         let certifier_info = self.read_optional_identity_certifier()?;
-
-        let count = self.read_var_int()?;
-        let mut keyring =
-            HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
-        for _ in 0..count {
-            let key = self.read_string()?;
-            let len = self.read_length()?;
-            let value = to_base64(self.read_bytes(len)?);
-            set_unique_record_entry(&mut keyring, "discovery public keyring", key, value)?;
-        }
-        let count = self.read_var_int()?;
-        let mut fields =
-            HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
-        for _ in 0..count {
-            let key = self.read_string()?;
-            let value = self.read_string()?;
-            set_unique_record_entry(&mut fields, "discovery decrypted fields", key, value)?;
-        }
+        let (publicly_revealed_keyring, decrypted_fields) = self.read_discovery_maps()?;
 
         Ok(IdentityCertificate {
             certificate,
             certifier_info,
-            publicly_revealed_keyring: (!keyring.is_empty()).then_some(keyring),
-            decrypted_fields: (!fields.is_empty()).then_some(fields),
+            publicly_revealed_keyring,
+            decrypted_fields,
         })
     }
 
