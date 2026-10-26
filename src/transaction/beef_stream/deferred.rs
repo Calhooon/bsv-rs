@@ -23,7 +23,9 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::primitives::{bounded_capacity, Reader, Writer};
 
-use super::{Hash32, InputRef, TxBody, MAX_MONEY};
+use super::{
+    BeefIndex, ChainTip, Folded, Hash32, InputRef, Judge, Pending, Stop, TxBody, MAX_MONEY,
+};
 
 /// An input of a held transaction: where it lies and the outpoint it spends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -296,10 +298,123 @@ impl Deferred {
         self.held.insert(tx.offset, tx);
     }
 
+    /// The earliest held transaction on the wire and its earliest input that
+    /// names a txid `known` does not hold (its offset and that txid), or the
+    /// transaction's offset and zeros: what the end refuses.
+    pub(super) fn unresolved(&self, known: impl Fn(&Hash32) -> bool) -> Option<(u64, Hash32)> {
+        let held = self.held.values().next()?;
+        let input = held.inputs.iter().find(|input| !known(&input.prev));
+        Some(input.map_or((held.offset, [0u8; 32]), |i| (i.at, i.prev)))
+    }
+
     /// The transaction taken out at `at` was folded in.
     pub(super) fn folded(&mut self, at: u64, tx: &HeldTx) {
         self.ready.remove(&at);
         self.bytes -= tx.held_bytes();
+    }
+}
+
+/// The index's side of the deferral: a transaction held for a parent, and
+/// one released, folded in.
+impl BeefIndex {
+    /// Holds an unproven transaction an input of which names a txid the
+    /// index does not hold yet, by its entry: true when it is held.
+    pub(super) fn held_for_a_parent(&mut self, offset: u64, txid: &Hash32, body: &TxBody) -> bool {
+        let missing: HashSet<Hash32> = body
+            .inputs
+            .iter()
+            .map(|input| input.prev)
+            .filter(|prev| !self.txs.contains_key(prev))
+            .collect();
+        if missing.is_empty() {
+            return false;
+        }
+        self.note_raw(txid, offset);
+        let held = HeldTx::of(offset, *txid, body, self.check_spends);
+        self.deferred.hold(held, missing);
+        true
+    }
+
+    /// The earliest ready transaction of the held set folded in, its scripts
+    /// run from input `from` with `spent` asked between inputs: `None` when
+    /// none is ready. A pause or a refusal leaves it held and the index
+    /// unchanged; folded in, its txid wakes what waits on it.
+    pub(super) fn release_one(
+        &mut self,
+        from: u32,
+        spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
+        tip: Option<ChainTip>,
+    ) -> Result<Option<Folded>, Stop> {
+        let Some((at, _)) = self.deferred.next_ready() else {
+            return Ok(None);
+        };
+        let Some(held) = self.deferred.take_ready(at) else {
+            return Ok(None);
+        };
+        let folded = self.fold_tx(
+            held.offset,
+            &held.txid,
+            None,
+            false,
+            &held,
+            from,
+            spent,
+            work_limit,
+            tip,
+        );
+        match folded {
+            Ok(Folded::Paused(input)) => {
+                self.deferred.put_back(held);
+                Ok(Some(Folded::Paused(input)))
+            }
+            Ok(folded) => {
+                self.deferred.folded(at, &held);
+                if let Folded::In { txid, new: true } = folded {
+                    self.deferred.wake(&txid);
+                }
+                Ok(Some(folded))
+            }
+            Err(stop) => {
+                self.deferred.put_back(held);
+                Err(stop)
+            }
+        }
+    }
+}
+
+/// The reader's side: one released transaction per step.
+impl Judge {
+    /// Folds in the earliest held transaction that waits on nothing
+    /// (bsv-rs#240), its scripts run under `spent` from the input a paused
+    /// reading reached in it, else the first: `None` when none waits on
+    /// nothing, `Some(Ok(true))` a pause, which `resume_at` then names.
+    pub(super) fn release_next(
+        &mut self,
+        spent: &mut dyn FnMut() -> bool,
+        work_limit: Option<u64>,
+        tip: Option<ChainTip>,
+    ) -> Option<Result<bool, Stop>> {
+        let (at, txid) = self.index.deferred.next_ready()?;
+        let from = match self.resume_at {
+            Some(p) if p.offset == at && p.txid == txid => {
+                self.resume_at = None;
+                p.input
+            }
+            _ => 0,
+        };
+        Some(match self.index.release_one(from, spent, work_limit, tip) {
+            Ok(Some(Folded::Paused(input))) => {
+                self.resume_at = Some(Pending {
+                    offset: at,
+                    txid,
+                    input,
+                });
+                Ok(true)
+            }
+            Ok(_) => Ok(false),
+            Err(stop) => Err(stop),
+        })
     }
 }
 
