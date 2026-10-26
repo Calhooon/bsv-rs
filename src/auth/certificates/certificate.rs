@@ -5,7 +5,6 @@
 
 #[cfg(test)]
 use super::certificate_json::revocation_outpoint_from_str;
-use crate::primitives::{bounded_capacity, sha256, PrivateKey, PublicKey, Signature};
 use crate::primitives::{bounded_capacity, sha256, to_hex, PrivateKey, PublicKey, Signature};
 use crate::wallet::types::Outpoint;
 use crate::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
