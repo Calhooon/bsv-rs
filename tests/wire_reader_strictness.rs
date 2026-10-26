@@ -1197,9 +1197,20 @@ fn a_list_actions_satoshis_value_outside_the_reference_bound_is_refused() {
         let read = WireReader::new(&action(satoshis)).read_wallet_action();
         assert_eq!(read.map(|a| a.satoshis), Ok(satoshis));
     }
-    for satoshis in [2_100_000_000_000_001, -2_100_000_000_000_001, i64::MIN] {
+    for satoshis in [2_100_000_000_000_001, -2_100_000_000_000_001] {
         let read = WireReader::new(&action(satoshis)).read_wallet_action();
         assert_eq!(read.map(drop), Err(Error::WalletError(bound(satoshis))));
+    }
+    // A negative below `-(2^53 - 1)` never reaches the bound in the reference:
+    // `readInt64LEBn().toNumber()` throws at `BigNumber.ts:625-630` (the review's fold).
+    for satoshis in [i64::MIN, -(1 << 53)] {
+        let read = WireReader::new(&action(satoshis)).read_wallet_action();
+        assert_eq!(
+            read.map(drop),
+            Err(Error::WalletError(
+                "Number can only safely store up to 53 bits".into()
+            ))
+        );
     }
     // Past `2^53 - 1` without the sign bit: the strict reader's words.
     let read = WireReader::new(&action(1 << 60)).read_wallet_action();

@@ -175,7 +175,10 @@ impl WireReader<'_> {
     /// value `readVarIntNumStrict(false)`; the value then
     /// `#requireInteger(value, 'listActions satoshis', -21e14, 21e14)`
     /// (`:2018-2025`). The varint read as a `u64` and reinterpreted is the
-    /// same int64 for the `0xff` form (bsv-rs#236).
+    /// same int64 for the `0xff` form (bsv-rs#236). A negative below
+    /// `-(2^53 - 1)` never reaches the bound there: `readInt64LEBn().toNumber()`
+    /// throws `Number can only safely store up to 53 bits` (`BigNumber.ts:625-630`),
+    /// so this reader refuses it in those words ahead of the bound.
     pub(crate) fn read_action_satoshis(&mut self) -> Result<i64, Error> {
         const BOUND: i64 = 2_100_000_000_000_000;
         let raw = self.read_var_int()?;
@@ -184,6 +187,9 @@ impl WireReader<'_> {
             return Err(refused(
                 "number too large to retain precision - use readVarIntBn",
             ));
+        }
+        if value < -(MAX_SAFE_INTEGER as i64) {
+            return Err(refused("Number can only safely store up to 53 bits"));
         }
         if !(-BOUND..=BOUND).contains(&value) {
             return Err(refused(format!(
