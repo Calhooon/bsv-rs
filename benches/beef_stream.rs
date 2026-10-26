@@ -1,4 +1,9 @@
 //! File-backed BEEF streaming: decimal MB, with sampled RSS in fresh processes.
+//!
+//! `BSV_BEEF_REVERSED=1` adds `beef_stream_reversed`: the same chains written
+//! newest first, the proven funding transaction last (bsv-rs#240: every link
+//! held until it arrives, then released on a heap). Off by default, so the
+//! gate's inventory (`tools/bench-compare`) is unchanged.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: benchmark setup
 
 use std::collections::HashMap;
@@ -75,6 +80,15 @@ fn build_fixture(path: &Path, bytes: usize) -> [u8; 32] {
     assert_eq!(encoded.len(), bytes, "fixture byte count");
     std::fs::write(path, encoded).expect("write fixture");
     root
+}
+
+/// The chain at `forward` written newest first, at `path`.
+fn build_reversed(forward: &Path, path: &Path) {
+    let mut beef = Beef::from_binary(&std::fs::read(forward).expect("fixture")).expect("a BEEF");
+    beef.txs.reverse();
+    let mut writer = bsv_rs::primitives::Writer::new();
+    beef.to_writer(&mut writer);
+    std::fs::write(path, writer.into_bytes()).expect("write fixture");
 }
 
 fn rss() -> usize {
@@ -180,5 +194,47 @@ fn main() {
         }
     }
     group.finish();
+    if std::env::var_os("BSV_BEEF_REVERSED").is_some() {
+        let mut group = c.benchmark_group("beef_stream_reversed");
+        for bytes in SIZES {
+            let forward = dir.join(format!("{bytes}.beef"));
+            let root = build_fixture(&forward, bytes);
+            let path = dir.join(format!("{bytes}.reversed.beef"));
+            build_reversed(&forward, &path);
+            let headers = HashMap::from([(HEIGHT, root)]);
+            group.throughput(Throughput::Bytes(bytes as u64));
+            for scripts in [false, true] {
+                let mode = if scripts { "scripts" } else { "structure" };
+                let read = |path: &Path| {
+                    let source =
+                        BufReader::with_capacity(64 * 1024, File::open(path).expect("fixture"));
+                    if scripts {
+                        verify_stream(source, &headers, None)
+                    } else {
+                        verify_stream_structure(source, &headers, None)
+                    }
+                    .expect("read fixture")
+                };
+                let verdict = format!("{:?}", read(&path));
+                println!(
+                    "beef_stream_reversed/{mode}/{bytes}: {}",
+                    verdict.split(" {").next().unwrap_or("unknown")
+                );
+                group.bench_with_input(BenchmarkId::new(mode, bytes), &path, |b, path| {
+                    b.iter(|| {
+                        let source =
+                            BufReader::with_capacity(64 * 1024, File::open(path).expect("fixture"));
+                        let verdict = if scripts {
+                            verify_stream(source, &headers, None)
+                        } else {
+                            verify_stream_structure(source, &headers, None)
+                        };
+                        black_box(verdict.expect("read fixture"));
+                    });
+                });
+            }
+        }
+        group.finish();
+    }
     c.final_summary();
 }
