@@ -1,0 +1,347 @@
+name: Nightly oracles
+
+# The night's oracle runs (docs/NIGHTLY.md): the mutation floor (#81), the
+# fuzz matrix (#82), and ci.yml's full set on beta and on main, dispatched on
+# each line (a pull request runs only its line's required set; the owner's word
+# of 2026-10-26). Never on a push or a PR: the gate is ci.yml. GitHub loads a
+# schedule from the default branch, so the cron fires main's copy of this file.
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+
+# Every job names its own permissions; only the fuzz job, which files its
+# crashes, may write issues.
+permissions: {}
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: never
+  CARGO_BUILD_JOBS: '2'
+  CARGO_PROFILE_DEV_DEBUG: '0'
+  CARGO_PROFILE_TEST_DEBUG: '0'
+  CARGO_INCREMENTAL: '1'
+  CARGO_MUTANTS_VERSION: '27.1.0'
+  # cargo-fuzz needs a nightly compiler (-Zsanitizer); pinned by date so a
+  # night's build does not move under the corpus.
+  FUZZ_TOOLCHAIN: nightly-2026-10-19
+  CARGO_FUZZ_VERSION: 0.13.2
+
+jobs:
+  # The full matrix once a day on each line, pushed to or not. A dispatch runs
+  # the line's own ci.yml at the line's tip, its github.ref the line, so no job
+  # of ci.yml changes for it; a workflow_call from here would run this run's ref
+  # (main's on a schedule) and share its concurrency group with main's pushes.
+  # A dispatch made with the GITHUB_TOKEN starts a run, as the sync's does.
+  ci-full:
+    name: CI full set (${{ matrix.line }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    strategy:
+      fail-fast: false
+      matrix:
+        line: [beta, main]
+    steps:
+      - name: Dispatch ci.yml on the line
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LINE: ${{ matrix.line }}
+        run: gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$LINE"
+
+  source:
+    name: Pin the run to one source commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # GitHub loads schedules from the default branch; judge beta's sources.
+          ref: ${{ github.event_name == 'schedule' && 'beta' || github.ref }}
+          persist-credentials: false
+
+      - id: source
+        run: echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Check the scoreboard's failure cases
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_nightly_mutants.py' -v
+        env:
+          TMPDIR: ${{ runner.temp }}
+
+  mutants:
+    name: Mutants (${{ matrix.surface }}, ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    needs: source
+    timeout-minutes: 360
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        surface: [script, beef, merkle, wire, substrates]
+        shard: [0, 1, 2, 3]
+    env:
+      SURFACE: ${{ matrix.surface }}
+      SHARD: ${{ matrix.shard }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - name: Prepare external build directories
+        run: |
+          mkdir -p "$RUNNER_TEMP/mutants-tmp" "$RUNNER_TEMP/mutants-target" "$RUNNER_TEMP/tools"
+          echo "TMPDIR=$RUNNER_TEMP/mutants-tmp" >> "$GITHUB_ENV"
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/mutants-target" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Build cargo-mutants from its versioned source
+        run: |
+          cargo install cargo-mutants --version "$CARGO_MUTANTS_VERSION" --locked \
+            --root "$RUNNER_TEMP/tools" --target-dir "$RUNNER_TEMP/tool-target"
+          echo "$RUNNER_TEMP/tools/bin" >> "$GITHUB_PATH"
+
+      - name: Run the scoped tests on every mutant
+        run: |
+          status=0
+          python3 .github/scripts/nightly_mutants.py run \
+            --surface "$SURFACE" --shard "$SHARD/4" \
+            --output "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" || status=$?
+          # Misses (2) and timeouts (3) are judged by the per-file floor below.
+          # Baseline, setup and runner failures remain failures of this job.
+          if [[ "$status" != 0 && "$status" != 2 && "$status" != 3 ]]; then
+            exit "$status"
+          fi
+
+      - name: Package the outcomes and mutant diffs
+        if: always()
+        run: |
+          python3 .github/scripts/nightly_mutants.py package \
+            --run "$RUNNER_TEMP/mutations/$SURFACE-$SHARD" \
+            --output "$RUNNER_TEMP/mutation-artifact"
+
+      - name: Upload mutation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutants-${{ matrix.surface }}-${{ matrix.shard }}
+          path: ${{ runner.temp }}/mutation-artifact/
+          if-no-files-found: error
+          retention-days: 30
+
+  mutation-score:
+    name: Mutation score floor
+    needs: [source, mutants]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      # #81: each file defaults to 80%. A lower measured floor must name its
+      # own improvement issue here, and is the complete score rounded down.
+      MUTATION_FLOORS: '{}'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: mutants-*
+          path: ${{ runner.temp }}/mutation-results
+          merge-multiple: true
+
+      - name: Publish every file's score and enforce its floor
+        if: always()
+        run: |
+          python3 .github/scripts/nightly_mutants.py report \
+            --input "$RUNNER_TEMP/mutation-results" --expected-shards 4 \
+            --output "$RUNNER_TEMP/mutation-summary.json"
+
+      - name: Upload the scoreboard
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mutation-summary
+          path: |
+            ${{ runner.temp }}/mutation-summary.json
+            ${{ runner.temp }}/mutation-summary.md
+          if-no-files-found: error
+          retention-days: 30
+
+  fuzz:
+    name: fuzz (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    needs: source
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      issues: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - fuzz_auth_messages
+          - fuzz_base58
+          - fuzz_beef_parser
+          - fuzz_bip32
+          - fuzz_bip39
+          - fuzz_bsm
+          - fuzz_chain_primitives
+          - fuzz_ecies
+          - fuzz_http_json_responses
+          - fuzz_merkle_path
+          - fuzz_messages_encrypted
+          - fuzz_messages_signed
+          - fuzz_script_parser
+          - fuzz_script_spend
+          - fuzz_shamir_backup
+          - fuzz_transaction_parser
+          - fuzz_wire_decoders
+          - fuzz_wire_protocol
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          ref: ${{ needs.source.outputs.commit }}
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: ${{ env.FUZZ_TOOLCHAIN }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            fuzz/target
+          key: ${{ runner.os }}-fuzz-${{ env.FUZZ_TOOLCHAIN }}-${{ hashFiles('Cargo.toml', 'fuzz/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-fuzz-${{ env.FUZZ_TOOLCHAIN }}-
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --version "$CARGO_FUZZ_VERSION" --locked --root "$RUNNER_TEMP/tools"
+
+      - name: Build the target
+        run: |
+          export PATH="$RUNNER_TEMP/tools/bin:$PATH"
+          cargo fuzz build -O "${{ matrix.target }}"
+
+      # One hour from the checked-in corpus. New entries are written to
+      # $RUNNER_TEMP/new (the leading corpus directory); a crash's input to
+      # $RUNNER_TEMP/artifacts, and the run goes on (-ignore_crashes).
+      - name: Fuzz for an hour
+        run: |
+          export PATH="$RUNNER_TEMP/tools/bin:$PATH"
+          mkdir -p "$RUNNER_TEMP/new" "$RUNNER_TEMP/artifacts" "fuzz/corpus/${{ matrix.target }}"
+          status=0
+          cargo fuzz run -O "${{ matrix.target }}" "$RUNNER_TEMP/new" "fuzz/corpus/${{ matrix.target }}" -- \
+            -fork=2 -ignore_crashes=1 -max_total_time=3600 \
+            -artifact_prefix="$RUNNER_TEMP/artifacts/" > "$RUNNER_TEMP/fuzz.log" 2>&1 || status=$?
+          tail -n 40 "$RUNNER_TEMP/fuzz.log"
+          echo "libFuzzer exited $status (a crash is judged by the next steps)"
+          echo "new corpus entries: $(find "$RUNNER_TEMP/new" -type f | wc -l)" >> "$GITHUB_STEP_SUMMARY"
+
+      # The repository does not let a workflow open a pull request (Settings,
+      # Actions, "Allow GitHub Actions to create and approve pull requests" is
+      # off), so the new entries are an artifact; the captain merges them with
+      # `cargo fuzz cmin` (docs/NIGHTLY.md).
+      - name: Upload the new corpus entries
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: corpus-${{ matrix.target }}
+          path: ${{ runner.temp }}/new
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload the crash inputs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: crashes-${{ matrix.target }}
+          path: ${{ runner.temp }}/artifacts
+          if-no-files-found: ignore
+          retention-days: 90
+
+      # A crash is an issue: one per target and panic site, the input
+      # attached as base64 and the panic's tail; a site with an open issue
+      # gets a comment with the night's run instead of a second issue. The
+      # job then fails, so the night's summary shows it.
+      - name: File the crashes
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TARGET: ${{ matrix.target }}
+          # The commit the job checked out; on a schedule $GITHUB_SHA is the
+          # default branch's, not beta's.
+          SOURCE_COMMIT: ${{ needs.source.outputs.commit }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          shopt -s nullglob
+          bin="fuzz/target/x86_64-unknown-linux-gnu/release/$TARGET"
+          found=0
+          declare -A filed
+          for input in "$RUNNER_TEMP"/artifacts/crash-* "$RUNNER_TEMP"/artifacts/oom-* "$RUNNER_TEMP"/artifacts/timeout-*; do
+            found=1
+            kind="$(basename "$input" | cut -d- -f1)"
+            tail="$("$bin" "$input" 2>&1 | grep -A4 -E 'panicked at|ERROR: libFuzzer|SUMMARY' | head -n 12 || true)"
+            site="$(printf '%s\n' "$tail" | grep -oE 'panicked at [^ ]+' | head -n 1 | sed 's/^panicked at //; s/:$//')"
+            # A site in the crate is printed under the checkout; the title
+            # carries its repository-relative path.
+            site="${site#"$GITHUB_WORKSPACE"/}"
+            [ -n "$site" ] || site="$kind"
+            title="fuzz: $TARGET: $site"
+            [ -z "${filed[$title]:-}" ] || continue
+            filed[$title]=1
+            body="$RUNNER_TEMP/body.md"
+            {
+              echo "Found by the nightly fuzz job: $RUN_URL (artifact \`crashes-$TARGET\`, file \`$(basename "$input")\`)."
+              echo
+              echo "Source $SOURCE_COMMIT, $FUZZ_TOOLCHAIN, cargo-fuzz $CARGO_FUZZ_VERSION"
+              echo
+              echo "## The panic's tail"
+              echo
+              echo '```'
+              printf '%s\n' "$tail"
+              echo '```'
+              echo
+              echo "## The input ($(wc -c < "$input") bytes, base64)"
+              echo
+              echo '```'
+              if [ "$(wc -c < "$input")" -le 4096 ]; then base64 -w 76 "$input"; else echo "over 4096 bytes: in the artifact"; fi
+              echo '```'
+              echo
+              echo "Reproduce: \`cargo fuzz run $TARGET <the input>\`. Fixed with a test that was red before it (CLAUDE.md rule 2)."
+            } > "$body"
+            number="$(gh issue list --state open --search "in:title \"$title\"" --json number,title \
+              --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)"
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body "Seen again by the nightly fuzz job: $RUN_URL"
+            else
+              gh issue create --title "$title" --body-file "$body"
+            fi
+          done
+          if [ "$found" = 1 ]; then
+            echo "crashes found: see the issues and the crashes-$TARGET artifact" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
