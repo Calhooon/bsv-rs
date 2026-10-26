@@ -39,6 +39,9 @@ macro_rules! write_key_related {
     };
 }
 
+/// `walletErrors.abortRefused` (`WalletError.ts:79` at `ts-stack@edf6e03`).
+const ABORT_REFUSED: u8 = 8;
+
 /// Client-side wallet wire protocol implementation.
 ///
 /// The transceiver serializes wallet method calls into binary messages,
@@ -84,6 +87,21 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         originator: &str,
         params: &[u8],
     ) -> Result<Vec<u8>, Error> {
+        self.exchange(call, originator, params)
+            .await?
+            .map_err(|(code, message)| {
+                Error::WalletError(format!("wallet error (code {}): {}", code, message))
+            })
+    }
+
+    /// Transmits a message and reads the response frame: the result's bytes,
+    /// or an error frame's code and message.
+    async fn exchange(
+        &self,
+        call: WalletCall,
+        originator: &str,
+        params: &[u8],
+    ) -> Result<Result<Vec<u8>, (u8, String)>, Error> {
         let mut writer = WireWriter::new();
 
         // Write call code
@@ -106,7 +124,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
 
         if error_byte == 0 {
             // Success - return remaining bytes
-            Ok(reader.read_remaining().to_vec())
+            Ok(Ok(reader.read_remaining().to_vec()))
         } else {
             // Error
             let message = reader.read_string()?;
@@ -116,10 +134,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
                 let _stack = reader.read_bytes(reader.wire_length(stack_len)?)?;
             }
 
-            Err(Error::WalletError(format!(
-                "wallet error (code {}): {}",
-                error_byte, message
-            )))
+            Ok(Err((error_byte, message)))
         }
     }
 
@@ -708,10 +723,24 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let reference_bytes = from_base64(&args.reference)
             .map_err(|e| Error::WalletError(format!("invalid reference base64: {}", e)))?;
 
-        self.transmit(WalletCall::AbortAction, originator, &reference_bytes)
-            .await?;
-
-        Ok(AbortActionResult { aborted: true })
+        // Nothing after the error byte for an abort; code 8 (`abortRefused`)
+        // is the wallet's refusal, `aborted: false`, and every other error
+        // frame the error it is (`WalletWireTransceiver.ts:334-341` at
+        // `ts-stack@edf6e03`; bsv-rs#206)
+        match self
+            .exchange(WalletCall::AbortAction, originator, &reference_bytes)
+            .await?
+        {
+            Ok(response) => {
+                super::require_response_length(&response, 0, "abortAction")?;
+                Ok(AbortActionResult { aborted: true })
+            }
+            Err((ABORT_REFUSED, _)) => Ok(AbortActionResult { aborted: false }),
+            Err((code, message)) => Err(Error::WalletError(format!(
+                "wallet error (code {}): {}",
+                code, message
+            ))),
+        }
     }
 
     /// Lists wallet actions (transactions).
