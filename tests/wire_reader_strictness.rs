@@ -1060,6 +1060,76 @@ fn a_certificate_signature_that_is_not_der_is_refused_by_the_writer() {
     }
 }
 
+/// `Certificate.toBinary` refuses more than 100,000 fields before it writes
+/// (`snapshotCertificateFields`, `Certificate.ts:57-58`), as `fromBinary`
+/// refuses the count (`:357-360`); this writer wrote them unchecked until
+/// #246.
+#[test]
+fn a_certificate_with_more_than_100000_fields_is_refused_by_the_writer() {
+    let valid = read_certificate(&Parts::valid().bytes()).unwrap();
+    let mut cert = valid.clone();
+    cert.fields = (0..100_000)
+        .map(|i| (format!("f{i}"), String::new()))
+        .collect();
+    let mut w = WireWriter::new();
+    w.write_wallet_certificate(&cert).unwrap();
+    assert_eq!(read_certificate(w.as_bytes()).unwrap().fields, cert.fields);
+    cert.fields.insert("f100000".into(), String::new());
+    refused_by_every_writer(
+        &cert,
+        "Certificate field count exceeds the maximum of 100000",
+    );
+}
+
+/// `Certificate.toBinary` refuses a field value over 1 MiB before it writes
+/// (`snapshotCertificateFields`, `Certificate.ts:76-79`), as `fromBinary`
+/// refuses it (`:378-382`); this writer wrote it unchecked until #246.
+#[test]
+fn a_certificate_field_value_past_a_mebibyte_is_refused_by_the_writer() {
+    let valid = read_certificate(&Parts::valid().bytes()).unwrap();
+    let mut cert = valid.clone();
+    cert.fields.insert("big".into(), "v".repeat(1024 * 1024));
+    let mut w = WireWriter::new();
+    w.write_wallet_certificate(&cert).unwrap();
+    assert_eq!(read_certificate(w.as_bytes()).unwrap().fields, cert.fields);
+    cert.fields
+        .insert("big".into(), "v".repeat(1024 * 1024 + 1));
+    refused_by_every_writer(
+        &cert,
+        "Certificate field big exceeds the maximum of 1048576 bytes",
+    );
+}
+
+/// `Certificate.toBinary` refuses a frame over 16 MiB before it returns it
+/// (`Certificate.ts:316-320`, in its words), as `fromBinary` refuses one
+/// (`snapshotCertificateBinary`, `:87-91`); this writer wrote it unchecked
+/// until #246. Fifteen values of 1 MiB and one padded to 16 MiB exactly.
+#[test]
+fn a_certificate_frame_past_16_mebibytes_is_refused_by_the_writer() {
+    const MAX: usize = 16 * 1024 * 1024;
+    let mut cert = read_certificate(&Parts::valid().bytes()).unwrap();
+    for i in 0..15 {
+        cert.fields
+            .insert(format!("m{i:02}"), "v".repeat(1024 * 1024));
+    }
+    cert.fields.insert("pad".into(), String::new());
+    let mut w = WireWriter::new();
+    w.write_wallet_certificate(&cert).unwrap();
+    // The pad's length grows from a one-byte varint to a five-byte one.
+    let pad = MAX - w.as_bytes().len() + 1 - 5;
+    assert!((0x1_0000..=1024 * 1024).contains(&pad), "{pad}");
+    cert.fields.insert("pad".into(), "v".repeat(pad));
+    let mut w = WireWriter::new();
+    w.write_wallet_certificate(&cert).unwrap();
+    assert_eq!(w.as_bytes().len(), MAX);
+    assert_eq!(read_certificate(w.as_bytes()).unwrap().fields, cert.fields);
+    cert.fields.insert("pad".into(), "v".repeat(pad + 1));
+    refused_by_every_writer(
+        &cert,
+        "Certificate binary exceeds the maximum of 16777216 bytes",
+    );
+}
+
 // ---------------------------------------------------------------------------
 // 6. The processor's reads
 // ---------------------------------------------------------------------------
