@@ -6,7 +6,7 @@
 //! - Discovering certificates for an identity
 //! - Managing personal contacts
 
-use crate::auth::certificates::Certificate;
+use crate::auth::certificates::{revocation_outpoint_from_str, Certificate};
 use crate::auth::VerifiableCertificate;
 use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, OutputListItem,
@@ -1242,8 +1242,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         // Parse revocation outpoint if present
         if let Some(outpoint_str) = cert_data["revocationOutpoint"].as_str() {
             if !outpoint_str.is_empty() {
-                certificate.revocation_outpoint =
-                    Some(crate::wallet::types::Outpoint::from_string(outpoint_str)?);
+                certificate.revocation_outpoint = Some(revocation_outpoint_from_str(outpoint_str)?);
             }
         }
 
@@ -1417,8 +1416,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         // Parse revocation outpoint if present
         if let Some(outpoint_str) = cert_data["revocationOutpoint"].as_str() {
             if !outpoint_str.is_empty() {
-                certificate.revocation_outpoint =
-                    crate::wallet::types::Outpoint::from_string(outpoint_str).ok();
+                certificate.revocation_outpoint = revocation_outpoint_from_str(outpoint_str).ok();
             }
         }
 

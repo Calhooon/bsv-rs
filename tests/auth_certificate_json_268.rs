@@ -10,7 +10,8 @@
 //! The witnesses are `tests/vectors/certificate_json_268.json`, recorded by
 //! `tests/support/certificate_json_268.mjs` under Node v22.18.0: the
 //! reference's `JSON.stringify` of a `Certificate`, a `MasterCertificate` and
-//! a `VerifiableCertificate` it issued (three fields and one field), each
+//! a `VerifiableCertificate` it issued (three fields and one field, and one
+//! field with the reference's default revocation outpoint, the txid alone), each
 //! read here and written back, by value and, where every map has one key,
 //! byte for byte; and this crate's JSON of the three types, read by the
 //! reference, with the reference's `verify()` verdict, its `toBinary(true)`,
@@ -19,7 +20,9 @@
 #![cfg(feature = "auth")]
 
 use bsv_rs::auth::certificates::{Certificate, MasterCertificate, VerifiableCertificate};
+use bsv_rs::auth::types::{AuthMessage, MessageType};
 use bsv_rs::primitives::{to_hex, PrivateKey};
+use bsv_rs::wallet::types::Outpoint;
 use bsv_rs::wallet::ProtoWallet;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -83,19 +86,33 @@ fn key(scalar: u8) -> PrivateKey {
 /// Reads `text` as `T` and writes it back: equal to the text by value, and
 /// byte for byte when `exact` (every map of the certificate has one key, so
 /// no map order can differ).
+/// A revocation outpoint written as the txid alone (the reference's default)
+/// is written back here with its index: `<txid>.0`.
 fn read_and_write_back<T: DeserializeOwned + Serialize>(text: &str, exact: bool, what: &str) -> T {
     let read: T = serde_json::from_str(text)
         .unwrap_or_else(|e| panic!("{what}: the reference's JSON is not read here: {e}"));
     let written = serde_json::to_string(&read).unwrap();
+    let expected = with_the_index(text);
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&written).unwrap(),
-        serde_json::from_str::<serde_json::Value>(text).unwrap(),
+        serde_json::from_str::<serde_json::Value>(&expected).unwrap(),
         "{what}: written back by value"
     );
     if exact {
-        assert_eq!(written, text, "{what}: written back byte for byte");
+        assert_eq!(written, expected, "{what}: written back byte for byte");
     }
     read
+}
+
+/// `text` with a txid-alone `revocationOutpoint` given its index 0.
+fn with_the_index(text: &str) -> String {
+    let value: serde_json::Value = serde_json::from_str(text).unwrap();
+    let outpoint = value["revocationOutpoint"].as_str().unwrap();
+    if outpoint.contains('.') {
+        return text.to_string();
+    }
+    let key = format!("\"revocationOutpoint\":\"{outpoint}\"");
+    text.replace(&key, &format!("\"revocationOutpoint\":\"{outpoint}.0\""))
 }
 
 /// Reads the three texts as this crate's types, checks each is written
@@ -119,7 +136,7 @@ async fn read_the_three(
     assert_eq!(to_hex(&verifiable.to_binary(true)), binary_hex);
     assert_eq!(
         verifiable.to_json_value(),
-        serde_json::from_str::<serde_json::Value>(&json.verifiable).unwrap()
+        serde_json::from_str::<serde_json::Value>(&with_the_index(&json.verifiable)).unwrap()
     );
 
     let decrypted = master
@@ -148,7 +165,7 @@ async fn read_the_three(
 #[tokio::test]
 async fn the_reference_json_of_the_three_certificate_types_is_read_here_and_written_back() {
     let v = vectors();
-    assert_eq!(v.reference_issued.len(), 2);
+    assert_eq!(v.reference_issued.len(), 3);
     for r in &v.reference_issued {
         assert!(r.reference_verify);
         assert_eq!(&r.reference_master_plaintexts, &r.plaintexts);
@@ -220,6 +237,119 @@ async fn a_fresh_issuance_writes_the_reference_names_and_encodings() {
     let master_json = serde_json::to_value(&master).unwrap();
     assert!(master_json.get("certType").is_none());
     assert!(master_json["masterKeyring"]["name"].is_string());
+}
+
+/// The reference's default issuance writes the revocation outpoint as the
+/// txid alone (`ts-stack@edf6e03` `MasterCertificate.ts:442`) and reads it as
+/// index 0 (`:112-123`, `Certificate.ts:261-262`): the third
+/// reference-issued certificate of the vector carries it.
+#[tokio::test]
+async fn the_reference_default_txid_alone_revocation_outpoint_reads_as_index_zero() {
+    let v = vectors();
+    let r = &v.reference_issued[2];
+    let zeros = "00".repeat(32);
+    for text in [&r.json.certificate, &r.json.master, &r.json.verifiable] {
+        let value: serde_json::Value = serde_json::from_str(text).unwrap();
+        assert_eq!(value["revocationOutpoint"], zeros.as_str());
+    }
+    assert!(r.reference_verify);
+
+    let cert: Certificate = serde_json::from_str(&r.json.certificate).unwrap();
+    assert_eq!(cert.revocation_outpoint, None);
+    assert_eq!(to_hex(&cert.to_binary(true)), r.binary_hex);
+    assert!(cert.verify().unwrap());
+
+    // A txid other than the sentinel's reads as that txid at index 0.
+    let mut value: serde_json::Value = serde_json::from_str(&r.json.certificate).unwrap();
+    value["revocationOutpoint"] = "ab".repeat(32).into();
+    let read: Certificate = serde_json::from_value(value).unwrap();
+    assert_eq!(
+        read.revocation_outpoint,
+        Some(Outpoint::from_string(&format!("{}.0", "ab".repeat(32))).unwrap())
+    );
+}
+
+/// A certificateResponse from a reference peer carries the certificate's
+/// JSON as the reference writes it: the txid alone is read inside an
+/// `AuthMessage` as in a certificate.
+#[test]
+fn an_auth_message_carrying_the_reference_default_revocation_outpoint_is_read() {
+    let v = vectors();
+    let r = &v.reference_issued[2];
+    let sender = key(r.keys.subject).public_key();
+    let mut message =
+        serde_json::to_value(AuthMessage::new(MessageType::CertificateResponse, sender)).unwrap();
+    message["certificates"] =
+        serde_json::Value::Array(vec![serde_json::from_str(&r.json.verifiable).unwrap()]);
+    let read: AuthMessage = serde_json::from_value(message)
+        .unwrap_or_else(|e| panic!("the reference's certificateResponse is not read here: {e}"));
+    let certificates = read.certificates.unwrap();
+    assert_eq!(certificates.len(), 1);
+    assert_eq!(to_hex(&certificates[0].to_binary(true)), r.binary_hex);
+    assert!(certificates[0].verify().unwrap());
+}
+
+/// A wallet's listCertificates result may carry the reference's default
+/// outpoint form; `get_verifiable_certificates` reads it as index 0, so a
+/// certificate signed over `<txid>.0` verifies.
+#[cfg(feature = "http")]
+#[tokio::test]
+async fn a_wallet_certificate_with_a_txid_alone_revocation_outpoint_verifies() {
+    use bsv_rs::auth::types::RequestedCertificateSet;
+    use bsv_rs::auth::utils::get_verifiable_certificates;
+    use bsv_rs::primitives::to_base64;
+    use bsv_rs::wallet::substrates::HttpWalletJson;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let certifier = key(31);
+    let txid = "ab".repeat(32);
+    let mut cert = Certificate::new(
+        [6; 32],
+        [7; 32],
+        key(37).public_key(),
+        certifier.public_key(),
+    );
+    cert.revocation_outpoint = Some(Outpoint::from_string(&format!("{txid}.0")).unwrap());
+    cert.set_field("name", "QWxpY2U=");
+    cert.sign(&certifier).unwrap();
+
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/listCertificates"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+            "totalCertificates": 1,
+            "certificates": [{ "certificate": {
+                "certificateType": to_base64(&cert.cert_type),
+                "serialNumber": to_base64(&cert.serial_number),
+                "subject": cert.subject.to_hex(),
+                "certifier": cert.certifier.to_hex(),
+                "revocationOutpoint": txid,
+                "signature": to_hex(cert.signature.as_ref().unwrap()),
+                "fields": cert.fields,
+            }}],
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/proveCertificate"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(serde_json::json!({ "keyringForVerifier": {} })),
+        )
+        .mount(&server)
+        .await;
+
+    let wallet = HttpWalletJson::new(Some("test".into()), Some(server.uri()));
+    let mut requested = RequestedCertificateSet::new();
+    requested.add_certifier(certifier.public_key().to_hex());
+    requested.add_type(to_base64(&cert.cert_type), vec!["name".to_string()]);
+    let certs = get_verifiable_certificates(&wallet, &requested, &key(41).public_key(), "test")
+        .await
+        .unwrap();
+    assert_eq!(certs.len(), 1);
+    assert_eq!(certs[0].revocation_outpoint, cert.revocation_outpoint);
+    assert!(certs[0].verify().unwrap());
 }
 
 #[test]

@@ -384,7 +384,7 @@ being `JSON.stringify` of the instance and `Certificate.fromObject`,
 |---|---|---|
 | the type | `certType` (base64) | `type` (base64), `Certificate.ts:150-153`, `certificate.go:34` |
 | `signature` | an array of numbers (the DER bytes) | the DER bytes in hex, `Certificate.ts:184`, `certificate.go:52` (`util.ByteString`) |
-| `revocationOutpoint` when `None` | no key | the binary form's sentinel, `"<64 zeros>.0"`: the reference's is always a string (`Certificate.ts:174`) and its `toBinary` refuses another type (`:257-258`); read back from the sentinel, `null` (Go's nil) or no key as `None` |
+| `revocationOutpoint` when `None` | no key | the binary form's sentinel, `"<64 zeros>.0"`: the reference's is always a string (`Certificate.ts:174`) and its `toBinary` refuses another type (`:257-258`); read back from the sentinel, `null` (Go's nil) or no key as `None`; the txid alone, the reference's default issuance's form (`MasterCertificate.ts:442`), read as index 0 as the reference reads it (`:112-123`, `Certificate.ts:261-262`) and written back with its index |
 | `masterKeyring` | an array of numbers per field | the base64 string, `MasterCertificate.ts:173`, `master.go:34` |
 | `keyring` | an array of numbers per field | the base64 string, `VerifiableCertificate.ts:90`, `verifiable.go:23` |
 | `to_json_value()`'s `signature` | base64 | hex; the absent outpoint the sentinel, where it wrote `null`; the method is now the type's serde |
@@ -453,7 +453,16 @@ the three types for a certificate it issued, read by the reference
 (`verify()` true on the three, its `toBinary(true)` this crate's bytes, the
 plaintexts decrypted under both keyrings, its `JSON.stringify` of what it read
 this crate's text byte for byte); a fresh issuance's keys and encodings; an
-absent outpoint read from the sentinel, `null` and no key. Red on the base
+absent outpoint read from the sentinel, `null` and no key. A third
+reference-issued certificate takes the reference's default outpoint, the txid
+alone (`verify()` true there): read here as index 0 as a certificate, inside
+an `AuthMessage` (a certificateResponse) and from a wallet's listCertificates
+result by `get_verifiable_certificates`, and by the identity client's two
+parsers (`src/identity/client_field_value_261_tests.rs`), each red on
+the tip before the fold (6 of 6: `Invalid outpoint format: expected
+'txid.vout'` at the certificate and the message, the whole output refused by
+one parser, the outpoint dropped and the signature failed at the other and at
+`get_verifiable_certificates`); the four sites read it through one helper. Red on the base
 (4 of 4: the hex signature refused, `expected a sequence`; the absent outpoint
 `null`; the keys `certType` and no `revocationOutpoint`); the reference refuses
 the base's JSON (`Master certificate keyring.city must be an own string data
@@ -471,7 +480,11 @@ here a peer's `decryptedFields` is ignored, since a cache read from the wire
 would answer `decrypt_fields` with the sender's plaintexts. An absent
 `revocationOutpoint` (Go's `null` for nil, `certificate.go:46`) reads as
 `None` here; the reference keeps it and refuses it at `toBinary`
-(`Certificate.ts:257-258`).
+(`Certificate.ts:257-258`). A `revocationOutpoint` of the txid alone with no
+index is written by TypeScript alone (its default issuance,
+`MasterCertificate.ts:442`) and read there as index 0; go-sdk refuses it
+(`go-sdk@2ca481c` `transaction/outpoint.go:50`); this crate reads it as the
+reference does and writes `<txid>.<index>` always.
 
 ### Added: what `auth_certificate.json` vector 0 is, and the test that says so (#252)
 

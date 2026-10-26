@@ -225,7 +225,7 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         let revocation_outpoint = if cert_result.certificate.revocation_outpoint.is_empty() {
             None
         } else {
-            crate::wallet::types::Outpoint::from_string(
+            crate::auth::certificates::revocation_outpoint_from_str(
                 &cert_result.certificate.revocation_outpoint,
             )
             .ok()

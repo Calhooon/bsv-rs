@@ -6,11 +6,17 @@
 //! (`brcs@5119a9b` `peer-to-peer/0052.md:97`), so the reference-issued
 //! certificate of `tests/vectors/certificate_field_value_261.json` verifies
 //! here and decrypts with the anyone keyring to the reference's plaintexts.
+//!
+//! And a revocation outpoint written as the txid alone (#268): the
+//! reference's default issuance writes that form (`MasterCertificate.ts:442`)
+//! and reads it as index 0 (`:112-123`, `Certificate.ts:261-262`); both
+//! parsers read it so, and a certificate signed over `<txid>.0` verifies.
 
 use super::*;
 use crate::overlay::OutputListItem;
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
+use crate::wallet::types::Outpoint;
 
 fn reference_issued() -> serde_json::Value {
     let v: serde_json::Value = serde_json::from_str(include_str!(
@@ -140,4 +146,65 @@ async fn a_malformed_signature_skips_its_output_and_the_resolution_goes_on() {
         identities[0].identity_key,
         r["certificate"]["subject"].as_str().unwrap()
     );
+}
+
+/// A certificate signed over `<ab..ab>.0`, published with its outpoint
+/// written as the txid alone and an empty keyring.
+fn published_with_txid_alone() -> (Certificate, OutputListItem) {
+    let certifier = PrivateKey::from_bytes(&[31u8; 32]).unwrap();
+    let subject = PrivateKey::from_bytes(&[37u8; 32]).unwrap().public_key();
+    let txid = "ab".repeat(32);
+    let mut cert = Certificate::new([6; 32], [7; 32], subject, certifier.public_key());
+    cert.revocation_outpoint = Some(Outpoint::from_string(&format!("{txid}.0")).unwrap());
+    cert.set_field("name", "QWxpY2U=");
+    cert.sign(&certifier).unwrap();
+
+    let mut json = serde_json::to_value(&cert).unwrap();
+    json["revocationOutpoint"] = txid.into();
+    json["keyring"] = serde_json::json!({});
+    let locking = PushDrop::new(
+        PrivateKey::from_bytes(&[3u8; 32]).unwrap().public_key(),
+        vec![serde_json::to_vec(&json).unwrap()],
+    )
+    .lock();
+    let mut tx = Transaction::new();
+    tx.add_input(TransactionInput::new("11".repeat(32), 0))
+        .unwrap();
+    tx.add_output(TransactionOutput::new(1, locking)).unwrap();
+    let mut beef = Beef::new();
+    beef.merge_transaction(tx);
+    let output = OutputListItem {
+        beef: beef.to_binary(),
+        output_index: 0,
+        context: None,
+    };
+    (cert, output)
+}
+
+#[tokio::test]
+async fn a_published_txid_alone_revocation_outpoint_parses_as_index_zero() {
+    let (cert, output) = published_with_txid_alone();
+    let client = IdentityClient::new(ProtoWallet::new(None), Default::default());
+    let parsed = client
+        .parse_output_to_certificate(&output)
+        .await
+        .unwrap()
+        .expect("the certificate verifies");
+    assert_eq!(
+        parsed.certificate.revocation_outpoint,
+        cert.revocation_outpoint
+    );
+}
+
+#[tokio::test]
+async fn a_published_txid_alone_revocation_outpoint_parses_to_a_verifying_certificate() {
+    let (cert, output) = published_with_txid_alone();
+    let client = IdentityClient::new(ProtoWallet::new(None), Default::default());
+    let parsed = client
+        .parse_output_to_verifiable_certificate(&output)
+        .await
+        .unwrap()
+        .expect("the certificate verifies");
+    assert_eq!(parsed.revocation_outpoint, cert.revocation_outpoint);
+    assert!(parsed.verify().unwrap());
 }
