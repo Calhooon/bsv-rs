@@ -42,8 +42,7 @@ fn email(certifier: &PrivateKey) -> Certificate {
         key(9).public_key(),
         certifier.public_key(),
     );
-    cert.fields
-        .insert("email".into(), to_base64(b"v-email").into_bytes());
+    cert.fields.insert("email".into(), to_base64(b"v-email"));
     cert
 }
 
