@@ -77,7 +77,7 @@ pub struct Certificate {
     pub revocation_outpoint: Option<Outpoint>,
 
     /// Field values (name -> base64 text), signed and written as the text's UTF-8 bytes
-    /// (BRC-52 `0052.md:41,97`; `Certificate.ts:294-296`; Go's `interfaces.go:122`; #261).
+    /// (`brcs@5119a9b` `0052.md:41,97`; `ts-stack@edf6e03` `Certificate.ts:294-296`; `go-sdk@2ca481c` `wallet/interfaces.go:122`; #261).
     #[serde(default)]
     pub fields: HashMap<String, String>,
 
