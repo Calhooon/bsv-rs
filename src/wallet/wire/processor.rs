@@ -35,7 +35,7 @@ use super::results::{
     write_reveal_specific_key_linkage_result, write_verify_hmac_result,
     write_verify_signature_result, write_wait_for_authentication_result,
 };
-use super::validation::{self, Refusal};
+use super::validation::{self, explicit_wallet_code, Refusal};
 use super::WalletCall;
 use crate::primitives::to_base64;
 use crate::wallet::interface::WalletInterface;
@@ -43,9 +43,6 @@ use crate::wallet::types::Network;
 use crate::wallet::AbortActionArgs;
 use crate::Error;
 use std::marker::PhantomData;
-
-/// `walletErrors.unknownError` (`WalletError.ts:72` at `ts-stack@edf6e03`).
-const UNKNOWN_ERROR: u8 = 1;
 
 /// `MAX_WIRE_ERROR_MESSAGE_BYTES` (`WalletWireProcessor.ts:25`).
 const MAX_WIRE_ERROR_MESSAGE_BYTES: usize = 4096;
@@ -55,42 +52,8 @@ const MAX_WIRE_ERROR_MESSAGE_BYTES: usize = 4096;
 /// framed as `new WalletError('Wallet operation failed', unknownError)`.
 const WALLET_OPERATION_FAILED: &str = "Wallet operation failed";
 
-/// The code of an explicit wallet error, 2 to 8 (`WalletWireProcessor.ts:2405-2416`:
-/// a `WalletError`, or a `WERR_` error, whose `code` lies in unsupportedAction
-/// to abortRefused): a [`Error::WalletRefusal`]'s class (#137), which keeps
-/// its words and its code on the wire. Every other error has none.
-fn explicit_wallet_code(error: &Error) -> Option<u8> {
-    match error {
-        Error::WalletRefusal { class, .. } => Some(class.code()),
-        _ => None,
-    }
-}
-
-/// The words an error frame carries: the reference writes `error.message`
-/// (`WalletWireProcessor.ts:2387`), never this crate's `Display` prefix. A
-/// `WalletError` is its own words (the replacement's constant, a stub's
-/// refusal); every other variant, the processor's own reading of the request,
-/// is this crate's own sentence, written as its `Display` reads.
-fn wire_message(error: &Error) -> String {
-    match error {
-        Error::WalletError(words) | Error::WalletRefusal { message: words, .. } => words.clone(),
-        other => other.to_string(),
-    }
-}
-
 /// A call's answer: its result's bytes, or the processor's refusal.
 type Answer = Result<Vec<u8>, Refusal>;
-
-impl From<Error> for Refusal {
-    /// The reference's outer catch (`WalletWireProcessor.ts:2379-2387`): an
-    /// explicit wallet code or unknownError, and the error's own words.
-    fn from(error: Error) -> Self {
-        Self {
-            code: explicit_wallet_code(&error).unwrap_or(UNKNOWN_ERROR),
-            words: wire_message(&error),
-        }
-    }
-}
 
 /// Server-side processor for WalletWire messages.
 ///
