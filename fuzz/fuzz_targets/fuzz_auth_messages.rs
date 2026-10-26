@@ -2,15 +2,17 @@
 //! The BRC-103 message decoders (`auth`) on arbitrary input, as each
 //! transport reads it: an `AuthMessage` from JSON (the HTTP and WebSocket
 //! transports' `serde_json::from_str`, the Socket.IO transport's
-//! `from_value` on an event's second argument), then its `validate`,
-//! `signing_data` and key id; the Engine.IO and Socket.IO frames; the
+//! `from_str` on an event's second argument as its text, and `from_value`
+//! on it as a `Value`, as the message box reads it), then its `validate`,
+//! `signing_data` and key id, the signed bytes the same after a write and a
+//! read (#280); the Engine.IO and Socket.IO frames; the
 //! General message's HTTP request and response payloads (bytes); a
 //! certificate from bytes and from JSON; a requested certificate set; the
 //! auth headers; a nonce's format. The assertion is that each returns; the
 //! target also checks round trips: a payload, a certificate and a frame that
 //! parse encode to bytes that parse back to the same encoding.
 use bsv_rs::auth::transports::socketio::codec::{
-    decode_polling_batch, EngineIoPacket, SocketIoPacket,
+    decode_event_args_text, decode_polling_batch, EngineIoPacket, SocketIoPacket,
 };
 use bsv_rs::auth::transports::socketio::parse_app_event_payload;
 use bsv_rs::auth::transports::{HttpRequest, HttpResponse, SimplifiedFetchTransport};
@@ -29,6 +31,7 @@ fn message(message: &AuthMessage) {
     let _ = message.get_key_id(Some("peer"));
     let text = serde_json::to_string(message).expect("a message serializes");
     let again: AuthMessage = serde_json::from_str(&text).expect("a message's JSON parses");
+    assert_eq!(again.signing_data(), message.signing_data());
     assert_eq!(
         serde_json::to_string(&again).expect("a message serializes"),
         text
@@ -119,6 +122,13 @@ fuzz_target!(|data: &[u8]| {
                 if let Ok(parsed) = serde_json::from_value::<AuthMessage>(value.clone()) {
                     message(&parsed);
                 }
+            }
+        }
+    }
+    if let Ok(args) = decode_event_args_text(text) {
+        if let Some(arg) = args.get(1) {
+            if let Ok(parsed) = serde_json::from_str::<AuthMessage>(arg.get()) {
+                message(&parsed);
             }
         }
     }
