@@ -672,20 +672,24 @@ this crate's request bodies equal the reference's for the same args, the
 reference's request bodies parse as this crate's args, the reference's result
 bodies parse here and write back as they came, and the reference's client
 takes this crate's request bodies as its args and reads this crate's result
-bodies to the values it reads from its own; on `95075b0` the request bodies
-carried `certificateType` and the reference's bodies were refused (`missing
-field certificateType`, `missing field linkage`). The Go vectors' json, the
+bodies to the values it reads from its own; on `0906111` (the base) the
+request bodies carried `certificateType` and the reference's bodies were
+refused (`missing field certificateType`, `missing field linkage`). The Go vectors' json, the
 three certificate args, a certificate and the two linkage results, now read
 as this crate's types and write back unchanged (they were refused the same
-way), so the fuzz harness's reshape of a certificate's `type` is gone (`tx` and
-a public-key `keyringRevealer` remain, #105's comments). Sixteen recordings
-moved, in JSON only, no wire byte (`docs/FIXTURES.md` F7, F8, F20).
+way, three of the five refused in the fuzz census, two left: `tx` and a
+public-key `keyringRevealer`, #105's comments), so the fuzz harness's
+reshape of a certificate's `type` is gone. The key-linkage results and
+their helper live in `src/wallet/types/linkage.rs`, re-exported from
+`types` under the same names (the ratchet holds `types.rs` to its length).
+Sixteen recordings moved, in JSON only, no wire byte (`docs/FIXTURES.md` F7,
+F8, F20).
 
 Consumer note: a JSON consumer of these types moves with them, both ways.
 bsv-wallet-cli serves the certificate and linkage results from these types
 on its JSON wire, and bsv-wallet-toolbox-rs builds `WalletCertificate` and
 the linkage results; both move to `type` and the flat byte-array linkage in
-the next prerelease (0.9.0-beta.2), and both captains are told the field
+the next prerelease (0.9.0-beta.2), their captains to be told the field
 names ahead of it (the owner's word, 2026-10-26). A body in the old shape is
 refused here, not read: the keeper's reading puts the one-minor acceptance of
 both shapes on the CLI's way in.
