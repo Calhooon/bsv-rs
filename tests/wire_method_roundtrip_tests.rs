@@ -30,7 +30,7 @@ use bsv_rs::wallet::{
     QueryMode, RelinquishCertificateArgs, RelinquishOutputArgs, SecurityLevel, SendWithResult,
     SendWithResultStatus, SignActionArgs, SignActionSpend, TrustSelf, VerifyHmacArgs,
     VerifySignatureArgs, WalletAction, WalletActionInput, WalletActionOutput, WalletCertificate,
-    WalletOutput, WalletPayment,
+    WalletInterface, WalletOutput, WalletPayment,
 };
 use bsv_rs::Error;
 use std::collections::HashMap;
@@ -1143,21 +1143,16 @@ mod status_tests {
         assert_eq!(result, Network::Mainnet);
     }
 
-    /// A processor configured for testnet still answers the wallet's network:
-    /// the configuration reaches no frame (#222).
+    /// getNetwork answers the wallet's own `get_network`, byte for byte (#222).
     #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_roundtrip_get_network_ignores_the_processor_configuration() {
+    async fn test_roundtrip_get_network_is_the_wallets_answer() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let processor = Arc::new(WalletWireProcessor::with_config(
-            wallet,
-            Network::Testnet,
-            "1.0.0",
-        ));
+        let expected = wallet.get_network("test").await.unwrap().network;
+        let processor = Arc::new(WalletWireProcessor::new(wallet));
         let wire = LoopbackWire { processor };
         let transceiver = WalletWireTransceiver::new(wire);
         let result = transceiver.get_network("test").await.unwrap();
-        assert_eq!(result, Network::Mainnet);
+        assert_eq!(result, expected);
     }
 
     /// Tests getVersion roundtrip (the wallet's answer; #222).
@@ -1168,20 +1163,16 @@ mod status_tests {
         assert_eq!(result, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
     }
 
-    /// A processor configured with a version still answers the wallet's (#222).
+    /// getVersion answers the wallet's own `get_version`, byte for byte (#222).
     #[tokio::test]
-    #[allow(deprecated)]
-    async fn test_roundtrip_get_version_ignores_the_processor_configuration() {
+    async fn test_roundtrip_get_version_is_the_wallets_answer() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let processor = Arc::new(WalletWireProcessor::with_config(
-            wallet,
-            Network::Mainnet,
-            "2.5.1-beta",
-        ));
+        let expected = wallet.get_version("test").await.unwrap().version;
+        let processor = Arc::new(WalletWireProcessor::new(wallet));
         let wire = LoopbackWire { processor };
         let transceiver = WalletWireTransceiver::new(wire);
         let result = transceiver.get_version("test").await.unwrap();
-        assert_eq!(result, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
+        assert_eq!(result, expected);
     }
 
     /// Tests getHeaderForHeight roundtrip. ProtoWallet doesn't support this,

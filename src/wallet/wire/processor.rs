@@ -78,8 +78,6 @@ type Answer = Result<Vec<u8>, Refusal>;
 /// ```
 pub struct WalletWireProcessor<W: WalletInterface> {
     wallet: W,
-    network: Network,
-    version: String,
     _marker: PhantomData<W>,
 }
 
@@ -88,24 +86,6 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     pub fn new(wallet: W) -> Self {
         Self {
             wallet,
-            network: Network::Mainnet,
-            version: "0.1.0".to_string(),
-            _marker: PhantomData,
-        }
-    }
-
-    /// Creates a new processor with custom network and version.
-    ///
-    /// Since bsv-rs#222 the two values reach no frame: getNetwork and
-    /// getVersion answer the wallet's `get_network` and `get_version`, as the
-    /// reference's processor does. [`network`](Self::network) and
-    /// [`version`](Self::version) return what was given here.
-    #[deprecated(note = "getNetwork and getVersion answer the wallet's (bsv-rs#222); use new")]
-    pub fn with_config(wallet: W, network: Network, version: impl Into<String>) -> Self {
-        Self {
-            wallet,
-            network,
-            version: version.into(),
             _marker: PhantomData,
         }
     }
@@ -113,20 +93,6 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     /// Returns a reference to the underlying wallet.
     pub fn wallet(&self) -> &W {
         &self.wallet
-    }
-
-    /// Returns the configured network, which no frame carries since
-    /// bsv-rs#222: getNetwork and getVersion answer the wallet's.
-    #[deprecated(note = "getNetwork and getVersion answer the wallet's (bsv-rs#222)")]
-    pub fn network(&self) -> Network {
-        self.network
-    }
-
-    /// Returns the configured version string, which no frame carries since
-    /// bsv-rs#222: getNetwork and getVersion answer the wallet's.
-    #[deprecated(note = "getNetwork and getVersion answer the wallet's (bsv-rs#222)")]
-    pub fn version(&self) -> &str {
-        &self.version
     }
 
     /// Processes an incoming binary message and returns the response.

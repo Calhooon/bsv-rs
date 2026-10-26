@@ -45,6 +45,22 @@ precision bound) into the outpoint string; its `toBinary` refuses one above
 truncation above the bound) and its writer writes a `uint32` (`:20-25`).
 This crate's reader refuses it: no SDK writer produces the oversized index,
 so the bound meets the north star's "accept what the reference accepts".
+### Removed: the processor's `with_config`, `network()` and `version()` (#222)
+
+`WalletWireProcessor::with_config`, `network()` and `version()`,
+`#[deprecated]` since #222 forwarded getNetwork and getVersion to the
+wallet (PR #231, e65a8cb), are removed in 0.9.0 on the owner's word
+(2026-10-26, DECISIONS 16.5: removal if a grep of the toolbox, the CLI and
+LOW's Workers finds zero calls; it found zero). The values they held reached
+no frame, so a caller that set them was told a network and version the wire
+never answered. Migration: `WalletWireProcessor::new(wallet)` in place of
+`with_config(wallet, network, version)`; the wallet's own `get_network` and
+`get_version` in place of the accessors. The two roundtrip tests that built
+a processor with `with_config` under `#[allow(deprecated)]`
+(`tests/wire_method_roundtrip_tests.rs`) are now
+`test_roundtrip_get_network_is_the_wallets_answer` and
+`test_roundtrip_get_version_is_the_wallets_answer`: the transceiver's
+answer equals the wallet's `get_network` and `get_version`.
 
 ### Changed: the secrets scan covers the commits the event brings (#272)
 

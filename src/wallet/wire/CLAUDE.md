@@ -205,8 +205,7 @@ pub mod status_codes {
 
 **Configuration:**
 - `new(wallet)` - the processor over its wallet
-- `with_config(wallet, network, version)` - deprecated (#222): the network and version reach no frame, getNetwork and getVersion answering the wallet's
-- `wallet()` - accessor; `network()`, `version()` deprecated with `with_config`, returning what it was given
+- `wallet()` - accessor; getNetwork and getVersion answer the wallet's `get_network` and `get_version` (`with_config`, `network()` and `version()`, deprecated in #222, removed in 0.9.0)
 
 **Fully implemented handlers (delegated to wallet):**
 - getPublicKey, encrypt, decrypt, createHmac, verifyHmac
