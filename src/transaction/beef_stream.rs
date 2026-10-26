@@ -3513,32 +3513,6 @@ impl AsyncStreamVerifier {
         self.judge.cursor(&self.decoder)
     }
 
-    /// Folds in every held transaction that waits on nothing (bsv-rs#240),
-    /// in wire order, with the mining tip asked once: this reader has no
-    /// step budget.
-    async fn release_all(
-        &mut self,
-        tracker: &dyn ChainTracker,
-    ) -> Result<Option<Verdict>, AsyncVerifyError> {
-        if !self.judge.index.deferred.has_ready() {
-            return Ok(None);
-        }
-        let tip = if self.judge.index.check_spends {
-            tracker
-                .mining_tip()
-                .await
-                .map_err(AsyncVerifyError::Headers)?
-        } else {
-            None
-        };
-        while let Some(released) = self.judge.release_next(&mut || false, self.work_limit, tip) {
-            if let Err(stop) = released {
-                return Ok(Some(stop.into()));
-            }
-        }
-        Ok(None)
-    }
-
     /// Reads the source to its end, asking `tracker` for each BUMP's root as
     /// it streams.
     pub async fn run<S: AsyncByteSource>(

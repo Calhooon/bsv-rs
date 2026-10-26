@@ -27,11 +27,12 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use crate::primitives::{bounded_capacity, Reader, Writer};
+use crate::transaction::chain_tracker::ChainTracker;
 
 use super::{
-    BeefIndex, ChainTip, Folded, Hash32, InputRef, Judge, Pending, Stop, TxBody, MAX_MONEY,
+    AsyncStreamVerifier, AsyncVerifyError, BeefIndex, ChainTip, Folded, Hash32, InputRef, Judge,
+    Pending, Stop, TxBody, Verdict, MAX_MONEY,
 };
-
 /// An input of a held transaction: where it lies and the outpoint it spends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct HeldInput {
@@ -421,6 +422,35 @@ impl Judge {
             Ok(_) => Ok(false),
             Err(stop) => Err(stop),
         })
+    }
+}
+
+/// The asynchronous reader's side: every released transaction at once.
+impl AsyncStreamVerifier {
+    /// Folds in every held transaction that waits on nothing (bsv-rs#240),
+    /// in wire order, with the mining tip asked once: this reader has no
+    /// step budget.
+    pub(super) async fn release_all(
+        &mut self,
+        tracker: &dyn ChainTracker,
+    ) -> Result<Option<Verdict>, AsyncVerifyError> {
+        if !self.judge.index.deferred.has_ready() {
+            return Ok(None);
+        }
+        let tip = if self.judge.index.check_spends {
+            tracker
+                .mining_tip()
+                .await
+                .map_err(AsyncVerifyError::Headers)?
+        } else {
+            None
+        };
+        while let Some(released) = self.judge.release_next(&mut || false, self.work_limit, tip) {
+            if let Err(stop) = released {
+                return Ok(Some(stop.into()));
+            }
+        }
+        Ok(None)
     }
 }
 
