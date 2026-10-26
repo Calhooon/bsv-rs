@@ -67,7 +67,9 @@
 //! survives a decode and an encode and a frame's encoding is a fixed point
 //! (bsv-rs#285). The text may differ from `JSON.stringify`'s (`100.0` for
 //! `100`, `-0.0` for `0`, an integer within `u64` kept exact); a number past
-//! the double range is a `Malformed` refusal.
+//! the double range is a `Malformed` refusal, where the reference's
+//! `JSON.parse` reads it as `Infinity` and `JSON.stringify` writes `null`
+//! back (a divergence, stated in `CLAUDE.md`).
 
 use serde_json::Value;
 

@@ -144,8 +144,9 @@ fn a_long_decimal_text_reads_as_the_correctly_rounded_double() {
 
 #[test]
 fn a_number_past_the_double_range_is_refused_with_a_reason() {
-    // `JSON.parse` reads it as Infinity, which JSON cannot write back; the
-    // codec refuses the frame (rule 5: the exact value back or a refusal).
+    // The reference's `JSON.parse` reads it as `Infinity` and `JSON.stringify`
+    // writes `null` back, the frame's data changed; the codec refuses the frame
+    // instead (rule 5: the exact value back or a refusal), a stated divergence.
     let err = SocketIoPacket::decode("2[\"n\",[1e400]]").unwrap_err();
     assert!(err.to_string().contains("invalid JSON"), "{err}");
 }
