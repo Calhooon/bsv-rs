@@ -395,3 +395,61 @@ async fn an_empty_abort_reference_is_refused_code_6() {
         .unwrap();
     assert_eq!(hex::encode(&frame), WALLET_OPERATION_FAILED_FRAME);
 }
+
+/// #206: the transceiver reads code 8 as `aborted: false`, as the reference's
+/// client does (`WalletWireTransceiver.ts:336-339`, on the code alone), and
+/// the processor's refusal reaches a consumer as that verdict end to end.
+#[tokio::test]
+async fn the_transceiver_reads_code_8_as_aborted_false() {
+    let args = || bsv_rs::wallet::AbortActionArgs {
+        reference: "Zml4dHVyZQ==".into(),
+    };
+    for frame in [
+        hex::decode(ABORT_REFUSED_FRAME).unwrap(),
+        reference_frame(8, b"any words"),
+    ] {
+        let result = WalletWireTransceiver::new(ReplyWire(frame.clone()))
+            .abort_action(args(), "test")
+            .await
+            .map(|r| r.aborted);
+        assert_eq!(result, Ok(false), "{}", hex::encode(&frame));
+    }
+
+    let (client, tape) = taped(json!({"aborted": false}));
+    let result = client.abort_action(args(), "test").await.map(|r| r.aborted);
+    assert_eq!(
+        hex::encode(tape.lock().unwrap().as_slice()),
+        ABORT_REFUSED_FRAME
+    );
+    assert_eq!(result, Ok(false));
+}
+
+/// #206: every other error frame on abortAction is the error it was
+/// (`WalletWireTransceiver.ts:340`), and a byte after a success frame's error
+/// byte is refused (`#requireEmptyResponse`, `:334`, `:2027-2035`).
+#[tokio::test]
+async fn every_other_abort_frame_is_the_error_it_was() {
+    let args = || bsv_rs::wallet::AbortActionArgs {
+        reference: "Zml4dHVyZQ==".into(),
+    };
+    for (frame, words) in [
+        (
+            hex::decode(WALLET_OPERATION_FAILED_FRAME).unwrap(),
+            "wallet error (code 1): Wallet operation failed",
+        ),
+        (
+            reference_frame(7, b"insufficient"),
+            "wallet error (code 7): insufficient",
+        ),
+        (
+            vec![0, 1],
+            "Wallet Wire abortAction response has an invalid length",
+        ),
+    ] {
+        let result = WalletWireTransceiver::new(ReplyWire(frame))
+            .abort_action(args(), "test")
+            .await
+            .map(|r| r.aborted);
+        assert_eq!(result, Err(Error::WalletError(words.into())), "{words}");
+    }
+}
