@@ -194,7 +194,7 @@ let known_type = cert.known_type(); // Option<KnownCertificateType>
 **Reading a published certificate** (#261): the parsers read the JSON the
 reference's `publiclyRevealAttributes` publishes (`{...certificate, keyring}`,
 `ts-stack@edf6e03` `IdentityClient.ts:503`). Each field is held as its base64
-text's bytes, never decoded, as BRC-52 signs it (`brcs@5119a9b`
+text, never decoded, as BRC-52 signs it (`brcs@5119a9b`
 `peer-to-peer/0052.md:41,97`); the signature is hex, as the reference's
 `WalletCertificate.signature` and this crate's `publicly_reveal_attributes`
 write it, and one that is not skips its output, never the resolution

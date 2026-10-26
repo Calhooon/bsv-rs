@@ -1511,15 +1511,19 @@ writes `UtilsToArray(fieldValue, 'utf8')` (`packages/sdk/src/auth/certificates/C
 and stores `toBase64(ciphertext)` as the field (`MasterCertificate.ts:283`);
 Go holds `Fields map[string]string` (`go-sdk@2ca481c` `wallet/interfaces.go:122`)
 and writes `[]byte(fieldValue)` (`wallet/serializer/certificate.go:58-60`).
-`Certificate.fields` (`HashMap<String, Vec<u8>>`) and its writer already held
-and wrote bytes as given; the sites that put the decoded ciphertext there:
+`Certificate.fields` was `HashMap<String, Vec<u8>>`, its writer writing the
+bytes as given; it is now `HashMap<String, String>`, the base64 text, as the
+reference's `Record<CertificateFieldNameUnder50Bytes, Base64String>` and Go's
+`map[string]string` hold it (the owner's word of 2026-10-26, option A), the
+writer writing `value.as_bytes()`, so the wire bytes are the text's UTF-8 as
+before. The sites that put the decoded ciphertext there:
 
 - `get_verifiable_certificates` (`src/auth/utils/validation.rs`) decoded each
   field of the wallet's `listCertificates` result before building the
-  certificate; it now holds the text's bytes.
+  certificate; it now holds the text.
 - The identity client's two parsers (`parse_output_to_certificate`,
   `parse_output_to_verifiable_certificate`, `src/identity/client.rs`) decoded
-  each field; they now hold the text's bytes. They also read the signature as
+  each field; they now hold the text. They also read the signature as
   base64, where the reference's `WalletCertificate.signature` is hex and this
   crate's own `publicly_reveal_attributes` writes hex, so no published
   certificate parsed; they read hex now.
@@ -1536,22 +1540,20 @@ and wrote bytes as given; the sites that put the decoded ciphertext there:
   the wallet encrypted the plaintext directly and the master keyring held a
   copy of that ciphertext, so no certificate the reference issued decrypted
   here and none issued here decrypted there.
-- `Certificate`'s serde: `fields` had no `with`, so a value went out as an
-  array of numbers. It now goes out as the string it holds and a string comes
-  in as its UTF-8 bytes; a held value that is not UTF-8 is refused on the way
-  out (`certificate field <name> is not UTF-8 base64 text: ...`), and serde_json
-  refuses bytes that are not UTF-8 on the way in. `to_wallet_certificate` and
+- `Certificate`'s serde: `fields` went out as arrays of numbers. It is now the
+  plain map of strings, each value the string itself, and serde_json refuses
+  bytes that are not UTF-8 on the way in. `to_wallet_certificate` and
   `VerifiableCertificate::to_json_value` write the held text where they wrote
   its base64.
 - `Certificate::from_binary` held a field value's bytes as given; it refuses
-  one that is not UTF-8 as `InvalidUtf8`, the field named, as the reference's
-  `fromBinary` reads it with `toUTF8Strict` (`Certificate.ts:384`) and BRC-52
-  asks (`0052.md:103`: "Malformed UTF-8 ... MUST NOT be made acceptable by
-  retaining bytes"). `set_field` refuses it the same way and returns
-  `Result<()>`. A value that is not UTF-8 can now be held only by a write into
-  the public `fields` map; `to_wallet_certificate` and `to_json_value`, which
-  return no `Result`, write such a value with U+FFFD in place of its invalid
-  bytes, and their docs say so.
+  one that is not UTF-8 as `InvalidUtf8` (`certificate field <name> is not
+  UTF-8 base64 text: ...`), as the reference's `fromBinary` reads it with
+  `toUTF8Strict` (`Certificate.ts:384`) and BRC-52 asks (`0052.md:103`:
+  "Malformed UTF-8 ... MUST NOT be made acceptable by retaining bytes").
+  `set_field` takes `impl Into<String>` for the value and returns `()`: the
+  reference's record takes any string and refuses nothing at its write
+  (`Certificate.ts:294-296`), so any string is accepted, base64 or not, and a
+  value the reference would sign is signed here.
 - The identity client's revelation parser (`parse_output_to_certificate`)
   aborted the whole resolution on a signature that is not hex; it skips that
   output, as its sibling parser does and the reference does
@@ -1564,8 +1566,8 @@ The certificate methods take the reference's parameters (the owner's word of
 2026-10-26, option A: the signature breaks once, in 0.9.0, and never again).
 `cargo semver-checks check-release --baseline-rev origin/beta --features full
 --release-type minor` reports `method_parameter_count_changed` for the six
-below; `set_field`'s return type moves too. Migration, the old call and the
-new:
+below, 0.9.0's; the type of the public field `Certificate.fields` and
+`set_field`'s value parameter move too. Migration, the old call and the new:
 
 ```text
 create_keyring_for_verifier(w, certifier, verifier, &reveal, &cert.fields, &cert.master_keyring, &serial, originator)
@@ -1586,8 +1588,11 @@ verifiable.decrypt_field(w, name, None, None, originator)
 verifiable.decrypt_fields(w, subject, originator)
 verifiable.decrypt_fields(w, None, None, originator)
 
-cert.set_field(name, value)
-cert.set_field(name, value)?
+cert.set_field(name, ciphertext_bytes)
+cert.set_field(name, to_base64(&ciphertext_bytes))
+
+let bytes: &Vec<u8> = &cert.fields[name];
+let text: &String = &cert.fields[name];  // value.as_bytes(), or from_base64(text)? at the decrypt site
 ```
 
 - `MasterCertificate::create_keyring_for_verifier` takes the subject wallet,
@@ -1634,8 +1639,9 @@ under the master, verifier and anyone keyrings (`DecryptionFailed` on the
 base); a certificate issued here holds canonical base64 text, its bytes are
 the reference's `toBinary(true)` of its JSON, and the reference verifies it
 (`true`) and decrypts it to its plaintexts; a value that is not UTF-8 is
-refused at the JSON intake and the JSON writer, at `from_binary` and at
-`set_field`. `tests/auth_certificate_privileged_261.rs`: a recording wallet
+refused at the JSON intake and at `from_binary`; `set_field` holds any string
+and writes its bytes; a doc test on `set_field` pins a value set from a
+string serializing to those bytes. `tests/auth_certificate_privileged_261.rs`: a recording wallet
 sees `privileged: true` and the reason on each `encrypt` and `decrypt` of the
 five methods, and neither on an unprivileged call (red on a copy that takes
 the pair and does not pass it). The identity client skipping a malformed
@@ -1646,9 +1652,9 @@ signature's output: `a_malformed_signature_skips_its_output_and_the_resolution_g
 The JSON shape of `Certificate.fields` moves from arrays of numbers to the
 reference's strings (`Wallet.interfaces.ts` `WalletCertificate.fields:
 Record<CertificateFieldNameUnder50Bytes, string>`); `AuthMessage`'s
-certificates carry it so on the auth wire. A Rust caller that read a field as
-ciphertext decodes it at the decrypt site:
-`from_base64(std::str::from_utf8(&cert.fields[name])?)?`. The rest of this
+certificates carry it so on the auth wire. A Rust caller holding ciphertext
+bytes writes `to_base64(&bytes)`; one reading `fields` as bytes reads
+`value.as_bytes()`, or `from_base64(value)?` at its decrypt site. The rest of this
 crate's `Certificate` serde stays where it was and is not the reference's
 JSON: `certType` where the reference writes `type`, the signature an array of
 numbers where it writes hex, the keyrings arrays of numbers where it writes
@@ -1656,8 +1662,8 @@ base64 (a line in `CLAUDE.md`'s list; the keyrings and the rest of the JSON
 shape follow on the owner's same word in #268). `bsv-wallet-toolbox-rs` (at `6317222`) moves in three
 places with this release: its intake decodes each field
 (`src/wallet/certificate_issuance.rs:553-556`, `BASE64.decode` then
-`set_field`) and must pass the string's bytes through, `set_field` now a
-`Result`; its own issuance (`create_certificate_fields_for_issuance`,
+`set_field`) and must pass the string through, `set_field(name.clone(),
+value.clone())` (its captain told); its own issuance (`create_certificate_fields_for_issuance`,
 `certificate_issuance.rs:346-384`) is this crate's old scheme, the wallet
 encrypting the plaintext and the master keyring a copy of the ciphertext; and
 its own keyring helper (`create_keyring_for_verifier`,
