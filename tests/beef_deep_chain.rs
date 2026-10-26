@@ -353,7 +353,7 @@ fn a_deep_chain_history_builds_on_a_small_stack() {
 /// The same chain written newest first: a sort that rescans the pending list
 /// once per resolved link is quadratic here, so a stranger's byte order alone
 /// would cost `N^2 / 2` lookups. The order on the wire is BRC-62's or it is
-/// refused: through 0.9.0 `verify_valid` sorted ahead of judging and accepted
+/// refused: through 0.8 `verify_valid` sorted ahead of judging and accepted
 /// it; since bsv-rs#86 the newest link, held ahead of its parent, is
 /// `InputNamesNoElement` on the whole path, as on the stream, and the sort of
 /// the chain held newest to oldest stays linear.

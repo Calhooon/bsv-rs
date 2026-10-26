@@ -683,8 +683,8 @@ impl Beef {
     ///   [`Kind::InputNamesNoElement`].
     /// - The order is BRC-62's, parents before children, as the stream reads
     ///   it: an input that names an entry held after it is
-    ///   [`Kind::InputNamesNoElement`], before any sort (bsv-rs#86; through
-    ///   0.9.0 this sorted ahead of judging, as `@bsv/sdk`'s
+    ///   [`Kind::InputNamesNoElement`], before any sort (bsv-rs#86; 0.8's
+    ///   `verify_valid` sorted ahead of judging, as `@bsv/sdk`'s
     ///   `Beef.verifyValid` and go-sdk's `verifyValid` do). The entries are
     ///   then sorted ([`sort_txs`](Self::sort_txs)), proven ones leading, as
     ///   they always were after this call.

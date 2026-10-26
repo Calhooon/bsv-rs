@@ -23,7 +23,7 @@
 //!
 //! No difference is stated. A transaction written ahead of the parent it
 //! spends is refused by both, `InputNamesNoElement` (BRC-62's dependency
-//! order, the charter's validity clause): through 0.9.0 the whole
+//! order, the charter's validity clause): through 0.8 the whole
 //! path sorted ahead of judging, as `@bsv/sdk`'s `Beef.verifyValid` does
 //! (`ts-stack@edf6e03` `packages/sdk/src/transaction/Beef.ts:1065`), and
 //! accepted what the stream refused.
