@@ -1158,3 +1158,55 @@ async fn a_certificates_page_past_the_requested_limit_is_refused() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// 7. A listActions satoshis value in the reference's bound (bsv-rs#236)
+// ---------------------------------------------------------------------------
+
+fn action(satoshis: i64) -> Vec<u8> {
+    let mut w = WireWriter::new();
+    w.write_wallet_action(&WalletAction {
+        txid: [0x11; 32],
+        satoshis,
+        status: ActionStatus::Completed,
+        is_outgoing: false,
+        description: "fixture".into(),
+        labels: None,
+        version: 1,
+        lock_time: 0,
+        inputs: None,
+        outputs: None,
+    });
+    w.as_bytes().to_vec()
+}
+
+/// `#readActionSatoshis` (`WalletWireTransceiver.ts:400-416`): a negative net
+/// amount `0xff` and a signed int64 with its high bit set, any other value
+/// `readVarIntNumStrict(false)` (refused past `2^53 - 1`), and the value
+/// `#requireInteger(value, 'listActions satoshis', -21e14, 21e14)` (`:2018-2025`).
+/// Until #236 `read_wallet_action` cast the varint `as i64`: the negatives the
+/// same, no bound.
+#[test]
+fn a_list_actions_satoshis_value_outside_the_reference_bound_is_refused() {
+    let bound = |value: i64| {
+        format!(
+            "Invalid listActions satoshis: expected an integer from -2100000000000000 to 2100000000000000, received {value}"
+        )
+    };
+    for satoshis in [0, -25_000, 2_100_000_000_000_000, -2_100_000_000_000_000] {
+        let read = WireReader::new(&action(satoshis)).read_wallet_action();
+        assert_eq!(read.map(|a| a.satoshis), Ok(satoshis));
+    }
+    for satoshis in [2_100_000_000_000_001, -2_100_000_000_000_001, i64::MIN] {
+        let read = WireReader::new(&action(satoshis)).read_wallet_action();
+        assert_eq!(read.map(drop), Err(Error::WalletError(bound(satoshis))));
+    }
+    // Past `2^53 - 1` without the sign bit: the strict reader's words.
+    let read = WireReader::new(&action(1 << 60)).read_wallet_action();
+    assert_eq!(
+        read.map(drop),
+        Err(Error::WalletError(
+            "number too large to retain precision - use readVarIntBn".into()
+        ))
+    );
+}

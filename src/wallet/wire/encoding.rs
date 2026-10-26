@@ -671,8 +671,8 @@ impl<'a> WireReader<'a> {
         let txid_bytes = self.read_bytes(32)?;
         let mut txid = [0u8; 32];
         txid.copy_from_slice(txid_bytes);
-        // Go uses unsigned VarInt for satoshis, cast to i64
-        let satoshis = self.read_var_int()? as i64;
+        // The reference's signed net amount in its bound (bsv-rs#236)
+        let satoshis = self.read_action_satoshis()?;
         let status = self
             .read_action_status()?
             .unwrap_or(ActionStatus::Unprocessed);
