@@ -629,6 +629,7 @@ it, no job outside the set and its needs able to run there), plus every job
 on a push and on the nightly's dispatch save five named exceptions. A context
 added to or dropped from a protection is a change to the test's constants.
 ### Fixed: the HTTP JSON substrate's certificate `type` and flat key-linkage results, as BRC-100 and the reference have them (#105)
+### Fixed: the HTTP JSON substrate's shapes are BRC-100's and the reference's: the certificate `type`, the flat key-linkage results and certificate entries, the action calls' encodings, `protocolID` and `keyID` (#105)
 
 `HttpWalletJson` sent and read the certificate's type field as
 `certificateType`: `WalletCertificate`, `AcquireCertificateArgs` and
@@ -685,6 +686,55 @@ their helper live in `src/wallet/types/linkage.rs`, re-exported from
 Sixteen recordings moved, in JSON only, no wire byte (`docs/FIXTURES.md` F7,
 F8, F20).
 
+The rest of #105 (items 3 to 8 and the `keyringRevealer` comment, the owner's
+word of 2026-10-26 taking them with items 1 and 2) moves the same way, serde
+attributes and the substrate's private request structs only, no public Rust
+field or type. Every field, at BRC-100 `5119a9b` `wallet/0100.md` and
+`ts-stack@edf6e03` `Wallet.interfaces.ts` (`HTTPWalletJSON.ts:303` sends the
+args as given, `stringifyBRC100`; byte arrays as JSON number arrays):
+
+| Call | Field | Was | Now | BRC-100 | Reference |
+|---|---|---|---|---|---|
+| listCertificates | `certificates[]` | `{certificate: {..}, keyring, verifier}` | the certificate's seven fields flat beside `keyring` and `verifier` | `:1299-1307` | `:900-903` (`CertificateResult extends WalletCertificate`) |
+| discoverByIdentityKey, discoverByAttributes | `certificates[]` | `{certificate: {..}, certifierInfo, ..}` | flat beside `certifierInfo`, `publiclyRevealedKeyring`, `decryptedFields` | `:1393-1411`, `:1436-1454` | `:877-881` |
+| acquireCertificate | `keyringRevealer` | `"certifier"` or `{"publicKey": "02.."}` | `"certifier"` or `"02.."` | `:1255` | `:233`, `:845` |
+| createAction | `inputBeef` | hex string | `inputBEEF`, number array | `:676` | `:391` |
+| createAction | `options.knownTxids`, `options.sendWith` | number arrays of 32 | hex strings | `:699`, `:703` | `:301`, `:305` |
+| createAction, signAction | `options.returnTxidOnly` | so named | `returnTXIDOnly` | `:700`, `:750` | `:302`, `:419` |
+| signAction | `options.sendWith` | number arrays of 32 | hex strings | `:752` | `:421` |
+| createAction, signAction | result `txid` | number array of 32 | hex string | `:709`, `:757` | `:355`, `:439` |
+| createAction, signAction | result `tx` | hex string | number array | `:710`, `:758` | `:373`, `:440` |
+| createAction | `signableTransaction.tx` | hex string | number array | `:717` | `:350` |
+| createAction | `signableTransaction.reference` | hex string | base64 | `:718` | `:351` |
+| internalizeAction | `tx` | hex string | number array | `:877` | `:602` |
+| getPublicKey, revealSpecificKeyLinkage, encrypt, decrypt, createHmac, verifyHmac, createSignature, verifySignature | `protocolId`, `keyId` | so named | `protocolID` (`[level, name]`), `keyID` | `:981-982`, `:1037-1038`, `:1071-1072`, `:1098-1099`, `:1125-1126`, `:1154-1155`, `:1183-1184`, `:1215-1216` | `:665-667`, `:711-712` |
+| createSignature, verifySignature | `hashToDirectlySign`, `hashToDirectlyVerify` | hex string | number array | `:1182`, `:1213` | `:798`, `:813` |
+| getPublicKey | `identityKey` | `false` written when not asked | written only when `true` | `:980` (`identityKey?: true`) | `:683` |
+
+The getPublicKey row was not in #105's list: the witnesses found it (the
+reference sends no `identityKey` for a derived key). The helpers live in
+`src/wallet/types/json_forms.rs` (`hex_txid_option`, `base64_bytes`,
+`KeyringRevealer`'s serde); `CreateActionResult`'s fields of this crate's own
+(`inputType`, `inputs`, `referenceNumber`, `beef`, not in BRC-100) keep their
+forms. The witnesses grow to 21 cases (one per call and shape: a
+`keyringRevealer` key, a one-entry list and discovery page, createAction
+signable and completed, signAction, internalizeAction, the seven key-related
+calls), both directions as above, every one of them equal; the action cases'
+transactions are this crate's writer's (a parent proven alone at height
+800,000 and its child, unsigned and signed: the reference's internalizeAction
+asks a complete atomic BEEF; `the_action_witnesses_are_this_crates_bytes`).
+On `29970f5` (this fix's base, the source of the scratch copy) 15 of the 21
+are red, the six green ones items 1 and 2's: the reference's action and
+`keyringRevealer` bodies refused as this crate's args, the list and
+discovery entries refused as its results (`error decoding response body`),
+the eight key-related requests and getPublicKey's in the old names and
+encodings. The Go vectors' json for internalizeAction, acquireCertificate (a
+public-key revealer), the list and discovery results, createAction and
+signAction now read and write back unchanged, and the fuzz harness reads
+every vector as it is: `reshape` is gone and `--args-census` reads 15 of 15.
+Twenty-one more recordings moved, in JSON only, no wire frame
+(`docs/FIXTURES.md` F5, F6, F7, F21).
+
 Consumer note: a JSON consumer of these types moves with them, both ways.
 bsv-wallet-cli serves the certificate and linkage results from these types
 on its JSON wire, and bsv-wallet-toolbox-rs builds `WalletCertificate` and
@@ -692,21 +742,37 @@ the linkage results; both move to `type` and the flat byte-array linkage in
 the next prerelease (0.9.0-beta.2), their captains to be told the field
 names ahead of it (the owner's word, 2026-10-26). A body in the old shape is
 refused here, not read: the keeper's reading puts the one-minor acceptance of
-both shapes on the CLI's way in.
+both shapes on the CLI's way in. The CLI's fixtures that carry the shapes, as
+its captain listed them on #105 (2026-10-26): 025-revealCounterpartyKeyLinkage.ok
+and 027-revealSpecificKeyLinkage.ok (items 1 and 2), 044 to 052 (the
+acquire, relinquish, prove and list certificate shapes: `type`, and the flat
+listCertificates entry of item 3, the CLI's #122 item 8), 053 and 054
+(discoverByIdentityKey, discoverByAttributes: empty lists today, so the flat
+entry moves them when they carry one). For items 5 to 8 the #76 cold review
+found the CLI already recording the reference's shapes (bsv-wallet-cli beta
+`d93e077`): there this crate moves to the CLI, and `HttpWalletJson` can now
+talk to a TypeScript wallet on the eight key-related calls. The toolbox's
+JSON carries two of these: bsv-wallet-toolbox-rs (`6317222`) sends
+`bsv_rs::wallet::CreateActionOptions` inside its storage client's
+`ValidCreateActionArgs` (`src/storage/client/storage_client.rs:73-103`;
+`knownTxids` and `sendWith` now hex, `returnTXIDOnly`) and
+`InternalizeActionArgs` whole (`:971`; `tx` now an array) over its JSON-RPC,
+the reference storage server's shapes; its own `inputBeef` field is its own
+and does not move.
 
 ### Notes: cross-SDK parity (#105)
 
-What #105 recorded and this fix leaves, each a JSON shape the owner has not
-ruled: revealSpecificKeyLinkage's request still sends `protocolId` and
-`keyId` (item 7, with the seven other key-related requests; the reference's
-client refuses this crate's request, `The protocolID parameter must be a
-[securityLevel, protocolName] tuple`, recorded in the vector); the certificate
-list and discovery results nest each certificate under `certificate` where
-BRC-100 has it flat (item 3, `0100.md:1298-1307`); the discovery result's
-`certifierInfo`, `publiclyRevealedKeyring` and `decryptedFields` are optional
-(item 4); a public-key `keyringRevealer` is `{"publicKey": ..}` where BRC-100
-has the bare hex; the action calls' BEEF, transaction and txid encodings and
-`hashToDirectlySign` (items 5, 6, 8). `wallet::Certificate` (built by
+What #105 recorded and this fix leaves. Item 4: the discovery entry's
+`certifierInfo`, `publiclyRevealedKeyring` and `decryptedFields` are required
+in BRC-100 (`0100.md:1401-1411`) and the reference (`IdentityCertificate`,
+`Wallet.interfaces.ts:877-881`; `IdentityCertifier`'s `iconUrl` and
+`description` too, `:870-875`) and `Option` here, read when absent and
+omitted when `None`: making them required changes the Rust fields' types
+(`IdentityCertificate.certifier_info: IdentityCertifier`,
+`publicly_revealed_keyring` and `decrypted_fields: HashMap<String, String>`,
+`IdentityCertifier.icon_url` and `description: String`), a public shape
+outside this fix, the owner's word with the toolbox (`src/wallet/lookup.rs`
+builds `IdentityCertificate`). `wallet::Certificate` (built by
 `auth::Certificate::to_wallet_certificate`, not carried by the JSON
 substrate) keeps `certificateType`. `spendable` does not move: the wire
 writes `1` for every output listed, where BRC-100 at `5119a9b` permits `0`

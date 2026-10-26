@@ -2,7 +2,7 @@
 //! (`HTTPWalletJSON` sends the args object as given), moved out of
 //! `http_json.rs`: `protocolID` the `[level, name]` pair, `keyID`, and the
 //! two direct hashes as arrays of byte numbers (BRC-100 at `5119a9b`
-//! `wallet/0100.md:1037-1038`, `:1182-1184`, `:1213-1216`;
+//! `wallet/0100.md:981-982`, `:1037-1038`, `:1182-1184`, `:1213-1216`;
 //! `ts-stack@edf6e03` `Wallet.interfaces.ts:665-667`, `:798`, `:813`; #105).
 
 use serde::{Deserialize, Serialize};

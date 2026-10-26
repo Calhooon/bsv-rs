@@ -181,12 +181,12 @@ let result = client.get_public_key(
 
 ### Binary Data Encoding
 
-Binary data in JSON requests/responses uses base64 encoding:
-- `plaintext`, `ciphertext`, `data` - base64
-- `hmac`, `signature` - base64
-- `hash_to_directly_sign`, `hash_to_directly_verify` - hex (32 bytes)
-- `public_key` - hex (33 bytes compressed)
-- `encryptedLinkage`, `encryptedLinkageProof` (the two key-linkage results) - arrays of byte numbers, flat in the result with `protocolID` and `keyID` for the specific one; a certificate's type field is `type` (#105, BRC-100 and the reference's `HTTPWalletJSON`)
+The bodies are BRC-100's and the reference's `HTTPWalletJSON`'s (#105; `wallet/0100.md` at `5119a9b`, `Wallet.interfaces.ts` at `ts-stack@edf6e03`; pinned in both directions by `tests/wallet_http_json_shapes_105.rs`):
+- Bytes are arrays of byte numbers: `plaintext`, `ciphertext`, `data`, `hmac`, `signature`, `hashToDirectlySign`, `hashToDirectlyVerify`, `encryptedLinkage`, `encryptedLinkageProof`, createAction's `inputBEEF`, the action results' `tx` and `signableTransaction.tx`, internalizeAction's `tx`
+- Hex strings: public keys (33 bytes compressed), txids (the action results' `txid`, the options' `knownTxids` and `sendWith`), scripts
+- Base64: `signableTransaction.reference`
+- The key-related requests name `protocolID` (the `[level, name]` pair) and `keyID`; getPublicKey writes `identityKey` only when true; the options name `returnTXIDOnly`
+- A certificate's type field is `type`; list and discovery entries carry the certificate's fields flat; `keyringRevealer` is `"certifier"` or the key's hex; the linkage results are flat
 
 ## Constants
 
