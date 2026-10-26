@@ -133,9 +133,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     /// getVersion answer the wallet's `get_network` and `get_version`, as the
     /// reference's processor does. [`network`](Self::network) and
     /// [`version`](Self::version) return what was given here.
-    #[deprecated(
-        note = "getNetwork and getVersion answer the wallet's get_network and get_version (bsv-rs#222); use WalletWireProcessor::new"
-    )]
+    #[deprecated(note = "getNetwork and getVersion answer the wallet's (bsv-rs#222); use new")]
     pub fn with_config(wallet: W, network: Network, version: impl Into<String>) -> Self {
         Self {
             wallet,
@@ -152,18 +150,14 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
 
     /// Returns the configured network, which no frame carries since
     /// bsv-rs#222: getNetwork and getVersion answer the wallet's.
-    #[deprecated(
-        note = "getNetwork and getVersion answer the wallet's get_network and get_version (bsv-rs#222)"
-    )]
+    #[deprecated(note = "getNetwork and getVersion answer the wallet's (bsv-rs#222)")]
     pub fn network(&self) -> Network {
         self.network
     }
 
     /// Returns the configured version string, which no frame carries since
     /// bsv-rs#222: getNetwork and getVersion answer the wallet's.
-    #[deprecated(
-        note = "getNetwork and getVersion answer the wallet's get_network and get_version (bsv-rs#222)"
-    )]
+    #[deprecated(note = "getNetwork and getVersion answer the wallet's (bsv-rs#222)")]
     pub fn version(&self) -> &str {
         &self.version
     }
@@ -568,11 +562,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let result = self
             .invoke_wallet(WalletCall::GetNetwork, self.wallet.get_network(originator))
             .await?;
-        let code = match result.network {
-            Network::Mainnet => 0u8,
-            Network::Testnet => 1u8,
-        };
-        Ok(vec![code])
+        Ok(vec![u8::from(result.network == Network::Testnet)])
     }
 
     async fn handle_get_version(&self, originator: &str) -> Answer {
