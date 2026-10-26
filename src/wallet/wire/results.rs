@@ -2,10 +2,11 @@
 //! frame needs more than the handler's few lines.
 
 use super::encoding::WireWriter;
+use super::validation::Refusal;
 use crate::wallet::{
-    AuthenticatedResult, CreateHmacResult, CreateSignatureResult, DecryptResult, EncryptResult,
-    KeyLinkageResult, RevealCounterpartyKeyLinkageResult, RevealSpecificKeyLinkageResult,
-    VerifyHmacResult, VerifySignatureResult,
+    AbortActionResult, AuthenticatedResult, CreateHmacResult, CreateSignatureResult, DecryptResult,
+    EncryptResult, KeyLinkageResult, RevealCounterpartyKeyLinkageResult,
+    RevealSpecificKeyLinkageResult, VerifyHmacResult, VerifySignatureResult,
 };
 use crate::Error;
 
@@ -67,6 +68,25 @@ pub(super) fn write_wait_for_authentication_result(
         result.authenticated,
         "Wallet did not affirmatively authenticate",
     )
+}
+
+/// `walletErrors.abortRefused` (`WalletError.ts:79` at `ts-stack@edf6e03`).
+const ABORT_REFUSED: u8 = 8;
+
+/// abortAction's result (bsv-rs#206): an abort is the error byte alone
+/// (`WalletWireProcessor.ts:806-809`); a refusal the reference's error frame,
+/// code 8 (`abortRefused`) in its words (`:797-804`), raised after the wallet
+/// answers and so outside the wrapper. Its client reads 8 as `aborted: false`
+/// (`WalletWireTransceiver.ts:337`).
+pub(super) fn write_abort_action_result(result: &AbortActionResult) -> Result<Vec<u8>, Refusal> {
+    if !result.aborted {
+        return Err(Refusal {
+            code: ABORT_REFUSED,
+            words: "The wallet refused to abort this action because it has already been broadcast"
+                .to_string(),
+        });
+    }
+    Ok(Vec::new())
 }
 
 fn verdict(affirmed: bool, refusal: &str) -> Result<Vec<u8>, Error> {
