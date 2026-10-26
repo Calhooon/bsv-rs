@@ -1542,19 +1542,75 @@ and wrote bytes as given; the sites that put the decoded ciphertext there:
   out (`certificate field <name> is not UTF-8 base64 text: ...`), and serde_json
   refuses bytes that are not UTF-8 on the way in. `to_wallet_certificate` and
   `VerifiableCertificate::to_json_value` write the held text where they wrote
-  its base64 (a non-UTF-8 value, which no certificate this crate or the
-  reference issues carries, is written with U+FFFD in place of its invalid
-  bytes there; those two return no `Result`).
+  its base64.
+- `Certificate::from_binary` held a field value's bytes as given; it refuses
+  one that is not UTF-8 as `InvalidUtf8`, the field named, as the reference's
+  `fromBinary` reads it with `toUTF8Strict` (`Certificate.ts:384`) and BRC-52
+  asks (`0052.md:103`: "Malformed UTF-8 ... MUST NOT be made acceptable by
+  retaining bytes"). `set_field` refuses it the same way and returns
+  `Result<()>`. A value that is not UTF-8 can now be held only by a write into
+  the public `fields` map; `to_wallet_certificate` and `to_json_value`, which
+  return no `Result`, write such a value with U+FFFD in place of its invalid
+  bytes, and their docs say so.
+- The identity client's revelation parser (`parse_output_to_certificate`)
+  aborted the whole resolution on a signature that is not hex; it skips that
+  output, as its sibling parser does and the reference does
+  (`IdentityClient.ts:823-825`).
 
 The keyrings (outside the signature, `0052.md:75,143`) keep their
 representation: raw ciphertext bytes, base64 at the JSON intakes as before.
 
-One public signature moves: `MasterCertificate::create_keyring_for_verifier`
-takes the master keyring after the fields
-(`create_keyring_for_verifier(wallet, certifier, verifier, fields_to_reveal, &cert.fields, &cert.master_keyring, &serial, originator)`),
-which the reference's takes too and the decrypt needs. A certificate issued by
-this crate's `MasterCertificate` before this release does not decrypt under
-the reference's scheme: re-issue it.
+The certificate methods take the reference's parameters (the owner's word of
+2026-10-26, option A: the signature breaks once, in 0.9.0, and never again).
+`cargo semver-checks check-release --baseline-rev origin/beta --features full
+--release-type minor` reports `method_parameter_count_changed` for the six
+below; `set_field`'s return type moves too. Migration, the old call and the
+new:
+
+```text
+create_keyring_for_verifier(w, certifier, verifier, &reveal, &cert.fields, &cert.master_keyring, &serial, originator)
+create_keyring_for_verifier(w, certifier, verifier, &cert.fields, &reveal, &cert.master_keyring, &serial, None, None, originator)
+
+create_certificate_fields(w, &subject, fields, &serial, originator)
+create_certificate_fields(w, &subject, fields, None, None, originator)
+
+master.decrypt_field(w, certifier, name, originator)
+master.decrypt_field(w, certifier, name, None, None, originator)
+
+master.decrypt_fields(w, certifier, originator)
+master.decrypt_fields(w, certifier, None, None, originator)
+
+verifiable.decrypt_field(w, subject, name, originator)
+verifiable.decrypt_field(w, subject, name, None, None, originator)
+
+verifiable.decrypt_fields(w, subject, originator)
+verifiable.decrypt_fields(w, subject, None, None, originator)
+
+cert.set_field(name, value)
+cert.set_field(name, value)?
+```
+
+- `MasterCertificate::create_keyring_for_verifier` takes the subject wallet,
+  the certifier, the verifier, the fields, the fields to reveal, the master
+  keyring, the serial number, `privileged`, `privileged_reason`, then this
+  crate's `originator`: the reference's order (`MasterCertificate.ts:325-346`),
+  the fields now ahead of the fields to reveal and the master keyring a
+  parameter (the decrypt needs it).
+- `privileged: Option<bool>` and `privileged_reason: Option<&str>` are carried
+  as this crate's `EncryptArgs` and `DecryptArgs` carry them (absent the
+  reference's default, `None`), the reason borrowed since one reason goes to
+  every field's call, and passed into each wallet `encrypt` and `decrypt` as
+  the reference passes them: `create_keyring_for_verifier` (`:390-391`,
+  `:400-401`), `create_certificate_fields` (`:254-260`, `:289-290`; its unused
+  serial number dropped, the reference has none), `MasterCertificate::
+  decrypt_field` (`:564-572`, `:596-597`) and `decrypt_fields` (`:512-519`,
+  `:553-554`), `VerifiableCertificate::decrypt_fields`
+  (`VerifiableCertificate.ts:152-156`, `:197-198`) and `decrypt_field`, which
+  it calls. `issue_for_subject` takes none, as `issueCertificateForSubject`
+  takes none (`:437-444`).
+
+A certificate issued by this crate's `MasterCertificate` before this release
+does not decrypt under the reference's scheme: re-issue it.
 
 Pinned by `tests/auth_certificate_field_value_261.rs` and
 `src/identity/client_field_value_261_tests.rs` on the witnesses
@@ -1571,7 +1627,12 @@ under the master, verifier and anyone keyrings (`DecryptionFailed` on the
 base); a certificate issued here holds canonical base64 text, its bytes are
 the reference's `toBinary(true)` of its JSON, and the reference verifies it
 (`true`) and decrypts it to its plaintexts; a value that is not UTF-8 is
-refused at the JSON intake and the JSON writer.
+refused at the JSON intake and the JSON writer, at `from_binary` and at
+`set_field`. `tests/auth_certificate_privileged_261.rs`: a recording wallet
+sees `privileged: true` and the reason on each `encrypt` and `decrypt` of the
+five methods, and neither on an unprivileged call (red on a copy that takes
+the pair and does not pass it). The identity client skipping a malformed
+signature's output: `a_malformed_signature_skips_its_output_and_the_resolution_goes_on`.
 
 ### Notes: cross-SDK parity (#261)
 
@@ -1584,10 +1645,17 @@ ciphertext decodes it at the decrypt site:
 crate's `Certificate` serde stays where it was and is not the reference's
 JSON: `certType` where the reference writes `type`, the signature an array of
 numbers where it writes hex, the keyrings arrays of numbers where it writes
-base64 (a line in `CLAUDE.md`'s list). `bsv-wallet-toolbox-rs` decodes each
-field on intake (`src/wallet/certificate_issuance.rs:553-556`,
-`BASE64.decode` then `set_field`) and must pass the string's bytes through
-with this release.
+base64 (a line in `CLAUDE.md`'s list). `bsv-wallet-toolbox-rs` (at `6317222`) moves in three
+places with this release: its intake decodes each field
+(`src/wallet/certificate_issuance.rs:553-556`, `BASE64.decode` then
+`set_field`) and must pass the string's bytes through, `set_field` now a
+`Result`; its own issuance (`create_certificate_fields_for_issuance`,
+`certificate_issuance.rs:346-384`) is this crate's old scheme, the wallet
+encrypting the plaintext and the master keyring a copy of the ciphertext; and
+its own keyring helper (`create_keyring_for_verifier`,
+`src/wallet/wallet.rs:3127`) reads the keyring that issuance writes. Once the
+issuance and the helper move to the reference's scheme, every certificate the
+toolbox issued under the old one is re-issued.
 
 ## [0.9.0-beta.1] - 2026-10-26
 

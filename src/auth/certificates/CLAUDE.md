@@ -110,11 +110,11 @@ time and nowhere earlier (#261):
 | `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249) |
 | `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
 | `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249) |
-| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249) |
+| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249); a field value that is not UTF-8 refused as `InvalidUtf8` (`Certificate.ts:384`, #261) |
 | `signing_hash()` | Get SHA-256 hash for signing |
 | `type_base64()` | Get certificate type as base64 string |
 | `serial_number_base64()` | Get serial number as base64 string |
-| `set_field()` | Set a field value: the bytes of its base64 text; clears `received_unsigned` |
+| `set_field()` | Set a field value: the bytes of its base64 text; `Result`, a value that is not UTF-8 refused (#261); clears `received_unsigned` |
 | `get_field()` | Get a field value as held (its base64 text's bytes) |
 | `field_names()` | Get all field names |
 | `get_field_encryption_key_id_master()` | Key ID for master encryption |
@@ -127,10 +127,10 @@ time and nowhere earlier (#261):
 |--------|---------|
 | `new()` | Create from base certificate and keyring |
 | `issue_for_subject()` | Issue new certificate (async) |
-| `create_certificate_fields()` | Encrypt fields and create keyring (async) |
-| `create_keyring_for_verifier()` | Create verifier-specific keyring from the master keyring (async) |
-| `decrypt_field()` | Decrypt single field (async) |
-| `decrypt_fields()` | Decrypt all fields (async) |
+| `create_certificate_fields()` | Encrypt fields and create keyring (async); `privileged`, `privileged_reason` to each `encrypt` |
+| `create_keyring_for_verifier()` | Create verifier-specific keyring from the master keyring (async); the reference's parameters in its order (`MasterCertificate.ts:325-346`), then `originator` |
+| `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt` |
+| `decrypt_fields()` | Decrypt all fields (async); the same pair |
 | `verify()` | Verify underlying certificate signature |
 
 ### VerifiableCertificate
@@ -209,10 +209,12 @@ let keyring = MasterCertificate::create_keyring_for_verifier(
     &subject_wallet,
     &certifier_public_key,
     &verifier_public_key,
-    &["name".to_string()],  // Only reveal name, not email
     &master_cert.certificate.fields,
+    &["name".to_string()],  // Only reveal name, not email
     &master_cert.master_keyring,
     &master_cert.certificate.serial_number,
+    None,  // privileged
+    None,  // privileged reason
     "app_originator",
 ).await?;
 
