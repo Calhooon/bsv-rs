@@ -71,6 +71,7 @@
 //! `JSON.parse` reads it as `Infinity` and `JSON.stringify` writes `null`
 //! back (a divergence, stated in `CLAUDE.md`).
 
+use serde_json::value::RawValue;
 use serde_json::Value;
 
 /// U+001E record separator used between concatenated Engine.IO
@@ -382,6 +383,36 @@ impl SocketIoPacket {
     }
 }
 
+/// The arguments of an EVENT or ACK packet (the payload of an Engine.IO
+/// message, without the leading `4`) as their JSON texts on the wire.
+///
+/// [`SocketIoPacket::decode`] reads the arguments into `serde_json::Value`,
+/// whose objects sort their keys; a BRC-103 certificateRequest or
+/// certificateResponse is signed over the text as transmitted (#280), so
+/// the transport reads an `authMessage` argument from its text here.
+pub fn decode_event_args_text(raw: &str) -> Result<Vec<Box<RawValue>>, CodecError> {
+    match raw.as_bytes().first() {
+        None => return Err(CodecError::EmptyPacket),
+        Some(b'2') | Some(b'3') => {}
+        Some(_) => {
+            return Err(CodecError::Malformed(
+                "socket.io packet carries no event arguments".into(),
+            ))
+        }
+    }
+    // The type digit is one ASCII byte
+    let mut rest = &raw[1..];
+    if rest.starts_with('/') {
+        rest = match rest.find(',') {
+            Some(comma) => &rest[comma + 1..],
+            None => "",
+        };
+    }
+    let rest = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+    serde_json::from_str(rest)
+        .map_err(|e| CodecError::Malformed(format!("invalid JSON in socket.io payload: {e}")))
+}
+
 // ============================================================================
 // Errors
 // ============================================================================
@@ -417,6 +448,28 @@ impl std::error::Error for CodecError {}
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn event_args_text_keeps_each_argument_as_written() {
+        for raw in [
+            r#"2["authMessage",{"b":1,"a":[2, 3]}]"#,
+            r#"2/chat,["authMessage",{"b":1,"a":[2, 3]}]"#,
+            r#"212["authMessage",{"b":1,"a":[2, 3]}]"#,
+            r#"3/chat,7["authMessage",{"b":1,"a":[2, 3]}]"#,
+        ] {
+            let args = decode_event_args_text(raw).unwrap();
+            assert_eq!(args.len(), 2, "{raw}");
+            assert_eq!(args[0].get(), r#""authMessage""#);
+            assert_eq!(args[1].get(), r#"{"b":1,"a":[2, 3]}"#);
+        }
+        assert_eq!(
+            decode_event_args_text("").unwrap_err(),
+            CodecError::EmptyPacket
+        );
+        for raw in ["0{}", "é[]", "2", "2[", "2/chat"] {
+            assert!(decode_event_args_text(raw).is_err(), "{raw}");
+        }
+    }
 
     // ---------- Engine.IO ----------
 

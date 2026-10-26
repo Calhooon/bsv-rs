@@ -134,6 +134,22 @@ pub trait SocketIoSink: Send + Sync {
             )),
         }
     }
+
+    /// Send an encoded Socket.IO packet (the Engine.IO message payload,
+    /// without the leading `4`) as the text given. [`SocketIoTransport`]
+    /// sends every `authMessage` EVENT through this method, since a
+    /// certificateRequest's and a certificateResponse's signatures cover
+    /// their JSON text as transmitted (#280). The default decodes the
+    /// packet and forwards it to [`SocketIoSink::send_socketio`], whose
+    /// `serde_json::Value` arguments sort object keys: override it to
+    /// write the text (`EngineIoPacket::Message(packet.to_string())`) and
+    /// keep a multi-key certificate's signature valid on the wire.
+    fn send_socketio_text(&self, packet: &str) -> std::result::Result<(), String> {
+        match SocketIoPacket::decode(packet) {
+            Ok(sio) => self.send_socketio(&sio),
+            Err(e) => Err(format!("send_socketio_text default: {e}")),
+        }
+    }
 }
 
 /// An inbound frame source for [`run_dispatch`].
@@ -211,17 +227,14 @@ impl<S: SocketIoSink + Clone + 'static> Transport for SocketIoTransport<S> {
         // namespace. The byte form is identical to the canonical TS
         // `socket.emit('authMessage', message)` because socket.io-client
         // serializes via `JSON.stringify` exactly as `serde_json` does
-        // the camelCase `AuthMessage`.
-        let json = serde_json::to_value(message).map_err(|e| {
+        // the camelCase `AuthMessage`. The message's text is written as
+        // serialized, never through a `Value`, which would sort the keys
+        // of the signed certificate texts (#280).
+        let json = serde_json::to_string(message).map_err(|e| {
             crate::Error::AuthError(format!("SocketIoTransport::send: serialize: {e}"))
         })?;
-        let pkt = SocketIoPacket::Event {
-            nsp: "/".to_string(),
-            ack_id: None,
-            data: vec![Value::String("authMessage".to_string()), json],
-        };
         self.sink
-            .send_socketio(&pkt)
+            .send_socketio_text(&format!("2[\"authMessage\",{json}]"))
             .map_err(|e| crate::Error::TransportFault {
                 // The sink cannot say how much of the frame it wrote
                 fault: crate::TransportFault::MayHaveBeenReceived,
@@ -291,9 +304,14 @@ pub async fn run_dispatch<F, S>(
                 };
                 if let SocketIoPacket::Event { data, .. } = sio {
                     if data.len() >= 2 && data[0].as_str() == Some("authMessage") {
-                        let auth_msg: AuthMessage = match serde_json::from_value(data[1].clone()) {
-                            Ok(m) => m,
-                            Err(_) => continue,
+                        // From the argument's text, which keeps the signed
+                        // certificate texts as transmitted (#280)
+                        let auth_msg: AuthMessage = match codec::decode_event_args_text(&payload)
+                            .ok()
+                            .and_then(|args| serde_json::from_str(args.get(1)?.get()).ok())
+                        {
+                            Some(m) => m,
+                            None => continue,
                         };
 
                         // Synchronously invoke the callback under the lock
