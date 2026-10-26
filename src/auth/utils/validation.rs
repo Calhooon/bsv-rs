@@ -246,18 +246,13 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
                 .with_fields(cert_result.certificate.fields.clone())
                 .with_signature(signature);
 
-        // Convert keyring
-        let keyring: std::collections::HashMap<String, Vec<u8>> = prove_result
-            .keyring_for_verifier
-            .iter()
-            .filter_map(|(k, v)| {
-                crate::primitives::from_base64(v)
-                    .ok()
-                    .map(|decoded| (k.clone(), decoded))
-            })
-            .collect();
-
-        let verifiable = VerifiableCertificate::new(base_cert, keyring);
+        // The keyring held as its base64 text, decoded only where the
+        // verifier's wallet decrypts (#268), as the reference holds the
+        // wallet's `keyringForVerifier` strings (`ts-stack@edf6e03`
+        // `getVerifiableCertificates.ts:92-104`); an entry that did not
+        // decode was dropped here before.
+        let verifiable =
+            VerifiableCertificate::new(base_cert, prove_result.keyring_for_verifier.clone());
         verifiable_certs.push(verifiable);
     }
 
@@ -612,8 +607,8 @@ mod tests {
         cert_inner.sign(&certifier).unwrap();
 
         let mut keyring = HashMap::new();
-        keyring.insert("name".to_string(), vec![1, 2, 3]);
-        keyring.insert("email".to_string(), vec![4, 5, 6]);
+        keyring.insert("name".to_string(), "AQID".to_string());
+        keyring.insert("email".to_string(), "BAUG".to_string());
 
         let cert = VerifiableCertificate::new(cert_inner, keyring);
 

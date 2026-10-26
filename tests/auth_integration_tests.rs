@@ -10,7 +10,7 @@ use bsv_rs::auth::{
     AuthMessage, Certificate, MessageType, PeerSession, RequestedCertificateSet, SessionManager,
     VerifiableCertificate,
 };
-use bsv_rs::primitives::PrivateKey;
+use bsv_rs::primitives::{to_base64, PrivateKey};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -421,7 +421,7 @@ fn test_verifiable_certificate_creation() {
 
     // Create verifiable certificate with keyring
     let mut keyring = HashMap::new();
-    keyring.insert("name".to_string(), b"decryption_key".to_vec());
+    keyring.insert("name".to_string(), to_base64(b"decryption_key"));
 
     let verifiable = VerifiableCertificate::new(cert.clone(), keyring);
 
@@ -659,7 +659,7 @@ fn test_verifiable_certificate_json_roundtrip() {
     cert.sign(&certifier_key).unwrap();
 
     let mut keyring = HashMap::new();
-    keyring.insert("field1".to_string(), b"key1".to_vec());
+    keyring.insert("field1".to_string(), to_base64(b"key1"));
 
     let verifiable = VerifiableCertificate::new(cert, keyring);
 
@@ -1976,7 +1976,7 @@ fn test_verifiable_certificate_with_garbage_keyring() {
 
     // Create VerifiableCertificate with garbage keyring
     let mut garbage_keyring = HashMap::new();
-    garbage_keyring.insert("name".to_string(), vec![0xFF, 0xFE, 0xFD, 0xFC]);
+    garbage_keyring.insert("name".to_string(), to_base64(&[0xFF, 0xFE, 0xFD, 0xFC]));
 
     let verifiable = VerifiableCertificate::new(cert, garbage_keyring);
 
@@ -2056,7 +2056,10 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
 
     // Create VerifiableCertificate with garbage keyring bytes
     let mut garbage_keyring = HashMap::new();
-    garbage_keyring.insert("name".to_string(), vec![0x00, 0x01, 0x02, 0x03, 0x04]);
+    garbage_keyring.insert(
+        "name".to_string(),
+        to_base64(&[0x00, 0x01, 0x02, 0x03, 0x04]),
+    );
 
     let mut verifiable =
         VerifiableCertificate::new(master_cert.certificate.clone(), garbage_keyring);

@@ -23,15 +23,20 @@ pub struct MasterCertificate {
     #[serde(flatten)]
     pub certificate: Certificate,
 
-    /// Master keyring: field_name -> encrypted_master_key.
-    /// The master key is encrypted from certifier to subject.
+    /// Master keyring: field_name -> the base64 text of the field's
+    /// revelation key encrypted from certifier to subject, held as the
+    /// reference's `Record<CertificateFieldNameUnder50Bytes, Base64String>`
+    /// (`ts-stack@edf6e03` `MasterCertificate.ts:173`) and Go's
+    /// `map[..]wallet.StringBase64` (`go-sdk@2ca481c`
+    /// `auth/certificates/master.go:34`) hold it, and written so in JSON;
+    /// decoded only where the wallet decrypts (#268).
     #[serde(default)]
-    pub master_keyring: HashMap<String, Vec<u8>>,
+    pub master_keyring: HashMap<String, String>,
 }
 
 impl MasterCertificate {
     /// Creates a new master certificate from a base certificate and keyring.
-    pub fn new(certificate: Certificate, master_keyring: HashMap<String, Vec<u8>>) -> Self {
+    pub fn new(certificate: Certificate, master_keyring: HashMap<String, String>) -> Self {
         Self {
             certificate,
             master_keyring,
@@ -46,7 +51,7 @@ impl MasterCertificate {
     /// and writes it, `0052.md:97`; #261), and the master keyring holds the
     /// symmetric key encrypted by the creator's wallet to the subject under
     /// protocol `[2, "certificate field encryption"]` and key ID the field
-    /// name, as the raw ciphertext.
+    /// name, as that ciphertext's base64 text (`:292-298`; #268).
     ///
     /// # Arguments
     /// * `creator_wallet` - Wallet for encryption (certifier's wallet)
@@ -65,7 +70,7 @@ impl MasterCertificate {
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: &str,
-    ) -> Result<(HashMap<String, String>, HashMap<String, Vec<u8>>)> {
+    ) -> Result<(HashMap<String, String>, HashMap<String, String>)> {
         let mut encrypted_fields = HashMap::new();
         let mut master_keyring = HashMap::new();
 
@@ -89,7 +94,7 @@ impl MasterCertificate {
                     originator,
                 )
                 .await?;
-            master_keyring.insert(field_name, encrypt_result.ciphertext);
+            master_keyring.insert(field_name, to_base64(&encrypt_result.ciphertext));
         }
 
         Ok((encrypted_fields, master_keyring))
@@ -109,7 +114,8 @@ impl MasterCertificate {
     /// * `verifier` - Verifier's public key
     /// * `fields` - The certificate's field values (base64 text)
     /// * `fields_to_reveal` - List of field names to reveal
-    /// * `master_keyring` - The master keyring (encrypted revelation keys)
+    /// * `master_keyring` - The master keyring (encrypted revelation keys,
+    ///   base64 text)
     /// * `serial_number` - Certificate serial number
     /// * `privileged` - The reference's `privileged`, passed to each `decrypt`
     ///   and `encrypt` (`:384-402`)
@@ -117,7 +123,8 @@ impl MasterCertificate {
     /// * `originator` - Application originator
     ///
     /// # Returns
-    /// Keyring for the verifier: field_name -> encrypted revelation key
+    /// Keyring for the verifier: field_name -> the base64 text of the
+    /// encrypted revelation key (`:405`; #268)
     #[allow(clippy::too_many_arguments)]
     pub async fn create_keyring_for_verifier<W: WalletInterface>(
         subject_wallet: &W,
@@ -125,12 +132,12 @@ impl MasterCertificate {
         verifier: &PublicKey,
         fields: &HashMap<String, String>,
         fields_to_reveal: &[String],
-        master_keyring: &HashMap<String, Vec<u8>>,
+        master_keyring: &HashMap<String, String>,
         serial_number: &[u8; 32],
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: &str,
-    ) -> Result<HashMap<String, Vec<u8>>> {
+    ) -> Result<HashMap<String, String>> {
         let mut keyring = HashMap::new();
 
         for field_name in fields_to_reveal {
@@ -167,7 +174,7 @@ impl MasterCertificate {
                 )
                 .await?;
 
-            keyring.insert(field_name.clone(), re_encrypted.ciphertext);
+            keyring.insert(field_name.clone(), to_base64(&re_encrypted.ciphertext));
         }
 
         Ok(keyring)
@@ -175,12 +182,13 @@ impl MasterCertificate {
 
     /// Decrypts a field's revelation key from the master keyring and the
     /// field value with it (the reference's `MasterCertificate.decryptField`,
-    /// `MasterCertificate.ts:564-625`). Returns the revelation key, 32 bytes,
-    /// and the plaintext.
+    /// `MasterCertificate.ts:564-625`): the keyring entry's base64 text is
+    /// decoded here, for the wallet's decrypt, and nowhere earlier (#268).
+    /// Returns the revelation key, 32 bytes, and the plaintext.
     #[allow(clippy::too_many_arguments)]
     async fn decrypt_with_master_keyring<W: WalletInterface>(
         wallet: &W,
-        master_keyring: &HashMap<String, Vec<u8>>,
+        master_keyring: &HashMap<String, String>,
         counterparty: &PublicKey,
         field_name: &str,
         field_value: &str,
@@ -198,7 +206,7 @@ impl MasterCertificate {
         let decrypted = wallet
             .decrypt(
                 DecryptArgs {
-                    ciphertext: encrypted_key.clone(),
+                    ciphertext: from_base64(encrypted_key)?,
                     protocol_id: field_protocol(),
                     key_id: Certificate::get_field_encryption_key_id_master(field_name),
                     counterparty: Some(Counterparty::Other(counterparty.clone())),

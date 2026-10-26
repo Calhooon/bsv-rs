@@ -422,8 +422,8 @@ pub struct IdentityCertificate {
     pub certificate: VerifiableCertificate,
     /// Information about the certifier.
     pub certifier_info: CertifierInfo,
-    /// Publicly revealed keyring for field decryption.
-    pub publicly_revealed_keyring: HashMap<String, Vec<u8>>,
+    /// Publicly revealed keyring: field name -> encrypted key, base64 text (`Wallet.interfaces.ts:879`, #268).
+    pub publicly_revealed_keyring: HashMap<String, String>,
     /// Decrypted field values.
     pub decrypted_fields: HashMap<String, String>,
 }
