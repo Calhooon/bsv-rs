@@ -667,6 +667,32 @@ async fn a_discovery_trust_outside_1_to_10_is_refused() {
     }
 }
 
+/// `WireReader::read_identity_certificate` refuses a trust byte outside 1 to
+/// 10 as discovery does, through the same check, in its words
+/// (`WalletWireTransceiver.ts:1710`, `:2018-2025`; bsv-rs#247): 0 is Go's zero
+/// value (`go-sdk@2ca481c` `wallet/serializer/identity_certificate.go:26`
+/// writes the byte as is, `:66` reads any byte). Until #247 the reader read
+/// any byte (#184).
+#[tokio::test]
+async fn an_identity_certificate_with_a_trust_outside_1_to_10_is_refused_as_discovery_refuses_it() {
+    let cert = Parts::valid().bytes();
+    for trust in [0u8, 11, 0xff] {
+        let frame = discovery_frame(&cert, trust, &[0], &[0]);
+        let words =
+            format!("Invalid discovery trust: expected an integer from 1 to 10, received {trust}");
+        let read = WireReader::new(&frame[1..]).read_identity_certificate();
+        assert_eq!(read.map(drop), Err(Error::WalletError(words.clone())));
+        assert_eq!(message(discover(frame).await.unwrap_err()), words);
+    }
+    for trust in [1u8, 10] {
+        let frame = discovery_frame(&cert, trust, &[0], &[0]);
+        let mut reader = WireReader::new(&frame[1..]);
+        let read = reader.read_identity_certificate().unwrap();
+        assert_eq!(read.certifier_info.unwrap().trust, trust);
+        assert_eq!(reader.remaining(), 0);
+    }
+}
+
 /// `WalletWireTransceiver.ts:1712-1717`, `:1730-1735`: each count is
 /// `readVarIntNumStrict(false)` and `#requireResponseCollectionLength`
 /// (`:1955-1969`): nine 0xFF are refused by the strict reader, a count past
