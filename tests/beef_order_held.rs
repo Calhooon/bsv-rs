@@ -42,7 +42,7 @@ use bsv_rs::primitives::bsv::sighash::{
 use bsv_rs::primitives::{sha256d, to_hex, PrivateKey, Writer};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_async, verify_stream_structure, AsyncByteSource, Beef, BeefTx,
-    Cursor, Kind, MerklePath, MockChainTracker, Progress, Reason, StreamVerifier, Verdict,
+    Cursor, Kind, MerklePath, MockChainTracker, Progress, Reason, StreamVerifier, Timed, Verdict,
     ATOMIC_BEEF, BEEF_V1, BEEF_V2,
 };
 
@@ -360,6 +360,114 @@ fn a_reversed_beef_is_judged_whatever_its_size() {
             "structure {structure}"
         );
     }
+}
+
+/// A link spending both outputs of `prev` with empty unlocks, paying two
+/// `OP_TRUE` outputs of the chain's value each: one input after another, so
+/// the caller's budget is asked between its two scripts.
+fn spend_both(prev: &Hash32) -> Vec<u8> {
+    let mut v = 1u32.to_le_bytes().to_vec();
+    v.push(2);
+    for vout in 0u32..2 {
+        v.extend_from_slice(prev);
+        v.extend_from_slice(&vout.to_le_bytes());
+        v.push(0);
+        v.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    }
+    v.push(2);
+    for _ in 0..2 {
+        v.extend_from_slice(&beef_chain::SATS.to_le_bytes());
+        v.extend_from_slice(&[1, 0x51]);
+    }
+    v.extend_from_slice(&0u32.to_le_bytes());
+    v
+}
+
+/// The funding transaction (two outputs) and `n - 1` links of two inputs,
+/// newest first.
+fn reversed_two_input_chain(n: usize) -> Vec<u8> {
+    let mut raws = vec![beef_chain::funding()];
+    for _ in 1..n {
+        let prev = sha256d(raws.last().unwrap());
+        raws.push(spend_both(&prev));
+    }
+    raws.reverse();
+    written(BEEF_V2, &raws)
+}
+
+/// The review's fold (bsv-rs#240): the funding transaction, written last,
+/// releases the whole chain, and the reader folds the released links one per
+/// step, each under the caller's budget, a released link's own child
+/// released the same way. A chain of 1,000 newest first: the budget is
+/// asked inside at least the 999 released links, at most once per step (one
+/// link's two scripts); under a budget spent at every ask the reading pauses
+/// inside every released link, a cursor taken at a pause resumes it, and the
+/// verdict is the reading's without a budget. RED on `6f52634` (the funding
+/// transaction's step ran the 999 links' scripts with the budget asked 0
+/// times).
+#[test]
+fn a_released_child_is_folded_one_per_step_under_the_callers_budget() {
+    let n = 1_000;
+    let bytes = reversed_two_input_chain(n);
+    let valid = Verdict::Valid {
+        subject: None,
+        roots: roots(),
+    };
+    assert_eq!(
+        verify_stream(bytes.as_slice(), headers(), None).unwrap(),
+        valid
+    );
+
+    // A budget never spent, its asks counted per step.
+    let mut reader = StreamVerifier::new(bytes.as_slice(), headers(), None);
+    let (mut asks, mut most, mut steps) = (0usize, 0usize, 0usize);
+    let verdict = loop {
+        let mut here = 0usize;
+        let timed = reader
+            .step_until(&mut || {
+                here += 1;
+                false
+            })
+            .unwrap();
+        asks += here;
+        most = most.max(here);
+        steps += 1;
+        match timed {
+            Timed::Progress(Progress::Verdict(verdict)) => break verdict,
+            Timed::Progress(Progress::Stepped) => {}
+            Timed::Paused => panic!("a budget never spent paused"),
+        }
+    };
+    assert_eq!(verdict, valid);
+    assert!(asks >= n - 1, "the budget was asked {asks} times");
+    assert_eq!(most, 1, "one released link's two scripts per step");
+    // The BUMP, n entries read, n - 1 links released, the verdict.
+    assert_eq!(steps, 1 + n + (n - 1) + 1);
+
+    // A budget spent at every ask: a pause inside every released link; every
+    // hundredth pause through a cursor's bytes.
+    let mut reader = StreamVerifier::new(bytes.as_slice(), headers(), None);
+    let mut pauses = 0usize;
+    let verdict = loop {
+        match reader.step_until(&mut || true).unwrap() {
+            Timed::Progress(Progress::Verdict(verdict)) => break verdict,
+            Timed::Progress(Progress::Stepped) => {}
+            Timed::Paused => {
+                pauses += 1;
+                if pauses.is_multiple_of(100) {
+                    let cursor = reader.cursor();
+                    assert_eq!(cursor.input_reached(), Some(1));
+                    assert!(cursor.offset() as usize == bytes.len());
+                    let decoded = Cursor::from_binary(&cursor.to_binary()).unwrap();
+                    assert_eq!(decoded, cursor);
+                    let rest = &bytes[decoded.offset() as usize..];
+                    reader = StreamVerifier::resume(decoded, rest, headers());
+                }
+            }
+        }
+    };
+    assert_eq!(verdict, valid);
+    assert_eq!(pauses, n - 1);
 }
 
 /// A cursor taken while children are held carries them (BSC4) and resumes
