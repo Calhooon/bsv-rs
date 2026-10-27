@@ -28,7 +28,8 @@ fn client(server: &MockServer, timeout: Duration) -> HttpWalletJson {
         .timeout(timeout)
         .build()
         .unwrap();
-    HttpWalletJson::with_client(client, None, Some(server.uri()))
+    HttpWalletJson::with_client(client, Some("app.example.com".into()), Some(server.uri()))
+        .expect("the substrate is configured")
 }
 
 pub async fn record(suite: &mut Suite) {
@@ -221,7 +222,12 @@ async fn errors(server: &MockServer) -> Vec<Value> {
         .timeout(Duration::from_secs(2))
         .build()
         .unwrap();
-    let wallet = HttpWalletJson::with_client(client, None, Some(format!("http://{address}")));
+    let wallet = HttpWalletJson::with_client(
+        client,
+        Some("app.example.com".into()),
+        Some(format!("http://{address}")),
+    )
+    .expect("the substrate is configured");
     let peer = async move {
         let (stream, _) = listener.accept().await.unwrap();
         stream.readable().await.unwrap();

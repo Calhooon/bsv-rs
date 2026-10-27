@@ -18,7 +18,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
 | `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
 | `proto_wallet.rs` | ProtoWallet struct + WalletInterface impl; reads neither `privileged` nor `seek_permission`, as the reference's ProtoWallet does not | ~1284 |
-| `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282) and `validation/internalize.rs` (#117) re-exported from it | ~1130 |
+| `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
 | `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
@@ -32,6 +32,7 @@ Transport layer implementations for wallet communication (requires `http` featur
 - `mod.rs` - Module definitions, re-exports, `SECURE_JSON_URL` constant
 - `http_json.rs` - JSON over HTTP substrate (`HttpWalletJson`)
 - `http_wire.rs` - Binary wire protocol over HTTP substrate (`HttpWalletWire`)
+- `origin.rs` - The base-URL and origin-header rules both share, the client that follows no redirect (#323); the constructors return `Result`, the originator validated and required at a JSON call
 - See `substrates/CLAUDE.md` for details
 
 ### wire/
@@ -175,7 +176,8 @@ The `validation` module (`validation.rs`) provides 40+ validation functions for 
 | Satoshis | `validate_satoshis` (with optional min) |
 | Integers | `validate_integer`, `validate_integer_u32`, `validate_positive_integer_or_zero` |
 | Strings | `validate_string_length`, `validate_optional_string_length`, `validate_hex_string`, `validate_optional_hex_string`, `validate_base64_string`, `validate_optional_base64_string`, `is_hex_string` |
-| Identifiers | `validate_basket`, `validate_optional_basket`, `validate_label`, `validate_tag`, `validate_originator` (all normalize to lowercase, trim whitespace) |
+| Identifiers | `validate_basket`, `validate_optional_basket`, `validate_label`, `validate_tag` (all normalize to lowercase, trim whitespace) |
+| Originator | `validate_originator` (`validation/originator.rs`, #323): the reference's `validateOriginator` (`validationHelpers.ts:996-1037` at `ts-stack@edf6e03`): trimmed, lower-cased, 1 to 250 bytes, a canonical DNS hostname (parts 1 to 63 bytes of `[a-z0-9]`, inner hyphens) with an optional port (1 to 5 digits, at most 65535) dropped from the answer; each refusal `WalletRefusal` of class `InvalidParameter` in the reference's words (`The originator parameter must be a canonical DNS hostname with an optional port`); both HTTP substrates call it at construction |
 | Outpoints | `parse_wallet_outpoint`, `validate_outpoint_string`, `validate_optional_outpoint_string` |
 | Descriptions | `validate_description_5_2000`, `validate_description_5_50` |
 | Actions | `validate_create_action_args`, `validate_create_action_input` (`validation/create_action_input.rs`), `validate_create_action_output`, `validate_create_action_options`, `validate_sign_action_spend`; an input's empty `unlockingScript` refused in the reference's words (`The unlockingScript parameter must be hexadecimal string.`, `validationHelpers.ts:595` at `ts-stack@edf6e03`) and an `unlockingScriptLength` of 0 as BRC-100's positive integer (`0100.md:649`; the reference permits it, `:598`), both `WalletRefusal` of class `InvalidParameter` (#282) |

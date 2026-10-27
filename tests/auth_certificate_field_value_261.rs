@@ -196,7 +196,8 @@ async fn a_reference_issued_certificate_from_a_wallet_json_result_verifies_and_d
         .mount(&server)
         .await;
 
-    let wallet = HttpWalletJson::new(Some("test".into()), Some(server.uri()));
+    let wallet = HttpWalletJson::new(Some("test".into()), Some(server.uri()))
+        .expect("the substrate is configured");
     let mut requested = RequestedCertificateSet::new();
     requested.add_certifier(c.certifier.clone());
     requested.add_type(c.cert_type.clone(), r.plaintexts.keys().cloned().collect());

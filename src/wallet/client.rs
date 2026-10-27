@@ -157,17 +157,19 @@ impl WalletClient {
                 self.auto_detect().await?;
             }
             SubstrateType::JsonApi => {
-                let client = HttpWalletJson::new(self.originator.clone(), None);
+                let client = HttpWalletJson::new(self.originator.clone(), None)?;
                 self.connected = Some(ConnectedSubstrate::JsonApi(client));
             }
             SubstrateType::Cicada => {
-                let wire = HttpWalletWire::new(self.originator.clone(), None);
+                let wire = HttpWalletWire::new(self.originator.clone(), None)?;
                 let transceiver = WalletWireTransceiver::new(wire);
                 self.connected = Some(ConnectedSubstrate::WireApi(transceiver));
             }
             SubstrateType::SecureJsonApi => {
-                let client =
-                    HttpWalletJson::new(self.originator.clone(), Some(SECURE_JSON_URL.to_string()));
+                let client = HttpWalletJson::new(
+                    self.originator.clone(),
+                    Some(SECURE_JSON_URL.to_string()),
+                )?;
                 self.connected = Some(ConnectedSubstrate::JsonApi(client));
             }
         }
@@ -185,7 +187,7 @@ impl WalletClient {
 
         // Try secure JSON API first
         let secure_client =
-            HttpWalletJson::new(Some(originator.clone()), Some(SECURE_JSON_URL.to_string()));
+            HttpWalletJson::new(self.originator.clone(), Some(SECURE_JSON_URL.to_string()))?;
         if let Ok(version) = secure_client.get_version(&originator).await {
             if !version.is_empty() {
                 self.connected = Some(ConnectedSubstrate::JsonApi(secure_client));
@@ -194,7 +196,7 @@ impl WalletClient {
         }
 
         // Try standard JSON API
-        let json_client = HttpWalletJson::new(Some(originator.clone()), None);
+        let json_client = HttpWalletJson::new(self.originator.clone(), None)?;
         if let Ok(version) = json_client.get_version(&originator).await {
             if !version.is_empty() {
                 self.connected = Some(ConnectedSubstrate::JsonApi(json_client));
@@ -203,7 +205,7 @@ impl WalletClient {
         }
 
         // Try wire protocol
-        let wire = HttpWalletWire::new(Some(originator.clone()), None);
+        let wire = HttpWalletWire::new(self.originator.clone(), None)?;
         let wire_client = WalletWireTransceiver::new(wire);
         if let Ok(version) = wire_client.get_version(&originator).await {
             if !version.is_empty() {

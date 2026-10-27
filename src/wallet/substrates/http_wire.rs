@@ -4,6 +4,7 @@
 //! enabling wallet communication over HTTP using the efficient binary wire protocol.
 
 use crate::transaction::broadcasters::transport_fault as fault;
+use crate::wallet::validation::validate_originator;
 use crate::wallet::wire::{WalletCall, WalletWire};
 use crate::{Error, TransportFault};
 use reqwest::{Client, StatusCode};
@@ -26,8 +27,19 @@ use reqwest::{Client, StatusCode};
 /// - Method: POST
 /// - URL: `{base_url}/{call_name}` (e.g., `http://localhost:3301/getPublicKey`)
 /// - Content-Type: `application/octet-stream`
-/// - Headers: `Origin` header set from originator if present
+/// - Headers: `Origin`, the frame's originator as `validate_originator`
+///   normalized it, raw (no origin form), empty when the frame has none
 /// - Body: The raw payload bytes
+///
+/// # The originator (#323)
+///
+/// The reference's rule (`ts-stack@edf6e03` `HTTPWalletWire.ts:17-20`,
+/// `:50-66`): the constructor validates the originator and normalizes the
+/// base URL (an exact origin, cleartext only to a loopback host); a frame's
+/// originator is validated, and when one is configured the frame's must
+/// equal it, else the frame is refused unsent. The client `new` builds
+/// follows no redirect (`redirect: 'error'`); a client given to
+/// `with_client` is used as given.
 ///
 /// # Example
 ///
@@ -35,16 +47,8 @@ use reqwest::{Client, StatusCode};
 /// use bsv_rs::wallet::substrates::HttpWalletWire;
 /// use bsv_rs::wallet::wire::WalletWireTransceiver;
 ///
-/// // Create wire transport
-/// let wire = HttpWalletWire::new(
-///     Some("myapp.example.com".into()),
-///     None, // Uses default http://localhost:3301
-/// );
-///
-/// // Wrap with transceiver for high-level wallet operations
+/// let wire = HttpWalletWire::new(Some("myapp.example.com".into()), None)?;
 /// let wallet = WalletWireTransceiver::new(wire);
-///
-/// // Make wallet calls
 /// let version = wallet.get_version("myapp.example.com").await?;
 /// ```
 pub struct HttpWalletWire {
@@ -53,57 +57,66 @@ pub struct HttpWalletWire {
     originator: Option<String>,
 }
 
+/// The reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletWire.ts:9`).
+const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
+
 impl HttpWalletWire {
-    /// Creates a new HTTP wallet wire transport.
+    /// Creates a wire to the wallet at `base_url` (default
+    /// `http://localhost:3301`) on a client that follows no redirect.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `originator` - Optional originator identifier for the client
-    /// * `base_url` - Optional base URL; defaults to `http://localhost:3301`
-    ///
-    /// # Example
-    ///
-    /// ```rust,ignore
-    /// // With defaults
-    /// let wire = HttpWalletWire::new(None, None);
-    ///
-    /// // With custom originator and URL
-    /// let wire = HttpWalletWire::new(
-    ///     Some("myapp.example.com".into()),
-    ///     Some("https://wallet.example.com:3301".into()),
-    /// );
-    /// ```
-    pub fn new(originator: Option<String>, base_url: Option<String>) -> Self {
-        Self {
-            client: Client::new(),
-            base_url: base_url.unwrap_or_else(|| super::DEFAULT_WIRE_URL.to_string()),
-            originator,
-        }
+    /// The originator and the base URL refused as the type's doc says.
+    pub fn new(originator: Option<String>, base_url: Option<String>) -> Result<Self, Error> {
+        Self::with_client(super::origin::default_client()?, originator, base_url)
     }
 
-    /// Creates a new HTTP wallet wire transport with a custom HTTP client.
+    /// Creates a wire on `client`, used as given (its redirect policy too).
     ///
-    /// This allows configuration of timeouts, TLS settings, proxies, etc.
+    /// # Errors
+    ///
+    /// As [`HttpWalletWire::new`].
     pub fn with_client(
         client: Client,
         originator: Option<String>,
         base_url: Option<String>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let originator = validate_originator(originator.as_deref())?;
+        let base_url = base_url.as_deref().unwrap_or(super::DEFAULT_WIRE_URL);
+        Ok(Self {
             client,
-            base_url: base_url.unwrap_or_else(|| super::DEFAULT_WIRE_URL.to_string()),
+            base_url: super::origin::normalize_wallet_http_base_url(base_url)?,
             originator,
-        }
+        })
     }
 
-    /// Returns the base URL.
+    /// Returns the base URL, the origin the constructor normalized.
     pub fn base_url(&self) -> &str {
         &self.base_url
     }
 
-    /// Returns the originator.
+    /// Returns the originator, as `validate_originator` normalized it.
     pub fn originator(&self) -> Option<&str> {
         self.originator.as_deref()
+    }
+
+    /// The frame's originator, validated, and refused when it is not the
+    /// configured one (`HTTPWalletWire.ts:43-56`).
+    fn frame_originator(&self, bytes: &[u8]) -> Result<Option<String>, Error> {
+        let originator = match bytes {
+            [] => None,
+            bytes => {
+                let text = std::str::from_utf8(bytes)
+                    .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?;
+                validate_originator(Some(text))?
+            }
+        };
+        if self.originator.is_some() && originator != self.originator {
+            return Err(Error::WalletError(
+                "Wallet Wire frame originator does not match the configured originator".to_string(),
+            ));
+        }
+        Ok(originator)
     }
 }
 
@@ -113,6 +126,11 @@ impl WalletWire for HttpWalletWire {
         // Parse the message header to extract call code and originator
         if message.is_empty() {
             return Err(Error::WalletError("empty message".to_string()));
+        }
+        if message.len() > MAX_WALLET_WIRE_FRAME_BYTES {
+            return Err(Error::WalletError(
+                "HTTPWalletWire request exceeds the maximum permitted size".to_string(),
+            ));
         }
 
         // First byte is the call code
@@ -128,18 +146,17 @@ impl WalletWire for HttpWalletWire {
         }
         let originator_len = message[1] as usize;
 
-        // Extract originator string
+        if originator_len > 250 {
+            return Err(Error::WalletError(format!(
+                "Invalid originator length: expected at most 250 bytes, received {originator_len}"
+            )));
+        }
         if message.len() < 2 + originator_len {
             return Err(Error::WalletError(
                 "message too short for originator".to_string(),
             ));
         }
-        let originator = if originator_len > 0 {
-            String::from_utf8(message[2..2 + originator_len].to_vec())
-                .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?
-        } else {
-            String::new()
-        };
+        let originator = self.frame_originator(&message[2..2 + originator_len])?;
 
         // Remaining bytes are the payload
         let payload = &message[2 + originator_len..];
@@ -147,23 +164,13 @@ impl WalletWire for HttpWalletWire {
         // Build URL
         let url = format!("{}/{}", self.base_url, call_name);
 
-        // Build request
-        let mut request = self
+        // The frame's originator raw, empty when it has none
+        let request = self
             .client
             .post(&url)
             .header("Content-Type", "application/octet-stream")
+            .header("Origin", originator.unwrap_or_default())
             .body(payload.to_vec());
-
-        // Set Origin header from originator (or fallback to configured originator)
-        let origin = if !originator.is_empty() {
-            Some(to_origin_header(&originator))
-        } else {
-            self.originator.as_ref().map(|o| to_origin_header(o))
-        };
-
-        if let Some(origin) = origin {
-            request = request.header("Origin", origin);
-        }
 
         // Send request
         let response = request
@@ -171,6 +178,12 @@ impl WalletWire for HttpWalletWire {
             .await
             .map_err(|e| fault::wallet_error(&e, format!("HTTP request failed: {}", e)))?;
 
+        if response.status().is_redirection() {
+            return Err(super::origin::redirect_refused(
+                response.status(),
+                call_name,
+            ));
+        }
         // Check status: the wire has no busy word, so a fault is the
         // status's, read before the body
         if !response.status().is_success() {
@@ -203,49 +216,28 @@ impl WalletWire for HttpWalletWire {
     }
 }
 
-/// Converts an originator domain to an origin header value.
-fn to_origin_header(originator: &str) -> String {
-    // If it already looks like a URL, use it as-is
-    if originator.starts_with("http://") || originator.starts_with("https://") {
-        originator.to_string()
-    } else {
-        // Convert domain to http:// origin
-        format!("http://{}", originator)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_to_origin_header() {
-        assert_eq!(to_origin_header("example.com"), "http://example.com");
-        assert_eq!(to_origin_header("http://example.com"), "http://example.com");
-        assert_eq!(
-            to_origin_header("https://example.com"),
-            "https://example.com"
-        );
-    }
-
-    #[test]
     fn test_default_url() {
-        let wire = HttpWalletWire::new(None, None);
+        let wire = HttpWalletWire::new(None, None).unwrap();
         assert_eq!(wire.base_url(), "http://localhost:3301");
     }
 
     #[test]
     fn test_custom_url() {
-        let wire = HttpWalletWire::new(None, Some("https://wallet.example.com".into()));
+        let wire = HttpWalletWire::new(None, Some("https://wallet.example.com".into())).unwrap();
         assert_eq!(wire.base_url(), "https://wallet.example.com");
     }
 
     #[test]
     fn test_originator() {
-        let wire = HttpWalletWire::new(Some("myapp.example.com".into()), None);
+        let wire = HttpWalletWire::new(Some("myapp.example.com".into()), None).unwrap();
         assert_eq!(wire.originator(), Some("myapp.example.com"));
 
-        let wire = HttpWalletWire::new(None, None);
+        let wire = HttpWalletWire::new(None, None).unwrap();
         assert_eq!(wire.originator(), None);
     }
 }

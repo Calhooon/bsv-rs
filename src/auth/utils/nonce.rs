@@ -322,7 +322,9 @@ mod tests {
                 .await;
 
             for nonce in [canonical.clone(), legacy.clone()] {
-                let wallet = HttpWalletJson::new(None, Some(server.uri()));
+                let wallet =
+                    HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+                        .expect("the substrate is configured");
                 let answer =
                     tokio::spawn(
                         async move { verify_nonce(&nonce, &wallet, None, "test.app").await },

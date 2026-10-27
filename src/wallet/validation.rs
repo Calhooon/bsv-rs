@@ -32,8 +32,10 @@ use crate::error::{Error, Result};
 use crate::wallet::types::{Outpoint, Protocol, SecurityLevel, TxId, MAX_SATOSHIS};
 mod create_action_input;
 mod internalize;
+mod originator;
 pub use create_action_input::validate_create_action_input;
 pub use internalize::validate_internalize_action_args;
+pub use originator::validate_originator;
 
 // =============================================================================
 // Basic Validation Functions
@@ -492,26 +494,6 @@ pub fn validate_label(s: &str) -> Result<String> {
 /// Validates a tag identifier (1-300 bytes, lowercase, trimmed).
 pub fn validate_tag(s: &str) -> Result<String> {
     validate_identifier(s, "tag", Some(1), Some(300))
-}
-
-/// Validates an originator string.
-///
-/// The originator must be 1-250 bytes total, with each dot-separated part
-/// being 1-63 bytes.
-pub fn validate_originator(s: Option<&str>) -> Result<Option<String>> {
-    let s = match s {
-        Some(s) => s,
-        None => return Ok(None),
-    };
-
-    let s = s.trim().to_lowercase();
-    validate_string_length(&s, "originator", Some(1), Some(250))?;
-
-    for part in s.split('.') {
-        validate_string_length(part, "originator part", Some(1), Some(63))?;
-    }
-
-    Ok(Some(s))
 }
 
 // =============================================================================
