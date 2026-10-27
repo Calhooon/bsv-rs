@@ -663,6 +663,100 @@ measurement before each minor tag, none for a prerelease. The push matrix on
 the protected branches is unchanged (the rule of 2026-10-26). `docs/NIGHTLY.md`
 and `docs/ARCHITECTURE.md` say so.
 
+### Fixed: `HttpWalletJson` reads a code-5 body's `reviewActionResults` as the reference's `HTTPWalletJSON` does, and `ReviewActionsRefusal` carries the reference's five members (#339)
+
+`HttpWalletJson` read a wallet's code-5 body as `WalletRefusal { class:
+ReviewActions, message }` and never read its `reviewActionResults`, so the
+identity revocation's double-spend retry (#327, `src/identity/double_spend.rs`)
+saw no evidence over the JSON substrate. The reference's `HTTPWalletJSON`
+(`ts-stack@edf6e03` `packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:117-241`,
+`:330-341`) builds a `WERR_REVIEW_ACTIONS` from a 400 body with its results
+validated, so its revocation over HTTP retries. Now a 400 body with an own
+`isError`, code 5 and `reviewActionResults` is read as it reads it
+(`src/wallet/substrates/http_json/review_actions.rs`), in its order and words:
+
+| The reference | Now |
+|---|---|
+| `isError` true and a safe-integer code, else `Invalid wallet error envelope` (`:204-206`) | the same |
+| `message` a string of at most 4096 UTF-8 bytes, else `Invalid wallet error message` (`:207`, `:117-122`) | the same |
+| a call other than createAction or signAction: `Invalid <call> wallet error code` (`:210-212`) | the same |
+| `sendWithResults` an array, else `Invalid wallet error sendWithResults` (`:213-215`) | the same |
+| `txid`, `tx`, `noSendChange`, `sendWithResults` through `validateWalletResult` under the request with `returnTXIDOnly: true` (`:219-235`; `WalletResultValidation.ts:1242-1374`): `txid` 32 hex bytes, `tx` a BEEF whose transaction matches it, `noSendChange` canonical outpoints of that transaction (absent for signAction), each send result a txid and a supported status, unique and one of the action's or its `sendWith`; signAction's txid present; a createAction asking for a completed transaction answered with its txid, one deferring signing refused (a code-5 body has no signable transaction); an outcome | the same checks in its words (`Invalid <call> result <field>: expected <expectation>`) |
+| `reviewActionResults` at most 1001 objects, each txid 64 hex digits, one of the action's (its txid or `sendWith`) and not repeated, a status of the four, competing txids and BEEF on a double spend alone, at most 1000 distinct txids not the reviewed one, a BEEF read whole (`Beef.fromBinaryStrict`) holding each (`:131-197`) | the same, each refusal `Invalid wallet error reviewActionResults[<i>]<member>` |
+| `new WERR_REVIEW_ACTIONS(reviewActionResults, sendWithResults, txid, tx, noSendChange)`, its message the constant (`WERR_REVIEW_ACTIONS.ts:17-27`) | `Error::WalletReviewActions` with the five members and the constant |
+
+`ReviewActionsRefusal` carries the reference's five members in its names:
+`review_action_results` (as before), `send_with_results`
+(`Vec<SendWithResult>`), `txid` (`Option<TxId>`), `tx` (`Option<Vec<u8>>`,
+the atomic BEEF) and `no_send_change` (`Option<Vec<Outpoint>>`), beside
+`message`; `ReviewActionsRefusal::with_members` is the reference's
+constructor, `new` unchanged (the four new members empty). It is not
+`#[non_exhaustive]`: the reference's class has carried these five since
+it was written, and a wallet built on this crate constructs it.
+`SendWithResult` derives `PartialEq` and `Eq` for it. `Error::WalletReviewActions`
+is unchanged in shape. The binary wire is unchanged: the processor frames
+the refusal with code 5 and its words and the transceiver reads back the
+`ReviewActions` class, no member on the wire, as the reference's frame
+carries none (`tests/wire_wallet_refusal_class.rs` unchanged and green).
+`double_spend.rs` reads the evidence from the refusal whichever substrate
+built it; only the JSON substrate can carry it.
+
+Migration: a literal `ReviewActionsRefusal { message, review_action_results }`
+adds `send_with_results: vec![]`, `txid: None`, `tx: None` and
+`no_send_change: None` (or calls `ReviewActionsRefusal::new`); a pattern
+with `..` is unaffected. No downstream builds one (`bsv-wallet-toolbox-rs`,
+`bsv-wallet-cli`, `rust-message-box`, `bsv-overlay-cloudflare`,
+`bsv-middleware-cloudflare-public`, `rust-chaintracks` grepped;
+`bsv-wallet-cli` builds `SendWithResult` literally, which the derives do
+not change). A caller that matched `WalletRefusal` of the `ReviewActions`
+class from `HttpWalletJson`'s createAction or signAction gets
+`WalletReviewActions` when the body carries results, or the reference's
+refusal of a malformed member (`WalletError` with its words).
+
+Pinned by `tests/wallet_http_json_review_actions_339.rs` (5 tests) on
+`tests/vectors/wallet_http_json_review_actions_339.json`: 37 code-5 bodies
+answered to signAction, createAction and listActions, each with the
+reference's `HTTPWalletJSON` outcome (its `WERR_REVIEW_ACTIONS` members, or
+the words it threw) at `ts-stack@edf6e03` under Node v22.18.0, recorded by
+`tests/support/wallet_http_json_review_actions_339.mjs` (the competing
+transaction and BEEF #327's), each served through wiremock here: 34 read
+to the reference's outcome, 3 otherwise and enumerated with their reasons
+(below); the five members on signAction (a double spend with its BEEF, two
+send results) and on createAction (txid, BEEF, change outpoint); five
+refusals named; a body without results the `WalletRefusal` of before; and
+the revocation of #327's run `double_spend_then_accepted` with signAction
+answered through the substrate under wiremock (a code-5 body with the
+competing transaction, then the signed one; #327's recording wallet gains
+`sign_via`): the reference's calls, broadcasts and both signAction bodies.
+4 of the 5 red on a copy with the substrate's reading removed (the struct
+kept so the file compiles; the fifth pins the old reading, green on both).
+
+### Notes: cross-SDK parity (#339)
+
+Three bodies are read otherwise than the reference reads them, enumerated
+in the test: a code-5 body without `reviewActionResults` stays the class
+refusal of #137 (`WalletRefusal`; the reference refuses it,
+`Invalid wallet error sendWithResults` or `reviewActionResults`); a code-5
+body at a status other than 400 is the class refusal at any status, as
+#137 reads every class (the reference: `HTTPWalletJSON <call> failed with
+HTTP status <n>`); and the checks `validateWalletResult` makes of a
+returned `tx`'s transaction against the request
+(`validateCreateActionTransaction`, `validateSignActionTransaction`,
+`validateTransactionValueConservation`) are not ported, as the success
+path makes none of them either: a `tx` is read as a BEEF and bound to
+`txid`, its outputs, inputs and values not compared with the request. A
+`tx` or `competingBeef` is read as an array of byte numbers alone (the
+reference's `normalizeBRC100ByteArray` reads its historical byte objects
+too), and `actionBeefTransaction`'s three readings (strict atomic, partial
+atomic, plain) are this crate's one `Beef::from_binary`, the subject the
+transaction of `txid`, else the atomic subject, else the last full one.
+go-sdk@2ca481c's JSON substrate reads no error body as a typed error
+(`wallet/substrates/http_wallet_json.go:62-64`: `HTTP request failed with
+status <n>: <body>`).
+`bsv-wallet-toolbox-rs` answers no review body over HTTP (its storage's
+`notDelayedResults`, `src/storage/traits.rs:289,337`, are its own types),
+so there is nothing of its to compare.
+
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 
 `IdentityClient::revoke_certificate_revelation` took the first output of
