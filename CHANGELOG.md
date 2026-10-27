@@ -95,7 +95,11 @@ new API; `tests/identity_wallet_calls_318.rs` now asserts the reference's
 calls in its order, its stop (`Failed to sign transaction`) and its
 abortAction (4 of 4 red on that copy); the #307, #310, #315 and #318
 witnesses unchanged (the #318 script prints its vector byte for byte).
-`tests/wire_wallet_refusal_class.rs` pins the processor's frame of the
+`tests/identity_spend_witness.rs`'s revocation now revokes the reference's
+token for #318's certificate with the subject's key (its bare PushDrop and
+serial `"serial"` are refused before any spend, as the reference refuses
+them), its mock answering createAction with atomic BEEF as the reference's
+`fromAtomicBEEF` asks. `tests/wire_wallet_refusal_class.rs` pins the processor's frame of the
 new variant (code 5, the reference's words, read back as the class; red
 without the arm, `Wallet operation failed` code 1).
 
