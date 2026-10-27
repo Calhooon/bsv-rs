@@ -9,7 +9,7 @@
 //! `Number(run)` (`:233`): the run trimmed, `0` when nothing is left, the
 //! digits' value otherwise, `NaN` when white space sits between digits. The
 //! payload after the run must be JSON of the type's shape (`isPayloadValid`,
-//! `:256-275`), else `invalid payload` (`:242`).
+//! `:256-274`), else `invalid payload` (`:242`).
 
 use serde_json::Value;
 
@@ -97,7 +97,7 @@ pub(crate) fn read_payload(type_ch: char, payload: &str) -> Result<Option<Value>
     }
 }
 
-/// `isPayloadValid` (`:256-275`): CONNECT an object, DISCONNECT none,
+/// `isPayloadValid` (`:256-274`): CONNECT an object, DISCONNECT none,
 /// CONNECT_ERROR a string or an object, EVENT an array whose head is a
 /// number or a string outside [`RESERVED_EVENTS`], ACK an array.
 fn payload_valid(type_ch: char, value: &Value) -> bool {
