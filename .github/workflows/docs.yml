@@ -1,0 +1,81 @@
+name: Docs
+
+# The checks of the text (the owner's word of 2026-10-27, the keeper's ruling): rustdoc with
+# warnings denied, and the workflows linted. Off the push run (ci.yml runs the required set,
+# nothing more); on demand (`gh workflow run docs.yml --ref <line>`) and called by release.yml
+# on every version tag before it publishes.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+# a newer dispatch on the same ref waits for the one running; a tag's call is never cancelled
+concurrency:
+  group: docs-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ubuntu-docs-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ubuntu-docs-
+
+      - name: Build docs
+        run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+
+  # the workflows linted (bsv-stack-lean #145), shellcheck on every run script: actionlint is built
+  # from its release source, the tarball pinned by sha256. Every `uses:` in every workflow
+  # is pinned by a commit sha with its version beside it (#144)
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 454800bd4f854592bcfe79b161f71d56e35940eb7016e48a26dd356adc9d400a
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Build actionlint from its pinned source
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/archive/refs/tags/v${ACTIONLINT_VERSION}.tar.gz"
+          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/actionlint-${ACTIONLINT_VERSION}"
+          go build -o "$RUNNER_TEMP/bin/actionlint" ./cmd/actionlint
+
+      - name: Every action pinned by a commit sha
+        run: |
+          if grep -nE '^\s*-?\s*uses:' .github/workflows/*.yml | grep -vE 'uses: (\./|[^@ ]+@[0-9a-f]{40} # v)'; then
+            echo "::error::a uses: line above is not pinned by a 40-hex commit sha with its version"
+            exit 1
+          fi
+
+      - name: Lint the workflows
+        run: '"$RUNNER_TEMP/bin/actionlint" -no-color'

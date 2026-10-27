@@ -205,7 +205,7 @@ its reason and its step.
 
 ## Feature and wasm builds
 
-CI's `features` job builds cargo-hack **0.6.45** from source using its release
+The `features` job (`features.yml`, on dispatch and before every tag) builds cargo-hack **0.6.45** from source using its release
 lockfile into `$RUNNER_TEMP/tools`, then runs:
 
 ```sh
@@ -213,8 +213,9 @@ cargo hack check --each-feature --no-dev-deps
 ```
 
 It checks all 21 declared features, plus cargo-hack's empty and all-feature
-cases, without dev-dependency feature unification. The six `wasm32` matrix
-rows use `--target wasm32-unknown-unknown --no-default-features`:
+cases, without dev-dependency feature unification. The six `wasm32` slices
+(`wasm32 (combined)` in `ci.yml` on every event, the other five in
+`features.yml`) use `--target wasm32-unknown-unknown --no-default-features`:
 
 | Consumer | Features |
 | --- | --- |

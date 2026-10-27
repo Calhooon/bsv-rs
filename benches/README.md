@@ -144,10 +144,14 @@ the baseline. A run on a CPU model or core count with no entry exits 3 and names
 the recorded entries; hosted runners draw from several CPUs, so each one the
 job lands on needs its own reviewed entry.
 
-The CI `benchmarks` job runs on a push to `beta` and on the nightly's dispatch
-on `beta`; no pull request runs it (it is not a required check, 2026-10-26).
-`benchmarks-build` compiles every bench with all features on every event but
-a pull request.
+The `benchmarks` job (Benchmark Regression Check) lives in
+[`.github/workflows/bench.yml`](../.github/workflows/bench.yml) with
+`benchmarks-build` (every bench compiled with all features) and the
+scoreboard. No push and no pull request runs it: it judges the runner's load
+as much as the commit (beta's push run went red on it alone, and the owner's
+word of 2026-10-27 took it off the push run). It runs on a dispatch
+(`gh workflow run bench.yml --ref <line>`) and on every version tag, called by
+`release.yml` beside the publish, which it does not hold.
 The seed repository `Calgooon/bsv-script-lean` is private. The captain must
 provision `BSV_SCRIPT_CORPUS_TOKEN` with read access; CI downloads only
 `corpus/seed/seed.jsonl` at the named commit. No wallet or network request is
@@ -156,12 +160,13 @@ repository without the secret) the job warns
 `script_spend skipped: BSV_SCRIPT_CORPUS_TOKEN not set (the script corpus is private)`
 and compares the other eight benches with `--skip script_spend`. Where the
 runner's platform/CPU/cores key has no entry (exit 3) the job warns
-`no baseline entry for <key>: record one with gh workflow run ci.yml -f bench_baseline_record=true` and
+`no baseline entry for <key>: record one with gh workflow run bench.yml -f bench_baseline_record=true` and
 does not fail.
 
 The lane can record the local machine only. To record Linux, the captain
-dispatches CI on the baseline PR's branch with the record input:
-`gh workflow run ci.yml --ref <branch> -f bench_baseline_record=true` (until
+dispatches the bench workflow on the baseline PR's branch with the record input:
+`gh workflow run bench.yml --ref <branch> -f bench_baseline_record=true` (`ci.yml`
+carried the input until 2026-10-27; until
 2026-10-26 a `[bench-baseline-record]` marker in the PR's description did this;
 no pull request runs the job now). That run proposes `linux-baseline.json` as an artifact; it does not commit or
 publish it. Review the machine line and measurements, commit the Linux entry,
