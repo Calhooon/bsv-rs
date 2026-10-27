@@ -136,19 +136,11 @@ fuzz_target!(|data: &[u8]| {
         }
     }
     if let Ok(packet) = SocketIoPacket::decode(text) {
+        // Every decoded frame's encoding reads back to the packet (bsv-rs#110)
         let encoded = packet.encode();
-        // bsv-rs#110: a CONNECT's payload of another JSON type than an object
-        // re-reads as an ack id, and the rest may not decode; skipped until
-        // the ruling.
-        let known = matches!(
-            &packet,
-            SocketIoPacket::Connect { data: Some(v), .. }
-                | SocketIoPacket::ConnectError { data: Some(v), .. } if !v.is_object()
-        );
-        if !known {
-            let again = SocketIoPacket::decode(&encoded).expect("a frame's encoding decodes");
-            assert_eq!(again.encode(), encoded);
-        }
+        let again = SocketIoPacket::decode(&encoded).expect("a frame's encoding decodes");
+        assert_eq!(again, packet);
+        assert_eq!(again.encode(), encoded);
         if let SocketIoPacket::Event { data: args, .. } = &packet {
             if let Some(value) = args.get(1) {
                 if let Ok(parsed) = serde_json::from_value::<AuthMessage>(value.clone()) {

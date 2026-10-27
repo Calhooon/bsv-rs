@@ -171,6 +171,98 @@ outside #318). The contacts manager and the key-value stores send
 signAction the hex of the reference (`src/identity/contacts.rs:447`,
 `:732`, `src/kvstore/global.rs:281`, `:409`, `src/kvstore/local.rs:331`,
 `:438`), the same fault as the revocation's: a finding outside #318.
+### Fixed: the Socket.IO codec reads a frame as `socket.io-parser` reads it, and carries the id on every packet (#110)
+
+`SocketIoPacket::decode` (`src/auth/transports/socketio/codec.rs`) read
+the digit run after the namespace as an ack id on every type, then dropped
+it on CONNECT, DISCONNECT and CONNECT_ERROR, which had no field for it, and
+took any JSON as a CONNECT's or CONNECT_ERROR's payload and any payload on
+a DISCONNECT: `0\n0\n` decoded to a CONNECT carrying the number `0`, which
+encoded as `00`, a CONNECT with an id and no payload; `0000000   8147…`
+read `000000` as an id and the rest as a number, and its encoding did not
+decode at all (the oracle-fuzz lane's two inputs, #82). The reference,
+`socket.io-parser` 4.2.7 (the parser `socket.io` ^4.8.3 ships, which
+`@bsv/authsocket` reaches, `ts-stack@edf6e03`
+`packages/messaging/authsocket/package.json`), reads the run as the id on
+every type and keeps it on the packet (`decodeString`,
+`build/cjs/index.js:220-234`), writes the id of every packet that has one
+(`encodeAsString`, `:90-93`), and judges the payload by the type
+(`isPayloadValid`, `:256-275`): CONNECT an object, DISCONNECT none,
+CONNECT_ERROR a string or an object, EVENT an array whose head is a number
+or a string outside its reserved names (`:16-23`), ACK an array; anything
+else, and a payload that is not JSON, is `invalid payload`. Its id run
+takes a character when `Number(c) == c`: an ASCII digit, or a character
+JavaScript trims as white space, so `0\n0\n` is a CONNECT with the id 0
+there, and so here now. The decoder now reads the id as the reference
+does (`src/auth/transports/socketio/packet_rules.rs`), refuses an id the
+reference reads as `NaN` (white space between digits) or past `u64::MAX`,
+judges the payload by `isPayloadValid` in the reference's words
+(`malformed packet: invalid payload`; a payload that is not JSON
+`invalid payload (invalid JSON: <serde_json's reason>)`), checks the type
+digit before the payload, and `encode` writes the id of every packet that
+carries one and omits an empty namespace as the reference does. The event
+argument reader (`decode_event_args_text`) skips the same id run.
+
+Migration: `SocketIoPacket::Connect`, `Disconnect` and `ConnectError`
+carry `ack_id: Option<u64>`, the reference's own field (the owner's ruling
+of 2026-10-26 on #110); a literal adds `ack_id: None`
+(`SocketIoPacket::Disconnect { nsp: "/".into(), ack_id: None }`) and a
+pattern `..`; `SocketIoPacket::ack_id()` reads it on every type. One downstream enables
+this crate's `socketio` feature: `~/bsv/mpc/bsv-mpc` (`bsv-mpc-messagebox`,
+`bsv-mpc-worker`, at `3674c9b`), on bsv-rs `0.3.13`, so it meets the shape
+only when it moves to this line; it builds `SocketIoPacket::Connect { nsp:
+"/".to_string(), data: None }` at six sites (`transport_native.rs:419`,
+`subscribe.rs:345`, `poc.rs:881`, `:1187`, `:1550`, a test at
+`transport_native_handshake.rs:79`), each adding `ack_id: None`, and reads
+the server's CONNECT with `Connect { .. }`, unchanged. The relay
+(`rust-message-box`) has its own codec (`src/engineio/codec.rs`, on
+bsv-rs 0.4.5, `socketio` not enabled). A frame this
+crate accepted before is refused now where the reference refuses it (a
+CONNECT carrying an array, a string, a number or `null`; a DISCONNECT with
+a payload; an EVENT whose head is `null`, an object or a reserved name; an
+ACK without a payload, which decoded to an empty array and encoded with
+one).
+
+Pinned by `tests/socketio_packet_validity_110.rs` (7 tests) on
+`tests/vectors/socketio_packet_validity_110.json`: 59 frames (the issue's
+two inputs, each packet type with each payload shape, ids with leading
+zeros, past 2^53, at and past `u64::MAX`, white space in and around the
+id run, namespaces with and without the comma, the binary types, an empty
+frame) with the reference's verdict, its encoding of an accepted packet
+and whether that is a fixed point, and the 35 UTF-16 code units its id run
+takes, recorded by `tests/support/socketio_packet_validity_110.mjs`
+running the parser under Node v22.18.0. Every frame the reference refuses
+is refused here in its words; every frame both read is the reference's
+packet and its encoding byte for byte, the encoding reading back to the
+packet; the frames read there and refused here are enumerated with their
+reasons (`REFUSED_HERE`, 14). 7 of the 7 red on the tree with the decoder
+and encoder of before (the shape kept); `socketio_float_round_trip` and
+`socketio_signed_text_280` unchanged. The fuzz target
+`fuzz_auth_messages` asserts the round trip for every decoded frame (the
+skip of #110 removed); the two inputs are its seeds
+(`fuzz/corpus/fuzz_auth_messages/socketio-connect-id-110`,
+`socketio-connect-nan-id-110`), and 120 seconds ran 319,702 inputs
+without a failure.
+
+### Notes: cross-SDK parity (#110)
+
+Where the reference reads a frame and this crate refuses it, a stated
+difference: an id run whose text is `NaN` (`21 2["ev"]`, the issue's
+second input), which the reference encodes as `NaN` and cannot read back;
+an id past `u64::MAX`, which the reference keeps as the nearest double (no
+Socket.IO peer issues one: ids count from 0 on each socket); an EVENT
+without a payload and an ACK without an id or a payload (the reference's
+`data` and `id` undefined; this crate's `Event.data` is a `Vec` and
+`Ack.ack_id` a `u64`); the binary types `5` and `6`, which the reference
+reads and then waits for attachments (no AuthSocket peer sends them); an
+empty frame and a frame whose type character is white space, which the
+reference's `Number(str.charAt(0))` reads as `0`, a CONNECT; a JSON string
+with a lone surrogate escape, which `JSON.parse` keeps and a Rust string
+cannot. Where both read a frame, one difference: an id above 2^53 and
+within `u64` is exact here and the nearest double there, so
+`18446744073709551615` is written back as given here and as
+`18446744073709552000` there. The JSON numbers' differences are #285's.
+go-sdk@2ca481c carries no Socket.IO codec.
 
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 

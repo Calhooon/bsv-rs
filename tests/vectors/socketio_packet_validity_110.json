@@ -1,0 +1,584 @@
+{
+  "issue": "Calhooon/bsv-rs#110",
+  "description": "Socket.IO frames and the reference decoder's verdict on each (the packet, or the error's words), the reference encoder's writing of an accepted packet and whether it is a fixed point, and the UTF-16 code units its id loop reads as part of the digit run; written by tests/support/socketio_packet_validity_110.mjs",
+  "reference": "socket.io-parser 4.2.7 under Node v22.18.0",
+  "id_run_units": [
+    9,
+    10,
+    11,
+    12,
+    13,
+    32,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    160,
+    5760,
+    8192,
+    8193,
+    8194,
+    8195,
+    8196,
+    8197,
+    8198,
+    8199,
+    8200,
+    8201,
+    8202,
+    8232,
+    8233,
+    8239,
+    8287,
+    12288,
+    65279
+  ],
+  "cases": [
+    {
+      "name": "the issue's first fuzz input",
+      "frame": "0\n0\n",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "0",
+      "encoding": "00",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "the issue's second fuzz input",
+      "frame": "0000000   8147419714181474197141034192303419232\n\n\n",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "NaN",
+      "encoding": "0NaN",
+      "encoding_fixed_point": false,
+      "encoding_error": "invalid payload"
+    },
+    {
+      "name": "CONNECT with an id",
+      "frame": "00",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "0",
+      "encoding": "00",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT, an object",
+      "frame": "0{\"a\":1}",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "data_text": "{\"a\":1}",
+      "encoding": "0{\"a\":1}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT, an array",
+      "frame": "0[1]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "CONNECT, a string",
+      "frame": "0\"x\"",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "CONNECT, null",
+      "frame": "0null",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "CONNECT, a number after the id",
+      "frame": "012",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "12",
+      "encoding": "012",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT, not JSON",
+      "frame": "0{",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "CONNECT, no payload",
+      "frame": "0",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "encoding": "0",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT, an id and an object",
+      "frame": "07{\"a\":1}",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "7",
+      "data_text": "{\"a\":1}",
+      "encoding": "07{\"a\":1}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "DISCONNECT",
+      "frame": "1",
+      "accepted": true,
+      "type": 1,
+      "nsp": "/",
+      "encoding": "1",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "DISCONNECT, a payload",
+      "frame": "1{}",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "DISCONNECT, an id",
+      "frame": "13",
+      "accepted": true,
+      "type": 1,
+      "nsp": "/",
+      "id": "3",
+      "encoding": "13",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT_ERROR, a string",
+      "frame": "4\"msg\"",
+      "accepted": true,
+      "type": 4,
+      "nsp": "/",
+      "data_text": "\"msg\"",
+      "encoding": "4\"msg\"",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT_ERROR, an object",
+      "frame": "4{\"message\":\"x\"}",
+      "accepted": true,
+      "type": 4,
+      "nsp": "/",
+      "data_text": "{\"message\":\"x\"}",
+      "encoding": "4{\"message\":\"x\"}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT_ERROR, an array",
+      "frame": "4[1]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "CONNECT_ERROR, a number after the id",
+      "frame": "45",
+      "accepted": true,
+      "type": 4,
+      "nsp": "/",
+      "id": "5",
+      "encoding": "45",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "CONNECT_ERROR, no payload",
+      "frame": "4",
+      "accepted": true,
+      "type": 4,
+      "nsp": "/",
+      "encoding": "4",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "EVENT, a reserved name",
+      "frame": "2[\"connect\"]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "EVENT, each reserved name",
+      "frame": "2[\"newListener\",1]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "EVENT, a number head",
+      "frame": "2[1]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "data_text": "[1]",
+      "encoding": "2[1]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "EVENT, an empty array",
+      "frame": "2[]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "EVENT, an object",
+      "frame": "2{}",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "EVENT, a null head",
+      "frame": "2[null]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "EVENT, an object head",
+      "frame": "2[{}]",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "EVENT, no payload",
+      "frame": "2",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "encoding": "2",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "EVENT, an id and no payload",
+      "frame": "25",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "5",
+      "encoding": "25",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "EVENT, a name",
+      "frame": "2[\"ev\",1]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "data_text": "[\"ev\",1]",
+      "encoding": "2[\"ev\",1]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "ACK with no id",
+      "frame": "3[]",
+      "accepted": true,
+      "type": 3,
+      "nsp": "/",
+      "data_text": "[]",
+      "encoding": "3[]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "ACK, an object",
+      "frame": "3{}",
+      "accepted": false,
+      "error": "invalid payload"
+    },
+    {
+      "name": "ACK with an id",
+      "frame": "30[]",
+      "accepted": true,
+      "type": 3,
+      "nsp": "/",
+      "id": "0",
+      "data_text": "[]",
+      "encoding": "30[]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "ACK with an id and no payload",
+      "frame": "30",
+      "accepted": true,
+      "type": 3,
+      "nsp": "/",
+      "id": "0",
+      "encoding": "30",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "ACK with no id and no payload",
+      "frame": "3",
+      "accepted": true,
+      "type": 3,
+      "nsp": "/",
+      "encoding": "3",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a namespace and no payload",
+      "frame": "0/nsp,",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/nsp",
+      "encoding": "0/nsp,",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a namespace and an object",
+      "frame": "0/nsp,{\"a\":1}",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/nsp",
+      "data_text": "{\"a\":1}",
+      "encoding": "0/nsp,{\"a\":1}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a namespace without its comma",
+      "frame": "0/nsp",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/nsp",
+      "encoding": "0/nsp,",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "the default namespace written",
+      "frame": "0/,",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "encoding": "0",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "an EVENT on a namespace with an id",
+      "frame": "2/nsp,5[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/nsp",
+      "id": "5",
+      "data_text": "[\"ev\"]",
+      "encoding": "2/nsp,5[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a 20-digit id within u64",
+      "frame": "218446744073709551615[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "18446744073709552000",
+      "data_text": "[\"ev\"]",
+      "encoding": "218446744073709552000[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a 20-digit id past u64",
+      "frame": "218446744073709551616[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "18446744073709552000",
+      "data_text": "[\"ev\"]",
+      "encoding": "218446744073709552000[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a 21-digit id",
+      "frame": "2123456789012345678901[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "123456789012345680000",
+      "data_text": "[\"ev\"]",
+      "encoding": "2123456789012345680000[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "an id past 2^53 within u64",
+      "frame": "29007199254740993[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "9007199254740992",
+      "data_text": "[\"ev\"]",
+      "encoding": "29007199254740992[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "an id with leading zeros",
+      "frame": "2007[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "7",
+      "data_text": "[\"ev\"]",
+      "encoding": "27[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a space before the payload",
+      "frame": "2 [\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "0",
+      "data_text": "[\"ev\"]",
+      "encoding": "20[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a space inside the digit run",
+      "frame": "21 2[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "NaN",
+      "data_text": "[\"ev\"]",
+      "encoding": "2NaN[\"ev\"]",
+      "encoding_fixed_point": false,
+      "encoding_error": "invalid payload"
+    },
+    {
+      "name": "spaces around the id",
+      "frame": "2 12 [\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "12",
+      "data_text": "[\"ev\"]",
+      "encoding": "212[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a tab before the id",
+      "frame": "0\t5",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "5",
+      "encoding": "05",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a no-break space before the payload",
+      "frame": "0 {}",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "0",
+      "data_text": "{}",
+      "encoding": "00{}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a BOM before the payload",
+      "frame": "0﻿{}",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "id": "0",
+      "data_text": "{}",
+      "encoding": "00{}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "an ideographic space before the payload",
+      "frame": "2　[\"ev\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "id": "0",
+      "data_text": "[\"ev\"]",
+      "encoding": "20[\"ev\"]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "white space after the payload",
+      "frame": "0{} ",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "data_text": "{}",
+      "encoding": "0{}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a BINARY_EVENT",
+      "frame": "51-[\"ev\",{\"_placeholder\":true,\"num\":0}]",
+      "accepted": true,
+      "type": 5,
+      "nsp": "/",
+      "attachments": 1,
+      "data_text": "[\"ev\",{\"_placeholder\":true,\"num\":0}]",
+      "encoding": "51-[\"ev\",{\"_placeholder\":true,\"num\":0}]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a BINARY_ACK",
+      "frame": "61-0[{\"_placeholder\":true,\"num\":0}]",
+      "accepted": true,
+      "type": 6,
+      "nsp": "/",
+      "id": "0",
+      "attachments": 1,
+      "data_text": "[{\"_placeholder\":true,\"num\":0}]",
+      "encoding": "61-0[{\"_placeholder\":true,\"num\":0}]",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "an unknown type",
+      "frame": "7",
+      "accepted": false,
+      "error": "unknown packet type 7"
+    },
+    {
+      "name": "a letter type",
+      "frame": "x",
+      "accepted": false,
+      "error": "unknown packet type NaN"
+    },
+    {
+      "name": "an empty frame",
+      "frame": "",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "encoding": "0",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a space as the type",
+      "frame": " {\"a\":1}",
+      "accepted": true,
+      "type": 0,
+      "nsp": "/",
+      "data_text": "{\"a\":1}",
+      "encoding": "0{\"a\":1}",
+      "encoding_fixed_point": true
+    },
+    {
+      "name": "a lone surrogate escape",
+      "frame": "2[\"ev\",\"\\ud800\"]",
+      "accepted": true,
+      "type": 2,
+      "nsp": "/",
+      "data_text": "[\"ev\",\"\\ud800\"]",
+      "encoding": "2[\"ev\",\"\\ud800\"]",
+      "encoding_fixed_point": true
+    }
+  ]
+}

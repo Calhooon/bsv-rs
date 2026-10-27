@@ -76,6 +76,7 @@
 //! ```
 
 pub mod codec;
+mod packet_rules;
 
 use std::sync::{Arc, Mutex as StdMutex};
 
