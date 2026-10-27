@@ -8,7 +8,8 @@
 //! read (#280); the Engine.IO and Socket.IO frames; the
 //! General message's HTTP request and response payloads (bytes); a
 //! certificate from bytes and from JSON; a requested certificate set (its
-//! JSON a fixed point, `types` in insertion order, #288); the
+//! JSON a fixed point, `types` in insertion order, #288; both validators,
+//! `Peer`'s the reference's, #294); the
 //! auth headers; a nonce's format. The assertion is that each returns; the
 //! target also checks round trips: a payload, a certificate and a frame that
 //! parse encode to bytes that parse back to the same encoding.
@@ -19,14 +20,18 @@ use bsv_rs::auth::transports::socketio::parse_app_event_payload;
 use bsv_rs::auth::transports::{HttpRequest, HttpResponse, SimplifiedFetchTransport};
 use bsv_rs::auth::utils::{get_nonce_random, validate_nonce_format};
 use bsv_rs::auth::{
-    validate_certificate_encoding, validate_requested_certificate_set, AuthMessage, Certificate,
-    RequestedCertificateSet, VerifiableCertificate,
+    assert_requested_certificate_set, validate_certificate_encoding,
+    validate_requested_certificate_set, AuthMessage, Certificate, RequestedCertificateSet,
+    VerifiableCertificate,
 };
 use libfuzzer_sys::fuzz_target;
 use std::sync::OnceLock;
 
 fn message(message: &AuthMessage) {
     let _ = message.validate();
+    if let Some(ref requested) = message.requested_certificates {
+        let _ = assert_requested_certificate_set(requested);
+    }
     let _ = message.signing_data();
     let _ = message.get_key_id(None);
     let _ = message.get_key_id(Some("peer"));
@@ -93,6 +98,7 @@ fuzz_target!(|data: &[u8]| {
     }
     if let Ok(parsed) = serde_json::from_slice::<RequestedCertificateSet>(data) {
         let _ = validate_requested_certificate_set(&parsed);
+        let _ = assert_requested_certificate_set(&parsed);
         // `types` in insertion order (#288): written, read and written again,
         // the same bytes
         let text = serde_json::to_string(&parsed).expect("a set serializes");

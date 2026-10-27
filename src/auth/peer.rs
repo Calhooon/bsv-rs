@@ -11,7 +11,10 @@ use crate::auth::{
         AuthMessage, MessageType, PeerSession, RequestedCertificateSet, AUTH_PROTOCOL_ID,
         AUTH_VERSION,
     },
-    utils::{create_nonce, get_verifiable_certificates, validate_certificates, verify_nonce},
+    utils::{
+        assert_requested_certificate_set, check_received_requested_certificates, create_nonce,
+        get_verifiable_certificates, validate_certificates, verify_nonce,
+    },
 };
 use crate::primitives::to_base64;
 use crate::primitives::PublicKey;
@@ -213,7 +216,8 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             let certificate_request_callbacks = certificate_request_callbacks.clone();
 
             Box::pin(async move {
-                // Process the message based on type
+                // Refused before any handler, as the reference does (#294)
+                check_received_requested_certificates(&message)?;
                 match message.message_type {
                     MessageType::InitialResponse => {
                         // Process InitialResponse - complete the handshake.
@@ -428,6 +432,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         identity_key: Option<&str>,
         max_wait_time: Option<u64>,
     ) -> Result<()> {
+        assert_requested_certificate_set(&requested)?; // before a session or a signature (#294)
         let session = self
             .get_authenticated_session(identity_key, max_wait_time)
             .await?;
@@ -605,9 +610,13 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                 AUTH_VERSION, message.version
             )));
         }
+        check_received_requested_certificates(&message)?; // before any handler (#294)
 
         match message.message_type {
-            MessageType::InitialRequest => self.process_initial_request(message).await,
+            MessageType::InitialRequest => {
+                self.check_own_policy()?; // before the response is signed (#294)
+                self.process_initial_request(message).await
+            }
             MessageType::InitialResponse => self.process_initial_response(message).await,
             MessageType::CertificateRequest => self.process_certificate_request(message).await,
             MessageType::CertificateResponse => self.process_certificate_response(message).await,
@@ -618,6 +627,15 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     // ========================================================================
     // Private methods
     // ========================================================================
+
+    /// This peer's own policy, refused where the reference snapshots it
+    /// (`Peer.ts:332`, `:630`, `:811`; its construction-time refusal, `:158`,
+    /// made here since `new` cannot fail; #294)
+    fn check_own_policy(&self) -> Result<()> {
+        self.certificates_to_request
+            .as_ref()
+            .map_or(Ok(()), assert_requested_certificate_set)
+    }
 
     async fn sign_message(&self, message: &mut AuthMessage, session: &PeerSession) -> Result<()> {
         let data = message.signing_data();
@@ -686,6 +704,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         _identity_key: Option<&str>,
         max_wait_time: Option<u64>,
     ) -> Result<PeerSession> {
+        self.check_own_policy()?; // before a nonce or a message (#294)
         let my_identity = self.get_identity_key().await?;
 
         // Create session with new nonce
@@ -1006,48 +1025,5 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::auth::transports::MockTransport;
-    use crate::primitives::PrivateKey;
-    use crate::wallet::ProtoWallet;
-
-    fn make_peer() -> Peer<ProtoWallet, MockTransport> {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let transport = MockTransport::new();
-        Peer::new(PeerOptions {
-            wallet,
-            transport,
-            certificates_to_request: None,
-            session_manager: None,
-            auto_persist_last_session: false,
-            originator: Some("test".into()),
-        })
-    }
-
-    #[tokio::test]
-    async fn test_peer_creation() {
-        let peer = make_peer();
-        let identity = peer.get_identity_key().await.unwrap();
-        assert_eq!(identity.to_compressed().len(), 33);
-    }
-
-    #[tokio::test]
-    async fn test_listener_registration() {
-        let peer = make_peer();
-
-        let id = peer
-            .listen_for_general_messages(|_sender, _payload| Box::pin(async { Ok(()) }))
-            .await;
-        assert!(id > 0);
-
-        peer.stop_listening_for_general_messages(id).await;
-    }
-
-    #[tokio::test]
-    async fn test_session_manager_access() {
-        let peer = make_peer();
-        let mgr = peer.session_manager.read().await;
-        assert!(mgr.is_empty());
-    }
-}
+#[path = "peer_tests.rs"]
+mod tests;
