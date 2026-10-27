@@ -13,7 +13,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
 | `peer.rs` | Core Peer implementation with `start()` transport setup | 1,029 |
-| `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 45 |
+| `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
 | `utils/` | Utility functions | - |

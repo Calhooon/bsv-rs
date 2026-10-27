@@ -159,6 +159,11 @@ and the bounded-data walk's budgets over the whole message (16 MiB, depth
 (100 certifiers, 100 types, 100 fields) bind first on any set those budgets
 pass but one of more than 100,000 nodes, which both refuse in other words.
 
+One residual, stated: a session a caller injects lets that caller's own
+malformed policy reach `process_certificate_response` unchecked, where the
+reference's `Peer` holds only a policy it validated at construction
+(`Peer.ts:158`); a policy that enters through `Peer`'s own doors is checked.
+
 ### Fixed: a JSON number reads to the correctly rounded double, so a Socket.IO frame round-trips every finite `f64` (#285)
 
 The Socket.IO codec (`src/auth/transports/socketio/codec.rs`) reads and
