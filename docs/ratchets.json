@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "2a552eba473aec31fc1c79169fb6fcb643189972",
+  "source_commit": "8b7517b78cf8ae3f2e2e10e7180695e869462062",
   "toolchain": "1.95.0",
   "metrics": {
     "files_over_800": 39,
@@ -14,7 +14,7 @@
   "files_over_800": [
     {
       "path": "src/auth/peer.rs",
-      "lines": 1053
+      "lines": 942
     },
     {
       "path": "src/auth/transports/http.rs",
