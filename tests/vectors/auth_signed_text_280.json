@@ -100,23 +100,77 @@
   "this_crate_messages": [
     {
       "member": "requestedCertificates",
-      "member_text": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=\":[\"nickname\"],\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\":[\"name\",\"email\",\"country\"],\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=\":[\"z\",\"y\",\"x\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"phone\"],\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\":[\"b\",\"a\"]}}",
+      "member_text": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\":[\"b\",\"a\"],\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\":[\"name\",\"email\",\"country\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"phone\"],\"CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=\":[\"nickname\"],\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=\":[\"z\",\"y\",\"x\"]}}",
       "messageType": "certificateRequest",
-      "text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"nonce\":\"Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"orzhO0NMAuqBOlOCUVLC1cMP9NZKA5ohbkSrpKA3n7LbDwNuhZF18MyXsYakGqun\",\"requestedCertificates\":{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=\":[\"nickname\"],\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\":[\"name\",\"email\",\"country\"],\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=\":[\"z\",\"y\",\"x\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"phone\"],\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\":[\"b\",\"a\"]}},\"signature\":[48,67,2,31,36,76,15,231,229,65,7,212,238,216,240,95,39,61,51,218,254,130,181,54,209,33,88,142,201,166,203,8,75,1,110,2,32,111,98,20,255,122,197,63,37,135,241,215,115,94,77,163,206,102,183,254,149,193,123,217,45,181,42,139,55,85,142,248,70]}",
-      "reference_verified_bytes": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=\":[\"nickname\"],\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\":[\"name\",\"email\",\"country\"],\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=\":[\"z\",\"y\",\"x\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"phone\"],\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\":[\"b\",\"a\"]}}",
+      "text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"nonce\":\"Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"orzhO0NMAuqBOlOCUVLC1cMP9NZKA5ohbkSrpKA3n7LbDwNuhZF18MyXsYakGqun\",\"requestedCertificates\":{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\":[\"b\",\"a\"],\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\":[\"name\",\"email\",\"country\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"phone\"],\"CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=\":[\"nickname\"],\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=\":[\"z\",\"y\",\"x\"]}},\"signature\":[48,69,2,33,0,228,138,109,116,56,145,177,85,255,175,190,17,162,4,8,156,82,37,217,85,31,158,223,226,73,147,231,153,145,23,86,182,2,32,71,46,129,140,177,81,188,219,22,168,57,189,236,74,20,23,220,77,38,102,193,47,230,113,188,211,176,121,10,60,170,221]}",
+      "reference_verified_bytes": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=\":[\"b\",\"a\"],\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\":[\"name\",\"email\",\"country\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"phone\"],\"CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=\":[\"nickname\"],\"BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=\":[\"z\",\"y\",\"x\"]}}",
       "reference_verified_bytes_equal_member_text": true,
       "reference_signature_valid": true,
+      "reference_pending_request": {
+        "certifiers": [
+          "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f"
+        ],
+        "types": {
+          "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=": [
+            "b",
+            "a"
+          ],
+          "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=": [
+            "name",
+            "email",
+            "country"
+          ],
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=": [
+            "phone"
+          ],
+          "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=": [
+            "nickname"
+          ],
+          "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=": [
+            "z",
+            "y",
+            "x"
+          ]
+        }
+      },
       "reference_error": null
     },
     {
       "member": "certificates",
-      "member_text": "[{\"certType\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\",\"serialNumber\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"subject\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"certifier\":\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\",\"fields\":{\"name\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\",\"email\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==\",\"country\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw==\"},\"signature\":[48,69,2,33,0,252,183,60,155,112,47,71,210,42,119,149,15,146,219,70,72,14,143,156,44,24,203,18,254,37,139,155,180,161,242,51,106,2,32,88,207,172,135,78,27,227,1,28,80,52,210,240,152,79,193,133,62,105,136,56,85,87,236,52,85,20,29,75,147,177,84],\"keyring\":{\"country\":[66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66],\"name\":[64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64],\"email\":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65]}}]",
+      "member_text": "[{\"type\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\",\"serialNumber\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"subject\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"certifier\":\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\",\"revocationOutpoint\":\"0000000000000000000000000000000000000000000000000000000000000000.0\",\"fields\":{\"name\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\",\"email\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==\",\"country\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw==\"},\"signature\":\"3045022100fcb73c9b702f47d22a77950f92db46480e8f9c2c18cb12fe258b9bb4a1f2336a022058cfac874e1be3011c5034d2f0984fc1853e6988385557ec3455141d4b93b154\",\"keyring\":{\"email\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB\",\"country\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJC\",\"name\":\"QEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA\"}}]",
       "messageType": "certificateResponse",
-      "text": "{\"version\":\"0.1\",\"messageType\":\"certificateResponse\",\"identityKey\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"nonce\":\"ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"orzhO0NMAuqBOlOCUVLC1cMP9NZKA5ohbkSrpKA3n7LbDwNuhZF18MyXsYakGqun\",\"certificates\":[{\"certType\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\",\"serialNumber\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"subject\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"certifier\":\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\",\"fields\":{\"name\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\",\"email\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==\",\"country\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw==\"},\"signature\":[48,69,2,33,0,252,183,60,155,112,47,71,210,42,119,149,15,146,219,70,72,14,143,156,44,24,203,18,254,37,139,155,180,161,242,51,106,2,32,88,207,172,135,78,27,227,1,28,80,52,210,240,152,79,193,133,62,105,136,56,85,87,236,52,85,20,29,75,147,177,84],\"keyring\":{\"country\":[66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66],\"name\":[64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64],\"email\":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65]}}],\"signature\":[48,69,2,33,0,186,136,186,5,178,230,10,67,86,57,114,206,154,164,212,80,40,79,63,159,20,9,7,221,223,182,120,224,5,66,101,54,2,32,37,206,197,211,247,177,197,220,1,80,112,223,84,81,25,207,174,42,169,131,197,56,109,156,47,78,93,170,231,65,90,201]}",
-      "reference_verified_bytes": "[{\"serialNumber\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"subject\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"certifier\":\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\",\"fields\":{\"name\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\",\"email\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==\",\"country\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw==\"},\"signature\":[48,69,2,33,0,252,183,60,155,112,47,71,210,42,119,149,15,146,219,70,72,14,143,156,44,24,203,18,254,37,139,155,180,161,242,51,106,2,32,88,207,172,135,78,27,227,1,28,80,52,210,240,152,79,193,133,62,105,136,56,85,87,236,52,85,20,29,75,147,177,84],\"keyring\":{\"country\":[66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66,66],\"name\":[64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64,64],\"email\":[65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65,65]}}]",
-      "reference_verified_bytes_equal_member_text": false,
-      "reference_signature_valid": false,
-      "reference_error": "Unable to verify certificate response signature for peer: 026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4"
+      "text": "{\"version\":\"0.1\",\"messageType\":\"certificateResponse\",\"identityKey\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"nonce\":\"ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg4ODg=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"orzhO0NMAuqBOlOCUVLC1cMP9NZKA5ohbkSrpKA3n7LbDwNuhZF18MyXsYakGqun\",\"certificates\":[{\"type\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\",\"serialNumber\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"subject\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"certifier\":\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\",\"revocationOutpoint\":\"0000000000000000000000000000000000000000000000000000000000000000.0\",\"fields\":{\"name\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\",\"email\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==\",\"country\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw==\"},\"signature\":\"3045022100fcb73c9b702f47d22a77950f92db46480e8f9c2c18cb12fe258b9bb4a1f2336a022058cfac874e1be3011c5034d2f0984fc1853e6988385557ec3455141d4b93b154\",\"keyring\":{\"email\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB\",\"country\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJC\",\"name\":\"QEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA\"}}],\"signature\":[48,69,2,33,0,160,45,65,27,152,15,90,89,117,152,53,222,190,192,152,144,132,244,18,178,253,2,60,162,23,56,67,136,15,251,75,112,2,32,98,213,66,152,113,204,166,122,229,55,112,209,49,135,20,45,166,40,107,22,77,160,60,138,206,75,220,54,74,97,141,200]}",
+      "reference_verified_bytes": "[{\"type\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=\",\"serialNumber\":\"CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=\",\"subject\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"certifier\":\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\",\"revocationOutpoint\":\"0000000000000000000000000000000000000000000000000000000000000000.0\",\"fields\":{\"name\":\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\",\"email\":\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg==\",\"country\":\"AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAw==\"},\"signature\":\"3045022100fcb73c9b702f47d22a77950f92db46480e8f9c2c18cb12fe258b9bb4a1f2336a022058cfac874e1be3011c5034d2f0984fc1853e6988385557ec3455141d4b93b154\",\"keyring\":{\"email\":\"QUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFB\",\"country\":\"QkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJC\",\"name\":\"QEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBA\"}}]",
+      "reference_verified_bytes_equal_member_text": true,
+      "reference_signature_valid": true,
+      "reference_pending_request": {
+        "certifiers": [
+          "032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f"
+        ],
+        "types": {
+          "BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=": [
+            "b",
+            "a"
+          ],
+          "AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=": [
+            "name",
+            "email",
+            "country"
+          ],
+          "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=": [
+            "phone"
+          ],
+          "CAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg=": [
+            "nickname"
+          ],
+          "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=": [
+            "z",
+            "y",
+            "x"
+          ]
+        }
+      },
+      "reference_error": "Failed to decrypt selectively revealed certificate fields using keyring: Decryption failed!"
     }
   ]
 }
