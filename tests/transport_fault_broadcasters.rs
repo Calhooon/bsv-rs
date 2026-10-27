@@ -16,6 +16,7 @@
 use std::net::TcpListener;
 use std::time::Duration;
 
+#[allow(deprecated)] // the ARC case of the fault classes names the deprecated ARC items (#350)
 use bsv_rs::transaction::{
     ArcBroadcaster, ArcConfig, BroadcastFailure, Broadcaster, TeranodeBroadcaster, TeranodeConfig,
     Transaction, TransactionOutput, TransportFault, WhatsOnChainBroadcaster, WocBroadcastConfig,
@@ -45,6 +46,7 @@ impl Service {
         }
     }
 
+    #[allow(deprecated)] // ARC's fault classes stay pinned while the type is deprecated (#350)
     fn broadcaster(self, url: &str, timeout_ms: u64) -> Box<dyn Broadcaster> {
         let url = url.to_string();
         match self {

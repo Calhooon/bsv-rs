@@ -7,6 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(all(feature = "transaction", feature = "http"))]
 
+#[allow(deprecated)] // the ARC tests below name the deprecated ARC items (#350)
 use bsv_rs::transaction::{
     ArcBroadcaster, ArcConfig, BroadcastStatus, Broadcaster, TeranodeBroadcaster, TeranodeConfig,
     Transaction, TransactionOutput, WhatsOnChainBroadcaster, WocBroadcastNetwork,
@@ -58,6 +59,7 @@ fn ef_capable_transaction() -> Transaction {
 // ARC Broadcaster Tests
 // =============================================================================
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_success() {
     let mock_server = MockServer::start().await;
@@ -88,6 +90,7 @@ async fn test_arc_broadcast_success() {
     assert_eq!(response.message, "SEEN_ON_NETWORK");
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_success_with_api_key() {
     let mock_server = MockServer::start().await;
@@ -110,6 +113,7 @@ async fn test_arc_broadcast_success_with_api_key() {
     assert!(result.is_ok(), "Expected success, got: {:?}", result);
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_error_response() {
     let mock_server = MockServer::start().await;
@@ -137,6 +141,7 @@ async fn test_arc_broadcast_error_response() {
     assert_eq!(failure.description, "Transaction validation failed");
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_server_error() {
     let mock_server = MockServer::start().await;
@@ -163,6 +168,7 @@ async fn test_arc_broadcast_server_error() {
     assert_eq!(failure.description, "Internal Server Error");
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_server_error_empty_detail() {
     let mock_server = MockServer::start().await;
@@ -191,6 +197,7 @@ async fn test_arc_broadcast_server_error_empty_detail() {
     assert_eq!(failure.description, "");
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_malformed_json() {
     let mock_server = MockServer::start().await;
@@ -220,6 +227,7 @@ async fn test_arc_broadcast_malformed_json() {
     );
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_sends_raw_tx_in_body() {
     let mock_server = MockServer::start().await;
@@ -243,6 +251,7 @@ async fn test_arc_broadcast_sends_raw_tx_in_body() {
     assert!(result.is_ok(), "Expected success, got: {:?}", result);
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_with_config_timeout() {
     let mock_server = MockServer::start().await;
@@ -277,6 +286,7 @@ async fn test_arc_broadcast_with_config_timeout() {
     assert_eq!(failure.code, "MAY_HAVE_BEEN_RECEIVED");
 }
 
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn test_arc_broadcast_many() {
     let mock_server = MockServer::start().await;
@@ -834,6 +844,7 @@ fn arc_verdict_mismatch(
 /// vector's verdict: REJECTED, DOUBLE_SPEND_ATTEMPTED, MINED_IN_STALE_BLOCK, the
 /// ORPHAN statuses, an unknown status and a missing `txStatus` fail on HTTP 200;
 /// SEEN_ON_NETWORK and MINED succeed, with the competing transactions carried.
+#[allow(deprecated)] // ARC's wire: the deprecated ArcBroadcaster's own test (#350)
 #[tokio::test]
 async fn an_arc_2xx_answer_is_judged_by_its_tx_status_not_by_the_http_code() {
     let vectors = arc_verdict_vectors();

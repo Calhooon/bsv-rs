@@ -1,7 +1,17 @@
 //! Live Policy Fee Model
 //!
 //! This module provides the [`LivePolicy`] fee model that fetches the current
-//! fee rate from an ARC (Avalanche Relay Client) service's policy endpoint.
+//! fee rate from a policy endpoint in ARC's schema (`GET /v1/policy`, its
+//! `miningFee`), such as ARCade's (`arcade@1dbd889`
+//! `services/api_server/routes.go:296-297`).
+//!
+//! The endpoint is the caller's: [`LivePolicy::with_url`] or
+//! [`LivePolicy::with_config`]. The reference reads ARC's GorillaPool policy
+//! and takes no URL (`ts-stack@edf6e03` `LivePolicy.ts:10`); ARC is deprecated
+//! and nowhere a default here (bsv-rs#350, the owner's word of 2026-10-27), so
+//! [`LivePolicy::new`] and [`DEFAULT_POLICY_URL`] are deprecated, and the
+//! `Default`s, which cannot carry `#[deprecated]`, take no URL:
+//! [`LivePolicy::refresh`] refuses until one is given.
 //!
 //! The fee rate is cached to avoid excessive API calls, with a configurable TTL.
 //!
@@ -12,8 +22,8 @@
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     // Use default GorillaPool ARC endpoint
-//!     let fee_model = LivePolicy::default();
+//!     // The policy endpoint is the caller's (ARCade serves ARC's schema)
+//!     let fee_model = LivePolicy::with_url("https://arcade.example.com/v1/policy");
 //!
 //!     // Refresh the cached fee rate (fetches from API)
 //!     fee_model.refresh().await?;
@@ -26,7 +36,7 @@
 //!
 //! # Reference
 //!
-//! - [ARC Policy Endpoint](https://arc.gorillapool.io/v1/policy)
+//! - `ts-stack@edf6e03` `packages/sdk/src/transaction/fee-models/LivePolicy.ts`
 
 use std::sync::RwLock;
 use std::time::{Duration, Instant};
@@ -36,8 +46,18 @@ use crate::transaction::fee_models::SatoshisPerKilobyte;
 use crate::transaction::transaction::Transaction;
 use crate::Result;
 
-/// Default ARC policy endpoint URL.
+/// ARC's GorillaPool policy endpoint, the reference's (`LivePolicy.ts:10`).
+/// No default of this crate's since 0.9.0: [`LivePolicy::new`] alone reads it.
+#[deprecated(
+    since = "0.9.0",
+    note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27): pass the policy URL to LivePolicy::with_url"
+)]
 pub const DEFAULT_POLICY_URL: &str = "https://arc.gorillapool.io/v1/policy";
+
+/// The refusal of a `refresh` with no policy URL.
+#[cfg_attr(not(feature = "http"), allow(dead_code))]
+const NO_POLICY_URL: &str =
+    "No policy URL: build the LivePolicy with with_url (ARC is deprecated and no default, bsv-rs#350)";
 
 /// Default cache TTL (5 minutes).
 pub const DEFAULT_CACHE_TTL_SECS: u64 = 300;
@@ -48,7 +68,8 @@ pub const DEFAULT_FALLBACK_RATE: u64 = 100;
 /// Live policy fee model configuration.
 #[derive(Debug, Clone)]
 pub struct LivePolicyConfig {
-    /// URL for the ARC policy endpoint
+    /// URL of the policy endpoint (ARC's schema); empty in the `Default`,
+    /// which `refresh` refuses
     pub policy_url: String,
     /// API key for authentication (optional)
     pub api_key: Option<String>,
@@ -63,7 +84,7 @@ pub struct LivePolicyConfig {
 impl Default for LivePolicyConfig {
     fn default() -> Self {
         Self {
-            policy_url: DEFAULT_POLICY_URL.to_string(),
+            policy_url: String::new(),
             api_key: None,
             cache_ttl: Duration::from_secs(DEFAULT_CACHE_TTL_SECS),
             fallback_rate: DEFAULT_FALLBACK_RATE,
@@ -80,7 +101,7 @@ struct CachedRate {
 
 /// Live policy fee model.
 ///
-/// Fetches the current fee rate from an ARC policy endpoint and caches it
+/// Fetches the current fee rate from a policy endpoint and caches it
 /// for a configurable duration. Falls back to a default rate if the API
 /// is unavailable.
 ///
@@ -89,7 +110,7 @@ struct CachedRate {
 /// ```rust,ignore
 /// use bsv_rs::transaction::{LivePolicy, FeeModel};
 ///
-/// let fee_model = LivePolicy::default();
+/// let fee_model = LivePolicy::with_url("https://arcade.example.com/v1/policy");
 ///
 /// // Refresh the cached rate
 /// fee_model.refresh().await?;
@@ -104,23 +125,33 @@ pub struct LivePolicy {
     client: reqwest::Client,
 }
 
+/// No policy URL: [`LivePolicy::refresh`] refuses until one is configured,
+/// and [`FeeModel::compute_fee`] uses the fallback rate. Before 0.9.0 this
+/// read ARC's GorillaPool policy (bsv-rs#350).
 impl Default for LivePolicy {
     fn default() -> Self {
-        Self::new()
+        Self::with_config(LivePolicyConfig::default())
     }
 }
 
 impl LivePolicy {
-    /// Create a new live policy fee model with default configuration.
+    /// Create a live policy fee model reading ARC's GorillaPool policy
+    /// ([`DEFAULT_POLICY_URL`]), the reference's endpoint.
+    #[deprecated(
+        since = "0.9.0",
+        note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27): use LivePolicy::with_url"
+    )]
     pub fn new() -> Self {
-        Self::with_config(LivePolicyConfig::default())
+        #[allow(deprecated)] // the deprecated constructor reads the deprecated URL
+        Self::with_url(DEFAULT_POLICY_URL)
     }
 
     /// Create a live policy fee model with a custom policy URL.
     ///
     /// # Arguments
     ///
-    /// * `policy_url` - The URL for the ARC policy endpoint
+    /// * `policy_url` - The URL of the policy endpoint (ARC's schema, as
+    ///   ARCade's `/v1/policy` serves it)
     pub fn with_url(policy_url: &str) -> Self {
         Self::with_config(LivePolicyConfig {
             policy_url: policy_url.to_string(),
@@ -176,8 +207,9 @@ impl LivePolicy {
 
     /// Refresh the cached fee rate from the policy endpoint.
     ///
-    /// This method fetches the current fee rate from the configured ARC
-    /// policy endpoint and updates the cache.
+    /// This method fetches the current fee rate from the configured policy
+    /// endpoint and updates the cache. A `LivePolicy` with no policy URL (the
+    /// `Default`) is refused before any request.
     ///
     /// # Returns
     ///
@@ -204,6 +236,10 @@ impl LivePolicy {
         struct MiningFee {
             satoshis: Option<u64>,
             bytes: Option<u64>,
+        }
+
+        if self.config.policy_url.is_empty() {
+            return Err(crate::Error::FeeModelError(NO_POLICY_URL.to_string()));
         }
 
         let mut request = self.client.get(&self.config.policy_url);
@@ -292,7 +328,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = LivePolicyConfig::default();
-        assert_eq!(config.policy_url, DEFAULT_POLICY_URL);
+        assert_eq!(config.policy_url, "", "no default policy URL (bsv-rs#350)");
         assert!(config.api_key.is_none());
         assert_eq!(
             config.cache_ttl,
@@ -302,6 +338,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(deprecated)] // pins the deprecated constructor's ARC URL
     fn test_new() {
         let fee_model = LivePolicy::new();
         assert_eq!(fee_model.policy_url(), DEFAULT_POLICY_URL);
@@ -319,14 +356,14 @@ mod tests {
 
     #[test]
     fn test_fallback_rate() {
-        let fee_model = LivePolicy::new();
+        let fee_model = LivePolicy::default();
         // Without any cached rate, should use fallback
         assert_eq!(fee_model.effective_rate(), DEFAULT_FALLBACK_RATE);
     }
 
     #[test]
     fn test_set_rate() {
-        let fee_model = LivePolicy::new();
+        let fee_model = LivePolicy::default();
         fee_model.set_rate(200);
         assert_eq!(fee_model.cached_rate(), Some(200));
         assert_eq!(fee_model.effective_rate(), 200);
@@ -334,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_compute_fee_with_fallback() {
-        let fee_model = LivePolicy::new();
+        let fee_model = LivePolicy::default();
         let tx = Transaction::new();
         // Empty transaction: 10 bytes * 100 sat/KB / 1000 = 1 sat (ceiling)
         let fee = fee_model.compute_fee(&tx).unwrap();
@@ -343,12 +380,22 @@ mod tests {
 
     #[test]
     fn test_compute_fee_with_cached_rate() {
-        let fee_model = LivePolicy::new();
+        let fee_model = LivePolicy::default();
         fee_model.set_rate(1000); // 1 sat/byte
         let tx = Transaction::new();
         // Empty transaction: 10 bytes * 1000 sat/KB / 1000 = 10 sats
         let fee = fee_model.compute_fee(&tx).unwrap();
         assert_eq!(fee, 10);
+    }
+
+    #[cfg(feature = "http")]
+    #[tokio::test]
+    async fn a_live_policy_with_no_policy_url_refuses_to_refresh() {
+        let fee_model = LivePolicy::default();
+        assert_eq!(fee_model.policy_url(), "");
+        let err = fee_model.refresh().await.unwrap_err();
+        assert_eq!(err, crate::Error::FeeModelError(NO_POLICY_URL.to_string()));
+        assert_eq!(fee_model.effective_rate(), DEFAULT_FALLBACK_RATE);
     }
 
     #[test]

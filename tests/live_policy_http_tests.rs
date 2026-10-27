@@ -8,6 +8,7 @@
 
 #![cfg(all(feature = "transaction", feature = "http"))]
 
+#[allow(deprecated)] // `DEFAULT_POLICY_URL` pins the deprecated constructor's URL (#350)
 use bsv_rs::transaction::{
     FeeModel, LivePolicy, LivePolicyConfig, Transaction, DEFAULT_CACHE_TTL_SECS,
     DEFAULT_FALLBACK_RATE, DEFAULT_POLICY_URL,
@@ -204,7 +205,7 @@ async fn test_live_policy_refresh_missing_mining_fee() {
 #[tokio::test]
 async fn test_live_policy_fallback_when_not_refreshed() {
     // Without refreshing, the fee model should use the fallback rate
-    let fee_model = LivePolicy::new();
+    let fee_model = LivePolicy::default();
     assert_eq!(fee_model.effective_rate(), DEFAULT_FALLBACK_RATE);
     assert!(fee_model.cached_rate().is_none());
 }
@@ -240,7 +241,7 @@ async fn test_live_policy_compute_fee_after_refresh() {
 #[tokio::test]
 async fn test_live_policy_compute_fee_with_fallback() {
     // Without refreshing, should use fallback rate (100 sat/KB)
-    let fee_model = LivePolicy::new();
+    let fee_model = LivePolicy::default();
     let tx = Transaction::new();
     let fee = fee_model.compute_fee(&tx).unwrap();
     // Empty transaction: 10 bytes * 100 sat/KB / 1000 = 1 sat
@@ -249,7 +250,7 @@ async fn test_live_policy_compute_fee_with_fallback() {
 
 #[tokio::test]
 async fn test_live_policy_set_rate_overrides_fallback() {
-    let fee_model = LivePolicy::new();
+    let fee_model = LivePolicy::default();
     fee_model.set_rate(500);
 
     assert_eq!(fee_model.cached_rate(), Some(500));
@@ -325,14 +326,41 @@ async fn test_live_policy_custom_fallback_rate() {
 }
 
 #[tokio::test]
+#[allow(deprecated)] // the deprecated constructor still reads ARC's URL (#350)
 async fn test_live_policy_default_policy_url() {
     let fee_model = LivePolicy::new();
     assert_eq!(fee_model.policy_url(), DEFAULT_POLICY_URL);
+    assert_eq!(
+        fee_model.policy_url(),
+        "https://arc.gorillapool.io/v1/policy"
+    );
+}
+
+#[tokio::test]
+async fn a_live_policy_built_without_a_url_refuses_to_refresh_and_reads_no_arc() {
+    // ARC is deprecated and nowhere a default (#350): neither Default names it.
+    assert_eq!(LivePolicyConfig::default().policy_url, "");
+    let fee_model = LivePolicy::default();
+    assert_eq!(fee_model.policy_url(), "");
+    let err = fee_model.refresh().await.unwrap_err();
+    assert!(
+        err.to_string().contains("No policy URL"),
+        "refused before any request: {err}"
+    );
+    assert!(fee_model.cached_rate().is_none());
+    assert_eq!(fee_model.effective_rate(), DEFAULT_FALLBACK_RATE);
+
+    // A config filled from the Default with only an API key is refused the same.
+    let fee_model = LivePolicy::with_config(LivePolicyConfig {
+        api_key: Some("key".to_string()),
+        ..Default::default()
+    });
+    assert!(fee_model.refresh().await.is_err());
 }
 
 #[tokio::test]
 async fn test_live_policy_default_cache_ttl() {
-    let fee_model = LivePolicy::new();
+    let fee_model = LivePolicy::default();
     assert_eq!(
         fee_model.cache_ttl(),
         Duration::from_secs(DEFAULT_CACHE_TTL_SECS)

@@ -2,7 +2,8 @@
 //!
 //! This module provides the [`Broadcaster`] trait that defines how transactions
 //! are broadcast to the BSV network. Implementations can use different broadcasting
-//! services such as ARC, WhatsOnChain, or custom endpoints.
+//! services such as Teranode, WhatsOnChain, or custom endpoints (ARC's
+//! broadcaster is deprecated since 0.9.0, bsv-rs#350).
 //!
 //! # Example
 //!
@@ -152,8 +153,9 @@ pub type BroadcastResult = Result<BroadcastResponse, BroadcastFailure>;
 /// This trait defines a standard async method for broadcasting transactions to the
 /// BSV network. Implementations can use different services such as:
 ///
-/// - ARC (TAAL's broadcast service)
+/// - Teranode
 /// - WhatsOnChain
+/// - ARC (deprecated since 0.9.0: ARC is deprecated, ARCade is the standard, bsv-rs#350)
 /// - Custom node endpoints
 ///
 /// # Example
