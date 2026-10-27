@@ -59,6 +59,11 @@ carries the labels `identity` and `revocation` and `signAndProcess: false`
 beside the reference's arguments (`IdentityClient.ts:845-863`): a finding
 outside #315.
 
+The originator: the recorder's reference was configured with
+`"identity-client"`, so the two calls carry the same originator in the
+vector; by default the reference sends none where this crate sends
+`"identity-client"`, the difference of #318.
+
 ### Fixed: `Certificate` parses its signature's DER and re-encodes it on read, as the reference does (#305)
 
 `Certificate::to_binary` wrote and `from_binary` kept the signature's bytes
