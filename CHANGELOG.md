@@ -50,7 +50,7 @@ failed: Certificate verification failed!` (`:451-467`). After
 asked (`wallet returned a keyring for unrequested fields!`, `:487-491`).
 Each is here now, in the reference's words and order, as
 `Error::IdentityError`, the class of the client's other refusals
-(`src/identity/reveal.rs`; `client.rs` calls it and is 15 lines shorter).
+(`src/identity/reveal.rs`; `client.rs` calls it and is 16 lines shorter).
 The master certificate is read from the wallet certificate's members'
 JSON (`Certificate`'s reader, #268) and verified by `Certificate::verify`
 (#299); a member it cannot hold (an empty subject, a signature that is not
