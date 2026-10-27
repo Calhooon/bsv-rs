@@ -487,7 +487,9 @@ fn write_varint(value: i64) -> Vec<u8> {
 /// Sends auth messages to `.well-known/auth` endpoint for handshake,
 /// and general messages as HTTP requests with auth headers. A general answer without
 /// `x-bsv-auth-version`, `x-bsv-auth-identity-key` or `x-bsv-auth-signature` is refused in the
-/// reference's words: `Error::AuthError`, the named host's answer, no transport fault (#354).
+/// reference's words before its body becomes a message (#354): an unsigned 429, 502, 503 or
+/// 504 is a transport fault of #73's and #87's classes (a gateway or a limiter answered), any
+/// other status `Error::AuthError`, the named host's own answer.
 pub struct SimplifiedFetchTransport {
     /// Base URL of the remote server.
     base_url: String,

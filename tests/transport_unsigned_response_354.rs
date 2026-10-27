@@ -1,7 +1,9 @@
 //! `SimplifiedFetchTransport` refuses a general answer without valid BSV
 //! authentication (#354): an answer missing any of `x-bsv-auth-version`,
 //! `x-bsv-auth-identity-key`, `x-bsv-auth-signature` (absent, or blank) is
-//! `Error::AuthError` in the reference's words, the missing headers named in
+//! refused in the reference's words, `Error::AuthError` for the named host's
+//! answer and a transport fault for an unsigned 429, 502, 503 or 504 (#73,
+//! #87), the missing headers named in
 //! its order, before the body becomes a message (`ts-stack@edf6e03`
 //! `SimplifiedFetchTransport.ts:220-232`, `:464-494`, the preview `:512-579`).
 //! Through 0.9.0-beta.1 such an answer reached the callback as a message whose
