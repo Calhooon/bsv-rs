@@ -1,5 +1,5 @@
 //! The local budgets and their declines: the element and memory bounds, the
-//! node's stack memory policy, the work budget, and the resource-limit errors
+//! node's stack memory policy and consensus figure, the work budget, and the resource-limit errors
 //! (`ScriptResourceLimit`) they raise.
 
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource, ScriptResourceLimit};
@@ -38,7 +38,9 @@ impl Spend {
     /// operator's mandatory `-maxstackmemoryusageconsensus`,
     /// `src/bitcoind.cpp:140-157`, 0 meaning `INT64_MAX`,
     /// `src/configscriptpolicy.cpp:280-283`, so there is no protocol figure to
-    /// adopt; `Some(usize::MAX)` models a node run with 0). Exhausting it stops
+    /// adopt; `Some(usize::MAX)` models a node run with 0, and `Some(X)` a node
+    /// set to `X` only as a decline above `X`: that node's verdict is
+    /// [`set_stack_memory_consensus`](Self::set_stack_memory_consensus)). Exhausting it stops
     /// the evaluation with a resource limit
     /// ([`ScriptEvaluationError::resource_limit`]): the evaluator declines to go
     /// on, it does not decide, and a caller that judges validity must not read
@@ -51,11 +53,10 @@ impl Spend {
         })
     }
 
-    /// The stack memory budget whose excess is a VERDICT, in force: `None` in
-    /// the default mode and on the block path (a node's block-path budget is
-    /// its operator's mandatory `-maxstackmemoryusageconsensus`, which this
-    /// interpreter cannot know: the local budget declines instead,
-    /// [`memory_limit`](Self::memory_limit)); on the mempool path the policy of
+    /// The mempool path's stack memory budget whose excess is a VERDICT, in
+    /// force: `None` in the default mode and on the block path (whose verdict
+    /// is [`stack_memory_consensus`](Self::stack_memory_consensus)); on the
+    /// mempool path the policy of
     /// [`set_stack_memory_policy`](Self::set_stack_memory_policy)
     /// ([`ScriptFlags::max_stack_memory_usage`](crate::script::ScriptFlags::max_stack_memory_usage)). A growth that would take the
     /// node's count above it is refused before it happens, as the reference
@@ -78,18 +79,59 @@ impl Spend {
         self.stack_memory_policy = bytes;
     }
 
+    /// The block path's stack memory budget whose excess is a VERDICT, in
+    /// force: the figure of
+    /// [`set_stack_memory_consensus`](Self::set_stack_memory_consensus) under a
+    /// word without the mempool bits, when it is not 0; `None` otherwise (the
+    /// default mode, the mempool word, no figure given). The node picks it on
+    /// that path (`GetMaxStackMemoryUsage`, `src/configscriptpolicy.cpp:139-154`
+    /// at bitcoin-sv v1.2.3) and refuses a growth above it before it happens
+    /// (`limitedstack.cpp:202-205`, `SCRIPT_ERR_STACK_SIZE`,
+    /// `interpreter.cpp:1815-1817`): `Stack size limit exceeded: N bytes, the
+    /// stack memory consensus limit is M bytes.` (bsv-rs#38).
+    pub fn stack_memory_consensus(&self) -> Option<usize> {
+        match self.flags {
+            Some(word) if !word.is_mempool_word() && self.stack_memory_consensus != 0 => {
+                Some(self.stack_memory_consensus)
+            }
+            _ => None,
+        }
+    }
+
+    /// The node's `-maxstackmemoryusageconsensus` for a word on the block path,
+    /// a setting the node does not start without (`src/bitcoind.cpp:140-157`);
+    /// 0, the default here, selects no verdict, as the node sets 0 to
+    /// `INT64_MAX` (`src/configscriptpolicy.cpp:280-287`,
+    /// `src/consensus/consensus.h:82`). The mempool word and the default mode
+    /// ignore it. The node refuses at start a policy above it (`:298-305`);
+    /// this interpreter takes both figures as given and judges each path by its
+    /// own. The local budget (`SpendParams::memory_limit`) is a separate knob:
+    /// below this figure it stops the evaluation first, with a decline.
+    pub fn set_stack_memory_consensus(&mut self, bytes: usize) {
+        self.stack_memory_consensus = bytes;
+    }
+
     /// Whether the node's count may reach `attempted` bytes. Above the stack
-    /// memory policy in force ([`stack_memory_policy`](Self::stack_memory_policy))
-    /// it is the reference's verdict: `LimitedStack::increaseCombinedStackSize`
+    /// memory policy or consensus figure in force
+    /// ([`stack_memory_policy`](Self::stack_memory_policy),
+    /// [`stack_memory_consensus`](Self::stack_memory_consensus)) it is the
+    /// reference's verdict: `LimitedStack::increaseCombinedStackSize`
     /// throws before the growth (`limitedstack.cpp:202-205`), caught as
     /// `SCRIPT_ERR_STACK_SIZE` (`interpreter.cpp:1815-1817`). Above the local
     /// budget ([`memory_limit`](Self::memory_limit)) it is a resource limit.
-    /// The policy is tested first: its verdict needs nothing allocated.
+    /// The verdicts are tested first: they need nothing allocated.
     pub(super) fn check_node_budget(&self, attempted: u64) -> Result<(), ScriptEvaluationError> {
         if let Some(policy) = self.stack_memory_policy() {
             if attempted > policy as u64 {
                 return Err(self.error(&format!(
                     "Stack size limit exceeded: {attempted} bytes, the stack memory policy is {policy} bytes."
+                )));
+            }
+        }
+        if let Some(consensus) = self.stack_memory_consensus() {
+            if attempted > consensus as u64 {
+                return Err(self.error(&format!(
+                    "Stack size limit exceeded: {attempted} bytes, the stack memory consensus limit is {consensus} bytes."
                 )));
             }
         }

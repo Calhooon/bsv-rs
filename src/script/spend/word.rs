@@ -37,7 +37,9 @@ impl Spend {
     ///
     /// The memory budget follows the word too: the node's stack memory count
     /// and, on the mempool path, its policy verdict ([`memory_limit`](Self::memory_limit),
-    /// [`stack_memory_policy`](Self::stack_memory_policy)).
+    /// [`stack_memory_policy`](Self::stack_memory_policy)); on the block path the
+    /// consensus figure's verdict, when one is given
+    /// ([`stack_memory_consensus`](Self::stack_memory_consensus)).
     ///
     /// A consensus oracle selects the block word:
     ///

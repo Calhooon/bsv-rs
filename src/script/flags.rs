@@ -400,9 +400,9 @@ impl ScriptFlags {
     /// of `src/consensus/consensus.h:82`); on the block path none: a node's
     /// budget there is its operator's mandatory `-maxstackmemoryusageconsensus`
     /// (`src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
-    /// `src/configscriptpolicy.cpp:280-283`), which this interpreter cannot
-    /// know, so its local budget declines instead
-    /// ([`Spend::memory_limit`](super::Spend::memory_limit)). The node
+    /// `src/configscriptpolicy.cpp:280-283`), which a word does not carry: its
+    /// verdict is [`Spend::set_stack_memory_consensus`](super::Spend::set_stack_memory_consensus)'s
+    /// (bsv-rs#38), the local budget a decline ([`Spend::memory_limit`](super::Spend::memory_limit)). The node
     /// counts one budget over the main and the alt stack, each element at its
     /// size plus [`STACK_ELEMENT_OVERHEAD`], and refuses a growth that would
     /// exceed it before the growth happens (`LimitedStack`,

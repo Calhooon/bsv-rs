@@ -39,15 +39,16 @@
 //! besides: a growth above it is `SCRIPT_ERR_STACK_SIZE` on the reference
 //! ([`Spend::stack_memory_policy`], [`Spend::set_stack_memory_policy`]).
 //!
-//! On the block path a node's budget is its operator's
-//! `-maxstackmemoryusageconsensus`, a mandatory setting (bitcoin-sv v1.2.2 does
-//! not start without it, `src/bitcoind.cpp:140-157`) in which 0 means
-//! `INT64_MAX` (`src/configscriptpolicy.cpp:280-283`): no constant a library can
-//! adopt, so above its local budget the evaluator declines, it never decides.
-//! A caller modelling a node run with 0 passes `memory_limit: Some(usize::MAX)`:
-//! the evaluation then allocates what the script asks (`OP_NUM2BIN` alone asks
-//! up to `INT32_MAX` bytes, and an error's report copies the stack) and decides
-//! as that node does.
+//! On the block path a node's budget is its operator's mandatory
+//! `-maxstackmemoryusageconsensus` (`src/bitcoind.cpp:140-157` at bitcoin-sv
+//! v1.2.3; 0 means `INT64_MAX`, `src/configscriptpolicy.cpp:280-287`), and a
+//! growth above it is that node's verdict, `SCRIPT_ERR_STACK_SIZE`. Without
+//! [`Spend::set_stack_memory_consensus`] the evaluator knows no such figure:
+//! above its local budget it declines, never decides, so `memory_limit:
+//! Some(X)` models a node set to `X` only as a decline above `X`, never as its
+//! verdict (bsv-rs#38). `memory_limit: Some(usize::MAX)` models a node run with
+//! 0: the evaluation allocates what the script asks (`OP_NUM2BIN` alone asks
+//! up to `INT32_MAX` bytes) and decides as that node does.
 //!
 //! A decline is an `Err` whose
 //! [`resource_limit`](ScriptEvaluationError::resource_limit) is `Some`
@@ -165,8 +166,10 @@ pub struct SpendParams {
     /// ([`ScriptEvaluationError::resource_limit`]), never a verdict, and
     /// `Some(n)` wins in every mode. `None` selects the mode's figure: 32,000,000
     /// bytes in the default mode, 100,000,000 on the node's count under a word
-    /// ([`Spend::memory_limit`]). `Some(usize::MAX)` under the block word models
-    /// a node run with `-maxstackmemoryusageconsensus=0`.
+    /// ([`Spend::memory_limit`]). Under the block word `Some(X)` models a node's
+    /// `-maxstackmemoryusageconsensus=X` as a decline, not its verdict
+    /// ([`Spend::set_stack_memory_consensus`] is the verdict); `Some(usize::MAX)`
+    /// models a node run with 0.
     pub memory_limit: Option<usize>,
     /// LOCAL work budget: one unit per opcode plus bytes hashed (both rounds
     /// of double hashes and uncached sighash midstates). `None` is unbounded.
@@ -192,9 +195,7 @@ pub struct TxSpendParams {
     pub unlocking_script: UnlockingScript,
     /// As [`SpendParams::memory_limit`].
     pub memory_limit: Option<usize>,
-    /// LOCAL work budget: one unit per opcode plus bytes hashed (both rounds
-    /// of double hashes and uncached sighash midstates). `None` is unbounded.
-    /// Exhaustion is `ScriptResource::Work`, never a validity verdict.
+    /// As [`SpendParams::work_limit`].
     pub work_limit: Option<u64>,
 }
 
@@ -224,8 +225,7 @@ pub struct Spend {
     stack: Vec<Vec<u8>>,
     alt_stack: Vec<Vec<u8>>,
     if_stack: Vec<bool>,
-    /// `SpendParams::memory_limit`; `None` selects the mode's figure
-    /// ([`Spend::memory_limit`]).
+    /// `SpendParams::memory_limit`; `None` the mode's ([`Spend::memory_limit`]).
     memory_limit: Option<usize>,
     work_limit: Option<u64>,
     work_spent: u64,
@@ -271,6 +271,8 @@ pub struct Spend {
     /// none); read under a word carrying the mempool word's bits, see
     /// [`Spend::stack_memory_policy`].
     stack_memory_policy: usize,
+    /// The node's `-maxstackmemoryusageconsensus`, 0 none ([`Spend::stack_memory_consensus`]).
+    stack_memory_consensus: usize,
     /// Whether an `OP_ELSE` was seen at each conditional depth (the
     /// reference's `conditional_tracker`: a second `OP_ELSE` for one `OP_IF`
     /// is unbalanced after Genesis, `interpreter.cpp:829-831`).
@@ -404,9 +406,8 @@ impl Spend {
             require_low_s: REQUIRE_LOW_S_SIGNATURES && transaction_version <= 1,
             require_clean_stack: REQUIRE_CLEAN_STACK && transaction_version <= 1,
             require_null_dummy: transaction_version <= 1,
-            // Not in the ts-sdk default mode (its NULLFAIL, MINIMALIF and
-            // DISCOURAGE_UPGRADABLE_NOPS exist only under explicit verifyFlags);
-            // derived from a word by `set_flags`.
+            // ts-sdk: NULLFAIL, MINIMALIF, DISCOURAGE_UPGRADABLE_NOPS only under
+            // explicit verifyFlags; here derived from a word by `set_flags`.
             require_null_fail: false,
             require_minimal_if: false,
             require_compressed_pubkey: false,
@@ -416,6 +417,7 @@ impl Spend {
             utxo_after_chronicle: transaction_version > 1,
             script_num_length_policy: DEFAULT_SCRIPT_NUM_LENGTH_POLICY,
             stack_memory_policy: DEFAULT_STACK_MEMORY_USAGE_POLICY,
+            stack_memory_consensus: 0,
             else_stack: Vec::new(),
             returning: false,
             unlocking_truncated: None,

@@ -1818,7 +1818,10 @@ impl Transaction {
     /// order (`ts-stack@edf6e03` `Transaction.ts:1336-1342`); this walk asks
     /// it of a proven one too, as the streaming reader does.
     ///
-    /// # Arguments
+    /// Scripts run in the default mode, its 32,000,000-byte local budget. An
+    /// invalid script is `Err(TransactionError("Script validation failed for
+    /// input N: …"))`; one stopped at the budget `Err(ScriptEvaluationDeclined)`,
+    /// a decline, never to be read as invalid (bsv-rs#38).
     ///
     /// * `chain_tracker` - The chain tracker for verifying merkle roots
     /// * `fee_model` - Optional fee model for fee validation
@@ -1974,12 +1977,9 @@ impl Transaction {
                     work_limit: None,
                 })?;
 
-                spend.validate().map_err(|e| {
-                    crate::Error::TransactionError(format!(
-                        "Script validation failed for input {}: {}",
-                        vin, e.message
-                    ))
-                })?;
+                spend
+                    .validate()
+                    .map_err(|e| super::verify_refusal::script_refusal(vin, e))?;
 
                 // Enqueue unverified source transactions, by txid
                 if !verified_txids.contains(&source_txid) {
