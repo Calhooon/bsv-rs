@@ -305,6 +305,37 @@ async fn a_success_tx_in_the_object_form_or_integral_floats_is_read_as_its_bytes
     assert!(wrong.is_empty(), "{wrong:#?}");
 }
 
+/// A 200 createAction answer neither reading takes is refused in serde's
+/// words (the second and third folds): one that is not JSON with the typed
+/// reading's, its place in the text; one whose `tx` the byte reader does not
+/// take with the reading after it, no place. The reference throws its
+/// runtime's `SyntaxError` at the first and `Invalid createAction result
+/// tx: expected an array of bytes` at the second (`HTTPWalletJSON.ts:322-341`).
+#[tokio::test]
+async fn a_success_answer_neither_reading_takes_is_refused_in_serdes_words() {
+    for (body, words) in [
+        (
+            "not json",
+            "failed to parse JSON response: expected ident at line 1 column 2",
+        ),
+        (
+            r#"{"tx": "x"}"#,
+            r#"failed to parse JSON response: invalid type: string "x", expected a sequence"#,
+        ),
+    ] {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/createAction"))
+            .respond_with(ResponseTemplate::new(200).set_body_raw(body, "application/json"))
+            .mount(&server)
+            .await;
+        let wallet = HttpWalletJson::new(Some("example.com".into()), Some(server.uri())).unwrap();
+        let args = serde_json::from_value(json!({ "description": "a malformed answer" })).unwrap();
+        let error = wallet.create_action(args, None).await.unwrap_err();
+        assert_eq!(error, Error::WalletError(words.to_string()), "{body}");
+    }
+}
+
 #[tokio::test]
 async fn a_malformed_member_is_refused_in_the_references_words() {
     for (name, words) in [
