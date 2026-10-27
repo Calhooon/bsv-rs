@@ -631,7 +631,7 @@ pub enum SendWithResultStatus {
 }
 
 /// Result for a transaction sent with another action.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SendWithResult {
     /// The transaction ID (hex encoded in JSON).

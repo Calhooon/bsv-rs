@@ -30,6 +30,7 @@ use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 
 mod key_requests;
+mod review_actions;
 use key_requests::{
     key_params, permission, JsonCreateHmacRequest, JsonCreateHmacResponse,
     JsonCreateSignatureRequest, JsonCreateSignatureResponse, JsonDecryptRequest,
@@ -38,6 +39,7 @@ use key_requests::{
     JsonRevealSpecificRequest, JsonVerifyHmacRequest, JsonVerifyHmacResponse,
     JsonVerifySignatureRequest, JsonVerifySignatureResponse,
 };
+use review_actions::ReviewRequest;
 
 /// HTTP substrate using JSON payloads.
 ///
@@ -134,7 +136,19 @@ impl HttpWalletJson {
         &self,
         method: &str,
         args: &T,
+        originator: Option<&str>,
+    ) -> Result<R, Error> {
+        self.request_bound(method, args, originator, None).await
+    }
+
+    /// [`request`](Self::request), a code-5 body with its results read
+    /// against `review`, the createAction or signAction asked (#339).
+    async fn request_bound<T: Serialize, R: for<'de> Deserialize<'de>>(
+        &self,
+        method: &str,
+        args: &T,
         _originator: Option<&str>,
+        review: Option<&ReviewRequest>,
     ) -> Result<R, Error> {
         let Some(originator) = self.originator.as_deref() else {
             return Err(Error::WalletError(ORIGINATOR_REQUIRED.to_string()));
@@ -171,6 +185,13 @@ impl HttpWalletJson {
             // that it took no action; the status alone promises nothing
             if let Some(busy) = wallet_busy_from_response(&text, retry_after.as_deref()) {
                 return Err(busy);
+            }
+            // A 400's code-5 body with its results is the reference's
+            // WERR_REVIEW_ACTIONS, every member read as it reads them (#339)
+            if let Ok(body) = serde_json::from_str::<serde_json::Value>(&text) {
+                if review_actions::is_review_body(status.as_u16(), &body) {
+                    return Err(review_actions::read(&body, method, review));
+                }
             }
             let detail = format!("HTTP {} for {}: {}", status, method, text);
 
@@ -458,7 +479,8 @@ impl HttpWalletJson {
         args: CreateActionArgs,
         originator: Option<&str>,
     ) -> Result<CreateActionResult, Error> {
-        self.request("createAction", &args, originator).await
+        let review = ReviewRequest::create_action(&args);
+        (self.request_bound("createAction", &args, originator, Some(&review))).await
     }
 
     /// Signs a previously created action.
@@ -467,7 +489,8 @@ impl HttpWalletJson {
         args: SignActionArgs,
         originator: Option<&str>,
     ) -> Result<SignActionResult, Error> {
-        self.request("signAction", &args, originator).await
+        let review = ReviewRequest::sign_action(&args);
+        (self.request_bound("signAction", &args, originator, Some(&review))).await
     }
 
     /// Aborts an in-progress action.
