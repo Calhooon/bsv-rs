@@ -7,24 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
-
-`ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
-(the bench baseline's record mode, `bench_baseline_record`; the nightly's
-dispatch of this workflow) shared the group with every push to `beta`, and
-the first record run for #245 (2026-10-27 04:23Z, run 40449439162) was
-cancelled by #306's landing twenty minutes in. The group is
-`ci-<event>-[record-]<ref>` now: a push to a line cancels the earlier push's
-run as before, a pull request's own ref keeps each PR in a group of its own,
-a dispatch runs to its end beside a push and a pull request, and a record
-dispatch runs apart from the nightly's dispatch of the same line (the two
-would otherwise cancel each other within the record's window). The keeper's CI
-rule (a pull request runs exactly its line's required
-set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
-`main` is a `git cherry-pick -x` (RELEASING.md point 21).
-
-### Changed: `Certificate::verify` answers `false`, never an error, as the
-reference's `verify` does (#299)
 ### Fixed: `publicly_reveal_attributes` verifies the master certificate, and checks the names to reveal, before any wallet call, as the reference does (#307)
 
 `IdentityClient::publicly_reveal_attributes` refused a certificate with no
@@ -127,6 +109,22 @@ so on its keyrings the two name the same value unless a name is
 integer-like; a wallet of another order (a Go map's) is named otherwise
 here, the bound in the message that value's. Every value is refused in
 either order.
+
+### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
+
+`ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
+(the bench baseline's record mode, `bench_baseline_record`; the nightly's
+dispatch of this workflow) shared the group with every push to `beta`, and
+the first record run for #245 (2026-10-27 04:23Z, run 40449439162) was
+cancelled by #306's landing twenty minutes in. The group is
+`ci-<event>-[record-]<ref>` now: a push to a line cancels the earlier push's
+run as before, a pull request's own ref keeps each PR in a group of its own,
+a dispatch runs to its end beside a push and a pull request, and a record
+dispatch runs apart from the nightly's dispatch of the same line (the two
+would otherwise cancel each other within the record's window). The keeper's CI
+rule (a pull request runs exactly its line's required
+set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
+`main` is a `git cherry-pick -x` (RELEASING.md point 21).
 
 ### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
