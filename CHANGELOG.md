@@ -118,10 +118,12 @@ insertion order but for an integer-like key, which a JavaScript object
 moves first in ascending order. The reference's validator refuses such a
 key: a type is canonical base64 of 32 bytes
 (`AuthMessageValidation.ts:141-144`), 44 characters ending in `=`, never
-integer-like. This crate's `validate_requested_certificate_set` checks no
-type ID's form, so a set the reference refuses (a type `"1"` after a type
-`"2"`) is written here in insertion order where a JavaScript object would
-write `"1"` first; on every set the reference accepts the two write the
+integer-like. This crate's `validate_requested_certificate_set` refuses
+the same form (`src/auth/utils/validation.rs`), but `Peer` never calls it
+where the reference validates on snapshot (`Peer.ts:332`) and on receipt
+(`AuthMessageValidation.ts:345-346`, `:367`; bsv-rs#294), so a set the
+reference refuses (a type `"1"` after a type `"2"`) is written here in
+insertion order where a JavaScript object would write `"1"` first; on every set the reference accepts the two write the
 same bytes. Go holds `types` as a `map[wallet.CertificateType][]string`
 (`go-sdk@2ca481c` `auth/utils/validate_certificates.go:20`, `:54`) and
 `json.Marshal` writes a map's keys sorted, so

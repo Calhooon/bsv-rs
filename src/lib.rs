@@ -132,8 +132,8 @@ pub use auth::{
 #[cfg(feature = "auth")]
 pub use auth::{
     AuthMessage, Certificate, MasterCertificate, MessageType, Peer, PeerOptions, PeerSession,
-    RequestedCertificateSet, SessionManager, SimplifiedFetchTransport, Transport,
-    VerifiableCertificate,
+    RequestedCertificateSet, RequestedCertificateTypes, SessionManager, SimplifiedFetchTransport,
+    Transport, VerifiableCertificate,
 };
 #[cfg(feature = "websocket")]
 pub use auth::{WebSocketTransport, WebSocketTransportOptions};
