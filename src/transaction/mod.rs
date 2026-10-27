@@ -115,6 +115,7 @@ pub use broadcaster::{
     is_broadcast_failure, is_broadcast_success, BroadcastFailure, BroadcastResponse,
     BroadcastResult, BroadcastStatus, Broadcaster,
 };
+#[allow(deprecated)] // the ARC items re-exported for the callers who name them (#350)
 pub use broadcasters::{
     ArcBroadcaster, ArcConfig, TeranodeBroadcaster, TeranodeConfig, WhatsOnChainBroadcaster,
     WocBroadcastConfig, WocBroadcastNetwork,
@@ -127,6 +128,7 @@ pub use chain_trackers::{
     DEFAULT_HEADERS_URL,
 };
 pub use fee_model::{FeeModel, FixedFee};
+#[allow(deprecated)] // the ARC items re-exported for the callers who name them (#350)
 pub use fee_models::{
     LivePolicy, LivePolicyConfig, SatoshisPerKilobyte, DEFAULT_CACHE_TTL_SECS,
     DEFAULT_FALLBACK_RATE, DEFAULT_POLICY_URL,

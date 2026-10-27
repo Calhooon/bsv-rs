@@ -5,6 +5,15 @@
 //! ARC is TAAL's transaction processing service that provides reliable
 //! transaction broadcasting with callback notifications.
 //!
+//! # Deprecated
+//!
+//! [`ArcBroadcaster`] and [`ArcConfig`] are deprecated since 0.9.0 (bsv-rs#350,
+//! the owner's word of 2026-10-27: "arc is just deprecated, arcade is the
+//! standard") and are nowhere a default. The reference keeps ARC undeprecated
+//! and as its default broadcaster (`ts-stack@edf6e03`
+//! `DefaultBroadcaster.ts:1-12`); this crate diverges under that word. The
+//! type stays for a caller who names it, with its verdict below unchanged.
+//!
 //! # The verdict
 //!
 //! ARC answers `POST /v1/tx` with an HTTP 2xx whenever it processed the
@@ -58,6 +67,9 @@
 //! # Reference
 //!
 //! - [ARC Documentation](https://github.com/bitcoin-sv/arc)
+
+// The module defines the deprecated items; its own uses of them are not callers.
+#![allow(deprecated)]
 
 use async_trait::async_trait;
 
@@ -273,6 +285,10 @@ mod verdict {
 }
 
 /// ARC broadcaster configuration.
+#[deprecated(
+    since = "0.9.0",
+    note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27)"
+)]
 #[derive(Debug, Clone)]
 pub struct ArcConfig {
     /// ARC API URL (e.g., `https://arc.taal.com`)
@@ -296,6 +312,9 @@ impl Default for ArcConfig {
 /// ARC broadcaster implementation.
 ///
 /// Broadcasts transactions to the BSV network via TAAL's ARC service.
+/// Deprecated since 0.9.0: ARC is deprecated, ARCade is the standard
+/// (bsv-rs#350); its `Default` (`https://arc.taal.com`) is deprecated with the
+/// type, a trait impl carrying no `#[deprecated]` of its own.
 ///
 /// # Example
 ///
@@ -311,6 +330,10 @@ impl Default for ArcConfig {
 ///     Some("your-api-key".to_string())
 /// );
 /// ```
+#[deprecated(
+    since = "0.9.0",
+    note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27)"
+)]
 pub struct ArcBroadcaster {
     config: ArcConfig,
     #[cfg(feature = "http")]
@@ -330,6 +353,10 @@ impl ArcBroadcaster {
     ///
     /// * `url` - The ARC API URL
     /// * `api_key` - Optional API key for authentication
+    #[deprecated(
+        since = "0.9.0",
+        note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27)"
+    )]
     pub fn new(url: &str, api_key: Option<String>) -> Self {
         Self {
             config: ArcConfig {
@@ -343,6 +370,10 @@ impl ArcBroadcaster {
     }
 
     /// Create with full configuration.
+    #[deprecated(
+        since = "0.9.0",
+        note = "ARC is deprecated; ARCade is the standard (the owner's word of 2026-10-27)"
+    )]
     pub fn with_config(config: ArcConfig) -> Self {
         Self {
             config,

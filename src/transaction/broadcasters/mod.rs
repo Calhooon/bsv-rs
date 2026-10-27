@@ -5,8 +5,10 @@
 //!
 //! # Available Broadcasters
 //!
-//! - [`ArcBroadcaster`] - Broadcasts via the ARC (TAAL's broadcast service)
+//! - [`TeranodeBroadcaster`] - Broadcasts Extended Format bytes to a Teranode `POST /v1/tx`
 //! - [`WhatsOnChainBroadcaster`] - Broadcasts via the WhatsOnChain API
+//! - [`ArcBroadcaster`] - ARC (TAAL's broadcast service): deprecated since 0.9.0,
+//!   ARC is deprecated and ARCade is the standard (bsv-rs#350); never a default
 //!
 //! # Feature Requirements
 //!
@@ -27,6 +29,7 @@ mod whatsonchain;
 #[cfg(feature = "http")]
 pub(crate) mod transport_fault;
 
+#[allow(deprecated)] // re-exported for the callers who name them; deprecated at the definition
 pub use arc::{ArcBroadcaster, ArcConfig};
 pub use teranode::{TeranodeBroadcaster, TeranodeConfig};
 pub use whatsonchain::{WhatsOnChainBroadcaster, WocBroadcastConfig, WocBroadcastNetwork};
