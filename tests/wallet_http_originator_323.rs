@@ -326,7 +326,7 @@ async fn a_json_request_over_256_mib_is_refused_unsent() {
 }
 
 #[tokio::test]
-async fn a_wire_frame_over_256_mib_is_refused_unsent_before_any_allocation() {
+async fn a_wire_frame_over_256_mib_is_refused_unsent_on_its_length() {
     let server = version_server().await;
     let wire = wire(Some("example.com"), &server.uri()).unwrap();
     // One byte past the reference's `MAX_WALLET_WIRE_FRAME_BYTES`
