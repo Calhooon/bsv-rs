@@ -69,8 +69,8 @@ fn from_binary_then_to_binary_writes_the_issuers_bytes_unchanged() {
     ] {
         let w = witness(name);
         let cert = Certificate::from_binary(&bytes(&w)).unwrap();
-        assert_eq!(to_hex(&cert.to_binary(true)), w.hex, "{name}");
-        let unsigned = cert.to_binary(false);
+        assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex, "{name}");
+        let unsigned = cert.to_binary(false).unwrap();
         assert_eq!(cert.received_unsigned.as_deref(), Some(&unsigned[..]));
         assert_eq!(
             unsigned.len() + cert.signature.as_ref().unwrap().len(),
@@ -99,12 +99,12 @@ fn a_field_changed_after_from_binary_unbinds_the_received_bytes() {
     // value, so they authenticate nothing and are not written.
     cert.fields.insert("f".into(), "dGFtcGVyZWQ=".to_string());
     assert_eq!(cert.verify(), Ok(false));
-    assert_ne!(to_hex(&cert.to_binary(true)), w.hex);
+    assert_ne!(to_hex(&cert.to_binary(true).unwrap()), w.hex);
 
     // The value restored: the bytes bind again.
     cert.fields.insert("f".into(), original.clone());
     assert_eq!(cert.verify(), Ok(true));
-    assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex);
 
     // A setter that changes a value in the preimage clears them, even to
     // the same value.
@@ -128,7 +128,7 @@ fn received_bytes_carrying_other_values_are_never_used() {
         .unwrap()
         .with_fields(Default::default());
     b.received_unsigned = a.received_unsigned.clone();
-    assert_eq!(b.to_binary(false).last(), Some(&0u8)); // a field count of 0
+    assert_eq!(b.to_binary(false).unwrap().last(), Some(&0u8)); // a field count of 0
     assert_eq!(b.verify(), Ok(false));
 }
 
@@ -147,7 +147,7 @@ fn a_certificate_signed_here_keeps_the_preimage_it_signed() {
     cert.sign(&certifier).unwrap();
     assert_eq!(
         cert.received_unsigned.as_deref(),
-        Some(&cert.to_binary(false)[..])
+        Some(&cert.to_binary(false).unwrap()[..])
     );
     assert_eq!(cert.verify(), Ok(true));
 }
@@ -172,7 +172,7 @@ fn a_certificate_signed_here_over_mixed_case_names_verifies_in_the_reference() {
     .with_revocation_outpoint(Some(Outpoint::new([10u8; 32], 1)))
     .with_fields(names);
     cert.sign(&key(25)).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex);
 }
 
 #[test]
@@ -185,12 +185,12 @@ fn a_certificate_rebuilt_from_json_signs_in_the_reference_order() {
 
     // Its signature verifies over the serializer's order, the reference's.
     assert_eq!(rebuilt.verify(), Ok(true));
-    assert_eq!(to_hex(&rebuilt.to_binary(true)), w.hex);
+    assert_eq!(to_hex(&rebuilt.to_binary(true).unwrap()), w.hex);
 
     // Signed again here, it is the reference's bytes.
     rebuilt.set_signature(None);
     rebuilt.sign(&key(21)).unwrap();
-    assert_eq!(to_hex(&rebuilt.to_binary(true)), w.hex);
+    assert_eq!(to_hex(&rebuilt.to_binary(true).unwrap()), w.hex);
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn a_byte_order_certificate_signed_again_signs_in_the_reference_order() {
     cert.set_signature(None);
     cert.sign(&key(21)).unwrap();
     assert_eq!(
-        to_hex(&cert.to_binary(true)),
+        to_hex(&cert.to_binary(true).unwrap()),
         witness("reference_signed_mixed_names").hex
     );
     assert_eq!(cert.verify(), Ok(true));
@@ -264,7 +264,7 @@ fn the_serializer_orders_names_as_local_compare_does_on_the_latin_1_corpus() {
     )
     .with_fields(fields);
     assert_eq!(
-        names_written(&cert.to_binary(false)),
+        names_written(&cert.to_binary(false).unwrap()),
         corpus.collation_corpus
     );
 }
@@ -280,12 +280,12 @@ fn the_six_witness_names_are_written_a_b_a0_age_ea_f_name() {
     )
     .with_fields(read.fields.clone());
     assert_eq!(
-        names_written(&rebuilt.to_binary(false)),
+        names_written(&rebuilt.to_binary(false).unwrap()),
         ["a_b", "a0", "age", "éa", "f", "Name"]
     );
     // The byte order it was received in is kept for the received bytes.
     assert_eq!(
-        names_written(&read.to_binary(false)),
+        names_written(&read.to_binary(false).unwrap()),
         ["Name", "a0", "a_b", "age", "f", "éa"]
     );
 }

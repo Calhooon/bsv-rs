@@ -110,7 +110,7 @@ fn assert_wire_frame_is_the_signed_bytes(cert: &Certificate, witness: &Witness) 
     let wallet = wallet_certificate(cert);
     let frame = write(&wallet);
     assert_eq!(to_hex(&frame), witness.hex, "{}", witness.name);
-    assert_eq!(frame, cert.to_binary(true), "{}", witness.name);
+    assert_eq!(frame, cert.to_binary(true).unwrap(), "{}", witness.name);
 
     let read = Certificate::from_binary(&frame).unwrap();
     assert_eq!(read.verify(), Ok(true), "{}", witness.name);

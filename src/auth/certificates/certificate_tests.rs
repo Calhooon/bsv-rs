@@ -35,7 +35,7 @@ fn test_binary_roundtrip() {
     cert.set_field("name", "encrypted_value");
     cert.sign(&certifier).unwrap();
 
-    let binary = cert.to_binary(true);
+    let binary = cert.to_binary(true).unwrap();
     let parsed = Certificate::from_binary(&binary).unwrap();
 
     assert_eq!(cert.cert_type, parsed.cert_type);
@@ -55,7 +55,7 @@ fn test_binary_with_revocation_outpoint() {
     cert.revocation_outpoint = Some(Outpoint::new([3u8; 32], 5));
     cert.sign(&certifier).unwrap();
 
-    let binary = cert.to_binary(true);
+    let binary = cert.to_binary(true).unwrap();
     let parsed = Certificate::from_binary(&binary).unwrap();
 
     assert!(parsed.revocation_outpoint.is_some());
@@ -100,7 +100,7 @@ fn a_revocation_outpoint_index_above_u32_max_is_refused_not_truncated_in_the_bou
     let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
     cert.revocation_outpoint = Some(Outpoint::new([3u8; 32], u32::MAX));
     cert.sign(&certifier).unwrap();
-    let binary = cert.to_binary(true);
+    let binary = cert.to_binary(true).unwrap();
 
     let parsed = Certificate::from_binary(&binary).unwrap();
     assert_eq!(

@@ -51,9 +51,13 @@ fn certificate(certificate: &Certificate) {
     let _ = certificate.signing_hash();
     let _ = certificate.to_wallet_certificate();
     for signed in [false, true] {
-        let bytes = certificate.to_binary(signed);
+        // A value over the 1 MiB bound is refused (bsv-rs#275); the
+        // reader refuses one, so only a JSON-read certificate meets it.
+        let Ok(bytes) = certificate.to_binary(signed) else {
+            continue;
+        };
         if let Ok(again) = Certificate::from_binary(&bytes) {
-            assert_eq!(again.to_binary(signed), bytes);
+            assert_eq!(again.to_binary(signed).ok(), Some(bytes));
         }
     }
 }

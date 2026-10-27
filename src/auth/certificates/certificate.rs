@@ -7,6 +7,7 @@
 use super::certificate_json::revocation_outpoint_from_str;
 use crate::primitives::{bounded_capacity, sha256, to_hex, PrivateKey, PublicKey, Signature};
 use crate::wallet::types::Outpoint;
+use crate::wallet::wire::{certificate_field_value_refusal, MAX_CERTIFICATE_FIELD_VALUE_BYTES};
 use crate::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use crate::{Error, Result};
 use std::collections::HashMap;
@@ -188,10 +189,18 @@ impl Certificate {
     /// the issuer signed, BRC-52 `0052.md:103`; #249), and the serializer's
     /// field order otherwise.
     ///
+    /// A field value whose text is over 1 MiB of UTF-8 is refused before
+    /// anything is written, in the reference's words, `Certificate field
+    /// <name> exceeds the maximum of 1048576 bytes`: the reference's
+    /// `toBinary` refuses it in its snapshot of the fields
+    /// (`ts-stack@edf6e03` `Certificate.ts:76-79`, `:281`), and `sign` and
+    /// `verify` with it (`:458`, `:427`); `set_field` takes any value, as the
+    /// reference's constructor does (bsv-rs#275).
+    ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
-    pub fn to_binary(&self, include_signature: bool) -> Vec<u8> {
-        let mut buf = self.unsigned_bytes();
+    pub fn to_binary(&self, include_signature: bool) -> Result<Vec<u8>> {
+        let mut buf = self.unsigned_bytes()?;
 
         // Signature: raw bytes, no length prefix (matches TypeScript SDK)
         if include_signature {
@@ -201,14 +210,14 @@ impl Certificate {
             // If no signature, write nothing (not even a marker byte)
         }
 
-        buf
+        Ok(buf)
     }
 
     /// The unsigned prefix: the retained bytes when they bind to the
     /// current values, the serializer's otherwise.
-    fn unsigned_bytes(&self) -> Vec<u8> {
+    fn unsigned_bytes(&self) -> Result<Vec<u8>> {
         match self.received_unsigned {
-            Some(ref bytes) if self.binds(bytes) => bytes.clone(),
+            Some(ref bytes) if self.binds(bytes) => Ok(bytes.clone()),
             _ => self.serialize_unsigned(),
         }
     }
@@ -233,8 +242,24 @@ impl Certificate {
         }
     }
 
-    /// The serializer's unsigned prefix.
-    fn serialize_unsigned(&self) -> Vec<u8> {
+    /// The serializer's unsigned prefix, every field value's bound checked
+    /// before the buffer is allocated (`Certificate.ts:281`; bsv-rs#275).
+    fn serialize_unsigned(&self) -> Result<Vec<u8>> {
+        // Fields in the reference's order: `localeCompare` under Node's
+        // default collation (`ts-stack@edf6e03` `Certificate.ts:282`), not
+        // the bytes (#249; the residual is `collation.rs`'s), the wire
+        // writer's order too (#246)
+        let mut field_names: Vec<&str> = self.fields.keys().map(String::as_str).collect();
+        crate::wallet::collation::sort_field_names(&mut field_names);
+        if let Some(name) = field_names
+            .iter()
+            .find(|name| self.fields[**name].len() > MAX_CERTIFICATE_FIELD_VALUE_BYTES)
+        {
+            return Err(Error::CertificateValidationError(
+                certificate_field_value_refusal(name),
+            ));
+        }
+
         let mut buf = Vec::new();
 
         // Type (32 bytes)
@@ -264,13 +289,6 @@ impl Certificate {
         // Fields count (varint)
         write_varint(&mut buf, self.fields.len() as u64);
 
-        // Fields in the reference's order: `localeCompare` under Node's
-        // default collation (`ts-stack@edf6e03` `Certificate.ts:282`), not
-        // the bytes (#249; the residual is `collation.rs`'s), the wire
-        // writer's order too (#246)
-        let mut field_names: Vec<&str> = self.fields.keys().map(String::as_str).collect();
-        crate::wallet::collation::sort_field_names(&mut field_names);
-
         for name in field_names {
             let value = &self.fields[name];
             // Field name (length-prefixed string)
@@ -281,7 +299,7 @@ impl Certificate {
             buf.extend_from_slice(value.as_bytes());
         }
 
-        buf
+        Ok(buf)
     }
 
     /// Parses a certificate from binary format.
@@ -304,7 +322,9 @@ impl Certificate {
     /// `to_binary` use the issuer's bytes whatever order its fields came in
     /// (BRC-52 `0052.md:103`; #249). A repeated field name is refused, as
     /// the reference refuses it (`ts-stack@edf6e03` `Certificate.ts:374`):
-    /// retaining bytes must not make one acceptable.
+    /// retaining bytes must not make one acceptable. A field value's declared
+    /// length over 1 MiB is refused before its bytes are read, as the
+    /// reference's reader refuses it (`Certificate.ts:377-381`; bsv-rs#275).
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let mut reader = BinaryReader::new(data);
         let unsigned = read_unsigned(&mut reader)?;
@@ -329,9 +349,11 @@ impl Certificate {
         })
     }
 
-    /// Gets the hash to sign (SHA-256 of binary without signature).
-    pub fn signing_hash(&self) -> [u8; 32] {
-        sha256(&self.unsigned_bytes())
+    /// Gets the hash to sign (SHA-256 of binary without signature), a field
+    /// value over the bound refused as [`to_binary`](Self::to_binary)
+    /// refuses it (bsv-rs#275).
+    pub fn signing_hash(&self) -> Result<[u8; 32]> {
+        Ok(sha256(&self.unsigned_bytes()?))
     }
 
     /// The BRC-52 signature key ID: `"<type> <serialNumber>"`, the two
@@ -373,7 +395,7 @@ impl Certificate {
             &self.signature_key_id(),
             &Counterparty::Anyone,
         )?;
-        let preimage = self.serialize_unsigned();
+        let preimage = self.serialize_unsigned()?;
         let sig = child.sign(&sha256(&preimage))?;
         self.signature = Some(sig.to_der());
         self.received_unsigned = Some(preimage);
@@ -393,7 +415,7 @@ impl Certificate {
             .as_ref()
             .ok_or_else(|| Error::InvalidSignature("Certificate not signed".into()))?;
 
-        let hash = self.signing_hash();
+        let hash = self.signing_hash()?;
         let sig = Signature::from_der(sig_bytes)?;
 
         let child = KeyDeriver::new(None).derive_public_key(
@@ -436,7 +458,7 @@ impl Certificate {
     /// let key = PrivateKey::random().public_key();
     /// let mut cert = Certificate::new([1; 32], [2; 32], key.clone(), key);
     /// cert.set_field("email", to_base64(&[0xff, 0xfe, 0x41]));
-    /// assert!(cert.to_binary(false).windows(11).any(|w| w == b"\x05email\x04//5B"));
+    /// assert!(cert.to_binary(false).unwrap().windows(11).any(|w| w == b"\x05email\x04//5B"));
     /// ```
     pub fn set_field(&mut self, name: impl Into<String>, value: impl Into<String>) {
         self.received_unsigned = None;
@@ -531,6 +553,11 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
             )));
         }
         let value_len = reader.read_len()?;
+        if value_len > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+            return Err(Error::CertificateValidationError(
+                certificate_field_value_refusal(&name),
+            ));
+        }
         // UTF-8 or refused, as `toUTF8Strict` (`Certificate.ts:384`; BRC-52 `0052.md:103`; #261)
         let value = std::str::from_utf8(reader.read_bytes(value_len)?).map_err(|e| {
             Error::InvalidUtf8(format!(

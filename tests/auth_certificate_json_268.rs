@@ -131,9 +131,9 @@ async fn read_the_three(
         read_and_write_back(&json.verifiable, exact, "VerifiableCertificate");
 
     assert!(cert.verify().unwrap());
-    assert_eq!(to_hex(&cert.to_binary(true)), binary_hex);
-    assert_eq!(to_hex(&master.to_binary(true)), binary_hex);
-    assert_eq!(to_hex(&verifiable.to_binary(true)), binary_hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), binary_hex);
+    assert_eq!(to_hex(&master.to_binary(true).unwrap()), binary_hex);
+    assert_eq!(to_hex(&verifiable.to_binary(true).unwrap()), binary_hex);
     assert_eq!(
         verifiable.to_json_value(),
         serde_json::from_str::<serde_json::Value>(&with_the_index(&json.verifiable)).unwrap()
@@ -256,7 +256,7 @@ async fn the_reference_default_txid_alone_revocation_outpoint_reads_as_index_zer
 
     let cert: Certificate = serde_json::from_str(&r.json.certificate).unwrap();
     assert_eq!(cert.revocation_outpoint, None);
-    assert_eq!(to_hex(&cert.to_binary(true)), r.binary_hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), r.binary_hex);
     assert!(cert.verify().unwrap());
 
     // A txid other than the sentinel's reads as that txid at index 0.
@@ -352,7 +352,10 @@ fn an_auth_message_carrying_the_reference_default_revocation_outpoint_is_read() 
         .unwrap_or_else(|e| panic!("the reference's certificateResponse is not read here: {e}"));
     let certificates = read.certificates.unwrap();
     assert_eq!(certificates.len(), 1);
-    assert_eq!(to_hex(&certificates[0].to_binary(true)), r.binary_hex);
+    assert_eq!(
+        to_hex(&certificates[0].to_binary(true).unwrap()),
+        r.binary_hex
+    );
     assert!(certificates[0].verify().unwrap());
 }
 
@@ -435,7 +438,7 @@ fn an_absent_revocation_outpoint_reads_from_null_from_no_key_and_from_the_sentin
     j.as_object_mut().unwrap().remove("revocationOutpoint");
     let read: Certificate = serde_json::from_value(j).unwrap();
     assert_eq!(read.revocation_outpoint, None);
-    assert_eq!(read.to_binary(true), cert.to_binary(true));
+    assert_eq!(read.to_binary(true).unwrap(), cert.to_binary(true).unwrap());
 }
 
 /// Issues a certificate here with `fields`, and a keyring for `verifier`.
@@ -513,7 +516,7 @@ async fn print_the_certificates_issued_here_for_the_reference() {
                 master: serde_json::to_string(&master).unwrap(),
                 verifiable: serde_json::to_string(&verifiable).unwrap(),
             },
-            "binary_hex": to_hex(&master.to_binary(true)),
+            "binary_hex": to_hex(&master.to_binary(true).unwrap()),
         }));
     }
     println!("{}", serde_json::to_string_pretty(&out).unwrap());

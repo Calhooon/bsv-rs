@@ -375,7 +375,7 @@ fn test_certificate_binary_roundtrip() {
     cert.sign(&certifier_key).unwrap();
 
     // Binary roundtrip
-    let binary = cert.to_binary(true);
+    let binary = cert.to_binary(true).unwrap();
     let decoded = Certificate::from_binary(&binary).unwrap();
 
     assert_eq!(decoded.cert_type, cert.cert_type);
@@ -2014,7 +2014,7 @@ fn test_certificate_with_empty_fields_map() {
     );
 
     // Binary roundtrip should work with empty fields
-    let binary = cert.to_binary(true);
+    let binary = cert.to_binary(true).unwrap();
     let decoded = Certificate::from_binary(&binary).unwrap();
     assert!(
         decoded.fields.is_empty(),

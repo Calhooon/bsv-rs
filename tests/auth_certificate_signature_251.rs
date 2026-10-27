@@ -49,7 +49,7 @@ fn key(scalar: u8) -> PrivateKey {
 /// The certifier's raw key over the preimage: 0.9.0-beta.1's reading.
 fn verifies_under_raw_key(cert: &Certificate) -> bool {
     let sig = Signature::from_der(cert.signature.as_ref().unwrap()).unwrap();
-    cert.certifier.verify(&cert.signing_hash(), &sig)
+    cert.certifier.verify(&cert.signing_hash().unwrap(), &sig)
 }
 
 #[test]
@@ -73,7 +73,7 @@ fn a_certificate_signed_here_is_the_reference_signed_bytes() {
     );
     cert.set_field("email", to_base64(b"v-email"));
     cert.sign(&certifier).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex);
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn a_certificate_signed_here_verifies_in_the_reference() {
     cert.revocation_outpoint = Some(Outpoint::new([5u8; 32], 1));
     cert.set_field("name", to_base64(b"v-name"));
     cert.sign(&certifier).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.hex);
     assert_eq!(certificate(&w).verify(), Ok(true));
 }
 

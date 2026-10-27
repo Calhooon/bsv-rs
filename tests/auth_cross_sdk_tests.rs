@@ -151,7 +151,7 @@ fn test_certificate_binary_roundtrip() {
         let cert = vector_to_certificate(v);
 
         // Test binary serialization without signature
-        let binary_no_sig = cert.to_binary(false);
+        let binary_no_sig = cert.to_binary(false).unwrap();
         let parsed_no_sig = Certificate::from_binary(&binary_no_sig)
             .unwrap_or_else(|_| panic!("Vector {}: failed to parse binary (no sig)", i));
 
@@ -169,7 +169,7 @@ fn test_certificate_binary_roundtrip() {
 
         // Test binary serialization with signature
         if cert.signature.is_some() {
-            let binary_with_sig = cert.to_binary(true);
+            let binary_with_sig = cert.to_binary(true).unwrap();
             let parsed_with_sig = Certificate::from_binary(&binary_with_sig)
                 .unwrap_or_else(|_| panic!("Vector {}: failed to parse binary (with sig)", i));
 
@@ -188,8 +188,8 @@ fn test_certificate_deterministic_serialization() {
         let cert = vector_to_certificate(v);
 
         // Serialize twice and verify identical output
-        let binary1 = cert.to_binary(false);
-        let binary2 = cert.to_binary(false);
+        let binary1 = cert.to_binary(false).unwrap();
+        let binary2 = cert.to_binary(false).unwrap();
 
         assert_eq!(
             binary1, binary2,
@@ -199,7 +199,7 @@ fn test_certificate_deterministic_serialization() {
 
         // Parse and re-serialize
         let parsed = Certificate::from_binary(&binary1).unwrap();
-        let binary3 = parsed.to_binary(false);
+        let binary3 = parsed.to_binary(false).unwrap();
 
         assert_eq!(binary1, binary3, "Vector {}: roundtrip changed binary", i);
 
@@ -220,7 +220,7 @@ fn test_certificate_fields_sorted_alphabetically() {
 
     if let Some(v) = multi_field_vector {
         let cert = vector_to_certificate(v);
-        let binary = cert.to_binary(false);
+        let binary = cert.to_binary(false).unwrap();
 
         // Parse it back
         let parsed = Certificate::from_binary(&binary).unwrap();
@@ -318,7 +318,7 @@ fn load_origin() -> OriginFile {
 fn verifies_derived_with(cert: &Certificate, type_b64: &str, serial_b64: &str) -> bool {
     let mut preimage = from_base64(type_b64).unwrap();
     preimage.extend(from_base64(serial_b64).unwrap());
-    preimage.extend_from_slice(&cert.to_binary(false)[64..]);
+    preimage.extend_from_slice(&cert.to_binary(false).unwrap()[64..]);
     let child = KeyDeriver::new(None)
         .derive_public_key(
             &Protocol::new(SecurityLevel::Counterparty, "certificate signature"),
@@ -350,7 +350,7 @@ fn vector_0_signature_verifies_under_no_known_reading() {
 
     assert_eq!(cert.verify(), Ok(false));
     let sig = Signature::from_der(cert.signature.as_ref().unwrap()).unwrap();
-    assert!(!cert.certifier.verify(&cert.signing_hash(), &sig));
+    assert!(!cert.certifier.verify(&cert.signing_hash().unwrap(), &sig));
 }
 
 /// The signature vector 0 carries is the reference fixture's, and it
@@ -520,7 +520,7 @@ fn test_certificate_empty_fields() {
         assert!(cert.fields.is_empty());
 
         // Should still serialize/deserialize correctly
-        let binary = cert.to_binary(false);
+        let binary = cert.to_binary(false).unwrap();
         let parsed = Certificate::from_binary(&binary).unwrap();
         assert!(parsed.fields.is_empty());
 
@@ -542,7 +542,7 @@ fn test_certificate_without_revocation_outpoint() {
         assert!(cert.revocation_outpoint.is_none());
 
         // Should still serialize/deserialize correctly
-        let binary = cert.to_binary(false);
+        let binary = cert.to_binary(false).unwrap();
         let parsed = Certificate::from_binary(&binary).unwrap();
         assert!(parsed.revocation_outpoint.is_none());
 
@@ -592,7 +592,7 @@ fn test_certificate_binary_format_structure() {
     let cert = Certificate::new(cert_type, serial_number, subject, certifier)
         .with_revocation_outpoint(Some(outpoint));
 
-    let binary = cert.to_binary(false);
+    let binary = cert.to_binary(false).unwrap();
 
     // Verify structure:
     // Offset 0-31: type (32 bytes)
@@ -649,7 +649,7 @@ fn test_certificate_no_outpoint_sentinel_value() {
     // No outpoint
     let cert = Certificate::new(cert_type, serial_number, subject, certifier);
 
-    let binary = cert.to_binary(false);
+    let binary = cert.to_binary(false).unwrap();
 
     // Offset 130-161: should be all zeros (sentinel value)
     assert_eq!(

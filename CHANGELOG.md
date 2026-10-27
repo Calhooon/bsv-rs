@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
+
+`Certificate::to_binary` wrote and `from_binary` read a field value of any
+length (the reader bounded only by the bytes remaining), where the reference
+refuses one over 1 MiB at both: `toBinary`'s snapshot of the fields measures
+each value's text as UTF-8 bytes (`ts-stack@edf6e03` `Certificate.ts:27`,
+`:76-79`, `:281`) and `fromBinary` the declared length before it reads the
+bytes (`:377-381`), both in the words `Certificate field <name> exceeds the
+maximum of 1048576 bytes`. The wallet wire's writer (#246) and reader (#189)
+already refused it; the text is now one function's
+(`wallet::wire::certificate_field_value_refusal`), at the four sites.
+`to_binary` checks every value before it allocates the buffer; `sign` and
+`verify` serialize through it, as `Certificate.ts:458` and `:427` do;
+`set_field` takes any value, as the reference's constructor does. Where a
+field is decrypted (`MasterCertificate::decrypt_field`, `decrypt_fields`,
+`create_keyring_for_verifier`, `VerifiableCertificate::decrypt_field`,
+`decrypt_fields`), its text was decoded leniently (whitespace stripped, the
+URL alphabet and missing padding accepted, `from_base64`); the reference
+decodes it as canonical base64 of 1 byte to 1 MiB (`canonicalBase64`,
+`MasterCertificate.ts:63-74`, called at `:351-357`, `:534-538`, `:587-591`;
+`VerifiableCertificate.ts:41-52`, `:187-191`; `WalletByteEncoding.ts:39-64`)
+and refuses otherwise in `Certificate field <name> must use canonical base64
+encoding` or `Certificate field <name> is empty, oversized, or
+non-canonical`, both now this crate's (`CertificateValidationError`), before
+the wallet's decrypt; `create_keyring_for_verifier` checks every field, revealed
+or not, first, as `:351-357` does. Pinned by
+`tests/auth_certificate_field_bound_275.rs` (8 tests; 7 red on the tree with
+the checks removed). `auth_reader_bounds.rs`'s
+`a_certificate_value_length_of_usize_max_is_refused` (#108) pinned
+`ReaderUnderflow` for a value length of `u64::MAX`; the bound now refuses it
+first, in its words, and the pin says so.
+
+Migration: `Certificate::to_binary` returns `Result<Vec<u8>>` and
+`Certificate::signing_hash` `Result<[u8; 32]>`, the reference's throwing
+`toBinary` and Go's `ToBinary(bool) ([]byte, error)`
+(`go-sdk@2ca481c` `auth/certificates/certificate.go:114`); add `?` or
+`.unwrap()` at the call.
+
+### Notes: cross-SDK parity (#275)
+
+The base `Certificate` reads no field value as base64 in the reference
+(`Certificate.ts` checks only `type` and `serialNumber`, `:30-43`), and
+neither does this crate: the canonical rule is the decrypting classes'. Go
+bounds no field value (`go-sdk@2ca481c` `auth/certificates/certificate.go:114-148`)
+and decodes a field with `base64.StdEncoding` (`verifiable.go:140`), which
+skips line breaks and accepts unused bits set; this crate refuses both, as
+the reference does. Not carried here: the reference's `MasterCertificate`
+constructor checks each field and keyring entry at construction
+(`MasterCertificate.ts:205-232`; `MasterCertificate::new` takes them
+unchecked and the decrypt sites refuse them); the keyring entries' canonical
+2048-byte bound (`:220-231`, `VerifiableCertificate.ts:182-186`), the 64 KiB
+plaintext bound at issuance and decrypt (`MasterCertificate.ts:272-276`,
+`:612-616`, `VerifiableCertificate.ts:208-209`), the 100,000-field count and
+the name checks in `toBinary`'s snapshot (`Certificate.ts:57-58`, `:73-74`);
+and the reference's outer decrypt words (`Failed to decrypt certificate
+field!` and `Failed to decrypt all master certificate fields.`,
+`MasterCertificate.ts:622`, `:560`; `Failed to decrypt selectively
+revealed certificate fields using keyring: <words>`,
+`VerifiableCertificate.ts:214-217`): the inner refusal is returned as is.
+
 ### Fixed: a JSON number reads to the correctly rounded double, so a Socket.IO frame round-trips every finite `f64` (#285)
 
 The Socket.IO codec (`src/auth/transports/socketio/codec.rs`) reads and
