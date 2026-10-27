@@ -233,13 +233,12 @@ async fn a_server_response_signed_by_another_key_is_refused_353() {
     assert!(received.lock().unwrap().is_empty());
 }
 
-/// An unsigned response is refused; the words are this crate's, not the
-/// reference's: the transport gives a response without an identity header the
-/// client's own key (`src/auth/transports/http.rs`, `response_identity`) and
-/// the Peer refuses its absent `yourNonce` naming it, where the reference's
-/// transport refuses the response first (`Received HTTP 200 from <url>
+/// An unsigned response is refused by the transport before it becomes a
+/// message, in the reference's words (`Received HTTP 200 OK from <url>
 /// without valid BSV authentication (missing headers: ...)`,
-/// `SimplifiedFetchTransport.ts:220-232`, `:464-485`).
+/// `SimplifiedFetchTransport.ts:220-232`, `:464-494`; bsv-rs#354), where
+/// until #354 the transport gave it the client's own key and the Peer
+/// refused its absent `yourNonce` naming that key.
 #[tokio::test]
 async fn an_unsigned_server_response_is_refused_353() {
     let mock = server(Signing::None).await;
@@ -248,8 +247,10 @@ async fn an_unsigned_server_response_is_refused_353() {
     assert_eq!(
         say_hello(&peer).await.unwrap_err(),
         Error::AuthError(format!(
-            "Unable to verify nonce for general message from: {}",
-            client_key().public_key().to_hex()
+            "Received HTTP 200 OK from {}/hello without valid BSV authentication \
+             (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, \
+             x-bsv-auth-signature) - body preview: hi",
+            mock.uri()
         ))
     );
     assert!(received.lock().unwrap().is_empty());
