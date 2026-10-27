@@ -1,7 +1,7 @@
 {
-  "description": "publiclyRevealAttributes refuses before any wallet call a certificate whose fields, names to reveal or signature the reference refuses (#307)",
+  "description": "publiclyRevealAttributes refuses before any wallet call a certificate whose fields, names to reveal or signature the reference refuses, and before createAction a keyring whose names or values it refuses, publishing the values trimmed (#307)",
   "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), run under Node v22.18.0 by tests/support/identity_reveal_verifies_307.mjs",
-  "site": "ts-stack@edf6e03 packages/sdk/src/identity/IdentityClient.ts:420-467",
+  "site": "ts-stack@edf6e03 packages/sdk/src/identity/IdentityClient.ts:420-499",
   "witnesses": [
     {
       "name": "signed",
@@ -519,6 +519,487 @@
       ],
       "refusal": "Public reveal failed: requested field is not present in the certificate!",
       "wallet_calls": 0
+    },
+    {
+      "name": "keyring_unsafe_proto",
+      "origin": "the keyring carrying __proto__ beside email",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Invalid display identity: proof result keyringForVerifier contains an unsafe field",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "AAAA",
+        "__proto__": "AAAA"
+      },
+      "refusal_name": "Error",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_unsafe_constructor",
+      "origin": "the keyring naming constructor alone, one name as asked",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Invalid display identity: proof result keyringForVerifier contains an unsafe field",
+      "wallet_calls": 1,
+      "keyring": {
+        "constructor": "AAAA"
+      },
+      "refusal_name": "Error",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_unrequested",
+      "origin": "the keyring naming email and name, email asked",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: wallet returned a keyring for unrequested fields!",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "AAAA",
+        "name": "AAAA"
+      },
+      "refusal_name": "Error",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_other_name",
+      "origin": "the keyring naming name alone, email asked",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: wallet returned a keyring for unrequested fields!",
+      "wallet_calls": 1,
+      "keyring": {
+        "name": "AAAA"
+      },
+      "refusal_name": "Error",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_missing",
+      "origin": "the empty keyring",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: wallet returned a keyring for unrequested fields!",
+      "wallet_calls": 1,
+      "keyring": {},
+      "refusal_name": "Error",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_not_base64",
+      "origin": "a value with !",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "AA!A"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_empty",
+      "origin": "the empty value",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": ""
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_whitespace_only",
+      "origin": "a value of whitespace alone",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": " \t\n"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_padding_inside",
+      "origin": "a = before the last two places",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "A=AA"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_short",
+      "origin": "three characters, no padding",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "AAA"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_one_char",
+      "origin": "one character",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "A"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_oversized",
+      "origin": "2732 characters, 2049 bytes",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be no more than 2048 bytes",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_at_bound",
+      "origin": "2731 characters and =, 2048 bytes",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": null,
+      "wallet_calls": 3,
+      "keyring": {
+        "email": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      },
+      "refusal_name": null,
+      "published_keyring": {
+        "email": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+      }
+    },
+    {
+      "name": "keyring_trimmed",
+      "origin": "a value with whitespace around it",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": null,
+      "wallet_calls": 3,
+      "keyring": {
+        "email": " \tAAAA\n "
+      },
+      "refusal_name": null,
+      "published_keyring": {
+        "email": "AAAA"
+      }
+    },
+    {
+      "name": "keyring_bom_trimmed",
+      "origin": "a value after U+FEFF, which JavaScript trims",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": null,
+      "wallet_calls": 3,
+      "keyring": {
+        "email": "﻿AAAA"
+      },
+      "refusal_name": null,
+      "published_keyring": {
+        "email": "AAAA"
+      }
+    },
+    {
+      "name": "keyring_nel_kept",
+      "origin": "a value after U+0085, which JavaScript does not trim",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "The keyringForVerifier.email parameter must be valid base64 string",
+      "wallet_calls": 1,
+      "keyring": {
+        "email": "AAAA"
+      },
+      "refusal_name": "WERR_INVALID_PARAMETER",
+      "published_keyring": null
+    },
+    {
+      "name": "keyring_noncanonical",
+      "origin": "AB==, its last bits not zero, read by shape only",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": null,
+      "wallet_calls": 3,
+      "keyring": {
+        "email": "AB=="
+      },
+      "refusal_name": null,
+      "published_keyring": {
+        "email": "AB=="
+      }
+    },
+    {
+      "name": "keyring_both_fields_trimmed",
+      "origin": "both fields revealed, each value padded with spaces",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email",
+        "name"
+      ],
+      "refusal": null,
+      "wallet_calls": 3,
+      "keyring": {
+        "email": " AAAA",
+        "name": "AAAA "
+      },
+      "refusal_name": null,
+      "published_keyring": {
+        "email": "AAAA",
+        "name": "AAAA"
+      }
     }
   ]
 }

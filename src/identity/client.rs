@@ -429,7 +429,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                 originator,
             )
             .await?;
-        super::reveal::check_keyring_fields(&prove_result.keyring_for_verifier, &fields_to_reveal)?;
+        let keyring =
+            super::reveal::check_keyring(&prove_result.keyring_for_verifier, &fields_to_reveal)?;
 
         // Create JSON object with certificate and keyring
         let cert_with_keyring = serde_json::json!({
@@ -440,7 +441,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             "revocationOutpoint": certificate.revocation_outpoint,
             "fields": certificate.fields,
             "signature": certificate.signature,
-            "keyring": prove_result.keyring_for_verifier,
+            "keyring": keyring,
         });
 
         let cert_json = serde_json::to_vec(&cert_with_keyring)

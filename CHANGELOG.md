@@ -46,11 +46,25 @@ not present in the certificate!`, `:434-450`; its dense-array refusal at
 `:436-438` has no counterpart, a `Vec` being dense); then the master
 certificate's `verify()`, any failure under it one sentence, `Public reveal
 failed: Certificate verification failed!` (`:451-467`). After
-`proveCertificate` it refuses a keyring naming other fields than those
-asked (`wallet returned a keyring for unrequested fields!`, `:487-491`).
+`proveCertificate` it refuses a keyring carrying a name `__proto__`,
+`constructor` or `prototype` (`Invalid display identity: proof result
+keyringForVerifier contains an unsafe field`, `identityRecord` at
+`:480-483`), whether or not the count matches; then one naming other
+fields than those asked, or missing one (`wallet returned a keyring for
+unrequested fields!`, `:484-491`); then each value through
+`validateBase64String(.., 1, 2048)` (`:492-499`, `validationHelpers.ts:488-498`):
+trimmed as JavaScript's `trim` trims (U+FEFF trimmed, U+0085 kept), base64
+by its shape alone, 1 to 2048 bytes, a refusal `WERR_INVALID_PARAMETER`
+(`The keyringForVerifier.<name> parameter must be valid base64 string`,
+`.. no more than 2048 bytes`, `.. at least 1 bytes`), here
+`Error::WalletRefusal` of the `InvalidParameter` class; the PushDrop
+carries the trimmed values. Until this fold an unsafe name was refused
+as an unrequested field and the wallet's values were published as given
+(the review's two findings; this closes item 1 of #310).
 Each is here now, in the reference's words and order, as
 `Error::IdentityError`, the class of the client's other refusals
-(`src/identity/reveal.rs`; `client.rs` calls it and is 16 lines shorter).
+(the keyring values' refusal as above; `src/identity/reveal.rs`;
+`client.rs` calls it and is 15 lines shorter).
 The master certificate is read from the wallet certificate's members'
 JSON (`Certificate`'s reader, #268) and verified by `Certificate::verify`
 (#299); a member it cannot hold (an empty subject, a signature that is not
@@ -62,21 +76,31 @@ text: `bsv-overlay-cloudflare` `9a0f3c29`, `rust-message-box` `419bf18`,
 `bsv-wallet-toolbox-rs` `6317222`, `bsv-wallet-cli` `a55990c` call
 neither).
 
-Pinned by `tests/identity_reveal_verifies_307.rs` (7 tests) on
+Pinned by `tests/identity_reveal_verifies_307.rs` (10 tests) on
 `tests/vectors/identity_reveal_verifies_307.json`: the reference's verdicts
-on twenty witnesses (a signed certificate, one and both fields revealed;
+on thirty-eight witnesses (a signed certificate, one and both fields revealed;
 unsigned, another key's signature, a field changed after signing, not DER,
 not hex, an empty subject; the outpoint the txid alone, which both verify;
 each refusal above; an unsigned certificate with an absent name, refused
-for the name first) recorded by `tests/support/identity_reveal_verifies_307.mjs`
+for the name first; eighteen keyrings the wallet answers: `__proto__`
+beside the name asked, `constructor` alone, another name, an extra name,
+none; a value with `!`, empty, whitespace alone, `=` inside, three
+characters, one, 2049 bytes, after U+0085, each refused after the one
+wallet call; 2048 bytes, `AB==`, whitespace, U+FEFF and both fields
+padded, each published as the reference publishes it, trimmed) recorded by `tests/support/identity_reveal_verifies_307.mjs`
 at `ts-stack@edf6e03` under Node v22.18.0 (two runs byte for byte), its
-wallet counting its calls: every refusal the same words here with no
-wallet call before it, every acceptance reaching createAction; the signed
+wallet counting its calls: every refusal the same words and class here
+with the same wallet calls before it, every acceptance reaching
+createAction with the keyring the reference publishes; the signed
 certificate's signature this crate's own bytes; a signed certificate
 published as before (the PushDrop carrying its JSON and the keyring); a
-keyring for another field refused before createAction. 5 of the 7 red on
-the tree before the fix (`6c5e4d8`), the other two pinning what did not
-move. The #105 and #261 identity witnesses are unchanged.
+keyring for another field refused before createAction; an unsafe keyring
+name refused in the reference's words; a value not base64 or over 2048
+bytes refused as the reference refuses it; values published trimmed. 5 of
+the first 7 red on the tree before the fix (`6c5e4d8`), the other two
+pinning what did not move; 4 of the 10 red on the fold's base (`e62bdd7`:
+the vector's test, the three keyring tests), the 20 earlier witnesses
+recorded again byte for byte. The #105 and #261 identity witnesses are unchanged.
 
 ### Notes: cross-SDK parity (#307)
 
@@ -87,11 +111,7 @@ words, converts the certificate (`FromWalletCertificate`, `:86-89`) and
 refuses a failed `Verify` as `certificate verification failed` (`:91-94`),
 all before `ProveCertificate` (`:109`): the verification at the
 reference's site; it checks no name against the certificate, no repeat, no
-count or length, and not the keyring the wallet returns. One reference
-check is not followed: the reference reads each keyring value with
-`validateBase64String(.., 1, 2048)` and publishes the trimmed text
-(`IdentityClient.ts:492-499`); this crate publishes the wallet's values as
-given.
+count or length, and not the keyring the wallet returns.
 
 ### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
