@@ -82,7 +82,7 @@ pub use transports::{MockTransport, SimplifiedFetchTransport, Transport};
 pub use transports::{WebSocketTransport, WebSocketTransportOptions};
 pub use types::{
     current_time_ms, AuthMessage, MessageType, PeerSession, RequestedCertificateSet,
-    AUTH_PROTOCOL_ID, AUTH_VERSION,
+    RequestedCertificateTypes, AUTH_PROTOCOL_ID, AUTH_VERSION,
 };
 pub use utils::{
     create_nonce, validate_certificate_encoding, validate_certificates,

@@ -1,0 +1,38 @@
+{
+  "issue": "bsv-rs#288",
+  "description": "A certificateRequest policy whose types name three certificate types in an order no sort gives. policy_text: the reference's JSON.stringify(policy), the bytes Peer.ts:451-453 signs; reference_request: two reference Peers' certificateRequest over an in-memory transport carrying JSON.stringify text; this_crate_messages: the certificateRequest this crate wrote, handed to a reference Peer holding the session.",
+  "node": "v22.18.0",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "keys": {
+    "verifier": "0000000000000000000000000000000000000000000000000000000000000015",
+    "holder": "0000000000000000000000000000000000000000000000000000000000000016",
+    "certifier": "0000000000000000000000000000000000000000000000000000000000000017",
+    "this_crate": "000000000000000000000000000000000000000000000000000000000000001f"
+  },
+  "policy_text": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}}",
+  "reference_request": {
+    "text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"02352bbf4a4cdd12564f93fa332ce333301d9ad40271f8107181340aef25be59d5\",\"nonce\":\"cXfCy6+JqKNgQrl8JdedzMPzLBjm1tdLCeFoS0WjhFE=\",\"initialNonce\":\"JbzWbvoOR6PKUjO2Acy64f3du98fIKV8m5diaopBVEPrtvSBR3abqiuKi09Lbayr\",\"yourNonce\":\"P8en77NaSVmrYWMmZsBkcjIB8cJLiDmzpqVUsC84t84rDcWdehtNdjkbEW+5jpG+\",\"requestedCertificates\":{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}},\"signature\":[48,69,2,33,0,179,97,116,98,125,134,144,7,75,90,130,85,120,121,87,105,116,20,226,195,174,125,27,249,19,219,63,217,209,236,172,98,2,32,55,227,91,19,70,213,148,108,205,232,163,27,27,181,240,30,15,71,134,65,172,99,153,186,177,192,36,219,71,218,173,83]}",
+    "signed": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}}",
+    "signed_equals_policy_text": true,
+    "holder_received_policy_text": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}}",
+    "holder_verified": [
+      true
+    ]
+  },
+  "transport_errors": [],
+  "reference_session_nonce": "Ua9WPLjaRtC2SXjVE+dLoeRg26+/KhMPBg1ro12k+ff7URRhuTAb0xeiBIkfA9rA",
+  "this_crate_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+  "this_crate_messages": [
+    {
+      "member": "requestedCertificates",
+      "member_text": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}}",
+      "messageType": "certificateRequest",
+      "text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"026a245bf6dc698504c89a20cfded60853152b695336c28063b61c65cbd269e6b4\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"Ua9WPLjaRtC2SXjVE+dLoeRg26+/KhMPBg1ro12k+ff7URRhuTAb0xeiBIkfA9rA\",\"requestedCertificates\":{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}},\"signature\":[48,68,2,32,101,42,255,16,234,3,182,211,68,31,198,144,187,130,43,251,193,4,69,94,52,68,159,253,3,44,241,231,112,92,223,146,2,32,124,27,56,175,140,51,53,178,232,21,80,204,232,143,50,85,2,228,146,253,91,78,5,107,50,60,172,132,44,177,170,17]}",
+      "reference_verified_bytes": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}}",
+      "reference_verified_bytes_equal_member_text": true,
+      "reference_signature_valid": true,
+      "reference_received_policy_text": "{\"certifiers\":[\"032fa2104d6b38d11b0230010559879124e42ab8dfeff5ff29dc9cdadd4ecacc3f\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"nickname\"],\"AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=\":[\"name\",\"email\"],\"BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=\":[\"z\",\"a\"]}}",
+      "reference_error": null
+    }
+  ]
+}

@@ -76,6 +76,10 @@ lazy_static = "1.4"
 # BIP-39's NFKD form of a mnemonic, a passphrase and a wordlist (optional, for compat)
 unicode-normalization = { version = "0.1", optional = true }
 
+# Insertion-ordered map (optional, for auth): a requested certificate set's `types`, the
+# reference's `Record` order on the wire and in the signed text (bsv-rs#288)
+indexmap = { version = "2", features = ["serde"], optional = true }
+
 # HTTP client (optional, for broadcasters and chain trackers)
 reqwest = { version = "0.12", features = ["json"], optional = true }
 
@@ -144,7 +148,7 @@ wallet = ["transaction"]
 messages = ["wallet"]
 compat = ["primitives", "dep:unicode-normalization"]
 totp = ["primitives"]
-auth = ["wallet", "messages", "dep:tokio"]
+auth = ["wallet", "messages", "dep:tokio", "dep:indexmap"]
 overlay = ["wallet", "dep:tokio"]
 storage = ["overlay"]
 registry = ["overlay"]

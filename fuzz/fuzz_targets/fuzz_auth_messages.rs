@@ -7,7 +7,8 @@
 //! `signing_data` and key id, the signed bytes the same after a write and a
 //! read (#280); the Engine.IO and Socket.IO frames; the
 //! General message's HTTP request and response payloads (bytes); a
-//! certificate from bytes and from JSON; a requested certificate set; the
+//! certificate from bytes and from JSON; a requested certificate set (its
+//! JSON a fixed point, `types` in insertion order, #288); the
 //! auth headers; a nonce's format. The assertion is that each returns; the
 //! target also checks round trips: a payload, a certificate and a frame that
 //! parse encode to bytes that parse back to the same encoding.
@@ -88,6 +89,15 @@ fuzz_target!(|data: &[u8]| {
     }
     if let Ok(parsed) = serde_json::from_slice::<RequestedCertificateSet>(data) {
         let _ = validate_requested_certificate_set(&parsed);
+        // `types` in insertion order (#288): written, read and written again,
+        // the same bytes
+        let text = serde_json::to_string(&parsed).expect("a set serializes");
+        let again: RequestedCertificateSet =
+            serde_json::from_str(&text).expect("a set's JSON parses");
+        assert_eq!(
+            serde_json::to_string(&again).expect("a set serializes"),
+            text
+        );
     }
 
     let Ok(text) = std::str::from_utf8(data) else {
