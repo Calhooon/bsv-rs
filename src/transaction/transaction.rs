@@ -578,8 +578,7 @@ impl Transaction {
 
     /// Serializes this transaction and its ancestors to BEEF V1 format.
     ///
-    /// BEEF V1 (BRC-62): the version byte `0100BEEF`, with no TXID-only
-    /// entries, for a reader that does not take BEEF V2 (BRC-96).
+    /// BEEF V1 (BRC-62) has no TXID-only entries, for a reader that takes no V2 (BRC-96).
     /// This method is identical to `to_beef()` but produces V1 format output.
     ///
     /// # Arguments
