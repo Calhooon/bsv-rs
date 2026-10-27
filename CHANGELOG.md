@@ -222,6 +222,22 @@ is re-encoded on write, not written as given. `Verify` parses with
 `ec.ParseSignature` and returns `failed to parse signature` (`:168-172`).
 This crate follows the reference.
 
+### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
+
+`ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
+(the bench baseline's record mode, `bench_baseline_record`; the nightly's
+dispatch of this workflow) shared the group with every push to `beta`, and
+the first record run for #245 (2026-10-27 04:23Z, run 40449439162) was
+cancelled by #306's landing twenty minutes in. The group is
+`ci-<event>-[record-]<ref>` now: a push to a line cancels the earlier push's
+run as before, a pull request's own ref keeps each PR in a group of its own,
+a dispatch runs to its end beside a push and a pull request, and a record
+dispatch runs apart from the nightly's dispatch of the same line (the two
+would otherwise cancel each other within the record's window). The keeper's CI
+rule (a pull request runs exactly its line's required
+set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
+`main` is a `git cherry-pick -x` (RELEASING.md point 21).
+
 ### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
 `Certificate::verify` answered `Err(InvalidSignature("Certificate not
@@ -351,7 +367,7 @@ signature's `Serialize()` and reads the bytes remaining through
 reference's `Signature.fromDER` at both sites (`Certificate.ts:310`, `:396`)
 and its re-encoding on read (`sig.toString('hex')`, `:397`); `Certificate`
 keeps the signature's bytes as given, the wire's reader and writer alone
-parse the DER (#183, #189). Carried since #305.
+parse the DER (#183, #189).
 
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
@@ -491,7 +507,7 @@ carried on the wire since #246: `Certificate::to_binary`'s 16 MiB frame
 bound (`Certificate.ts:314-319`) and `from_binary`'s (`:86-92`, the input),
 and the 72-byte signature bound and DER re-encoding at both
 (`:300-312`, `:389-398`); the two bounds are carried since #301, the DER
-parse and re-encoding since #305.
+parse and re-encoding remain the wire's alone.
 
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 
