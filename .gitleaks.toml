@@ -57,3 +57,13 @@ regexes = ['''^0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f8179
 [[allowlists]]
 description = "the old revealer shape's test key (#105)"
 regexes = ['''^025ad43a22ac38d0bc1f8bacaabb323b5d634703b7a774c4268f6a09e4ddf79097$''']
+
+# tests/vectors/transport_unsigned_response_354.json: the #354 transport vector's `x-bsv-auth-identity-key`
+# header is the public point of the scalar 42 (`new PrivateKey(42).toPublicKey()` in
+# tests/support/transport_unsigned_response_354.mjs, the `server_key()` of #353's tests), recorded from the
+# reference's SimplifiedFetchTransport; a public key of a test scalar, not a key in use. The same literal sits
+# in #353's test and vector inside the Peer's error strings, where the generic-api-key rule does not reach it;
+# as a bare JSON header value it does. Only that literal is let through, never the file.
+[[allowlists]]
+description = "the scalar-42 public point as the #354 transport vector's identity header"
+regexes = ['''^02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af$''']
