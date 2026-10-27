@@ -7,6 +7,98 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `Transaction::verify` takes the caller's memory budget as the reference's third parameter, and runs uncapped without one, as the reference does (#331)
+
+`Transaction::verify` evaluated every input under `memory_limit: None`, the
+default mode's 32,000,000-byte local budget, and took no budget from its
+caller, so a script whose stack passes 32,000,000 bytes, which the network
+accepts, was a decline (#38's `ScriptEvaluationDeclined`). The reference's
+`verify(chainTracker, feeModel, memoryLimit?, verifier?)` takes the budget
+as its third parameter and hands it to `Spend` only when given
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/Transaction.ts:1685-1697`,
+`:1653-1664`), whose default is `Number.POSITIVE_INFINITY` with
+`hasExplicitMemoryLimit` false (`packages/sdk/src/script/Spend.ts:295-296`):
+without a caller's word it judges every script the network judges. The
+keeper's ruling of 2026-10-27, under the owner's ruling (c), carries the
+signature change on the 0.9.0 line.
+
+- `verify(chain_tracker, fee_model, memory_limit: Option<usize>)`: `None`
+  is uncapped, `SpendParams::memory_limit: Some(usize::MAX)` (a new reading
+  of `None` would have moved every `Spend` caller); `Some(n)` is the
+  caller's local budget, `n` bytes on each stack, a decline above it
+  `Error::ScriptEvaluationDeclined { input_index, limit }` as in #38.
+  `SpendParams::memory_limit: None` is unchanged (32,000,000 in the default
+  mode, 100,000,000 under a word), and so is `set_stack_memory_consensus`,
+  the block path's word.
+- Uncapped, the allocator is the budget, and rule 5 forbids its abort (on
+  `wasm32` an abort nobody catches). Every element the interpreter makes
+  (a push, a copy by `OP_DUP` and its kin, `OP_CAT`, `OP_SPLIT`, the
+  splices, `OP_NUM2BIN`, the byte shifts) is allocated with
+  `try_reserve`, and so is each stack's growth: one the allocator refuses
+  is a decline, `ScriptResource::Stack` with `limit` the bytes both stacks
+  held and `attempted` those and the size asked (`Stack memory usage has
+  exceeded N bytes`). `OP_INVERT`, `OP_AND`, `OP_OR`, `OP_XOR` work in
+  place, allocating nothing. An error's copy of the stacks is made the same
+  way, left empty if refused. The numbers are not: `BigNumber`
+  (`num-bigint`) allocates infallibly, its results bounded by the operands'
+  sizes and, for the left shift, the element bound below, not by the
+  allocator. The reference's allocation failure is a `RangeError` out of
+  `verify`, neither of its two classes.
+- The default mode's 1 GiB element bound is the only bound an uncapped
+  budget leaves, and it stays: `OP_CAT`, `OP_NUM2BIN` (whose bound under a
+  word stays `INT32_MAX`), and now the numeric left shift, whose result
+  above it is refused before the shift allocates, `It's not currently
+  possible to push data larger than 1073741824 bytes.` (a shift of 1 by
+  2^40 bits asked for 2^37 bytes). Under a budget the budget's
+  `ElementSize` decline comes first, as before. The default mode's shift
+  compares its size in `u64`, as the word branch does, where it truncated
+  to `usize` (on `wasm32` a count past 2^35 bits wrapped below the budget).
+
+Pinned by `tests/transaction_verify_budget_331.rs` (#38's shape, 33 copies
+of a 1,000,000-byte element: `Ok(true)` under `None`, the decline at
+33,000,000 of 32,000,000 under `Some(32_000_000)`, `Ok(true)` under
+`Some(40_000_000)`, an invalid script the same `TransactionError` under
+both, the shift past the bound refused uncapped and declined under a
+budget) and `an_allocation_the_allocator_refuses_is_a_decline_not_an_abort`
+(the `spend` unit tests: an element of `isize::MAX + 1` bytes, which no
+script reaches on a 64-bit host, is the decline at the 7 bytes held, where
+`Vec::with_capacity` panicked). Red on the code before, the parameter
+unread and allocation infallible: 3 of the 5 in the file (the 2 others, the
+32,000,000 decline and the invalid script, hold either way) and the unit
+test (`capacity overflow`). `tests/transaction_verify_decline_38.rs` passes
+`Some(32_000_000)`, the budget it pins; its 3 tests are otherwise
+unchanged.
+
+Migration: `tx.verify(&tracker, fee)` becomes `tx.verify(&tracker, fee,
+None)` for the reference's uncapped default, or `Some(n)` to keep a budget
+(`Some(32_000_000)` is the old one). A door that verifies untrusted
+transactions passes its own figure: uncapped, a script can hold up to
+1 GiB per element and as many elements as its length allows. Downstreams,
+grepped at their tips: `bsv-overlay-cloudflare@8c18730c`, the two
+`overlay-engine` tests (`tests/script_verification.rs:785`, `:919`), add
+`None`; its production walk is its own (`verify_spv_like_the_reference`),
+no call. `bsv-wallet-cli@f4285bf`, `bsv-wallet-toolbox-rs@a3377ef`,
+`rust-message-box@08418ec`: no `Transaction::verify` call.
+
+Semver: a breaking change to a public method's signature (one parameter
+added), carried by the ruling on the 0.9.0 line; `cargo semver-checks`
+names it (`method_parameter_count_changed`).
+
+### Notes: cross-SDK parity (#331)
+
+The #38 note that `verify` kept 32,000,000 bytes where the reference
+imposes no cap is closed: the parameter and its default are the
+reference's. Two differences stay, stated: the default mode's 1 GiB
+element bound, which the reference's default does not have (its
+`#maxPushSize` is unbounded outside explicit flags, `Spend.ts:405-409`),
+and the allocator's refusal, a decline here and a `RangeError` there.
+`SpendParams::memory_limit: None` keeps 32,000,000 bytes in the default
+mode, the reference's `Spend` default until `ts-stack@30210fe` (#349,
+2026-07-25), where it became `Number.POSITIVE_INFINITY`; this entry moves
+`verify` only. go-sdk@2ca481c's `spv.Verify` takes no caller's budget and
+runs the interpreter at the relay policy's 100,000,000 bytes
+(`interpreter.DefaultMaxStackMemory`, `spv/verify.go:64-68`).
+
 ### Changed: a push runs exactly the required set; the measurements run on dispatch and before every tag, each in its own workflow with its own badge (the owner's word of 2026-10-27)
 
 The owner's word at 20:1xZ, 2026-10-27, through the keeper: "sick of seeing
@@ -384,7 +476,6 @@ classes here, where the reference's `#sendAuthMessage` throws
 `#createUnauthenticatedResponseError`'s words with `response lacked
 required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
 follow-up is #366).
-
 ### Fixed: `Peer`'s client path verifies the initial response and general messages as the reference's `Peer` does: the nonce, the session, the pinned identity, the signature (#353)
 
 `Peer::start` installed a callback of its own (`src/auth/peer.rs:194-338`
@@ -1574,7 +1665,8 @@ The reference's `Spend` defaults `memoryLimit` to `Number.POSITIVE_INFINITY`
 without a caller's `memoryLimit` (`Transaction.ts:1685-1687`); this crate's
 `verify` keeps the default mode's 32,000,000 bytes and takes no budget, so a
 script between 32,000,000 bytes and the reference's allocation failure is a
-decline here and a verdict there: a finding, not changed by #38. go-sdk@2ca481c
+decline here and a verdict there: a finding, not changed by #38 (closed by
+#331: `verify` takes the budget and runs uncapped without one). go-sdk@2ca481c
 runs the interpreter at the relay policy's 100,000,000 bytes and wraps its
 error with two `%w`, `ErrScriptVerificationFailed` and the interpreter's own,
 so `errors.Is(err, ctx.Err())` tells a stopped evaluation from an invalid
