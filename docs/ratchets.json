@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "source_commit": "543274f9d60d5cde7a2eb0c6a614b132900f7f80",
+  "source_commit": "3d0e2d9b70482ab7b663559ad58b7199af47ca85",
   "toolchain": "1.95.0",
   "metrics": {
     "files_over_800": 38,
@@ -8,13 +8,13 @@
     "functions_over_60": 89,
     "cognitive_complexity_over_25": 1,
     "missing_docs": 0,
-    "duplicate_windows_40": 8325,
+    "duplicate_windows_40": 8257,
     "pedantic_warnings": 2661
   },
   "files_over_800": [
     {
       "path": "src/auth/peer.rs",
-      "lines": 970
+      "lines": 968
     },
     {
       "path": "src/auth/transports/http.rs",
@@ -94,7 +94,7 @@
     },
     {
       "path": "src/registry/client.rs",
-      "lines": 1132
+      "lines": 1130
     },
     {
       "path": "src/registry/types.rs",
@@ -138,11 +138,11 @@
     },
     {
       "path": "src/wallet/proto_wallet.rs",
-      "lines": 1294
+      "lines": 1286
     },
     {
       "path": "src/wallet/substrates/http_json.rs",
-      "lines": 1102
+      "lines": 1113
     },
     {
       "path": "src/wallet/types.rs",
@@ -158,7 +158,7 @@
     },
     {
       "path": "src/wallet/wire/processor.rs",
-      "lines": 901
+      "lines": 934
     },
     {
       "path": "src/wallet/wire/transceiver.rs",
