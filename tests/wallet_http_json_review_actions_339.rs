@@ -4,9 +4,10 @@
 //! body with its `reviewActionResults` is `Error::WalletReviewActions`
 //! carrying the reference's five members, each member validated and a
 //! malformed one refused in the reference's words, against
-//! `wallet_http_json_review_actions_339.json` (39 bodies, Node v22.18.0,
+//! `wallet_http_json_review_actions_339.json` (41 bodies, Node v22.18.0,
 //! `tests/support/wallet_http_json_review_actions_339.mjs`), each served
-//! through wiremock to the call the reference was asked. A body without
+//! through wiremock to the call the reference was asked; two are 200
+//! answers whose `tx` the success path reads as the error path does. A body without
 //! results is the `WalletRefusal` of before; the identity revocation's
 //! double-spend retry runs over the substrate, #327's recording wallet
 //! answering signAction through it.
@@ -71,9 +72,10 @@ fn competing_beef() -> Vec<u8> {
     from_hex(revocation()["competing"]["beef"].as_str().unwrap()).unwrap()
 }
 
-/// The body with the competing BEEF where it holds `$BEEF`, and in the
+/// The body with the competing BEEF where it holds `$BEEF`, in the
 /// historical object form (`{"0": .., "1": ..}`) where it holds
-/// `$BEEF_OBJECT`.
+/// `$BEEF_OBJECT`, and each byte an integral float (`1.0`) where it holds
+/// `$BEEF_FLOAT`.
 fn with_beef(body: &Value, beef: &[u8]) -> Value {
     match body {
         Value::String(s) if s == "$BEEF" => json!(beef),
@@ -82,6 +84,9 @@ fn with_beef(body: &Value, beef: &[u8]) -> Value {
                 .map(|(i, b)| (i.to_string(), json!(b)))
                 .collect(),
         ),
+        Value::String(s) if s == "$BEEF_FLOAT" => {
+            Value::Array(beef.iter().map(|b| json!(f64::from(*b))).collect())
+        }
         Value::Array(items) => Value::Array(items.iter().map(|v| with_beef(v, beef)).collect()),
         Value::Object(map) => Value::Object(
             map.iter()
@@ -128,19 +133,22 @@ async fn answer(c: &Case) -> Value {
         "signAction" => wallet
             .sign_action(serde_json::from_value(c.args.clone()).unwrap(), None)
             .await
-            .map(drop),
+            .map(|r| (r.txid, r.tx)),
         "createAction" => wallet
             .create_action(serde_json::from_value(c.args.clone()).unwrap(), None)
             .await
-            .map(drop),
+            .map(|r| (r.txid, r.tx)),
         "listActions" => wallet
             .list_actions(serde_json::from_value(c.args.clone()).unwrap(), None)
             .await
-            .map(drop),
+            .map(|_| (None, None)),
         other => panic!("no call {other}"),
     };
     match outcome {
-        Ok(()) => json!({ "answered": true }),
+        Ok((txid, tx)) => json!({ "answered": {
+            "txid": txid.map(|t| to_hex(&t)),
+            "tx": tx.map(|t| to_hex(&t)),
+        } }),
         Err(Error::WalletReviewActions(review)) => json!({ "review": review_json(&review) }),
         Err(Error::WalletError(words)) => json!({ "error": words }),
         Err(other) => json!({ "other": format!("{other:?}") }),
@@ -181,7 +189,7 @@ fn review_json(r: &ReviewActionsRefusal) -> Value {
 #[tokio::test]
 async fn each_code_5_body_is_read_as_the_reference_reads_it() {
     let v = vector();
-    assert_eq!(v.cases.len(), 39);
+    assert_eq!(v.cases.len(), 41);
     let mut divergent = 0;
     for c in &v.cases {
         let ours = answer(c).await;
@@ -260,6 +268,35 @@ async fn a_byte_field_in_the_historical_object_form_is_read_as_its_bytes() {
     ] {
         let c = case(name);
         assert_eq!(c.reference.pointer(read), Some(&beef), "{name}");
+        let ours = answer(&c).await;
+        if ours != c.reference {
+            wrong.push(format!("{name}: {ours}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
+/// The re-review's finding: a 200 createAction or signAction answer's `tx`
+/// in the historical object form, or with its bytes written as integral
+/// floats (`1.0`), is read as its bytes, as the reference's success path
+/// normalizes it before `validateWalletResult` (`HTTPWalletJSON.ts:322-341`,
+/// `BRC100ByteEncoding.ts:52-86`): one reader for both paths.
+#[tokio::test]
+async fn a_success_tx_in_the_object_form_or_integral_floats_is_read_as_its_bytes() {
+    let competing = revocation()["competing"]["txid"].clone();
+    let beef = json!(to_hex(&competing_beef()));
+    let mut wrong = Vec::new();
+    for name in [
+        "create_success_tx_object_form",
+        "sign_success_tx_integral_floats",
+    ] {
+        let c = case(name);
+        assert_eq!(c.status, 200, "{name}");
+        assert_eq!(
+            c.reference,
+            json!({ "answered": { "txid": competing, "tx": beef } }),
+            "{name}"
+        );
         let ours = answer(&c).await;
         if ours != c.reference {
             wrong.push(format!("{name}: {ours}"));
