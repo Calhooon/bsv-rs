@@ -126,6 +126,92 @@ rule (a pull request runs exactly its line's required
 set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
 `main` is a `git cherry-pick -x` (RELEASING.md point 21).
 
+### Changed: `Certificate::verify` answers `false`, never an error, as the
+reference's `verify` does (#299)
+### Fixed: `Certificate` parses its signature's DER and re-encodes it on read, as the reference does (#305)
+
+`Certificate::to_binary` wrote and `from_binary` kept the signature's bytes
+as given, and `verify` read them with this crate's lenient
+`Signature::from_der`; the reference rounds the signature through its own
+`Signature.fromDER` at three sites (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts`; the parser at
+`packages/sdk/src/primitives/Signature.ts:44-97`, the writer at `:201-256`):
+
+- `toBinary` parses it and writes the bytes it was given (`:309-311`): a
+  DER `fromDER` refuses is refused in its words (`Signature DER must start
+  with 0x30`, `Signature DER invalid`, `Invalid DER entity length`,
+  `Invalid R-length in signature DER`, `Invalid R-value in signature DER`,
+  `Invalid S-value in signature DER`), one it reads out of DER's form (`r`
+  or `s` with its high bit set and no zero byte, an empty integer) is
+  written as given; an empty signature is written as nothing, unchecked
+  (`:300`).
+- `fromBinary` parses the bytes after the fields and keeps `toDER`'s
+  re-encoding (`:395-397`): a zero byte before a high bit restored, an
+  empty `r` written `02 01 00`, `s` high or low as read (no low-S
+  normalization). The reference's `toBinary` then refuses that `02 01 00`
+  (`fromDER` refuses the zero byte its own `toDER` wrote), and so does this
+  crate's.
+- `verify` parses with `fromDER` and verifies the `(r, s)` it reads
+  (`:432-435`): `false` for a DER it refuses, the ECDSA verdict for one it
+  reads, a DER out of form included.
+
+Now each is so here, every refusal `CertificateValidationError` as #297's and
+#301's are (`src/auth/certificates/certificate.rs`, through
+`bounds::der_signature`). The wallet wire's `certificate_signature_der`
+(#183, #189) stays, its class `WalletError`; the two now share one reading,
+`wallet::wire::reference_der`, which returns the reference's words and lets
+each caller frame them. Before the fix `verify` answered `true` for three
+signatures the reference refuses (a zero byte before an `s` whose high bit
+is clear, a byte after the sequence, a sequence length one short of the
+bytes), and `from_binary` and `to_binary` accepted eight DERs the reference
+refuses. `received_unsigned` (#249) is the unsigned prefix as received and
+binds no signature: the signature read is the re-encoding, the prefix the
+bytes. The fuzz target `fuzz_auth_messages` asserts the prefix byte for
+byte and the whole frame where the signature read back is the one written.
+
+Pinned by `tests/auth_certificate_signature_der_305.rs` (7 tests over 12
+signatures of `tests/vectors/auth_certificate_signature_der_305.json`, the
+reference's verdicts at `fromBinary` (the signature held, its `verify`, its
+`toBinary(true)`), `toBinary(true)` and `verify` recorded by
+`tests/support/certificate_signature_der_305.mjs` at `ts-stack@edf6e03`
+under Node v22.18.0, two runs byte for byte): the canonical signature (this
+crate's signer's bytes, RFC 6979) round-trips unchanged; `r` without its zero
+byte written as given, read back with it, verified; high `s` kept and
+verified; an empty `r` read as `02 01 00`, `false`, then refused at write;
+excessively padded `r` and `s`, a long-form length, a trailing byte, a short
+sequence length, a long `s` length, a set tag and an `r` tag refused at
+`from_binary` and `to_binary` in the reference's words and `false` at
+`verify`. 4 of the 7 red on the tree before the fix (`6c5e4d8`), 21 of the
+36 case verdicts differing (`from_binary` 10, `to_binary` 8, `verify` 3);
+the other three pin what did not move (the canonical round trip, the empty
+signature, the vector's census). The #249 witnesses still hold: their
+signatures are signers' canonical DER, which the re-encoding writes back
+byte for byte, and the prefix kept is untouched; the #251, #261, #262, #268,
+#275, #297, #299 and #301 vectors are unchanged (#301's 72-byte signature is
+canonical DER, its 73-byte one refused by the length first; #299's non-DER
+signatures were `false` and stay `false`).
+
+### Notes: cross-SDK parity (#305)
+
+go-sdk@2ca481c reads the signature as BER, not DER: `CertificateFromBinary`
+(`auth/certificates/certificate.go:134-146`) hands the bytes to
+`DeserializeCertificate`, which parses them with `ec.ParseSignature`
+(`wallet/serializer/certificate.go:118-124`; `primitives/ec/signature.go:297-299`,
+`parseSig(sigStr, false)`, `:177-292`), so an excessively padded or negative
+integer is read where the reference refuses it, an `r` or `s` of zero or at
+or above `n` is refused at the parse (`signature R isn't 1 or more`,
+`:278-289`) where the reference reads it and answers `false` at `verify`,
+and the error is `error parsing signature: <words>`.
+`FromWalletCertificate` keeps `Signature.Serialize()` (`certificate.go:319-322`),
+which writes the canonical DER and normalizes `s` to low-S
+(`signature.go:77-102`), where the reference keeps a high `s`. `ToBinary`
+parses the held bytes with `ec.ParseSignature` and drops a signature it
+cannot parse, writing none (`certificate.go:274-280`), then writes
+`Serialize()` (`wallet/serializer/certificate.go:63-66`): a DER out of form
+is re-encoded on write, not written as given. `Verify` parses with
+`ec.ParseSignature` and returns `failed to parse signature` (`:168-172`).
+This crate follows the reference.
+
 ### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
 `Certificate::verify` answered `Err(InvalidSignature("Certificate not
@@ -255,7 +341,7 @@ signature's `Serialize()` and reads the bytes remaining through
 reference's `Signature.fromDER` at both sites (`Certificate.ts:310`, `:396`)
 and its re-encoding on read (`sig.toString('hex')`, `:397`); `Certificate`
 keeps the signature's bytes as given, the wire's reader and writer alone
-parse the DER (#183, #189).
+parse the DER (#183, #189). Carried since #305.
 
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
@@ -395,7 +481,7 @@ carried on the wire since #246: `Certificate::to_binary`'s 16 MiB frame
 bound (`Certificate.ts:314-319`) and `from_binary`'s (`:86-92`, the input),
 and the 72-byte signature bound and DER re-encoding at both
 (`:300-312`, `:389-398`); the two bounds are carried since #301, the DER
-parse and re-encoding remain the wire's alone.
+parse and re-encoding since #305.
 
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 

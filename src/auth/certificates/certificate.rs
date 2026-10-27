@@ -212,7 +212,11 @@ impl Certificate {
     /// frame written, its length taken once it is whole, over 16 MiB
     /// (`Certificate binary exceeds the maximum of 16777216 bytes`, `:315-319`),
     /// with or without the signature; `signing_hash`, `sign` and `verify` over
-    /// it as over a value past its bound (bsv-rs#301).
+    /// it as over a value past its bound (bsv-rs#301). A signature
+    /// `Signature.fromDER` refuses is refused in its words (`Signature DER
+    /// invalid`, `Invalid R-value in signature DER`, ...), and one it reads
+    /// is written as given, a DER out of form included (`Certificate.ts:309-311`;
+    /// bsv-rs#305); an empty signature is written as nothing, unchecked.
     ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
@@ -221,8 +225,9 @@ impl Certificate {
 
         // Signature: raw bytes, no length prefix (matches TypeScript SDK)
         if include_signature {
-            if let Some(ref sig) = self.signature {
+            if let Some(sig) = self.signature.as_ref().filter(|s| !s.is_empty()) {
                 bounds::require_written_signature(sig)?;
+                bounds::der_signature(sig)?;
                 buf.extend_from_slice(sig);
             }
             // If no signature, write nothing (not even a marker byte)
@@ -351,7 +356,11 @@ impl Certificate {
     /// binary must be a byte array of at most 16777216 bytes`,
     /// `snapshotCertificateBinary`, `:87-91`), and more than 72 bytes after
     /// the fields before they are read (`Certificate signature exceeds the DER
-    /// size limit`, `:390-394`; bsv-rs#301).
+    /// size limit`, `:390-394`; bsv-rs#301). The signature is parsed by the
+    /// reference's `Signature.fromDER`, refused in its words, and held as its
+    /// `toDER` writes it (`:395-397`; bsv-rs#305): a zero byte DER asks for
+    /// before a high bit restored, an empty integer `02 01 00`; the unsigned
+    /// prefix is kept as received, the signature is not.
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         bounds::require_read_frame(data.len())?;
         let mut reader = BinaryReader::new(data);
@@ -361,7 +370,7 @@ impl Certificate {
         // Signature: remaining bytes (no length prefix) - matches TypeScript SDK
         bounds::require_read_signature(reader.remaining())?;
         let signature = if reader.remaining() > 0 {
-            Some(reader.read_remaining())
+            Some(bounds::der_signature(&reader.read_remaining())?)
         } else {
             None
         };
@@ -445,7 +454,11 @@ impl Certificate {
     /// "the historical boolean verification contract"): an absent or empty
     /// signature, one that is not DER, a frame that does not serialize (a
     /// field over the bound, #275), a key that does not derive (#299). It
-    /// returns no `Err` today; the `Result` stays for semver.
+    /// returns no `Err` today; the `Result` stays for semver. The signature
+    /// is read as the reference's `Signature.fromDER` reads it (#305): a DER
+    /// it refuses (an integer padded past its need, a long-form length, a
+    /// byte after the sequence) is `false`, one it reads out of form (a
+    /// zero byte missing before a high bit) verifies by its `(r, s)`.
     pub fn verify(&self) -> Result<bool> {
         let Some(sig_bytes) = self.signature.as_ref() else {
             return Ok(false);
@@ -453,7 +466,12 @@ impl Certificate {
         let Ok(hash) = self.signing_hash() else {
             return Ok(false);
         };
-        let Ok(sig) = Signature::from_der(sig_bytes) else {
+        // The reference's parse, then its `(r, s)` (`Certificate.ts:434`;
+        // bsv-rs#305): a DER it refuses is `false`, one out of form verifies
+        let Ok(der) = bounds::der_signature(sig_bytes) else {
+            return Ok(false);
+        };
+        let Ok(sig) = Signature::from_der(&der) else {
             return Ok(false);
         };
         let Ok(child) = KeyDeriver::new(None).derive_public_key(

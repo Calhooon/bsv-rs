@@ -64,8 +64,17 @@ fn certificate(certificate: &Certificate) {
         let Ok(bytes) = certificate.to_binary(signed) else {
             continue;
         };
+        // The unsigned prefix reads back byte for byte; the signature as
+        // `toDER` re-encodes it (bsv-rs#305), so the whole frame only where
+        // the signature read back is the one written.
         if let Ok(again) = Certificate::from_binary(&bytes) {
-            assert_eq!(again.to_binary(signed).ok(), Some(bytes));
+            assert_eq!(
+                again.to_binary(false).ok(),
+                certificate.to_binary(false).ok()
+            );
+            if again.signature == certificate.signature || !signed {
+                assert_eq!(again.to_binary(signed).ok(), Some(bytes));
+            }
         }
     }
 }
