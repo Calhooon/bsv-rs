@@ -22,6 +22,7 @@ use reqwest::header::{HeaderMap, CONTENT_TYPE};
 use reqwest::{Response, StatusCode};
 
 use super::headers;
+use crate::primitives::PublicKey;
 use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, Result};
 
@@ -84,6 +85,17 @@ pub(super) fn refuse_unauthenticated(
     }
     let class = fault::status_fault(status, response_headers);
     Err(fault::fault_or(class, Some(status), text, Error::AuthError))
+}
+
+/// The answer's sender: the identity key it carries, which
+/// `refuse_unauthenticated` has required (#354).
+pub(super) fn sender(response_headers: &HeaderMap) -> Result<PublicKey> {
+    PublicKey::from_hex(
+        response_headers
+            .get(headers::IDENTITY_KEY)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or_default(),
+    )
 }
 
 /// `statusText.trim()` after the status, or the status alone when nothing is
