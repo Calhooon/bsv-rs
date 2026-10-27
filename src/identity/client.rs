@@ -447,7 +447,9 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         )
         .await?;
 
-        // Create the transaction using wallet's createAction
+        // The reference's arguments and no others (`IdentityClient.ts:513-528`,
+        // #315): no label, tag, signAndProcess or acceptDelayedBroadcast, so
+        // the wallet applies its own defaults
         let create_result = self
             .wallet
             .create_action(
@@ -461,21 +463,14 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                         output_description: "Identity Token".to_string(),
                         basket: None,
                         custom_instructions: None,
-                        tags: Some(vec!["identity".to_string()]),
+                        tags: None,
                     }]),
                     lock_time: None,
                     version: None,
-                    labels: Some(vec!["identity".to_string(), "revelation".to_string()]),
+                    labels: None,
                     options: Some(CreateActionOptions {
-                        sign_and_process: Some(true),
-                        accept_delayed_broadcast: Some(false),
-                        trust_self: None,
-                        known_txids: None,
-                        return_txid_only: None,
-                        no_send: None,
-                        no_send_change: None,
-                        send_with: None,
                         randomize_outputs: Some(false),
+                        ..Default::default()
                     }),
                 },
                 originator,

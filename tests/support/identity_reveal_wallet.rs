@@ -1,7 +1,8 @@
 //! The counting wallet of the identity reveal's tests (#307, #310): a
 //! ProtoWallet under a client that records each call, answers
 //! proveCertificate with a keyring it is given and createAction with no
-//! transaction, so nothing is broadcast.
+//! transaction, so nothing is broadcast; createAction's arguments and
+//! originator kept (#315).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -19,6 +20,7 @@ pub struct Counting {
     calls: Arc<Mutex<Vec<&'static str>>>,
     pub keyring: Option<HashMap<String, String>>,
     pub created: Arc<Mutex<Option<CreateActionArgs>>>,
+    pub created_originator: Arc<Mutex<Option<String>>>,
     pub public_key_args: Arc<Mutex<Vec<GetPublicKeyArgs>>>,
     pub signature_args: Arc<Mutex<Vec<CreateSignatureArgs>>>,
 }
@@ -42,6 +44,7 @@ impl Counting {
             calls: Arc::default(),
             keyring: None,
             created: Arc::default(),
+            created_originator: Arc::default(),
             public_key_args: Arc::default(),
             signature_args: Arc::default(),
         }
@@ -83,10 +86,11 @@ macro_rules! counting {
             async fn create_action(
                 &self,
                 args: CreateActionArgs,
-                _o: &str,
+                o: &str,
             ) -> bsv_rs::Result<CreateActionResult> {
                 self.note("create_action");
                 *self.created.lock().unwrap() = Some(args);
+                *self.created_originator.lock().unwrap() = Some(o.to_string());
                 Ok(CreateActionResult::default())
             }
             async fn get_public_key(

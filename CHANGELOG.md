@@ -7,6 +7,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
+
+`IdentityClient::publicly_reveal_attributes` called createAction with the
+labels `identity` and `revelation`, the output tag `identity`,
+`signAndProcess: true` and `acceptDelayedBroadcast: false` beside the
+reference's arguments; the reference's `publiclyRevealAttributes`
+(`ts-stack@edf6e03` `packages/sdk/src/identity/IdentityClient.ts:513-528`)
+sends the description `Create a new Identity Token`, one output of
+`satoshis` (the client's `tokenAmount`), `lockingScript` and
+`outputDescription: 'Identity Token'`, and `options: { randomizeOutputs:
+false }`, nothing else. An extra argument changes what the wallet does: a
+label and a tag persist on its records, and `acceptDelayedBroadcast:
+false` forces an immediate broadcast where the reference leaves it to the
+wallet, whose own validation reads the absent option as `true`, as it
+reads `signAndProcess` (`validationHelpers.ts:659-660`; `isDelayed` true,
+`:804`). The call now sends the reference's arguments alone.
+
+Migration: a wallet that found the reveal's actions by the label
+`identity` or `revelation`, or its token by the tag `identity`, finds them
+no more; a reference wallet now applies its default delayed broadcast to
+the reveal. No downstream calls the reveal or reads the label or tag
+(`bsv-wallet-toolbox-rs` `6317222`, `bsv-wallet-cli` `a55990c`), and the
+toolbox's wallet reads an absent `signAndProcess` as `true` and an absent
+`acceptDelayedBroadcast` as `false` (`src/wallet/wallet.rs:1071-1075`,
+`:1102-1106`, `:1331`), so on it the reveal is still signed and
+broadcast at once; only the label and the tag are gone.
+
+Pinned by `tests/identity_reveal_create_action_315.rs` (3 tests) on
+`tests/vectors/identity_reveal_create_action_315.json`: #310's certificate
+revealed by the subject's wallet for `email` and for both fields, the
+arguments the reference's wallet received in its createAction call, their
+member names at each level, its originator, and the reference's
+`Validation.validateCreateActionArgs` reading of them (the left-out
+options `true`, no label, no tag); recorded by
+`tests/support/identity_reveal_create_action_315.mjs` at
+`ts-stack@edf6e03` under Node v22.18.0, the randomness #310's SHA-256
+counter stream (two runs byte for byte). The arguments this crate's
+counting wallet receives (`tests/support/identity_reveal_wallet.rs`, which
+keeps the originator now), written as JSON, equal the reference's member by
+member, and carry no member it leaves out. 3 of the 3 red on the tree
+before the fix; the #307 and #310 witnesses unchanged (10 and 6 green).
+
+### Notes: cross-SDK parity (#315)
+
+go-sdk@2ca481c's `PubliclyRevealAttributes` sends the reference's
+arguments (`identity/client.go:163-174`: the description, one output of
+`Satoshis`, `LockingScript` and `OutputDescription`, `RandomizeOutputs`
+false); no difference. `revoke_certificate_revelation`'s createAction still
+carries the labels `identity` and `revocation` and `signAndProcess: false`
+beside the reference's arguments (`IdentityClient.ts:845-863`): a finding
+outside #315.
+
 ### Fixed: `Certificate` parses its signature's DER and re-encodes it on read, as the reference does (#305)
 
 `Certificate::to_binary` wrote and `from_binary` kept the signature's bytes
@@ -215,7 +267,7 @@ The reference's createAction asks for the output alone with
 `randomizeOutputs: false` (`:513-528`); this crate also sends the labels
 `identity`, `revelation`, the tag `identity`, `signAndProcess: true` and
 `acceptDelayedBroadcast: false`. Not changed here (outside #310's three
-items); a finding for its own issue.
+items); a finding for its own issue, fixed by #315.
 
 ### Fixed: `publicly_reveal_attributes` verifies the master certificate, and checks the names to reveal, before any wallet call, as the reference does (#307)
 
