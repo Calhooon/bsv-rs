@@ -30,6 +30,8 @@ use tokio::sync::RwLock;
 
 #[cfg(feature = "http")]
 mod client;
+#[cfg(feature = "http")]
+mod unauthenticated;
 
 /// Transport trait for sending/receiving auth messages.
 #[async_trait]
@@ -483,7 +485,9 @@ fn write_varint(value: i64) -> Vec<u8> {
 /// HTTP-based transport for authentication.
 ///
 /// Sends auth messages to `.well-known/auth` endpoint for handshake,
-/// and general messages as HTTP requests with auth headers.
+/// and general messages as HTTP requests with auth headers. A general answer without
+/// `x-bsv-auth-version`, `x-bsv-auth-identity-key` or `x-bsv-auth-signature` is refused in the
+/// reference's words: `Error::AuthError`, the named host's answer, no transport fault (#354).
 pub struct SimplifiedFetchTransport {
     /// Base URL of the remote server.
     base_url: String,
@@ -744,7 +748,7 @@ impl Transport for SimplifiedFetchTransport {
                         .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
                     client::refuse_redirect(&url, &response)?;
                     // Extract response headers and body
-                    let response_status = response.status().as_u16();
+                    let response_status = response.status();
                     let response_headers = response.headers().clone();
                     let response_body = response
                         .bytes()
@@ -752,8 +756,13 @@ impl Transport for SimplifiedFetchTransport {
                         .map_err(|e| fault::auth_error(&e, "Failed to read response"))?
                         .to_vec();
 
-                    // Note: Auth headers on response are optional - not all servers return them
-                    // The caller can verify response authenticity if headers are present
+                    // Refused unless signed, before it becomes a message (#354)
+                    unauthenticated::refuse_unauthenticated(
+                        &url,
+                        response_status,
+                        &response_headers,
+                        &response_body,
+                    )?;
 
                     // Extract request ID from response
                     let response_request_id: [u8; 32] =
@@ -784,22 +793,18 @@ impl Transport for SimplifiedFetchTransport {
                     // Build response payload
                     let http_response = HttpResponse {
                         request_id: response_request_id,
-                        status: response_status,
+                        status: response_status.as_u16(),
                         headers: included_headers,
                         body: response_body,
                     };
 
-                    // Build response AuthMessage
-                    // Note: Identity key header is optional - server may not return it
-                    let response_identity = if let Some(resp_identity_key) = response_headers
-                        .get(headers::IDENTITY_KEY)
-                        .and_then(|v| v.to_str().ok())
-                    {
-                        crate::primitives::PublicKey::from_hex(resp_identity_key)?
-                    } else {
-                        // Use the identity key from the original request message
-                        message.identity_key.clone()
-                    };
+                    // Build response AuthMessage, its sender the answer's identity key (#354)
+                    let response_identity = crate::primitives::PublicKey::from_hex(
+                        response_headers
+                            .get(headers::IDENTITY_KEY)
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or_default(),
+                    )?;
 
                     let mut response_message =
                         AuthMessage::new(MessageType::General, response_identity);
