@@ -222,10 +222,12 @@ fn historical_bytes(value: &Value) -> Option<Vec<u8>> {
 /// `isByte` (`BRC100ByteEncoding.ts:32-34`): `Number.isInteger` from 0 to
 /// 255, so `1.0` and `-0` are bytes as `JSON.parse` reads them.
 fn byte(value: &Value) -> Option<u8> {
-    let n = value.as_f64()?;
-    // the range checked first, so the cast is exact
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-    ((0.0..=255.0).contains(&n) && n.fract() == 0.0).then_some(n as u8)
+    if let Some(n) = value.as_u64() {
+        return u8::try_from(n).ok();
+    }
+    // an integral float in range: the first byte not below it is its value
+    let n = (value.as_f64()).filter(|n| (0.0..=255.0).contains(n) && n.fract() == 0.0)?;
+    (0..=u8::MAX).find(|&b| f64::from(b) >= n)
 }
 
 /// `optionalArray` (`WalletResultValidation.ts:971-976`).
