@@ -1,0 +1,74 @@
+//! The default mode's read limit: a script number the reference cannot read
+//! is invalid there, and so invalid here in that mode (bsv-rs#331, the
+//! keeper's word of 2026-10-27). The figures are V8's longest string under
+//! Node 22 at the reference's pin (`ts-stack@edf6e03`), not a BRC's rule:
+//! `BigNumber.fromSm` writes the operand's bytes as hex text and parses
+//! `'0x' + hex` (`BigNumber.ts:1518-1527`), then `#_finishInitialization`
+//! takes `toString(2)` of the magnitude (`:450`); a string past 536,870,888
+//! characters throws, and `#readScriptNumber` rethrows the words as a script
+//! error (`Spend.ts:525-535`). So an operand whose magnitude passes
+//! 536,870,888 bits (a minimal encoding past 67,108,862 bytes) is refused.
+//! The hex text's own bound (an operand past 268,435,443 bytes) is not
+//! followed: the reference cannot hold such an element (a `number[]` of 2^27
+//! entries is `RangeError: Invalid array length` under Node 22), so no
+//! script reaches it there.
+//! The node's number length after Chronicle is 32,000,000 bytes
+//! (`ScriptFlags::max_script_num_length`): the reference reads numbers the
+//! node refuses, and the default mode follows the reference. Under a word
+//! the node's rules alone apply.
+
+/// V8's longest string, `String::kMaxLength` on a 64-bit host (Node's
+/// `buffer.constants.MAX_STRING_LENGTH`, v22.18.0).
+const MAX_STRING_LENGTH: u64 = 536_870_888;
+
+/// The reference's words for an operand it cannot read, or `None`; after
+/// its minimal-encoding check, which the caller makes first.
+pub(super) fn refusal(bytes: &[u8]) -> Option<&'static str> {
+    // `toString(2)` of the magnitude (`BigNumber.ts:450`)
+    (magnitude_bits(bytes) > MAX_STRING_LENGTH).then_some("Invalid string length")
+}
+
+/// The bits of a script number's magnitude, read from its bytes without
+/// decoding them (a non-minimal encoding's padding counts nothing).
+pub(super) fn magnitude_bits(bytes: &[u8]) -> u64 {
+    let last = bytes.len().saturating_sub(1);
+    for (i, &byte) in bytes.iter().enumerate().rev() {
+        let byte = if i == last { byte & 0x7f } else { byte };
+        if byte != 0 {
+            return 8 * i as u64 + u64::from(8 - byte.leading_zeros());
+        }
+    }
+    0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The boundary on one 67,108,862-byte buffer, changed in place: 536,870,888
+    /// bits of ones and a sign byte is read; a 536,870,889th bit is refused,
+    /// as is any minimal encoding one byte longer.
+    #[test]
+    fn a_magnitude_past_v8s_longest_string_is_refused() {
+        let mut bytes = vec![0xff; 67_108_862];
+        bytes[67_108_861] = 0x00;
+        assert_eq!(magnitude_bits(&bytes), 536_870_888);
+        assert_eq!(refusal(&bytes), None);
+        bytes[67_108_861] = 0x80;
+        assert_eq!(refusal(&bytes), None, "the sign bit adds no bit");
+        bytes[67_108_861] = 0x01;
+        assert_eq!(magnitude_bits(&bytes), 536_870_889);
+        assert_eq!(refusal(&bytes), Some("Invalid string length"));
+        bytes[67_108_861] = 0x00;
+        bytes.push(0x01);
+        assert_eq!(refusal(&bytes), Some("Invalid string length"));
+    }
+
+    /// Padding counts no bit: a long non-minimal zero is read.
+    #[test]
+    fn padding_is_not_magnitude() {
+        assert_eq!(magnitude_bits(&[0x00; 1000]), 0);
+        assert_eq!(magnitude_bits(&[0x01, 0x00, 0x80]), 1);
+        assert_eq!(refusal(&vec![0x00; 67_108_870]), None);
+    }
+}

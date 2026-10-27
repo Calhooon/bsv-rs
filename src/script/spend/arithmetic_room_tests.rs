@@ -306,7 +306,10 @@ fn encode(n: i64) -> Vec<u8> {
 /// under the modelled allocator at the review's 4 GiB less the operands the
 /// stack holds at the step (the review's allocator counts everything held).
 /// Without the step's probe each aborted under the review's allocator (exit
-/// 134); the real ceiling's reproduction is the review's harness.
+/// 134); with it the sum and the increment were computed and the product
+/// declined (`f92e2b4a`, the review's harness); since the default mode reads
+/// an operand as the reference does, each is invalid at its read, the
+/// reference's verdict, before any room is asked.
 fn review_script(len: u32, tail: &[u8], held: usize) -> Result<bool, ScriptEvaluationError> {
     let mut lock = Script::new();
     lock.write_opcode(OP_1)
@@ -320,34 +323,49 @@ fn review_script(len: u32, tail: &[u8], held: usize) -> Result<bool, ScriptEvalu
     under_ceiling((4usize << 30) - held, &[], &lock)
 }
 
-/// `OP_1 <2^29> OP_NUM2BIN OP_INVERT OP_DUP OP_ADD`: 1 GiB held, the step's
-/// 2 GiB granted, the sum computed (about 1.3 s, 2.1 GB resident).
-#[test]
-#[ignore = "by hand: about 2 GB resident"]
-fn the_reviews_sum_of_two_half_gib_operands_is_computed_under_4_gib() {
-    let verdict = review_script(1 << 29, &[OP_DUP, OP_ADD], 1 << 30);
-    assert_eq!(verdict.map_err(|e| e.message), Ok(true));
+/// The reference's verdict on an operand past its read: its words, no
+/// resource limit.
+fn unreadable(result: Result<bool, ScriptEvaluationError>) {
+    let error = result.expect_err("the reference's verdict");
+    assert!(error.resource_limit.is_none(), "{}", error.message);
+    assert_eq!(error.message, "Invalid string length");
 }
 
-/// `OP_MUL` of two 300 MiB operands: 600 MiB held, the step's 3,774,873,600
-/// bytes refused, a decline before either operand is decoded.
+/// `OP_1 <2^29> OP_NUM2BIN OP_INVERT OP_DUP OP_ADD`: operands of
+/// 4,294,967,295 bits, invalid at the read.
+#[test]
+#[ignore = "by hand: about 1 GB resident"]
+fn the_reviews_sum_of_two_half_gib_operands_is_invalid_at_the_read() {
+    unreadable(review_script(1 << 29, &[OP_DUP, OP_ADD], 1 << 30));
+}
+
+/// `OP_MUL` of two 300 MiB operands: invalid at the read.
 #[test]
 #[ignore = "by hand: about 630 MB resident"]
-fn the_reviews_product_of_two_300_mib_operands_is_declined_under_4_gib() {
+fn the_reviews_product_of_two_300_mib_operands_is_invalid_at_the_read() {
     let len = 300 << 20;
-    let message = refused(
-        review_script(len, &[OP_DUP, OP_MUL], 2 * len as usize),
-        3_774_873_600,
-    );
-    assert!(message.ends_with("the allocator refused the 3774873600 bytes OP_MUL's step may need, from operands of 314572800 and 314572800 bytes."), "{message}");
+    unreadable(review_script(len, &[OP_DUP, OP_MUL], 2 * len as usize));
 }
 
-/// `OP_1ADD` of an operand 16 bytes under 1 GiB: 1 GiB held, the step's
-/// 2 GiB granted, computed (about 1.4 s, 2.1 GB resident).
+/// `OP_1ADD` of an operand 16 bytes under 1 GiB: invalid at the read.
 #[test]
-#[ignore = "by hand: about 2 GB resident"]
-fn the_reviews_increment_near_1_gib_is_computed_under_4_gib() {
+#[ignore = "by hand: about 1 GB resident"]
+fn the_reviews_increment_near_1_gib_is_invalid_at_the_read() {
     let len = (1 << 30) - 16;
-    let verdict = review_script(len, &[OP_1ADD], len as usize);
-    assert_eq!(verdict.map_err(|e| e.message), Ok(true));
+    unreadable(review_script(len, &[OP_1ADD], len as usize));
+}
+
+/// The largest product the default mode reads: two operands of 67,108,862
+/// bytes at 536,870,888 bits each, its step's 805,306,344 bytes refused by
+/// the modelled allocator at 512 MiB, a decline before either is decoded.
+#[test]
+#[ignore = "by hand: about 400 MB resident"]
+fn the_largest_readable_product_is_declined_under_a_512_mib_ceiling() {
+    let mut operand = vec![0xff; 67_108_862];
+    operand[67_108_861] = 0x00;
+    let message = refused(
+        under_ceiling(512 << 20, &[operand.clone(), operand], &then_true(OP_MUL)),
+        805_306_344,
+    );
+    assert!(message.ends_with("the allocator refused the 805306344 bytes OP_MUL's step may need, from operands of 67108862 and 67108862 bytes."), "{message}");
 }

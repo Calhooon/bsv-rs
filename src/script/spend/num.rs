@@ -6,7 +6,7 @@ use crate::primitives::BigNumber;
 use crate::script::evaluation_error::ScriptEvaluationError;
 use crate::script::script_num::ScriptNum;
 
-use super::Spend;
+use super::{reference_read, Spend};
 
 impl Spend {
     /// The script-number length limit in force: `None` in the TypeScript
@@ -52,6 +52,7 @@ impl Spend {
                 return Err(self.overflow_error(bytes.len(), max));
             }
         }
+        self.check_reference_read(bytes)?;
         // the digits, at most 7 bytes past the operand's, and a non-minimal
         // operand's shrink half again, asked first (bsv-rs#374)
         let len = bytes.len() as u64;
@@ -68,9 +69,25 @@ impl Spend {
         if self.require_minimal && !ScriptNum::is_minimally_encoded(bytes) {
             return self.read_number(bytes).map(drop);
         }
+        self.check_reference_read(bytes)?;
         match self.max_script_num_length() {
             Some(max) if bytes.len() > max => Err(self.overflow_error(bytes.len(), max)),
             _ => Ok(()),
+        }
+    }
+
+    /// In the default mode, the reference's read limit
+    /// ([`reference_read`](super::reference_read)): a number it cannot read
+    /// is the verdict it gives, in its words, after the minimal-encoding
+    /// check it makes first (`BigNumber.fromScriptNum`, `BigNumber.ts:1681-1688`).
+    fn check_reference_read(&self, bytes: &[u8]) -> Result<(), ScriptEvaluationError> {
+        if self.flags.is_some() || (self.require_minimal && !ScriptNum::is_minimally_encoded(bytes))
+        {
+            return Ok(());
+        }
+        match reference_read::refusal(bytes) {
+            Some(words) => Err(self.error(words)),
+            None => Ok(()),
         }
     }
 
