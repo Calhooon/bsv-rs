@@ -7,13 +7,13 @@ use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{to_hex, PublicKey, Signature};
+use crate::primitives::{to_base64, PublicKey, Signature};
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction};
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
     CreateSignatureArgs, DecryptArgs, EncryptArgs, ListOutputsArgs, OutputInclude, Protocol,
-    SecurityLevel, SignActionArgs, SignActionOptions, SignActionSpend, WalletInterface,
+    SecurityLevel, SignActionArgs, SignActionSpend, WalletInterface,
 };
 use crate::{Error, Result};
 
@@ -444,13 +444,8 @@ impl<W: WalletInterface> ContactsManager<W> {
                         .sign_action(
                             SignActionArgs {
                                 spends,
-                                reference: to_hex(&signable_tx.reference),
-                                options: Some(SignActionOptions {
-                                    accept_delayed_broadcast: Some(false),
-                                    return_txid_only: None,
-                                    no_send: None,
-                                    send_with: None,
-                                }),
+                                reference: to_base64(&signable_tx.reference),
+                                options: None,
                             },
                             originator,
                         )
@@ -480,7 +475,6 @@ impl<W: WalletInterface> ContactsManager<W> {
 
     /// Generate a random key ID for contact encryption.
     fn generate_key_id(&self) -> String {
-        use crate::primitives::to_base64;
         let random_bytes: [u8; 32] = rand::random();
         to_base64(&random_bytes)
     }
@@ -729,13 +723,8 @@ impl<W: WalletInterface> ContactsManager<W> {
                         .sign_action(
                             SignActionArgs {
                                 spends,
-                                reference: to_hex(&signable_tx.reference),
-                                options: Some(SignActionOptions {
-                                    accept_delayed_broadcast: Some(false),
-                                    return_txid_only: None,
-                                    no_send: None,
-                                    send_with: None,
-                                }),
+                                reference: to_base64(&signable_tx.reference),
+                                options: None,
                             },
                             originator,
                         )

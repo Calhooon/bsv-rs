@@ -3,7 +3,7 @@
 //! Uses the wallet's basket system to store encrypted key-value pairs.
 //! Only the wallet owner can read/write entries.
 
-use crate::primitives::{from_hex, to_hex, PublicKey};
+use crate::primitives::{from_hex, to_base64, to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::script::LockingScript;
 use crate::wallet::{
@@ -13,6 +13,7 @@ use crate::wallet::{
 };
 use crate::{Error, Result};
 
+use super::bound::bound_sign_options;
 use super::interpreter::KVStoreInterpreter;
 use super::types::{
     decode_value_with_ttl, encode_value_with_ttl, KVStoreConfig, KVStoreEntry, KVStoreGetOptions,
@@ -328,7 +329,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
         // If we had inputs, we need to sign
         if let Some(signable) = create_result.signable_transaction.as_ref() {
             if !inputs.is_empty() {
-                let reference_str = to_hex(&signable.reference);
+                let reference_str = to_base64(&signable.reference);
 
                 // Prepare spends (unlocking scripts)
                 let spends = self
@@ -341,7 +342,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                         SignActionArgs {
                             reference: reference_str,
                             spends,
-                            options: None,
+                            options: Some(bound_sign_options(None)),
                         },
                         self.originator(),
                     )
@@ -435,7 +436,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                 .await?;
 
             if let Some(signable) = &create_result.signable_transaction {
-                let reference_str = to_hex(&signable.reference);
+                let reference_str = to_base64(&signable.reference);
                 let spends = self
                     .prepare_spends(key, &lookup_result.outputs, &signable.tx, input_beef)
                     .await?;
@@ -446,7 +447,7 @@ impl<W: WalletInterface + std::fmt::Debug> LocalKVStore<W> {
                         SignActionArgs {
                             reference: reference_str,
                             spends,
-                            options: None,
+                            options: Some(bound_sign_options(None)),
                         },
                         self.originator(),
                     )
