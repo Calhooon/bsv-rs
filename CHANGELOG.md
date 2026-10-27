@@ -112,7 +112,10 @@ and no `withDoubleSpendRetry`. The reference's `Certificate` is built from
 the token's seven members and its constructor's failure caught; here the
 certificate is read from those members' JSON (`Certificate`'s
 `Deserialize`), a member it cannot hold a skip, the same verdict for every
-token the reference's reveal writes. The serial number's base64 length is
+token the reference's reveal writes; a token JSON without
+`revocationOutpoint` reads as `None` here and verifies over the sentinel
+(`src/auth/certificates/certificate.rs:303-310`), where the reference's
+`verify()` answers false (`Certificate.ts:257-258`). The serial number's base64 length is
 measured in UTF-8 bytes where the reference measures UTF-16 units; a
 non-ASCII character is refused as not base64 either way. The reference
 reads `networkPreset` from the wallet's getNetwork when its options name
