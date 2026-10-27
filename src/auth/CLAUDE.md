@@ -495,6 +495,7 @@ The auth module uses:
 - `tokio` - Async runtime (sync primitives, time, spawn)
 - `async_trait` - Async trait support
 - `serde`, `serde_json` - Serialization
+- `indexmap` - `RequestedCertificateTypes`, the requested set's `types` in insertion order (#288)
 - `rand` - Random number generation
 - `reqwest` - HTTP client (with `http` feature)
 - `tokio-tungstenite` - WebSocket client (with `websocket` feature)
