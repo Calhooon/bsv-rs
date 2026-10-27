@@ -6,7 +6,7 @@
 This module provides concrete implementations of the `FeeModel` trait for computing transaction fees:
 
 - **`SatoshisPerKilobyte`** - Static fee rate based on transaction size
-- **`LivePolicy`** - Dynamic fee rate fetched from ARC policy endpoint
+- **`LivePolicy`** - Dynamic fee rate fetched from a policy endpoint of the caller's, in ARC's schema
 
 ## Files
 
@@ -14,7 +14,7 @@ This module provides concrete implementations of the `FeeModel` trait for comput
 |------|---------|
 | `mod.rs` | Module root; exports all fee models |
 | `sats_per_kb.rs` | Size-based fee model computing satoshis per kilobyte |
-| `live_policy.rs` | Live fee rate fetched from ARC policy API |
+| `live_policy.rs` | Live fee rate fetched from a policy endpoint (ARC's schema; ARCade serves it) |
 
 ## Key Exports
 
@@ -151,13 +151,15 @@ The module includes unit tests in `sats_per_kb.rs`:
 
 ## LivePolicy
 
-The `LivePolicy` fee model fetches the current fee rate from an ARC policy endpoint and caches it for a configurable duration.
+The `LivePolicy` fee model fetches the current fee rate from a policy endpoint in ARC's schema (`GET /v1/policy`, its `miningFee`; ARCade serves it, `arcade@1dbd889` `services/api_server/routes.go:296-297`) and caches it for a configurable duration.
+
+The endpoint is the caller's since 0.9.0 (#350, the owner's word of 2026-10-27: ARC is deprecated, ARCade is the standard). The reference takes no URL and reads ARC's GorillaPool policy (`ts-stack@edf6e03` `LivePolicy.ts:10`); this crate's shape is the reference's plus `with_url`, minus the ARC default: `new()` and `DEFAULT_POLICY_URL` are deprecated (they still read ARC), and the two `Default`s, which cannot carry `#[deprecated]` (a trait impl), carry an empty URL that `refresh()` refuses before any request.
 
 ### LivePolicyConfig
 
 ```rust
 pub struct LivePolicyConfig {
-    pub policy_url: String,        // Default: "https://arc.gorillapool.io/v1/policy"
+    pub policy_url: String,        // Default: "" (refused by refresh, #350)
     pub api_key: Option<String>,   // Optional Bearer token
     pub cache_ttl: Duration,       // Default: 5 minutes
     pub fallback_rate: u64,        // Default: 100 sat/KB
@@ -169,7 +171,7 @@ pub struct LivePolicyConfig {
 
 | Constant | Value | Description |
 |----------|-------|-------------|
-| `DEFAULT_POLICY_URL` | `"https://arc.gorillapool.io/v1/policy"` | Default ARC policy endpoint |
+| `DEFAULT_POLICY_URL` | `"https://arc.gorillapool.io/v1/policy"` | ARC's policy endpoint, read by the deprecated `new()` alone; deprecated since 0.9.0 (#350) |
 | `DEFAULT_CACHE_TTL_SECS` | `300` | 5 minute cache TTL |
 | `DEFAULT_FALLBACK_RATE` | `100` | Fallback rate in sat/KB |
 
@@ -183,7 +185,7 @@ pub struct LivePolicy {
 }
 
 impl LivePolicy {
-    pub fn new() -> Self                         // Create with default config
+    pub fn new() -> Self                         // Deprecated (#350): ARC's GorillaPool policy
     pub fn with_url(policy_url: &str) -> Self    // Create with custom URL
     pub fn with_config(config: LivePolicyConfig) -> Self
     pub fn policy_url(&self) -> &str
@@ -204,8 +206,8 @@ impl FeeModel for LivePolicy {
 ```rust
 use bsv_rs::transaction::{LivePolicy, FeeModel, Transaction};
 
-// Create with default configuration
-let fee_model = LivePolicy::default();
+// The policy endpoint is the caller's (ARCade serves ARC's schema)
+let fee_model = LivePolicy::with_url("https://arcade.example.com/v1/policy");
 
 // Refresh the cached rate (async)
 fee_model.refresh().await?;

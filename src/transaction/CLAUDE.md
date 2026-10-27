@@ -22,7 +22,7 @@ This module provides complete Bitcoin transaction functionality:
 - A ring of source links terminates (#160): on the wire a raw entry is named by its bytes' hash, so a ring (A spends B, B spends A) is writable only by its input fields, and its inputs never reach a proven entry: `Beef::from_binary` parses it (it judges the frame), the stream with and without its spend checks (each member held to the end, #240), `verify_structure` and `verify_valid` (the sort's `not_valid`) refuse it `InputNamesNoElement`, before any walk, in every order, with or without a BUMP that proves none of it, V1 and V2; `Transaction::from_atomic_beef` returns the subject with that input unlinked (it does not judge the graph) and it does not verify. In memory, since #171, a ring cannot close through the parsed transactions either: an entry mutated through `BeefTx::tx_mut` is renamed by its new hash, so pointing `T0`'s input at its descendant leaves a chain with `T0` missing (`sort_txs` names it, `verify_structure` refuses `InputNamesNoElement`, the writer emits the mutated bytes). A ring is left only in the public `input_txids` cache written by hand on an entry `tx_mut` never touched: `sort_txs` holds every link not valid, `verify_structure` refuses it, `trim_known_proven` stops, and the writer emits the bytes each entry was read with. `add_input_proof` still memoizes the stub before it descends and `to_binary_atomic`'s closure keeps a seen set. Each reader runs on its own thread under a 5 s bound. Pinned by `tests/beef_cycle.rs` (the renamed chain and the cached ring) and `tests/beef_tx_mut.rs`
 - `BeefLimits { max_txs, max_bumps }` are memory hints since 0.4.0; `Beef::from_binary_with_limits` is deprecated and refuses nothing by size or count
 - JSON serialization matching Go SDK format for cross-SDK compatibility
-- Async Broadcaster trait with ARC, Teranode, and WhatsOnChain implementations
+- Async Broadcaster trait with Teranode and WhatsOnChain implementations, and ARC's, deprecated since 0.9.0 (#350)
 - Async ChainTracker trait with WhatsOnChain and BlockHeadersService implementations
 
 Compatible with the TypeScript and Go SDKs through shared binary formats.
@@ -49,7 +49,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `fee_model.rs` | `FeeModel` trait, `FixedFee` |
 | `fee_models/` | `SatoshisPerKilobyte`, `LivePolicy`, `LivePolicyConfig`, default constants |
 | `broadcaster.rs` | `Broadcaster` trait, response/failure types, helper functions |
-| `broadcasters/` | `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster` |
+| `broadcasters/` | `TeranodeBroadcaster`, `WhatsOnChainBroadcaster`, `ArcBroadcaster` (deprecated, #350) |
 | `chain_tracker.rs` | `ChainTracker` trait, `MockChainTracker` (a synthetic mainnet mining tip at its height, `with_mining_tip`; #218), `AlwaysValidChainTracker` |
 | `chain_trackers/` | `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, `BlockHeadersServiceConfig` |
 
@@ -147,7 +147,7 @@ impl Transaction {
     pub fn to_ef(&self) -> Result<Vec<u8>>
     pub fn to_hex_ef(&self) -> Result<String>
     pub fn to_beef(&self, allow_partial: bool) -> Result<Vec<u8>>      // BEEF V2
-    pub fn to_beef_v1(&self, allow_partial: bool) -> Result<Vec<u8>>   // BEEF V1 for ARC
+    pub fn to_beef_v1(&self, allow_partial: bool) -> Result<Vec<u8>>   // BEEF V1 (BRC-62), no TXID-only entries
     pub fn to_atomic_beef(&self, allow_partial: bool) -> Result<Vec<u8>>
     pub fn to_json(&self) -> Result<String>              // Go SDK-compatible JSON
     pub fn to_json_pretty(&self) -> Result<String>       // Pretty-printed JSON
@@ -230,15 +230,15 @@ pub trait FeeModel: Send + Sync {
 
 pub struct FixedFee(u64);                              // Always returns same fee
 pub struct SatoshisPerKilobyte { pub value: u64 }      // Fee based on tx size (default: 100 sat/KB)
-pub struct LivePolicy { /* ... */ }                    // Fetches rate from ARC policy endpoint
+pub struct LivePolicy { /* ... */ }                    // Fetches rate from a policy endpoint of the caller's (ARC's schema)
 
 // Exported constants
-pub const DEFAULT_POLICY_URL: &str;     // "https://arc.gorillapool.io/v1/policy"
+pub const DEFAULT_POLICY_URL: &str;     // "https://arc.gorillapool.io/v1/policy", deprecated (#350)
 pub const DEFAULT_FALLBACK_RATE: u64;   // Fallback sat/KB rate
 pub const DEFAULT_CACHE_TTL_SECS: u64;  // Cache TTL for live policy
 ```
 
-`LivePolicy` has `new()`, `with_url()`, `with_config(LivePolicyConfig)`, `refresh()` (async fetch), `cached_rate()`, `effective_rate()`, `set_rate()`. Config: `LivePolicyConfig { policy_url, api_key, cache_ttl, fallback_rate, timeout_ms }`. Default policy URL: `https://arc.gorillapool.io/v1/policy`.
+`LivePolicy` has `with_url()`, `with_config(LivePolicyConfig)`, `refresh()` (async fetch), `cached_rate()`, `effective_rate()`, `set_rate()`. Config: `LivePolicyConfig { policy_url, api_key, cache_ttl, fallback_rate, timeout_ms }`. No default policy URL since 0.9.0 (#350, the owner's word of 2026-10-27: ARC is deprecated, ARCade is the standard): `new()` (ARC's GorillaPool policy, the reference's) and `DEFAULT_POLICY_URL` are deprecated; `LivePolicy::default()` and `LivePolicyConfig::default()` carry an empty URL, which `refresh()` refuses before any request (`No policy URL: ..`), as a trait impl cannot carry `#[deprecated]`. ARCade serves ARC's schema at `/v1/policy`.
 
 ## Broadcasting
 
@@ -261,11 +261,11 @@ pub enum BroadcastStatus { Success, Error }
 
 | Broadcaster | Format | Default | Config |
 |-------------|--------|---------|--------|
-| `ArcBroadcaster` | BEEF V1 (JSON) | `default()` = gorillapool.io | `ArcConfig` |
+| `ArcBroadcaster` (deprecated since 0.9.0, #350) | Raw tx hex (JSON `rawTx`) | none of this crate's: its deprecated `default()` is `arc.taal.com` | `ArcConfig` (deprecated) |
 | `TeranodeBroadcaster` | Extended Format (EF binary) | No default URL | `TeranodeConfig` |
 | `WhatsOnChainBroadcaster` | Raw tx hex | `mainnet()`, `testnet()`, `stn()` | `WocBroadcastConfig`, `WocBroadcastNetwork` |
 
-ARC/Teranode have `new(url, api_key)` and `with_config(config)` constructors. WoC has `new(network, api_key)`, `mainnet()`, `testnet()`, `stn()`, `with_config(config)`, `with_base_url(url, network, api_key)`. `WocBroadcastNetwork` enum selects `Mainnet`, `Testnet`, or `STN`.
+Teranode has `new(url, api_key)` and `with_config(config)` constructors, as the deprecated ARC broadcaster does. WoC has `new(network, api_key)`, `mainnet()`, `testnet()`, `stn()`, `with_config(config)`, `with_base_url(url, network, api_key)`. `WocBroadcastNetwork` enum selects `Mainnet`, `Testnet`, or `STN`.
 
 ## Chain Tracking
 
@@ -387,12 +387,11 @@ let tx2 = Transaction::from_json(&json)?;
 assert_eq!(tx.to_hex(), tx2.to_hex());
 
 // Broadcasting (requires `http` feature)
-let result = ArcBroadcaster::default().broadcast(&tx).await;             // BEEF V1
 let result = WhatsOnChainBroadcaster::mainnet().broadcast(&tx).await;    // Raw hex
 let result = TeranodeBroadcaster::new(url, None).broadcast(&tx).await;   // EF binary
 
 // Serializing to BEEF (collects ancestors with an explicit stack)
-let beef_v1 = tx.to_beef_v1(false)?;  // For ARC
+let beef_v1 = tx.to_beef_v1(false)?;  // V1 format (BRC-62)
 let beef_v2 = tx.to_beef(false)?;     // V2 format
 let atomic = tx.to_atomic_beef(false)?;
 
@@ -421,9 +420,9 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **TXID**: `hash()` = internal byte order; `id()` = reversed hex (display format)
 - **Debug**: `Transaction` and `TransactionInput` implement `Debug` by hand; a linked `source_transaction` prints as `Some("<txid>")`, never its ancestry (0.3.35, bsv-stack-lean #57 P0-5c)
 - **Async traits**: `Broadcaster` uses `?Send` (Transaction has RefCell); `ChainTracker` is standard async
-- **HTTP feature**: `ArcBroadcaster`, `TeranodeBroadcaster`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
+- **HTTP feature**: `TeranodeBroadcaster`, `ArcBroadcaster` (deprecated), `WhatsOnChainBroadcaster`, `WhatsOnChainTracker`, `BlockHeadersServiceTracker`, and `LivePolicy` require the `http` feature flag
 - **BEEF ancestry**: `to_beef()` and `to_beef_v1()` walk the `source_transaction` chain depth first with an explicit stack via `collect_ancestors()`, stop at txs with `merkle_path`, and store each ancestor without its own ancestry
-- **BEEF V1 vs V2**: Use `to_beef_v1()` for ARC compatibility (BRC-62), `to_beef()` for V2 with TXID-only support (BRC-96)
+- **BEEF V1 vs V2**: Use `to_beef_v1()` for a reader that takes V1 only (BRC-62), `to_beef()` for V2 with TXID-only support (BRC-96)
 - **BEEF indexing**: Beef maintains an internal `txid_index` HashMap for O(1) transaction lookup by txid
 - **MerklePath root check**: `new` and `new_unchecked` check every level-0 leaf's root with one `RootWalker` (the parse, since #167, by the decoder's walk) that indexes each level by offset and computes each node once, shared across the walks (the reference's `computeRootCached`; linear in the leaves since 0.3.35, bsv-stack-lean #57 P0-5c). A tree height over 64 is refused before any shift
 - **MerklePath dedup**: BEEF ancestry collection deduplicates proofs by `"height:root"` key; combines proofs at same height/root
@@ -459,5 +458,5 @@ The `collect_ancestors()` method implements the same algorithm as TypeScript/Go 
 - `../script/CLAUDE.md` - LockingScript, UnlockingScript, templates
 - `../primitives/CLAUDE.md` - Reader, Writer, sha256d, from_hex, to_hex
 - `fee_models/CLAUDE.md` - SatoshisPerKilobyte, LivePolicy
-- `broadcasters/CLAUDE.md` - ArcBroadcaster, TeranodeBroadcaster, WhatsOnChainBroadcaster
+- `broadcasters/CLAUDE.md` - TeranodeBroadcaster, WhatsOnChainBroadcaster, ArcBroadcaster (deprecated)
 - `chain_trackers/CLAUDE.md` - WhatsOnChainTracker, BlockHeadersServiceTracker

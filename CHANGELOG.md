@@ -128,6 +128,103 @@ Spends }` (`kvstore/local_kv_store.go:342-345`, `:494-497`), the bytes
 createAction answered (`Reference []byte`, `wallet/interfaces.go:203-206`,
 `:222-226`), and no options: the reference's bytes, without
 `completeBoundAction`'s options.
+### Deprecated: the ARC client surface, nowhere a default (#350)
+
+The owner's word of 2026-10-27: "arc is just deprecated, arcade is the
+standard"; for this crate, any ARC client surface is marked deprecated and
+is never a default. `ArcBroadcaster`, `ArcConfig`, `ArcBroadcaster::new`,
+`ArcBroadcaster::with_config`, `LivePolicy::new` and `DEFAULT_POLICY_URL`
+carry `#[deprecated(since = "0.9.0", note = "ARC is deprecated; ARCade is
+the standard (the owner's word of 2026-10-27)")]` (the two `LivePolicy`
+items add the migration: `use LivePolicy::with_url`). Nothing is removed
+and nothing ARC does changes: the broadcaster's verdict, its transport
+faults and its tests are as they were.
+
+rustc refuses `#[deprecated]` on a trait impl block, so a `Default` cannot
+be deprecated by itself. `ArcBroadcaster::default()` (`https://arc.taal.com`)
+and `ArcConfig::default()` warn through their deprecated types (naming the
+type is the use). `LivePolicy` is not ARC's (it reads any policy endpoint
+in ARC's schema, and ARCade serves that schema at `/v1/policy`,
+`arcade@1dbd889` `services/api_server/routes.go:294-297`), so the type stays
+undeprecated and its two `Default`s stop choosing ARC: `LivePolicy::default()`
+and `LivePolicyConfig::default()` carry an empty `policy_url`, which
+`refresh()` refuses before any request (`Error::FeeModelError("No policy
+URL: build the LivePolicy with with_url (ARC is deprecated and no default,
+bsv-rs#350)")`), `compute_fee` using the fallback rate as it did before a
+refresh. `LivePolicy::new()` (deprecated) still reads ARC's GorillaPool
+policy. Of the brief's two shapes for `new` (deprecated, or made to take
+the URL), deprecating it is the reference's shape minus the ARC default:
+the reference's `LivePolicy` takes no URL and reads ARC
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/fee-models/LivePolicy.ts:10`),
+this crate's `new()` is that constructor and `with_url` the one with the
+URL; changing `new`'s signature would break every caller to say what the
+deprecation says, and `--release-type minor` refuses that break.
+
+The docs: the broadcasters' `CLAUDE.md` no longer calls ARC "recommended
+for production" and its examples broadcast through WhatsOnChain and
+Teranode; `Transaction::to_beef_v1` is documented by its format (BRC-62, no
+TXID-only entries), not "for ARC"; the transaction and fee models'
+`CLAUDE.md` name no ARC default. This crate adds no ARCade client (below).
+
+The crate's own uses: the module that defines the ARC items
+(`src/transaction/broadcasters/arc.rs`, `#![allow(deprecated)]`), the
+re-exports (`broadcasters/mod.rs`, `fee_models/mod.rs`, `transaction/mod.rs`,
+an `#[allow(deprecated)]` each), and the tests of ARC's wire
+(`tests/broadcaster_http_tests.rs`: the import and the ten ARC tests;
+`tests/transport_fault_broadcasters.rs`: the import and the ARC arm of
+`Service::broadcaster`) keep the ARC items under `#[allow(deprecated)]`
+with the reason. They test ARC's own wire, so no other broadcaster could
+replace them. `LivePolicy`'s fallback, rate and TTL tests (five in
+`tests/live_policy_http_tests.rs`, four in the module) move from `new()` to
+`default()`; the two that pin `new()`'s ARC URL keep it under an allow. No
+example, bench or README block names an ARC item.
+
+Pinned by `tests/arch_arc_deprecated.rs` (2 tests, read from the source as
+the other `arch_*` rules are): each of the six items carries
+`#[deprecated(since = "0.9.0", ..)]` with the note naming ARCade, and
+neither `LivePolicy` `Default` names `DEFAULT_POLICY_URL`, an ARC host or
+`Self::new()`; both red on the base (the six items listed, the config's
+`Default` naming the URL), green on the fix. The refusal:
+`a_live_policy_built_without_a_url_refuses_to_refresh_and_reads_no_arc`
+(`tests/live_policy_http_tests.rs`) and
+`a_live_policy_with_no_policy_url_refuses_to_refresh` (the module). Their
+URL assertions are red on the base by reading; they were not run there,
+because on the base `refresh()` of a `Default` reaches gorillapool. A
+scratch crate under `#![deny(deprecated)]` naming each item builds on the
+base and fails on the fix with nine errors, one per use.
+
+Migration: a caller of `ArcBroadcaster` or `ArcConfig` gets a warning
+(an error under `-D warnings`) and keeps working; move to ARCade (the
+wallet toolbox's `Arcade` provider) or another `Broadcaster`, or add
+`#[allow(deprecated)]`. A caller of `LivePolicy::new()` passes the URL:
+`LivePolicy::with_url("<host>/v1/policy")`. A caller of
+`LivePolicy::default()` or of `LivePolicyConfig { .., ..Default::default() }`
+without a `policy_url` now has `refresh()` refused and stays on the
+fallback rate until it sets one. The downstreams have no site at their tips:
+`bsv-wallet-toolbox-rs` (`a3377ef`) uses its own `services::{Arc,
+ArcConfig, Arcade}`, `bsv-wallet-cli` (`f4285bf`) imports the toolbox's
+`ArcConfig` (`src/services_env.rs:21-24`), `bsv-overlay-cloudflare`
+(`8c18730c`) defines its own `overlay_engine::broadcaster::ArcBroadcaster`
+trait (`crates/overlay-engine/src/broadcaster.rs:53`) and
+`WorkerArcBroadcaster`/`ArcadeBroadcaster`, and `rust-message-box`
+(`08418ec`) names none. No downstream names `LivePolicy` or
+`DEFAULT_POLICY_URL`.
+
+### Notes: cross-SDK parity (#350)
+
+The reference keeps ARC undeprecated and as its default:
+`defaultBroadcaster` returns an `ARC` on `https://arc.gorillapool.io`
+(testnet `https://testnet.arc.gorillapool.io`; `ts-stack@edf6e03`
+`packages/sdk/src/transaction/broadcasters/DefaultBroadcaster.ts:1-12`),
+`ARC.ts` carries no deprecation, and `LivePolicy` reads
+`https://arc.gorillapool.io/v1/policy` with no way to pass another URL
+(`LivePolicy.ts:10`). This crate diverges under the owner's word: ARC
+deprecated, no default broadcaster or policy URL. ARCade is a service of
+the toolbox and the overlay layer in the reference
+(`packages/wallet/wallet-toolbox/src/services/`,
+`packages/overlays/overlay-express/src/ArcadeProvider.ts`), not an SDK
+broadcaster, so this crate adds no ARCade client; the toolbox's side has
+one. Go (`go-sdk`) is not read for this entry.
 
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 
