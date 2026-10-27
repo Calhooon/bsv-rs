@@ -180,7 +180,13 @@ streaming reader with `set_work_limit`, or bounds the call from outside
 (`tests/script_verification.rs:785`, `:919`), add `None`; its production
 walk is its own (`verify_spv_like_the_reference`), no call.
 `bsv-wallet-cli@f4285bf`, `bsv-wallet-toolbox-rs@a3377ef`,
-`rust-message-box@08418ec`: no `Transaction::verify` call.
+`rust-message-box@08418ec`: no `Transaction::verify` call; the relay's
+`src/beef_door.rs` (419bf18 at its tip, `:420-428`) runs the streaming reader
+(`StreamVerifier::new`, `structure_only`, `resume`) with `set_work_limit` and
+no memory budget, so its scripts run uncapped after this change until the
+stream takes `verify`'s parameter (#373, the keeper's shape). LOW's
+`low-spend` (`crates/low-spend/src/covenant.rs`) pins `=0.8.1` and takes the
+parameter when its own captain re-pins.
 
 Semver: a breaking change to a public method's signature (one parameter
 added), carried by the ruling on the 0.9.0 line; `cargo semver-checks`
@@ -590,6 +596,7 @@ classes here, where the reference's `#sendAuthMessage` throws
 `#createUnauthenticatedResponseError`'s words with `response lacked
 required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
 follow-up is #366).
+
 ### Fixed: `Peer`'s client path verifies the initial response and general messages as the reference's `Peer` does: the nonce, the session, the pinned identity, the signature (#353)
 
 `Peer::start` installed a callback of its own (`src/auth/peer.rs:194-338`
