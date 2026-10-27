@@ -28,6 +28,9 @@ use std::sync::Arc;
 use std::sync::RwLock as StdRwLock;
 use tokio::sync::RwLock;
 
+#[cfg(feature = "http")]
+mod client;
+
 /// Transport trait for sending/receiving auth messages.
 #[async_trait]
 pub trait Transport: Send + Sync {
@@ -500,28 +503,18 @@ impl std::fmt::Debug for SimplifiedFetchTransport {
 }
 
 impl SimplifiedFetchTransport {
-    /// Creates a new HTTP transport.
+    /// Creates a new HTTP transport with this crate's client: a 30 s request
+    /// and 10 s connect timeout, no idle connection reuse, and no redirect
+    /// followed (a redirect status is refused, bsv-rs#320). To set the
+    /// client's policy, use [`SimplifiedFetchTransport::with_client`].
     ///
     /// # Arguments
     /// * `base_url` - Base URL of the remote server (e.g., `https://example.com`)
     pub fn new(base_url: &str) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
-            // Egress-NAT'd hosts (e.g. Cloudflare Containers) silently drop idle
-            // keep-alive sockets. reqwest's default pool then reuses a half-dead
-            // connection and the next request HANGS INDEFINITELY — `Client::new()`
-            // sets no timeout, so there is nothing to break the hang. This wedged
-            // the BRC-104 General POST (`/sendMessage`) from the deployed MPC
-            // cosigner. Bound every request (overall + connect) and disable
-            // idle-socket reuse so a dropped keep-alive forces a fresh connection
-            // instead of a hang.
             #[cfg(feature = "http")]
-            client: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .connect_timeout(std::time::Duration::from_secs(10))
-                .pool_max_idle_per_host(0)
-                .build()
-                .unwrap_or_else(|_| reqwest::Client::new()),
+            client: client::default_client(),
             callback: Arc::new(StdRwLock::new(None)),
         }
     }
@@ -649,7 +642,7 @@ impl Transport for SimplifiedFetchTransport {
                         .send()
                         .await
                         .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
-
+                    client::refuse_redirect(&self.auth_url(), &response)?;
                     if !response.status().is_success() {
                         return Err(fault::auth_status_error(response).await);
                     }
@@ -749,7 +742,7 @@ impl Transport for SimplifiedFetchTransport {
                         .send()
                         .await
                         .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
-
+                    client::refuse_redirect(&url, &response)?;
                     // Extract response headers and body
                     let response_status = response.status().as_u16();
                     let response_headers = response.headers().clone();
