@@ -7,6 +7,116 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
+
+`IdentityClient::revoke_certificate_revelation` took the first output of
+the `ls_identity` answer, the first transaction of its BEEF, spent the
+configured `output_index` (0) at input 0 and checked nothing: a lookup
+host could answer any output and the wallet was asked to spend it. The
+reference's `revokeCertificateRevelation` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/IdentityClient.ts:705-950`) is now followed
+step by step, in its order and words (`src/identity/revoke.rs`):
+
+| The reference | Before | Now |
+|---|---|---|
+| the serial number `validateBase64String(.., 32, 32)` (`:712-717`) | sent as given | refused in `WERR_INVALID_PARAMETER`'s words (`The serialNumber parameter must be at least 32 bytes`), before any call |
+| getPublicKey for the identity key, then for the token's key (`[1, identity]`, `1`, anyone, `forSelf`) (`:718-730`) | none | the same two calls |
+| no output or not an output list: `Failed to get lookup result` (`:743-745`) | `Failed to find revelation output`, `No revelation found for this certificate` | the reference's words |
+| more than 10000 outputs, more than 16 MiB of BEEF across them (`:746-758`) | unbounded | refused in its words |
+| each output: the BEEF's subject (`Transaction.fromBEEF`, its atomic txid or last transaction), the output at the lookup's index, a canonical signed PushDrop of two fields (`assertCanonicalIdentityTokenScript`, `:130-147`) locked to the token's key, its JSON naming the serial number and the identity key as subject, `Certificate.verify`, the wallet's verifySignature over the token; any failure skips the output (`:768-825`) | the first transaction of the first output, unread | the same checks, the same skips |
+| none authenticated: `No authenticated revelation output matches the requested certificate.` (`:828-830`) | spent | refused |
+| every authenticated output spent at its own `outputIndex`, the outpoint `<subject txid>.<index>` (`:837-844`) | the first, at `output_index` | the reference's |
+| the signable transaction read as atomic BEEF, exactly one input spending the outpoint, signed at that index (`revelationInputOutpoint`, `:149-172`, `:870-894`) | input 0 | the matching input, else `Wallet signable transaction does not contain the requested revelation input.` |
+| no transaction from signAction: `Failed to sign transaction` (`:913-915`) | `signAction did not return a transaction` | the reference's words |
+| the signed transaction checked against the signable one (version, lock time, inputs, sequences, outputs, the revelation input and its unlocking script, the txid answered; `:174-200`, `:917-932`) | not checked | the same checks in its words |
+| the broadcast's failure `Failed to broadcast certificate revelation revocation: <code>: <description>` (`:934-939`) | `Failed to broadcast revocation: ..` | the reference's words |
+| abortAction with the reference when anything after createAction fails, its answer ignored, the failure kept (`:940-946`) | no abort | the same |
+| the spend under `withDoubleSpendRetry` (`:837`, `:948`) | none | the reference's rule (below) |
+
+The retry is the reference's `withDoubleSpendRetry`
+(`overlay-tools/withDoubleSpendRetry.ts:8-165`), in
+`src/identity/double_spend.rs`: an attempt that fails with a
+`WERR_REVIEW_ACTIONS` carrying double-spend evidence (each `doubleSpend`
+result's `competingTxs`, 1 to 256 distinct txids, and `competingBeef`, 1
+byte to 64 MiB; at most 256 results, 64 MiB and 256 txids across them) is
+repeated after every competing transaction is read from its BEEF by txid
+and acknowledged by the `tm_identity` broadcaster, at most five attempts
+in all; any other error, malformed evidence or a failed acknowledgement
+ends the spend as it came. `crate::overlay::with_double_spend_retry` is
+not that rule (it repeats any error whose words name a double spend,
+synchronizes nothing and makes four attempts by default) and is not used.
+The evidence needs a carrier: `Error::WalletReviewActions(Box<ReviewActionsRefusal>)`
+(new, `wallet`), the reference's `WERR_REVIEW_ACTIONS` with its
+`reviewActionResults`; the wire processor frames it with code 5 and its
+words (`WalletWireProcessor.ts:2405-2416`), the results not on the wire, as
+the reference's frame carries none, so a refusal read back from the wire
+(`WalletRefusal` of the `ReviewActions` class) is never retried, as the
+reference's transceiver's `WalletError` of code 5 is not
+(`withDoubleSpendRetry.ts:66-71`). `ReviewActionResult` derives
+`PartialEq` and `Eq` for it. `IdentityClient::with_broadcast_facilitator`
+(new) sends the revocation's broadcasts through a facilitator of the
+caller's, the seam the tests use.
+
+Migration: a revocation that spent a wrong output before (another
+certificate's token, an output the client cannot spend, a token not the
+subject's) now refuses in the reference's words, `No authenticated
+revelation output matches the requested certificate.`, after the two
+getPublicKey calls and a verifySignature for each candidate token; every
+authenticated output is spent, not the first; a caller matching the old
+words (`No revelation found for this certificate`, `signAction did not
+return a transaction`, `Failed to broadcast revocation: ..`) matches the
+reference's now. `IdentityClientConfig::output_index` is no longer read by
+the revocation. A downstream matching `Error` exhaustively is unaffected
+(`#[non_exhaustive]`). No downstream calls the identity client or names
+`ReviewActionResult` from this crate (`bsv-wallet-toolbox-rs`,
+`bsv-wallet-cli`, `rust-message-box`, `bsv-overlay-cloudflare`,
+`bsv-middleware-cloudflare-public`, `rust-chaintracks` grepped).
+
+Pinned by `tests/identity_revocation_checks_327.rs` (9 tests) on
+`tests/vectors/identity_revocation_checks_327.json`: the reference's
+revocation on ten lookups its script answers (an empty and a freeform
+answer, 10001 outputs, 17 MiB of BEEF, a serial number of 3 bytes, a token
+for another certificate, two outputs of which the second matches, a
+signAction that throws, a double spend answered once then a signed
+transaction, a `WERR_REVIEW_ACTIONS` without evidence), each its verdict,
+wallet calls in order, createAction, signAction and abortAction arguments
+and broadcast txids, recorded by `tests/support/identity_wallet_calls_318.mjs`
+with the mode `revocation-checks` (`tests/support/identity_revocation_checks_327.mjs`;
+without it the script prints the #318 vector byte for byte) at
+`ts-stack@edf6e03` under Node v22.18.0, the randomness #310's SHA-256
+counter stream, two runs byte for byte; and this crate's reading of the
+retry's rule (five attempts, four synchronizations; a class-only refusal
+and double-spend words not retried). The lookups are answered through the
+resolver, which keeps one output per `<txid>.<index>` and none whose BEEF
+does not parse, so the bound tests answer distinct outputs of real BEEFs
+(the 1 MiB one this crate's writer's) where the reference's script
+answered copies. 9 of the 9 red on a copy with the old revocation and the
+new API; `tests/identity_wallet_calls_318.rs` now asserts the reference's
+calls in its order, its stop (`Failed to sign transaction`) and its
+abortAction (4 of 4 red on that copy); the #307, #310, #315 and #318
+witnesses unchanged (the #318 script prints its vector byte for byte).
+`tests/wire_wallet_refusal_class.rs` pins the processor's frame of the
+new variant (code 5, the reference's words, read back as the class; red
+without the arm, `Wallet operation failed` code 1).
+
+### Notes: cross-SDK parity (#327)
+
+#318's remaining item is closed: the revocation authenticates, spends the
+matching output at its index, aborts and retries as the reference does.
+go-sdk@2ca481c has no revocation (`identity/client.go` revokes nothing),
+and no `withDoubleSpendRetry`. The reference's `Certificate` is built from
+the token's seven members and its constructor's failure caught; here the
+certificate is read from those members' JSON (`Certificate`'s
+`Deserialize`), a member it cannot hold a skip, the same verdict for every
+token the reference's reveal writes. The serial number's base64 length is
+measured in UTF-8 bytes where the reference measures UTF-16 units; a
+non-ASCII character is refused as not base64 either way. The reference
+reads `networkPreset` from the wallet's getNetwork when its options name
+none (`:732-735`, `:832-835`); this crate's `IdentityClientConfig` always
+names one, so no getNetwork call is made, as in the reference's witnesses.
+The contacts manager's and key-value stores' signAction reference (#318's
+note) is unchanged.
+
 ### Fixed: `Transaction::verify` answers a decline as a decline, and the block path's consensus budget can be the node's verdict (#38)
 
 Two gaps the docs pass of #36 left. First, `Transaction::verify` evaluates

@@ -656,7 +656,7 @@ pub enum ReviewActionResultStatus {
 }
 
 /// Result of reviewing an action.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewActionResult {
     /// The transaction ID (hex encoded in JSON).

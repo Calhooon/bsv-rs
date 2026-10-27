@@ -163,8 +163,7 @@ pub enum Error {
     TransactionError(String),
 
     /// `Transaction::verify` stopped an input's evaluation at a local budget:
-    /// the script was not judged, valid or not (the reference's
-    /// `ScriptResourceLimitError`; bsv-rs#38).
+    /// the script was not judged, valid or not (the reference's `ScriptResourceLimitError`; bsv-rs#38).
     #[cfg(feature = "transaction")]
     #[error("script evaluation declined for input {input_index}: {limit}")]
     ScriptEvaluationDeclined {
@@ -212,8 +211,7 @@ pub enum Error {
     /// `Wallet operation failed`, code 1 (`WalletWireProcessor.ts:2402-2418`);
     /// the transceiver reads a frame coded 2 to 8 back as this variant
     /// (`WalletWireTransceiver.ts:153`); the HTTP JSON substrate reads an
-    /// error body's class by its name or its code (#137).
-    /// `Display` is the message alone: the class is the typed field.
+    /// error body's class by its name or its code (#137). `Display` is the message alone: the class is the typed field.
     #[cfg(feature = "wallet")]
     #[error("{message}")]
     WalletRefusal {
@@ -222,6 +220,11 @@ pub enum Error {
         /// The refusal in the wallet's words, as the frame carries them.
         message: String,
     },
+
+    /// `WERR_REVIEW_ACTIONS` with its review results ([`crate::wallet::ReviewActionsRefusal`], #327).
+    #[cfg(feature = "wallet")]
+    #[error("{}", .0.message)]
+    WalletReviewActions(Box<crate::wallet::ReviewActionsRefusal>),
 
     /// The wallet is busy: a refusal before acting, in the wallet's word.
     ///

@@ -282,6 +282,42 @@ async fn a_wallet_refusal_is_framed_with_its_sdk_code_or_as_wallet_operation_fai
     }
 }
 
+/// #327: a `WERR_REVIEW_ACTIONS` with its results is framed as the reference
+/// frames its instance (code 5, its words, `:2407-2416`), the results not on
+/// the wire; the transceiver reads it back as the class alone.
+#[tokio::test]
+async fn a_review_with_its_results_is_framed_with_code_5_and_read_back_as_the_class() {
+    use bsv_rs::wallet::{ReviewActionResult, ReviewActionResultStatus, ReviewActionsRefusal};
+    let review = Error::WalletReviewActions(Box::new(ReviewActionsRefusal::new(vec![
+        ReviewActionResult {
+            txid: [0x22; 32],
+            status: ReviewActionResultStatus::DoubleSpend,
+            competing_txs: Some(vec![[0x33; 32]]),
+            competing_beef: Some(vec![1, 2, 3]),
+        },
+    ])));
+    let words = "Undelayed createAction or signAction results require review.";
+    assert_eq!(review.to_string(), words);
+    let frame = refusing(review.clone())
+        .process_message(&get_height_request())
+        .await
+        .unwrap();
+    assert_eq!(
+        hex::encode(&frame),
+        hex::encode(reference_frame(5, words.as_bytes()))
+    );
+    let result = WalletWireTransceiver::new(Loop(refusing(review)))
+        .get_height("test")
+        .await;
+    assert_eq!(
+        result,
+        Err(Error::WalletRefusal {
+            class: WalletRefusalClass::ReviewActions,
+            message: words.into()
+        })
+    );
+}
+
 /// #137: the transceiver reads a frame coded 2 to 8 back as the typed class
 /// and the words (`WalletWireTransceiver.ts:153`), end to end through the
 /// processor; a class with no SDK code comes back as the un-coded error.

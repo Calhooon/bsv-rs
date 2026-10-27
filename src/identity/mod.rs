@@ -79,7 +79,9 @@
 
 pub mod client;
 pub mod contacts;
+mod double_spend;
 mod reveal;
+mod revoke;
 pub mod types;
 
 // Re-exports

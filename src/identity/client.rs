@@ -10,19 +10,14 @@ use crate::auth::certificates::{revocation_outpoint_from_str, Certificate};
 use crate::auth::VerifiableCertificate;
 use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, OutputListItem,
-    TopicBroadcaster, TopicBroadcasterConfig,
+    OverlayBroadcastFacilitator, TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::bsv::sighash::{
-    parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
-};
-use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{from_base64, from_hex, to_base64, PrivateKey, PublicKey, Signature};
+use crate::primitives::{from_base64, from_hex, PrivateKey, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Broadcaster, Transaction};
 use crate::wallet::{
-    Counterparty, CreateActionArgs, CreateActionInput, CreateActionOptions, CreateActionOutput,
-    CreateSignatureArgs, Outpoint, ProtoWallet, Protocol, ProveCertificateArgs, SignActionArgs,
-    SignActionOptions, SignActionSpend, WalletCertificate, WalletInterface,
+    CreateActionArgs, CreateActionOptions, CreateActionOutput, ProtoWallet, ProveCertificateArgs,
+    WalletCertificate, WalletInterface,
 };
 use crate::{Error, Result};
 
@@ -65,6 +60,7 @@ pub struct IdentityClient<W: WalletInterface> {
     config: IdentityClientConfig,
     resolver: Arc<LookupResolver>,
     contacts_manager: ContactsManager<W>,
+    broadcast_facilitator: Option<Arc<dyn OverlayBroadcastFacilitator>>,
 }
 
 // Static methods that don't require Clone
@@ -321,6 +317,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             config,
             resolver,
             contacts_manager,
+            broadcast_facilitator: None,
         }
     }
 
@@ -341,7 +338,19 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             config,
             resolver,
             contacts_manager,
+            broadcast_facilitator: None,
         }
+    }
+
+    /// The facilitator the revocation's `tm_identity` broadcasts go
+    /// through, in place of the HTTP one (#327): the
+    /// [`TopicBroadcasterConfig::facilitator`] of its broadcaster.
+    pub fn with_broadcast_facilitator(
+        mut self,
+        facilitator: Arc<dyn OverlayBroadcastFacilitator>,
+    ) -> Self {
+        self.broadcast_facilitator = Some(facilitator);
+        self
     }
 
     /// The originator every wallet call carries: the configured one, or none
@@ -540,236 +549,35 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         }
     }
 
-    /// Revokes a previously published certificate revelation.
-    ///
-    /// Finds the UTXO containing the revealed certificate and spends it
-    /// to remove the revelation from the overlay network.
-    ///
-    /// # Arguments
-    /// * `serial_number` - The serial number of the certificate to revoke
+    /// Revokes a previously published certificate revelation, as the
+    /// reference's `revokeCertificateRevelation` does (`ts-stack@edf6e03`
+    /// `IdentityClient.ts:705-950`; #327, the steps in `revoke.rs`): the
+    /// serial number read as base64 of 32 bytes; the identity key and the
+    /// revelation key; the `ls_identity` lookup (`Failed to get lookup
+    /// result` for no output, at most 10000 outputs and 16 MiB of BEEF);
+    /// each output's token authenticated (the subject, the serial number,
+    /// the certificate's and the token's signatures), none: `No
+    /// authenticated revelation output matches the requested
+    /// certificate.`; every authenticated output spent at its own index on
+    /// `tm_identity`, the action aborted when signing or broadcasting fails,
+    /// and the spend retried on a wallet's double-spend evidence
+    /// ([`Error::WalletReviewActions`]) after the competing transactions are
+    /// broadcast, at most five attempts.
     ///
     /// # Example
     /// ```rust,ignore
     /// client.revoke_certificate_revelation("abc123...").await?;
     /// ```
     pub async fn revoke_certificate_revelation(&self, serial_number: &str) -> Result<()> {
-        let originator = self.originator();
-
-        // Step 1: Find the existing UTXO via lookup
-        let question = LookupQuestion::new(
-            "ls_identity",
-            serde_json::json!({
-                "serialNumber": serial_number
-            }),
-        );
-
-        let answer = self.resolver.query(&question, None).await?;
-
-        let outputs = match answer {
-            LookupAnswer::OutputList { outputs } => outputs,
-            _ => {
-                return Err(Error::IdentityError(
-                    "Failed to find revelation output".to_string(),
-                ))
-            }
-        };
-
-        if outputs.is_empty() {
-            return Err(Error::IdentityError(
-                "No revelation found for this certificate".to_string(),
-            ));
+        super::revoke::Revocation {
+            wallet: &self.wallet,
+            originator: self.originator(),
+            config: &self.config,
+            resolver: &self.resolver,
+            facilitator: self.broadcast_facilitator.clone(),
         }
-
-        let output = &outputs[0];
-
-        // Step 2: Parse BEEF to get the transaction
-        let beef = Beef::from_binary(&output.beef).map_err(|e| {
-            Error::IdentityError(format!("Failed to parse BEEF for revelation: {}", e))
-        })?;
-
-        // Get the transaction from BEEF
-        let tx = beef
-            .txs
-            .first()
-            .ok_or_else(|| Error::IdentityError("BEEF contains no transactions".to_string()))?;
-
-        let raw_tx = tx.raw_tx().ok_or_else(|| {
-            Error::IdentityError("Failed to get raw transaction from BEEF".to_string())
-        })?;
-
-        let txid = tx.txid();
-
-        // Get the locking script from the revelation output
-        let parsed_tx = parse_transaction(raw_tx)
-            .map_err(|e| Error::IdentityError(format!("Failed to parse transaction: {}", e)))?;
-
-        let output_index = self.config.output_index as usize;
-        if output_index >= parsed_tx.outputs.len() {
-            return Err(Error::IdentityError(format!(
-                "Output index {} out of range (tx has {} outputs)",
-                output_index,
-                parsed_tx.outputs.len()
-            )));
-        }
-
-        let locking_script = &parsed_tx.outputs[output_index].script;
-        let source_satoshis = parsed_tx.outputs[output_index].satoshis;
-
-        // Create the outpoint string
-        let outpoint_str = format!("{}.{}", txid, output_index);
-        let outpoint = Outpoint::from_string(&outpoint_str)?;
-
-        // Step 3: Create signable transaction with createAction (noSend=true):
-        // the reference's arguments and no others (`IdentityClient.ts:845-863`,
-        // #318): no label, no signAndProcess (the input has no unlocking
-        // script, so the wallet answers a signable transaction either way)
-        let create_result = self
-            .wallet
-            .create_action(
-                CreateActionArgs {
-                    description: "Spend certificate revelation token".to_string(),
-                    input_beef: Some(output.beef.clone()),
-                    inputs: Some(vec![CreateActionInput {
-                        outpoint,
-                        input_description: "Revelation token".to_string(),
-                        unlocking_script: None,
-                        unlocking_script_length: Some(74), // Signature length estimate
-                        sequence_number: None,
-                    }]),
-                    outputs: None, // No outputs - just spending
-                    lock_time: None,
-                    version: None,
-                    labels: None,
-                    options: Some(CreateActionOptions {
-                        randomize_outputs: Some(false),
-                        accept_delayed_broadcast: Some(false),
-                        no_send: Some(true),
-                        ..Default::default()
-                    }),
-                },
-                originator,
-            )
-            .await?;
-
-        // Get the signable transaction
-        let signable_tx = create_result.signable_transaction.ok_or_else(|| {
-            Error::IdentityError("createAction did not return a signable transaction".to_string())
-        })?;
-
-        // Step 4: Parse the partial transaction and compute sighash
-        let partial_tx = Transaction::from_beef(&signable_tx.tx, None).map_err(|e| {
-            Error::IdentityError(format!("Failed to parse signable transaction: {}", e))
-        })?;
-
-        let partial_raw = partial_tx.to_binary();
-        let partial_parsed = parse_transaction(&partial_raw).map_err(|e| {
-            Error::IdentityError(format!("Failed to parse partial transaction: {}", e))
-        })?;
-
-        // Compute the sighash preimage
-        let scope = SIGHASH_ALL | SIGHASH_FORKID;
-        let sighash_params = SighashParams {
-            version: partial_parsed.version,
-            inputs: &partial_parsed.inputs,
-            outputs: &partial_parsed.outputs,
-            locktime: partial_parsed.locktime,
-            input_index: 0, // We're signing the first (and only) input
-            subscript: locking_script,
-            satoshis: source_satoshis,
-            scope,
-        };
-
-        // The digest the node verifies: the dispatcher's (sha256d, BIP143 under FORKID)
-        let preimage_hash = crate::primitives::bsv::sighash::compute_sighash_dispatched_for_signing(
-            &sighash_params,
-        );
-
-        // Step 5: Sign using wallet.create_signature with "anyone" counterparty
-        let protocol =
-            Protocol::from_tuple((self.config.protocol_id.0, &self.config.protocol_id.1))
-                .ok_or_else(|| {
-                    Error::IdentityError(format!(
-                        "Invalid protocol ID: ({}, {})",
-                        self.config.protocol_id.0, self.config.protocol_id.1
-                    ))
-                })?;
-
-        let sig_result = self
-            .wallet
-            .create_signature(
-                CreateSignatureArgs {
-                    hash_to_directly_sign: Some(preimage_hash),
-                    protocol_id: protocol,
-                    key_id: self.config.key_id.clone(),
-                    counterparty: Some(Counterparty::Anyone),
-                    ..Default::default()
-                },
-                originator,
-            )
-            .await?;
-
-        // Parse the DER signature and create transaction signature with scope
-        let signature = Signature::from_der(&sig_result.signature)?;
-        let tx_sig = TransactionSignature::new(signature, scope);
-        let checksig_format = tx_sig.to_checksig_format();
-
-        // The unlocking script is just the signature push
-        let mut unlocking_script = Vec::new();
-        unlocking_script.push(checksig_format.len() as u8);
-        unlocking_script.extend_from_slice(&checksig_format);
-
-        // Step 6: Sign the action with the unlocking script
-        let mut spends = HashMap::new();
-        spends.insert(
-            0u32,
-            SignActionSpend {
-                unlocking_script,
-                sequence_number: None,
-            },
-        );
-
-        // The reference as createAction answered it, its base64 text, and
-        // `returnTXIDOnly: false` (`IdentityClient.ts:896-911`, #318)
-        let sign_result = self
-            .wallet
-            .sign_action(
-                SignActionArgs {
-                    spends,
-                    reference: to_base64(&signable_tx.reference),
-                    options: Some(SignActionOptions {
-                        accept_delayed_broadcast: Some(false),
-                        return_txid_only: Some(false),
-                        no_send: Some(true),
-                        send_with: None,
-                    }),
-                },
-                originator,
-            )
-            .await?;
-
-        // Get the signed transaction
-        let signed_tx_bytes = sign_result.tx.ok_or_else(|| {
-            Error::IdentityError("signAction did not return a transaction".to_string())
-        })?;
-
-        let signed_tx = Transaction::from_atomic_beef(&signed_tx_bytes).map_err(|e| {
-            Error::IdentityError(format!("Failed to parse signed transaction: {}", e))
-        })?;
-
-        // Step 7: Broadcast via TopicBroadcaster
-        let broadcaster = TopicBroadcaster::new(
-            vec!["tm_identity".to_string()],
-            TopicBroadcasterConfig {
-                network_preset: self.config.network_preset,
-                ..Default::default()
-            },
-        )?;
-
-        broadcaster.broadcast(&signed_tx).await.map_err(|e| {
-            Error::IdentityError(format!("Failed to broadcast revocation: {}", e.description))
-        })?;
-
-        Ok(())
+        .run(serial_number)
+        .await
     }
 
     // =========================================================================

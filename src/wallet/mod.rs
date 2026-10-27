@@ -115,6 +115,7 @@ pub mod interface;
 mod key_args;
 mod key_deriver;
 mod proto_wallet;
+mod review_actions;
 pub mod substrates;
 pub mod types;
 pub mod validation;
@@ -138,6 +139,7 @@ pub use proto_wallet::{
     RevealSpecificKeyLinkageArgs,
     RevealSpecificKeyLinkageResult as ProtoWalletRevealSpecificResult,
 };
+pub use review_actions::ReviewActionsRefusal;
 pub use types::{
     // Validation helpers
     validate_description,
