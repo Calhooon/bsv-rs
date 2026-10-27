@@ -7,6 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `Peer`'s client path verifies the initial response and general messages as the reference's `Peer` does: the nonce, the session, the pinned identity, the signature (#353)
+
+`Peer::start` installed a callback of its own (`src/auth/peer.rs:194-338`
+at `1cdd149`) that marked a session authenticated on any `initialResponse`
+without a check (`:258-275`) and handed any general message to the
+listeners without a session or a signature (`:298-307`); the verifying path,
+`handle_incoming_message`, was installed by `start_server` only. A client on
+`start` took its server's answers unproven: an initial response signed by
+anyone, from any identity, naming any nonce, authenticated a session, and a
+general message carrying anyone's key reached the listeners. Behind it,
+`initiate_handshake` dropped the identity it was given (`_identity_key`,
+`:704`); `process_initial_response_inner` checked the responder's nonce
+against the responder's key, which no wallet but the responder's can
+match, and continued on the failure ("Nonce verification is optional,
+continue anyway", `:857-874`); `process_general_message` looked its session
+up by the sender's key, verified no `yourNonce` and required no nonce
+(`:986-1013`).
+
+`start` now installs `handle_incoming_message` (`start_server` calls
+`start`), the one path of both roles, as the reference's `Peer` has one
+(`ts-stack@edf6e03` `packages/sdk/src/auth/Peer.ts:766-794`). An initial
+response is checked in the reference's order and words
+(`authenticateInitialResponse`, `:886-930`): its `yourNonce` one this
+peer's wallet made (`Initial response nonce verification failed from peer:
+<key>`), its session found by it (`Peer session not found for peer:
+<key>`), the responder the identity the handshake was asked for
+(`initialResponse identity does not match the requested peer identity.`),
+its signature (`Unable to verify initial response signature for peer:
+<key>`), its `initialNonce` present (`Initial response message nonce is
+required.`); a refusal reaches the waiting handshake, whose session is
+removed, as the reference removes it (`:658-664`). A general message
+(`processGeneralMessage`, `:1270-1314`): its `yourNonce` (`Unable to verify
+nonce for general message from: <key>`), its session found by it (`Session
+not found for nonce: <nonce>`), the session's peer the sender (`Peer
+identity is not established for general message.`, `general identity does
+not match the authenticated session.`, `:745-759`), its signature (`Invalid
+signature in generalMessage from <key>`), its nonce (`General message nonce
+is required.`) and the session's (`Session nonce is required for general
+messages`); the session is then marked authenticated and a listener's
+error is the message's, as the reference's are (`:1315`, `:1329-1331`).
+`initiate_handshake` pins the session to the identity key it is given and
+refuses a string that is not one (`PublicKey::from_hex`'s error, before a
+nonce is made). A wallet whose verify call refuses a miss
+(`ProtoWallet`'s `Signature is not valid`) refuses in its own words before
+the Peer's, on both sides.
+
+Migration: a client on `start` that accepted unsigned or unproven answers
+now refuses them: an initial response from another identity than the one
+asked for, or not signed over the two nonces, fails the handshake; a
+general message (over `SimplifiedFetchTransport`, an HTTP response) without
+the server's signature, its nonce and the client's `yourNonce` is refused
+and the request returns the error. A server that signs its responses, as
+the reference's middleware does, is unaffected. A peer on `start` now
+answers an initial request, as one on `start_server` did. `start_server`
+keeps its signature. `get_authenticated_session`, `to_peer` and
+`request_certificates` given a string that is not an identity key and
+names no authenticated session now refuse it rather than handshaking with
+whoever answers. The toolbox's storage client (`bsv-wallet-toolbox-rs`,
+`src/storage/client/storage_client.rs:293-303`) runs on `start`, so its
+server's answers are now proven. Its `verify_responses` (`:263`, `:313`,
+`:347-348`) is the toolbox's field, not this crate's: set and never read
+there, it meant nothing before this change and the `Peer` verifies
+whatever it says after it; nothing in this crate is named by it, and its
+removal is the toolbox's.
+
+Pinned by `tests/auth_peer_client_verifies_353.rs` (8 tests) on
+`tests/vectors/auth_peer_client_verifies_353.json`, recorded by
+`tests/support/auth_peer_client_verifies_353.mjs` at `ts-stack@edf6e03`
+under Node v22.18.0: a reference client `Peer` (scalar 41) pinned to its
+server (42) given an initial response forged at one field (a wrong
+signature, mallory's (43) identity, a `yourNonce` not its own) and, after
+an honest handshake, a general message forged at one field (a wrong
+`yourNonce`, no nonce, mallory's signature, mallory's identity), each
+verdict recorded with the client on a `ProtoWallet` and on a wallet
+answering `{ valid: false }` where `ProtoWallet` throws. Here each case
+runs over an in-process transport whose deliveries go through the callback
+`start` installs: every forgery refused, the listener not called, no
+session authenticated, in the reference's words save three stated below;
+the honest response and message accepted; a handshake pinned to mallory
+refused with its session gone; two peers both on `start` handshaking and
+exchanging three messages each way. 5 of 8 red on the tree before the fix
+(a scratch copy of `1cdd149` with the file added; the honest cases and the
+vector's check pass on both). `auth_integration_tests.rs`'s TS-style
+response and `auth_peer_e2e_tests.rs`'s session-less general message now
+carry a nonce the receiving wallet made, the nonce being checked first.
+
+### Notes: cross-SDK parity (#353)
+
+The verdicts are the reference's; three words are not. The reference's
+`verifyNonce` asks its wallet's `verifyHmac` (`verifyNonce.ts:44-53`),
+which a `ProtoWallet` throws on (`HMAC is not valid`) before the Peer's
+words; this crate's `verify_nonce` recomputes the HMAC with `create_hmac`
+(it compares the 16 bytes a legacy 32-byte nonce keeps) and so reaches the
+Peer's words on the initial response and the general message. The
+reference's message snapshot refuses a general message without a nonce
+(`general.nonce must be canonical base64.`, `snapshotAuthMessage`,
+`Peer.ts:767`) before its Peer's `General message nonce is required.`;
+this crate has no snapshot, and the Peer's check refuses it. Two of the
+reference's checks are not here, each its own finding: the replay claim of
+every message nonce (`#claimIncomingMessageNonce`, `:258-272`; Go's
+`claimMessageNonce`), and the `yourNonce` and identity checks of a
+certificate request and response (`:1044-1068`, `:1177-1200`), which here
+still find their session by the sender's key and verify its signature.
+
+Go's `Peer` (`go-sdk@2ca481c` `auth/peer.go`) verifies an initial
+response's `yourNonce` against its own wallet (`ErrInvalidNonce`,
+`:624-631`), finds the session by it (`ErrSessionNotFound`, `:633-636`),
+verifies the signature over the two nonces (`initial response -
+invalid-signature`) and claims the responder's nonce (`:675`), but does
+not compare the responder with the identity `initiateHandshake` stored
+(`:344`): it overwrites it with the message's (`:680`), so a Go client
+pinned to one key accepts another's signed response. Its general message:
+`yourNonce` (`:991-998`), the session by it (`:1003-1006`), the session
+authenticated (`ErrNotAuthenticated`, `:1009-1011`, a check the reference
+does not make and this crate no longer makes: the reference marks the
+session authenticated after the signature), the signature over the payload
+under `<nonce> <sessionNonce>`, the nonce required and claimed (`:1041`).
+The comment this fix removes, that Go and TS let a failed nonce pass, was
+wrong of both: each refuses it, and the nonce it checked here was the
+responder's, which neither checks.
+
 ### Changed: `WalletInterface` takes `originator: Option<&str>`, the reference's optional, so an absent originator and an empty one are two values (#329)
 
 `WalletInterface`'s 28 methods took `originator: &str`, so an absent
