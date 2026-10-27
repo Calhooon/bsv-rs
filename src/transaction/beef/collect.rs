@@ -185,7 +185,7 @@ impl Beef {
 
 /// A streamed BUMP as the in-memory [`MerklePath`] ([`Bump::in_memory`]):
 /// each level's leaves by offset, a height above a `u32` refused. Through
-/// 0.9.0 the height was cut to its low 32 bits and the root keyed there.
+/// 0.8.3 the height was cut to its low 32 bits and the root keyed there.
 fn in_memory_bump(bump: &Bump) -> Result<MerklePath> {
     bump.in_memory().map_err(|r| refusal_error(&r))
 }

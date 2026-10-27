@@ -496,7 +496,7 @@ mod tests {
         assert!(beef_tx.input_txids.is_empty());
     }
 
-    /// Through 0.9.0 the reader computed an unproven entry's input txids
+    /// Through 0.8.3 the reader computed an unproven entry's input txids
     /// twice (`from_raw_tx`, then again once the parse was set) and kept
     /// both: `input_txids` named each parent twice, and
     /// `SortResult::missing_inputs` a missing parent twice. So did a second

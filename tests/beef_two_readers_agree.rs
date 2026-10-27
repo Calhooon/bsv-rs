@@ -326,7 +326,7 @@ fn above_u32_height() -> Vec<u8> {
     bytes
 }
 
-/// Through 0.9.0 the whole path cut a BUMP's height to its low 32 bits
+/// Through 0.8.3 the whole path cut a BUMP's height to its low 32 bits
 /// (`as u32`) and keyed the root at height 0 here; the stream reads the
 /// height whole. The in-memory height is a `u32`, so the parse refuses the
 /// BUMP as the stream refuses it under a chain's headers.
@@ -550,7 +550,7 @@ fn the_bump_the_repeats_are_built_on_is_valid_on_both_paths() {
 }
 
 /// Level 0 carries the txid's sibling twice, the same hash: through the
-/// lane's draft both paths read the earlier leaf and accepted it (0.9.0's
+/// lane's draft both paths read the earlier leaf and accepted it (0.8.3's
 /// whole reader refused it, `Duplicate offset`; so does the reference,
 /// `MerklePath.ts:221`).
 #[test]

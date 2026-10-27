@@ -284,8 +284,8 @@ fn each_shape_is_the_bytes_this_crates_writer_and_the_reference_write() {
 /// the working hash's sibling pairs it with itself (at levels 0, 1 and 2,
 /// and beside a second txid whose path finds the node over it carried); a
 /// node computed from it, as a left child or under a right child, is
-/// `LeftDuplicateBelow` at the node the walk needed. Through 0.9.0's
-/// re-read every shape was refused `BadFlag { byte: 1 }` at the flag.
+/// `LeftDuplicateBelow` at the node the walk needed. Through 0.9.0-beta.1, until the
+/// re-read of 2026-10-26, every shape was refused `BadFlag { byte: 1 }` at the flag.
 #[test]
 fn an_even_offset_duplicate_reads_as_the_reference_reads_it() {
     let v = vectors();
