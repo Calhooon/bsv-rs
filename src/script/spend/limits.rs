@@ -31,9 +31,9 @@ impl Spend {
     /// `Spend` is without a `memoryLimit` (`Number.POSITIVE_INFINITY`,
     /// `ts-stack@edf6e03` `Spend.ts:295-296`; bsv-rs#331), an allocation the
     /// allocator refuses a decline, the 1 GiB element bound held at a push,
-    /// `OP_CAT`, `OP_NUM2BIN` and `OP_LSHIFTNUM` and not at an arithmetic
-    /// result (`push_number`, unbounded as the reference's, `BigNumber`
-    /// allocating infallibly), and a memory budget bounds memory, never time
+    /// `OP_CAT`, `OP_NUM2BIN` and `OP_LSHIFTNUM`, and at an arithmetic result
+    /// a decline judged before `BigNumber` allocates it (bsv-rs#374,
+    /// `arithmetic_room.rs`), and a memory budget bounds memory, never time
     /// (`work_limit` does); a caller that wants a figure passes it
     /// (`Some(32_000_000)` was `None`'s); under a word, 100,000,000 bytes on the node's count,
     /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`](crate::script::flags::STACK_ELEMENT_OVERHEAD) bytes per

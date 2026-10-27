@@ -56,6 +56,20 @@ impl Spend {
             .map_err(|e| self.error(&format!("Invalid script number: {}", e)))
     }
 
+    /// [`read_number`](Self::read_number)'s verdicts without the decode, so a
+    /// guard can judge the operands' bytes before anything is allocated
+    /// (bsv-rs#374): a non-minimal encoding is the read's own refusal, which
+    /// `ScriptNum::from_bytes` makes before it copies a byte.
+    pub(super) fn check_number(&self, bytes: &[u8]) -> Result<(), ScriptEvaluationError> {
+        if self.require_minimal && !ScriptNum::is_minimally_encoded(bytes) {
+            return self.read_number(bytes).map(drop);
+        }
+        match self.max_script_num_length() {
+            Some(max) if bytes.len() > max => Err(self.overflow_error(bytes.len(), max)),
+            _ => Ok(()),
+        }
+    }
+
     /// A script number read under the limit in force
     /// ([`max_script_num_length`](Self::max_script_num_length)).
     pub(super) fn read_number(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
@@ -75,7 +89,14 @@ impl Spend {
     /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
     /// `301-315`).
     pub(super) fn push_number(&mut self, value: &BigNumber) -> Result<(), ScriptEvaluationError> {
-        let bytes = ScriptNum::to_bytes(value);
+        self.push_encoded_number(ScriptNum::to_bytes(value))
+    }
+
+    /// [`push_number`](Self::push_number) of a number already encoded.
+    pub(super) fn push_encoded_number(
+        &mut self,
+        bytes: Vec<u8>,
+    ) -> Result<(), ScriptEvaluationError> {
         if let Some(max) = self.max_script_num_length() {
             if bytes.len() > max {
                 return Err(self.overflow_error(bytes.len(), max));

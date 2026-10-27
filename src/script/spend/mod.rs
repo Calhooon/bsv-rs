@@ -104,6 +104,7 @@ use crate::primitives::to_hex;
 use std::sync::Arc;
 
 mod arithmetic;
+mod arithmetic_room;
 mod bitwise;
 mod crypto;
 mod flow;
