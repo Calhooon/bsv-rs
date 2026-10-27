@@ -25,6 +25,7 @@ impl Spend {
             )));
         }
         let buf = self.pop_stack()?;
+        self.arithmetic_room(opcode, &[&buf])?;
         let mut bn = self.read_number(&buf)?;
 
         bn = match opcode {
@@ -50,14 +51,14 @@ impl Spend {
             }
             _ => bn,
         };
-        self.push_number(&bn)?;
-        Ok(())
+        self.push_arithmetic_result(opcode, &[&buf], &bn)
     }
 
     pub(super) fn op_binary_number(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         self.require_two_items(opcode, "OP")?;
         let buf2 = self.pop_stack()?;
         let buf1 = self.pop_stack()?;
+        self.arithmetic_room(opcode, &[&buf1, &buf2])?;
         let bn1 = self.read_number(&buf1)?;
         let bn2 = self.read_number(&buf2)?;
 
@@ -85,24 +86,12 @@ impl Spend {
             OP_GREATERTHAN => truth(bn1 > bn2),
             OP_LESSTHANOREQUAL => truth(bn1 <= bn2),
             OP_GREATERTHANOREQUAL => truth(bn1 >= bn2),
-            OP_MIN => {
-                if bn1 < bn2 {
-                    bn1
-                } else {
-                    bn2
-                }
-            }
-            OP_MAX => {
-                if bn1 > bn2 {
-                    bn1
-                } else {
-                    bn2
-                }
-            }
+            OP_MIN => bn1.min(bn2),
+            OP_MAX => bn1.max(bn2),
             _ => BigNumber::zero(),
         };
 
-        self.push_number(&result)?;
+        self.push_arithmetic_result(opcode, &[&buf1, &buf2], &result)?;
 
         if opcode == OP_NUMEQUALVERIFY {
             if !ScriptNum::cast_to_bool(self.stack_top()?) {
