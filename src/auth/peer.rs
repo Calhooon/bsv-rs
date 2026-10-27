@@ -27,7 +27,7 @@ use rand::RngCore;
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tokio::sync::{oneshot, RwLock};
 
@@ -99,6 +99,15 @@ pub type CertificateRequestCallback = Box<
         + Sync,
 >;
 
+/// A Peer's hold on its transport: strong for the Peer, weak for the Peer the
+/// transport's callback owns, so the callback keeps neither the transport nor
+/// the Peer's state alive after the Peer is dropped, as the reference's `Peer`
+/// holds no reference to itself (#353).
+enum TransportHold<T> {
+    Owned(Arc<T>),
+    Callback(Weak<T>),
+}
+
 /// Configuration options for creating a Peer.
 pub struct PeerOptions<W: WalletInterface, T: Transport> {
     /// Wallet for cryptographic operations.
@@ -145,7 +154,7 @@ pub struct PeerOptions<W: WalletInterface, T: Transport> {
 /// ```
 pub struct Peer<W: WalletInterface, T: Transport> {
     wallet: Arc<W>,
-    transport: Arc<T>,
+    transport: TransportHold<T>,
     session_manager: Arc<RwLock<SessionManager>>,
     certificates_to_request: Option<RequestedCertificateSet>,
 
@@ -175,7 +184,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     pub fn new(options: PeerOptions<W, T>) -> Self {
         Self {
             wallet: Arc::new(options.wallet),
-            transport: Arc::new(options.transport),
+            transport: TransportHold::Owned(Arc::new(options.transport)),
             session_manager: Arc::new(RwLock::new(options.session_manager.unwrap_or_default())),
             certificates_to_request: options.certificates_to_request,
             general_message_callbacks: Arc::new(RwLock::new(HashMap::new())),
@@ -196,8 +205,11 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     /// are verified as a server's are (#353): the nonce it echoes, its session,
     /// the pinned identity and the signature; an initial request is answered.
     pub fn start(&self) {
+        let Ok(transport) = self.transport() else {
+            return;
+        };
         let peer = Arc::new(self.share());
-        self.transport.set_callback(Box::new(move |message| {
+        transport.set_callback(Box::new(move |message| {
             let peer = Arc::clone(&peer);
             Box::pin(async move { peer.handle_incoming_message(message).await })
         }));
@@ -209,12 +221,17 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         self.start();
     }
 
-    /// A Peer over the same wallet, transport, sessions, callbacks and pending
-    /// handshakes, for the transport callback to own.
+    /// A Peer over the same wallet, sessions, callbacks and pending handshakes,
+    /// for the transport callback to own; the transport held weakly, so no
+    /// cycle runs through the callback (a dropped Peer is freed).
     fn share(&self) -> Self {
+        let transport = match &self.transport {
+            TransportHold::Owned(transport) => Arc::downgrade(transport),
+            TransportHold::Callback(transport) => Weak::clone(transport),
+        };
         Self {
             wallet: Arc::clone(&self.wallet),
-            transport: Arc::clone(&self.transport),
+            transport: TransportHold::Callback(transport),
             session_manager: Arc::clone(&self.session_manager),
             certificates_to_request: self.certificates_to_request.clone(),
             general_message_callbacks: Arc::clone(&self.general_message_callbacks),
@@ -265,7 +282,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         self.sign_message(&mut msg, &session).await?;
 
         // Send
-        self.transport.send(&msg).await?;
+        self.transport()?.send(&msg).await?;
 
         Ok(())
     }
@@ -323,7 +340,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         msg.set_requested_certificates(requested);
 
         self.sign_message(&mut msg, &session).await?;
-        self.transport.send(&msg).await
+        self.transport()?.send(&msg).await
     }
 
     /// Sends certificates to a peer.
@@ -355,7 +372,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         msg.set_certificates(certificates);
 
         self.sign_message(&mut msg, &session).await?;
-        self.transport.send(&msg).await
+        self.transport()?.send(&msg).await
     }
 
     /// Registers a listener for general messages.
@@ -502,6 +519,16 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     // Private methods
     // ========================================================================
 
+    /// The transport, while the Peer that owns it lives.
+    fn transport(&self) -> Result<Arc<T>> {
+        match &self.transport {
+            TransportHold::Owned(transport) => Ok(Arc::clone(transport)),
+            TransportHold::Callback(transport) => transport
+                .upgrade()
+                .ok_or_else(|| Error::AuthError("Peer has been dropped".into())),
+        }
+    }
+
     /// This peer's own policy, refused where the reference snapshots it
     /// (`Peer.ts:332`, `:630`, `:811`; its construction-time refusal, `:158`,
     /// made here since `new` cannot fail; #294)
@@ -584,6 +611,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // initial response refused if another answers (`:903-908`; #353)
         let pinned = identity_key.map(PublicKey::from_hex).transpose()?;
         let my_identity = self.get_identity_key().await?;
+        let transport = self.transport()?;
 
         // Create session with new nonce
         let session_nonce = create_nonce(&*self.wallet, None, self.originator.as_deref()).await?;
@@ -614,7 +642,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         // Send the request and wait for the response; a failed handshake's
         // session removed, as the reference does (`Peer.ts:658-664`)
         let timeout = max_wait_time.unwrap_or(30000);
-        let result = match self.transport.send(&msg).await {
+        let result = match transport.send(&msg).await {
             Ok(()) => wait_with_timeout(rx, timeout)
                 .await
                 .and_then(|r| r.map_err(|_| Error::AuthError("Handshake cancelled".into())))
@@ -665,7 +693,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         self.sign_message(&mut response, &session).await?;
 
         // Send response
-        self.transport.send(&response).await?;
+        self.transport()?.send(&response).await?;
 
         // If peer requested certificates, try to provide them
         if let Some(ref req) = message.requested_certificates {

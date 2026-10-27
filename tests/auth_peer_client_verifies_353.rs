@@ -535,3 +535,71 @@ async fn a_handshake_named_by_a_string_that_is_no_identity_key_is_refused_353() 
     ));
     assert!(client.peer.session_manager().read().await.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// A dropped Peer is freed: the callback `start` installs in the transport
+// holds no strong reference back to it (the #353 review's F1)
+// ---------------------------------------------------------------------------
+
+/// A transport holding a marker: the marker's count says whether the
+/// transport (and the callback in it) outlived its Peer
+struct Held {
+    _marker: Arc<()>,
+    callback: Mutex<Option<Box<TransportCallback>>>,
+}
+
+#[async_trait]
+impl Transport for Held {
+    async fn send(&self, _message: &AuthMessage) -> Result<()> {
+        Ok(())
+    }
+
+    fn set_callback(&self, callback: Box<TransportCallback>) {
+        *self.callback.lock().unwrap() = Some(callback);
+    }
+
+    fn clear_callback(&self) {
+        *self.callback.lock().unwrap() = None;
+    }
+}
+
+fn held_peer(marker: &Arc<()>) -> Peer<ProtoWallet, Held> {
+    Peer::new(PeerOptions {
+        wallet: ProtoWallet::new(Some(client_key())),
+        transport: Held {
+            _marker: marker.clone(),
+            callback: Mutex::new(None),
+        },
+        certificates_to_request: None,
+        session_manager: None,
+        auto_persist_last_session: false,
+        originator: Some("test".into()),
+    })
+}
+
+#[test]
+fn a_dropped_peer_on_start_frees_its_transport_353() {
+    let marker = Arc::new(());
+    let peer = held_peer(&marker);
+    peer.start();
+    assert_eq!(Arc::strong_count(&marker), 2);
+    drop(peer);
+    assert_eq!(
+        Arc::strong_count(&marker),
+        1,
+        "the transport outlives its Peer"
+    );
+}
+
+#[test]
+fn a_dropped_peer_on_start_server_frees_its_transport_353() {
+    let marker = Arc::new(());
+    let peer = Arc::new(held_peer(&marker));
+    peer.start_server();
+    drop(peer);
+    assert_eq!(
+        Arc::strong_count(&marker),
+        1,
+        "the transport outlives its Peer"
+    );
+}
