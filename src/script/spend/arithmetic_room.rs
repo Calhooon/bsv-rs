@@ -61,14 +61,15 @@ const STEP_PEAK_MUL: u64 = 6;
 const STEP_PEAK_DIV: u64 = 12;
 
 impl Spend {
-    /// Room for `opcode`'s result on `operands` (in the order the opcode reads
-    /// them), before any is decoded.
+    /// Room for `opcode`'s result on `operands` (in stack order, the deepest
+    /// first), before any is decoded; their encodings judged from the top, as
+    /// the reference reads them (`bn2` first, `Spend.ts:1560-1561`).
     pub(super) fn arithmetic_room(
         &self,
         opcode: u8,
         operands: &[&[u8]],
     ) -> Result<(), ScriptEvaluationError> {
-        for operand in operands {
+        for operand in operands.iter().rev() {
             self.check_number(operand)?;
         }
         let bits: Vec<u64> = operands.iter().map(|o| magnitude_bits(o)).collect();
@@ -89,12 +90,14 @@ impl Spend {
 
     /// Room for a step outside the arithmetic opcodes that allocates at most
     /// `len` bytes past its operands (a number's read, a numeric shift's
-    /// result and its encoding), asked of the allocator first: its refusal is
-    /// [`allocation_declined`](Self::allocation_declined), never an abort.
-    pub(super) fn number_room(&self, len: u64) -> Result<(), ScriptEvaluationError> {
+    /// result and its encoding), asked of the allocator first, the step
+    /// holding `in_hand` bytes off the stacks: its refusal is
+    /// [`allocation_declined_holding`](Self::allocation_declined_holding),
+    /// never an abort.
+    pub(super) fn number_room(&self, in_hand: u64, len: u64) -> Result<(), ScriptEvaluationError> {
         if len >= RESERVATION_FLOOR {
             let room = usize::try_from(len).unwrap_or(usize::MAX);
-            reserve(room).map_err(|_| self.allocation_declined(room))?;
+            reserve(room).map_err(|_| self.allocation_declined_holding(in_hand, room))?;
         }
         Ok(())
     }
@@ -108,9 +111,9 @@ impl Spend {
         operands: &[usize],
         value: &BigNumber,
     ) -> Result<(), ScriptEvaluationError> {
-        let bytes = ScriptNum::try_to_bytes(value).map_err(|_| {
-            self.allocation_declined(encoded_len(value.as_bigint().bits()) as usize)
-        })?;
+        let len = encoded_len(value.as_bigint().bits());
+        let bytes = ScriptNum::try_to_bytes(value)
+            .map_err(|_| self.allocation_declined_holding(len, len as usize))?;
         if self.flags.is_none() && bytes.len() > element_bound() {
             let len = bytes.len() as u64;
             return Err(self.result_declined(opcode, operands, len, ""));
@@ -147,7 +150,9 @@ impl Spend {
     /// [`allocation_declined`](Self::allocation_declined)'s limit, with the
     /// opcode and the sizes.
     fn room_refused(&self, opcode: u8, operands: &[usize], len: u64) -> ScriptEvaluationError {
-        let declined = self.allocation_declined(usize::try_from(len).unwrap_or(usize::MAX));
+        let in_hand = operands.iter().map(|&o| o as u64).sum();
+        let declined =
+            self.allocation_declined_holding(in_hand, usize::try_from(len).unwrap_or(usize::MAX));
         let name = opcode_to_name(opcode).unwrap_or("OP");
         let message = format!(
             "{}: the allocator refused the {len} bytes {name}'s step may need, from {}.",

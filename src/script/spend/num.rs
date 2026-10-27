@@ -42,9 +42,12 @@ impl Spend {
     /// test precedes the decode and the minimal-encoding check, as on the
     /// reference (`script_num.cpp:62-68`; `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`,
     /// `interpreter.cpp:1807-1810`).
+    /// `bytes` are popped and held off the stacks with `others` more bytes of
+    /// the step's (its other operands), counted in an allocator's decline.
     pub(super) fn read_number_within(
         &self,
         bytes: &[u8],
+        others: u64,
         limit: Option<usize>,
     ) -> Result<BigNumber, ScriptEvaluationError> {
         if let Some(max) = limit {
@@ -56,7 +59,7 @@ impl Spend {
         // the digits, at most 7 bytes past the operand's, and a non-minimal
         // operand's shrink half again, asked first (bsv-rs#374)
         let len = bytes.len() as u64;
-        self.number_room(len + len / 2 + 8)?;
+        self.number_room(len + others, len + len / 2 + 8)?;
         ScriptNum::from_bytes(bytes, self.require_minimal)
             .map_err(|e| self.error(&format!("Invalid script number: {}", e)))
     }
@@ -94,7 +97,17 @@ impl Spend {
     /// A script number read under the limit in force
     /// ([`max_script_num_length`](Self::max_script_num_length)).
     pub(super) fn read_number(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
-        self.read_number_within(bytes, self.max_script_num_length())
+        self.read_number_holding(bytes, 0)
+    }
+
+    /// [`read_number`](Self::read_number) while the step holds `others` bytes
+    /// off the stacks beside `bytes` (a binary opcode's other operand).
+    pub(super) fn read_number_holding(
+        &self,
+        bytes: &[u8],
+        others: u64,
+    ) -> Result<BigNumber, ScriptEvaluationError> {
+        self.read_number_within(bytes, others, self.max_script_num_length())
     }
 
     /// `OP_CHECKMULTISIG`'s two counts: 4-byte numbers in every era
@@ -102,7 +115,7 @@ impl Spend {
     /// `1550-1552`) under a word; the default mode reads them as the
     /// TypeScript SDK does.
     pub(super) fn read_count(&self, bytes: &[u8]) -> Result<BigNumber, ScriptEvaluationError> {
-        self.read_number_within(bytes, self.flags.map(|_| 4))
+        self.read_number_within(bytes, 0, self.flags.map(|_| 4))
     }
 
     /// Pushes a computed number, refusing one longer than the limit in force
@@ -110,8 +123,9 @@ impl Spend {
     /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
     /// `301-315`).
     pub(super) fn push_number(&mut self, value: &BigNumber) -> Result<(), ScriptEvaluationError> {
+        let len = value.byte_length() + 1;
         let bytes = ScriptNum::try_to_bytes(value)
-            .map_err(|_| self.allocation_declined(value.byte_length() + 1))?;
+            .map_err(|_| self.allocation_declined_holding(len as u64, len))?;
         self.push_encoded_number(bytes)
     }
 

@@ -47,8 +47,11 @@ word.
   splices, `OP_NUM2BIN`, the byte shifts) is allocated with
   `try_reserve`, and so is each stack's growth: one the allocator refuses
   is a decline, `ScriptResource::Stack` with `limit` the bytes both stacks
-  held and `attempted` those and the size asked (`Stack memory usage has
-  exceeded N bytes`). `OP_INVERT`, `OP_AND`, `OP_OR`, `OP_XOR` work in
+  held and those the step holds off them (its popped operands: `OP_CAT`'s
+  two, `OP_SPLIT`'s and the splices' data, a number being read or encoded;
+  the re-review of the third fold: a step's operands were left out, and a
+  decline beside 600 MiB of them said `exceeded 0 bytes`) and `attempted`
+  those and the size asked (`Stack memory usage has exceeded N bytes`). `OP_INVERT`, `OP_AND`, `OP_OR`, `OP_XOR` work in
   place, allocating nothing. An error's copy of the stacks is made the same
   way, left empty if refused. A step no longer clones its chunk: the
   parsed scripts are shared (`Arc<[ScriptChunk]>`) and indexed in place,
@@ -72,7 +75,10 @@ word.
   wrapped below the budget). It now holds at every arithmetic result too,
   as a decline (`src/script/spend/arithmetic_room.rs`): before an operand
   is decoded its encoding is judged as the read judges it (the read's
-  verdicts first, as the reference reads both operands first), then a
+  verdicts first, as the reference reads both operands first, the top one
+  first, `bn2` before `bn1` (`Spend.ts:1560-1561`; the re-review of the third
+  fold: this crate judged the deeper first, so of two bad operands it named
+  the other; `OP_WITHIN` reads each operand as it pops it, `:1628-1630`)), then a
   result whose least possible length passes the bound is declined from the
   operands' bytes alone. Only `OP_MUL`'s result can pass its operands by
   more than a byte (at least `a + b - 1` bits for magnitudes of `a` and `b`
@@ -114,9 +120,13 @@ word.
   fallibly. The decline keeps its form, the step named where the result
   was: `Stack memory usage has exceeded H bytes: the allocator refused the
   N bytes OP_MUL's step may need, from operands of A and B bytes.`
-  (`limit` the bytes both stacks hold, as the other allocator declines; a
-  read or a shift the bare `Stack memory usage has exceeded H bytes`). On
-  the review's allocator refusing past 4 GiB (its harness, this tip): the
+  (`limit` the bytes the evaluation held when the allocator refused: both
+  stacks and what the step holds off them, its operands, the number it is
+  encoding; a read or a shift the bare `Stack memory usage has exceeded H
+  bytes`). On the review's allocator refusing past 4 GiB (its harness, at
+  the probe's commit, `d94a70b3` on `bb80a525`, `f92e2b4a` before the
+  rebase; from the read limit's commit on all three are `Invalid string
+  length` at the read, below): the
   sum of two 2^29-byte operands and `OP_1ADD` of 2^30 - 16 bytes are
   computed (`Ok(true)`, 1.3 s and 1.4 s, 2.1 GB resident), `OP_MUL` of two
   300 MiB operands is declined at 3,774,873,600 bytes; before this fold all

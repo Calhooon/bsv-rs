@@ -300,7 +300,7 @@ mode `None` is uncapped, as the reference's `Spend` is (`Spend.ts:295-296` at `e
 #331, the keeper's ruling of 2026-10-27; 32 MB until then), and `Some(n)` is `n` bytes for
 each stack apart, the bytes alone (`Transaction::verify` passes the caller's budget, its
 third parameter). Uncapped, an element the allocator refuses is a decline, its limit the
-bytes both stacks held, every element allocated fallibly; the 1 GiB element bound holds at
+bytes both stacks held and those the step holds off them (its popped operands), every element allocated fallibly; the 1 GiB element bound holds at
 a push, `OP_CAT`, `OP_NUM2BIN` and the numeric left shift, and at an arithmetic result as a
 decline (#374, `arithmetic_room.rs`): `BigNumber` allocates infallibly, so before an operand
 is decoded a result whose least length passes the bound (only `OP_MUL`'s can pass its

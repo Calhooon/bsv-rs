@@ -170,7 +170,7 @@ fn an_allocation_the_allocator_refuses_is_a_decline_not_an_abort() {
     });
     spend.push_stack(vec![0x01; 7]).unwrap();
     let asked = isize::MAX as usize + 1;
-    let declined = spend.zeroed_element(asked).unwrap_err();
+    let declined = spend.zeroed_element(0, asked).unwrap_err();
     assert_eq!(
         declined.resource_limit,
         Some(super::super::evaluation_error::ScriptResourceLimit {

@@ -175,7 +175,22 @@ impl Spend {
     /// failure (a `RangeError` from the JavaScript engine) propagates out of
     /// its `Transaction.verify` as neither verdict.
     pub(super) fn allocation_declined(&self, len: usize) -> ScriptEvaluationError {
-        let held = (self.stack_mem as u64).saturating_add(self.alt_stack_mem as u64);
+        self.allocation_declined_holding(0, len)
+    }
+
+    /// [`allocation_declined`](Self::allocation_declined) of a step that holds
+    /// `in_hand` bytes off the stacks (its popped operands, a number it is
+    /// reading or encoding): `limit` counts them with both stacks, so a
+    /// decline beside 600 MiB of operands does not say `exceeded 0 bytes`
+    /// (the re-review of PR #370's third fold).
+    pub(super) fn allocation_declined_holding(
+        &self,
+        in_hand: u64,
+        len: usize,
+    ) -> ScriptEvaluationError {
+        let held = (self.stack_mem as u64)
+            .saturating_add(self.alt_stack_mem as u64)
+            .saturating_add(in_hand);
         let limit = ScriptResourceLimit {
             resource: ScriptResource::Stack,
             limit: held,
@@ -189,25 +204,42 @@ impl Spend {
     /// ([`allocation_declined`](Self::allocation_declined)).
     pub(super) fn element_with_capacity(
         &self,
+        in_hand: u64,
         len: usize,
     ) -> Result<Vec<u8>, ScriptEvaluationError> {
         let mut element = Vec::new();
         element
             .try_reserve_exact(len)
-            .map_err(|_| self.allocation_declined(len))?;
+            .map_err(|_| self.allocation_declined_holding(in_hand, len))?;
         Ok(element)
     }
 
-    /// A copy of `bytes` for the stack, or the allocator's decline.
+    /// A copy of `bytes` for the stack, or the allocator's decline; `bytes`
+    /// still on a stack.
     pub(super) fn copy_element(&self, bytes: &[u8]) -> Result<Vec<u8>, ScriptEvaluationError> {
-        let mut element = self.element_with_capacity(bytes.len())?;
+        self.copy_element_holding(0, bytes)
+    }
+
+    /// [`copy_element`](Self::copy_element) while the step holds `in_hand`
+    /// bytes off the stacks (`bytes` among them when popped).
+    pub(super) fn copy_element_holding(
+        &self,
+        in_hand: u64,
+        bytes: &[u8],
+    ) -> Result<Vec<u8>, ScriptEvaluationError> {
+        let mut element = self.element_with_capacity(in_hand, bytes.len())?;
         element.extend_from_slice(bytes);
         Ok(element)
     }
 
-    /// `len` zero bytes for the stack, or the allocator's decline.
-    pub(super) fn zeroed_element(&self, len: usize) -> Result<Vec<u8>, ScriptEvaluationError> {
-        let mut element = self.element_with_capacity(len)?;
+    /// `len` zero bytes for the stack while the step holds `in_hand` bytes
+    /// off the stacks, or the allocator's decline.
+    pub(super) fn zeroed_element(
+        &self,
+        in_hand: u64,
+        len: usize,
+    ) -> Result<Vec<u8>, ScriptEvaluationError> {
+        let mut element = self.element_with_capacity(in_hand, len)?;
         element.resize(len, 0);
         Ok(element)
     }

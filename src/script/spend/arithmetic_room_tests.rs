@@ -183,15 +183,17 @@ fn under_ceiling(
 }
 
 /// The decline of a step the modelled allocator refused: no budget's limit,
-/// the step's bytes attempted.
-fn refused(result: Result<bool, ScriptEvaluationError>, attempted: u64) -> String {
+/// `held` the bytes the evaluation held (both stacks and the step's operands
+/// off them; `0` before the re-review of PR #370's third fold, whatever the
+/// step held), the step's bytes past them attempted.
+fn refused(result: Result<bool, ScriptEvaluationError>, held: u64, asked: u64) -> String {
     let (message, limit) = declined(result);
     assert_eq!(
         limit,
         ScriptResourceLimit {
             resource: ScriptResource::Stack,
-            limit: 0,
-            attempted,
+            limit: held,
+            attempted: held + asked,
             work_spent: None,
         }
     );
@@ -211,11 +213,12 @@ fn a_product_whose_step_passes_the_allocators_ceiling_is_declined() {
             &[widest(40_000), widest(40_000)],
             &then_true(OP_MUL),
         ),
+        80_000,
         480_000,
     );
     assert_eq!(
         message,
-        "Stack memory usage has exceeded 0 bytes: the allocator refused the 480000 bytes OP_MUL's step may need, from operands of 40000 and 40000 bytes."
+        "Stack memory usage has exceeded 80000 bytes: the allocator refused the 480000 bytes OP_MUL's step may need, from operands of 40000 and 40000 bytes."
     );
 }
 
@@ -227,11 +230,12 @@ fn a_division_whose_step_passes_the_allocators_ceiling_is_declined() {
     for (opcode, name) in [(OP_DIV, "OP_DIV"), (OP_MOD, "OP_MOD")] {
         let message = refused(
             under_ceiling(100_000, &[widest(40_000), widest(600)], &then_true(opcode)),
+            40_600,
             487_200,
         );
         assert_eq!(
             message,
-            format!("Stack memory usage has exceeded 0 bytes: the allocator refused the 487200 bytes {name}'s step may need, from operands of 40000 and 600 bytes.")
+            format!("Stack memory usage has exceeded 40600 bytes: the allocator refused the 487200 bytes {name}'s step may need, from operands of 40000 and 600 bytes.")
         );
     }
 }
@@ -248,11 +252,13 @@ fn a_sum_whose_step_passes_the_allocators_ceiling_is_declined() {
             &[widest(40_000), widest(40_000)],
             &then_true(OP_ADD),
         ),
+        80_000,
         160_000,
     );
     assert!(message.ends_with("the allocator refused the 160000 bytes OP_ADD's step may need, from operands of 40000 and 40000 bytes."), "{message}");
     let message = refused(
         under_ceiling(70_000, &[widest(40_000)], &then_true(OP_1ADD)),
+        40_000,
         80_000,
     );
     assert!(message.ends_with("the allocator refused the 80000 bytes OP_1ADD's step may need, from an operand of 40000 bytes."), "{message}");
@@ -270,7 +276,8 @@ fn a_step_the_allocator_grants_is_computed() {
 
 /// A number read outside the arithmetic opcodes (`OP_WITHIN`'s three) asks
 /// the allocator for its digits first: 50,000 bytes read as 75,008, refused
-/// under a ceiling of 70,000.
+/// under a ceiling of 70,000, the first operand popped and read while the
+/// other two are on the stack: 150,000 bytes held.
 #[test]
 fn a_number_read_the_allocator_refuses_is_a_decline() {
     let operand = widest(50_000);
@@ -280,9 +287,10 @@ fn a_number_read_the_allocator_refuses_is_a_decline() {
             &[operand.clone(), operand.clone(), operand],
             &then_true(OP_WITHIN),
         ),
+        150_000,
         75_008,
     );
-    assert_eq!(message, "Stack memory usage has exceeded 0 bytes");
+    assert_eq!(message, "Stack memory usage has exceeded 150000 bytes");
 }
 
 /// `OP_LSHIFTNUM` of 1 by 320,000 bits: a result of 40,001 bytes, its digits
@@ -291,9 +299,33 @@ fn a_number_read_the_allocator_refuses_is_a_decline() {
 fn a_left_shift_the_allocator_refuses_is_a_decline() {
     let message = refused(
         under_ceiling(70_000, &[vec![1], encode(320_000)], &then_true(OP_NOP7)),
+        4,
         80_020,
     );
-    assert_eq!(message, "Stack memory usage has exceeded 0 bytes");
+    assert_eq!(message, "Stack memory usage has exceeded 4 bytes");
+}
+
+/// A binary opcode reads its top operand first, as the reference reads
+/// `bn2` first (`Spend.ts:1560-1561`): under the standard word's 10,000-byte
+/// number length both operands overflow, and the refusal names the top's
+/// 10,002 bytes, not the deeper 10,001 (the re-review of PR #370's third
+/// fold).
+#[test]
+fn a_binary_opcode_judges_its_top_operand_first() {
+    let word = ScriptFlags::standard(ProtocolEra::PostGenesis);
+    for opcode in [OP_ADD, OP_MUL] {
+        let error = run(
+            &[widest(10_001), widest(10_002)],
+            &then_true(opcode),
+            2,
+            Some(word),
+        )
+        .expect_err("the overflow");
+        assert_eq!(
+            error.message,
+            "Script number overflow: 10002 bytes, the limit is 10000 bytes."
+        );
+    }
 }
 
 /// `n` as a minimal script number.
@@ -365,6 +397,7 @@ fn the_largest_readable_product_is_declined_under_a_512_mib_ceiling() {
     operand[67_108_861] = 0x00;
     let message = refused(
         under_ceiling(512 << 20, &[operand.clone(), operand], &then_true(OP_MUL)),
+        134_217_724,
         805_306_344,
     );
     assert!(message.ends_with("the allocator refused the 805306344 bytes OP_MUL's step may need, from operands of 67108862 and 67108862 bytes."), "{message}");
