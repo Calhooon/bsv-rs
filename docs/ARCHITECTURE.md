@@ -44,7 +44,7 @@ through `primitives`, `script`, `block`, `transaction`, `wallet`, `messages`,
 `wasm32-unknown-unknown` ([ARCH-RULES.md](ARCH-RULES.md), "Feature and wasm
 builds") are drawn from those eight. Every module, the four above `overlay`
 and `auth` and the two side modules included, is type-checked on wasm32 by
-the `msrv` job (`cargo check --lib --target wasm32-unknown-unknown
+the `msrv` job of `msrv.yml`, on dispatch and before every tag (`cargo check --lib --target wasm32-unknown-unknown
 --no-default-features --features "full,wasm"` on 1.88); only the eight
 marked are built and linked as a consumer's slice. Every network client
 lives in one of the four transport directories or the overlay facilitator
@@ -120,7 +120,7 @@ A rule whose test is missing says so: that is a finding, never an invention.
 - **Every public behavior is pinned by a test.** CLAUDE.md rule 2 (a fix lands with a test that was RED before it); `fixtures_replay` (`fixtures_replay`: a wire byte, a body byte or a JSON value that moves fails with the file, case and path), `every_readme_snippet_is_an_example_file_and_every_example_is_in_the_readme` (`readme_examples`); [FIXTURES.md](FIXTURES.md).
 - **The whole suite runs in CI; a file CI does not run is refused.** The `test` job's "Run every integration test" step runs `cargo test --features "full,http,websocket" --tests --no-fail-fast`, so cargo's own enumeration runs every `tests/*.rs` (an enumerated list had drifted to 34 of 73 files, #146); `memory_profiling` runs alone behind `dhat-profiling`, `wire_tracing_sink` in its own step behind `tracing` (outside `full`, #212). The guard is the step itself ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)); no test under `tests/` restates it.
 - **The census only falls.** `tools/ratchet/run --check` against [ratchets.json](ratchets.json) (seven counters, a limit per oversized file); `unwrap_and_expect_counts_never_rise` (`arch_no_unwrap`), `every_counter_and_each_file_has_an_independent_limit` (`tools/ratchet/src/model.rs`), `conformance_scripts_evaluation` (`conformance_scripts`: the corpus total pinned, every mismatch in an enumerated class with its count); [RATCHETS.md](RATCHETS.md), CLAUDE.md rule 3.
-- **The dependents build against every PR into `main` and every push.** The `dependents-plan`, `dependent-check`, `dependents` (required on `main` alone, so a PR into `beta` skips the three) and `semver` (every PR) jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) build every admitted consumer of [dependents.lock](dependents.lock) against the PR tree and refuse a breaking change against the last tag; `test_alias_resolves_to_the_pr_tree`, `test_unused_patch_cannot_report_success` ([`.github/scripts/test_dependents.py`](../.github/scripts/test_dependents.py), Python); [DEPENDENTS.md](DEPENDENTS.md).
+- **The dependents build against every PR into `main`, every push to `main`, every dispatch and every tag.** The `dependents-plan`, `dependent-check`, `dependents` (required on `main` alone, so a PR into `beta` and a push to `beta` skip the three) and `semver` (every PR) jobs ([`.github/workflows/ci.yml`](../.github/workflows/ci.yml)) build every admitted consumer of [dependents.lock](dependents.lock) against the PR tree and refuse a breaking change against the last tag; `test_alias_resolves_to_the_pr_tree`, `test_unused_patch_cannot_report_success` ([`.github/scripts/test_dependents.py`](../.github/scripts/test_dependents.py), Python); [DEPENDENTS.md](DEPENDENTS.md).
 
 The exit test's three gaps are closed: BRC-56's refusal by name is pinned by
 `tests/wallet_brc56_hmac_tests.rs` (#148), a BEEF whose source links form a
@@ -135,7 +135,9 @@ programme's line (epic #101): every lane PR targets it, one concern each,
 reviewed cold before the captain merges; `main` merges into `beta` after every
 stable patch, `beta` into `main` at a phase exit as the next minor. A tag
 `vX.Y.Z` on `main` is a release of record; `vX.Y.Z-beta.N` on `beta` a
-prerelease; either runs `release.yml`, which re-runs CI and publishes through
+prerelease; either runs `release.yml`, which re-runs CI, runs the measurement
+workflows (`bench.yml`, `msrv.yml`, `features.yml`, `machete.yml`,
+`docs.yml`, off the push run since 2026-10-27) and publishes through
 crates.io trusted publishing, nothing from a laptop. A beta tag is never
 admitted to the stack's line. [RELEASING.md](../RELEASING.md), [NORTH-STAR.md](NORTH-STAR.md).
 

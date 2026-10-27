@@ -55,7 +55,8 @@ Keep that baseline update in its own commit. `--record` requires committed
 sources, unless `--revision COMMIT` explicitly selects a committed snapshot.
 It replaces the whole baseline and records the measured commit, rather than
 editing individual limits. CI compares the proposed baseline with the PR
-base (or previous push) using `--against`, so raising a recorded limit cannot
+base (or previous push; `ratchet` is a required context, so it stays on every
+push when the measurements leave it, 2026-10-27) using `--against`, so raising a recorded limit cannot
 hide an increase in code. An ancestor without a baseline is the bootstrap
 case. Reviewers also compare the old and new JSON. A toolchain, method,
 exemption or dependency-lock change

@@ -9,10 +9,15 @@ Never on a push or a PR: the gate is `ci.yml`. It runs on demand only,
 beta`), never on a schedule: the owner's word of 2026-10-27 (the nightly runs
 were a waste of resources) took the 03:00 UTC cron off both lines. One
 dispatched measurement before each minor tag (0.9.0 to `main` gets one), none
-for a prerelease; the push matrix on the protected branches is `ci.yml`'s own.
-Its `ci-full` job dispatches `ci.yml` on `beta` and on `main`, so each line's
-whole matrix runs at its tip (a pull request runs only its line's required
-set). A dispatched run resolves the selected ref once, then every mutation
+for a prerelease (`RELEASING.md` step 3 names the dispatch: this workflow is
+not callable, so `release.yml` cannot run it before a tag). A push to a
+protected branch runs `ci.yml`'s required set, nothing more (the owner's word
+of 2026-10-27). Its `ci-full` job dispatches `ci.yml` on `beta` and on `main`,
+so each line's whole test matrix and `dependents` run at its tip (a pull
+request and a push run only the line's required set). The other measurements
+are workflows of their own, dispatched on the line and called by `release.yml`
+before every tag: `bench.yml`, `msrv.yml`, `features.yml`, `machete.yml`,
+`docs.yml`. A dispatched run resolves the selected ref once, then every mutation
 shard, the score job and every fuzz job check out that same commit.
 
 GitHub requires the workflow on the default branch (`main`) to enable manual

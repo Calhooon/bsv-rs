@@ -64,9 +64,52 @@ jobs:
     permissions:
       contents: read
 
+  # Every job that left the push run (ci.yml runs the required set, nothing more; the owner's word
+  # of 2026-10-27) runs once here, on every version tag, a prerelease's included. The checks of the
+  # commit (docs, msrv, features, machete) hold the publish as they did inside ci.yml; the bench
+  # measures the runner's load as much as the commit, so it runs beside the publish and does not
+  # hold it (its red shows on this run and on its badge). nightly.yml's oracles (mutants, fuzz)
+  # are dispatch-only, not callable: RELEASING.md names their dispatch as a step before a minor tag.
+  docs:
+    name: Docs
+    needs: version
+    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+
+  msrv:
+    name: MSRV
+    needs: version
+    uses: ./.github/workflows/msrv.yml
+    permissions:
+      contents: read
+
+  features:
+    name: Features
+    needs: version
+    uses: ./.github/workflows/features.yml
+    permissions:
+      contents: read
+
+  machete:
+    name: Unused dependencies
+    needs: version
+    uses: ./.github/workflows/machete.yml
+    permissions:
+      contents: read
+
+  bench:
+    name: Bench
+    needs: version
+    uses: ./.github/workflows/bench.yml
+    secrets:
+      BSV_SCRIPT_CORPUS_TOKEN: ${{ secrets.BSV_SCRIPT_CORPUS_TOKEN }}
+    permissions:
+      contents: read
+
   publish:
     name: Publish to crates.io
-    needs: [version, ci]
+    needs: [version, ci, docs, msrv, features, machete]
     runs-on: ubuntu-latest
     permissions:
       contents: read

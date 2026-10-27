@@ -8,39 +8,35 @@ on:
   # sync-main-into-beta.yml starts the suite on its PR's branch: a PR or a push made with the
   # GITHUB_TOKEN starts no workflow, a workflow_dispatch does
   workflow_dispatch:
-    inputs:
-      bench_baseline_record:
-        description: The benchmarks job proposes a baseline (benches/README.md) instead of comparing
-        type: boolean
-        default: false
   # release.yml runs these same jobs on a version tag before it publishes
   workflow_call:
     secrets:
       DEPENDENTS_READ_TOKEN:
         description: Read-only access to the private consumers in docs/dependents.lock
         required: false
-      BSV_SCRIPT_CORPUS_TOKEN:
-        description: Read-only access to the private seed corpus the benchmarks job reads (a tag's call skips that job)
-        required: false
 
 permissions:
   contents: read
 
-# Two sets by event (the owner's word of 2026-10-26): a pull request runs exactly the required
-# contexts of its base line's protection (and the jobs `dependents` needs to decide), one test
-# cell and one wasm32 consumer among them; every other event (a push to beta or main, the
-# nightly's dispatch on each line, the sync's dispatch, a tag's call from release.yml) runs every
-# job. Each condition is on the event and the base ref, so the one file serves both lines;
-# tests/arch_ci_pr_runs_the_required_set.rs pins the exact set both ways.
+# The required set, nothing more (the owner's word of 2026-10-26 for a pull request, of
+# 2026-10-27 for a push): a pull request runs exactly the required contexts of its base line's
+# protection (and the jobs `dependents` needs to decide), one test cell and one wasm32 consumer
+# among them; a push to beta or main runs the same set for its line, less the jobs that read a
+# pull request (`semver`, `beta-born`). A dispatch (the nightly's on each line, the sync's on its
+# branch) and a tag's call from release.yml add the five other test cells and run `dependents` on
+# any line. Every job that judges something other than the commit is in a workflow of its own,
+# run on dispatch and called by release.yml before a tag: bench.yml (the benchmark regression
+# check and the scoreboard), msrv.yml, features.yml (each feature alone, the other five wasm32
+# slices), machete.yml, docs.yml (rustdoc and actionlint). Each condition is on the event and
+# the refs, so the one file serves both lines; tests/arch_ci_pr_runs_the_required_set.rs pins
+# the exact set for every event.
 #
-# a newer push to the same branch or PR cancels the run it supersedes; a tag's run is never cancelled
-# The group carries the event, and a bench baseline record its own mark: a
-# dispatch (the nightly's dispatch of this workflow, a record for
-# benches/baseline.json) is never cancelled by a push to the same ref and
-# never cancels one, a record never cancels the nightly's dispatch nor the
-# nightly's dispatch a record; a pull request's own ref keeps each PR in a group of its own.
+# a newer push to the same branch or PR cancels the run it supersedes; a tag's run is never
+# cancelled. A cancelled run is superseded, never a red: the newer run judges the same line. The
+# group carries the event, so a dispatch (the nightly's, the sync's) is never cancelled by a push
+# to the same ref and never cancels one; a pull request's own ref keeps each PR in a group of its own.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ inputs.bench_baseline_record && 'record-' || '' }}${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
@@ -48,10 +44,13 @@ env:
   RUSTFLAGS: -Dwarnings
 
 jobs:
-  # dependents is required on main alone: a pull request into beta skips the three jobs
+  # dependents is required on main alone: a pull request into beta and a push to beta skip the
+  # three jobs; a dispatch on any line and a tag's call run them
   dependents-plan:
     name: Plan pinned dependents
-    if: github.event_name != 'pull_request' || github.base_ref == 'main'
+    if: >-
+      github.base_ref == 'main' ||
+      (github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref == 'refs/heads/beta'))
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -125,7 +124,9 @@ jobs:
   dependents:
     name: dependents
     needs: [dependents-plan, dependent-check]
-    if: always() && (github.event_name != 'pull_request' || github.base_ref == 'main')
+    if: >-
+      always() && (github.base_ref == 'main' ||
+      (github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref == 'refs/heads/beta')))
     runs-on: ubuntu-latest
     steps:
       - name: Require every eligible consumer check
@@ -196,11 +197,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      # a pull request runs the required cell alone, Test Suite (ubuntu-latest, stable); every
-      # other event the six. GitHub names a cell by its values in the keys' order, so no name moves
+      # a pull request and a push to a line run the required cell alone, Test Suite
+      # (ubuntu-latest, stable); a dispatch and a tag's call (whose event is the tag's push) the
+      # six. GitHub names a cell by its values in the keys' order, so no name moves
       matrix:
-        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest", "windows-latest"]') }}
-        rust: ${{ fromJSON(github.event_name == 'pull_request' && '["stable"]' || '["stable", "beta"]') }}
+        os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
+        rust: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '["stable", "beta"]' || '["stable"]') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -429,67 +431,6 @@ jobs:
       - name: Run the vector-backed tests
         run: cargo test --all-features --test conformance_beef --test conformance_scripts --test script_vectors_tests --test broadcaster_http_tests --test wallet_http_json_busy_tests --verbose -- --nocapture
 
-  docs:
-    name: Documentation
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ubuntu-docs-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ubuntu-docs-
-
-      - name: Build docs
-        run: cargo doc --no-deps --all-features
-        env:
-          RUSTDOCFLAGS: -Dwarnings
-
-  # the workflows linted (bsv-stack-lean #145), shellcheck on every run script: actionlint is built
-  # from its release source, the tarball pinned by sha256. Every `uses:` in ci.yml and release.yml
-  # is pinned by a commit sha with its version beside it (#144)
-  actionlint:
-    name: actionlint
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    env:
-      ACTIONLINT_VERSION: 1.7.12
-      ACTIONLINT_SHA256: 454800bd4f854592bcfe79b161f71d56e35940eb7016e48a26dd356adc9d400a
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Build actionlint from its pinned source
-        run: |
-          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/archive/refs/tags/v${ACTIONLINT_VERSION}.tar.gz"
-          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP"
-          cd "$RUNNER_TEMP/actionlint-${ACTIONLINT_VERSION}"
-          go build -o "$RUNNER_TEMP/bin/actionlint" ./cmd/actionlint
-
-      - name: Every action pinned by a commit sha
-        run: |
-          if grep -nE '^\s*-?\s*uses:' .github/workflows/*.yml | grep -vE 'uses: (\./|[^@ ]+@[0-9a-f]{40} # v)'; then
-            echo "::error::a uses: line above is not pinned by a 40-hex commit sha with its version"
-            exit 1
-          fi
-
-      - name: Lint the workflows
-        run: '"$RUNNER_TEMP/bin/actionlint" -no-color'
-
   # the secrets scan (bsv-stack-lean #140): gitleaks over the commits the event brings, the
   # values redacted, the locations printed; the findings judged not secrets are named by
   # fingerprint in .gitleaksignore or, for test material that is not a secret, by reason in
@@ -630,73 +571,17 @@ jobs:
           echo "::error::${#missing[@]} commit(s) of this PR were not born on beta; land each on beta through a PR, then cherry-pick it here with -x"
           exit 1
 
-  # the declared rust-version (bsv-stack-lean #139): the library with every feature, native and
-  # wasm32, on that toolchain, the dependencies resolved to versions it supports
-  msrv:
-    name: msrv
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    env:
-      CARGO_RESOLVER_INCOMPATIBLE_RUST_VERSIONS: fallback
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: "1.88.0"
-          targets: wasm32-unknown-unknown
-
-      - name: The manifest declares this toolchain
-        run: grep -qx 'rust-version = "1.88"' Cargo.toml
-
-      - name: Check the library
-        run: cargo check --lib --all-features
-
-      - name: Check the library on wasm32
-        run: cargo check --lib --target wasm32-unknown-unknown --no-default-features --features "full,wasm"
-
-  # Each feature must build without dev-dependency feature unification (#80).
-  features:
-    name: features
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Put build output in runner scratch
-        run: echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-features" >> "$GITHUB_ENV"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      - name: Build cargo-hack 0.6.45 from source
-        env:
-          RUSTFLAGS: ""
-        run: cargo install cargo-hack --version 0.6.45 --locked --root "$RUNNER_TEMP/tools"
-
-      - name: Check every feature without dev dependencies
-        run: PATH="$RUNNER_TEMP/tools/bin:$PATH" cargo hack check --each-feature --no-dev-deps
-
-  # These are the six library slices consumed by Workers, not full applications.
-  # Keep dead code in a diagnostic cdylib so the size is not an empty module.
-  # #96 will define the deployment artifact and its size budget.
-  # A pull request builds the combined slice alone (the required wasm32 (combined), the slice
-  # CLAUDE.md rule 6 names); every other event the six. An `include` row naming a consumer the
-  # list lacks would add a cell, so each consumer's features are the step's table, not the matrix's
+  # The combined library slice the Workers consume (the required wasm32 (combined), the slice
+  # CLAUDE.md rule 6 names), on every event; the other five slices are features.yml's. The
+  # one-cell matrix keeps the context's name. Keep dead code in a diagnostic cdylib so the size
+  # is not an empty module; #96 will define the deployment artifact and its size budget.
   wasm32:
     name: wasm32 (${{ matrix.consumer }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        consumer: ${{ fromJSON(github.event_name == 'pull_request' && '["combined"]' || '["combined", "watchtower", "monitor", "chaintracks", "overlay", "relay"]') }}
+        consumer: [combined]
     env:
       SLICE_NAME: ${{ matrix.consumer }}
     steps:
@@ -708,11 +593,6 @@ jobs:
         run: |
           case "$SLICE_NAME" in
             combined) features=auth,wallet,transaction,overlay,socketio,wasm ;;
-            watchtower) features=wallet,auth,transaction,wasm ;;
-            monitor) features=transaction,wasm ;;
-            chaintracks) features=block ;;
-            overlay) features=overlay,wasm ;;
-            relay) features=auth,socketio,wasm ;;
             *) echo "::error::no feature slice for consumer $SLICE_NAME"; exit 1 ;;
           esac
           echo "SLICE_FEATURES=$features" >> "$GITHUB_ENV"
@@ -731,7 +611,6 @@ jobs:
 
       # `http` is native-only (#152): the slice with it stops at build.rs, one message
       - name: The slice with http is refused at the build script
-        if: matrix.consumer == 'combined'
         run: |
           if cargo build --lib --target wasm32-unknown-unknown --no-default-features --features "$SLICE_FEATURES,http" 2> "$RUNNER_TEMP/http.log"; then
             echo '::error::the wasm32 build with http succeeded; build.rs no longer refuses it (#152)'
@@ -746,32 +625,6 @@ jobs:
           artifact="$CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/bsv_rs.wasm"
           bytes=$(wc -c < "$artifact")
           printf '%s: %s bytes (debug cdylib, dead code retained)\n' "$SLICE_NAME" "$bytes"
-
-  # the unused dependencies (bsv-stack-lean #137): cargo-machete reads the manifests and the
-  # sources of the crate and fuzz/, no build; non-blocking until a captain asks. The tool is
-  # installed by version from crates.io with its own lock, without the workflow's -Dwarnings
-  machete:
-    name: unused dependencies
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      - name: Install cargo-machete 0.9.2
-        env:
-          RUSTFLAGS: ""
-        run: cargo install cargo-machete --version 0.9.2 --locked --root "$RUNNER_TEMP/tools"
-
-      - name: Run cargo-machete
-        run: '"$RUNNER_TEMP/tools/bin/cargo-machete" --with-metadata'
 
   deny:
     name: deny
@@ -805,242 +658,3 @@ jobs:
           "$RUNNER_TEMP/tools/bin/cargo-deny" --locked --no-default-features --features "auth,wallet,transaction,overlay,socketio,wasm" --target wasm32-unknown-unknown check || result=1
           "$RUNNER_TEMP/tools/bin/cargo-deny" --locked check || result=1
           exit "$result"
-
-  benchmarks:
-    name: Benchmark Regression Check
-    runs-on: ubuntu-24.04
-    # beta's push and nightly; a dispatch on any branch that asks for a baseline record (no
-    # pull request: the job is not a required context)
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/beta' || inputs.bench_baseline_record)
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Keep benchmark output outside the checkout
-        run: |
-          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-bench-target" >> "$GITHUB_ENV"
-          echo "BSV_SCRIPT_CORPUS=$RUNNER_TEMP/bsv-script-corpus" >> "$GITHUB_ENV"
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      # The seed corpus's repository is private. Without the read-only token (a
-      # fork, a PR from outside, a repository without the secret) script_spend
-      # is skipped with a warning and bench-compare reports it as skipped, never
-      # as a pass or a regression; the other eight benches are still compared.
-      - name: Read the seed corpus at the lane's source revision
-        env:
-          GH_TOKEN: ${{ secrets.BSV_SCRIPT_CORPUS_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::warning::script_spend skipped: BSV_SCRIPT_CORPUS_TOKEN not set (the script corpus is private)"
-            echo "BENCH_SKIP=script_spend" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          mkdir -p "$BSV_SCRIPT_CORPUS"
-          gh api --method GET -H 'Accept: application/vnd.github.raw+json' \
-            'repos/Calgooon/bsv-script-lean/contents/corpus/seed/seed.jsonl?ref=8840488cc7922fa908ebcaa6333e885a49c6ca7c' \
-            > "$BSV_SCRIPT_CORPUS/seed.jsonl"
-          test -s "$BSV_SCRIPT_CORPUS/seed.jsonl"
-
-      # This library does not commit Cargo.lock (the deny job's rule): resolve
-      # once so the gate's `cargo bench --locked` measures one graph.
-      - name: Resolve the benchmark lockfile
-        run: cargo generate-lockfile
-
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ env.CARGO_TARGET_DIR }}
-          key: ${{ runner.os }}-bench-${{ hashFiles('Cargo.lock', 'tools/bench-compare/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bench-
-
-      - name: Test the comparison gate
-        run: |
-          cargo fmt --manifest-path tools/bench-compare/Cargo.toml -- --check
-          cargo clippy --locked --all-targets --manifest-path tools/bench-compare/Cargo.toml -- -D warnings
-          cargo test --locked --manifest-path tools/bench-compare/Cargo.toml
-
-      # Record mode is explicit: a dispatch with bench_baseline_record. Its
-      # artifact must be reviewed and committed, then compared by a plain run.
-      # Exit 3 is a runner whose platform/CPU/cores key has no baseline entry
-      # yet: a warning naming the key, not a failure.
-      - name: Compare p99, or record an explicitly requested baseline
-        env:
-          RECORD_BASELINE: ${{ inputs.bench_baseline_record == true }}
-        run: |
-          args=()
-          if [ -n "${BENCH_SKIP:-}" ]; then
-            args+=(--skip "$BENCH_SKIP")
-          fi
-          if [ "$RECORD_BASELINE" = 'true' ]; then
-            cp benches/baseline.json "$RUNNER_TEMP/linux-baseline.json"
-            args+=(--record --baseline "$RUNNER_TEMP/linux-baseline.json")
-          fi
-          set +e
-          cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- \
-            "${args[@]}" --output "$RUNNER_TEMP/bench-results" | tee "$RUNNER_TEMP/bench-compare.out"
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ "$status" -eq 3 ]; then
-            key=$(sed -n 's/^NO BASELINE ENTRY: //p' "$RUNNER_TEMP/bench-compare.out")
-            echo "::warning::no baseline entry for $key: record one with gh workflow run ci.yml -f bench_baseline_record=true"
-            exit 0
-          fi
-          exit "$status"
-
-      - name: Retain measurements and any proposed baseline
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: benchmark-evidence-${{ runner.os }}
-          path: |
-            ${{ runner.temp }}/bench-results/run.json
-            ${{ runner.temp }}/bench-results/baseline.json
-            ${{ runner.temp }}/bench-results/bench.log
-            ${{ runner.temp }}/linux-baseline.json
-          if-no-files-found: warn
-
-  benchmarks-build:
-    name: Benchmarks Build
-    runs-on: ubuntu-latest
-    # Keep a build-only check on every event but a pull request, every feature-gated bench.
-    if: github.event_name != 'pull_request'
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
-        with:
-          toolchain: stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            ${{ runner.temp }}/bsv-rs-bench-build
-          key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-bench-
-
-      - name: Build benchmarks
-        env:
-          CARGO_TARGET_DIR: ${{ runner.temp }}/bsv-rs-bench-build
-        run: |
-          cargo generate-lockfile
-          cargo bench --no-run --all-features --locked
-
-  # Add each new producer job to needs when it lands (#77, #78, #80).
-  # Missing producers are reported by name; this job never invents measurements. It reads
-  # artifacts, never the needs' results, so a producer its condition skipped (benchmarks off beta)
-  # is "not yet measured", not red. Not a required context: no pull request runs it.
-  scoreboard:
-    name: scoreboard
-    if: always() && github.event_name != 'pull_request'
-    needs: [test, clippy, fmt, vectors, docs, actionlint, secrets, msrv, machete, benchmarks, benchmarks-build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - name: Download available scoreboard inputs
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          path: ${{ runner.temp }}/scoreboard-inputs
-          pattern: '{*bench*,*ratchet*,*wasm*,*mutant*,*mutation*}'
-
-      - name: scoreboard
-        env:
-          SCOREBOARD_REPOSITORY: ${{ github.repository }}
-          SCOREBOARD_COMMIT: ${{ github.sha }}
-          SCOREBOARD_RUN: ${{ github.run_id }}
-        run: |
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-
-          repository = os.environ["SCOREBOARD_REPOSITORY"]
-          commit = os.environ["SCOREBOARD_COMMIT"]
-          run_id = os.environ["SCOREBOARD_RUN"]
-          definitions = {
-              "benchmarks": ("benchmarks (#77)", ("bench",), ("benches/baseline.json", "baseline.json")),
-              "ratchets": ("ratchet (#78)", ("ratchet",), ("docs/ratchets.json", "ratchets.json")),
-              "wasm_sizes": ("wasm32 (#80/#96)", ("wasm",), ("wasm-sizes.json",)),
-              "mutation": ("mutants (#81; the nightly workflow, not yet in the tree)", ("mutant", "mutation"), ("mutation-summary.json",)),
-          }
-          report = {
-              "repository": repository,
-              "commit": commit,
-              "run_id": run_id,
-              "inputs": {
-                  key: {"producer": spec[0], "status": "not yet measured", "records": []}
-                  for key, spec in definitions.items()
-              },
-              "errors": [],
-          }
-
-          def reject_constant(value):
-              raise ValueError("Non-finite JSON constant: " + value)
-
-          def record(key, raw, source):
-              try:
-                  data = json.loads(raw, parse_constant=reject_constant)
-                  json.dumps(data, allow_nan=False)
-              except (ValueError, UnicodeDecodeError):
-                  report["errors"].append("Invalid JSON from " + source["file"])
-                  return
-              report["inputs"][key]["records"].append({
-                  "source": source,
-                  "sha256": hashlib.sha256(raw).hexdigest(),
-                  "data": data,
-              })
-              report["inputs"][key]["status"] = "available"
-
-          try:
-              downloads = Path(os.environ["RUNNER_TEMP"], "scoreboard-inputs")
-              for path in sorted(downloads.rglob("*.json")):
-                  relative = path.relative_to(downloads)
-                  artifact = relative.parts[0]
-                  for key, (_, stems, filenames) in definitions.items():
-                      if any(stem in artifact.lower() for stem in stems) and any(
-                          relative.as_posix().endswith("/" + name) for name in filenames
-                      ):
-                          record(key, path.read_bytes(), {
-                              "kind": "current_run",
-                              "commit": commit,
-                              "run_id": run_id,
-                              "artifact": artifact,
-                              "file": relative.as_posix(),
-                          })
-              for key, filename in (("benchmarks", "benches/baseline.json"), ("ratchets", "docs/ratchets.json")):
-                  baseline = Path(filename)
-                  if baseline.is_file():
-                      record(key, baseline.read_bytes(), {
-                          "kind": "repository_baseline",
-                          "commit": commit,
-                          "file": filename,
-                      })
-          except OSError as error:
-              report["errors"].append(str(error))
-
-          encoded = json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n"
-          Path(os.environ["RUNNER_TEMP"], "scoreboard.json").write_text(encoded)
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write("## bsv-rs scoreboard\n\n```json\n" + encoded + "```\n")
-          for entry in report["inputs"].values():
-              print(f"{entry['producer']}: {entry['status']}")
-          if report["errors"]:
-              raise SystemExit("scoreboard: collection failed; see the JSON errors")
-          PY

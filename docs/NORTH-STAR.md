@@ -11,7 +11,7 @@ on `origin/beta` when read on 2026-10-23.
 ## The scoreboard
 
 Measurements belong to producer outputs, never to hand-edited cells here.
-The `scoreboard` job in [ci.yml](../.github/workflows/ci.yml) writes one JSON
+The `scoreboard` job in [bench.yml](../.github/workflows/bench.yml) (on dispatch and before every tag) writes one JSON
 document to its job summary and `$RUNNER_TEMP/scoreboard.json`. Each record
 keeps its source commit, run and artifact, or identifies a repository baseline.
 An available baseline is not a measurement of the current PR. A nightly result
@@ -29,7 +29,7 @@ is a current mutation floor only when its producing run covers that commit.
 | Code health | Falling ratchets, empty deny ignore list, isolated features, mutation floor per covered file | `ratchet`, `docs/ratchets.json` ([#78](https://github.com/Calhooon/bsv-rs/issues/78)); deny job pending [#79](https://github.com/Calhooon/bsv-rs/issues/79); `features` pending [#80](https://github.com/Calhooon/bsv-rs/issues/80); nightly `mutants`, `mutation-summary.json` pending [#81](https://github.com/Calhooon/bsv-rs/issues/81) | not yet measured |
 | Dependents | Consumer builds, semver guard and current pins or dated plans | Job and artifact pending [#83](https://github.com/Calhooon/bsv-rs/issues/83); pin ledger in [DEPENDENTS.md](DEPENDENTS.md), pending that lane | not yet measured |
 
-The existing `test`, `vectors`, `clippy` and `msrv` jobs provide checks and logs;
+The existing `test`, `vectors`, `clippy` (`ci.yml`) and `msrv` (`msrv.yml`) jobs provide checks and logs;
 they do not yet publish these measurements. The scoreboard is a collector,
 not a substitute for their gates. Each missing producer is named in its JSON.
 At the 2026-10-23 read, none of the listed JSON producers had landed on `beta`;

@@ -1,0 +1,271 @@
+name: Bench
+
+# The benchmark regression check and the scoreboard: they judge the runner's load as much as the
+# commit (beta's push run was red on the regression check alone, 2026-10-27), so they are off the
+# push run (ci.yml runs the required set, nothing more; the owner's word of 2026-10-27, the
+# keeper's ruling). On demand (`gh workflow run bench.yml --ref <line>`, a baseline record with
+# `-f bench_baseline_record=true`; benches/README.md) and called by release.yml on every version
+# tag before it publishes.
+on:
+  workflow_dispatch:
+    inputs:
+      bench_baseline_record:
+        description: The benchmarks job proposes a baseline (benches/README.md) instead of comparing
+        type: boolean
+        default: false
+  workflow_call:
+    secrets:
+      BSV_SCRIPT_CORPUS_TOKEN:
+        description: Read-only access to the private seed corpus the benchmarks job reads (absent, script_spend is skipped with a warning)
+        required: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+# a newer dispatch on the same ref waits for the one running; a tag's call is never cancelled;
+# a baseline record has its own mark, so a record and a plain run never wait on each other
+concurrency:
+  group: bench-${{ github.event_name }}-${{ inputs.bench_baseline_record && 'record-' || '' }}${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmarks-build:
+    name: Benchmarks Build
+    runs-on: ubuntu-latest
+    # A build-only check of every feature-gated bench.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ runner.temp }}/bsv-rs-bench-build
+          key: ${{ runner.os }}-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bench-
+
+      - name: Build benchmarks
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/bsv-rs-bench-build
+        run: |
+          cargo generate-lockfile
+          cargo bench --no-run --all-features --locked
+
+  benchmarks:
+    name: Benchmark Regression Check
+    runs-on: ubuntu-24.04
+    # every run of this workflow: a dispatch on any ref (a baseline record with
+    # bench_baseline_record) and a tag's call (which never records)
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Keep benchmark output outside the checkout
+        run: |
+          echo "CARGO_TARGET_DIR=$RUNNER_TEMP/bsv-rs-bench-target" >> "$GITHUB_ENV"
+          echo "BSV_SCRIPT_CORPUS=$RUNNER_TEMP/bsv-script-corpus" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      # The seed corpus's repository is private. Without the read-only token (a
+      # fork, a PR from outside, a repository without the secret) script_spend
+      # is skipped with a warning and bench-compare reports it as skipped, never
+      # as a pass or a regression; the other eight benches are still compared.
+      - name: Read the seed corpus at the lane's source revision
+        env:
+          GH_TOKEN: ${{ secrets.BSV_SCRIPT_CORPUS_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::script_spend skipped: BSV_SCRIPT_CORPUS_TOKEN not set (the script corpus is private)"
+            echo "BENCH_SKIP=script_spend" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          mkdir -p "$BSV_SCRIPT_CORPUS"
+          gh api --method GET -H 'Accept: application/vnd.github.raw+json' \
+            'repos/Calgooon/bsv-script-lean/contents/corpus/seed/seed.jsonl?ref=8840488cc7922fa908ebcaa6333e885a49c6ca7c' \
+            > "$BSV_SCRIPT_CORPUS/seed.jsonl"
+          test -s "$BSV_SCRIPT_CORPUS/seed.jsonl"
+
+      # This library does not commit Cargo.lock (the deny job's rule): resolve
+      # once so the gate's `cargo bench --locked` measures one graph.
+      - name: Resolve the benchmark lockfile
+        run: cargo generate-lockfile
+
+      - name: Cache cargo registry
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ${{ env.CARGO_TARGET_DIR }}
+          key: ${{ runner.os }}-bench-${{ hashFiles('Cargo.lock', 'tools/bench-compare/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bench-
+
+      - name: Test the comparison gate
+        run: |
+          cargo fmt --manifest-path tools/bench-compare/Cargo.toml -- --check
+          cargo clippy --locked --all-targets --manifest-path tools/bench-compare/Cargo.toml -- -D warnings
+          cargo test --locked --manifest-path tools/bench-compare/Cargo.toml
+
+      # Record mode is explicit: a dispatch with bench_baseline_record. Its
+      # artifact must be reviewed and committed, then compared by a plain run.
+      # Exit 3 is a runner whose platform/CPU/cores key has no baseline entry
+      # yet: a warning naming the key, not a failure.
+      - name: Compare p99, or record an explicitly requested baseline
+        env:
+          RECORD_BASELINE: ${{ inputs.bench_baseline_record == true }}
+        run: |
+          args=()
+          if [ -n "${BENCH_SKIP:-}" ]; then
+            args+=(--skip "$BENCH_SKIP")
+          fi
+          if [ "$RECORD_BASELINE" = 'true' ]; then
+            cp benches/baseline.json "$RUNNER_TEMP/linux-baseline.json"
+            args+=(--record --baseline "$RUNNER_TEMP/linux-baseline.json")
+          fi
+          set +e
+          cargo run --locked --manifest-path tools/bench-compare/Cargo.toml -- \
+            "${args[@]}" --output "$RUNNER_TEMP/bench-results" | tee "$RUNNER_TEMP/bench-compare.out"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -eq 3 ]; then
+            key=$(sed -n 's/^NO BASELINE ENTRY: //p' "$RUNNER_TEMP/bench-compare.out")
+            echo "::warning::no baseline entry for $key: record one with gh workflow run bench.yml -f bench_baseline_record=true"
+            exit 0
+          fi
+          exit "$status"
+
+      - name: Retain measurements and any proposed baseline
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmark-evidence-${{ runner.os }}
+          path: |
+            ${{ runner.temp }}/bench-results/run.json
+            ${{ runner.temp }}/bench-results/baseline.json
+            ${{ runner.temp }}/bench-results/bench.log
+            ${{ runner.temp }}/linux-baseline.json
+          if-no-files-found: warn
+
+  # Add each new producer job to needs when it lands (#77, #78, #80).
+  # Missing producers are reported by name; this job never invents measurements. It reads
+  # artifacts, never the needs' results, so a producer that did not run or upload is "not yet
+  # measured", not red. Not a required context: no pull request and no push runs it.
+  scoreboard:
+    name: scoreboard
+    if: always()
+    needs: [benchmarks, benchmarks-build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Download available scoreboard inputs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          path: ${{ runner.temp }}/scoreboard-inputs
+          pattern: '{*bench*,*ratchet*,*wasm*,*mutant*,*mutation*}'
+
+      - name: scoreboard
+        env:
+          SCOREBOARD_REPOSITORY: ${{ github.repository }}
+          SCOREBOARD_COMMIT: ${{ github.sha }}
+          SCOREBOARD_RUN: ${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          repository = os.environ["SCOREBOARD_REPOSITORY"]
+          commit = os.environ["SCOREBOARD_COMMIT"]
+          run_id = os.environ["SCOREBOARD_RUN"]
+          definitions = {
+              "benchmarks": ("benchmarks (#77)", ("bench",), ("benches/baseline.json", "baseline.json")),
+              "ratchets": ("ratchet (#78)", ("ratchet",), ("docs/ratchets.json", "ratchets.json")),
+              "wasm_sizes": ("wasm32 (#80/#96)", ("wasm",), ("wasm-sizes.json",)),
+              "mutation": ("mutants (#81; the nightly workflow, not yet in the tree)", ("mutant", "mutation"), ("mutation-summary.json",)),
+          }
+          report = {
+              "repository": repository,
+              "commit": commit,
+              "run_id": run_id,
+              "inputs": {
+                  key: {"producer": spec[0], "status": "not yet measured", "records": []}
+                  for key, spec in definitions.items()
+              },
+              "errors": [],
+          }
+
+          def reject_constant(value):
+              raise ValueError("Non-finite JSON constant: " + value)
+
+          def record(key, raw, source):
+              try:
+                  data = json.loads(raw, parse_constant=reject_constant)
+                  json.dumps(data, allow_nan=False)
+              except (ValueError, UnicodeDecodeError):
+                  report["errors"].append("Invalid JSON from " + source["file"])
+                  return
+              report["inputs"][key]["records"].append({
+                  "source": source,
+                  "sha256": hashlib.sha256(raw).hexdigest(),
+                  "data": data,
+              })
+              report["inputs"][key]["status"] = "available"
+
+          try:
+              downloads = Path(os.environ["RUNNER_TEMP"], "scoreboard-inputs")
+              for path in sorted(downloads.rglob("*.json")):
+                  relative = path.relative_to(downloads)
+                  artifact = relative.parts[0]
+                  for key, (_, stems, filenames) in definitions.items():
+                      if any(stem in artifact.lower() for stem in stems) and any(
+                          relative.as_posix().endswith("/" + name) for name in filenames
+                      ):
+                          record(key, path.read_bytes(), {
+                              "kind": "current_run",
+                              "commit": commit,
+                              "run_id": run_id,
+                              "artifact": artifact,
+                              "file": relative.as_posix(),
+                          })
+              for key, filename in (("benchmarks", "benches/baseline.json"), ("ratchets", "docs/ratchets.json")):
+                  baseline = Path(filename)
+                  if baseline.is_file():
+                      record(key, baseline.read_bytes(), {
+                          "kind": "repository_baseline",
+                          "commit": commit,
+                          "file": filename,
+                      })
+          except OSError as error:
+              report["errors"].append(str(error))
+
+          encoded = json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n"
+          Path(os.environ["RUNNER_TEMP"], "scoreboard.json").write_text(encoded)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("## bsv-rs scoreboard\n\n```json\n" + encoded + "```\n")
+          for entry in report["inputs"].values():
+              print(f"{entry['producer']}: {entry['status']}")
+          if report["errors"]:
+              raise SystemExit("scoreboard: collection failed; see the JSON errors")
+          PY
