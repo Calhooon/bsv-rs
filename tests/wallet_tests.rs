@@ -487,7 +487,7 @@ mod proto_wallet_tests {
                 privileged: None,
                 privileged_reason: None,
             };
-            let result = WalletInterface::reveal_specific_key_linkage(&wallet, args, "test")
+            let result = WalletInterface::reveal_specific_key_linkage(&wallet, args, Some("test"))
                 .await
                 .unwrap();
             assert_eq!(result.linkage.counterparty, named);

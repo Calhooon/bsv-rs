@@ -137,9 +137,10 @@ impl WalletClient {
         self.originator.as_deref()
     }
 
-    /// Returns the effective originator for requests.
-    fn effective_originator(&self) -> &str {
-        self.originator.as_deref().unwrap_or("")
+    /// Returns the effective originator for requests: the configured one,
+    /// `None` when none is set (#329).
+    fn effective_originator(&self) -> Option<String> {
+        self.originator.clone()
     }
 
     /// Ensures a substrate is connected, auto-detecting if necessary.
@@ -183,12 +184,12 @@ impl WalletClient {
     /// Auto-detects available substrate by trying each in order.
     #[cfg(feature = "http")]
     async fn auto_detect(&mut self) -> Result<(), Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
 
         // Try secure JSON API first
         let secure_client =
             HttpWalletJson::new(self.originator.clone(), Some(SECURE_JSON_URL.to_string()))?;
-        if let Ok(version) = secure_client.get_version(&originator).await {
+        if let Ok(version) = secure_client.get_version(originator.as_deref()).await {
             if !version.is_empty() {
                 self.connected = Some(ConnectedSubstrate::JsonApi(secure_client));
                 return Ok(());
@@ -197,7 +198,7 @@ impl WalletClient {
 
         // Try standard JSON API
         let json_client = HttpWalletJson::new(self.originator.clone(), None)?;
-        if let Ok(version) = json_client.get_version(&originator).await {
+        if let Ok(version) = json_client.get_version(originator.as_deref()).await {
             if !version.is_empty() {
                 self.connected = Some(ConnectedSubstrate::JsonApi(json_client));
                 return Ok(());
@@ -207,7 +208,7 @@ impl WalletClient {
         // Try wire protocol
         let wire = HttpWalletWire::new(self.originator.clone(), None)?;
         let wire_client = WalletWireTransceiver::new(wire);
-        if let Ok(version) = wire_client.get_version(&originator).await {
+        if let Ok(version) = wire_client.get_version(originator.as_deref()).await {
             if !version.is_empty() {
                 self.connected = Some(ConnectedSubstrate::WireApi(wire_client));
                 return Ok(());
@@ -229,60 +230,80 @@ impl WalletClient {
         &mut self,
         args: GetPublicKeyArgs,
     ) -> Result<GetPublicKeyResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.get_public_key(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.get_public_key(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.get_public_key(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.get_public_key(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Encrypts data using the wallet's derived key.
     #[cfg(feature = "http")]
     pub async fn encrypt(&mut self, args: EncryptArgs) -> Result<EncryptResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.encrypt(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.encrypt(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.encrypt(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.encrypt(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Decrypts data using the wallet's derived key.
     #[cfg(feature = "http")]
     pub async fn decrypt(&mut self, args: DecryptArgs) -> Result<DecryptResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.decrypt(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.decrypt(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.decrypt(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.decrypt(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Creates an HMAC using the wallet's derived key.
     #[cfg(feature = "http")]
     pub async fn create_hmac(&mut self, args: CreateHmacArgs) -> Result<CreateHmacResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.create_hmac(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.create_hmac(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.create_hmac(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.create_hmac(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Verifies an HMAC using the wallet's derived key.
     #[cfg(feature = "http")]
     pub async fn verify_hmac(&mut self, args: VerifyHmacArgs) -> Result<VerifyHmacResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.verify_hmac(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.verify_hmac(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.verify_hmac(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.verify_hmac(args, originator.as_deref()).await
+            }
         }
     }
 
@@ -292,12 +313,16 @@ impl WalletClient {
         &mut self,
         args: CreateSignatureArgs,
     ) -> Result<CreateSignatureResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.create_signature(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.create_signature(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.create_signature(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.create_signature(args, originator.as_deref()).await
+            }
         }
     }
 
@@ -307,60 +332,68 @@ impl WalletClient {
         &mut self,
         args: VerifySignatureArgs,
     ) -> Result<VerifySignatureResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.verify_signature(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.verify_signature(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.verify_signature(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.verify_signature(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Checks if the wallet is authenticated.
     #[cfg(feature = "http")]
     pub async fn is_authenticated(&mut self) -> Result<bool, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.is_authenticated(&originator).await,
-            ConnectedSubstrate::WireApi(client) => client.is_authenticated(&originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.is_authenticated(originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.is_authenticated(originator.as_deref()).await
+            }
         }
     }
 
     /// Gets the current block height.
     #[cfg(feature = "http")]
     pub async fn get_height(&mut self) -> Result<u64, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.get_height(&originator).await,
-            ConnectedSubstrate::WireApi(client) => client.get_height(&originator).await,
+            ConnectedSubstrate::JsonApi(client) => client.get_height(originator.as_deref()).await,
+            ConnectedSubstrate::WireApi(client) => client.get_height(originator.as_deref()).await,
         }
     }
 
     /// Gets the network the wallet is connected to.
     #[cfg(feature = "http")]
     pub async fn get_network(&mut self) -> Result<Network, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.get_network(&originator).await,
-            ConnectedSubstrate::WireApi(client) => client.get_network(&originator).await,
+            ConnectedSubstrate::JsonApi(client) => client.get_network(originator.as_deref()).await,
+            ConnectedSubstrate::WireApi(client) => client.get_network(originator.as_deref()).await,
         }
     }
 
     /// Gets the wallet version.
     #[cfg(feature = "http")]
     pub async fn get_version(&mut self) -> Result<String, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.get_version(&originator).await,
-            ConnectedSubstrate::WireApi(client) => client.get_version(&originator).await,
+            ConnectedSubstrate::JsonApi(client) => client.get_version(originator.as_deref()).await,
+            ConnectedSubstrate::WireApi(client) => client.get_version(originator.as_deref()).await,
         }
     }
 
@@ -374,24 +407,32 @@ impl WalletClient {
         &mut self,
         args: CreateActionArgs,
     ) -> Result<CreateActionResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.create_action(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.create_action(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.create_action(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.create_action(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Signs a previously created transaction.
     #[cfg(feature = "http")]
     pub async fn sign_action(&mut self, args: SignActionArgs) -> Result<SignActionResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.sign_action(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.sign_action(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.sign_action(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.sign_action(args, originator.as_deref()).await
+            }
         }
     }
 
@@ -401,12 +442,16 @@ impl WalletClient {
         &mut self,
         args: AbortActionArgs,
     ) -> Result<AbortActionResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.abort_action(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.abort_action(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.abort_action(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.abort_action(args, originator.as_deref()).await
+            }
         }
     }
 
@@ -416,12 +461,16 @@ impl WalletClient {
         &mut self,
         args: ListActionsArgs,
     ) -> Result<ListActionsResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.list_actions(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.list_actions(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.list_actions(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.list_actions(args, originator.as_deref()).await
+            }
         }
     }
 
@@ -432,15 +481,15 @@ impl WalletClient {
         args: InternalizeActionArgs,
     ) -> Result<InternalizeActionResult, Error> {
         crate::wallet::validation::validate_internalize_action_args(&args)?;
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.internalize_action(args, &originator).await
+                client.internalize_action(args, originator.as_deref()).await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.internalize_action(args, &originator).await
+                client.internalize_action(args, originator.as_deref()).await
             }
         }
     }
@@ -455,12 +504,16 @@ impl WalletClient {
         &mut self,
         args: ListOutputsArgs,
     ) -> Result<ListOutputsResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.list_outputs(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.list_outputs(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.list_outputs(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.list_outputs(args, originator.as_deref()).await
+            }
         }
     }
 
@@ -470,15 +523,15 @@ impl WalletClient {
         &mut self,
         args: RelinquishOutputArgs,
     ) -> Result<RelinquishOutputResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.relinquish_output(args, &originator).await
+                client.relinquish_output(args, originator.as_deref()).await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.relinquish_output(args, &originator).await
+                client.relinquish_output(args, originator.as_deref()).await
             }
         }
     }
@@ -493,15 +546,19 @@ impl WalletClient {
         &mut self,
         args: AcquireCertificateArgs,
     ) -> Result<WalletCertificate, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.acquire_certificate(args, &originator).await
+                client
+                    .acquire_certificate(args, originator.as_deref())
+                    .await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.acquire_certificate(args, &originator).await
+                client
+                    .acquire_certificate(args, originator.as_deref())
+                    .await
             }
         }
     }
@@ -512,15 +569,15 @@ impl WalletClient {
         &mut self,
         args: ListCertificatesArgs,
     ) -> Result<ListCertificatesResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.list_certificates(args, &originator).await
+                client.list_certificates(args, originator.as_deref()).await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.list_certificates(args, &originator).await
+                client.list_certificates(args, originator.as_deref()).await
             }
         }
     }
@@ -531,15 +588,15 @@ impl WalletClient {
         &mut self,
         args: ProveCertificateArgs,
     ) -> Result<ProveCertificateResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.prove_certificate(args, &originator).await
+                client.prove_certificate(args, originator.as_deref()).await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.prove_certificate(args, &originator).await
+                client.prove_certificate(args, originator.as_deref()).await
             }
         }
     }
@@ -550,15 +607,19 @@ impl WalletClient {
         &mut self,
         args: RelinquishCertificateArgs,
     ) -> Result<RelinquishCertificateResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.relinquish_certificate(args, &originator).await
+                client
+                    .relinquish_certificate(args, originator.as_deref())
+                    .await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.relinquish_certificate(args, &originator).await
+                client
+                    .relinquish_certificate(args, originator.as_deref())
+                    .await
             }
         }
     }
@@ -573,15 +634,19 @@ impl WalletClient {
         &mut self,
         args: DiscoverByIdentityKeyArgs,
     ) -> Result<DiscoverCertificatesResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.discover_by_identity_key(args, &originator).await
+                client
+                    .discover_by_identity_key(args, originator.as_deref())
+                    .await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.discover_by_identity_key(args, &originator).await
+                client
+                    .discover_by_identity_key(args, originator.as_deref())
+                    .await
             }
         }
     }
@@ -592,15 +657,19 @@ impl WalletClient {
         &mut self,
         args: DiscoverByAttributesArgs,
     ) -> Result<DiscoverCertificatesResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.discover_by_attributes(args, &originator).await
+                client
+                    .discover_by_attributes(args, originator.as_deref())
+                    .await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.discover_by_attributes(args, &originator).await
+                client
+                    .discover_by_attributes(args, originator.as_deref())
+                    .await
             }
         }
     }
@@ -612,27 +681,31 @@ impl WalletClient {
     /// Gets a block header for a given height.
     #[cfg(feature = "http")]
     pub async fn get_header(&mut self, args: GetHeaderArgs) -> Result<GetHeaderResult, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
-            ConnectedSubstrate::JsonApi(client) => client.get_header(args, &originator).await,
-            ConnectedSubstrate::WireApi(client) => client.get_header(args, &originator).await,
+            ConnectedSubstrate::JsonApi(client) => {
+                client.get_header(args, originator.as_deref()).await
+            }
+            ConnectedSubstrate::WireApi(client) => {
+                client.get_header(args, originator.as_deref()).await
+            }
         }
     }
 
     /// Waits for authentication.
     #[cfg(feature = "http")]
     pub async fn wait_for_authentication(&mut self) -> Result<bool, Error> {
-        let originator = self.effective_originator().to_string();
+        let originator = self.effective_originator();
         let substrate = self.connect().await?;
 
         match substrate {
             ConnectedSubstrate::JsonApi(client) => {
-                client.wait_for_authentication(&originator).await
+                client.wait_for_authentication(originator.as_deref()).await
             }
             ConnectedSubstrate::WireApi(client) => {
-                client.wait_for_authentication(&originator).await
+                client.wait_for_authentication(originator.as_deref()).await
             }
         }
     }
@@ -663,9 +736,10 @@ mod tests {
     #[test]
     fn test_effective_originator() {
         let client = WalletClient::new(SubstrateType::Auto, Some("myapp.com".into()));
-        assert_eq!(client.effective_originator(), "myapp.com");
+        assert_eq!(client.effective_originator().as_deref(), Some("myapp.com"));
 
+        // None when none is set, never "" (#329)
         let client = WalletClient::new(SubstrateType::Auto, None);
-        assert_eq!(client.effective_originator(), "");
+        assert_eq!(client.effective_originator(), None);
     }
 }

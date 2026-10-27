@@ -120,7 +120,7 @@ impl TokenWallet {
                 for_self: Some(true),
                 ..Default::default()
             },
-            "test",
+            Some("test"),
         )
         .await
         .unwrap();
@@ -145,23 +145,23 @@ impl WalletInterface for TokenWallet {
     async fn get_public_key(
         &self,
         args: GetPublicKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetPublicKeyResult> {
         WalletInterface::get_public_key(self.keys.as_ref(), args, originator).await
     }
 
-    async fn encrypt(&self, args: EncryptArgs, originator: &str) -> Result<EncryptResult> {
+    async fn encrypt(&self, args: EncryptArgs, originator: Option<&str>) -> Result<EncryptResult> {
         WalletInterface::encrypt(self.keys.as_ref(), args, originator).await
     }
 
-    async fn decrypt(&self, args: DecryptArgs, originator: &str) -> Result<DecryptResult> {
+    async fn decrypt(&self, args: DecryptArgs, originator: Option<&str>) -> Result<DecryptResult> {
         WalletInterface::decrypt(self.keys.as_ref(), args, originator).await
     }
 
     async fn create_hmac(
         &self,
         args: CreateHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateHmacResult> {
         WalletInterface::create_hmac(self.keys.as_ref(), args, originator).await
     }
@@ -169,7 +169,7 @@ impl WalletInterface for TokenWallet {
     async fn verify_hmac(
         &self,
         args: VerifyHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifyHmacResult> {
         WalletInterface::verify_hmac(self.keys.as_ref(), args, originator).await
     }
@@ -177,7 +177,7 @@ impl WalletInterface for TokenWallet {
     async fn create_signature(
         &self,
         args: CreateSignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateSignatureResult> {
         WalletInterface::create_signature(self.keys.as_ref(), args, originator).await
     }
@@ -185,7 +185,7 @@ impl WalletInterface for TokenWallet {
     async fn verify_signature(
         &self,
         args: VerifySignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifySignatureResult> {
         WalletInterface::verify_signature(self.keys.as_ref(), args, originator).await
     }
@@ -193,7 +193,7 @@ impl WalletInterface for TokenWallet {
     async fn reveal_counterparty_key_linkage(
         &self,
         _args: WalletRevealCounterpartyArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RevealCounterpartyKeyLinkageResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -201,7 +201,7 @@ impl WalletInterface for TokenWallet {
     async fn reveal_specific_key_linkage(
         &self,
         _args: WalletRevealSpecificArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RevealSpecificKeyLinkageResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -212,7 +212,7 @@ impl WalletInterface for TokenWallet {
     async fn create_action(
         &self,
         args: CreateActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<CreateActionResult> {
         let source = self.source();
         let mut partial = Transaction::new();
@@ -251,7 +251,7 @@ impl WalletInterface for TokenWallet {
     async fn sign_action(
         &self,
         args: SignActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<SignActionResult> {
         let unlock = args.spends.get(&0).unwrap().unlocking_script.clone();
         let mut seen = self.seen.lock().unwrap();
@@ -267,7 +267,7 @@ impl WalletInterface for TokenWallet {
     async fn abort_action(
         &self,
         _args: AbortActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<AbortActionResult> {
         Ok(AbortActionResult { aborted: true })
     }
@@ -275,7 +275,7 @@ impl WalletInterface for TokenWallet {
     async fn list_actions(
         &self,
         _args: ListActionsArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ListActionsResult> {
         Ok(ListActionsResult {
             actions: vec![],
@@ -286,7 +286,7 @@ impl WalletInterface for TokenWallet {
     async fn internalize_action(
         &self,
         _args: InternalizeActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<InternalizeActionResult> {
         Ok(InternalizeActionResult { accepted: true })
     }
@@ -296,7 +296,7 @@ impl WalletInterface for TokenWallet {
     async fn list_outputs(
         &self,
         _args: ListOutputsArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ListOutputsResult> {
         let source = self.source();
         Ok(ListOutputsResult {
@@ -319,7 +319,7 @@ impl WalletInterface for TokenWallet {
     async fn relinquish_output(
         &self,
         _args: RelinquishOutputArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RelinquishOutputResult> {
         Ok(RelinquishOutputResult { relinquished: true })
     }
@@ -327,7 +327,7 @@ impl WalletInterface for TokenWallet {
     async fn acquire_certificate(
         &self,
         _args: AcquireCertificateArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<WalletCertificate> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -335,7 +335,7 @@ impl WalletInterface for TokenWallet {
     async fn list_certificates(
         &self,
         _args: ListCertificatesArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ListCertificatesResult> {
         Ok(ListCertificatesResult {
             certificates: vec![],
@@ -346,7 +346,7 @@ impl WalletInterface for TokenWallet {
     async fn prove_certificate(
         &self,
         _args: ProveCertificateArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ProveCertificateResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -354,7 +354,7 @@ impl WalletInterface for TokenWallet {
     async fn relinquish_certificate(
         &self,
         _args: RelinquishCertificateArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RelinquishCertificateResult> {
         Ok(RelinquishCertificateResult { relinquished: true })
     }
@@ -362,7 +362,7 @@ impl WalletInterface for TokenWallet {
     async fn discover_by_identity_key(
         &self,
         _args: DiscoverByIdentityKeyArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult> {
         Ok(DiscoverCertificatesResult {
             certificates: vec![],
@@ -373,7 +373,7 @@ impl WalletInterface for TokenWallet {
     async fn discover_by_attributes(
         &self,
         _args: DiscoverByAttributesArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult> {
         Ok(DiscoverCertificatesResult {
             certificates: vec![],
@@ -381,37 +381,40 @@ impl WalletInterface for TokenWallet {
         })
     }
 
-    async fn is_authenticated(&self, _originator: &str) -> Result<AuthenticatedResult> {
+    async fn is_authenticated(&self, _originator: Option<&str>) -> Result<AuthenticatedResult> {
         Ok(AuthenticatedResult {
             authenticated: true,
         })
     }
 
-    async fn wait_for_authentication(&self, _originator: &str) -> Result<AuthenticatedResult> {
+    async fn wait_for_authentication(
+        &self,
+        _originator: Option<&str>,
+    ) -> Result<AuthenticatedResult> {
         Ok(AuthenticatedResult {
             authenticated: true,
         })
     }
 
-    async fn get_height(&self, _originator: &str) -> Result<GetHeightResult> {
+    async fn get_height(&self, _originator: Option<&str>) -> Result<GetHeightResult> {
         Ok(GetHeightResult { height: 800_000 })
     }
 
     async fn get_header_for_height(
         &self,
         _args: GetHeaderArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<GetHeaderResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
 
-    async fn get_network(&self, _originator: &str) -> Result<GetNetworkResult> {
+    async fn get_network(&self, _originator: Option<&str>) -> Result<GetNetworkResult> {
         Ok(GetNetworkResult {
             network: Network::Mainnet,
         })
     }
 
-    async fn get_version(&self, _originator: &str) -> Result<GetVersionResult> {
+    async fn get_version(&self, _originator: Option<&str>) -> Result<GetVersionResult> {
         Ok(GetVersionResult {
             version: "token-wallet-1.0".to_string(),
         })

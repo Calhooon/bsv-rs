@@ -140,7 +140,7 @@ async fn an_acquired_certificate_reads_as_the_reference_and_the_writer_write_it(
     assert_eq!(writer_certificate(), reference_certificate());
     for frame in [writer_certificate(), reference_certificate()] {
         let read = client(frame.clone())
-            .acquire_certificate(acquire_args(), "fixtures.invalid")
+            .acquire_certificate(acquire_args(), Some("fixtures.invalid"))
             .await
             .unwrap();
         assert_eq!(json(&read), json(&certificate()));
@@ -185,7 +185,7 @@ async fn a_listed_certificate_and_its_verifier_read_as_the_reference_writes_them
         (reference_certificate(), None),
     ] {
         let read = client(list_frame(&cert, verifier))
-            .list_certificates(list_args(), "fixtures.invalid")
+            .list_certificates(list_args(), Some("fixtures.invalid"))
             .await
             .unwrap();
         assert_eq!(read.total_certificates, 1);
@@ -209,7 +209,7 @@ async fn a_listed_verifier_of_another_length_is_refused() {
     frame.pop();
     var_bytes(&mut frame, G.as_bytes());
     let err = client(frame)
-        .list_certificates(list_args(), "fixtures.invalid")
+        .list_certificates(list_args(), Some("fixtures.invalid"))
         .await
         .unwrap_err();
     assert_eq!(
@@ -226,7 +226,7 @@ async fn a_listed_verifier_of_another_length_is_refused() {
 async fn the_shared_list_certificates_vector_reads_through_the_transceiver() {
     let (json, wire) = vector("listCertificates-full-result.json");
     let read = client(wire[1..].to_vec())
-        .list_certificates(list_args(), "fixtures.invalid")
+        .list_certificates(list_args(), Some("fixtures.invalid"))
         .await
         .unwrap();
     let expected = &json["certificates"][0];
@@ -293,7 +293,7 @@ async fn a_certificate_discovered_by_identity_key_reads_as_the_reference_writes_
         (reference_certificate(), ""),
     ] {
         let read = client(discovery_frame(&cert, icon_url))
-            .discover_by_identity_key(args.clone(), "fixtures.invalid")
+            .discover_by_identity_key(args.clone(), Some("fixtures.invalid"))
             .await
             .unwrap();
         assert_discovered(&read, icon_url);
@@ -315,7 +315,7 @@ async fn a_certificate_discovered_by_attributes_reads_as_the_reference_writes_it
         (reference_certificate(), ""),
     ] {
         let read = client(discovery_frame(&cert, icon_url))
-            .discover_by_attributes(args.clone(), "fixtures.invalid")
+            .discover_by_attributes(args.clone(), Some("fixtures.invalid"))
             .await
             .unwrap();
         assert_discovered(&read, icon_url);
@@ -335,7 +335,7 @@ async fn the_shared_discovery_vector_reads_through_the_transceiver() {
         seek_permission: None,
     };
     let read = client(wire[1..].to_vec())
-        .discover_by_identity_key(args, "fixtures.invalid")
+        .discover_by_identity_key(args, Some("fixtures.invalid"))
         .await
         .unwrap();
     let expected = &json["certificates"][0];
@@ -371,7 +371,7 @@ async fn a_proved_certificate_keyring_reads_as_the_reference_writes_it() {
         privileged_reason: None,
     };
     let read = client(frame)
-        .prove_certificate(args, "fixtures.invalid")
+        .prove_certificate(args, Some("fixtures.invalid"))
         .await
         .unwrap();
     assert_eq!(

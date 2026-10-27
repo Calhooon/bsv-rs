@@ -57,7 +57,7 @@ const NONCE_LEGACY_SIZE: usize = NONCE_RANDOM_SIZE + NONCE_RANDOM_SIZE;
 pub async fn create_nonce<W: WalletInterface>(
     wallet: &W,
     counterparty: Option<&crate::primitives::PublicKey>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<String> {
     // Generate 16 random bytes
     let mut random_bytes = [0u8; NONCE_RANDOM_SIZE];
@@ -107,7 +107,7 @@ pub async fn verify_nonce<W: WalletInterface>(
     nonce: &str,
     wallet: &W,
     counterparty: Option<&crate::primitives::PublicKey>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<bool> {
     // Decode nonce
     let nonce_bytes = from_base64(nonce)?;
@@ -241,14 +241,14 @@ mod tests {
             )
             .unwrap(),
         ));
-        let nonce = create_nonce(&wallet, None, "test.app").await.unwrap();
+        let nonce = create_nonce(&wallet, None, Some("test.app")).await.unwrap();
         let decoded = from_base64(&nonce).unwrap();
         assert_eq!(
             decoded.len(),
             NONCE_TOTAL_SIZE,
             "canonical nonce must be 48 bytes"
         );
-        assert!(verify_nonce(&nonce, &wallet, None, "test.app")
+        assert!(verify_nonce(&nonce, &wallet, None, Some("test.app"))
             .await
             .unwrap());
     }
@@ -281,7 +281,7 @@ mod tests {
         legacy.extend_from_slice(&hmac.hmac[..NONCE_RANDOM_SIZE]);
         let nonce = to_base64(&legacy);
         assert_eq!(from_base64(&nonce).unwrap().len(), NONCE_LEGACY_SIZE);
-        assert!(verify_nonce(&nonce, &wallet, None, "test.app")
+        assert!(verify_nonce(&nonce, &wallet, None, Some("test.app"))
             .await
             .unwrap());
     }
@@ -325,11 +325,10 @@ mod tests {
                 let wallet =
                     HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
                         .expect("the substrate is configured");
-                let answer =
-                    tokio::spawn(
-                        async move { verify_nonce(&nonce, &wallet, None, "test.app").await },
-                    )
-                    .await;
+                let answer = tokio::spawn(async move {
+                    verify_nonce(&nonce, &wallet, None, Some("test.app")).await
+                })
+                .await;
                 let answer = answer.unwrap_or_else(|e| {
                     panic!("verify_nonce panicked on a {short}-byte HMAC: {e}")
                 });

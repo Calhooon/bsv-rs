@@ -161,7 +161,7 @@ pub struct Peer<W: WalletInterface, T: Transport> {
     // Options
     #[allow(dead_code)]
     auto_persist_last_session: bool,
-    originator: String,
+    originator: Option<String>,
 
     // Cached identity key
     identity_key: Arc<RwLock<Option<PublicKey>>>,
@@ -173,8 +173,6 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
     /// Note: After creating the Peer, you should call `start()` to set up
     /// the transport callback for receiving messages.
     pub fn new(options: PeerOptions<W, T>) -> Self {
-        let originator = options.originator.unwrap_or_else(|| "unknown".to_string());
-
         Self {
             wallet: options.wallet,
             transport: Arc::new(options.transport),
@@ -186,7 +184,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             next_callback_id: AtomicU32::new(1),
             pending_handshakes: Arc::new(RwLock::new(HashMap::new())),
             auto_persist_last_session: options.auto_persist_last_session,
-            originator,
+            originator: options.originator,
             identity_key: Arc::new(RwLock::new(None)),
         }
     }
@@ -590,7 +588,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     counterparty: None,
                     ..Default::default()
                 },
-                &self.originator,
+                self.originator.as_deref(),
             )
             .await?;
 
@@ -657,7 +655,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     counterparty,
                     ..Default::default()
                 },
-                &self.originator,
+                self.originator.as_deref(),
             )
             .await?;
 
@@ -692,7 +690,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     counterparty: Some(Counterparty::Other(message.identity_key.clone())),
                     ..Default::default()
                 },
-                &self.originator,
+                self.originator.as_deref(),
             )
             .await?;
 
@@ -708,7 +706,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let my_identity = self.get_identity_key().await?;
 
         // Create session with new nonce
-        let session_nonce = create_nonce(&self.wallet, None, &self.originator).await?;
+        let session_nonce = create_nonce(&self.wallet, None, self.originator.as_deref()).await?;
         let session = PeerSession::with_nonce(session_nonce.clone());
 
         // Add to session manager
@@ -748,7 +746,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         let my_identity = self.get_identity_key().await?;
 
         // Create our session nonce (counterparty=None=Self, matching Go/TS)
-        let session_nonce = create_nonce(&self.wallet, None, &self.originator).await?;
+        let session_nonce = create_nonce(&self.wallet, None, self.originator.as_deref()).await?;
         let mut session = PeerSession::with_nonce(session_nonce.clone());
         session.peer_identity_key = Some(message.identity_key.clone());
         session.peer_nonce = message.initial_nonce.clone();
@@ -790,7 +788,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
                     &self.wallet,
                     req,
                     &message.identity_key,
-                    &self.originator,
+                    self.originator.as_deref(),
                 )
                 .await
                 .unwrap_or_default();
@@ -865,7 +863,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             nonce_to_verify,
             &self.wallet,
             Some(&message.identity_key),
-            &self.originator,
+            self.originator.as_deref(),
         )
         .await
         .unwrap_or(false)
@@ -959,7 +957,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             &self.wallet,
             &message,
             self.certificates_to_request.as_ref(),
-            &self.originator,
+            self.originator.as_deref(),
         )
         .await?;
 

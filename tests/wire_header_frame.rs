@@ -55,30 +55,30 @@ macro_rules! header_wallet {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for HeaderWallet {
-            $(async fn $method(&self, _: $args, _: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, _: $args, _: Option<&str>) -> bsv_rs::Result<$result> {
                 unreachable!()
             })*
 
-            async fn is_authenticated(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 unreachable!()
             }
-            async fn wait_for_authentication(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn wait_for_authentication(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 unreachable!()
             }
-            async fn get_height(&self, _: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, _: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 unreachable!()
             }
             async fn get_header_for_height(
                 &self,
                 _: GetHeaderArgs,
-                _: &str,
+                _: Option<&str>,
             ) -> bsv_rs::Result<GetHeaderResult> {
                 Ok(GetHeaderResult { header: genesis().0 })
             }
-            async fn get_network(&self, _: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, _: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 unreachable!()
             }
-            async fn get_version(&self, _: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, _: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 unreachable!()
             }
         }
@@ -153,11 +153,11 @@ async fn a_header_frame_is_the_error_byte_then_the_80_raw_bytes() {
 async fn a_header_for_height_reaches_the_client_as_its_80_bytes() {
     let (header, reference) = genesis();
     let looped = WalletWireTransceiver::new(ProcessorWire(WalletWireProcessor::new(HeaderWallet)))
-        .get_header(GetHeaderArgs { height: 1 }, "fixtures.invalid")
+        .get_header(GetHeaderArgs { height: 1 }, Some("fixtures.invalid"))
         .await
         .unwrap();
     let canned = client(reference[1..].to_vec())
-        .get_header(GetHeaderArgs { height: 1 }, "fixtures.invalid")
+        .get_header(GetHeaderArgs { height: 1 }, Some("fixtures.invalid"))
         .await
         .unwrap();
     for read in [looped, canned] {

@@ -49,6 +49,8 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 └─────────┴──────────────┴────────────┴────────────────┘
 ```
 
+The transceiver's methods take `originator: Option<&str>` as `WalletInterface` does (#329): `None` and `Some("")` are written as the length-0 originator, and the processor reads length 0 back as `None` (a named originator as given). The reference's processor reads length 0 as `''` (`WalletWireProcessor.ts:292-294` at `ts-stack@edf6e03`): the divergence is in the root `CLAUDE.md`'s list.
+
 ### Response Frame (Success)
 
 ```

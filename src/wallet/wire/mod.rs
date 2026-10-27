@@ -69,7 +69,7 @@
 //! let wallet = WalletWireTransceiver::new(wire);
 //!
 //! // Use wallet methods
-//! let result = wallet.get_public_key(args, "originator").await?;
+//! let result = wallet.get_public_key(args, Some("example.com")).await?;
 //! ```
 
 mod calls;

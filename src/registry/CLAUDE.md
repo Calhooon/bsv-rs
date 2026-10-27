@@ -320,7 +320,7 @@ impl<W: WalletInterface> RegistryClient<W> {
 pub struct RegistryClientConfig {
     pub network_preset: NetworkPreset,    // Mainnet, Testnet, Local
     pub resolver: Option<Arc<LookupResolver>>,
-    pub originator: Option<String>,
+    pub originator: Option<String>,       // None: no originator to the wallet ("registry-client" until #329)
     pub accept_delayed_broadcast: bool,
 }
 

@@ -138,7 +138,7 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
     let master = MasterCertificate::new(cert.clone(), r.master_keyring.clone()).unwrap();
     let subject_wallet = ProtoWallet::new(Some(key(r.keys.subject)));
     let decrypted = master
-        .decrypt_fields(&subject_wallet, &certifier, None, None, "test")
+        .decrypt_fields(&subject_wallet, &certifier, None, None, Some("test"))
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
@@ -146,14 +146,14 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
     let mut verifiable = VerifiableCertificate::new(cert.clone(), r.verifier_keyring.clone());
     let verifier_wallet = ProtoWallet::new(Some(key(r.keys.verifier)));
     let decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, None, None, "test")
+        .decrypt_fields(&verifier_wallet, None, None, Some("test"))
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
 
     let mut public = VerifiableCertificate::new(cert, r.anyone_keyring.clone());
     let decrypted = public
-        .decrypt_fields(&ProtoWallet::anyone(), None, None, "test")
+        .decrypt_fields(&ProtoWallet::anyone(), None, None, Some("test"))
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
@@ -204,7 +204,7 @@ async fn a_reference_issued_certificate_from_a_wallet_json_result_verifies_and_d
     let verifier = key(r.keys.verifier);
 
     let mut certs =
-        get_verifiable_certificates(&wallet, &requested, &verifier.public_key(), "test")
+        get_verifiable_certificates(&wallet, &requested, &verifier.public_key(), Some("test"))
             .await
             .unwrap();
     assert_eq!(certs.len(), 1);
@@ -213,7 +213,7 @@ async fn a_reference_issued_certificate_from_a_wallet_json_result_verifies_and_d
     assert!(cert.verify().unwrap());
 
     let decrypted = cert
-        .decrypt_fields(&ProtoWallet::new(Some(verifier)), None, None, "test")
+        .decrypt_fields(&ProtoWallet::new(Some(verifier)), None, None, Some("test"))
         .await
         .unwrap();
     assert_eq!(decrypted, r.plaintexts);
@@ -243,7 +243,7 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
         w.plaintexts.clone(),
         bytes32(&w.certificate.cert_type),
         Some(bytes32(&w.certificate.serial_number)),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -271,7 +271,7 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
             &certifier.public_key(),
             None,
             None,
-            "test",
+            Some("test"),
         )
         .await
         .unwrap();
@@ -373,7 +373,7 @@ async fn print_a_certificate_issued_here_for_the_reference() {
         plaintexts.clone(),
         [8u8; 32],
         Some([9u8; 32]),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -389,7 +389,7 @@ async fn print_a_certificate_issued_here_for_the_reference() {
         &master.serial_number,
         None,
         None,
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();

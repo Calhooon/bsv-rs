@@ -220,7 +220,7 @@ async fn read_as_the_overlay_reads(script: &LockingScript) -> HashMap<String, St
     let mut certificate: VerifiableCertificate = serde_json::from_value(json).unwrap();
     assert!(certificate.verify().unwrap());
     certificate
-        .decrypt_fields(&anyone, None, None, "identity-client")
+        .decrypt_fields(&anyone, None, None, Some("identity-client"))
         .await
         .unwrap()
 }

@@ -64,7 +64,7 @@ The HMAC is computed using BRC-42 key derivation with:
 pub async fn create_nonce<W: WalletInterface>(
     wallet: &W,
     counterparty: Option<&PublicKey>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<String>
 ```
 
@@ -92,7 +92,7 @@ pub async fn verify_nonce<W: WalletInterface>(
     nonce: &str,
     wallet: &W,
     counterparty: Option<&PublicKey>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<bool>
 ```
 
@@ -169,7 +169,7 @@ pub async fn validate_certificates<W: WalletInterface>(
     verifier_wallet: &W,
     message: &AuthMessage,
     certificates_requested: Option<&RequestedCertificateSet>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<()>
 ```
 
@@ -217,7 +217,7 @@ pub async fn validate_certificate<W: WalletInterface>(
     cert: &VerifiableCertificate,
     sender_key: &PublicKey,
     certificates_requested: Option<&RequestedCertificateSet>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<()>
 ```
 
@@ -245,7 +245,7 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
     wallet: &W,
     requested: &RequestedCertificateSet,
     verifier_identity_key: &PublicKey,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<Vec<VerifiableCertificate>>
 ```
 

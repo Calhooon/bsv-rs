@@ -116,35 +116,35 @@ macro_rules! bloated {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for Bloated {
-            $(async fn $method(&self, args: $args, o: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, args: $args, o: Option<&str>) -> bsv_rs::Result<$result> {
                 WalletInterface::$method(&self.inner, args, o).await
             })*
 
-            async fn encrypt(&self, _: EncryptArgs, _: &str) -> bsv_rs::Result<EncryptResult> {
+            async fn encrypt(&self, _: EncryptArgs, _: Option<&str>) -> bsv_rs::Result<EncryptResult> {
                 Ok(EncryptResult { ciphertext: vec![0x41; self.n] })
             }
-            async fn decrypt(&self, args: DecryptArgs, o: &str) -> bsv_rs::Result<DecryptResult> {
+            async fn decrypt(&self, args: DecryptArgs, o: Option<&str>) -> bsv_rs::Result<DecryptResult> {
                 match self.decrypted {
                     Some(n) => Ok(DecryptResult { plaintext: vec![0x41; n] }),
                     None => WalletInterface::decrypt(&self.inner, args, o).await,
                 }
             }
-            async fn is_authenticated(&self, o: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, o: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 WalletInterface::is_authenticated(&self.inner, o).await
             }
             async fn wait_for_authentication(
                 &self,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<AuthenticatedResult> {
                 WalletInterface::wait_for_authentication(&self.inner, o).await
             }
-            async fn get_height(&self, o: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, o: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 WalletInterface::get_height(&self.inner, o).await
             }
-            async fn get_network(&self, o: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, o: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 WalletInterface::get_network(&self.inner, o).await
             }
-            async fn get_version(&self, o: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, o: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 WalletInterface::get_version(&self.inner, o).await
             }
         }
@@ -220,7 +220,7 @@ async fn encrypt_key(
     };
     let wallet = ProtoWallet::new(Some(from));
     to_base64(
-        &WalletInterface::encrypt(&wallet, args, "test")
+        &WalletInterface::encrypt(&wallet, args, Some("test"))
             .await
             .unwrap()
             .ciphertext,
@@ -313,11 +313,18 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
     };
     match site {
         "master_decrypt_field" => master()
-            .decrypt_field(&subject_wallet, &certifier_key, "name", None, None, "test")
+            .decrypt_field(
+                &subject_wallet,
+                &certifier_key,
+                "name",
+                None,
+                None,
+                Some("test"),
+            )
             .await
             .map(|p| json!(p.len())),
         "master_decrypt_fields" => master()
-            .decrypt_fields(&subject_wallet, &certifier_key, None, None, "test")
+            .decrypt_fields(&subject_wallet, &certifier_key, None, None, Some("test"))
             .await
             .map(|r| json!(r.len())),
         "create_keyring_for_verifier" => {
@@ -340,7 +347,7 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
                         args.3,
                         None,
                         None,
-                        "test",
+                        Some("test"),
                     )
                     .await
                 }
@@ -355,7 +362,7 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
                         args.3,
                         None,
                         None,
-                        "test",
+                        Some("test"),
                     )
                     .await
                 }
@@ -365,7 +372,7 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
         "verifiable_decrypt_fields" => {
             let mut v =
                 VerifiableCertificate::new(certificate(c.fields.clone()), c.verifier_keyring);
-            v.decrypt_fields(&verifier_of(input), None, None, "test")
+            v.decrypt_fields(&verifier_of(input), None, None, Some("test"))
                 .await
                 .map(|r| json!(r.values().map(String::len).sum::<usize>()))
         }
@@ -419,13 +426,23 @@ async fn run(case: &Value) -> Value {
                         decrypted: None,
                     };
                     MasterCertificate::create_certificate_fields(
-                        &wallet, &to, plaintexts, None, None, "test",
+                        &wallet,
+                        &to,
+                        plaintexts,
+                        None,
+                        None,
+                        Some("test"),
                     )
                     .await
                 }
                 None => {
                     MasterCertificate::create_certificate_fields(
-                        &inner, &to, plaintexts, None, None, "test",
+                        &inner,
+                        &to,
+                        plaintexts,
+                        None,
+                        None,
+                        Some("test"),
                     )
                     .await
                 }
@@ -524,13 +541,14 @@ async fn verifiable_decrypt_field_quotes_the_failure_as_decrypt_fields_does_297(
     let wallet = ProtoWallet::new(Some(verifier()));
     let oversized = "Failed to decrypt selectively revealed certificate fields using keyring: Decrypted certificate field is oversized";
     assert_eq!(
-        v.decrypt_field(&wallet, "name", None, None, "test").await,
+        v.decrypt_field(&wallet, "name", None, None, Some("test"))
+            .await,
         Err(bsv_rs::Error::CertificateValidationError(oversized.into()))
     );
     c.verifier_keyring.insert("name".into(), b64(2049));
     let v = VerifiableCertificate::new(certificate(c.fields), c.verifier_keyring);
     assert_eq!(
-        v.decrypt_field(&wallet, "name", None, None, "test").await,
+        v.decrypt_field(&wallet, "name", None, None, Some("test")).await,
         Err(bsv_rs::Error::CertificateValidationError(
             "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring field name is empty, oversized, or non-canonical".into()
         ))
@@ -547,7 +565,7 @@ async fn issue_for_subject_refuses_a_plaintext_over_64_kib_and_issues_one_at_the
             HashMap::from([("name".to_string(), "A".repeat(len))]),
             [1; 32],
             Some(SERIAL),
-            "test",
+            Some("test"),
         )
         .await
     };

@@ -145,7 +145,7 @@ async fn read_the_three(
             &key(keys.certifier).public_key(),
             None,
             None,
-            "test",
+            Some("test"),
         )
         .await
         .unwrap();
@@ -155,7 +155,7 @@ async fn read_the_three(
             &ProtoWallet::new(Some(key(keys.verifier))),
             None,
             None,
-            "test",
+            Some("test"),
         )
         .await
         .unwrap();
@@ -415,9 +415,10 @@ async fn a_wallet_certificate_with_a_txid_alone_revocation_outpoint_verifies() {
     let mut requested = RequestedCertificateSet::new();
     requested.add_certifier(certifier.public_key().to_hex());
     requested.add_type(to_base64(&cert.cert_type), vec!["name".to_string()]);
-    let certs = get_verifiable_certificates(&wallet, &requested, &key(41).public_key(), "test")
-        .await
-        .unwrap();
+    let certs =
+        get_verifiable_certificates(&wallet, &requested, &key(41).public_key(), Some("test"))
+            .await
+            .unwrap();
     assert_eq!(certs.len(), 1);
     assert_eq!(certs[0].revocation_outpoint, cert.revocation_outpoint);
     assert!(certs[0].verify().unwrap());
@@ -460,7 +461,7 @@ async fn issue_here(
         plaintexts.clone(),
         [8u8; 32],
         Some([9u8; 32]),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -476,7 +477,7 @@ async fn issue_here(
         &master.serial_number,
         None,
         None,
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();

@@ -254,14 +254,14 @@ mod tests {
             key_id: "k".to_string(),
             ..Default::default()
         };
-        let plain = client.create_signature(args.clone(), "").await.unwrap();
+        let plain = client.create_signature(args.clone(), None).await.unwrap();
         let with = CreateSignatureArgs {
             privileged: Some(true),
             privileged_reason: Some("json reason".to_string()),
             seek_permission: Some(false),
             ..args
         };
-        let privileged = client.create_signature(with, "").await.unwrap();
+        let privileged = client.create_signature(with, None).await.unwrap();
         assert_eq!((plain.signature, privileged.signature), (vec![1], vec![2]));
     }
 }

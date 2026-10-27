@@ -147,7 +147,7 @@ async fn list(frame: Vec<u8>) -> Result<ListCertificatesResult, Error> {
         privileged_reason: None,
     };
     client(frame)
-        .list_certificates(args, "fixtures.invalid")
+        .list_certificates(args, Some("fixtures.invalid"))
         .await
 }
 
@@ -174,7 +174,7 @@ async fn discover(frame: Vec<u8>) -> Result<DiscoverCertificatesResult, Error> {
         seek_permission: None,
     };
     client(frame)
-        .discover_by_identity_key(args, "fixtures.invalid")
+        .discover_by_identity_key(args, Some("fixtures.invalid"))
         .await
 }
 
@@ -223,7 +223,7 @@ async fn the_valid_certificate_is_read_by_every_reader() {
 async fn a_header_that_is_not_80_bytes_is_refused() {
     for length in [0, 79, 81] {
         let error = client(vec![1; length])
-            .get_header(GetHeaderArgs { height: 1 }, "fixtures.invalid")
+            .get_header(GetHeaderArgs { height: 1 }, Some("fixtures.invalid"))
             .await
             .unwrap_err();
         assert_eq!(
@@ -232,7 +232,7 @@ async fn a_header_that_is_not_80_bytes_is_refused() {
         );
     }
     let read = client(vec![1; 80])
-        .get_header(GetHeaderArgs { height: 1 }, "fixtures.invalid")
+        .get_header(GetHeaderArgs { height: 1 }, Some("fixtures.invalid"))
         .await
         .unwrap();
     assert_eq!(read.header, "01".repeat(80));
@@ -248,30 +248,30 @@ macro_rules! header_wallet {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for HeaderWallet {
-            $(async fn $method(&self, _: $args, _: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, _: $args, _: Option<&str>) -> bsv_rs::Result<$result> {
                 unreachable!()
             })*
 
-            async fn is_authenticated(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 unreachable!()
             }
-            async fn wait_for_authentication(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn wait_for_authentication(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 unreachable!()
             }
-            async fn get_height(&self, _: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, _: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 unreachable!()
             }
             async fn get_header_for_height(
                 &self,
                 _: GetHeaderArgs,
-                _: &str,
+                _: Option<&str>,
             ) -> bsv_rs::Result<GetHeaderResult> {
                 Ok(GetHeaderResult { header: self.0.clone() })
             }
-            async fn get_network(&self, _: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, _: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 unreachable!()
             }
-            async fn get_version(&self, _: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, _: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 unreachable!()
             }
         }
@@ -1249,7 +1249,7 @@ async fn every_page_reader(
                 privileged: None,
                 privileged_reason: None,
             },
-            "fixtures.invalid",
+            Some("fixtures.invalid"),
         )
         .await
         .map(|r| (r.total_certificates, r.certificates.len()))
@@ -1262,7 +1262,7 @@ async fn every_page_reader(
                 offset: None,
                 seek_permission: None,
             },
-            "fixtures.invalid",
+            Some("fixtures.invalid"),
         )
         .await
         .map(|r| (r.total_certificates, r.certificates.len()))
@@ -1275,7 +1275,7 @@ async fn every_page_reader(
                 offset: None,
                 seek_permission: None,
             },
-            "fixtures.invalid",
+            Some("fixtures.invalid"),
         )
         .await
         .map(|r| (r.total_certificates, r.certificates.len()))

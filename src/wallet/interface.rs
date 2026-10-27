@@ -90,6 +90,16 @@ pub struct RevealSpecificKeyLinkageArgs {
 /// - `is_authenticated`, `wait_for_authentication`, `get_height`, `get_header_for_height`
 /// - `get_network`, `get_version`
 ///
+/// # The originator
+///
+/// Every method takes `originator: Option<&str>`, the reference's optional
+/// `originator?` (`Wallet.interfaces.ts`, 28 sites; bsv-rs#329): `None` is an
+/// absent originator, which the reference's `validateOriginator` accepts, and
+/// `Some("")` an empty one, which it refuses; a caller passes `None` when it
+/// has no originator configured, and nothing in process maps one to the
+/// other. The binary wire has one form for both, the length-0 originator,
+/// read back as `None`.
+///
 /// # Implementation Notes
 ///
 /// Implementations that don't support certain operations should return
@@ -104,49 +114,55 @@ pub trait WalletInterface: Send + Sync {
     async fn get_public_key(
         &self,
         args: GetPublicKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetPublicKeyResult>;
 
     /// Encrypts plaintext data using derived keys.
-    async fn encrypt(&self, args: EncryptArgs, originator: &str) -> Result<EncryptResult>;
+    async fn encrypt(&self, args: EncryptArgs, originator: Option<&str>) -> Result<EncryptResult>;
 
     /// Decrypts ciphertext using derived keys.
-    async fn decrypt(&self, args: DecryptArgs, originator: &str) -> Result<DecryptResult>;
+    async fn decrypt(&self, args: DecryptArgs, originator: Option<&str>) -> Result<DecryptResult>;
 
     /// Creates an HMAC for the provided data.
-    async fn create_hmac(&self, args: CreateHmacArgs, originator: &str)
-        -> Result<CreateHmacResult>;
+    async fn create_hmac(
+        &self,
+        args: CreateHmacArgs,
+        originator: Option<&str>,
+    ) -> Result<CreateHmacResult>;
 
     /// Verifies an HMAC for the provided data.
-    async fn verify_hmac(&self, args: VerifyHmacArgs, originator: &str)
-        -> Result<VerifyHmacResult>;
+    async fn verify_hmac(
+        &self,
+        args: VerifyHmacArgs,
+        originator: Option<&str>,
+    ) -> Result<VerifyHmacResult>;
 
     /// Creates a digital signature.
     async fn create_signature(
         &self,
         args: CreateSignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateSignatureResult>;
 
     /// Verifies a digital signature.
     async fn verify_signature(
         &self,
         args: VerifySignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifySignatureResult>;
 
     /// Reveals the key linkage between self and a counterparty to a verifier.
     async fn reveal_counterparty_key_linkage(
         &self,
         args: RevealCounterpartyKeyLinkageArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RevealCounterpartyKeyLinkageResult>;
 
     /// Reveals a specific key linkage to a verifier.
     async fn reveal_specific_key_linkage(
         &self,
         args: RevealSpecificKeyLinkageArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RevealSpecificKeyLinkageResult>;
 
     // =========================================================================
@@ -157,32 +173,35 @@ pub trait WalletInterface: Send + Sync {
     async fn create_action(
         &self,
         args: CreateActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateActionResult>;
 
     /// Signs a transaction previously created using `create_action`.
-    async fn sign_action(&self, args: SignActionArgs, originator: &str)
-        -> Result<SignActionResult>;
+    async fn sign_action(
+        &self,
+        args: SignActionArgs,
+        originator: Option<&str>,
+    ) -> Result<SignActionResult>;
 
     /// Aborts a transaction that is in progress.
     async fn abort_action(
         &self,
         args: AbortActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<AbortActionResult>;
 
     /// Lists all transactions matching the specified labels.
     async fn list_actions(
         &self,
         args: ListActionsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListActionsResult>;
 
     /// Submits a transaction to be internalized.
     async fn internalize_action(
         &self,
         args: InternalizeActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<InternalizeActionResult>;
 
     // =========================================================================
@@ -193,14 +212,14 @@ pub trait WalletInterface: Send + Sync {
     async fn list_outputs(
         &self,
         args: ListOutputsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListOutputsResult>;
 
     /// Relinquishes an output from a basket.
     async fn relinquish_output(
         &self,
         args: RelinquishOutputArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RelinquishOutputResult>;
 
     // =========================================================================
@@ -211,28 +230,28 @@ pub trait WalletInterface: Send + Sync {
     async fn acquire_certificate(
         &self,
         args: AcquireCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<WalletCertificate>;
 
     /// Lists identity certificates.
     async fn list_certificates(
         &self,
         args: ListCertificatesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListCertificatesResult>;
 
     /// Proves select fields of an identity certificate.
     async fn prove_certificate(
         &self,
         args: ProveCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ProveCertificateResult>;
 
     /// Relinquishes an identity certificate.
     async fn relinquish_certificate(
         &self,
         args: RelinquishCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RelinquishCertificateResult>;
 
     // =========================================================================
@@ -243,14 +262,14 @@ pub trait WalletInterface: Send + Sync {
     async fn discover_by_identity_key(
         &self,
         args: DiscoverByIdentityKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult>;
 
     /// Discovers certificates by attributes.
     async fn discover_by_attributes(
         &self,
         args: DiscoverByAttributesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult>;
 
     // =========================================================================
@@ -258,26 +277,29 @@ pub trait WalletInterface: Send + Sync {
     // =========================================================================
 
     /// Checks if the user is authenticated.
-    async fn is_authenticated(&self, originator: &str) -> Result<AuthenticatedResult>;
+    async fn is_authenticated(&self, originator: Option<&str>) -> Result<AuthenticatedResult>;
 
     /// Waits until the user is authenticated.
-    async fn wait_for_authentication(&self, originator: &str) -> Result<AuthenticatedResult>;
+    async fn wait_for_authentication(
+        &self,
+        originator: Option<&str>,
+    ) -> Result<AuthenticatedResult>;
 
     /// Gets the current blockchain height.
-    async fn get_height(&self, originator: &str) -> Result<GetHeightResult>;
+    async fn get_height(&self, originator: Option<&str>) -> Result<GetHeightResult>;
 
     /// Gets the block header at a specific height.
     async fn get_header_for_height(
         &self,
         args: GetHeaderArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetHeaderResult>;
 
     /// Gets the Bitcoin network (mainnet or testnet).
-    async fn get_network(&self, originator: &str) -> Result<GetNetworkResult>;
+    async fn get_network(&self, originator: Option<&str>) -> Result<GetNetworkResult>;
 
     /// Gets the wallet version string.
-    async fn get_version(&self, originator: &str) -> Result<GetVersionResult>;
+    async fn get_version(&self, originator: Option<&str>) -> Result<GetVersionResult>;
 }
 
 /// Marker trait for wallets that support crypto-only operations.

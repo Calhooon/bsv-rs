@@ -43,7 +43,7 @@ async fn create_action_against(answer: ResponseTemplate) -> Error {
     let wallet = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
         .expect("the substrate is configured");
     wallet
-        .create_action(create_action_args(), "app.example.com")
+        .create_action(create_action_args(), Some("app.example.com"))
         .await
         .expect_err("the wallet answered an error")
 }
@@ -263,7 +263,7 @@ async fn a_refused_connection_is_a_transport_fault() {
     )
     .expect("the substrate is configured");
     let err = wallet
-        .create_action(create_action_args(), "app.example.com")
+        .create_action(create_action_args(), Some("app.example.com"))
         .await
         .expect_err("nothing listens");
     match err {
@@ -292,7 +292,7 @@ async fn a_connection_reset_before_an_answer_is_a_transport_fault() {
     )
     .expect("the substrate is configured");
     let err = wallet
-        .create_action(create_action_args(), "app.example.com")
+        .create_action(create_action_args(), Some("app.example.com"))
         .await
         .expect_err("the peer closed");
     peer.join().unwrap();
@@ -321,7 +321,7 @@ async fn a_timeout_is_a_transport_fault() {
         HttpWalletJson::with_client(client, Some("app.example.com".into()), Some(server.uri()))
             .expect("the substrate is configured");
     let err = wallet
-        .create_action(create_action_args(), "app.example.com")
+        .create_action(create_action_args(), Some("app.example.com"))
         .await
         .expect_err("the answer came too late");
     match err {

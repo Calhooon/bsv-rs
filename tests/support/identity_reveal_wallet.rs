@@ -54,7 +54,7 @@ fn spending_signable(source: &Transaction, outputs: &[CreateActionOutput]) -> Si
 pub struct Counting {
     inner: Arc<ProtoWallet>,
     calls: Arc<Mutex<Vec<&'static str>>>,
-    originators: Arc<Mutex<Vec<String>>>,
+    originators: Arc<Mutex<Vec<Option<String>>>>,
     /// The signable transaction createAction answers (its atomic BEEF and
     /// reference), none by default (#318).
     pub signable: Option<SignableTransaction>,
@@ -124,17 +124,18 @@ impl Counting {
         self.calls.lock().unwrap().clone()
     }
 
-    /// The originator each call received, in the order of `calls` (#318).
-    pub fn originators(&self) -> Vec<String> {
+    /// The originator each call received, in the order of `calls` (#318;
+    /// `None` an absent one, #329).
+    pub fn originators(&self) -> Vec<Option<String>> {
         self.originators.lock().unwrap().clone()
     }
 
-    fn note(&self, name: &'static str, originator: &str) {
+    fn note(&self, name: &'static str, originator: Option<&str>) {
         self.calls.lock().unwrap().push(name);
         self.originators
             .lock()
             .unwrap()
-            .push(originator.to_string());
+            .push(originator.map(str::to_string));
     }
 }
 
@@ -144,7 +145,7 @@ macro_rules! counting {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for Counting {
-            $(async fn $method(&self, args: $args, o: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, args: $args, o: Option<&str>) -> bsv_rs::Result<$result> {
                 self.note(stringify!($method), o);
                 WalletInterface::$method(&*self.inner, args, o).await
             })*
@@ -152,7 +153,7 @@ macro_rules! counting {
             async fn prove_certificate(
                 &self,
                 args: ProveCertificateArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<ProveCertificateResult> {
                 self.note("prove_certificate", o);
                 let asked = args.fields_to_reveal.iter().map(|f| (f.clone(), "AAAA".to_string()));
@@ -165,7 +166,7 @@ macro_rules! counting {
             async fn create_action(
                 &self,
                 args: CreateActionArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<CreateActionResult> {
                 self.note("create_action", o);
                 self.creates.lock().unwrap().push(args.clone());
@@ -177,7 +178,7 @@ macro_rules! counting {
                     None => self.signable.clone(),
                 };
                 *self.created.lock().unwrap() = Some(args);
-                *self.created_originator.lock().unwrap() = Some(o.to_string());
+                *self.created_originator.lock().unwrap() = o.map(str::to_string);
                 Ok(CreateActionResult {
                     signable_transaction: signable,
                     ..Default::default()
@@ -186,7 +187,7 @@ macro_rules! counting {
             async fn sign_action(
                 &self,
                 args: SignActionArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<SignActionResult> {
                 self.note("sign_action", o);
                 self.signs.lock().unwrap().push(args.clone());
@@ -200,7 +201,7 @@ macro_rules! counting {
             async fn abort_action(
                 &self,
                 args: AbortActionArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<AbortActionResult> {
                 self.note("abort_action", o);
                 self.aborts.lock().unwrap().push(args);
@@ -209,7 +210,7 @@ macro_rules! counting {
             async fn list_outputs(
                 &self,
                 args: ListOutputsArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<ListOutputsResult> {
                 self.note("list_outputs", o);
                 if let Some(listed) = self.listed.lock().unwrap().clone() {
@@ -220,7 +221,7 @@ macro_rules! counting {
             async fn get_public_key(
                 &self,
                 args: GetPublicKeyArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<GetPublicKeyResult> {
                 self.note("get_public_key", o);
                 self.public_key_args.lock().unwrap().push(args.clone());
@@ -229,32 +230,32 @@ macro_rules! counting {
             async fn create_signature(
                 &self,
                 args: CreateSignatureArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<CreateSignatureResult> {
                 self.note("create_signature", o);
                 self.signature_args.lock().unwrap().push(args.clone());
                 WalletInterface::create_signature(&*self.inner, args, o).await
             }
-            async fn is_authenticated(&self, o: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, o: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 self.note("is_authenticated", o);
                 WalletInterface::is_authenticated(&*self.inner, o).await
             }
             async fn wait_for_authentication(
                 &self,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<AuthenticatedResult> {
                 self.note("wait_for_authentication", o);
                 WalletInterface::wait_for_authentication(&*self.inner, o).await
             }
-            async fn get_height(&self, o: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, o: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 self.note("get_height", o);
                 WalletInterface::get_height(&*self.inner, o).await
             }
-            async fn get_network(&self, o: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, o: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 self.note("get_network", o);
                 WalletInterface::get_network(&*self.inner, o).await
             }
-            async fn get_version(&self, o: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, o: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 self.note("get_version", o);
                 WalletInterface::get_version(&*self.inner, o).await
             }

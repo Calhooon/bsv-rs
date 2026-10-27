@@ -33,7 +33,7 @@ impl Stub {
         &self,
         method: &str,
         args: Value,
-        originator: &str,
+        originator: Option<&str>,
     ) -> bsv_rs::Result<T> {
         *self.observed.lock().unwrap() =
             Some(json!({"method": method, "args": args, "originator": originator}));
@@ -75,60 +75,60 @@ macro_rules! implementations {
     ($(($call:ident, $method:ident, $args:ty, $result:ty)),* $(,)?) => {
         pub async fn invoke(wallet: &dyn WalletInterface, call: WalletCall, input: Value) -> bsv_rs::Result<Value> {
             Ok(match call {
-                $(WalletCall::$call => wallet.$method(<$args>::from_fixture(input), ORIGINATOR).await?.fixture(),)*
-                WalletCall::IsAuthenticated => wallet.is_authenticated(ORIGINATOR).await?.fixture(),
-                WalletCall::WaitForAuthentication => wallet.wait_for_authentication(ORIGINATOR).await?.fixture(),
-                WalletCall::GetHeight => wallet.get_height(ORIGINATOR).await?.fixture(),
-                WalletCall::GetNetwork => wallet.get_network(ORIGINATOR).await?.fixture(),
-                WalletCall::GetVersion => wallet.get_version(ORIGINATOR).await?.fixture(),
-                WalletCall::RevealCounterpartyKeyLinkage => wallet.reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs::from_fixture(input), ORIGINATOR).await?.fixture(),
-                WalletCall::RevealSpecificKeyLinkage => wallet.reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs::from_fixture(input), ORIGINATOR).await?.fixture(),
-                WalletCall::GetHeaderForHeight => wallet.get_header_for_height(GetHeaderArgs::from_fixture(input), ORIGINATOR).await?.fixture(),
+                $(WalletCall::$call => wallet.$method(<$args>::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),)*
+                WalletCall::IsAuthenticated => wallet.is_authenticated(Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::WaitForAuthentication => wallet.wait_for_authentication(Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::GetHeight => wallet.get_height(Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::GetNetwork => wallet.get_network(Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::GetVersion => wallet.get_version(Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::RevealCounterpartyKeyLinkage => wallet.reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::RevealSpecificKeyLinkage => wallet.reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),
+                WalletCall::GetHeaderForHeight => wallet.get_header_for_height(GetHeaderArgs::from_fixture(input), Some(ORIGINATOR)).await?.fixture(),
             })
         }
 
         #[async_trait::async_trait]
         impl WalletInterface for Stub {
-            $(async fn $method(&self, args: $args, originator: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, args: $args, originator: Option<&str>) -> bsv_rs::Result<$result> {
                 self.answer(stringify!($method), args.fixture(), originator)
             })*
-            async fn is_authenticated(&self, originator: &str) -> bsv_rs::Result<AuthenticatedResult> { self.answer("is_authenticated", json!({}), originator) }
-            async fn wait_for_authentication(&self, originator: &str) -> bsv_rs::Result<AuthenticatedResult> { self.answer("wait_for_authentication", json!({}), originator) }
-            async fn get_height(&self, originator: &str) -> bsv_rs::Result<GetHeightResult> { self.answer("get_height", json!({}), originator) }
-            async fn get_network(&self, originator: &str) -> bsv_rs::Result<GetNetworkResult> { self.answer("get_network", json!({}), originator) }
-            async fn get_version(&self, originator: &str) -> bsv_rs::Result<GetVersionResult> { self.answer("get_version", json!({}), originator) }
-            async fn reveal_counterparty_key_linkage(&self, args: RevealCounterpartyKeyLinkageArgs, originator: &str) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> { self.answer("reveal_counterparty_key_linkage", args.fixture(), originator) }
-            async fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs, originator: &str) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> { self.answer("reveal_specific_key_linkage", args.fixture(), originator) }
-            async fn get_header_for_height(&self, args: GetHeaderArgs, originator: &str) -> bsv_rs::Result<GetHeaderResult> { self.answer("get_header_for_height", args.fixture(), originator) }
+            async fn is_authenticated(&self, originator: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> { self.answer("is_authenticated", json!({}), originator) }
+            async fn wait_for_authentication(&self, originator: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> { self.answer("wait_for_authentication", json!({}), originator) }
+            async fn get_height(&self, originator: Option<&str>) -> bsv_rs::Result<GetHeightResult> { self.answer("get_height", json!({}), originator) }
+            async fn get_network(&self, originator: Option<&str>) -> bsv_rs::Result<GetNetworkResult> { self.answer("get_network", json!({}), originator) }
+            async fn get_version(&self, originator: Option<&str>) -> bsv_rs::Result<GetVersionResult> { self.answer("get_version", json!({}), originator) }
+            async fn reveal_counterparty_key_linkage(&self, args: RevealCounterpartyKeyLinkageArgs, originator: Option<&str>) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> { self.answer("reveal_counterparty_key_linkage", args.fixture(), originator) }
+            async fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs, originator: Option<&str>) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> { self.answer("reveal_specific_key_linkage", args.fixture(), originator) }
+            async fn get_header_for_height(&self, args: GetHeaderArgs, originator: Option<&str>) -> bsv_rs::Result<GetHeaderResult> { self.answer("get_header_for_height", args.fixture(), originator) }
         }
 
         #[async_trait::async_trait]
         impl<T: WalletWire> WalletInterface for WireWallet<T> {
-            $(async fn $method(&self, args: $args, originator: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, args: $args, originator: Option<&str>) -> bsv_rs::Result<$result> {
                 self.0.$method(args, originator).await
             })*
-            async fn is_authenticated(&self, originator: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, originator: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 Ok(AuthenticatedResult { authenticated: self.0.is_authenticated(originator).await? })
             }
-            async fn wait_for_authentication(&self, originator: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn wait_for_authentication(&self, originator: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 Ok(AuthenticatedResult { authenticated: self.0.wait_for_authentication(originator).await? })
             }
-            async fn get_height(&self, originator: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, originator: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 Ok(GetHeightResult { height: self.0.get_height(originator).await?.try_into().unwrap() })
             }
-            async fn get_network(&self, originator: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, originator: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 Ok(GetNetworkResult { network: self.0.get_network(originator).await? })
             }
-            async fn get_version(&self, originator: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, originator: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 Ok(GetVersionResult { version: self.0.get_version(originator).await? })
             }
-            async fn get_header_for_height(&self, args: GetHeaderArgs, originator: &str) -> bsv_rs::Result<GetHeaderResult> {
+            async fn get_header_for_height(&self, args: GetHeaderArgs, originator: Option<&str>) -> bsv_rs::Result<GetHeaderResult> {
                 self.0.get_header(args, originator).await
             }
-            async fn reveal_counterparty_key_linkage(&self, args: RevealCounterpartyKeyLinkageArgs, originator: &str) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
+            async fn reveal_counterparty_key_linkage(&self, args: RevealCounterpartyKeyLinkageArgs, originator: Option<&str>) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
                 super::wire::counterparty(&self.0, args, originator).await
             }
-            async fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs, originator: &str) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
+            async fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs, originator: Option<&str>) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
                 super::wire::specific(&self.0, args, originator).await
             }
         }

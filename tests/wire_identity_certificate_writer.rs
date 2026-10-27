@@ -100,7 +100,7 @@ async fn discovered(frame: Vec<u8>) -> DiscoverCertificatesResult {
         seek_permission: None,
     };
     WalletWireTransceiver::new(CannedWire { body: frame })
-        .discover_by_identity_key(args, "fixtures.invalid")
+        .discover_by_identity_key(args, Some("fixtures.invalid"))
         .await
         .unwrap()
 }

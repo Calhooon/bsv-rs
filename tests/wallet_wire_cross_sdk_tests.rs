@@ -1593,7 +1593,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             counterparty: None,
                             ..Default::default()
                         },
-                        "",
+                        None,
                     )
                     .await
                     .unwrap();
@@ -1609,7 +1609,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             counterparty: None,
                             ..Default::default()
                         },
-                        "",
+                        None,
                     )
                     .await
                     .unwrap();
@@ -1625,7 +1625,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             counterparty: None,
                             ..Default::default()
                         },
-                        "",
+                        None,
                     )
                     .await
                     .unwrap();
@@ -1642,7 +1642,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             counterparty: None,
                             ..Default::default()
                         },
-                        "",
+                        None,
                     )
                     .await
                     .unwrap();
@@ -1659,7 +1659,7 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             counterparty: None,
                             ..Default::default()
                         },
-                        "",
+                        None,
                     )
                     .await
                     .unwrap();
@@ -1678,14 +1678,14 @@ async fn the_transceiver_reads_the_seven_vectors_wire_as_their_json() {
                             for_self: None,
                             ..Default::default()
                         },
-                        "",
+                        None,
                     )
                     .await
                     .unwrap();
                 serde_json::json!({"valid": r.valid})
             }
             "waitForAuthentication" => {
-                serde_json::json!({"authenticated": client.wait_for_authentication("").await.unwrap()})
+                serde_json::json!({"authenticated": client.wait_for_authentication(None).await.unwrap()})
             }
             other => unreachable!("{other}"),
         };
@@ -1883,31 +1883,31 @@ async fn the_transceiver_writes_the_seven_key_related_go_requests_whole() {
         });
         let sent = match call {
             "getPublicKey" => client
-                .get_public_key(GetPublicKeyArgs::from_fixture(json), "")
+                .get_public_key(GetPublicKeyArgs::from_fixture(json), None)
                 .await
                 .map(drop),
             "encrypt" => client
-                .encrypt(EncryptArgs::from_fixture(json), "")
+                .encrypt(EncryptArgs::from_fixture(json), None)
                 .await
                 .map(drop),
             "decrypt" => client
-                .decrypt(DecryptArgs::from_fixture(json), "")
+                .decrypt(DecryptArgs::from_fixture(json), None)
                 .await
                 .map(drop),
             "createHmac" => client
-                .create_hmac(CreateHmacArgs::from_fixture(json), "")
+                .create_hmac(CreateHmacArgs::from_fixture(json), None)
                 .await
                 .map(drop),
             "verifyHmac" => client
-                .verify_hmac(VerifyHmacArgs::from_fixture(json), "")
+                .verify_hmac(VerifyHmacArgs::from_fixture(json), None)
                 .await
                 .map(drop),
             "createSignature" => client
-                .create_signature(CreateSignatureArgs::from_fixture(json), "")
+                .create_signature(CreateSignatureArgs::from_fixture(json), None)
                 .await
                 .map(drop),
             _ => client
-                .verify_signature(VerifySignatureArgs::from_fixture(json), "")
+                .verify_signature(VerifySignatureArgs::from_fixture(json), None)
                 .await
                 .map(drop),
         };

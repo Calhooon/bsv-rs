@@ -117,7 +117,10 @@ fn a_create_action_outputs_custom_instructions_stay_unbounded() {
 async fn proto_wallet_internalize_refuses_overlong_custom_instructions_before_acting() {
     let wallet = ProtoWallet::anyone();
     let refused = wallet
-        .internalize_action(args(vec![insertion(Some("a".repeat(1001)))]), "app.example")
+        .internalize_action(
+            args(vec![insertion(Some("a".repeat(1001)))]),
+            Some("app.example"),
+        )
         .await;
     assert_eq!(refused.unwrap_err(), refusal(0, 1001));
 }
@@ -142,7 +145,7 @@ mod http_json_door {
         wallet
             .internalize_action(
                 args(vec![insertion(Some(custom_instructions))]),
-                "app.example",
+                Some("app.example"),
             )
             .await
             .map(|r| r.accepted)

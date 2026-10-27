@@ -103,7 +103,7 @@ impl VerifiableCertificate {
         field_name: &str,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<String> {
         let encrypted_key = self.keyring.get(field_name).ok_or_else(|| {
             Error::AuthError(format!(
@@ -135,7 +135,7 @@ impl VerifiableCertificate {
         encrypted_key: &str,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<String> {
         if !bounds::is_safe_field_name(field_name) {
             return Err(refused("Certificate keyring contains an unsafe field name"));
@@ -199,7 +199,7 @@ impl VerifiableCertificate {
         verifier_wallet: &W,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<HashMap<String, String>> {
         // Return cached result if available
         if let Some(ref cached) = self.decrypted_fields {

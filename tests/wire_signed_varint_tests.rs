@@ -108,7 +108,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 labels: None,
                 options: None,
             };
-            t.create_action(args, o).await.unwrap_err()
+            t.create_action(args, Some(o)).await.unwrap_err()
         }
         SignActionSequenceNumber => {
             let spend = SignActionSpend {
@@ -120,7 +120,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 reference: "cmVm".to_string(),
                 options: None,
             };
-            t.sign_action(args, o).await.unwrap_err()
+            t.sign_action(args, Some(o)).await.unwrap_err()
         }
         ListActionsLimit | ListActionsOffset => {
             let args = ListActionsArgs {
@@ -136,7 +136,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 offset: only(ListActionsOffset),
                 seek_permission: None,
             };
-            t.list_actions(args, o).await.unwrap_err()
+            t.list_actions(args, Some(o)).await.unwrap_err()
         }
         ListOutputsLimit | ListOutputsOffset => {
             let args = ListOutputsArgs {
@@ -154,7 +154,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 },
                 seek_permission: None,
             };
-            t.list_outputs(args, o).await.unwrap_err()
+            t.list_outputs(args, Some(o)).await.unwrap_err()
         }
         ListCertificatesLimit | ListCertificatesOffset => {
             let args = ListCertificatesArgs {
@@ -165,7 +165,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 privileged: None,
                 privileged_reason: None,
             };
-            t.list_certificates(args, o).await.unwrap_err()
+            t.list_certificates(args, Some(o)).await.unwrap_err()
         }
         DiscoverByIdentityKeyLimit | DiscoverByIdentityKeyOffset => {
             let key = PrivateKey::from_bytes(&[1u8; 32]).unwrap().public_key();
@@ -175,7 +175,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 offset: only(DiscoverByIdentityKeyOffset),
                 seek_permission: None,
             };
-            t.discover_by_identity_key(args, o).await.unwrap_err()
+            t.discover_by_identity_key(args, Some(o)).await.unwrap_err()
         }
         DiscoverByAttributesLimit | DiscoverByAttributesOffset => {
             let args = DiscoverByAttributesArgs {
@@ -184,7 +184,7 @@ async fn frame(field: Field, value: Option<i64>) -> Result<Vec<u8>, Error> {
                 offset: only(DiscoverByAttributesOffset),
                 seek_permission: None,
             };
-            t.discover_by_attributes(args, o).await.unwrap_err()
+            t.discover_by_attributes(args, Some(o)).await.unwrap_err()
         }
     };
     let sent = t.wire().0.lock().unwrap().clone();

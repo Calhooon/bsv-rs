@@ -307,7 +307,7 @@ async fn a_review_with_its_results_is_framed_with_code_5_and_read_back_as_the_cl
         hex::encode(reference_frame(5, words.as_bytes()))
     );
     let result = WalletWireTransceiver::new(Loop(refusing(review)))
-        .get_height("test")
+        .get_height(Some("test"))
         .await;
     assert_eq!(
         result,
@@ -325,7 +325,7 @@ async fn a_review_with_its_results_is_framed_with_code_5_and_read_back_as_the_cl
 async fn the_transceiver_reads_a_coded_frame_back_as_its_class() {
     for class in WalletRefusalClass::ALL {
         let result = WalletWireTransceiver::new(Loop(refusing(refusal(class))))
-            .get_height("test")
+            .get_height(Some("test"))
             .await;
         let expected = match class.wire_code() {
             Some(_) => refusal(class),
@@ -341,7 +341,7 @@ async fn the_transceiver_reads_a_coded_frame_back_as_its_class() {
 async fn an_unclassed_code_is_read_back_as_before() {
     for code in [1u8, 9, 255] {
         let result = WalletWireTransceiver::new(ReplyWire(reference_frame(code, b"words")))
-            .get_height("test")
+            .get_height(Some("test"))
             .await;
         assert_eq!(
             result,

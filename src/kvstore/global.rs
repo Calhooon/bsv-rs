@@ -564,8 +564,8 @@ impl<W: WalletInterface> GlobalKVStore<W> {
     // Internal Helper Methods
     // =========================================================================
 
-    fn originator(&self) -> &str {
-        self.config.originator.as_deref().unwrap_or("kvstore")
+    fn originator(&self) -> Option<&str> {
+        self.config.originator.as_deref()
     }
 
     async fn get_identity_key(&self) -> Result<String> {

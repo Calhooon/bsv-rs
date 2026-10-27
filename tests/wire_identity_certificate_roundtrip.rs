@@ -102,7 +102,7 @@ async fn discovered(entry: &[u8]) -> Result<IdentityCertificate, Error> {
         seek_permission: None,
     };
     let mut result = WalletWireTransceiver::new(CannedWire { body: frame })
-        .discover_by_identity_key(args, "fixtures.invalid")
+        .discover_by_identity_key(args, Some("fixtures.invalid"))
         .await?;
     Ok(result.certificates.remove(0))
 }

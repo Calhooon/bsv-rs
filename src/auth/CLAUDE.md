@@ -268,7 +268,7 @@ pub struct PeerOptions<W: WalletInterface, T: Transport> {
     pub certificates_to_request: Option<RequestedCertificateSet>,
     pub session_manager: Option<SessionManager>,
     pub auto_persist_last_session: bool,
-    pub originator: Option<String>,
+    pub originator: Option<String>,   // None: no originator to the wallet ("unknown" until #329)
 }
 ```
 
