@@ -112,7 +112,11 @@ const recording = (state) => {
   }
 }
 
+// The revocation's arguments do not depend on the originator: each run's are
+// checked equal to the first's and written once. Bytes are hex text.
+const hex = (bytes) => Utils.toHex(bytes)
 const witnesses = []
+let revocation
 for (const [name, originator] of [['no_originator', undefined], ['configured', 'identity-client']]) {
   counter = 0
   const state = { calls: [], createAction: [], signAction: [], abortAction: [] }
@@ -151,16 +155,13 @@ for (const [name, originator] of [['no_originator', undefined], ['configured', '
     throw new Error('expected one createAction and one signAction')
   }
 
-  witnesses.push({
-    name,
-    configured_originator: originator ?? null,
-    reveal_calls: revealCalls,
-    revoke_calls: state.calls,
-    revoke_stopped: stopped,
-    lookup_beef: lookupBeef,
-    signable_tx: state.signable,
+  const createAction = { ...state.createAction[0], inputBEEF: hex(state.createAction[0].inputBEEF) }
+  const run = {
+    stopped,
+    lookup_beef: hex(lookupBeef),
+    signable_tx: hex(state.signable),
     signable_reference: REFERENCE,
-    create_action: state.createAction[0],
+    create_action: createAction,
     create_action_members: Object.keys(state.createAction[0]),
     create_action_input_members: Object.keys(state.createAction[0].inputs[0]),
     create_action_option_members: Object.keys(state.createAction[0].options),
@@ -168,6 +169,18 @@ for (const [name, originator] of [['no_originator', undefined], ['configured', '
     sign_action_members: Object.keys(state.signAction[0]),
     sign_action_option_members: Object.keys(state.signAction[0].options),
     abort_action: state.abortAction[0]
+  }
+  if (revocation === undefined) {
+    revocation = run
+  } else if (JSON.stringify(run) !== JSON.stringify(revocation)) {
+    throw new Error(`${name}: the revocation's arguments differ from the first run's`)
+  }
+
+  witnesses.push({
+    name,
+    configured_originator: originator ?? null,
+    reveal_calls: revealCalls,
+    revoke_calls: state.calls
   })
 }
 
@@ -179,5 +192,6 @@ console.log(JSON.stringify({
   certificate,
   fields_to_reveal: fieldsToReveal,
   keyring: { ...keyring },
+  revocation,
   witnesses
 }, null, 2))
