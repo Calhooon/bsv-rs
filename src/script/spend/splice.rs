@@ -29,9 +29,10 @@ impl Spend {
         }
         let buf2 = self.pop_stack()?;
         let mut result = self.pop_stack()?;
-        result
-            .try_reserve_exact(buf2.len())
-            .map_err(|_| self.allocation_declined(buf2.len()))?;
+        result.try_reserve_exact(buf2.len()).map_err(|_| {
+            let in_hand = (result.len() + buf2.len()) as u64;
+            self.allocation_declined_holding(in_hand, buf2.len())
+        })?;
         result.extend(buf2);
         // The default mode's 1 GiB element bound; under a word an element
         // after Genesis is bounded by the stack memory budget alone
@@ -55,8 +56,9 @@ impl Spend {
 
         let pos_bn = self.read_number(&pos_bytes)?;
         let split_idx = self.split_position(&pos_bn, data.len())?;
-        let left = self.copy_element(&data[..split_idx])?;
-        let right = self.copy_element(&data[split_idx..])?;
+        let in_hand = (data.len() + pos_bytes.len()) as u64;
+        let left = self.copy_element_holding(in_hand, &data[..split_idx])?;
+        let right = self.copy_element_holding(in_hand + split_idx as u64, &data[split_idx..])?;
         self.push_stack(left)?;
         self.push_stack(right)?;
         Ok(())
@@ -92,7 +94,7 @@ impl Spend {
         if minimal.len() == size {
             self.push_stack(minimal)?;
         } else {
-            let mut result = self.zeroed_element(size)?;
+            let mut result = self.zeroed_element(minimal.len() as u64, size)?;
             pad_into(&minimal, &mut result);
             self.push_stack(result)?;
         }
@@ -207,7 +209,8 @@ impl Spend {
                     )));
                 }
                 let (o, l) = (offset as usize, len as usize);
-                let out = self.copy_element(&data[o..o + l])?;
+                let in_hand = (data.len() + len_bytes.len() + off_bytes.len()) as u64;
+                let out = self.copy_element_holding(in_hand, &data[o..o + l])?;
                 self.push_stack(out)?;
             }
             OP_NOP5 | OP_NOP6 => {
@@ -222,10 +225,11 @@ impl Spend {
                     )));
                 }
                 let l = len as usize;
+                let in_hand = (data.len() + len_bytes.len()) as u64;
                 let out = if opcode == OP_NOP5 {
-                    self.copy_element(&data[..l])?
+                    self.copy_element_holding(in_hand, &data[..l])?
                 } else {
-                    self.copy_element(&data[data.len() - l..])?
+                    self.copy_element_holding(in_hand, &data[data.len() - l..])?
                 };
                 self.push_stack(out)?;
             }
@@ -238,6 +242,8 @@ impl Spend {
                 }
                 let x_bytes = self.pop_stack()?;
                 let x = num(self, &x_bytes)?;
+                // the two operands, held off the stack to the push
+                let in_hand = (x_bytes.len() + n_bytes.len()) as u64;
                 if let Some(max) = self.max_script_num_length() {
                     // Under a word, the reference's bounds (Calhooon/bsv-rs#21).
                     // A left shift first tests the result's size, the value's
@@ -291,7 +297,7 @@ impl Spend {
                         self.check_node_budget(
                             self.node_mem + len + STACK_ELEMENT_OVERHEAD as u64,
                         )?;
-                        self.number_room(2 * len + 16)?;
+                        self.number_room(in_hand, 2 * len + 16)?;
                         x.shl_bits(n)
                     } else {
                         // the default mode: the result's size, before allocating
@@ -313,13 +319,13 @@ impl Spend {
                                 MAX_SCRIPT_ELEMENT_SIZE
                             )));
                         }
-                        self.number_room(2 * bytes + 16)?;
+                        self.number_room(in_hand, 2 * bytes + 16)?;
                         x.shl_bits(n)
                     }
                 } else if n >= x.bit_length() as u64 {
                     BigNumber::zero()
                 } else {
-                    self.number_room(2 * x_bytes.len() as u64 + 16)?;
+                    self.number_room(in_hand, 2 * x_bytes.len() as u64 + 16)?;
                     x.shr_bits_toward_zero(n)
                 };
                 self.push_number(&out)?;

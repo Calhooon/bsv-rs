@@ -6,9 +6,10 @@
 //! here in the default mode with its words; one at the figure is read. Under
 //! a word the node's number length decides (32,000,000 bytes after
 //! Chronicle). By hand: each operand is 64 MiB, the file 0.14 s and 472 MB
-//! resident in release, one test at a time.
+//! resident in release under `--test-threads=1` (the figure holds one test
+//! at a time; the default threads peaked at 1.68 GB in the re-review).
 //!
-//! `cargo test --release --test script_reference_read_limit_331 -- --ignored`
+//! `cargo test --release --test script_reference_read_limit_331 -- --ignored --test-threads=1`
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::script::op::{OP_1, OP_1ADD, OP_DROP};

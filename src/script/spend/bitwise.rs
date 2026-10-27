@@ -88,7 +88,8 @@ impl Spend {
             // overflow ("BigNumber requires N bytes") and clamped the
             // shift count to 63 bits (conformance vectors
             // lshift-truncation.0001/.0003).
-            let mut result = self.zeroed_element(buf.len())?;
+            let in_hand = (buf.len() + n_bytes.len()) as u64;
+            let mut result = self.zeroed_element(in_hand, buf.len())?;
             shift_into(&buf, n, opcode, &mut result);
             self.push_stack(result)?;
         }

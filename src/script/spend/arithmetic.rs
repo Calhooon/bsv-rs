@@ -55,11 +55,13 @@ impl Spend {
         let buf1 = self.pop_stack()?;
         let lens = [buf1.len(), buf2.len()];
         self.arithmetic_room(opcode, &[&buf1, &buf2])?;
-        // Each operand's bytes leave as its number arrives (bsv-rs#374).
-        let bn1 = BigInt::from(self.read_number(&buf1)?);
-        drop(buf1);
-        let bn2 = BigInt::from(self.read_number(&buf2)?);
+        // The top operand read first, as the reference reads `bn2` first
+        // (`Spend.ts:1560-1561`); each operand's bytes leave as its number
+        // arrives (bsv-rs#374), the number held in their place.
+        let bn2 = BigInt::from(self.read_number_holding(&buf2, lens[0] as u64)?);
         drop(buf2);
+        let bn1 = BigInt::from(self.read_number_holding(&buf1, lens[1] as u64)?);
+        drop(buf1);
 
         // Owned where num-bigint reuses an operand's digits for the result.
         let result = match opcode {
@@ -108,16 +110,24 @@ impl Spend {
         if self.stack.len() < 3 {
             return Err(self.error("OP_WITHIN requires at least three items to be on the stack."));
         }
-        let max_bytes = self.pop_stack()?;
-        let min_bytes = self.pop_stack()?;
-        let x_bytes = self.pop_stack()?;
-        let max_bn = self.read_number(&max_bytes)?;
-        let min_bn = self.read_number(&min_bytes)?;
-        let x_bn = self.read_number(&x_bytes)?;
+        // Each operand read as it is popped, as the reference reads them
+        // (`Spend.ts:1628-1630`): the verdicts in the same order, the others
+        // still on the stack while one is read.
+        let max_bn = self.pop_number()?;
+        let min_bn = self.pop_number()?;
+        let x_bn = self.pop_number()?;
 
         let in_range = x_bn >= min_bn && x_bn < max_bn;
         self.push_stack(if in_range { vec![1] } else { vec![] })?;
         Ok(())
+    }
+}
+
+impl Spend {
+    /// The top element popped and read as a script number.
+    fn pop_number(&mut self) -> Result<BigNumber, ScriptEvaluationError> {
+        let bytes = self.pop_stack()?;
+        self.read_number(&bytes)
     }
 }
 
