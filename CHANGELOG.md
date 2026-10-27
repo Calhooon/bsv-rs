@@ -198,7 +198,16 @@ Where the wallet certificate's fields are not in byte order, the token's
 JSON differs from the reference's: `WalletCertificate.fields` is a
 `HashMap`, so this crate writes the fields by name, where the reference
 keeps the object's order; the signature is over the bytes written and the
-reader admits either. The keyring is written in the order asked, the
+reader admits either. The members' order is the object's too in the
+reference (`{ ...certificate, keyring }` spreads the caller's object):
+the toolbox's `listCertificates` answers `WalletCertificate`'s order
+(`packages/wallet/wallet-toolbox/src/storage/methods/listCertificates.ts:56-62`),
+the order written here, where a certificate read on the binary wire is a
+`Certificate` instance (`WalletWireTransceiver.ts:1512`, `:1543`) in the
+class's order (`type, serialNumber, subject, certifier, revocationOutpoint,
+fields, signature`, `Certificate.ts:206-212`): other bytes, admitted by the
+reader as well (the reader parses the JSON and checks its key set,
+`identityTokenValidation.ts:62-71`). The keyring is written in the order asked, the
 reference's in the wallet's (`Object.keys`, `:485`), the same for the
 reference's own wallet (#307's note).
 
