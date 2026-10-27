@@ -83,9 +83,14 @@ impl From<Error> for Refusal {
 /// (`WalletRefusalClass::wire_code`, #137), which keeps its words and its
 /// code on the wire. Every other error has none, a class whose code is its
 /// name among them (the toolbox's `WERR_*`, whose `code` is no integer).
+/// A `WERR_REVIEW_ACTIONS` with its results is code 5 and its words, its
+/// results not on the wire (#327).
 pub(super) fn explicit_wallet_code(error: &Error) -> Option<u8> {
     match error {
         Error::WalletRefusal { class, .. } => class.wire_code(),
+        Error::WalletReviewActions(_) => {
+            crate::error::WalletRefusalClass::ReviewActions.wire_code()
+        }
         _ => None,
     }
 }

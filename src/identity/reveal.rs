@@ -170,9 +170,28 @@ const MAX_KEYRING_VALUE_BYTES: usize = 2048;
 /// must be valid base64 string`, `.. at least 1 bytes`, `.. no more than
 /// 2048 bytes`. The answer is the trimmed text.
 fn keyring_value(value: &str, name: &str) -> Result<String> {
+    base64_parameter(
+        value,
+        &format!("keyringForVerifier.{name}"),
+        1,
+        MAX_KEYRING_VALUE_BYTES,
+    )
+}
+
+/// `validateBase64String(value, parameter, min, max)`
+/// (`validationHelpers.ts:439-498`): the value trimmed, base64 by its shape,
+/// `min` to `max` bytes by `floor(3 * unpadded / 4)`; a refusal
+/// `WERR_INVALID_PARAMETER` in its words. The revocation's serial number
+/// too, 32 bytes exactly (`IdentityClient.ts:712-717`, #327).
+pub(super) fn base64_parameter(
+    value: &str,
+    parameter: &str,
+    min: usize,
+    max: usize,
+) -> Result<String> {
     let invalid = |must_be: &str| Error::WalletRefusal {
         class: WalletRefusalClass::InvalidParameter,
-        message: format!("The keyringForVerifier.{name} parameter must be {must_be}"),
+        message: format!("The {parameter} parameter must be {must_be}"),
     };
     let value = value.trim_matches(is_js_whitespace);
     let not_base64 = || invalid("valid base64 string");
@@ -198,11 +217,11 @@ fn keyring_value(value: &str, name: &str) -> Result<String> {
         return Err(not_base64());
     }
     let bytes = (length - padding) * 3 / 4;
-    if bytes < 1 {
-        return Err(invalid("at least 1 bytes"));
+    if bytes < min {
+        return Err(invalid(&format!("at least {min} bytes")));
     }
-    if bytes > MAX_KEYRING_VALUE_BYTES {
-        return Err(invalid("no more than 2048 bytes"));
+    if bytes > max {
+        return Err(invalid(&format!("no more than {max} bytes")));
     }
     Ok(value.to_string())
 }

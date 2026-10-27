@@ -25,6 +25,20 @@
 // wallet hands a signable input out) to one `OP_FALSE OP_RETURN` output, and its
 // signAction answers no transaction, so the reference throws `Failed to sign
 // transaction`, aborts the action and stops before its broadcast.
+//
+// With a second argument `revocation-checks` it prints the #327 witnesses
+// instead (`tests/vectors/identity_revocation_checks_327.json`; the #318
+// file is the same bytes without it): `revokeCertificateRevelation`
+// (`IdentityClient.ts:705-950`) on lookups the script answers, its verdict,
+// its wallet calls in order with the createAction, signAction and
+// abortAction arguments, and the transactions it broadcast
+// (`TopicBroadcaster.prototype.broadcast` replaced, answering success). The
+// wallet spends the outpoint createAction names from the input BEEF's
+// subject, and answers signAction from a list: no transaction, the signed
+// transaction (the signable one with the spend's unlocking script), a thrown
+// error, or a `WERR_REVIEW_ACTIONS` with or without double-spend evidence.
+//   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/identity_wallet_calls_318.mjs \
+//     "$W/sdk.mjs" revocation-checks > tests/vectors/identity_revocation_checks_327.json
 import { createHash } from 'crypto'
 import { pathToFileURL } from 'url'
 
@@ -41,10 +55,10 @@ Object.defineProperty(globalThis, 'crypto', {
   value: { getRandomValues (arr) { arr.set(stream(arr.length)); return arr } }
 })
 
-const [sdkPath] = process.argv.slice(2)
+const [sdkPath, mode] = process.argv.slice(2)
 const {
   IdentityClient, LookupResolver, MasterCertificate, ProtoWallet, PrivateKey, Script,
-  Transaction, Utils
+  TopicBroadcaster, Transaction, Utils, WERR_REVIEW_ACTIONS
 } = await import(pathToFileURL(sdkPath).href)
 
 const key = (n) => new PrivateKey(n)
@@ -117,6 +131,7 @@ const recording = (state) => {
 const hex = (bytes) => Utils.toHex(bytes)
 const witnesses = []
 let revocation
+let tokenScript
 for (const [name, originator] of [['no_originator', undefined], ['configured', 'identity-client']]) {
   counter = 0
   const state = { calls: [], createAction: [], signAction: [], abortAction: [] }
@@ -129,6 +144,7 @@ for (const [name, originator] of [['no_originator', undefined], ['configured', '
   }
   const revealCalls = state.calls.splice(0)
   const lockingScript = state.createAction.splice(0)[0].outputs[0].lockingScript
+  tokenScript ??= lockingScript
 
   const source = new Transaction()
   source.addInput({
@@ -182,6 +198,16 @@ for (const [name, originator] of [['no_originator', undefined], ['configured', '
     reveal_calls: revealCalls,
     revoke_calls: state.calls
   })
+}
+
+if (mode === 'revocation-checks') {
+  const checks = await import(new URL('./identity_revocation_checks_327.mjs', import.meta.url).href)
+  console.log(JSON.stringify(await checks.record({
+    IdentityClient, LookupResolver, MasterCertificate, ProtoWallet, Script, TopicBroadcaster,
+    Transaction, Utils, WERR_REVIEW_ACTIONS, key, pub, certificate, subjectWallet, tokenScript,
+    reference: REFERENCE, stream, resetCounter: () => { counter = 0 }
+  }), null, 2))
+  process.exit(0)
 }
 
 console.log(JSON.stringify({

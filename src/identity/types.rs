@@ -465,7 +465,7 @@ pub struct IdentityClientConfig {
     pub key_id: String,
     /// Token amount for revelation outputs (satoshis).
     pub token_amount: u64,
-    /// Output index for the identity token.
+    /// Output index for the identity token; unread since #327 (the revocation spends the lookup's index).
     pub output_index: u32,
     /// Originator domain for audit trails.
     pub originator: Option<String>,

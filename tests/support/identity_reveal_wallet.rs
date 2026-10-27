@@ -4,13 +4,16 @@
 //! transaction, so nothing is broadcast; createAction's arguments and
 //! originator kept (#315); every call's originator kept, and with a
 //! signable transaction set createAction answers it and signAction's
-//! arguments are kept, signAction answering no transaction (#318).
+//! arguments are kept, signAction answering no transaction (#318); every
+//! createAction, signAction and abortAction's arguments kept in order,
+//! signAction answering from a queue when one is set, abortAction
+//! answering `aborted: true` (#327).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::PrivateKey;
 use bsv_rs::wallet::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
 /// A ProtoWallet that records each call by name; proveCertificate answers
@@ -30,6 +33,11 @@ pub struct Counting {
     pub created_originator: Arc<Mutex<Option<String>>>,
     pub public_key_args: Arc<Mutex<Vec<GetPublicKeyArgs>>>,
     pub signature_args: Arc<Mutex<Vec<CreateSignatureArgs>>>,
+    /// signAction's answers in turn, no transaction once empty (#327).
+    pub sign_answers: Arc<Mutex<VecDeque<bsv_rs::Result<SignActionResult>>>>,
+    pub creates: Arc<Mutex<Vec<CreateActionArgs>>>,
+    pub signs: Arc<Mutex<Vec<SignActionArgs>>>,
+    pub aborts: Arc<Mutex<Vec<AbortActionArgs>>>,
 }
 
 impl Counting {
@@ -57,6 +65,10 @@ impl Counting {
             created_originator: Arc::default(),
             public_key_args: Arc::default(),
             signature_args: Arc::default(),
+            sign_answers: Arc::default(),
+            creates: Arc::default(),
+            signs: Arc::default(),
+            aborts: Arc::default(),
         }
     }
 
@@ -108,6 +120,7 @@ macro_rules! counting {
                 o: &str,
             ) -> bsv_rs::Result<CreateActionResult> {
                 self.note("create_action", o);
+                self.creates.lock().unwrap().push(args.clone());
                 *self.created.lock().unwrap() = Some(args);
                 *self.created_originator.lock().unwrap() = Some(o.to_string());
                 Ok(CreateActionResult {
@@ -121,12 +134,22 @@ macro_rules! counting {
                 o: &str,
             ) -> bsv_rs::Result<SignActionResult> {
                 self.note("sign_action", o);
+                self.signs.lock().unwrap().push(args.clone());
                 *self.signed.lock().unwrap() = Some(args);
-                Ok(SignActionResult {
+                self.sign_answers.lock().unwrap().pop_front().unwrap_or(Ok(SignActionResult {
                     txid: None,
                     tx: None,
                     send_with_results: None,
-                })
+                }))
+            }
+            async fn abort_action(
+                &self,
+                args: AbortActionArgs,
+                o: &str,
+            ) -> bsv_rs::Result<AbortActionResult> {
+                self.note("abort_action", o);
+                self.aborts.lock().unwrap().push(args);
+                Ok(AbortActionResult { aborted: true })
             }
             async fn get_public_key(
                 &self,
@@ -181,7 +204,6 @@ counting! {
     (verify_signature, VerifySignatureArgs, VerifySignatureResult),
     (reveal_counterparty_key_linkage, WalletRevealCounterpartyArgs, RevealCounterpartyKeyLinkageResult),
     (reveal_specific_key_linkage, WalletRevealSpecificArgs, RevealSpecificKeyLinkageResult),
-    (abort_action, AbortActionArgs, AbortActionResult),
     (list_actions, ListActionsArgs, ListActionsResult),
     (internalize_action, InternalizeActionArgs, InternalizeActionResult),
     (list_outputs, ListOutputsArgs, ListOutputsResult),

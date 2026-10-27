@@ -11,7 +11,10 @@
 //! arguments its wallet received (the revocation's once, the same for both
 //! clients; bytes as hex text); the revocation is answered here with the
 //! reference's lookup BEEF and signable transaction, so the two signAction
-//! calls carry the same unlocking script.
+//! calls carry the same unlocking script. Since #327 the revocation makes
+//! the reference's calls in its order (the two keys, the token's
+//! verifySignature, createAction, createSignature, signAction, abortAction)
+//! and stops in its words, the action aborted with its reference.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "identity")]
 
@@ -62,6 +65,8 @@ struct Revocation {
     #[serde(deserialize_with = "hex")]
     signable_tx: Vec<u8>,
     signable_reference: String,
+    stopped: String,
+    abort_action: Value,
     create_action: Value,
     create_action_members: Vec<String>,
     create_action_input_members: Vec<String>,
@@ -147,9 +152,18 @@ async fn revoked(v: &Vector, w: &Witness) -> Counting {
     let stopped = client
         .revoke_certificate_revelation(&v.certificate.serial_number)
         .await;
-    assert!(
-        matches!(&stopped, Err(bsv_rs::Error::IdentityError(m)) if m.contains("did not return a transaction")),
-        "{}: {stopped:?}",
+    assert_eq!(
+        stopped,
+        Err(bsv_rs::Error::IdentityError(v.revocation.stopped.clone())),
+        "{}",
+        w.name
+    );
+    // the action aborted with the reference createAction answered (#327)
+    let aborts = serde_json::to_value(wallet.aborts.lock().unwrap().clone()).unwrap();
+    assert_eq!(
+        aborts,
+        Value::Array(vec![v.revocation.abort_action.clone()]),
+        "{}",
         w.name
     );
     wallet
@@ -315,12 +329,8 @@ async fn no_originator_is_sent_unless_one_is_configured() {
                 .unwrap_or_else(|| panic!("{}: {name} is not the reference's next call", w.name));
             assert_eq!(originator, sent(call), "{}: {name}", w.name);
         }
-        assert_eq!(
-            wallet.calls(),
-            ["create_action", "create_signature", "sign_action"],
-            "{}",
-            w.name
-        );
+        let reference: Vec<&str> = w.revoke_calls.iter().map(|c| snake(&c.name)).collect();
+        assert_eq!(wallet.calls(), reference, "{}", w.name);
 
         // the identity key and the contacts, outside the vector: the same rule
         let wallet = Counting::of_scalar(9);

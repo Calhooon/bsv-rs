@@ -293,6 +293,8 @@ pub async fn with_double_spend_retry<T, F, Fut>(
 
 Detects double-spend errors by matching: `double spend`, `double-spend`, `txn-mempool-conflict`, `already spent`, `missing inputs`. Non-double-spend errors are returned immediately without retry.
 
+This is not the reference's `withDoubleSpendRetry` (`ts-stack@edf6e03` `overlay-tools/withDoubleSpendRetry.ts`), which retries only a wallet's `WERR_REVIEW_ACTIONS` carrying double-spend evidence, broadcasts each competing transaction before the next attempt and makes five attempts; the identity revocation runs under that rule (`src/identity/double_spend.rs`, #327).
+
 ## Implementation Notes
 
 ### Host Discovery

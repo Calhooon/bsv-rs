@@ -16,6 +16,11 @@
 //! Hermetic: the wallet is a `ProtoWallet` for the keys and a mock for the
 //! actions, the overlay lookup is an injected facilitator, and the revocation
 //! stops before its broadcast (the mock's `signAction` returns no transaction).
+//! Since #327 the revocation spends only a token it authenticates: the
+//! subject's wallet (key 9) revokes the reference's token for #318's
+//! certificate (`vectors/identity_wallet_calls_318.json`, the token this
+//! crate's reveal writes byte for byte, #310), carried by a source
+//! transaction of this crate's writer.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "identity")]
 
@@ -86,7 +91,17 @@ struct TokenWallet {
 
 impl TokenWallet {
     fn new() -> Self {
-        let key = PrivateKey::from_hex(&"07".repeat(32)).unwrap();
+        Self::of_key(PrivateKey::from_hex(&"07".repeat(32)).unwrap())
+    }
+
+    /// A wallet of the scalar `n`, the reference's `new PrivateKey(n)`.
+    fn of_scalar(n: u8) -> Self {
+        let mut scalar = [0u8; 32];
+        scalar[31] = n;
+        Self::of_key(PrivateKey::from_bytes(&scalar).unwrap())
+    }
+
+    fn of_key(key: PrivateKey) -> Self {
         Self {
             keys: Arc::new(ProtoWallet::new(Some(key))),
             source: Arc::new(Mutex::new(None)),
@@ -211,7 +226,8 @@ impl WalletInterface for TokenWallet {
             let lock = LockingScript::from_binary(&output.locking_script)?;
             partial.add_output(TransactionOutput::new(output.satoshis, lock))?;
         }
-        let beef = partial.to_beef(true)?;
+        // atomic, as a wallet answers a signable transaction (BRC-100)
+        let beef = partial.to_atomic_beef(true)?;
         self.seen.lock().unwrap().partial = Some(partial);
         Ok(CreateActionResult {
             txid: None,
@@ -491,14 +507,16 @@ fn assert_every_spend_verifies(wallet: &TokenWallet, lock: &LockingScript, expec
 
 #[tokio::test]
 async fn an_identity_revocation_signature_verifies_under_the_node_word() {
-    let wallet = TokenWallet::new();
+    let wallet = TokenWallet::of_scalar(9);
     let config = IdentityClientConfig::default();
-    let protocol = Protocol::from_tuple((config.protocol_id.0, &config.protocol_id.1)).unwrap();
-    let lock = token(
-        wallet
-            .derived_key(protocol, &config.key_id, Counterparty::Anyone)
-            .await,
-    );
+    let vector: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/identity_wallet_calls_318.json")).unwrap();
+    let serial = vector["certificate"]["serialNumber"].as_str().unwrap();
+    let beef = bsv_rs::primitives::from_hex(vector["revocation"]["lookup_beef"].as_str().unwrap())
+        .unwrap();
+    let lock = Transaction::from_beef(&beef, None).unwrap().outputs[0]
+        .locking_script
+        .clone();
     let source = source_transaction(&lock);
     wallet.set_source(source.clone());
 
@@ -520,10 +538,12 @@ async fn an_identity_revocation_signature_verifies_under_the_node_word() {
 
     // the mock's signAction returns no transaction, so the call stops there,
     // before the broadcast, with the unlocking script recorded
-    let stopped = client.revoke_certificate_revelation("serial").await;
-    assert!(
-        matches!(&stopped, Err(Error::IdentityError(m)) if m.contains("did not return a transaction")),
-        "{stopped:?}"
+    let stopped = client.revoke_certificate_revelation(serial).await;
+    assert_eq!(
+        stopped,
+        Err(Error::IdentityError(
+            "Failed to sign transaction".to_string()
+        ))
     );
     assert_every_spend_verifies(&wallet, &lock, 1);
 }
