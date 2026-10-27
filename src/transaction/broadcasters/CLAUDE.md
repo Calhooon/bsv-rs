@@ -5,9 +5,13 @@
 
 This module provides production-ready implementations of the [`Broadcaster`](../broadcaster.rs) trait:
 
-- **`ArcBroadcaster`** - TAAL's ARC (Avalanche Relay Client) service, recommended for production
 - **`TeranodeBroadcaster`** - Teranode transaction processing using Extended Format (EF/BRC-30) binary
 - **`WhatsOnChainBroadcaster`** - WhatsOnChain API, free tier available
+- **`ArcBroadcaster`** - TAAL's ARC (Avalanche Relay Client) service: **deprecated since 0.9.0** and nowhere a default
+
+## ARC is deprecated (#350)
+
+The owner's word of 2026-10-27: "arc is just deprecated, arcade is the standard". `ArcBroadcaster`, `ArcConfig`, `ArcBroadcaster::new` and `ArcBroadcaster::with_config` carry `#[deprecated(since = "0.9.0")]`; `ArcBroadcaster::default()` (`https://arc.taal.com`) and `ArcConfig::default()` are deprecated with their types (rustc refuses `#[deprecated]` on a trait impl block; naming the type warns). The type and its verdict below stay for a caller who names them, and their tests stay (`#[allow(deprecated)]`, ARC's wire). The reference keeps ARC undeprecated and as its default broadcaster (`ts-stack@edf6e03` `DefaultBroadcaster.ts:1-12`); this crate diverges under the owner's word (`CLAUDE.md`'s divergence list). This crate adds no ARCade client: ARCade is a service of the wallet toolbox and the overlay layer, not an SDK broadcaster at `edf6e03`. `tests/arch_arc_deprecated.rs` pins the attributes.
 
 These implementations require the `http` feature flag to enable actual network requests.
 
@@ -16,7 +20,7 @@ These implementations require the `http` feature flag to enable actual network r
 | File | Purpose |
 |------|---------|
 | `mod.rs` | Module root; re-exports all broadcasters |
-| `arc.rs` | ARC broadcaster implementation for TAAL's service |
+| `arc.rs` | ARC broadcaster implementation for TAAL's service (deprecated, #350) |
 | `teranode.rs` | Teranode broadcaster using Extended Format binary data |
 | `whatsonchain.rs` | WhatsOnChain API broadcaster implementation |
 
@@ -46,7 +50,7 @@ The HTTP code never decides a 2xx. The vector is `tests/vectors/arc_tx_status_ve
 
 ## Key Exports
 
-### ArcConfig
+### ArcConfig (deprecated since 0.9.0)
 
 Configuration for the ARC broadcaster:
 
@@ -58,7 +62,7 @@ pub struct ArcConfig {
 }
 ```
 
-### ArcBroadcaster
+### ArcBroadcaster (deprecated since 0.9.0)
 
 TAAL's ARC service broadcaster:
 
@@ -71,7 +75,7 @@ pub struct ArcBroadcaster {
 impl ArcBroadcaster {
     pub fn new(url: &str, api_key: Option<String>) -> Self
     pub fn with_config(config: ArcConfig) -> Self
-    pub fn default() -> Self  // Uses https://arc.taal.com
+    // impl Default: https://arc.taal.com, deprecated with the type
     pub fn url(&self) -> &str
     pub fn api_key(&self) -> Option<&str>
 }
@@ -268,15 +272,14 @@ was decoded before the status (a 429 read `PARSE_ERROR`; witnesses #65, #66).
 
 ## Usage Examples
 
-### Basic Broadcasting (ARC)
+### Basic Broadcasting
 
 ```rust
-use bsv_rs::transaction::{ArcBroadcaster, Broadcaster, Transaction};
+use bsv_rs::transaction::{Broadcaster, Transaction, WhatsOnChainBroadcaster};
 
 #[tokio::main]
 async fn main() {
-    // Create broadcaster with default TAAL endpoint
-    let broadcaster = ArcBroadcaster::default();
+    let broadcaster = WhatsOnChainBroadcaster::mainnet();
 
     let tx = Transaction::from_hex("0100000001...").unwrap();
 
@@ -311,29 +314,18 @@ match broadcaster.broadcast(&tx).await {
 }
 ```
 
-### With API Key Authentication
-
-```rust
-use bsv_rs::transaction::{ArcBroadcaster, Broadcaster};
-
-let broadcaster = ArcBroadcaster::new(
-    "https://arc.taal.com",
-    Some("your-api-key".to_string())
-);
-```
-
 ### Custom Configuration
 
 ```rust
-use bsv_rs::transaction::broadcasters::{ArcBroadcaster, ArcConfig};
+use bsv_rs::transaction::{TeranodeBroadcaster, TeranodeConfig};
 
-let config = ArcConfig {
-    url: "https://arc.gorillapool.io".to_string(),
+let config = TeranodeConfig {
+    url: "https://teranode.example.com".to_string(),
     api_key: Some("my-api-key".to_string()),
     timeout_ms: 60_000,  // 60 second timeout
 };
 
-let broadcaster = ArcBroadcaster::with_config(config);
+let broadcaster = TeranodeBroadcaster::with_config(config);
 ```
 
 ### WhatsOnChain Broadcasting
@@ -377,9 +369,9 @@ let broadcaster = WhatsOnChainBroadcaster::with_base_url(
 ### Broadcasting Multiple Transactions
 
 ```rust
-use bsv_rs::transaction::{ArcBroadcaster, Broadcaster, Transaction};
+use bsv_rs::transaction::{Broadcaster, Transaction, WhatsOnChainBroadcaster};
 
-let broadcaster = ArcBroadcaster::default();
+let broadcaster = WhatsOnChainBroadcaster::mainnet();
 let transactions = vec![tx1, tx2, tx3];
 
 let results = broadcaster.broadcast_many(transactions).await;
@@ -404,13 +396,12 @@ for (i, result) in results.iter().enumerate() {
 
 ## Testing
 
-The module includes unit tests for configuration and construction:
+The module includes unit tests for configuration and construction; the HTTP tests are wiremock's (`tests/broadcaster_http_tests.rs`, `tests/transport_fault_broadcasters.rs`), the ARC ones under `#[allow(deprecated)]`:
 
 ```bash
 cargo test broadcasters
 ```
 
-Integration tests with actual endpoints require network access and valid API keys.
 
 ## Related Documentation
 
