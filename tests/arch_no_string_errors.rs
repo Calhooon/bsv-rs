@@ -84,6 +84,16 @@ const ALLOWED: &[(&str, &str, usize)] = &[
         "if msg_type.to_str().ok() == Some(\"certificateRequest\") {",
         1,
     ),
+    // The unsigned general answer's body preview (#354): the reference's
+    // `#isTextualContent` reads the answer's `Content-Type` header for a
+    // `charset=` (`SimplifiedFetchTransport.ts:559`) to choose text or hex
+    // for the refusal's preview; a header value, never an error's text, and
+    // it decides no class.
+    (
+        "src/auth/transports/http/unauthenticated.rs",
+        "if TEXTUAL.iter().any(|token| lowered.contains(token)) || lowered.contains(\"charset=\") {",
+        1,
+    ),
     (
         "src/auth/transports/socketio/mod.rs",
         "if data.len() >= 2 && data[0].as_str() == Some(\"authMessage\") {",
@@ -173,7 +183,7 @@ fn transport_code_adds_no_text_classification() {
     }
     arch_support::check_sites("text classification in a transport", &sites, ALLOWED);
     println!(
-        "text comparison exceptions: {} sites in 5 files",
+        "text comparison exceptions: {} sites in 6 files",
         sites.len()
     );
 }
