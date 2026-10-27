@@ -193,6 +193,19 @@ fn byte_array(value: &Value) -> Option<Vec<u8>> {
     (bytes.len() <= MAX_BYTES).then_some(bytes)
 }
 
+/// A 200 createAction or signAction answer's `tx` read by [`byte_array`],
+/// the one reader for both paths: the reference normalizes the success
+/// body as it does the error body (`HTTPWalletJSON.ts:322-341`), so the
+/// historical object form and an integral float (`1.0`) are bytes there
+/// too. A `tx` it does not read is left to the result's own reader.
+pub(super) fn normalize_success_tx(body: &mut Value) {
+    if let Some(tx) = body.get_mut("tx") {
+        if let Some(bytes) = byte_array(tx) {
+            *tx = Value::from(bytes);
+        }
+    }
+}
+
 /// `normalizeHistoricalByteObject` (`BRC100ByteEncoding.ts:52-71`): the
 /// object `JSON.stringify(new Uint8Array(..))` writes, at least one key, its
 /// keys exactly `"0"` to `"n-1"`, each a byte. `Object.keys` lists integer

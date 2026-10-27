@@ -228,10 +228,21 @@ impl HttpWalletJson {
         }
 
         // Parse response
-        response
-            .json::<R>()
+        if review.is_none() {
+            return response
+                .json::<R>()
+                .await
+                .map_err(|e| request_error(e, "failed to parse JSON response"));
+        }
+        // createAction's and signAction's `tx` read by the error path's
+        // byte reader, as the reference normalizes both (#339)
+        let mut body = response
+            .json::<serde_json::Value>()
             .await
-            .map_err(|e| request_error(e, "failed to parse JSON response"))
+            .map_err(|e| request_error(e, "failed to parse JSON response"))?;
+        review_actions::normalize_success_tx(&mut body);
+        serde_json::from_value(body)
+            .map_err(|e| Error::WalletError(format!("failed to parse JSON response: {e}")))
     }
 
     // =========================================================================

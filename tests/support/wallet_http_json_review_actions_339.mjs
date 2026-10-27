@@ -19,6 +19,13 @@
 // which the reference's `normalizeBRC100WalletByteFields` reads back as
 // bytes before the error is read (`BRC100ByteEncoding.ts:52-71`, `:164-190`;
 // `HTTPWalletJSON.ts:326-328`), as `$BEEF_OBJECT`.
+//
+// Two bodies are 200 answers, which the reference normalizes the same way
+// before `validateWalletResult` (`HTTPWalletJSON.ts:322-341`): a
+// createAction's `tx` in the object form, and a signAction's `tx` with
+// every byte written as an integral float (`1.0`), `$BEEF_FLOAT` in the
+// body, the text written with each byte as `<n>.0` (`JSON.stringify`
+// writes `1`). An answer is recorded as its `txid` and `tx` (hex).
 
 import { readFileSync, writeFileSync } from 'node:fs'
 
@@ -65,8 +72,16 @@ const createCompeting = {
   ...(competingTx.lockTime === 0 ? {} : { lockTime: competingTx.lockTime }),
   options: { noSend: true }
 }
+// The signAction the competing transaction answers: its input 0's
+// unlocking script (`validateSignActionTransaction`, `WalletResultValidation.ts:1208-1240`)
+const signCompeting = {
+  reference: 'UlJSUlJSUlI=',
+  spends: { 0: { unlockingScript: competingTx.inputs[0].unlockingScript.toHex() } }
+}
 const result = (members) => ({ txid: A, status: 'doubleSpend', ...members })
 const BEEF_OBJECT = Object.fromEntries(BEEF.map((b, i) => [String(i), b]))
+const BEEF_FLOAT = '$BEEF_FLOAT'
+const BEEF_FLOAT_TEXT = `[${BEEF.map((b) => `${b}.0`).join(',')}]`
 
 const cases = [
   ['sign_double_spend', 'signAction', sign({ sendWith: [B] }), 400, signBody({
@@ -177,14 +192,18 @@ const cases = [
   })],
   ['another_call', 'listActions', { labels: ['a label'] }, 400, signBody({})],
   ['review_at_status_500', 'signAction', sign(), 500, signBody({})],
-  ['no_results', 'signAction', sign(), 400, envelope({})]
+  ['no_results', 'signAction', sign(), 400, envelope({})],
+  ['create_success_tx_object_form', 'createAction', createCompeting, 200, {
+    txid: C, tx: BEEF_OBJECT, noSendChange: [`${C}.0`]
+  }],
+  ['sign_success_tx_integral_floats', 'signAction', signCompeting, 200, { txid: C, tx: BEEF_FLOAT }]
 ]
 
 const hex = (bytes) => Utils.toHex(Array.from(bytes))
 
 const out = []
 for (const [name, call, args, status, body] of cases) {
-  const text = JSON.stringify(body)
+  const text = JSON.stringify(body).replace(`"${BEEF_FLOAT}"`, BEEF_FLOAT_TEXT)
   const fetch = async () => {
     const bytes = new TextEncoder().encode(text)
     return {
@@ -198,8 +217,8 @@ for (const [name, call, args, status, body] of cases) {
   const wallet = new HTTPWalletJSON('example.com', 'http://localhost:3321', fetch)
   let outcome
   try {
-    await wallet[call](structuredClone(args))
-    outcome = { answered: true }
+    const r = await wallet[call](structuredClone(args))
+    outcome = { answered: { txid: r.txid ?? null, tx: r.tx === undefined ? null : hex(r.tx) } }
   } catch (e) {
     if (e?.name === 'WERR_REVIEW_ACTIONS') {
       outcome = {
@@ -221,8 +240,8 @@ for (const [name, call, args, status, body] of cases) {
       outcome = { error: e.message }
     }
   }
-  // the competing BEEF written once, as `$BEEF` (or `$BEEF_OBJECT`) in a
-  // body (the reader substitutes the bytes of #327's vector)
+  // the competing BEEF written once, as `$BEEF` (or `$BEEF_OBJECT`,
+  // `$BEEF_FLOAT`) in a body (the reader substitutes the bytes of #327's vector)
   const recorded = JSON.parse(JSON.stringify(body, (_, v) =>
     v === BEEF ? '$BEEF' : v === BEEF_OBJECT ? '$BEEF_OBJECT' : v))
   out.push({ name, call, args, status, body: recorded, reference: outcome })
