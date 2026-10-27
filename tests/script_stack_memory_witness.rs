@@ -26,8 +26,9 @@
 //! on both paths (on the block path a resource limit, the node's own figure
 //! being its operator's setting, which this crate cannot know until a caller
 //! gives it, `set_stack_memory_consensus`, #38) and the
-//! policy's verdict on the mempool path; the default mode keeps 0.3.29's
-//! budget and count. The two `OP_LSHIFTNUM` witnesses of
+//! policy's verdict on the mempool path; the default mode kept 0.3.29's
+//! budget and count until bsv-rs#331, and since runs uncapped without a
+//! caller's budget, as the reference's `Spend` does. The two `OP_LSHIFTNUM` witnesses of
 //! the same family, by `INT_MAX` and `INT_MAX + 1`, are pinned since 0.3.29 in
 //! `tests/script_shift_count_witness.rs`.
 //!
@@ -194,9 +195,23 @@ fn outcome(
     }
 }
 
-/// The witness transaction's own unlocking script, the default local budget.
+/// The witness transaction's own unlocking script, the mode's `None` (the word's 100,000,000 bytes; the default mode uncapped since bsv-rs#331).
 fn run(tx_hex: &str, lock_hex: &str, mode: Mode) -> Outcome {
     outcome(tx_hex, None, lock_hex, mode, None, |_| {})
+}
+
+/// The default mode under a caller's 32,000,000 bytes, each stack apart: the
+/// figure the default mode's `None` read until bsv-rs#331, which since runs
+/// uncapped as the reference's `Spend` does; a budget is the caller's.
+fn run_default_under_32_000_000(tx_hex: &str, lock_hex: &str) -> Outcome {
+    outcome(
+        tx_hex,
+        None,
+        lock_hex,
+        Mode::Default,
+        Some(32_000_000),
+        |_| {},
+    )
 }
 
 fn verdict(message: &str) -> Outcome {
@@ -255,12 +270,13 @@ fn the_32000001_byte_read_overflows_under_the_standard_word() {
     );
 }
 
-/// gen-00009 in the default mode: 0.3.29's local budget, refused before the
-/// allocation, as before. Allocates nothing.
+/// gen-00009 in the default mode under a caller's 32,000,000 bytes (0.3.29's
+/// local budget, the default mode's `None` until bsv-rs#331), refused before
+/// the allocation, as before. Allocates nothing.
 #[test]
 fn the_32000001_byte_read_is_the_default_modes_resource_limit() {
     assert_eq!(
-        run(TX_READ_32000001, LOCK_READ_32000001, Mode::Default),
+        run_default_under_32_000_000(TX_READ_32000001, LOCK_READ_32000001),
         Resource {
             resource: ScriptResource::ElementSize,
             limit: 32_000_000,
@@ -290,7 +306,7 @@ fn a_left_shift_to_exactly_32000000_bytes_overflows_the_policy() {
         verdict(OVERFLOW_32000000_POLICY)
     );
     assert_eq!(
-        run(TX_SHIFT_AT_WIDTH, LOCK_SHIFT_AT_WIDTH, Mode::Default),
+        run_default_under_32_000_000(TX_SHIFT_AT_WIDTH, LOCK_SHIFT_AT_WIDTH),
         Resource {
             resource: ScriptResource::ElementSize,
             limit: 32_000_000,
@@ -326,7 +342,7 @@ fn a_left_shift_whose_result_takes_a_sign_byte_overflows_after_the_shift() {
         verdict(OVERFLOW_32000000_POLICY)
     );
     assert_eq!(
-        run(TX_SHIFT_SIGN_BYTE, LOCK_SHIFT_SIGN_BYTE, Mode::Default),
+        run_default_under_32_000_000(TX_SHIFT_SIGN_BYTE, LOCK_SHIFT_SIGN_BYTE),
         Resource {
             resource: ScriptResource::ElementSize,
             limit: 32_000_000,
@@ -343,7 +359,7 @@ fn a_40000000_byte_element_is_valid_under_both_words() {
     assert_eq!(run(TX_NUM2BIN_40M, LOCK_NUM2BIN_40M, Mode::Block), Valid);
     assert_eq!(run(TX_NUM2BIN_40M, LOCK_NUM2BIN_40M, Mode::Standard), Valid);
     assert_eq!(
-        run(TX_NUM2BIN_40M, LOCK_NUM2BIN_40M, Mode::Default),
+        run_default_under_32_000_000(TX_NUM2BIN_40M, LOCK_NUM2BIN_40M),
         Resource {
             resource: ScriptResource::ElementSize,
             limit: 32_000_000,
@@ -851,7 +867,7 @@ fn the_budgets_in_force() {
         }
         s
     };
-    assert_eq!(spend(Mode::Default, None).memory_limit(), 32_000_000);
+    assert_eq!(spend(Mode::Default, None).memory_limit(), usize::MAX);
     assert_eq!(spend(Mode::Block, None).memory_limit(), 100_000_000);
     assert_eq!(spend(Mode::Standard, None).memory_limit(), 100_000_000);
     assert_eq!(spend(Mode::Block, Some(7)).memory_limit(), 7);

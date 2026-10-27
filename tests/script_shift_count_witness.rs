@@ -48,6 +48,9 @@ enum Mode {
     Block,
     Standard,
     Default,
+    /// The default mode under a caller's budget: its `None` is uncapped since
+    /// bsv-rs#331, as the reference's `Spend` is.
+    DefaultUnder(usize),
 }
 
 /// The interpreter's error is boxed here only to keep the `Result` small for
@@ -81,13 +84,16 @@ fn spend(
         unlocking_script: UnlockingScript::from_binary(&input.script).unwrap(),
         input_sequence: input.sequence,
         lock_time: tx.locktime,
-        memory_limit: None,
+        memory_limit: match mode {
+            Mode::DefaultUnder(budget) => Some(budget),
+            _ => None,
+        },
         work_limit: None,
     });
     match mode {
         Mode::Block => s.set_flags(ScriptFlags::block(ProtocolEra::PostChronicle)),
         Mode::Standard => s.set_flags(ScriptFlags::standard(ProtocolEra::PostChronicle)),
-        Mode::Default => {}
+        Mode::Default | Mode::DefaultUnder(_) => {}
     }
     s.set_utxo_after_chronicle(utxo_after_chronicle);
     s.validate().map_err(Box::new)
@@ -150,7 +156,9 @@ fn a_right_shift_by_int_max_is_valid() {
 
 /// The left shift by `INT_MAX`: the size test before the shift refuses a
 /// 268,435,456-byte result, no allocation. 0.3.28 stopped at its memory
-/// budget with no verdict; the default mode still does.
+/// budget with no verdict; the default mode does under a caller's
+/// 32,000,000 bytes (its `None` until bsv-rs#331; uncapped, the shift is
+/// computed, 268 MB, and the script is valid).
 #[test]
 fn a_left_shift_by_int_max_overflows_the_number_length_under_a_word() {
     assert_eq!(
@@ -162,15 +170,22 @@ fn a_left_shift_by_int_max_overflows_the_number_length_under_a_word() {
         run(TX_LSHIFT_MAX, LOCK_LSHIFT_MAX, Mode::Standard),
         Err("Script number overflow: 268435456 bytes, the limit is 10000 bytes.".to_string())
     );
-    let default = spend(TX_LSHIFT_MAX, LOCK_LSHIFT_MAX, Mode::Default, true).unwrap_err();
+    let default = spend(
+        TX_LSHIFT_MAX,
+        LOCK_LSHIFT_MAX,
+        Mode::DefaultUnder(32_000_000),
+        true,
+    )
+    .unwrap_err();
     assert!(
         default.resource_limit.is_some(),
-        "the default mode's local budget, not a verdict"
+        "the caller's local budget, not a verdict"
     );
 }
 
 /// The left shift by `INT_MAX + 1`: the size test runs first, so an overflow,
-/// not the big-integer error.
+/// not the big-integer error; the default mode under a caller's 32,000,000
+/// bytes declines it.
 #[test]
 fn a_left_shift_by_int_max_plus_1_overflows_before_the_count_test() {
     assert_eq!(
@@ -180,13 +195,13 @@ fn a_left_shift_by_int_max_plus_1_overflows_before_the_count_test() {
     let default = spend(
         TX_LSHIFT_MAX_PLUS_1,
         LOCK_LSHIFT_MAX_PLUS_1,
-        Mode::Default,
+        Mode::DefaultUnder(32_000_000),
         true,
     )
     .unwrap_err();
     assert!(
         default.resource_limit.is_some(),
-        "the default mode's local budget, not a verdict"
+        "the caller's local budget, not a verdict"
     );
 }
 
