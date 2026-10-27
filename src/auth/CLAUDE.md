@@ -10,7 +10,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
-| `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType) | 658 |
+| `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
 | `peer.rs` | Core Peer implementation with `start()` transport setup | 996 |
 | `certificates/` | Certificate submodule | - |
@@ -59,7 +59,7 @@ Re-exports from `mod.rs`:
 - `MockTransport`, `SimplifiedFetchTransport`, `Transport` (transports)
 - `headers`, `TransportCallback`, `HttpRequest`, `HttpResponse` (transports)
 - `WebSocketTransport`, `WebSocketTransportOptions` (transports, gated behind `websocket` feature)
-- `current_time_ms`, `AuthMessage`, `MessageType`, `PeerSession`, `RequestedCertificateSet`, `AUTH_PROTOCOL_ID`, `AUTH_VERSION` (types)
+- `current_time_ms`, `AuthMessage`, `MessageType`, `PeerSession`, `RequestedCertificateSet`, `RequestedCertificateTypes`, `AUTH_PROTOCOL_ID`, `AUTH_VERSION` (types)
 - `create_nonce`, `validate_certificate_encoding`, `validate_certificates`, `validate_requested_certificate_set`, `verify_nonce` (utils)
 
 ### Types
@@ -153,8 +153,10 @@ impl PeerSession {
 ```rust
 pub struct RequestedCertificateSet {
     pub certifiers: Vec<String>,            // hex-encoded public keys
-    pub types: HashMap<String, Vec<String>>, // type_id -> field_names
+    pub types: RequestedCertificateTypes,    // type_id -> field_names, insertion order (#288)
 }
+
+pub type RequestedCertificateTypes = indexmap::IndexMap<String, Vec<String>>;
 
 impl RequestedCertificateSet {
     pub fn new() -> Self
@@ -166,6 +168,8 @@ impl RequestedCertificateSet {
     pub fn get_fields_for_type(&self, type_id: &str) -> Option<&Vec<String>>
 }
 ```
+
+`types` keeps insertion order, as the reference's `Record` does (`ts-stack@edf6e03` `types.ts:21-23`; #288): a JSON read keeps the text's order, `add_type` appends a new type (one present keeps its place), and the JSON written, the bytes a certificateRequest signs (`Peer.ts:451-453`), is that order, so a set's JSON is a fixed point and the reference's `JSON.stringify(policy)` byte for byte. `indexmap` is a dependency of `auth` for it. A literal builds `types` with `.into_iter().collect()` or `RequestedCertificateTypes::from([...])`.
 
 **current_time_ms** - Utility function:
 ```rust

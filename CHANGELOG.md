@@ -59,6 +59,78 @@ it back as `null`, so the reference's encoding of such a frame is not a
 fixed point (its data changes); this crate refuses the frame as
 `Malformed` with `serde_json`'s reason (rule 5: the exact value back or a
 refusal), pinned by `a_number_past_the_double_range_is_refused_with_a_reason`.
+### Changed: `RequestedCertificateSet::types` keeps insertion order, as the reference's `Record` does (#288)
+
+`RequestedCertificateSet::types` was a `HashMap<String, Vec<String>>`
+(`src/auth/types.rs`), and each `HashMap` iterates in its own order: two
+encodings of one set wrote its types in different orders, so a set built
+here (`add_type`) and sent by `AuthMessage::set_requested_certificates`
+signed and sent the keys in the map's order, not the order given, and a
+set read and written again was not a fixed point. #280 keeps a received
+text, so a verifier checks the bytes it received; the sender's order was
+left. The reference holds `types` as a `Record<string, string[]>`
+(`ts-stack@edf6e03` `packages/sdk/src/auth/types.ts:21-23`), in insertion
+order, and signs a certificateRequest over the UTF-8 bytes of
+`JSON.stringify(policy)` (`Peer.ts:451-453`). `types` is now an
+`indexmap::IndexMap<String, Vec<String>>`, named
+`bsv_rs::auth::RequestedCertificateTypes`: a JSON read keeps the text's
+order, `add_type` appends a new type (one already present keeps its place
+and takes the new fields, as a `Record`'s assignment does), and the JSON
+written, the bytes a certificateRequest signs, is that order. `indexmap`
+(2, its `serde` feature, already in the tree under `http` through `h2`) is
+a new dependency behind `auth`; it builds for wasm32 and passes
+`cargo deny`, and a hand-rolled `Vec<(String, Vec<String>)>` would have
+needed its own map API and serde for no gain. `get`, `insert`, `iter`,
+`len`, `is_empty`, `contains_key` are as they were.
+
+Pinned by `tests/auth_requested_types_order_288.rs` with
+`tests/vectors/auth_requested_types_order_288.json` (new), recorded by
+`tests/support/requested_types_order_288.mjs` under Node v22.18.0: a set
+with three types encodes in the order given and re-encodes identically,
+and a message built with it sends and signs that text; a JSON read keeps
+the text's order; this crate's text for the reference's three-type policy
+is the reference's `JSON.stringify(policy)` byte for byte, which two
+reference `Peer`s sign and verify; and this crate's certificateRequest,
+handed to a reference `Peer` holding the session, verifies over the bytes
+sent, its listener receiving the policy in this crate's order. All four RED
+on `70799f4`. `fuzz_auth_messages` now asserts a requested set's JSON is a
+fixed point (it panicked on 4 of 5 runs of the three-type policy on
+`70799f4`); the #285 run's crash input, a message whose set holds two
+types, passes it and passed already on `70799f4`, where #280's kept text
+covered its path.
+
+Migration: a struct literal built with a `HashMap` writes
+`types: [(id, fields)].into_iter().collect()` (or
+`RequestedCertificateTypes::from([...])`); code that reads `types` with the
+map API compiles as it is, and a function that took the `HashMap` takes
+`&RequestedCertificateTypes`. Of the downstreams, none builds a
+`RequestedCertificateSet` or reads its `types`
+(`bsv-wallet-toolbox-rs`, `bsv-wallet-cli`, `rust-message-box`,
+`bsv-overlay-cloudflare` searched, 2026-10-26; their `PeerOptions` literals
+pass `certificates_to_request: None`). `indexmap`'s major version is now
+part of this crate's public API.
+
+### Notes: cross-SDK parity (#288)
+
+The reference's `#snapshotCertificatePolicy` copies `types` with
+`Object.fromEntries(Object.entries(...))` (`Peer.ts:331-339`), which keeps
+insertion order but for an integer-like key, which a JavaScript object
+moves first in ascending order. The reference's validator refuses such a
+key: a type is canonical base64 of 32 bytes
+(`AuthMessageValidation.ts:141-144`), 44 characters ending in `=`, never
+integer-like. This crate's `validate_requested_certificate_set` checks no
+type ID's form, so a set the reference refuses (a type `"1"` after a type
+`"2"`) is written here in insertion order where a JavaScript object would
+write `"1"` first; on every set the reference accepts the two write the
+same bytes. Go holds `types` as a `map[wallet.CertificateType][]string`
+(`go-sdk@2ca481c` `auth/utils/validate_certificates.go:20`, `:54`) and
+`json.Marshal` writes a map's keys sorted, so
+a Go sender's order is the sorted one; a text it sends verifies here as
+received. A certificate's `fields` and keyring are `HashMap`s in this
+crate's certificate JSON too; the certificateResponse is signed over the
+text sent (#280), so no signature depends on their order, and their JSON
+shape is #268's.
+
 ### Fixed: `write_wallet_certificate` refuses the reference's three bounds and writes the fields in the signed order (#246)
 
 Two things #189 left in `WireWriter::write_wallet_certificate`
