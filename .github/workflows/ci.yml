@@ -34,11 +34,13 @@ permissions:
 # tests/arch_ci_pr_runs_the_required_set.rs pins the exact set both ways.
 #
 # a newer push to the same branch or PR cancels the run it supersedes; a tag's run is never cancelled
-# The group carries the event: a dispatch (the bench baseline's record mode,
-# the nightly's call) is never cancelled by a push to the same ref and never
-# cancels one; a pull request's own ref keeps each PR in a group of its own.
+# The group carries the event, and a bench baseline record its own mark: a
+# dispatch (the nightly's dispatch of this workflow, a record for
+# benches/baseline.json) is never cancelled by a push to the same ref and
+# never cancels one, a record never cancels the nightly's run nor the nightly
+# a record; a pull request's own ref keeps each PR in a group of its own.
 concurrency:
-  group: ci-${{ github.event_name }}-${{ github.ref }}
+  group: ci-${{ github.event_name }}-${{ inputs.bench_baseline_record && 'record-' || '' }}${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 env:
