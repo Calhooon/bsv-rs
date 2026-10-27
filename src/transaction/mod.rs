@@ -99,6 +99,7 @@ pub mod output;
 #[allow(clippy::module_inception)]
 pub mod transaction;
 pub mod tx_json;
+mod verify_refusal;
 
 // Re-exports for convenience
 pub use crate::error::TransportFault;
