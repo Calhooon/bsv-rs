@@ -18,8 +18,8 @@
 
 use serde_json::Value;
 
-/// Load a vector file and return (json_value, wire_bytes).
 /// Whether the shared vector `filename` exists.
+#[cfg(feature = "http")]
 fn vector_exists(filename: &str) -> bool {
     std::path::Path::new(&format!(
         "{}/tests/vectors/wallet_wire/{}",
@@ -29,6 +29,7 @@ fn vector_exists(filename: &str) -> bool {
     .exists()
 }
 
+/// Load a vector file and return (json_value, wire_bytes).
 fn load_vector(filename: &str) -> (Value, Vec<u8>) {
     let path = format!(
         "{}/tests/vectors/wallet_wire/{}",
