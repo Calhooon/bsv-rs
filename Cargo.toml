@@ -82,6 +82,10 @@ indexmap = { version = "2", features = ["serde"], optional = true }
 
 # HTTP client (optional, for broadcasters and chain trackers)
 reqwest = { version = "0.12", features = ["json"], optional = true }
+# The status line's own reason phrase, which reqwest keeps in its answer's
+# extensions as hyper's `ext::ReasonPhrase` when it is not the canonical one
+# (bsv-rs#354); the hyper reqwest already builds on, no new crate in the tree.
+hyper = { version = "1.1", default-features = false, features = ["http1"], optional = true }
 
 # Async runtime (optional, for auth module)
 tokio = { version = "1", features = ["sync", "time", "rt"], optional = true }
@@ -165,7 +169,7 @@ full = ["primitives", "block", "script", "transaction", "wallet", "messages", "c
 # Native-only (#152): reqwest's futures are not `Send` on wasm32 and its wasm
 # backend has no `ClientBuilder::timeout`, so `build.rs` refuses `http` on a
 # wasm32 target with one message. No Worker asks for it (docs/DEPENDENTS.md).
-http = ["dep:reqwest"]
+http = ["dep:reqwest", "dep:hyper"]
 websocket = ["auth", "dep:tokio-tungstenite", "dep:futures-util"]
 # Socket.IO 5 / Engine.IO 4 + BRC-103 transport. Substrate-agnostic:
 # pulls in no new dependency (uses serde_json + async-trait + futures,

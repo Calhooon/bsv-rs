@@ -748,8 +748,8 @@ impl Transport for SimplifiedFetchTransport {
                         .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
                     client::refuse_redirect(&url, &response)?;
                     // Extract response headers and body
-                    let response_status = response.status();
-                    let response_headers = response.headers().clone();
+                    let (response_status, reason, response_headers) =
+                        unauthenticated::head(&response);
                     let response_body = response
                         .bytes()
                         .await
@@ -760,6 +760,7 @@ impl Transport for SimplifiedFetchTransport {
                     unauthenticated::refuse_unauthenticated(
                         &url,
                         response_status,
+                        reason.as_deref(),
                         &response_headers,
                         &response_body,
                     )?;

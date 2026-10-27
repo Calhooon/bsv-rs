@@ -9,14 +9,20 @@
 //! in `#createUnauthenticatedResponseError`'s words (`:464-494`), with its body
 //! preview (`#getBodyPreview`, `#isTextualContent`, `#formatBinaryPreview`,
 //! `:512-579`). Through 0.9.0-beta.1 this crate read such an answer as a
-//! message whose sender was the client's own identity key. The named host
-//! answered, so the refusal is [`Error::AuthError`], never a
-//! [`crate::TransportFault`].
+//! message whose sender was the client's own identity key.
+//!
+//! The class is #87's: an unsigned 429, 502, 503 or 504 is not the named
+//! host's word but a gateway's or a limiter's, a
+//! [`crate::TransportFault`] by `status_fault` (a 429 or a 503 with
+//! `Retry-After` rate limited with its wait, the rest may have been
+//! received), the refusal's words its detail; every other status is the
+//! named host's answer, [`Error::AuthError`].
 
 use reqwest::header::{HeaderMap, CONTENT_TYPE};
-use reqwest::StatusCode;
+use reqwest::{Response, StatusCode};
 
 use super::headers;
+use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, Result};
 
 /// The headers the reference requires, in its order (`:221-225`).
@@ -25,9 +31,8 @@ const REQUIRED: [&str; 3] = [headers::VERSION, headers::IDENTITY_KEY, headers::S
 const PREVIEW_BYTES: usize = 1024;
 /// The preview's length in UTF-16 code units before it is cut (`:533`).
 const PREVIEW_UNITS: usize = 512;
-/// The content types the reference reads as text (`:549-558`), and a
-/// `charset=` of any type (`:559`).
-const TEXTUAL: [&str; 9] = [
+/// The content types the reference reads as text (`:549-558`).
+const TEXTUAL: [&str; 8] = [
     "application/json",
     "application/problem+json",
     "application/xml",
@@ -36,16 +41,27 @@ const TEXTUAL: [&str; 9] = [
     "application/ecmascript",
     "application/x-www-form-urlencoded",
     "text/",
-    "charset=",
 ];
+
+/// The answer's status, the status line's own reason phrase when it is not
+/// the canonical one (hyper keeps that one alone, as `ext::ReasonPhrase` in
+/// the answer's extensions), and its headers.
+pub(super) fn head(response: &Response) -> (StatusCode, Option<Vec<u8>>, HeaderMap) {
+    let reason = response
+        .extensions()
+        .get::<hyper::ext::ReasonPhrase>()
+        .map(|reason| reason.as_bytes().to_vec());
+    (response.status(), reason, response.headers().clone())
+}
 
 /// Refuses a general answer missing a required header, in the reference's
 /// words: `Received HTTP <status> <reason> from <url> without valid BSV
 /// authentication (missing headers: <names>)`, then ` - body preview: <text>`
-/// when the body is not empty.
+/// when the body is not empty; a transport fault when the status is one.
 pub(super) fn refuse_unauthenticated(
     url: &str,
     status: StatusCode,
+    reason: Option<&[u8]>,
     response_headers: &HeaderMap,
     body: &[u8],
 ) -> Result<()> {
@@ -56,15 +72,9 @@ pub(super) fn refuse_unauthenticated(
     if missing.is_empty() {
         return Ok(());
     }
-    // The reason phrase is the status code's canonical one: reqwest does not
-    // keep the phrase on the wire, which fetch's `statusText` reports.
-    let status_description = match status.canonical_reason() {
-        Some(reason) => format!("{} {}", status.as_u16(), reason),
-        None => status.as_u16().to_string(),
-    };
     let mut text = format!(
         "Received HTTP {} from {} without valid BSV authentication (missing headers: {})",
-        status_description,
+        status_description(status, reason),
         url,
         missing.join(", ")
     );
@@ -72,7 +82,35 @@ pub(super) fn refuse_unauthenticated(
         text.push_str(" - body preview: ");
         text.push_str(&preview);
     }
-    Err(Error::AuthError(text))
+    let class = fault::status_fault(status, response_headers);
+    Err(fault::fault_or(class, Some(status), text, Error::AuthError))
+}
+
+/// `statusText.trim()` after the status, or the status alone when nothing is
+/// left (`:470-472`). fetch's `statusText` is the wire's phrase; hyper keeps
+/// no canonical phrase, so its absence is the canonical one, or none for a
+/// status without one. A phrase with a byte above `0x7e` hyper's parser
+/// reads as empty (httparse's `parse_reason`), where fetch reads it as UTF-8
+/// (an ill-formed byte one U+FFFD, recorded under Node v22.18.0): the status
+/// alone here (the parity note).
+fn status_description(status: StatusCode, reason: Option<&[u8]>) -> String {
+    let text = match reason {
+        Some(bytes) => String::from_utf8_lossy(bytes).into_owned(),
+        None => status.canonical_reason().unwrap_or_default().to_owned(),
+    };
+    let trimmed = text.trim_matches(is_js_whitespace);
+    if trimmed.is_empty() {
+        status.as_u16().to_string()
+    } else {
+        format!("{} {}", status.as_u16(), trimmed)
+    }
+}
+
+/// What JavaScript's `String.prototype.trim` removes: `WhiteSpace` and
+/// `LineTerminator` (ECMA-262), Unicode's `White_Space` with U+FEFF and
+/// without U+0085, which Rust's `char::is_whitespace` has the other way.
+fn is_js_whitespace(c: char) -> bool {
+    c == '\u{feff}' || (c.is_whitespace() && c != '\u{85}')
 }
 
 /// `Headers.get` joins repeated values with `", "`, so a header is absent when
@@ -134,7 +172,7 @@ fn is_textual(content_type: &str, sample: &[u8]) -> bool {
         return false;
     }
     let lowered = content_type.to_lowercase();
-    if TEXTUAL.iter().any(|token| lowered.contains(token)) {
+    if TEXTUAL.iter().any(|token| lowered.contains(token)) || lowered.contains("charset=") {
         return true;
     }
     let printable = sample
