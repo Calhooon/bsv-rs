@@ -56,22 +56,62 @@ word.
   infallible clone of the push's bytes doubled its peak (the review's
   third note). The reference's allocation failure is a `RangeError` out of
   `verify`, neither of its two classes.
-- The numbers are not fallible: `BigNumber` (`num-bigint`) allocates
-  infallibly. The default mode's 1 GiB element bound holds at a data push,
+- The numbers: `BigNumber` (`num-bigint`) allocates infallibly, so its
+  arithmetic is guarded before it runs (#374, closed by this branch; the
+  keeper's word of 2026-10-27, 17:0xZ: "the fold that made None uncapped
+  opened the abort path, and a change that opens an abort path lands with
+  its guard; make the allocation fallible so OP_MUL near 1 GiB declines, on
+  the branch before #331 lands. [...] A verdict is never loosened to go
+  faster."). The default mode's 1 GiB element bound holds at a data push,
   `OP_CAT`, `OP_NUM2BIN` (whose bound under a word stays `INT32_MAX`) and
-  now the numeric left shift, whose result above it is refused before the
+  the numeric left shift, whose result above it is refused before the
   shift allocates, `It's not currently possible to push data larger than
-  1073741824 bytes.` (a shift of 1 by 2^40 bits asked for 2^37 bytes).
-  It does not hold at an arithmetic result: `push_number`
-  (`src/script/spend/num.rs`) bounds a result by the number length under a
-  word and by nothing in the default mode, as the reference's
-  `#maxPushSize` does not bound it, so `OP_MUL` of two operands near 1 GiB
-  computes a result near 2 GiB through allocations a refusal aborts (the
-  review's first note; operands that large are built by the script within
-  its element bound). Under a budget the budget's `ElementSize` decline
-  comes first, as before. The default mode's shift compares its size in
-  `u64`, as the word branch does, where it truncated to `usize` (on
-  `wasm32` a count past 2^35 bits wrapped below the budget).
+  1073741824 bytes.` (a shift of 1 by 2^40 bits asked for 2^37 bytes);
+  the default mode's shift compares its size in `u64`, as the word branch
+  does, where it truncated to `usize` (on `wasm32` a count past 2^35 bits
+  wrapped below the budget). It now holds at every arithmetic result too,
+  as a decline (`src/script/spend/arithmetic_room.rs`): before an operand
+  is decoded its encoding is judged as the read judges it (the read's
+  verdicts first, as the reference reads both operands first), then a
+  result whose least possible length passes the bound is declined from the
+  operands' bytes alone. Only `OP_MUL`'s result can pass its operands by
+  more than a byte (at least `a + b - 1` bits for magnitudes of `a` and `b`
+  bits: two operands near 1 GiB asked about 2 GiB, the abort the review's
+  first note found); `OP_ADD`, `OP_SUB`, `OP_1ADD`, `OP_1SUB` and `OP_2MUL`
+  pass their longest by one byte at most and the others not at all, so
+  their exact length is judged after the arithmetic, no more than two bytes
+  past the bound allocated. The decline is `ScriptResource::ElementSize`,
+  `limit` 1073741824, `attempted` the length: `Script element allocation
+  has exceeded 1073741824 bytes: OP_MUL needs at least N bytes for its
+  result, from operands of A and B bytes.` (`needs N bytes` when judged
+  after the arithmetic, `from an operand of A bytes` for a unary opcode).
+  In every mode a result of 64 KiB or more is asked of the allocator
+  first, `try_reserve_exact` of its greatest possible length, then
+  released: the allocator's ceiling is the one bound nothing knows before
+  the allocation, and num-bigint has no fallible form, so its refusal is a
+  decline where the arithmetic's would be an abort, `Stack memory usage has
+  exceeded H bytes: the allocator refused the N bytes OP_MUL's result may
+  need, from operands of A and B bytes.` (`limit` the bytes both stacks
+  hold, as the other allocator declines). Under a word the element bound
+  does not apply (an element after Genesis is bounded by the stack memory
+  budget alone): the number length bounds each operand at its read (750,000
+  bytes after Genesis, 32,000,000 after Chronicle, the policy's on the
+  mempool path) and the node's overflow test follows the arithmetic
+  (`script_num.cpp:164`, `194`, `214`), so a 2 GiB product does not arise
+  on the block path; a node whose `BN_mul` cannot allocate answers
+  `SCRIPT_ERR_BIG_INT` (`big_int.cpp:226-236`, `interpreter.cpp:1819-1822`
+  at bitcoin-sv `6504a3a`), a verdict, where this crate declines. Under a
+  caller's `Some(n)` the budget already bounded the allocation (the operands
+  were charged when pushed, and a product is no longer than both together),
+  but nothing declined before it: the operands were popped and multiplied,
+  the push's charge after (`stack.rs`); the element bound now applies under
+  a budget too, as at a push. The reference's
+  `predictedLen` test (`Spend.ts:1562-1573`, the budget against the result's
+  predicted length before the arithmetic) cannot fire under that count (the
+  two operands it pops held at least as many bytes), so it is not ported.
+  An operand's decoding (`ScriptNum::from_bytes`, at most a few copies of
+  the operand, which the allocator has already given once) stays
+  infallible.
 
 Pinned by `tests/transaction_verify_budget_331.rs` (#38's shape, 33 copies
 of a 1,000,000-byte element: `Ok(true)` under `None`, the decline at
@@ -92,7 +132,20 @@ peak of 8,000,096 bytes, 16,000,096 with the clone) and
 `an_allocation_the_allocator_refuses_is_a_decline_not_an_abort` (the
 `spend` unit tests: an element of `isize::MAX + 1` bytes, which no script
 reaches on a 64-bit host, is the decline at the 7 bytes held, where
-`Vec::with_capacity` panicked). Red on the code before, the parameter
+`Vec::with_capacity` panicked), and for #374 the six unit tests of
+`src/script/spend/arithmetic_room_tests.rs` (the bound and the allocator's
+ceiling modelled at a small scale: two 600-byte operands under a bound of
+1,000 declined at 1,200 before either is decoded, two of 500 bytes pushed at
+1,000, `OP_1ADD` one byte past it declined at 1,001, a word not bounded, a
+non-minimal operand's verdict first, an allocator refusing 80,000 bytes
+declined) and the ignored `tests/script_arithmetic_result_bound_374.rs`
+(by hand: `OP_MUL` of two operands of 2^29 + 1 bytes declined at 2^30 + 2,
+0.69 s and 1.04 GB resident; with `dhat-profiling` a peak heap of
+1,073,751,978 bytes, the operands and no allocation of the product's size;
+without the guard still multiplying after 60 s at a peak footprint of
+5.4 GB, 3.7 GB resident). Red on the code before the guard: 3 of the 6
+(the two acceptances and the encoding's verdict hold either way) and the
+ignored test. Red on the code before, the parameter
 unread and allocation infallible: 3 of the 5 in the first file (the 2
 others, the 32,000,000 decline and the invalid script, hold either way) and
 the unit test (`capacity overflow`); on the code before the fold of the
@@ -145,7 +198,17 @@ None` keeping 32,000,000 bytes in the default mode where the reference's
 uncapped. Two differences stay, stated: the default mode's 1 GiB element
 bound, which the reference's default does not have (its `#maxPushSize` is
 unbounded outside explicit flags, `Spend.ts:405-409`), and the allocator's
-refusal, a decline here and a `RangeError` there. go-sdk@2ca481c's
+refusal, a decline here and a `RangeError` there. An arithmetic result
+(#374): the reference bounds none but by its engine. Its `BigNumber` holds
+the magnitude in a native `bigint` (`BigNumber.ts:97`), at most 2^30 bits
+(128 MiB) in V8: under Node v22.18.0 a product past it throws `RangeError:
+Maximum BigInt size exceeded` out of `mul` (`:926-933`) before computing,
+which `Spend` does not catch, so a 1 GiB multiply throws there and never
+exhausts memory; an operand of about 200 MB or more fails at its read
+(`fromSm`'s hex text and `BigInt('0x' + hex)`, `:1505-1530`), which
+`#readScriptNumber` rethrows as a script error (`Spend.ts:525-535`), a
+verdict. Here an operand is read to the element bound and a result past it
+is the decline above. go-sdk@2ca481c's
 `spv.Verify` takes no caller's budget and runs the interpreter at the relay
 policy's 100,000,000 bytes (`interpreter.DefaultMaxStackMemory`,
 `spv/verify.go:64-68`).

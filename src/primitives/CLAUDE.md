@@ -183,6 +183,12 @@ let new_key = private_key.add(&hmac_value).modulo(&order);
 let key_bytes = new_key.to_bytes_be(32);
 ```
 
+`BigNumber`'s operations allocate infallibly (`num-bigint` has no fallible form): a
+product is as long as its operands together, and an allocator's refusal aborts. Code
+that multiplies numbers it did not choose bounds them first; the script interpreter
+judges each arithmetic result's length from its operands' bytes and asks the allocator
+for a large one before the arithmetic (`src/script/spend/arithmetic_room.rs`, #374).
+
 ### Binary Serialization
 ```rust
 use bsv_rs::primitives::{Reader, Writer};
