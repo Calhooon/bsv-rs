@@ -12,7 +12,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation with `start()` transport setup | 1,029 |
+| `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles (#353) | 941 |
 | `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
@@ -221,8 +221,8 @@ pub type CertificateRequestCallback = Box<dyn Fn(PublicKey, RequestedCertificate
 ```rust
 impl<W: WalletInterface, T: Transport> Peer<W, T> {
     pub fn new(options: PeerOptions<W, T>) -> Self
-    pub fn start(&self)                      // Sets up client-side transport callback (ignores InitialRequest)
-    pub fn start_server(self: &Arc<Self>)    // Sets up server-side transport callback (handles ALL message types)
+    pub fn start(&self)                      // Installs handle_incoming_message as the transport callback (both roles, #353)
+    pub fn start_server(self: &Arc<Self>)    // The same as start(), kept for Arc holders
 
     // Sending messages
     pub async fn to_peer(&self, message: &[u8], identity_key: Option<&str>, max_wait_time: Option<u64>) -> Result<()>
@@ -247,18 +247,19 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 }
 ```
 
-`Peer` refuses a malformed requested certificate set where the reference does (#294), with `assert_requested_certificate_set`: `request_certificates` before it seeks a session or signs (`Peer.ts:434`); its own `certificates_to_request` in `initiate_handshake` before a nonce or the initialRequest (`:630`) and on a received initialRequest before `process_initial_request` signs the response (`:811`), the reference's construction-time refusal (`:158`) moved to the first snapshot since `new` cannot fail; a received message's `requestedCertificates` in `handle_incoming_message` and the `start` callback after the version check, before routing (`AuthMessageValidation.ts:345-346`; a certificateRequest without one `requestedCertificates must be an object.`, `:367`), the refusal the callback's `Err`.
+`Peer` refuses a malformed requested certificate set where the reference does (#294), with `assert_requested_certificate_set`: `request_certificates` before it seeks a session or signs (`Peer.ts:434`); its own `certificates_to_request` in `initiate_handshake` before a nonce or the initialRequest (`:630`) and on a received initialRequest before `process_initial_request` signs the response (`:811`), the reference's construction-time refusal (`:158`) moved to the first snapshot since `new` cannot fail; a received message's `requestedCertificates` in `handle_incoming_message` (the `start` callback since #353) after the version check, before routing (`AuthMessageValidation.ts:345-346`; a certificateRequest without one `requestedCertificates must be an object.`, `:367`), the refusal the callback's `Err`.
 
 **Internal methods** (private):
 - `sign_message()` - Signs an AuthMessage using BRC-42 key derivation with the session's peer identity key
 - `verify_message_signature()` - Verifies an incoming AuthMessage signature
-- `initiate_handshake()` - Creates session, sends InitialRequest, waits for InitialResponse via oneshot channel with timeout
+- `initiate_handshake()` - Creates the session pinned to the identity key given (a string that is not one refused), sends InitialRequest, waits for InitialResponse via oneshot channel with timeout; a failed handshake's session removed (`Peer.ts:658-664`)
 - `process_initial_request()` - Server-side: creates session, sends InitialResponse, optionally sends certificates
 - `process_initial_response()` - Client-side: delegates to `process_initial_response_inner()`, sends errors through oneshot channel
-- `process_initial_response_inner()` - Verifies InitialResponse signature, updates session, resolves pending handshake
+- `process_initial_response_inner()` - The reference's `authenticateInitialResponse` (`Peer.ts:886-930`) in its order and words: `your_nonce` made by this wallet, its session, the pinned identity, the signature, `initial_nonce` present; updates session, resolves pending handshake (#353)
 - `process_certificate_request()` - Verifies signature, notifies certificate request callbacks
 - `process_certificate_response()` - Verifies signature, validates certificates, updates session, notifies callbacks
-- `process_general_message()` - Verifies auth and signature, updates peer nonce, notifies callbacks
+- `process_general_message()` - The reference's `processGeneralMessage` (`Peer.ts:1270-1314`) in its order and words: `your_nonce` made by this wallet, its session, the session's peer the sender, the signature, the nonce and the session's nonce present; marks the session authenticated, notifies callbacks (a listener's error the message's) (#353)
+- `verify_own_nonce()` - `verify_nonce` with counterparty self, a malformed nonce `false` (the reference's `verifyNonce`)
 
 **PeerOptions** - Configuration for creating a Peer:
 ```rust
@@ -336,7 +337,7 @@ let peer = Peer::new(PeerOptions {
     auto_persist_last_session: false,
     originator: Some("myapp.com".into()),
 });
-peer.start(); // Client-side: handles responses but not incoming InitialRequest
+peer.start(); // Every message through handle_incoming_message, verified (#353)
 peer.to_peer(b"Hello, world!", None, None).await?;
 ```
 
@@ -353,7 +354,7 @@ let peer = Arc::new(Peer::new(PeerOptions {
     auto_persist_last_session: false,
     originator: Some("myserver.com".into()),
 }));
-peer.start_server(); // Server-side: handles ALL messages including InitialRequest
+peer.start_server(); // The same path as start()
 ```
 
 ### Listening for Messages
@@ -404,8 +405,8 @@ peer.start();
 
 1. **Create**: `Peer::new(options)` - constructs peer with wallet and transport
 2. **Start**: Choose one:
-   - `peer.start()` - client-side callback (handles InitialResponse, General, Certificate messages; ignores InitialRequest)
-   - `peer.start_server()` - server-side callback (handles ALL message types including InitialRequest). Requires `Arc<Peer>` since it routes through `handle_incoming_message()`.
+   - `peer.start()` - installs `handle_incoming_message()` as the transport callback: every message type, each verified (until #353 `start` installed an unverifying callback of its own and ignored InitialRequest)
+   - `peer.start_server()` - the same, on an `Arc<Peer>`
 3. **Communicate**: `to_peer()`, `request_certificates()`, etc.
 
 ### Authentication Flow
@@ -424,14 +425,11 @@ The InitialResponse field mapping matches Go and TS SDKs:
 
 On the initiator side, the responder's session nonce (`initial_nonce`) is stored as `peer_nonce`.
 
-**TS SDK compatibility**: The TS SDK's InitialResponse has NO `nonce` field (only `initialNonce`, `yourNonce`). The Go SDK sends both `Nonce` and `InitialNonce`. The Rust SDK accepts either: both `start()` callback and `process_initial_response()` fall back to `initial_nonce` when `nonce` is absent.
+**TS SDK compatibility**: The TS SDK's InitialResponse has NO `nonce` field (only `initialNonce`, `yourNonce`). The Go SDK sends both `Nonce` and `InitialNonce`. The Rust SDK reads `initial_nonce`, as the reference does, and requires it (`Initial response message nonce is required.`, #353).
 
 ### Error Propagation
 
-Errors during InitialResponse processing (e.g., signature verification failure) are sent through the oneshot channel to the waiting `initiate_handshake()` caller. This is implemented in two places:
-
-1. **`start()` callback**: Extracts nonces in a closure; on error, sends through oneshot before returning
-2. **`process_initial_response()`**: Delegates to `process_initial_response_inner()`; on error, sends through oneshot
+Errors during InitialResponse processing (e.g., signature verification failure) are sent through the oneshot channel to the waiting `initiate_handshake()` caller: `process_initial_response()` delegates to `process_initial_response_inner()` and on an error sends it through the oneshot named by `your_nonce` (a `your_nonce` naming none of ours leaves the handshake to time out, as the reference's does).
 
 Without this, errors would be swallowed by the routing task and the caller would time out instead of receiving the actual error.
 
@@ -439,7 +437,7 @@ Without this, errors would be swallowed by the routing task and the caller would
 
 Message nonces for General/CertificateRequest/CertificateResponse use simple 32-byte random values (base64-encoded), matching TypeScript's `Utils.toBase64(Random(32))`. Session nonces use HMAC-based `create_nonce()` with counterparty=Self (None).
 
-Nonce verification on InitialResponse uses `nonce` if present, falls back to `initial_nonce` for TS SDK compat. Verification failure is non-fatal (matches Go/TS behavior).
+An InitialResponse's and a General message's `your_nonce` is verified against this peer's own wallet (counterparty self), a failure a refusal, as the reference and Go refuse it (#353; until then the responder's nonce was checked against the responder's key, which no wallet but the responder's can match, and the failure passed). The replay claim of each message nonce (`Peer.ts:258-272`) and the `your_nonce` check of a certificate request and response are not yet here (the #353 changelog's parity note).
 
 ### Cryptographic Details
 
