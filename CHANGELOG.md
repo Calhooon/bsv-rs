@@ -19,7 +19,8 @@ cancelled by #306's landing twenty minutes in. The group is
 run as before, a pull request's own ref keeps each PR in a group of its own,
 a dispatch runs to its end beside a push and a pull request, and a record
 dispatch runs apart from the nightly's dispatch of the same line (the two
-would otherwise cancel each other within the record's window). The keeper's CI rule (a pull request runs exactly its line's required
+would otherwise cancel each other within the record's window). The keeper's CI
+rule (a pull request runs exactly its line's required
 set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
 `main` is a `git cherry-pick -x` (RELEASING.md point 21).
 
