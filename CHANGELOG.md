@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: a push runs exactly the required set; the measurements run on dispatch and before every tag, each in its own workflow with its own badge (the owner's word of 2026-10-27)
+
+The owner's word at 20:1xZ, 2026-10-27, through the keeper: "sick of seeing
+all these CI failures... why are none of them passing... they are all so
+hardcore and slowing us down". The keeper's read: beta's last push run was red
+on the Benchmark Regression Check alone, a job that judges the runner's load,
+not the commit. The keeper's ruling, the balance: a push to `beta` or `main`
+runs exactly the required set, the same contexts as a pull request to that
+line, nothing more; every job that judges something other than the commit runs
+on `workflow_dispatch` and once before a tag, each in its own workflow with its
+own badge, never on the push run; the README badge points at the required-set
+workflow on `main`; a cancelled run under the concurrency rule is never a red.
+Nothing is lost: the measurements still run before every tag.
+
+`ci.yml` keeps the required set (`Test Suite (ubuntu-latest, stable)`,
+`Clippy`, `Rustfmt`, `vectors`, `deny`, `ratchet`, `fixtures`, `secrets`,
+`wasm32 (combined)`, `main-in-beta` on beta, `dependents` on main, `semver` and
+`beta-born` on a pull request), the context names unchanged. Two of the
+required jobs read a pull request and cannot run on a push: `semver` (the
+base's last tag) and `beta-born` (the PR's commits). The five other test cells
+(macOS, Windows, the beta toolchain) run on a dispatch of `ci.yml` (the
+nightly's `ci-full` on each line, the sync's) and on a tag's call. The
+dependents jobs stay in `ci.yml`, since `dependents` is required on `main` and
+a called workflow's job reports as `<caller> / <name>`; they leave beta's push
+and run on a dispatch on either line and on every tag. The new workflows, each
+with `workflow_dispatch` and `workflow_call`:
+
+- `bench.yml`: `Benchmark Regression Check`, `Benchmarks Build` and the
+  `scoreboard` (its `needs` now the two bench jobs; it reads artifacts, as
+  before). On `main` the bench jobs keep main's bodies: main has no
+  `tools/bench-compare` and no `benches/baseline.json`, so no record input and
+  no corpus secret; `Benchmarks Build` is `cargo bench --no-run`, and the
+  critcmp regression check, which compared a pull request's base and head and
+  ran on beta's ref alone, compares the commit with the last release tag
+  before it (a `-beta.` tag never, a tag never with itself).
+- `msrv.yml`: `msrv`.
+- `features.yml`: `features` (each feature alone) and the five wasm32 slices
+  other than the required `wasm32 (combined)` (`wasm32 (watchtower)`,
+  `(monitor)`, `(chaintracks)`, `(overlay)`, `(relay)`).
+- `machete.yml`: `unused dependencies` (non-blocking, as before).
+- `docs.yml`: `Documentation` (rustdoc) and `actionlint`, the checks of the text.
+
+`release.yml` calls `ci.yml` and the five on every version tag (main's are
+plain `vX.Y.Z`). The publish waits for `ci.yml`, `docs.yml`, `msrv.yml`,
+`features.yml` and `machete.yml`, as it waited for those jobs inside `ci.yml`.
+`bench.yml` runs beside the publish and does not hold it: a red there is the
+runner's as often as the commit's, and it shows on the tag's run and the badge.
+Before this change a tag's call skipped the regression check. `nightly.yml` is
+unchanged: it is dispatch-only (the entry below) and not callable, so
+`RELEASING.md` step 3 names its dispatch before a minor tag.
+
+| Job (context) | Pull request | Push to `beta` | Push to `main` | Dispatch | Before a tag |
+|---|---|---|---|---|---|
+| `Test Suite (ubuntu-latest, stable)`, `Clippy`, `Rustfmt`, `vectors`, `deny`, `ratchet`, `fixtures`, `secrets`, `wasm32 (combined)` | yes | yes | yes | yes (`ci.yml`) | yes |
+| the other five `Test Suite` cells | no | no | no | yes (`ci.yml`) | yes |
+| `main-in-beta` | into `beta` | yes | no | on `sync/main-into-beta` | no |
+| `semver`, `beta-born` | `semver` both; `beta-born` into `main` | no | no | no | `semver` on `main` (against the release before it, #214) |
+| `Plan pinned dependents`, `dependent (<id>)`, `dependents` | into `main` | no (was yes) | yes | yes (`ci.yml`) | yes |
+| `Benchmark Regression Check` | no | no (was yes) | no | yes (`bench.yml`) | yes, not holding the publish (was skipped) |
+| `Benchmarks Build`, `scoreboard` | no | no (was yes) | no (was yes) | yes (`bench.yml`) | yes, not holding the publish |
+| `msrv` | no | no (was yes) | no (was yes) | yes (`msrv.yml`) | yes |
+| `features`, the other five `wasm32 (...)` | no | no (was yes) | no (was yes) | yes (`features.yml`) | yes |
+| `unused dependencies` | no | no (was yes) | no (was yes) | yes (`machete.yml`) | yes |
+| `Documentation`, `actionlint` | no | no (was yes) | no (was yes) | yes (`docs.yml`) | yes |
+
+The badges: README carries one per workflow, the required set's first. The
+`CI` badge reads `ci.yml` with `?branch=main`, so a beta push in progress or
+cancelled never shows there. The five measurement badges read their
+workflow's latest run on the default branch. `ci.yml`'s concurrency group
+stays per event and ref (`ci-<event>-<ref>`, without the record mark now that
+the record input is `bench.yml`'s). A newer push cancels the run it
+supersedes, and that cancelled run is never a red: the newer run judges the
+same line.
+
+`tests/arch_ci_pr_runs_the_required_set.rs` pins it. A push to each line runs
+exactly its required set less `semver` and `beta-born`
+(`a_push_to_beta_runs_exactly_betas_required_set`,
+`a_push_to_main_runs_exactly_mains_required_set`, both RED on the previous
+`ci.yml`, which named every leaving job, the Benchmark Regression Check among
+them). A dispatch on each line and a tag's call run every job and the six test
+cells. Each measurement workflow is triggered by dispatch and call alone, and
+`release.yml` calls it (`the_measurements_run_on_dispatch_and_before_a_tag_never_on_a_push`).
+Three edits are refused: the dependents back on beta's push, `semver` on a
+push (on `main` the edit removes main's condition, which also admits a tag's
+call), an unrequired job on the push run. The evaluator reads `startsWith`.
+Nothing under `src/` changes. `CLAUDE.md` (rule 7, the layout),
+`RELEASING.md` (steps 2, 3, 5), `README.md`, `docs/NIGHTLY.md`,
+`docs/RATCHETS.md` and `benches/CLAUDE.md` say so.
+
 ### Changed: the oracles run on demand, the nightly schedule removed (the owner's word of 2026-10-27)
 
 The owner's fleet word of 2026-10-27: the nightly runs were a waste of

@@ -1,13 +1,20 @@
-//! A pull request runs exactly its line's required set; every other event runs every job.
+//! A pull request and a push run exactly their line's required set; a dispatch and a tag's
+//! call run every job of ci.yml and the whole test matrix.
 //!
 //! The keeper's rule for every public repository of the stack, the owner's
-//! word behind it (2026-10-26): the jobs a pull request runs are exactly the
-//! required contexts of its base line's branch protection. A job that runs on
-//! a PR but cannot refuse it is load on GitHub and noise; a job that could
+//! word behind it (2026-10-26 for a pull request, 2026-10-27 for a push): the
+//! jobs a pull request runs are exactly the required contexts of its base
+//! line's branch protection, and a push to `beta` or `main` runs the same set,
+//! less the contexts that read a pull request ([`PULL_REQUEST_ONLY`]). A job
+//! that runs but cannot refuse is load on GitHub and noise; a job that could
 //! refuse but is not required is a hole. The jobs a required job `needs` are
 //! part of it (`Plan pinned dependents` and each `dependent (<id>)` decide
-//! `dependents`). A push to `beta` or `main` and the nightly's dispatch on
-//! each line run every job, save the few named in [`NOT_ON_THE_FULL_SET`].
+//! `dependents`). A dispatch on each line (the nightly's, the sync's) and a
+//! tag's call from release.yml (its event the tag's push) run every job, save
+//! the few named in [`NOT_ON_THE_FULL_SET`], and every cell of the test
+//! matrix. The jobs that judge something other than the commit live in
+//! workflows of their own (bench.yml, msrv.yml, features.yml, machete.yml,
+//! docs.yml), which no push and no pull request starts.
 //!
 //! This guard reads `.github/workflows/ci.yml` (nothing else; no network, no
 //! environment) at the string level and evaluates each job's `if:` and its
@@ -20,7 +27,8 @@
 //! written as one expression (`dependent-check`'s plan output) is unknown. An
 //! expression is read in three values (true, false, unknown): `github.*`
 //! takes the event's values, `inputs.*` is empty on a pull request,
-//! `always()` is true, every other context or function (`needs.*`,
+//! `always()` is true, `startsWith` of two known strings is read as GitHub
+//! reads it (ignoring case), every other context or function (`needs.*`,
 //! `contains(github.event.pull_request.body, ..)`) is unknown. An unknown
 //! required job is a refusal (it is not proven to run) and an unknown job
 //! outside the set is one too (it is not proven to stay off).
@@ -63,36 +71,44 @@ const REQUIRED_ON_MAIN: &[&str] = &[
     "wasm32 (combined)",
 ];
 
-/// Jobs a push or the nightly's dispatch does not run on a line, with the
-/// reason: (job id, line, reason). Nothing else belongs here.
+/// Required contexts a push cannot run, with the reason: (context, reason).
+/// A push to a line runs every other required context of the line, nothing else.
+const PULL_REQUEST_ONLY: &[(&str, &str)] = &[
+    (
+        "semver",
+        "it reads the pull request's base; no push has one",
+    ),
+    ("beta-born", "it judges a pull request into main"),
+];
+
+/// Jobs a dispatch or a tag's call does not run, with the reason: (job id,
+/// event label or `*` for every one, reason). Nothing else belongs here.
 const NOT_ON_THE_FULL_SET: &[(&str, &str, &str)] = &[
     (
         "semver",
-        "beta",
-        "it reads the pull request's base; no push has one",
+        "*",
+        "it reads the pull request's base; no dispatch and no tag has one",
     ),
-    (
-        "semver",
-        "main",
-        "it reads the pull request's base; no push has one",
-    ),
-    ("beta-born", "beta", "it judges a pull request into main"),
-    ("beta-born", "main", "it judges a pull request into main"),
-    ("main-in-beta", "main", "main is in main by definition"),
+    ("beta-born", "*", "it judges a pull request into main"),
     (
         "main-in-beta",
-        "beta-nightly",
+        "main-dispatch",
+        "main is in main by definition",
+    ),
+    (
+        "main-in-beta",
+        "beta-dispatch",
         "a push to beta and the sync's dispatch run it; the nightly's dispatch does not",
     ),
     (
-        "benchmarks",
-        "main",
-        "the baseline is beta's; a dispatch with bench_baseline_record runs it anywhere",
+        "main-in-beta",
+        "tag",
+        "a pull request into beta and a push to beta judged it; release.yml checks the tag's line",
     ),
 ];
 
-/// The cells of each matrix job on the full set.
-const FULL_MATRIX: &[(&str, usize)] = &[("test", 6), ("wasm32", 6)];
+/// The cells of each matrix job on the full set (the five other wasm32 slices are features.yml's).
+const FULL_MATRIX: &[(&str, usize)] = &[("test", 6), ("wasm32", 1)];
 
 fn read(path: &str) -> String {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -114,6 +130,18 @@ const fn pull_request(line: &'static str) -> Event {
         name: "pull_request",
         base_ref: line,
         git_ref: "refs/pull/1/merge",
+    }
+}
+
+fn push(line: &'static str) -> Event {
+    Event {
+        name: "push",
+        base_ref: "",
+        git_ref: if line == "beta" {
+            "refs/heads/beta"
+        } else {
+            "refs/heads/main"
+        },
     }
 }
 
@@ -372,9 +400,14 @@ impl Reader<'_> {
                     }
                 }
                 self.take();
-                match word.as_str() {
-                    "always" => Value::Bool(true),
-                    "fromJSON" => arguments.into_iter().next().unwrap_or(Value::Unknown),
+                match (word.as_str(), arguments.as_slice()) {
+                    ("always", _) => Value::Bool(true),
+                    ("fromJSON", _) => arguments.into_iter().next().unwrap_or(Value::Unknown),
+                    // GitHub compares strings ignoring case
+                    ("startsWith", [Value::Str(text), Value::Str(prefix)]) => Value::Bool(
+                        text.to_ascii_lowercase()
+                            .starts_with(&prefix.to_ascii_lowercase()),
+                    ),
                     _ => Value::Unknown,
                 }
             }
@@ -512,23 +545,50 @@ fn runs(all: &[Job], event: &Event) -> BTreeMap<String, Option<bool>> {
 
 /// The refusals of the exact-set rule on a pull request into `line`.
 fn pr_refusals(ci: &str, line: &'static str, required: &[&str]) -> Vec<String> {
-    let event = pull_request(line);
+    let label = format!("a pull request into {line}");
+    exact_refusals(ci, &pull_request(line), line, &label, required, &[])
+}
+
+/// The refusals of the exact-set rule on a push to `line`: its required set less
+/// [`PULL_REQUEST_ONLY`], which must not run.
+fn push_refusals(ci: &str, line: &'static str, required: &[&str]) -> Vec<String> {
+    let label = format!("a push to {line}");
+    let absent: Vec<&str> = PULL_REQUEST_ONLY.iter().map(|(c, _)| *c).collect();
+    exact_refusals(ci, &push(line), line, &label, required, &absent)
+}
+
+/// The refusals of the exact-set rule for `event`: every context of `required` but
+/// those of `absent` proven to run, no job proven to run `absent`'s, and no other
+/// context run (the jobs a deciding job needs aside).
+fn exact_refusals(
+    ci: &str,
+    event: &Event,
+    line: &str,
+    label: &str,
+    required: &[&str],
+    absent: &[&str],
+) -> Vec<String> {
     let all = jobs(ci);
-    let ran = runs(&all, &event);
-    let required: BTreeSet<&str> = required.iter().copied().collect();
+    let ran = runs(&all, event);
+    let absent: BTreeSet<&str> = absent.iter().copied().collect();
+    let required: BTreeSet<&str> = required
+        .iter()
+        .copied()
+        .filter(|c| !absent.contains(c))
+        .collect();
     let mut errors = Vec::new();
     let mut deciders = BTreeSet::new();
     for context in &required {
         let producers: Vec<&Job> = all
             .iter()
-            .filter(|j| contexts(j, &event).is_ok_and(|c| c.iter().any(|c| c == context)))
+            .filter(|j| contexts(j, event).is_ok_and(|c| c.iter().any(|c| c == context)))
             .collect();
         if !producers
             .iter()
             .any(|j| ran.get(&j.id) == Some(&Some(true)))
         {
             errors.push(format!(
-                "`{context}` is required on {line} but no job is proven to run it on a pull request into {line}"
+                "`{context}` is required on {line} but no job is proven to run it on {label}"
             ));
         }
         for job in producers {
@@ -552,19 +612,24 @@ fn pr_refusals(ci: &str, line: &'static str, required: &[&str]) -> Vec<String> {
             continue;
         }
         let helper = helpers.contains(&job.id);
-        match contexts(job, &event) {
+        match contexts(job, event) {
             Ok(names) => {
                 for name in names.iter().filter(|n| !required.contains(n.as_str())) {
-                    if !helper {
+                    if absent.contains(name.as_str()) {
                         errors.push(format!(
-                            "job `{}` runs `{name}` on a pull request into {line}, not a required context there",
+                            "job `{}` may run `{name}` on {label}, which cannot judge it",
+                            job.id
+                        ));
+                    } else if !helper {
+                        errors.push(format!(
+                            "job `{}` runs `{name}` on {label}, not a required context there",
                             job.id
                         ));
                     }
                 }
             }
             Err(why) if !helper => errors.push(format!(
-                "job `{}` may run on a pull request into {line} and its contexts are unreadable ({why})",
+                "job `{}` may run on {label} and its contexts are unreadable ({why})",
                 job.id
             )),
             Err(_) => {}
@@ -573,40 +638,44 @@ fn pr_refusals(ci: &str, line: &'static str, required: &[&str]) -> Vec<String> {
     errors
 }
 
-/// The refusals of the full set on `line`: every job runs (or may, by a plan's
-/// output) on a push to the line and on the nightly's dispatch on it, save the
-/// named exceptions, and the matrix jobs run every cell.
-fn full_refusals(ci: &str, line: &'static str) -> Vec<String> {
-    let git_ref = if line == "beta" {
-        "refs/heads/beta"
-    } else {
-        "refs/heads/main"
-    };
+/// The refusals of the full set: every job runs (or may, by a plan's output)
+/// on a dispatch on each line and on a tag's call, save the named exceptions,
+/// and the matrix jobs run every cell.
+fn full_refusals(ci: &str) -> Vec<String> {
     let all = jobs(ci);
     let mut errors = Vec::new();
     for (event, label) in [
         (
             Event {
-                name: "push",
+                name: "workflow_dispatch",
                 base_ref: "",
-                git_ref,
+                git_ref: "refs/heads/beta",
             },
-            line.to_string(),
+            "beta-dispatch",
         ),
         (
             Event {
                 name: "workflow_dispatch",
                 base_ref: "",
-                git_ref,
+                git_ref: "refs/heads/main",
             },
-            format!("{line}-nightly"),
+            "main-dispatch",
+        ),
+        // a called workflow sees its caller's event: release.yml's, the tag's push
+        (
+            Event {
+                name: "push",
+                base_ref: "",
+                git_ref: "refs/tags/v0.9.0-beta.2",
+            },
+            "tag",
         ),
     ] {
         let ran = runs(&all, &event);
         for job in &all {
             let excused = NOT_ON_THE_FULL_SET
                 .iter()
-                .any(|(id, l, _)| *id == job.id && (*l == label || *l == line));
+                .any(|(id, l, _)| *id == job.id && (*l == label || *l == "*"));
             if ran.get(&job.id) == Some(&Some(false)) && !excused {
                 errors.push(format!(
                     "job `{}` does not run on {} ({label})",
@@ -640,14 +709,68 @@ fn a_pull_request_into_main_runs_exactly_mains_required_set() {
 }
 
 #[test]
-fn a_push_and_the_nightly_run_every_job_on_each_line() {
-    let ci = read(".github/workflows/ci.yml");
-    let mut errors = full_refusals(&ci, "beta");
-    errors.extend(full_refusals(&ci, "main"));
+fn a_push_to_beta_runs_exactly_betas_required_set() {
+    let errors = push_refusals(&read(".github/workflows/ci.yml"), "beta", REQUIRED_ON_BETA);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+}
+
+#[test]
+fn a_push_to_main_runs_exactly_mains_required_set() {
+    let errors = push_refusals(&read(".github/workflows/ci.yml"), "main", REQUIRED_ON_MAIN);
+    assert!(errors.is_empty(), "{}", errors.join("\n"));
+}
+
+#[test]
+fn a_dispatch_and_a_tags_call_run_every_job_and_the_whole_matrix() {
+    let errors = full_refusals(&read(".github/workflows/ci.yml"));
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     for (id, line, reason) in NOT_ON_THE_FULL_SET {
         assert!(!reason.is_empty(), "{id} on {line} names no reason");
     }
+    for (context, reason) in PULL_REQUEST_ONLY {
+        assert!(!reason.is_empty(), "{context} names no reason");
+    }
+}
+
+/// The measurement workflows: none starts on a push or a pull request, each runs on
+/// a dispatch and on release.yml's call, and release.yml calls each.
+#[test]
+fn the_measurements_run_on_dispatch_and_before_a_tag_never_on_a_push() {
+    let release = read(".github/workflows/release.yml");
+    for file in ["bench", "msrv", "features", "machete", "docs"] {
+        let text = read(&format!(".github/workflows/{file}.yml"));
+        let on = text
+            .split("\non:\n")
+            .nth(1)
+            .unwrap_or_else(|| panic!("{file}.yml: no `on:`"));
+        let triggers: Vec<&str> = on
+            .lines()
+            .take_while(|l| l.is_empty() || l.starts_with(' '))
+            .filter(|l| indent(l) == 2)
+            .map(str::trim)
+            .collect();
+        assert_eq!(
+            triggers,
+            ["workflow_dispatch:", "workflow_call:"],
+            "{file}.yml's triggers"
+        );
+        assert!(
+            release.contains(&format!("uses: ./.github/workflows/{file}.yml\n")),
+            "release.yml does not call {file}.yml"
+        );
+    }
+}
+
+/// A job outside every required set, inserted first under `jobs:` with `condition`.
+fn with_docs_job(ci: &str, condition: Option<&str>) -> String {
+    let condition = condition.map_or(String::new(), |c| format!("    if: {c}\n"));
+    edited(
+        ci,
+        "\njobs:\n",
+        &format!(
+            "\njobs:\n  docs:\n    name: Documentation\n{condition}    runs-on: ubuntu-latest\n"
+        ),
+    )
 }
 
 /// Replaces `old` in `text` once, asserting it is there.
@@ -676,15 +799,59 @@ fn a_required_job_gated_off_pull_requests_is_refused() {
 
 #[test]
 fn an_unrequired_job_left_on_pull_requests_is_refused() {
-    let ci = edited(
-        &read(".github/workflows/ci.yml"),
-        "    name: Documentation\n    if: github.event_name != 'pull_request'\n",
-        "    name: Documentation\n",
-    );
+    let ci = with_docs_job(&read(".github/workflows/ci.yml"), None);
     let errors = pr_refusals(&ci, "beta", REQUIRED_ON_BETA);
     assert_eq!(
         errors,
         ["job `docs` runs `Documentation` on a pull request into beta, not a required context there"]
+    );
+    // the old condition, off pull requests alone, puts it back on the push run
+    let ci = with_docs_job(
+        &read(".github/workflows/ci.yml"),
+        Some("github.event_name != 'pull_request'"),
+    );
+    assert!(pr_refusals(&ci, "beta", REQUIRED_ON_BETA).is_empty());
+    for (line, required) in [("beta", REQUIRED_ON_BETA), ("main", REQUIRED_ON_MAIN)] {
+        assert_eq!(
+            push_refusals(&ci, line, required),
+            [format!(
+                "job `docs` runs `Documentation` on a push to {line}, not a required context there"
+            )]
+        );
+    }
+}
+
+#[test]
+fn the_dependents_on_a_push_to_beta_are_refused() {
+    let ci = edited(
+        &read(".github/workflows/ci.yml"),
+        "    if: >-\n      github.base_ref == 'main' ||\n      (github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref == 'refs/heads/beta'))\n",
+        "    if: github.event_name != 'pull_request' || github.base_ref == 'main'\n",
+    );
+    assert!(push_refusals(&ci, "main", REQUIRED_ON_MAIN).is_empty());
+    // the plan's old condition (every event but a pull request into beta) puts it and the
+    // consumer checks back on beta's push; the plan's `outputs.matrix` reads as a matrix
+    // expression, unreadable where the jobs decide nothing
+    assert_eq!(
+        push_refusals(&ci, "beta", REQUIRED_ON_BETA),
+        [
+            "job `dependents-plan` may run on a push to beta and its contexts are unreadable (a matrix written as one expression: ${{ steps.plan.outputs.matrix }})",
+            "job `dependent-check` may run on a push to beta and its contexts are unreadable (a matrix written as one expression: ${{ fromJSON(needs.dependents-plan.outputs.matrix) }})",
+        ]
+    );
+}
+
+#[test]
+fn a_pull_request_only_job_on_a_push_is_refused() {
+    let ci = edited(
+        &read(".github/workflows/ci.yml"),
+        // main's semver also runs on a tag's call (#214): its condition, not beta's
+        "    name: semver\n    if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')\n",
+        "    name: semver\n",
+    );
+    assert_eq!(
+        push_refusals(&ci, "beta", REQUIRED_ON_BETA),
+        ["job `semver` may run `semver` on a push to beta, which cannot judge it"]
     );
 }
 
@@ -692,7 +859,7 @@ fn an_unrequired_job_left_on_pull_requests_is_refused() {
 fn the_whole_test_matrix_on_a_pull_request_is_refused_cell_by_cell() {
     let ci = edited(
         &read(".github/workflows/ci.yml"),
-        "os: ${{ fromJSON(github.event_name == 'pull_request' && '[\"ubuntu-latest\"]' || '[\"ubuntu-latest\", \"macos-latest\", \"windows-latest\"]') }}",
+        "os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')) && '[\"ubuntu-latest\", \"macos-latest\", \"windows-latest\"]' || '[\"ubuntu-latest\"]') }}",
         "os: [ubuntu-latest, macos-latest, windows-latest]",
     );
     let errors = pr_refusals(&ci, "main", REQUIRED_ON_MAIN);
@@ -703,15 +870,22 @@ fn the_whole_test_matrix_on_a_pull_request_is_refused_cell_by_cell() {
             "job `test` runs `Test Suite (windows-latest, stable)` on a pull request into main, not a required context there",
         ]
     );
+    let errors = push_refusals(&ci, "beta", REQUIRED_ON_BETA);
+    assert_eq!(
+        errors,
+        [
+            "job `test` runs `Test Suite (macos-latest, stable)` on a push to beta, not a required context there",
+            "job `test` runs `Test Suite (windows-latest, stable)` on a push to beta, not a required context there",
+        ]
+    );
 }
 
 #[test]
 fn a_job_on_a_condition_the_parser_cannot_decide_is_refused_both_ways() {
     // the benchmarks job's old record trigger: a pull request whose body names a marker
-    let ci = edited(
+    let ci = with_docs_job(
         &read(".github/workflows/ci.yml"),
-        "    name: Documentation\n    if: github.event_name != 'pull_request'\n",
-        "    name: Documentation\n    if: contains(github.event.pull_request.body, '[docs]')\n",
+        Some("contains(github.event.pull_request.body, '[docs]')"),
     );
     let errors = pr_refusals(&ci, "beta", REQUIRED_ON_BETA);
     assert_eq!(
@@ -755,6 +929,18 @@ fn the_evaluator_reads_the_files_idioms() {
         Value::Bool(false)
     );
     assert_eq!(evaluate("inputs.record", &into_main), Value::Null);
+    assert_eq!(
+        evaluate("startsWith(github.ref, 'REFS/heads/')", &push),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        evaluate("startsWith(github.ref, 'refs/tags/')", &push),
+        Value::Bool(false)
+    );
+    assert_eq!(
+        evaluate("startsWith(needs.a.outputs.b, 'x')", &push),
+        Value::Unknown
+    );
     assert_eq!(
         values(
             "${{ fromJSON(github.event_name == 'pull_request' && '[\"a\"]' || '[\"a\", \"b\"]') }}",

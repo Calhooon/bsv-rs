@@ -1,5 +1,12 @@
 # bsv-rs
 
+[![CI](https://github.com/Calhooon/bsv-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Calhooon/bsv-rs/actions/workflows/ci.yml?query=branch%3Amain)
+[![Bench](https://github.com/Calhooon/bsv-rs/actions/workflows/bench.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/bench.yml)
+[![MSRV](https://github.com/Calhooon/bsv-rs/actions/workflows/msrv.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/msrv.yml)
+[![Features](https://github.com/Calhooon/bsv-rs/actions/workflows/features.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/features.yml)
+[![Unused dependencies](https://github.com/Calhooon/bsv-rs/actions/workflows/machete.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/machete.yml)
+[![Docs](https://github.com/Calhooon/bsv-rs/actions/workflows/docs.yml/badge.svg)](https://github.com/Calhooon/bsv-rs/actions/workflows/docs.yml)
+
 **0.7.1**, a Rust SDK for BSV: keys and cryptography, Script, transactions,
 BEEF and SPV, block headers and proof of work, wallets, authentication and
 overlay clients. Optional features support native applications and wasm hosts.
@@ -98,11 +105,21 @@ cargo test --test readme_examples --test merkle_path_lone_leaf --test script_wor
 cargo fmt --all -- --check
 ```
 
-[.github/workflows/ci.yml](.github/workflows/ci.yml) defines PR/main tests,
-formatting, clippy, vectors, docs, the workflow lint, the secrets scan, the
-minimum Rust check, the unused dependency check and benchmark checks.
-It checks out the pinned external conformance corpus for the vector job; a
-local run without that corpus can skip those tests and is not conformance
+[.github/workflows/ci.yml](.github/workflows/ci.yml) is the required set and
+the only workflow a push or a pull request starts: the tests, formatting,
+clippy, vectors, deny, the ratchet, the fixtures, the secrets scan, the
+combined wasm32 slice and the line checks, exactly the contexts the line's
+protection requires. The checks that judge something other than the commit
+run on dispatch and before every tag, each in its own workflow with its own
+badge above: [bench.yml](.github/workflows/bench.yml) (the benchmark
+regression check and the scoreboard), [msrv.yml](.github/workflows/msrv.yml),
+[features.yml](.github/workflows/features.yml) (each feature alone and the
+other wasm32 slices), [machete.yml](.github/workflows/machete.yml) (unused
+dependencies) and [docs.yml](.github/workflows/docs.yml) (rustdoc and the
+workflow lint). The CI badge reads `ci.yml` on `main`; a run cancelled because
+a newer push superseded it is never a red.
+`ci.yml` checks out the pinned external conformance corpus for the vector job;
+a local run without that corpus can skip those tests and is not conformance
 evidence.
 [RELEASING.md](RELEASING.md) defines the machine gate and trusted publication
 from tags. [CHANGELOG.md](CHANGELOG.md) holds release and API migration notes.
