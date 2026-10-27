@@ -3680,6 +3680,110 @@
       }
     },
     {
+      "id": "verifier_wallet_of_another_key",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_wallet_key": 40,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Decryption failed!"
+      }
+    },
+    {
+      "id": "field_ciphertext_tampered",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "field_tampered": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Decryption failed!"
+      }
+    },
+    {
+      "id": "field_ciphertext_of_47_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "field_ciphertext_bytes": 47,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Ciphertext too short"
+      }
+    },
+    {
+      "id": "verifier_keyring_entry_of_47_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_keyring_entry_bytes": 47,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Ciphertext too short"
+      }
+    },
+    {
+      "id": "revelation_key_of_31_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "revelation_key_bytes": 31,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate field revelation key must be a 32-byte array"
+      }
+    },
+    {
+      "id": "revelation_key_of_32_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "revelation_key_bytes": 32,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Decryption failed!"
+      }
+    },
+    {
+      "id": "revelation_key_of_33_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "revelation_key_bytes": 33,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate field revelation key must be a 32-byte array"
+      }
+    },
+    {
+      "id": "revelation_key_of_0_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "revelation_key_bytes": 0,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate field revelation key must be a 32-byte array"
+      }
+    },
+    {
       "id": "reveal_a_field_not_carried",
       "site": "create_keyring_for_verifier",
       "input": {

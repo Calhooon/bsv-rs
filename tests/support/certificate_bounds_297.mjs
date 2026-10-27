@@ -155,6 +155,15 @@ async function issued (plaintextBytes) {
 }
 
 /**
+ * The verifier's wallet a case names: the verifier's ProtoWallet, another
+ * key's (`verifier_wallet_key`), or one whose decrypt answers
+ * `revelation_key_bytes` bytes of 0x41.
+ */
+const verifierOf = (input) => input.revelation_key_bytes !== undefined
+  ? { decrypt: async () => ({ plaintext: new Array(input.revelation_key_bytes).fill(0x41) }) }
+  : input.verifier_wallet_key !== undefined ? new ProtoWallet(key(input.verifier_wallet_key)) : verifierWallet
+
+/**
  * The four decrypting sites on one input: `mutate` changes the issued
  * records, `reveal` is createKeyringForVerifier's fieldsToReveal.
  */
@@ -169,7 +178,7 @@ async function decryptCases (id, input, mutate = () => {}, reveal = ['name'], si
     create_keyring_for_verifier: () => MasterCertificate.createKeyringForVerifier(subjectWallet, certifierHex, verifierHex,
       c.fields, reveal, c.masterKeyring, SERIAL).then((r) => Object.keys(r).length),
     verifiable_decrypt_fields: () => new VerifiableCertificate(TYPE, SERIAL, subjectHex, certifierHex, ZERO_OUTPOINT,
-      c.fields, c.verifierKeyring).decryptFields(verifierWallet).then((r) => Object.values(r).map((v) => v.length).reduce((a, b) => a + b, 0))
+      c.fields, c.verifierKeyring).decryptFields(verifierOf(input)).then((r) => Object.values(r).map((v) => v.length).reduce((a, b) => a + b, 0))
   }
   for (const site of sites ?? Object.keys(run)) await add(id, site, { ...input, reveal }, run[site])
 }
@@ -193,6 +202,22 @@ await decryptCases('verifier_keyring_entry_for_no_field', { verifier_keyring_gho
   (c) => { c.verifierKeyring = { ghost: b64(48) } }, ['name'], ['verifiable_decrypt_fields'])
 await decryptCases('verifier_keyring_name___proto__', { verifier_keyring_proto: true },
   (c) => { c.verifierKeyring = record([['__proto__', b64(48)]]) }, ['name'], ['verifiable_decrypt_fields'])
+// The cipher's two refusals as the verifier's wrapper quotes them
+// (`SymmetricKey.ts:205`, `:217`, `:232`), and the revelation key's 32 bytes
+// (`VerifiableCertificate.ts:203`).
+await decryptCases('verifier_wallet_of_another_key', { verifier_wallet_key: 40 }, () => {}, ['name'],
+  ['verifiable_decrypt_fields'])
+await decryptCases('field_ciphertext_tampered', { field_tampered: true },
+  (c) => { const t = Utils.toArray(c.fields.name, 'base64'); t[t.length - 1] ^= 1; c.fields.name = Utils.toBase64(t) },
+  ['name'], ['verifiable_decrypt_fields'])
+await decryptCases('field_ciphertext_of_47_bytes', { field_ciphertext_bytes: 47 },
+  (c) => { c.fields.name = b64(47) }, ['name'], ['verifiable_decrypt_fields'])
+await decryptCases('verifier_keyring_entry_of_47_bytes', { verifier_keyring_entry_bytes: 47 },
+  (c) => { c.verifierKeyring.name = b64(47) }, ['name'], ['verifiable_decrypt_fields'])
+for (const n of [31, 32, 33, 0]) {
+  await decryptCases(`revelation_key_of_${n}_bytes`, { revelation_key_bytes: n }, () => {}, ['name'],
+    ['verifiable_decrypt_fields'])
+}
 await decryptCases('reveal_a_field_not_carried', {}, () => {}, ['ghost'], ['create_keyring_for_verifier'])
 await decryptCases('reveal_a_field_twice', {}, () => {}, ['name', 'name'], ['create_keyring_for_verifier'])
 await decryptCases('reveal_101_fields', {}, () => {}, Array.from({ length: 101 }, (_, i) => `f${i}`),

@@ -18,7 +18,10 @@
 //!   certificate field!` (`:621-623`), `Failed to decrypt all master
 //!   certificate fields.` (`:559-561`), `Failed to decrypt selectively
 //!   revealed certificate fields using keyring: <words>`
-//!   (`VerifiableCertificate.ts:214-217`).
+//!   (`VerifiableCertificate.ts:214-217`), the cipher's words in it the
+//!   reference's (`Decryption failed!`, `Ciphertext too short`,
+//!   `SymmetricKey.ts:205`, `:217`, `:232`) and the verifier's revelation key
+//!   exactly 32 bytes (`VerifiableCertificate.ts:203`).
 //!
 //! A verdict does not depend on a field key's or IV's randomness: each side
 //! builds its input from the case's parameters under the same keys.
@@ -26,7 +29,9 @@
 #![cfg(feature = "auth")]
 
 use bsv_rs::auth::certificates::{Certificate, MasterCertificate, VerifiableCertificate};
-use bsv_rs::primitives::{from_hex, sha256, to_base64, to_hex, PrivateKey, SymmetricKey};
+use bsv_rs::primitives::{
+    from_base64, from_hex, sha256, to_base64, to_hex, PrivateKey, SymmetricKey,
+};
 use bsv_rs::wallet::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -39,7 +44,7 @@ const SITES: [(&str, usize); 8] = [
     ("master_decrypt_field", 6),
     ("master_decrypt_fields", 6),
     ("create_keyring_for_verifier", 10),
-    ("verifiable_decrypt_fields", 9),
+    ("verifiable_decrypt_fields", 17),
 ];
 
 fn vector() -> Vec<Value> {
@@ -97,10 +102,12 @@ fn sha(bytes: &[u8]) -> Value {
     Value::String(to_hex(&sha256(bytes)))
 }
 
-/// A `ProtoWallet` whose `encrypt` answers `n` bytes of 0x41.
+/// A `ProtoWallet` whose `encrypt` answers `n` bytes of 0x41, and whose
+/// `decrypt` answers `decrypted` bytes of 0x41 when set.
 struct Bloated {
     inner: ProtoWallet,
     n: usize,
+    decrypted: Option<usize>,
 }
 
 // async_trait rewrites the impl it is applied to, so the macro writes the
@@ -115,6 +122,12 @@ macro_rules! bloated {
 
             async fn encrypt(&self, _: EncryptArgs, _: &str) -> bsv_rs::Result<EncryptResult> {
                 Ok(EncryptResult { ciphertext: vec![0x41; self.n] })
+            }
+            async fn decrypt(&self, args: DecryptArgs, o: &str) -> bsv_rs::Result<DecryptResult> {
+                match self.decrypted {
+                    Some(n) => Ok(DecryptResult { plaintext: vec![0x41; n] }),
+                    None => WalletInterface::decrypt(&self.inner, args, o).await,
+                }
             }
             async fn is_authenticated(&self, o: &str) -> bsv_rs::Result<AuthenticatedResult> {
                 WalletInterface::is_authenticated(&self.inner, o).await
@@ -140,7 +153,6 @@ macro_rules! bloated {
 
 bloated! {
     (get_public_key, GetPublicKeyArgs, GetPublicKeyResult),
-    (decrypt, DecryptArgs, DecryptResult),
     (create_hmac, CreateHmacArgs, CreateHmacResult),
     (verify_hmac, VerifyHmacArgs, VerifyHmacResult),
     (create_signature, CreateSignatureArgs, CreateSignatureResult),
@@ -262,6 +274,28 @@ fn mutate(c: &mut Issued, input: &Value) {
     if input["verifier_keyring_proto"] == true {
         c.verifier_keyring = HashMap::from([("__proto__".into(), b64(48))]);
     }
+    if input["field_tampered"] == true {
+        let mut bytes = from_base64(&c.fields["name"]).unwrap();
+        *bytes.last_mut().unwrap() ^= 1;
+        c.fields.insert("name".into(), to_base64(&bytes));
+    }
+    if let Some(n) = input["field_ciphertext_bytes"].as_u64() {
+        c.fields.insert("name".into(), b64(n as usize));
+    }
+}
+
+/// The verifier's wallet a case names, as the script's `verifierOf`: the
+/// verifier's `ProtoWallet`, another key's, or one whose `decrypt` answers
+/// `revelation_key_bytes` bytes of 0x41.
+fn verifier_of(input: &Value) -> Bloated {
+    let key_byte = input["verifier_wallet_key"]
+        .as_u64()
+        .map_or(41, |b| b as u8);
+    Bloated {
+        inner: ProtoWallet::new(Some(key(key_byte))),
+        n: 0,
+        decrypted: input["revelation_key_bytes"].as_u64().map(|n| n as usize),
+    }
 }
 
 async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
@@ -294,6 +328,7 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
                     let wallet = Bloated {
                         inner: subject_wallet,
                         n: n as usize,
+                        decrypted: None,
                     };
                     MasterCertificate::create_keyring_for_verifier(
                         &wallet,
@@ -330,7 +365,7 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
         "verifiable_decrypt_fields" => {
             let mut v =
                 VerifiableCertificate::new(certificate(c.fields.clone()), c.verifier_keyring);
-            v.decrypt_fields(&ProtoWallet::new(Some(verifier())), None, None, "test")
+            v.decrypt_fields(&verifier_of(input), None, None, "test")
                 .await
                 .map(|r| json!(r.values().map(String::len).sum::<usize>()))
         }
@@ -381,6 +416,7 @@ async fn run(case: &Value) -> Value {
                     let wallet = Bloated {
                         inner,
                         n: n as usize,
+                        decrypted: None,
                     };
                     MasterCertificate::create_certificate_fields(
                         &wallet, &to, plaintexts, None, None, "test",
@@ -405,14 +441,18 @@ async fn assert_site(site: &str) {
     let cases = cases(site);
     let expected = SITES.iter().find(|(s, _)| *s == site).unwrap().1;
     assert_eq!(cases.len(), expected, "{site}: the vector's case count");
+    let mut mismatches = Vec::new();
     for case in cases {
-        assert_eq!(
-            run(&case).await,
-            case["verdict"],
-            "{site} {}",
-            case["id"].as_str().unwrap()
-        );
+        let got = run(&case).await;
+        if got != case["verdict"] {
+            mismatches.push((case["id"].clone(), got, case["verdict"].clone()));
+        }
     }
+    assert_eq!(
+        mismatches,
+        Vec::new(),
+        "{site}: (id, this crate, the reference)"
+    );
 }
 
 #[test]

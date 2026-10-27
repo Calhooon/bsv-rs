@@ -33,12 +33,17 @@ pub(crate) fn refused(words: impl Into<String>) -> Error {
     Error::CertificateValidationError(words.into())
 }
 
-/// The words a wrapper quotes: a certificate refusal's own text, else the
-/// error as this crate prints it (a wallet's or the cipher's error has no
-/// twin in the reference's words).
+/// The words a wrapper quotes: a certificate refusal's own text; the
+/// cipher's two refusals in the reference's (`SymmetricKey.ts:205`, a
+/// ciphertext shorter than its IV and tag, the only length this path's
+/// `decrypt`s refuse; `:217`, `:232`, the tag not matching); else the error
+/// as this crate prints it (a plaintext that is not UTF-8 is refused in the
+/// platform's words on both sides, Node's `TextDecoder` there).
 fn message(error: &Error) -> String {
     match error {
         Error::CertificateValidationError(words) => words.clone(),
+        Error::InvalidDataLength { .. } => "Ciphertext too short".to_string(),
+        Error::DecryptionFailed => "Decryption failed!".to_string(),
         other => other.to_string(),
     }
 }
