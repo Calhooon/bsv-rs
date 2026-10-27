@@ -79,6 +79,7 @@
 
 pub mod client;
 pub mod contacts;
+mod reveal;
 pub mod types;
 
 // Re-exports

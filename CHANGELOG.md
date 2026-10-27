@@ -25,6 +25,75 @@ set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
 
 ### Changed: `Certificate::verify` answers `false`, never an error, as the
 reference's `verify` does (#299)
+### Fixed: `publicly_reveal_attributes` verifies the master certificate, and checks the names to reveal, before any wallet call, as the reference does (#307)
+
+`IdentityClient::publicly_reveal_attributes` refused a certificate with no
+fields, an empty list of names and an empty subject or certifier, then
+asked the wallet for a keyring and published whatever came back: a
+certificate whose signature does not verify was published here. The
+reference's `publiclyRevealAttributes` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/IdentityClient.ts:420-467`) refuses before
+`proveCertificate`, in this order: a field named `__proto__`,
+`constructor` or `prototype` (`Invalid display identity: certificate.fields
+contains an unsafe field`, `:420-424`, `identityRecord` at `:45-65`), no
+fields (`:425-427`), no names (`:428-430`), more than 100 (`:431-433`), and
+for each name in turn: over 50 UTF-8 bytes or carrying a display control
+(`Invalid display identity: fieldsToReveal[<i>] is oversized or contains
+unsafe controls`, `identityString` at `:89-102`), empty or an unsafe record
+key (`invalid certificate field name!`), a repeat (`duplicate certificate
+field name!`), a name the certificate does not carry (`requested field is
+not present in the certificate!`, `:434-450`; its dense-array refusal at
+`:436-438` has no counterpart, a `Vec` being dense); then the master
+certificate's `verify()`, any failure under it one sentence, `Public reveal
+failed: Certificate verification failed!` (`:451-467`). After
+`proveCertificate` it refuses a keyring naming other fields than those
+asked (`wallet returned a keyring for unrequested fields!`, `:487-491`).
+Each is here now, in the reference's words and order, as
+`Error::IdentityError`, the class of the client's other refusals
+(`src/identity/reveal.rs`; `client.rs` calls it and is 15 lines shorter).
+The master certificate is read from the wallet certificate's members'
+JSON (`Certificate`'s reader, #268) and verified by `Certificate::verify`
+(#299); a member it cannot hold (an empty subject, a signature that is not
+hex) is a `false`, as the reference's `verify` answers `false` for it. This
+crate's own refusal of an empty subject or certifier (`Certificate must
+have subject and certifier!`) is gone: such a certificate is refused by the
+verification, in the reference's words (no downstream matches the old
+text: `bsv-overlay-cloudflare` `9a0f3c29`, `rust-message-box` `419bf18`,
+`bsv-wallet-toolbox-rs` `6317222`, `bsv-wallet-cli` `a55990c` call
+neither).
+
+Pinned by `tests/identity_reveal_verifies_307.rs` (7 tests) on
+`tests/vectors/identity_reveal_verifies_307.json`: the reference's verdicts
+on twenty witnesses (a signed certificate, one and both fields revealed;
+unsigned, another key's signature, a field changed after signing, not DER,
+not hex, an empty subject; the outpoint the txid alone, which both verify;
+each refusal above; an unsigned certificate with an absent name, refused
+for the name first) recorded by `tests/support/identity_reveal_verifies_307.mjs`
+at `ts-stack@edf6e03` under Node v22.18.0 (two runs byte for byte), its
+wallet counting its calls: every refusal the same words here with no
+wallet call before it, every acceptance reaching createAction; the signed
+certificate's signature this crate's own bytes; a signed certificate
+published as before (the PushDrop carrying its JSON and the keyring); a
+keyring for another field refused before createAction. 5 of the 7 red on
+the tree before the fix (`6c5e4d8`), the other two pinning what did not
+move. The #105 and #261 identity witnesses are unchanged.
+
+### Notes: cross-SDK parity (#307)
+
+go-sdk@2ca481c's `PubliclyRevealAttributes` (`identity/client.go:68-115`)
+refuses no fields (`:73-75`), no names (`:76-78`), a nil revocation
+outpoint (`:79-81`) and a nil subject or certifier (`:82-84`) in its own
+words, converts the certificate (`FromWalletCertificate`, `:86-89`) and
+refuses a failed `Verify` as `certificate verification failed` (`:91-94`),
+all before `ProveCertificate` (`:109`): the verification at the
+reference's site; it checks no name against the certificate, no repeat, no
+count or length, and not the keyring the wallet returns. One reference
+check is not followed: the reference reads each keyring value with
+`validateBase64String(.., 1, 2048)` and publishes the trimmed text
+(`IdentityClient.ts:492-499`); this crate publishes the wallet's values as
+given.
+
+### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
 `Certificate::verify` answered `Err(InvalidSignature("Certificate not
 signed"))` for an absent signature, the DER parser's `Err` for a signature

@@ -380,9 +380,9 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// Result containing either a successful broadcast result or failure
     ///
     /// # Errors
-    /// - Returns error if certificate has no fields
-    /// - Returns error if fields_to_reveal is empty
-    /// - Returns error if certificate verification fails
+    /// - Returns error if certificate has no fields, a name to reveal is
+    ///   not one of them, or its signature does not verify, before any
+    ///   wallet call (the reference's checks, #307)
     /// - Returns error if transaction creation or broadcast fails
     ///
     /// # Example
@@ -397,25 +397,8 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         certificate: WalletCertificate,
         fields_to_reveal: Vec<CertificateFieldNameUnder50Bytes>,
     ) -> Result<BroadcastResult> {
-        // Validate inputs
-        if certificate.fields.is_empty() {
-            return Err(Error::IdentityError(
-                "Public reveal failed: Certificate has no fields to reveal!".to_string(),
-            ));
-        }
-
-        if fields_to_reveal.is_empty() {
-            return Err(Error::IdentityError(
-                "Public reveal failed: You must reveal at least one field!".to_string(),
-            ));
-        }
-
-        // Verify certificate has required fields
-        if certificate.subject.is_empty() || certificate.certifier.is_empty() {
-            return Err(Error::IdentityError(
-                "Public reveal failed: Certificate must have subject and certifier!".to_string(),
-            ));
-        }
+        // The reference's checks, the signature last, before any wallet call (#307)
+        super::reveal::check_master_certificate(&certificate, &fields_to_reveal)?;
 
         let originator = self
             .config
@@ -446,6 +429,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                 originator,
             )
             .await?;
+        super::reveal::check_keyring_fields(&prove_result.keyring_for_verifier, &fields_to_reveal)?;
 
         // Create JSON object with certificate and keyring
         let cert_with_keyring = serde_json::json!({

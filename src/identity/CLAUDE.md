@@ -18,10 +18,11 @@ This module integrates with the `auth` module for certificate handling and the `
 
 | File | Purpose |
 |------|---------|
-| `mod.rs` | Module root with re-exports (111 lines) |
+| `mod.rs` | Module root with re-exports (112 lines) |
 | `types.rs` | Core types: KnownCertificateType, DisplayableIdentity, Contact, configs (886 lines) |
 | `client.rs` | IdentityClient for identity resolution, revelation, and management |
 | `client_field_value_261_tests.rs` | The intake witnesses of #261 (`#[cfg(test)]`, included from `client.rs`): the reference-issued certificate of `tests/vectors/certificate_field_value_261.json`, published for anyone as the reference publishes it, parses, verifies and decrypts through both parsers; one output with a malformed signature among good ones is skipped and the resolution goes on (`IdentityClient.ts:823-825`); and #268's: a certificate signed over `<txid>.0`, published with its outpoint as the txid alone (the reference's default form), parses through both parsers to index 0 and verifies |
+| `reveal.rs` | The checks `publicly_reveal_attributes` makes around its wallet calls (#307), the reference's in its order and words (`ts-stack@edf6e03` `IdentityClient.ts:420-499`): a field named `__proto__`, `constructor` or `prototype`, no fields, no names, more than 100, a name over 50 bytes or with a display control, empty or unsafe, repeated or absent from the certificate, then the master certificate's signature (read from the wallet certificate's JSON, `Certificate::verify`), all before any wallet call; after `proveCertificate`, a keyring naming other fields than those asked. `IdentityError` in each case; pinned by `tests/identity_reveal_verifies_307.rs` |
 | `contacts.rs` | ContactsManager for encrypted contact storage with caching (1276 lines) |
 
 ## Feature Flag
@@ -257,6 +258,8 @@ match result {
     BroadcastResult::Success(s) => println!("TXID: {}", s.txid),
     BroadcastResult::Failure(f) => println!("Failed: {}", f.description),
 }
+// A certificate whose signature does not verify, or a name it does not
+// carry, is refused before the wallet is called (`reveal.rs`, #307)
 
 // Simplified version returning just txid
 let txid = client.publicly_reveal_attributes_simple(certificate, fields).await?;

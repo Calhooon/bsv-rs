@@ -1,0 +1,524 @@
+{
+  "description": "publiclyRevealAttributes refuses before any wallet call a certificate whose fields, names to reveal or signature the reference refuses (#307)",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), run under Node v22.18.0 by tests/support/identity_reveal_verifies_307.mjs",
+  "site": "ts-stack@edf6e03 packages/sdk/src/identity/IdentityClient.ts:420-467",
+  "witnesses": [
+    {
+      "name": "signed",
+      "origin": "signed by the certifier",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": null,
+      "wallet_calls": 3
+    },
+    {
+      "name": "signed_both_fields",
+      "origin": "signed by the certifier, both fields revealed",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email",
+        "name"
+      ],
+      "refusal": null,
+      "wallet_calls": 3
+    },
+    {
+      "name": "unsigned",
+      "origin": "the empty signature",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate verification failed!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "other_key",
+      "origin": "signed by key 11, the certificate naming key 7",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402205558b8e3dd3aac33007e9acb758b5b3b34bfa5b485a265d59a1b970a5fccc32b0220703e866c4d924f1e5ebf183f88c5865367fc7aef7168e801bac07a701ddf2c01",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate verification failed!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "field_changed",
+      "origin": "a field value changed after signing",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1vdGhlcg==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate verification failed!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "not_der",
+      "origin": "eight bytes that are not DER",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "3006ffffffffffff",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate verification failed!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "not_hex",
+      "origin": "a signature text that is not hex",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "zz",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate verification failed!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "empty_subject",
+      "origin": "the subject the empty string",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate verification failed!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "txid_alone",
+      "origin": "signed over <txid>.0, the outpoint the txid alone",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": null,
+      "wallet_calls": 3
+    },
+    {
+      "name": "no_fields",
+      "origin": "no fields",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {}
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Public reveal failed: Certificate has no fields to reveal!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "unsafe_field",
+      "origin": "a field named __proto__",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "__proto__": "AA==",
+          "email": "di1lbWFpbA=="
+        }
+      },
+      "fieldsToReveal": [
+        "email"
+      ],
+      "refusal": "Invalid display identity: certificate.fields contains an unsafe field",
+      "wallet_calls": 0
+    },
+    {
+      "name": "none_revealed",
+      "origin": "no names to reveal",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [],
+      "refusal": "Public reveal failed: You must reveal at least one field!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "too_many",
+      "origin": "101 names to reveal",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "f0",
+        "f1",
+        "f2",
+        "f3",
+        "f4",
+        "f5",
+        "f6",
+        "f7",
+        "f8",
+        "f9",
+        "f10",
+        "f11",
+        "f12",
+        "f13",
+        "f14",
+        "f15",
+        "f16",
+        "f17",
+        "f18",
+        "f19",
+        "f20",
+        "f21",
+        "f22",
+        "f23",
+        "f24",
+        "f25",
+        "f26",
+        "f27",
+        "f28",
+        "f29",
+        "f30",
+        "f31",
+        "f32",
+        "f33",
+        "f34",
+        "f35",
+        "f36",
+        "f37",
+        "f38",
+        "f39",
+        "f40",
+        "f41",
+        "f42",
+        "f43",
+        "f44",
+        "f45",
+        "f46",
+        "f47",
+        "f48",
+        "f49",
+        "f50",
+        "f51",
+        "f52",
+        "f53",
+        "f54",
+        "f55",
+        "f56",
+        "f57",
+        "f58",
+        "f59",
+        "f60",
+        "f61",
+        "f62",
+        "f63",
+        "f64",
+        "f65",
+        "f66",
+        "f67",
+        "f68",
+        "f69",
+        "f70",
+        "f71",
+        "f72",
+        "f73",
+        "f74",
+        "f75",
+        "f76",
+        "f77",
+        "f78",
+        "f79",
+        "f80",
+        "f81",
+        "f82",
+        "f83",
+        "f84",
+        "f85",
+        "f86",
+        "f87",
+        "f88",
+        "f89",
+        "f90",
+        "f91",
+        "f92",
+        "f93",
+        "f94",
+        "f95",
+        "f96",
+        "f97",
+        "f98",
+        "f99",
+        "f100"
+      ],
+      "refusal": "Public reveal failed: You may reveal at most 100 fields!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "empty_name",
+      "origin": "the empty name",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        ""
+      ],
+      "refusal": "Public reveal failed: invalid certificate field name!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "long_name",
+      "origin": "a name of 51 bytes",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      ],
+      "refusal": "Invalid display identity: fieldsToReveal[0] is oversized or contains unsafe controls",
+      "wallet_calls": 0
+    },
+    {
+      "name": "control_name",
+      "origin": "a name with U+0001",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "e\u0001"
+      ],
+      "refusal": "Invalid display identity: fieldsToReveal[0] is oversized or contains unsafe controls",
+      "wallet_calls": 0
+    },
+    {
+      "name": "unsafe_name",
+      "origin": "the name constructor",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "constructor"
+      ],
+      "refusal": "Public reveal failed: invalid certificate field name!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "duplicate_name",
+      "origin": "email twice",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "email",
+        "email"
+      ],
+      "refusal": "Public reveal failed: duplicate certificate field name!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "absent_name",
+      "origin": "a name the certificate does not carry",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "304402202d816fbce212a51da6146401c68d39909e386081063bd0f52b4073f0b31113ef022019277a1021c5957461d1c6aeea0f2fd2ad1f7beebca5df0de81a30f6be27389c",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "phone"
+      ],
+      "refusal": "Public reveal failed: requested field is not present in the certificate!",
+      "wallet_calls": 0
+    },
+    {
+      "name": "unsigned_absent_name",
+      "origin": "the empty signature and an absent name: the name refused first",
+      "certificate": {
+        "type": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "subject": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "serialNumber": "AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=",
+        "certifier": "025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bc",
+        "revocationOutpoint": "0000000000000000000000000000000000000000000000000000000000000000.0",
+        "signature": "",
+        "fields": {
+          "email": "di1lbWFpbA==",
+          "name": "di1uYW1l"
+        }
+      },
+      "fieldsToReveal": [
+        "phone"
+      ],
+      "refusal": "Public reveal failed: requested field is not present in the certificate!",
+      "wallet_calls": 0
+    }
+  ]
+}
