@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
+
+`ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
+(the bench baseline's record mode, `bench_baseline_record`; the nightly's
+call) shared the group with every push to `beta`, and the first record run
+for #245 (2026-10-27 04:23Z, run 40449439162) was cancelled by #306's
+landing twenty minutes in. The group is `ci-<event>-<ref>` now: a push to a
+line cancels the earlier push's run as before, a pull request's own ref
+keeps each PR in a group of its own, and a dispatch runs to its end beside
+them. The keeper's CI rule (a pull request runs exactly its line's required
+set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
+`main` is a `git cherry-pick -x` (RELEASING.md point 21).
+
 ### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
 `Certificate::verify` answered `Err(InvalidSignature("Certificate not
