@@ -12,7 +12,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles (#353) | 941 |
+| `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles, the callback's Peer holding the transport weakly so a dropped Peer is freed (#353) | 970 |
 | `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
@@ -405,7 +405,7 @@ peer.start();
 
 1. **Create**: `Peer::new(options)` - constructs peer with wallet and transport
 2. **Start**: Choose one:
-   - `peer.start()` - installs `handle_incoming_message()` as the transport callback: every message type, each verified (until #353 `start` installed an unverifying callback of its own and ignored InitialRequest)
+   - `peer.start()` - installs `handle_incoming_message()` as the transport callback: every message type, each verified (until #353 `start` installed an unverifying callback of its own and ignored InitialRequest). The callback owns a Peer over the same state whose transport is a `Weak` (`TransportHold::Callback`), upgraded for each send, so the transport's callback is no cycle and a dropped Peer frees its transport and state; a send from the callback after the Peer is dropped is `AuthError("Peer has been dropped")`
    - `peer.start_server()` - the same, on an `Arc<Peer>`
 3. **Communicate**: `to_peer()`, `request_certificates()`, etc.
 
