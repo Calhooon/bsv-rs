@@ -220,7 +220,7 @@ Transaction test vectors in `tests/transaction/vectors/`:
 - **`conformance_beef.rs`** — The corpus's BUMP (MerklePath), serialization, BEEF and transaction-regression suites, the same classification and pins
 
 ### Transaction HTTP (`transaction`+`http` features, wiremock)
-- **`broadcaster_http_tests.rs`** — ARC (9 tests: success, API key, errors, batch), WoC (9 tests: mainnet/testnet/STN, errors), Teranode (8 tests: EF format, timeout, batch)
+- **`broadcaster_http_tests.rs`** — ARC (10 tests: success, API key, errors, batch), WoC (9 tests: mainnet/testnet/STN, errors), Teranode (8 tests: EF format, timeout, batch)
 - **`chaintracker_http_tests.rs`** — WoC tracker: valid/invalid root, case-insensitive, 404/500, current_height, testnet paths
 - **`live_policy_http_tests.rs`** — LivePolicy dynamic fee model: refresh from a policy endpoint in ARC's schema, no default URL (#350), error handling (500/404/malformed), fallback rates, cache expiry, sat/byte→sat/KB conversion, API key auth
 

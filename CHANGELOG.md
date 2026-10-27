@@ -188,8 +188,10 @@ neither `LivePolicy` `Default` names `DEFAULT_POLICY_URL`, an ARC host or
 `a_live_policy_built_without_a_url_refuses_to_refresh_and_reads_no_arc`
 (`tests/live_policy_http_tests.rs`) and
 `a_live_policy_with_no_policy_url_refuses_to_refresh` (the module). Their
-URL assertions are red on the base by reading; they were not run there,
-because on the base `refresh()` of a `Default` reaches gorillapool. A
+URL assertions are red on the base, run there with the network denied (only
+localhost reachable): each fails at its first URL assertion, the base's
+`Default` holding `https://arc.gorillapool.io/v1/policy` where the fix holds
+none. A
 scratch crate under `#![deny(deprecated)]` naming each item builds on the
 base and fails on the fix with nine errors, one per use.
 
@@ -224,7 +226,12 @@ the toolbox and the overlay layer in the reference
 (`packages/wallet/wallet-toolbox/src/services/`,
 `packages/overlays/overlay-express/src/ArcadeProvider.ts`), not an SDK
 broadcaster, so this crate adds no ARCade client; the toolbox's side has
-one. Go (`go-sdk`) is not read for this entry.
+one. go-sdk@2ca481c keeps `broadcaster.Arc` undeprecated and makes it no
+default: `transaction/broadcaster/arc.go:37` is a plain `Arc{ApiUrl, ApiKey, ..}`
+struct with no constructor and no default URL (GorillaPool appears only in
+`docs/examples/broadcaster/broadcaster_gp/broadcaster_gp.go:16`), and Go has no
+`LivePolicy` (`transaction/fee_model/` holds `sats_per_kb.go` alone): the
+caller names every ARC URL there, as this crate now asks.
 
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 

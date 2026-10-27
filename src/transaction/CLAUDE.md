@@ -408,7 +408,7 @@ for (height, root) in validation.roots {
 
 // Fee Models
 let fee = SatoshisPerKilobyte::new(100).compute_fee(&tx)?;  // Fixed rate
-let live = LivePolicy::default(); live.refresh().await?;     // Live rate
+let live = LivePolicy::with_url("https://<host>/v1/policy"); live.refresh().await?;  // Live rate (ARC is deprecated and no default, #350)
 ```
 
 ## Implementation Notes
