@@ -16,8 +16,9 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
 | `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~849 |
-| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1743 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~826 |
+| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1729 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~838 |
+| `bound.rs` | `bound_sign_options` (crate-private): the signAction options the reference's `completeBoundAction` sends, `{ acceptDelayedBroadcast, returnTXIDOnly: false, noSend, sendWith }` carried from the createAction's (`ts-stack@edf6e03` `completeBoundAction.ts:1111-1120`; #326) | ~47 |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields, signature verification | ~573 |
 
 ## Key Exports
@@ -539,6 +540,10 @@ match store.get("key", "default").await {
 ```
 
 ## Internal Design
+
+### signAction (#326)
+
+Both stores' `set` and `remove` send signAction the reference as the wallet answered createAction, its base64 text (`to_base64` of `SignableTransaction.reference`, the bytes a substrate decoded), and `bound_sign_options` of the createAction's options, as the reference's stores do through `completeBoundAction`; until #326 they sent the hex of the bytes and no options. The createAction sends no options, so the signAction's options are `{ returnTXIDOnly: false }`, where the reference's carry `acceptDelayedBroadcast: false` (and the global store's `noSend: false`). `completeBoundAction`'s checks are not made here: the spends carry empty unlocking scripts for the wallet to fill (the reference signs each input with its PushDrop unlocker), nothing binds the signable transaction to the request or the signed one to the template, and no action is aborted on failure (the parity note of #326). Pinned by `tests/kvstore_signaction_326.rs`.
 
 ### Per-Key Locking
 
