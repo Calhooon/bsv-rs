@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed: CI's concurrency group carries the event, so a dispatch and a
-push to one ref never cancel each other
+### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
 
 `ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
 (the bench baseline's record mode, `bench_baseline_record`; the nightly's
@@ -17,12 +16,13 @@ the first record run for #245 (2026-10-27 04:23Z, run 40449439162) was
 cancelled by #306's landing twenty minutes in. The group is
 `ci-<event>-[record-]<ref>` now: a push to a line cancels the earlier push's
 run as before, a pull request's own ref keeps each PR in a group of its own,
-a dispatch runs to its end beside a push and a pull request, and a record
-dispatch runs apart from the nightly's dispatch of the same line (the two
-would otherwise cancel each other within the record's window). The keeper's CI
+a dispatch runs to its end beside a push and a pull request. On `beta` a
+record dispatch also runs apart from the nightly's dispatch of the same line
+(the group marks it); `main` has no record input and keys the group on the
+event alone. The keeper's CI
 rule (a pull request runs exactly its line's required
 set) is untouched; the `arch_*` guards and `actionlint` pass. The port to
-`main` is a `git cherry-pick -x` (RELEASING.md point 21).
+`main` is a `git cherry-pick -x` (RELEASING.md point 11).
 
 ### Changed: the nightly's heavy work holds at most six concurrent slots
 
