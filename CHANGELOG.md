@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the interpreter holds no number's bytes twice and writes no huge number in an error's text, under a caller's memory budget (#348, #349)
+
+The nightly fuzz job's two crashes in `fuzz_script_spend` (run 40474836749,
+at `5f3fa1ab`), both under the block word after Chronicle with
+`memory_limit: Some(1_048_576)`, neither past the node's count: the bytes were
+ones the budget did not see. The figures are the fuzz target's counting
+allocator's (a reservation left out, as the target leaves it out since #331)
+and `dhat`'s, at `7029c7e` (the base the fix was made on), at `e813ce4`
+(`beta` with #331) and at the tip.
+
+- #348, 4,815,906 bytes live and 1,372,366 in the largest request at
+  `7029c7e` (`dhat`: 2,061,735 bytes from one site, 4,129,299 at the peak):
+  an `OP_3DUP` and `OP_MUL` chain to 686 KB products. `ScriptNum::to_bytes`
+  grew the magnitude's buffer by doubling it for the sign byte (686,183 to
+  1,372,366 bytes), so a pushed number held twice the bytes it was charged;
+  it also took an absolute copy of the number first, `ScriptNum::from_bytes`
+  a negated copy, and `op_binary_number` held both popped operands, both
+  decoded numbers and the result through the encode. #331 (bsv-rs#374)
+  landed first with the same cures: the decode reads the magnitude in place,
+  the encoder writes into a buffer of exactly the encoding's length, and the
+  operands' bytes leave as their numbers arrive; at `e813ce4` the input holds
+  2,515,354 bytes live and 686,200 in the largest request, as at the tip
+  (`dhat`: 695,285 bytes from one site, the error's stack snapshot). What this
+  change adds over #331: `push_number` and `push_arithmetic_result` take the
+  number and free it once encoded, before its bytes join the stack, so the
+  number and its bytes are never both held through the push.
+- #349, one allocation of 3,978,066 bytes at `7029c7e` and at `e813ce4`
+  (10,872,599 live there): `OP_NUM2BIN`'s refusal of a size above `INT32_MAX`
+  (`SCRIPT_ERR_PUSH_SIZE`) wrote the size, an 825,905-byte number, in decimal
+  into its text (`splice.rs`, num-bigint's radix conversion), as the shifts'
+  two refusals of a huge count would. A number in an error's text is now
+  written in decimal up to 64 bytes and as `a N-byte number` above
+  (`found a 825905-byte number.`). The texts of the witnesses
+  (`found 2147483648.`, `found -1.`,
+  `OP_RSHIFTNUM count (2147483648) does not fit an int.`) are unchanged.
+  825,920 bytes the largest request after, 3,919,917 live.
+
+The arithmetic working set stays uncharged, in the keeper's word of
+2026-10-27, 19:1xZ, under the owner's ruling (c): "the arithmetic working set
+stays uncharged against the memory budget. The budget means what the node's
+limitedstack.cpp and the reference's Spend.ts:1562-1573 make it mean, the
+bytes of the stack's elements, and charging the working set would decline
+scripts both of them judge valid, which is a divergence on the policy path;
+parity is matching the reference's accounting exactly. The abort path is
+guarded separately by #374's room check, so nothing is left unguarded; the
+fuzz target's bound at ten budgets with its reason stated is a tolerance for
+what the accounting leaves out by design, and its line says so." A product or
+a quotient is computed in num-bigint 0.4.8's working memory, measured at 5.2
+and 8.5 times the operands on operands of 2^16 to 2^24 bytes; a 68-byte script
+squaring to a 1,015,808-byte dividend holds 7,667,840 bytes live in `OP_DIV`
+under 1 MiB (`3093a215…`, at `e813ce4` and at the tip). The fuzz target's live
+bound is now four budgets plus six for one arithmetic opcode's working set
+(`ARITHMETIC_WORKING_SET`), a tolerance for what the accounting leaves out by
+design; the single-request bound (twice the budget) holds as it was. Its side
+effect: the live bound no longer catches #348's shape (4,815,906 bytes is
+under ten budgets), so the test below holds that input to one site under the
+budget itself.
+
+Pinned by `tests/script_budget_before_allocation_348.rs`: each input as a
+constant named for its issue, held by `dhat` (now a dev-dependency; the crate
+forbids `unsafe`, so no allocator of its own) to the target's bounds when it
+found them (one site at most twice the budget, at most four budgets live, the
+input's term added; a reservation, the step probe's `try_reserve_exact`, out
+of the site read and added to the live bound, since `dhat`'s peak cannot
+leave one out), and #348's to one site under the budget; a 100,001-byte
+product's encoding; the 64-byte edge of the number text. At `7029c7e` three
+were red, then four with #348's site assertion (2,061,735 bytes from one
+site, the encoder's doubled buffer); at `e813ce4` the two #349 tests are red
+and #348's are green (#331's encoder); on the tip with the encoder's buffer
+doubled again, #348's is red (1,380,130 bytes from one site). Both inputs are
+in `fuzz/corpus/fuzz_script_spend/` under their sha1, with the 68-byte
+`OP_DIV` script above (`3093a215…`), which the moved bound covers.
+
+### Notes: cross-SDK parity (#348, #349)
+
+The reference predicts an arithmetic result's length before computing it and
+refuses it against the local budget (`ts-stack@edf6e03` `Spend.ts:1562-1573`:
+the operands' byte lengths summed for `OP_MUL`, the longer plus one for
+`OP_ADD` and `OP_SUB`, the longer otherwise). This crate does not port it: a
+result is never longer than its operands' charge (a product's bytes are at
+most the sum of the operands' minimal encodings, a sum's at most the longer
+plus one, and both operands were charged), so under the node's count the
+prediction never refuses before the push would, and the reference's
+`OP_ADD` of a number and an empty operand refuses one byte early at the exact
+budget, where this crate's push does not. Neither the reference nor the node
+counts the big-number library's working memory (BN.js, OpenSSL's `BIGNUM`).
+The reference's `OP_NUM2BIN` refusal writes no number
+(`OP_NUM2BIN size exceeds the node int32 push limit.`, `:1942`); this crate's
+words are its own.
+
 ## [0.9.0-beta.2] - 2026-10-28
 
 The 0.9.0 line's second prerelease (RELEASING.md point 14), cut from `beta` at the owner's word once #329 and #331 landed (the keeper's rulings under the owner's ruling (c): `WalletInterface`'s `originator: Option<&str>`, `Transaction::verify`'s caller budget with `None` uncapped; #331 at e813ce4f), for the toolbox's 0.14.0-beta.2 and the CLI's beta line to build against; the entries below are 0.9.0's since 0.9.0-beta.1, unreleased on `main` until the minor merges at the phase exit.

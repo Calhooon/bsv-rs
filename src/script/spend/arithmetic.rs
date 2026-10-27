@@ -46,7 +46,7 @@ impl Spend {
             OP_0NOTEQUAL => BigInt::from(u8::from(!n.is_zero())),
             _ => n,
         };
-        self.push_arithmetic_result(opcode, &lens, &BigNumber::from_bigint(n))
+        self.push_arithmetic_result(opcode, &lens, BigNumber::from_bigint(n))
     }
 
     pub(super) fn op_binary_number(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
@@ -93,7 +93,7 @@ impl Spend {
             _ => BigInt::zero(),
         };
 
-        self.push_arithmetic_result(opcode, &lens, &BigNumber::from_bigint(result))?;
+        self.push_arithmetic_result(opcode, &lens, BigNumber::from_bigint(result))?;
 
         if opcode == OP_NUMEQUALVERIFY {
             if !ScriptNum::cast_to_bool(self.stack_top()?) {

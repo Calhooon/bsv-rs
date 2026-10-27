@@ -121,11 +121,13 @@ impl Spend {
     /// Pushes a computed number, refusing one longer than the limit in force
     /// before it reaches the stack (the reference bounds the results of `+`,
     /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
-    /// `301-315`).
-    pub(super) fn push_number(&mut self, value: &BigNumber) -> Result<(), ScriptEvaluationError> {
+    /// `301-315`). The number is freed once encoded, before its bytes join
+    /// the stack (bsv-rs#348).
+    pub(super) fn push_number(&mut self, value: BigNumber) -> Result<(), ScriptEvaluationError> {
         let len = value.byte_length() + 1;
-        let bytes = ScriptNum::try_to_bytes(value)
+        let bytes = ScriptNum::try_to_bytes(&value)
             .map_err(|_| self.allocation_declined_holding(len as u64, len))?;
+        drop(value);
         self.push_encoded_number(bytes)
     }
 
@@ -148,3 +150,22 @@ impl Spend {
         ))
     }
 }
+
+/// A number named in an error's text: its decimal digits up to
+/// [`NUMBER_TEXT_BYTES`] bytes of magnitude, its length beyond. A decimal
+/// rendering costs about five times the number's bytes in scratch, and an
+/// operand may be as long as the era's number length (32,000,000 bytes after
+/// Chronicle): the refusal's text is not an allocation the budget pays for
+/// (bsv-rs#349).
+pub(super) fn number_text(value: &BigNumber) -> String {
+    let len = value.byte_length();
+    if len <= NUMBER_TEXT_BYTES {
+        value.to_dec_string()
+    } else {
+        format!("a {len}-byte number")
+    }
+}
+
+/// The longest magnitude [`number_text`] writes in decimal (at most 155
+/// digits).
+const NUMBER_TEXT_BYTES: usize = 64;

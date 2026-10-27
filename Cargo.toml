@@ -135,6 +135,9 @@ criterion = "0.5"
 tokio = { version = "1", features = ["rt", "macros", "net"] }
 memory-stats = "1.2"
 wiremock = "=0.6.2"
+# `tests/script_budget_before_allocation_348.rs` counts the interpreter's heap
+# under its budget (the crate forbids `unsafe`, so no allocator of its own).
+dhat = "0.3"
 # `tests/wire_tracing_sink.rs` scopes its collector with `with_default` (`std`).
 tracing = { version = "0.1", default-features = false, features = ["std"] }
 

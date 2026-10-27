@@ -10,6 +10,7 @@ use crate::script::op::{OP_NOP4, OP_NOP5, OP_NOP6, OP_NOP7};
 use crate::script::script_num::ScriptNum;
 
 use super::limits::MAX_SCRIPT_ELEMENT_SIZE;
+use super::num::number_text;
 use super::reference_read;
 use super::Spend;
 
@@ -118,7 +119,7 @@ impl Spend {
             if size < 0 || size > i64::from(i32::MAX) {
                 return Err(self.error(&format!(
                     "OP_NUM2BIN requires a size from 0 to 2147483647, found {}.",
-                    size_bn.to_dec_string()
+                    number_text(size_bn)
                 )));
             }
             Ok(size as usize)
@@ -260,7 +261,7 @@ impl Spend {
                             None => {
                                 return Err(self.error(&format!(
                                     "Script number overflow: a shift by {} bits, the limit is {max} bytes.",
-                                    n_bn.to_dec_string()
+                                    number_text(&n_bn)
                                 )))
                             }
                         }
@@ -273,7 +274,7 @@ impl Spend {
                     if n_bn.to_i64().is_none_or(|n| n > i64::from(i32::MAX)) {
                         return Err(self.error(&format!(
                             "{name} count ({}) does not fit an int.",
-                            n_bn.to_dec_string()
+                            number_text(&n_bn)
                         )));
                     }
                 }
@@ -339,7 +340,7 @@ impl Spend {
                     self.number_room(in_hand, 2 * x_bytes.len() as u64 + 16)?;
                     x.shr_bits_toward_zero(n)
                 };
-                self.push_number(&out)?;
+                self.push_number(out)?;
             }
         }
         Ok(())
