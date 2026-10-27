@@ -248,7 +248,7 @@ pub struct SpendParams {
     pub unlocking_script: UnlockingScript,
     pub input_sequence: u32,
     pub lock_time: u32,
-    pub memory_limit: Option<usize>,  // the LOCAL budget: None = 32 MB (default mode) or 100 MB on the node's count (under a word)
+    pub memory_limit: Option<usize>,  // the LOCAL budget: None = 32 MB (default mode) or 100 MB on the node's count (under a word); Some(usize::MAX) uncapped, Transaction::verify's None (#331)
 }
 
 // 0.4.4: one transaction shared by the spends of all its inputs (bsv-low #591)
@@ -292,7 +292,11 @@ table on `ScriptFlags` in `flags.rs`; the seven witness transactions are
 
 The memory budget (0.3.30, bsv-rs#30). `memory_limit` is LOCAL: exhausting it is a
 `ScriptResourceLimit`, never a verdict, and `Some(n)` wins in every mode. The default
-mode keeps 32 MB for each stack apart, the bytes alone. Under a word the count is the
+mode keeps 32 MB for each stack apart, the bytes alone (`Transaction::verify` passes the
+caller's budget, `Some(usize::MAX)` without one, the reference's uncapped default, #331;
+uncapped, an element the allocator refuses is a decline, its limit the bytes both stacks
+held, every element allocated fallibly, and the 1 GiB element bound, `OP_CAT`'s,
+`OP_NUM2BIN`'s and the numeric left shift's, the only bound left). Under a word the count is the
 node's (`LimitedStack`: one budget over both stacks, `STACK_ELEMENT_OVERHEAD` = 32
 bytes per element, every growth charged before it happens, an unlocking script's alt
 stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's policy
