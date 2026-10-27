@@ -426,7 +426,7 @@ pub(crate) fn certificate_signature_der(bytes: &[u8]) -> Result<Vec<u8>, Error> 
     if bytes.len() > MAX_CERTIFICATE_SIGNATURE_BYTES {
         return Err(refused(CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL));
     }
-    reference_der(bytes)
+    reference_der(bytes).map_err(refused)
 }
 
 /// `#setUniqueWireRecordEntry` (`:1992-2002`): a repeated key refused, never
@@ -455,17 +455,19 @@ fn utf8(bytes: &[u8]) -> Result<String, Error> {
 
 /// `Signature.fromDER` (`Signature.ts:44-97`) then `toDER` (`:201-250`): the
 /// reference's checks, in its order and words, and its re-encoding (an
-/// integer minimal, a zero byte before a high bit).
-fn reference_der(der: &[u8]) -> Result<Vec<u8>, Error> {
-    let invalid = || refused("Signature DER invalid");
+/// integer minimal, a zero byte before a high bit). The refusal is the words
+/// alone, each caller's error class its own: the wire's `WalletError`,
+/// `Certificate`'s `CertificateValidationError` (bsv-rs#305).
+pub(crate) fn reference_der(der: &[u8]) -> Result<Vec<u8>, String> {
+    let invalid = || "Signature DER invalid".to_string();
     // `getLength`: a short-form length; a missing byte fails the next check.
     let length = |at: usize| match der.get(at) {
         Some(b) if b & 0x80 == 0 => Ok(*b as usize),
-        Some(_) => Err(refused("Invalid DER entity length")),
+        Some(_) => Err("Invalid DER entity length".to_string()),
         None => Err(invalid()),
     };
     if der.first() != Some(&0x30) {
-        return Err(refused("Signature DER must start with 0x30"));
+        return Err("Signature DER must start with 0x30".to_string());
     }
     if length(1)? + 2 != der.len() || der.get(2) != Some(&0x02) {
         return Err(invalid());
@@ -476,14 +478,14 @@ fn reference_der(der: &[u8]) -> Result<Vec<u8>, Error> {
     }
     let s_len = length(r_end + 1)?;
     if der.len() != r_end + 2 + s_len {
-        return Err(refused("Invalid R-length in signature DER"));
+        return Err("Invalid R-length in signature DER".to_string());
     }
     // `toDER` (`Signature.ts:225-239`): R is written through `toArray`, which
     // gives a zero one byte `00`; S's leading zeros are dropped by a trailing
     // `while` loop that leaves a zero S empty, `02 00`.
-    let integer = |bytes: &[u8], which: &str, zero_is_empty: bool| -> Result<Vec<u8>, Error> {
+    let integer = |bytes: &[u8], which: &str, zero_is_empty: bool| -> Result<Vec<u8>, String> {
         if bytes.first() == Some(&0) && bytes.get(1).map_or(0, |b| b & 0x80) == 0 {
-            return Err(refused(format!("Invalid {which}-value in signature DER")));
+            return Err(format!("Invalid {which}-value in signature DER"));
         }
         let start = bytes.iter().position(|b| *b != 0).unwrap_or(bytes.len());
         let mut minimal = bytes[start..].to_vec();

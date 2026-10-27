@@ -1,0 +1,237 @@
+{
+  "description": "The reference's certificate signature DER at toBinary, fromBinary and verify (#305), recorded by tests/support/certificate_signature_der_305.mjs",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "node": "v22.18.0",
+  "field_value": "AAAA",
+  "unsigned_prefix": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f200000000000000000000000000000000000000000000000000000000000000000001036630300441414141",
+  "cases": [
+    {
+      "id": "canonical",
+      "signature": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 71,
+      "from_binary": {
+        "ok": {
+          "signature": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+          "verify": true,
+          "written": {
+            "ok": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+          }
+        }
+      },
+      "to_binary": {
+        "ok": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+      },
+      "verify": {
+        "ok": true
+      },
+      "from_der": {
+        "ok": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+      }
+    },
+    {
+      "id": "r_without_its_zero_byte",
+      "signature": "30440220a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 70,
+      "from_binary": {
+        "ok": {
+          "signature": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+          "verify": true,
+          "written": {
+            "ok": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+          }
+        }
+      },
+      "to_binary": {
+        "ok": "30440220a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+      },
+      "verify": {
+        "ok": true
+      },
+      "from_der": {
+        "ok": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+      }
+    },
+    {
+      "id": "high_s",
+      "signature": "3046022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022100c96875f52ccf60ddcb301b3b450a3ccc04fcba3989e20005e202822210fc25cf",
+      "length": 72,
+      "from_binary": {
+        "ok": {
+          "signature": "3046022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022100c96875f52ccf60ddcb301b3b450a3ccc04fcba3989e20005e202822210fc25cf",
+          "verify": true,
+          "written": {
+            "ok": "3046022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022100c96875f52ccf60ddcb301b3b450a3ccc04fcba3989e20005e202822210fc25cf"
+          }
+        }
+      },
+      "to_binary": {
+        "ok": "3046022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022100c96875f52ccf60ddcb301b3b450a3ccc04fcba3989e20005e202822210fc25cf"
+      },
+      "verify": {
+        "ok": true
+      },
+      "from_der": {
+        "ok": "3046022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022100c96875f52ccf60ddcb301b3b450a3ccc04fcba3989e20005e202822210fc25cf"
+      }
+    },
+    {
+      "id": "empty_r",
+      "signature": "30240200022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 38,
+      "from_binary": {
+        "ok": {
+          "signature": "3025020100022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+          "verify": false,
+          "written": {
+            "error": "Invalid R-value in signature DER"
+          }
+        }
+      },
+      "to_binary": {
+        "ok": "30240200022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "ok": "3025020100022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72"
+      }
+    },
+    {
+      "id": "s_excessively_padded",
+      "signature": "3046022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a3502210036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 72,
+      "from_binary": {
+        "error": "Invalid S-value in signature DER"
+      },
+      "to_binary": {
+        "error": "Invalid S-value in signature DER"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Invalid S-value in signature DER"
+      }
+    },
+    {
+      "id": "r_excessively_padded",
+      "signature": "304602220000a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 72,
+      "from_binary": {
+        "error": "Invalid R-value in signature DER"
+      },
+      "to_binary": {
+        "error": "Invalid R-value in signature DER"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Invalid R-value in signature DER"
+      }
+    },
+    {
+      "id": "long_form_length",
+      "signature": "308145022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 72,
+      "from_binary": {
+        "error": "Invalid DER entity length"
+      },
+      "to_binary": {
+        "error": "Invalid DER entity length"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Invalid DER entity length"
+      }
+    },
+    {
+      "id": "trailing_byte",
+      "signature": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b7200",
+      "length": 72,
+      "from_binary": {
+        "error": "Signature DER invalid"
+      },
+      "to_binary": {
+        "error": "Signature DER invalid"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Signature DER invalid"
+      }
+    },
+    {
+      "id": "sequence_length_short",
+      "signature": "3044022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 71,
+      "from_binary": {
+        "error": "Signature DER invalid"
+      },
+      "to_binary": {
+        "error": "Signature DER invalid"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Signature DER invalid"
+      }
+    },
+    {
+      "id": "s_length_long",
+      "signature": "3045022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022136978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 71,
+      "from_binary": {
+        "error": "Invalid R-length in signature DER"
+      },
+      "to_binary": {
+        "error": "Invalid R-length in signature DER"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Invalid R-length in signature DER"
+      }
+    },
+    {
+      "id": "set_tag",
+      "signature": "3145022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 71,
+      "from_binary": {
+        "error": "Signature DER must start with 0x30"
+      },
+      "to_binary": {
+        "error": "Signature DER must start with 0x30"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Signature DER must start with 0x30"
+      }
+    },
+    {
+      "id": "r_tag",
+      "signature": "3045032100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
+      "length": 71,
+      "from_binary": {
+        "error": "Signature DER invalid"
+      },
+      "to_binary": {
+        "error": "Signature DER invalid"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Signature DER invalid"
+      }
+    }
+  ]
+}

@@ -8,7 +8,7 @@
 
 use crate::wallet::wire::{
     certificate_binary_read_refusal, certificate_binary_written_refusal,
-    certificate_field_value_refusal, CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL,
+    certificate_field_value_refusal, reference_der, CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL,
     MAX_CERTIFICATE_BINARY_BYTES, MAX_CERTIFICATE_FIELDS, MAX_CERTIFICATE_FIELD_VALUE_BYTES,
     MAX_CERTIFICATE_SIGNATURE_BYTES,
 };
@@ -336,6 +336,15 @@ pub(crate) fn require_written_signature(signature: &[u8]) -> Result<()> {
         return Err(refused("Invalid certificate signature encoding"));
     }
     Ok(())
+}
+
+/// `Signature.fromDER` then `toDER` on a certificate's signature, the
+/// wire's reading (`wallet::wire::reference_der`, one function) in this
+/// type's class: `toBinary` parses it and writes the bytes given
+/// (`Certificate.ts:309-311`), `fromBinary` keeps the re-encoding
+/// (`:395-397`), `verify` verifies what it parses (`:432-435`; bsv-rs#305).
+pub(crate) fn der_signature(signature: &[u8]) -> Result<Vec<u8>> {
+    reference_der(signature).map_err(refused)
 }
 
 /// `Certificate.fromBinary`'s signature, the bytes after the fields, at
