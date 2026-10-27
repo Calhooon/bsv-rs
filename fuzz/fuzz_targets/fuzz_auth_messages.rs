@@ -56,8 +56,10 @@ fn certificate(certificate: &Certificate) {
     let _ = certificate.signing_hash();
     let _ = certificate.to_wallet_certificate();
     for signed in [false, true] {
-        // A value over the 1 MiB bound is refused (bsv-rs#275); the
-        // reader refuses one, so only a JSON-read certificate meets it.
+        // A value over the 1 MiB bound (bsv-rs#275), more than 100,000
+        // fields or a name outside 1 to 50 bytes or unsafe (bsv-rs#297) is
+        // refused; the reader refuses each, so only a JSON-read certificate
+        // meets one.
         let Ok(bytes) = certificate.to_binary(signed) else {
             continue;
         };
