@@ -10,7 +10,7 @@ This module implements identity certificates for the BSV authentication system, 
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, re-exports, protocol constants | ~43 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 661 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 662 |
 | `certificate_tests.rs` | `certificate.rs`'s unit tests (`#![cfg(test)]`, included by `#[path]`; the file-size ratchet) | 146 |
 | `certificate_json.rs` | `Certificate`'s JSON (#268): the serde impls (a remote derive over its fields), `base64_32_bytes`, `revocation_outpoint_from_str`, `revocation_outpoint_json` (the sentinel), `signature_hex` | 195 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | 429 |
