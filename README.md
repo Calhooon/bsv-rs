@@ -79,7 +79,11 @@ script. The implementation is [src/transaction/beef_stream.rs](src/transaction/b
 
 Script defaults follow SDK evaluation mode; callers modelling node validation
 select explicit `ScriptFlags` and interpret resource limits separately from
-validity. The flag and resource witnesses live in [tests](./tests).
+validity. `Transaction::verify` keeps the two apart: an invalid script is
+`TransactionError`, an input whose evaluation stopped at a budget is
+`Error::ScriptEvaluationDeclined`. On the block path
+`Spend::set_stack_memory_consensus` is a node's
+`-maxstackmemoryusageconsensus`, a verdict; `memory_limit` only declines. The flag and resource witnesses live in [tests](./tests).
 
 ## The node's mining checks
 

@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: `Transaction::verify` answers a decline as a decline, and the block path's consensus budget can be the node's verdict (#38)
+
+Two gaps the docs pass of #36 left. First, `Transaction::verify` evaluates
+each input under the default mode's 32,000,000-byte local budget and mapped
+every `Spend::validate` error to `TransactionError("Script validation failed
+for input N: …")`, so an evaluation stopped at the budget (`resource_limit`
+`Some`, `is_resource_limit`), a script nobody judged, reached the caller as
+invalid with its class dropped, where the crate's docs say a caller never
+reads a decline as invalid. The reference's `Transaction.verify` runs
+`Spend` per input and lets its two exceptions propagate by class,
+`ScriptEvaluationError` for an invalid script and `ScriptResourceLimitError`
+for a decline (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Transaction.ts:1441-1458`,
+`packages/sdk/src/script/Spend.ts:2020-2021`, thrown at `:433`, `:439`,
+`:745`, `:748`, `:1949`). A decline now leaves `verify` as
+`Error::ScriptEvaluationDeclined { input_index, limit }`, the input and the
+`ScriptResourceLimit` (resource, budget, attempted figure) kept, printed
+`script evaluation declined for input N: <the limit's sentence>`; an
+invalid script keeps `TransactionError("Script validation failed for input
+N: …")` byte for byte. The budget `verify` evaluates under is unchanged.
+
+Second, on the block path a node's budget is its operator's mandatory
+`-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.3, `6504a3a`:
+`src/bitcoind.cpp:140-157`; 0 means `INT64_MAX`,
+`src/consensus/consensus.h:82`, `src/configscriptpolicy.cpp:280-287`), the
+figure `GetMaxStackMemoryUsage` picks there (`:139-154`), and a growth above
+it is that node's verdict (`src/script/limitedstack.cpp:202-205`,
+`SCRIPT_ERR_STACK_SIZE`, `src/script/interpreter.cpp:1815-1817`). An
+operator may set it below 100,000,000; this crate's block word evaluated up
+to its local budget and said valid, and `memory_limit: Some(X)` modelled
+that node only as a decline above `X`, which no sentence said. The module
+doc's block-path paragraph and `SpendParams::memory_limit` now say so, and
+`Spend::set_stack_memory_consensus(bytes)` (with
+`Spend::stack_memory_consensus()`), beside `set_stack_memory_policy`, is
+the node's setting for a word without the mempool bits: a growth that would
+take the node's count above it is refused before it happens, `Stack size
+limit exceeded: N bytes, the stack memory consensus limit is M bytes.`,
+`is_resource_limit() == false`. 0, the default, selects no verdict (the
+node's `INT64_MAX`). The mempool word keeps the policy's verdict and
+ignores it; the default mode ignores both. The node refuses at start a
+policy above its consensus figure (`src/configscriptpolicy.cpp:298-305`);
+this interpreter takes both as given and judges each path by its own.
+
+Pinned by `tests/transaction_verify_decline_38.rs` (a child whose input
+pushes 1,000,000 bytes and whose parent's lock `OP_DUP`s it: 32 copies
+verify, a 33rd is `ScriptEvaluationDeclined` at 33,000,000 of 32,000,000,
+the same shape with an invalid script still `TransactionError`) and
+`tests/script_stack_memory_consensus_38.rs` (the verdict under the block
+word, the decline without the knob, the mempool word's policy verdict
+unchanged, the two figures unclamped); red on the code before (4 of 9;
+the 5 others hold either way). `tests/script_stack_memory_witness.rs` is
+unchanged.
+
+Semver: `Error` is `#[non_exhaustive]`, so the new variant is additive, as
+are the two `Spend` methods.
+
+Migration: a caller of `Transaction::verify` that read every `Err` as an
+invalid transaction reads `Error::ScriptEvaluationDeclined` as "not
+judged" (retry under a larger budget, or let the network judge); a match
+on `TransactionError` text containing `has exceeded` finds the decline in
+the new variant. No downstream reads it: `overlay-engine`'s submit door
+walks with its own `verify_beef_linear` and the stream script door, which
+already branches on `is_resource_limit`, and its two tests that call
+`verify` expect `Ok(true)`; `bsv-wallet-cli` calls no `Transaction::verify`.
+
+### Notes: cross-SDK parity (#38)
+
+The reference's `Spend` defaults `memoryLimit` to `Number.POSITIVE_INFINITY`
+(`ts-stack@edf6e03` `Spend.ts:295-296`) and its `verify` imposes no SDK cap
+without a caller's `memoryLimit` (`Transaction.ts:1685-1687`); this crate's
+`verify` keeps the default mode's 32,000,000 bytes and takes no budget, so a
+script between 32,000,000 bytes and the reference's allocation failure is a
+decline here and a verdict there: a finding, not changed by #38. go-sdk@2ca481c
+runs the interpreter at the relay policy's 100,000,000 bytes and wraps its
+error with two `%w`, `ErrScriptVerificationFailed` and the interpreter's own,
+so `errors.Is(err, ctx.Err())` tells a stopped evaluation from an invalid
+script (`spv/verify.go:64-76`, `:547-560`); it carries no consensus figure.
+
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 
 `IdentityClient::publicly_reveal_attributes` called createAction with the

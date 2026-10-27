@@ -272,6 +272,8 @@ impl Spend {
     pub fn memory_limit(&self) -> usize                      // the local budget in force (0.3.30)
     pub fn stack_memory_policy(&self) -> Option<usize>       // the mempool path's verdict figure in force (0.3.30)
     pub fn set_stack_memory_policy(&mut self, bytes: usize)  // the node's -maxstackmemoryusagepolicy, 0 = none (0.3.30)
+    pub fn stack_memory_consensus(&self) -> Option<usize>    // the block path's verdict figure in force (#38)
+    pub fn set_stack_memory_consensus(&mut self, bytes: usize)  // the node's -maxstackmemoryusageconsensus, 0 = none (#38)
     pub fn reset(&mut self)
     pub fn validate(&mut self) -> Result<bool, ScriptEvaluationError>  // refuses a word `check` refuses first
     pub fn step(&mut self) -> Result<bool, ScriptEvaluationError>  // Single instruction
@@ -300,7 +302,12 @@ bounded by `INT32_MAX` (`SCRIPT_ERR_PUSH_SIZE`). On the block path a node's budg
 is its operator's mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.2 does not
 start without it, `src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
 `src/configscriptpolicy.cpp:280-283`), no constant, so the local budget declines above
-100 MB; `memory_limit: Some(usize::MAX)` models a node run with 0. A decline is an `Err`
+100 MB; `memory_limit: Some(X)` models a node set to `X` only as a decline above `X`,
+`Some(usize::MAX)` a node run with 0. `set_stack_memory_consensus(X)` (#38) is that
+node's verdict on the block path (`Stack size limit exceeded: N bytes, the stack memory
+consensus limit is M bytes.`, `limitedstack.cpp:202-205` at v1.2.3), 0 none; the mempool
+word and the default mode ignore it, and a policy above it is not clamped (the node
+refuses that pair at start). A decline is an `Err`
 whose `resource_limit` is `Some`: never read it as invalid. The witnesses are
 `tests/script_stack_memory_witness.rs`.
 
@@ -428,7 +435,7 @@ direct call (no trait object, no table of function pointers, no clone added).
 | `arithmetic.rs` | The unary and binary number opcodes (`truth` for a comparison's 1 or 0), `OP_WITHIN` |
 | `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the signature encoding (DER, LOW_S at the order, STRICTENC's defined base type and CHRONICLE bit, FORKID), the public key encoding (COMPRESSED_PUBKEYTYPE), the scriptCode (`build_subscript`, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
 | `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
-| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `DEFAULT_MEMORY_LIMIT`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
+| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `DEFAULT_MEMORY_LIMIT`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `stack_memory_consensus` (the block path's, #38), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
 | `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number`, `read_count` (CHECKMULTISIG's 4-byte counts), `push_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
 | `tests.rs`, `flag_tests.rs`, `chronicle_tests.rs`, `low_s_order_tests.rs`, `script_num_length_tests.rs`, `fixed_width_operand_tests.rs` | The unit tests, one file per former inline module; their paths (`script::spend::flag_tests::...`) are unchanged |
 

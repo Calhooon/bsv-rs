@@ -35,6 +35,7 @@ Compatible with the TypeScript and Go SDKs through shared binary formats.
 | `input.rs` | `TransactionInput` and `Utxo` for transaction inputs |
 | `output.rs` | `TransactionOutput` for transaction outputs |
 | `transaction.rs` | `Transaction` with parsing, serialization, signing, SPV verification, BEEF ancestry collection |
+| `verify_refusal.rs` | What `Transaction::verify` answers for an input's script `Err` (#38): a decline (`resource_limit` `Some`) is `Error::ScriptEvaluationDeclined { input_index, limit }`, the reference's `ScriptResourceLimitError` kept apart; a verdict `TransactionError("Script validation failed for input N: …")` |
 | `tx_json.rs` | JSON serialization/deserialization matching Go SDK's `MarshalJSON`/`UnmarshalJSON` |
 | `merkle_path.rs` | `MerklePath` (BRC-74 BUMP) for merkle proofs; its readers are the BEEF reader's BUMP decoder (#167) |
 | `beef.rs` | `Beef` (BRC-62/95/96): the type, the public readers (over `beef/collect.rs`), `verify_structure`, sorting, merging, the writers (`to_binary`, the atomic closure), logging |
@@ -184,6 +185,8 @@ impl Transaction {
 
     // SPV Verification
     pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>) -> Result<bool>
+    // an invalid script: Err(TransactionError("Script validation failed for input N: …"));
+    // an input stopped at the default mode's 32 MB budget: Err(ScriptEvaluationDeclined { input_index, limit }) (#38)
 }
 
 pub enum ChangeDistribution { Equal, Random }  // Random uses Benford's law
@@ -427,7 +430,7 @@ let live = LivePolicy::default(); live.refresh().await?;     // Live rate
 - **Dependency order**: BEEF transactions sorted oldest-first; inputs processed in reverse order during collection (like TS SDK)
 - **JSON format**: `to_json()`/`from_json()` match Go SDK's `MarshalJSON`/`UnmarshalJSON`; deserialization prefers `hex` field when present
 - **Default impls**: `Transaction`, `TransactionInput`, `TransactionOutput`, `Beef`, `MockChainTracker`, `WhatsOnChainBroadcaster`, `WhatsOnChainTracker` implement `Default`
-- **SPV verify**: `verify()` performs queue-based verification over the whole ancestry (no recursion): checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input, enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
+- **SPV verify**: `verify()` performs queue-based verification over the whole ancestry (no recursion): checks merkle paths against chain tracker, validates fees (optional), runs script interpreter on each input (a decline is `Error::ScriptEvaluationDeclined`, never `TransactionError`, #38), enqueues unverified source transactions. Matches Go SDK's `spv.Verify()` and TS SDK's `Transaction.verify()`
 - **Equality**: `Transaction` and `TransactionOutput` implement `PartialEq`/`Eq` based on binary serialization
 
 ## BEEF Ancestry Collection Algorithm
