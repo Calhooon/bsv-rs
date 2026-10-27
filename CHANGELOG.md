@@ -7,6 +7,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
+
+The five checks #275 named as not here, each now at the reference's site in
+its words (`ts-stack@edf6e03`), every refusal `CertificateValidationError`,
+the checks in `src/auth/certificates/bounds.rs`:
+
+1. Construction. The reference's `Certificate` constructor checks nothing
+   (`Certificate.ts:197-213`), so `Certificate::new` and `set_field` stay
+   infallible. Its `MasterCertificate` constructor throws
+   (`MasterCertificate.ts:195-233`), and `MasterCertificate::new` now
+   refuses as it does: more than 100 fields or keyring entries (`Certificate
+   fields cannot contain more than 100 entries`, `Master certificate keyring
+   cannot ...`), a name that is not 1 to 50 bytes or is `__proto__`,
+   `constructor`, `prototype` (`Certificate field name must be a safe UTF-8
+   string of 1–50 bytes`, `:23-29`), a field with no keyring entry or an
+   empty one (`Master keyring must contain a value for every field. Missing
+   or empty key for field: "<name>".`), a field's text not canonical base64
+   of 1 byte to 1 MiB, a keyring entry's not of 1 to 2048 bytes.
+   `issue_for_subject` builds through it, as `:474-483` does.
+2. The 2048-byte keyring entry (`MasterCertificate.ts:19`,
+   `VerifiableCertificate.ts:18`), as canonical base64 at every reader:
+   the constructor (`:215-232`), `create_keyring_for_verifier` (every
+   entry, revealed or not, `:358-364`), the master's decrypt (`:582-586`)
+   and the verifier's (`VerifiableCertificate.ts:182-186`), `<keyring>
+   field <name> is empty, oversized, or non-canonical`; and the wallet's
+   ciphertext at the two writers (`Encrypted master keyring field <name>
+   ...`, `:292-298`; `Verifier keyring field <name> must be a non-empty byte
+   array of at most 2048 bytes`, `:405-411`).
+3. The 64 KiB plaintext: refused before encryption by
+   `create_certificate_fields` (`Certificate plaintext field <name> exceeds
+   the maximum of 65536 bytes`, `:271-276`), after decryption by both
+   decrypt paths (`:612-616`, `VerifiableCertificate.ts:208-210`).
+4. `to_binary`'s field checks (`Certificate.ts:44-129`, `:281-297`): more
+   than 100,000 fields (`Certificate field count exceeds the maximum of
+   100000`), a name outside 1 to 50 bytes (`Invalid certificate field name
+   length: expected 1–50 bytes, received N`) or unsafe (`Unsafe certificate
+   field name: <name>`), before the buffer; and the reader's twin
+   (`:357-373`): a count over 100,000 or over a third of the bytes after it
+   (`Certificate field count exceeds the available data`), a declared name
+   length outside 1 to 50 before the name is read (`Invalid certificate
+   field name length: received N`), an unsafe name. The wire's writer and
+   reader carried these since #246 and #183.
+5. The decrypt wrappers: `MasterCertificate::decrypt_field` answers every
+   failure as `Failed to decrypt certificate field!` (`:621-623`; the field
+   absent from the certificate with them), `decrypt_fields` every failure
+   after its snapshots and its empty-keyring check as `Failed to decrypt
+   all master certificate fields.` (`:525-561`), and
+   `VerifiableCertificate::decrypt_fields` and `decrypt_field` as `Failed to
+   decrypt selectively revealed certificate fields using keyring: <words>`
+   (`VerifiableCertificate.ts:214-217`), the inner refusal's words quoted.
+   #275's canonical-base64 refusals are now inside them, as in the
+   reference.
+
+With them, the reference's sequence around each: `create_keyring_for_verifier`
+refuses more than 100 fields to reveal or one named twice
+(`fieldsToReveal contains duplicate field: <name>`, `:125-146`) and a field to
+reveal the certificate does not carry in the reference's words (`Fields to
+reveal must be a subset of the certificate fields. Missing the "<name>"
+field.`, `:371-380`; it was `AuthError("Field '<name>' not found in
+certificate")`); `MasterCertificate::decrypt_fields` refuses an empty master
+keyring (`A MasterCertificate must have a valid masterKeyring!`, `:522-524`),
+and `VerifiableCertificate::decrypt_fields` an empty keyring (`A keyring is
+required to decrypt certificate fields for the verifier.`, `:161-163`) and
+one of more than 100 entries (`:164-166`), where each answered an empty map;
+the verifier's revelation key must be exactly 32 bytes (`:203`), the
+master's 1 to 32 (`MasterCertificate.ts:600-611`, the shorter one's zeros
+restored as before).
+
+Pinned by `tests/auth_certificate_bounds_297.rs` (11 tests over 64 cases of
+`tests/vectors/auth_certificate_bounds_297.json`, the reference's verdicts
+recorded by `tests/support/certificate_bounds_297.mjs` at `ts-stack@edf6e03`
+under Node v22.18.0: each bound at its edge and one past it, at its site; 10
+red on beta's tree at `83b804d` with `MasterCertificate::new` returning
+`Ok` unchecked, the eleventh the vector's census). Two pins moved with the
+wrappers and the name bound, each red on that tree: #275's
+`a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275` now
+expects the wrapped words, and `auth_reader_bounds.rs`'s
+`a_certificate_field_length_of_usize_max_minus_k_is_refused` (#108) the name
+bound's refusal ahead of `ReaderUnderflow`. #275's re-check's witness lands
+with it: `a_certificate_signed_over_a_field_value_one_byte_over_one_mib_is_false_at_verify_275`,
+a certificate whose 1 MiB-and-a-byte field is signed by the certifier's
+BRC-52 child over this crate's writer's frame, `Ok(false)` at `verify`
+(`Ok(true)` on the tree before #275, `cf38038`). The #249, #261, #268 and
+#275 vectors are unchanged.
+
+Migration: `MasterCertificate::new` returns `Result<MasterCertificate>`, the
+reference's throwing constructor and Go's `NewMasterCertificate(..)
+(*MasterCertificate, error)` (`go-sdk@2ca481c`
+`auth/certificates/master.go:39-60`); add `?` or `.unwrap()` at the call.
+No downstream calls it (`bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
+`rust-message-box`, `bsv-overlay-cloudflare` grepped 2026-10-26; the
+toolbox's `Certificate::new` and `set_field` at
+`src/wallet/certificate_issuance.rs:533`, `:556` and
+`busy_door_tests.rs:1299` are unchanged; its "not found in certificate" and
+"not found in master keyring" texts at `wallet.rs:3158`, `:3166` are its own
+function's).
+
+### Notes: cross-SDK parity (#297)
+
+go-sdk@2ca481c carries none of these bounds: no field count or name check
+in `ToBinary` or `CertificateFromBinary` (`auth/certificates/certificate.go:114-148`,
+`wallet/serializer/certificate.go:27-130`), a name's 50 bytes at issuance
+alone (`master.go:157-159`), no keyring entry or plaintext size; its
+`NewMasterCertificate` refuses an empty keyring and a missing entry, not an
+empty one (`master.go:43-52`); its decrypt errors are its own words around
+each step (`ErrFieldDecryption`, `verifiable.go:107-148`; `failed to decrypt
+field %s: %w`, `master.go:339`), and its `DecryptFields` on an empty
+verifier keyring refuses as the reference does (`verifiable.go:83-85`). The
+reference decides here. The reference's master decrypt refuses an empty
+plaintext (`denseBytes` asks at least a byte, `MasterCertificate.ts:83`,
+`:612-616`) while its issuance encrypts one and its verifier decrypts one
+(`VerifiableCertificate.ts:204-207`): followed, so a field issued empty is
+issued here and refused at the master's decrypt and keyring, as there (the
+vector's `plaintext_of_0_bytes`). Residuals: where several names break a
+bound the reference names the first in its object's key order, this crate
+the first in the names' order (`localeCompare`'s for `to_binary`, bytes for
+the records); a wallet's or the cipher's failure quoted by the verifier's
+wrapper is in this crate's words. Not carried, outside #297's five and
+carried on the wire since #246: `Certificate::to_binary`'s 16 MiB frame
+bound (`Certificate.ts:314-319`) and `from_binary`'s (`:86-92`, the input),
+and the 72-byte signature bound and DER re-encoding at both
+(`:300-312`, `:389-398`).
+
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 
 `Certificate::to_binary` wrote and `from_binary` read a field value of any
