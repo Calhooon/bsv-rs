@@ -231,6 +231,10 @@ impl ScriptNum {
 }
 ```
 
+`from_bytes` reads the element in place (no copy of the operand, the sign bit cleared in the
+digits) and `to_bytes` sizes its one allocation up front, the sign byte's room included;
+`try_to_bytes` (crate-internal) is its fallible form, the interpreter's (#374).
+
 ### Spend
 
 Full script interpreter for validating transaction spends:
@@ -301,8 +305,12 @@ a push, `OP_CAT`, `OP_NUM2BIN` and the numeric left shift, and at an arithmetic 
 decline (#374, `arithmetic_room.rs`): `BigNumber` allocates infallibly, so before an operand
 is decoded a result whose least length passes the bound (only `OP_MUL`'s can pass its
 operands by more than a byte) is declined from the operands' bytes, the others' exact length
-judged after; in every mode a result of 64 KiB or more is asked of the allocator first
-(`try_reserve_exact`, released), its refusal a decline. A memory budget bounds memory, never time: `work_limit` does. Under a word the count is the
+judged after; in every mode the step's peak, when 64 KiB or more, is asked of the allocator
+first (`try_reserve_exact`, released), its refusal a decline: 6 times the operands' bytes for
+`OP_MUL`, 12 for `OP_DIV` and `OP_MOD`, 2 for the rest (measured at most 5.12, 10.0 and 1.0:
+the decode reads the element without a copy, the arithmetic is owned, the encoding sized up
+front); a number's read (1.5 times its bytes) and the numeric shifts' results are asked the
+same way, and every encoded number is allocated fallibly. A memory budget bounds memory, never time: `work_limit` does. Under a word the count is the
 node's (`LimitedStack`: one budget over both stacks, `STACK_ELEMENT_OVERHEAD` = 32
 bytes per element, every growth charged before it happens, an unlocking script's alt
 stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's policy
@@ -443,11 +451,11 @@ direct call (no trait object, no table of function pointers, no clone added).
 | `splice.rs` | `OP_SIZE`, `OP_CAT`, `OP_SPLIT` (`split_position`, the `INT32_MAX` bound under a word), `OP_NUM2BIN` (`num2bin_size`, the bound before the allocation; `padded`), `OP_BIN2NUM`, the Chronicle `OP_SUBSTR`/`OP_LEFT`/`OP_RIGHT`/`OP_LSHIFTNUM`/`OP_RSHIFTNUM` (`op_chronicle_splice`, the shift counts' two bounds) and `read_splice_operand` (the `int64` operand under a word) |
 | `bitwise.rs` | `OP_INVERT`, `OP_AND`/`OP_OR`/`OP_XOR`, `OP_EQUAL`/`OP_EQUALVERIFY`, the width-preserving `OP_LSHIFT`/`OP_RSHIFT` (`shifted`) |
 | `arithmetic.rs` | The unary and binary number opcodes (`truth` for a comparison's 1 or 0), `OP_WITHIN` |
-| `arithmetic_room.rs` | The room an arithmetic result needs, judged before it is allocated (#374): `arithmetic_room` (the operands' encodings as the read judges them, then in the default mode the element bound on the result's least length from the operands' bytes, then in every mode `try_reserve_exact` of its greatest length when 64 KiB or more), `push_arithmetic_result` (the default mode's bound on the exact length); its unit tests, `arithmetic_room_tests.rs`, model the bound and the allocator's ceiling at a small scale |
+| `arithmetic_room.rs` | The room an arithmetic result needs, judged before it is allocated (#374): `arithmetic_room` (the operands' encodings as the read judges them, then in the default mode the element bound on the result's least length from the operands' bytes, then in every mode `try_reserve_exact` of the step's peak when 64 KiB or more, `step_peak`'s multiple of the operands' bytes, `STEP_PEAK_*`), `number_room` (the same probe for a number's read and a numeric shift), `push_arithmetic_result` (the encoding fallible, then the default mode's bound on the exact length); its unit tests, `arithmetic_room_tests.rs`, model the bound and the allocator's ceiling at a small scale |
 | `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the signature encoding (DER, LOW_S at the order, STRICTENC's defined base type and CHRONICLE bit, FORKID), the public key encoding (COMPRESSED_PUBKEYTYPE), the scriptCode (`build_subscript`, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
 | `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
 | `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `stack_memory_consensus` (the block path's, #38), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
-| `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number`, `check_number` (the read's verdicts without the decode, #374), `read_count` (CHECKMULTISIG's 4-byte counts), `push_number` and `push_encoded_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
+| `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number` (its digits asked of the allocator first, #374), `check_number` (the read's verdicts without the decode, #374), `read_count` (CHECKMULTISIG's 4-byte counts), `push_number` and `push_encoded_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
 | `tests.rs`, `flag_tests.rs`, `chronicle_tests.rs`, `low_s_order_tests.rs`, `script_num_length_tests.rs`, `fixed_width_operand_tests.rs` | The unit tests, one file per former inline module; their paths (`script::spend::flag_tests::...`) are unchanged |
 
 A new opcode handler goes in its group's module as a `pub(super) fn` on `Spend`
