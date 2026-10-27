@@ -248,7 +248,7 @@ pub struct SpendParams {
     pub unlocking_script: UnlockingScript,
     pub input_sequence: u32,
     pub lock_time: u32,
-    pub memory_limit: Option<usize>,  // the LOCAL budget: None = 32 MB (default mode) or 100 MB on the node's count (under a word); Some(usize::MAX) uncapped, Transaction::verify's None (#331)
+    pub memory_limit: Option<usize>,  // the LOCAL budget: None = uncapped (default mode, the reference's Spend, #331) or 100 MB on the node's count (under a word); Some(n) the caller's
 }
 
 // 0.4.4: one transaction shared by the spends of all its inputs (bsv-low #591)
@@ -291,12 +291,16 @@ table on `ScriptFlags` in `flags.rs`; the seven witness transactions are
 `tests/script_flags_witnesses.rs`.
 
 The memory budget (0.3.30, bsv-rs#30). `memory_limit` is LOCAL: exhausting it is a
-`ScriptResourceLimit`, never a verdict, and `Some(n)` wins in every mode. The default
-mode keeps 32 MB for each stack apart, the bytes alone (`Transaction::verify` passes the
-caller's budget, `Some(usize::MAX)` without one, the reference's uncapped default, #331;
-uncapped, an element the allocator refuses is a decline, its limit the bytes both stacks
-held, every element allocated fallibly, and the 1 GiB element bound, `OP_CAT`'s,
-`OP_NUM2BIN`'s and the numeric left shift's, the only bound left). Under a word the count is the
+`ScriptResourceLimit`, never a verdict, and `Some(n)` wins in every mode. In the default
+mode `None` is uncapped, as the reference's `Spend` is (`Spend.ts:295-296` at `edf6e03`;
+#331, the keeper's ruling of 2026-10-27; 32 MB until then), and `Some(n)` is `n` bytes for
+each stack apart, the bytes alone (`Transaction::verify` passes the caller's budget, its
+third parameter). Uncapped, an element the allocator refuses is a decline, its limit the
+bytes both stacks held, every element allocated fallibly; the 1 GiB element bound holds at
+a push, `OP_CAT`, `OP_NUM2BIN` and the numeric left shift, and not at an arithmetic result
+(`push_number`: `OP_ADD`, `OP_MUL`, ..., unbounded as the reference's; `BigNumber`
+allocates it infallibly, so `OP_MUL` of two operands near 1 GiB asks about 2 GiB that a
+refusal aborts). A memory budget bounds memory, never time: `work_limit` does. Under a word the count is the
 node's (`LimitedStack`: one budget over both stacks, `STACK_ELEMENT_OVERHEAD` = 32
 bytes per element, every growth charged before it happens, an unlocking script's alt
 stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's policy
@@ -439,7 +443,7 @@ direct call (no trait object, no table of function pointers, no clone added).
 | `arithmetic.rs` | The unary and binary number opcodes (`truth` for a comparison's 1 or 0), `OP_WITHIN` |
 | `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the signature encoding (DER, LOW_S at the order, STRICTENC's defined base type and CHRONICLE bit, FORKID), the public key encoding (COMPRESSED_PUBKEYTYPE), the scriptCode (`build_subscript`, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
 | `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
-| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `DEFAULT_MEMORY_LIMIT`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `stack_memory_consensus` (the block path's, #38), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
+| `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `stack_memory_consensus` (the block path's, #38), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
 | `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number`, `read_count` (CHECKMULTISIG's 4-byte counts), `push_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
 | `tests.rs`, `flag_tests.rs`, `chronicle_tests.rs`, `low_s_order_tests.rs`, `script_num_length_tests.rs`, `fixed_width_operand_tests.rs` | The unit tests, one file per former inline module; their paths (`script::spend::flag_tests::...`) are unchanged |
 
@@ -453,7 +457,6 @@ helper (`require_two_items`), not a copy per module.
 ```rust
 // limits.rs
 const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;  // 1GB (BSV unlimited)
-const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;              // 32MB, the default mode's local budget
 const WORD_MEMORY_LIMIT: usize = DEFAULT_STACK_MEMORY_USAGE_POLICY;  // 100MB, under a word
 const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
 // mod.rs
