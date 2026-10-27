@@ -1,0 +1,51 @@
+{
+  "source": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk/src/auth/Peer.ts), Node v22.18.0",
+  "keys": {
+    "client": 41,
+    "server": 42,
+    "mallory": 43
+  },
+  "identities": {
+    "client": "037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb",
+    "server": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+    "mallory": "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+  },
+  "cases": {
+    "initial_response_honest": {
+      "proto": null,
+      "answering": null
+    },
+    "initial_response_wrong_signature": {
+      "proto": "Signature is not valid",
+      "answering": "Unable to verify initial response signature for peer: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    "initial_response_another_identity": {
+      "proto": "initialResponse identity does not match the requested peer identity.",
+      "answering": "initialResponse identity does not match the requested peer identity."
+    },
+    "initial_response_wrong_nonce": {
+      "proto": "HMAC is not valid",
+      "answering": "Initial response nonce verification failed from peer: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    "general_honest": {
+      "proto": null,
+      "answering": null
+    },
+    "general_wrong_your_nonce": {
+      "proto": "HMAC is not valid",
+      "answering": "Unable to verify nonce for general message from: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    "general_no_nonce": {
+      "proto": "general.nonce must be canonical base64.",
+      "answering": "general.nonce must be canonical base64."
+    },
+    "general_wrong_signature": {
+      "proto": "Signature is not valid",
+      "answering": "Invalid signature in generalMessage from 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    "general_another_identity": {
+      "proto": "general identity does not match the authenticated session.",
+      "answering": "general identity does not match the authenticated session."
+    }
+  }
+}
