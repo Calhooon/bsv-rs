@@ -106,7 +106,7 @@ signAction left `returnTXIDOnly` absent and sent the reference createAction
 answered as the hex of its bytes; the reference's (`:896-911`) sends
 `returnTXIDOnly: false` and the reference as it was answered, its base64
 text, which is what the binary wire's transceiver decodes
-(`src/wallet/wire/transceiver.rs:733`) and the HTTP JSON substrate carries:
+(`src/wallet/wire/transceiver.rs:667-668`) and the HTTP JSON substrate carries:
 the hex text named an action no wallet had made. Both calls now send the
 reference's arguments alone.
 
