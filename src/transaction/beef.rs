@@ -2219,7 +2219,7 @@ mod merkle_path_reattach_tests {
     //! and dropped the proof, because bumps live in `Beef::bumps` and are
     //! referenced by `BeefTx::bump_index` rather than being stored inside the
     //! transaction. Every caller asking "is this mined?" got "no" forever.
-    use crate::transaction::Transaction;
+    use crate::transaction::{MockChainTracker, Transaction};
 
     /// A BEEF carrying one proven transaction, produced by this crate's own
     /// writer so the test cannot drift from the wire format.
@@ -2387,11 +2387,7 @@ mod merkle_path_reattach_tests {
         assert!(
             matches!(
                 parsed
-                    .verify(
-                        &crate::transaction::MockChainTracker::always_valid(800_010),
-                        None,
-                        None
-                    )
+                    .verify(&MockChainTracker::always_valid(800_010), None, None)
                     .await,
                 Ok(true)
             ),
@@ -2419,11 +2415,7 @@ mod merkle_path_reattach_tests {
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
             .expect("a 24-deep diamond of unproven spends must parse and link");
         let verified = parsed
-            .verify(
-                &crate::transaction::MockChainTracker::always_valid(800_010),
-                None,
-                None,
-            )
+            .verify(&MockChainTracker::always_valid(800_010), None, None)
             .await;
         let elapsed = started.elapsed();
 
@@ -2460,11 +2452,7 @@ mod merkle_path_reattach_tests {
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid))
             .expect("the corrupted chain still parses and links");
         match parsed
-            .verify(
-                &crate::transaction::MockChainTracker::always_valid(800_010),
-                None,
-                None,
-            )
+            .verify(&MockChainTracker::always_valid(800_010), None, None)
             .await
         {
             Err(e) => assert!(
@@ -2517,11 +2505,7 @@ mod merkle_path_reattach_tests {
 
         let parsed = Transaction::from_beef(&beef, Some(&subject_txid)).unwrap();
         let verified = parsed
-            .verify(
-                &crate::transaction::MockChainTracker::always_valid(800_010),
-                None,
-                None,
-            )
+            .verify(&MockChainTracker::always_valid(800_010), None, None)
             .await;
         assert!(
             matches!(verified, Ok(false)),

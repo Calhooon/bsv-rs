@@ -30,7 +30,12 @@ impl Spend {
     /// the default mode, none: `usize::MAX`, uncapped, as the reference's
     /// `Spend` is without a `memoryLimit` (`Number.POSITIVE_INFINITY`,
     /// `ts-stack@edf6e03` `Spend.ts:295-296`; bsv-rs#331), an allocation the
-    /// allocator refuses a decline; under a word, 100,000,000 bytes on the node's count,
+    /// allocator refuses a decline, the 1 GiB element bound held at a push,
+    /// `OP_CAT`, `OP_NUM2BIN` and `OP_LSHIFTNUM` and not at an arithmetic
+    /// result (`push_number`, unbounded as the reference's, `BigNumber`
+    /// allocating infallibly), and a memory budget bounds memory, never time
+    /// (`work_limit` does); a caller that wants a figure passes it
+    /// (`Some(32_000_000)` was `None`'s); under a word, 100,000,000 bytes on the node's count,
     /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`](crate::script::flags::STACK_ELEMENT_OVERHEAD) bytes per
     /// element (the node's policy default, `src/policy/policy.h:153`, on the
     /// block path as on the mempool path: a node's block-path budget is its
