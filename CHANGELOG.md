@@ -35,8 +35,10 @@ encoding` or `Certificate field <name> is empty, oversized, or
 non-canonical`, both now this crate's (`CertificateValidationError`), before
 the wallet's decrypt; `create_keyring_for_verifier` checks every field, revealed
 or not, first, as `:351-357` does. Pinned by
-`tests/auth_certificate_field_bound_275.rs` (8 tests; 7 red on the tree with
-the checks removed). `auth_reader_bounds.rs`'s
+`tests/auth_certificate_field_bound_275.rs` (8 tests; 6 red on the tree with
+the checks removed: the `verify` pin is green there too, the signature not
+covering the mutated value, and pins `Ok(false)` where this change's first
+cut answered an error). `auth_reader_bounds.rs`'s
 `a_certificate_value_length_of_usize_max_is_refused` (#108) pinned
 `ReaderUnderflow` for a value length of `u64::MAX`; the bound now refuses it
 first, in its words, and the pin says so.
