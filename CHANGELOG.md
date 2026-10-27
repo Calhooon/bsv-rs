@@ -100,6 +100,113 @@ cannot parse, writing none (`certificate.go:274-280`), then writes
 is re-encoded on write, not written as given. `Verify` parses with
 `ec.ParseSignature` and returns `failed to parse signature` (`:168-172`).
 This crate follows the reference.
+### Fixed: the identity token `publicly_reveal_attributes` publishes is the reference's, signed by the subject, and createAction's empty answer is refused (#310)
+
+`IdentityClient::publicly_reveal_attributes` locked its identity token as
+one PushDrop field, the certificate JSON unsigned, under the key
+`getPublicKey` answers for counterparty `anyone` with `for_self: false`;
+the reference's `publiclyRevealAttributes` (`ts-stack@edf6e03`
+`packages/sdk/src/identity/IdentityClient.ts:501-509`) locks it with
+`new PushDrop(wallet, originator).lock([json], protocolID, keyID, 'anyone',
+true, true)` (`PushDrop.ts:146-202`): the key for the client's protocol and
+key ID (`[1, 'identity']`, `'1'` by default, `identity/types/index.ts:23-24`),
+counterparty `anyone`, `forSelf: true`; then `createSignature` over the
+JSON's bytes with the same protocol, key ID and counterparty (it carries no
+`forSelf`), the signature pushed as a second field, the two dropped by one
+`OP_2DROP`. The JSON is `JSON.stringify({ ...certificate, keyring })`
+(`:503`): the wallet certificate's members in `WalletCertificate`'s order
+(`type, subject, serialNumber, certifier, revocationOutpoint, signature,
+fields`), then the keyring; this crate wrote them through a `serde_json`
+map, every key sorted. The overlay's identity reader
+(`packages/overlays/topics/src/identity/identityTokenValidation.ts:92-154`,
+called by `IdentityTopicManager.ts:24`) admits only that shape: two fields,
+the five canonical chunks, the key the subject's child under
+`[1, 'identity']` key `1` as the anyone wallet derives it, the subject's
+signature over the JSON; it refused this crate's token (`Identity token
+must contain exactly two fields`), as the reference's revocation filter
+(`:722-728`, `:774-815`) skips it. The old key was, besides, the child the
+anyone wallet derives for itself (`for_self: false` toward anyone), so
+any wallet could spend the token, and this crate's own
+`revoke_certificate_revelation`, which signs as the reference's does
+(counterparty `anyone`, the subject's child), could not.
+The token is the reference's now (`identity_token` in
+`src/identity/reveal.rs`; `client.rs` calls it and is 39 lines shorter):
+the same calls with the same arguments, the JSON in the reference's member
+order, the keyring in the order the names were asked (the reference's own
+wallet's order, #307's note), the fields by name, the signature RFC 6979's,
+so for the reference's certificate and keyring the locking script is the
+reference's byte for byte, signature included.
+
+When createAction answers no transaction the reference throws `Public
+reveal failed: failed to create action!` (`:537`); this crate returned
+`Ok(BroadcastResult::Failure { code: "CREATE_ACTION_FAILED", .. })`. It is
+`Err(Error::IdentityError("Public reveal failed: failed to create
+action!"))` now. A failure the overlay answers stays a value
+(`BroadcastResult::Failure`), as the reference returns its broadcaster's
+`BroadcastFailure` (`:530-535`, `Promise<BroadcastResponse |
+BroadcastFailure>`) and Go its `*BroadcastFailure` (`identity/client.go:212-213`):
+only the empty createAction moved. Migration: a caller matching
+`BroadcastResult::Failure` with `code == "CREATE_ACTION_FAILED"` matches
+`Err(Error::IdentityError(_))` instead (`publicly_reveal_attributes_simple`
+returned an `Err` before and does now, in the new words). No downstream
+calls either method (`bsv-wallet-toolbox-rs` `6317222`, `bsv-wallet-cli`
+`a55990c`, `rust-message-box` `419bf18`, `bsv-overlay-cloudflare`
+`9a0f3c29`); recorded on #310 under ruling (c).
+
+Item 1 of #310 (each keyring value base64 of 1 to 2048 bytes, trimmed)
+landed with #307; the three items are closed.
+
+Pinned by `tests/identity_reveal_rest_310.rs` (6 tests) on
+`tests/vectors/identity_reveal_rest_310.json`: a certificate the reference
+issued (`MasterCertificate.issueCertificateForSubject`, certifier key 7,
+subject key 9, `email` and `name`) revealed by the subject's wallet for
+`email`, for both and for both asked `name` first, each with the keyring
+the reference's `createKeyringForVerifier` writes for anyone, the
+reference's wallet calls and their arguments, its locking script, its
+refusal of the empty createAction and the identity reader's verdict
+(admitted, the plaintexts decrypted), and the reader's refusal of the
+token this crate built before; recorded by
+`tests/support/identity_reveal_rest_310.mjs` at `ts-stack@edf6e03` under
+Node v22.18.0, the reader bundled from `packages/overlays/topics` beside
+the SDK, the randomness a SHA-256 counter stream (two runs byte for byte).
+This crate's token is the reference's bytes for the three; getPublicKey
+and createSignature are asked with the reference's arguments; the reader's
+checks run here on this crate's token admit it and decrypt the reference's
+plaintexts; the token's key is the one the revocation signs under, not the
+anyone wallet's; the empty createAction refused in the reference's words.
+5 of the 6 red on the tree before the fix (`e08e677d`), the sixth pinning
+the vector's verdict on the old token; and 3 of the 10 tests of
+`tests/identity_reveal_verifies_307.rs`, whose counting wallet moved to
+`tests/support/identity_reveal_wallet.rs` (keeping getPublicKey's and
+createSignature's arguments) and whose reached witnesses now expect the
+refusal and the reference's count of wallet calls before createAction
+(three: proveCertificate, getPublicKey, createSignature); its vector is
+unchanged, as are the #105 and #261 identity witnesses.
+
+### Notes: cross-SDK parity (#310)
+
+go-sdk@2ca481c's `PubliclyRevealAttributes` locks the token as the
+reference does (`identity/client.go:141-160`: `pushDrop.Lock(.., Anyone,
+true, true, LockBefore)`) and refuses an empty createAction in its own words
+(`public reveal failed: failed to create action`, `:180-182`); it writes the
+JSON with `json.Marshal` of a map (`:123-139`), its keys sorted, so its
+token is another byte string the reader admits; it publishes the keyring
+unchecked (`:132`) and proves for a random verifier key (`:102-113`), where
+the reference names the anyone key.
+
+Where the wallet certificate's fields are not in byte order, the token's
+JSON differs from the reference's: `WalletCertificate.fields` is a
+`HashMap`, so this crate writes the fields by name, where the reference
+keeps the object's order; the signature is over the bytes written and the
+reader admits either. The keyring is written in the order asked, the
+reference's in the wallet's (`Object.keys`, `:485`), the same for the
+reference's own wallet (#307's note).
+
+The reference's createAction asks for the output alone with
+`randomizeOutputs: false` (`:513-528`); this crate also sends the labels
+`identity`, `revelation`, the tag `identity`, `signAndProcess: true` and
+`acceptDelayedBroadcast: false`. Not changed here (outside #310's three
+items); a finding for its own issue.
 
 ### Fixed: `publicly_reveal_attributes` verifies the master certificate, and checks the names to reveal, before any wallet call, as the reference does (#307)
 

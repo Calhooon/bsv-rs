@@ -4,15 +4,23 @@
 //! certificate's fields and the names to reveal, then the master
 //! certificate's signature, all before the wallet is asked for anything;
 //! after `proveCertificate`, the keyring's names against the names asked
-//! and each value's base64 form and size, the trimmed values published.
+//! and each value's base64 form and size, the trimmed values published;
+//! then the identity token, the PushDrop the subject signs (`:501-509`, #310).
 //!
 //! [`IdentityClient::publicly_reveal_attributes`]: super::IdentityClient::publicly_reveal_attributes
 
 use crate::auth::certificates::Certificate;
 use crate::error::WalletRefusalClass;
-use crate::wallet::WalletCertificate;
+use crate::primitives::PublicKey;
+use crate::script::templates::PushDrop;
+use crate::script::LockingScript;
+use crate::wallet::{
+    Counterparty, CreateSignatureArgs, GetPublicKeyArgs, Protocol, WalletCertificate,
+    WalletInterface,
+};
 use crate::{Error, Result};
-use std::collections::{HashMap, HashSet};
+use serde::{Serialize, Serializer};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// The most names one reveal may ask for (`IdentityClient.ts:431-433`).
 const MAX_FIELDS_TO_REVEAL: usize = 100;
@@ -123,13 +131,14 @@ fn master_signature_verifies(certificate: &WalletCertificate) -> bool {
 /// count matches; then any other name than those asked, or one missing
 /// (`:484-491`); then each value through [`keyring_value`] (`:492-499`).
 /// The answer is the keyring with each value trimmed, the one the PushDrop
-/// carries. The reference judges the values in the wallet's key order; the
-/// crate's keyring is a map, so they are judged in the order of the names
-/// asked, which differs only in which of two bad values is named.
+/// carries, in the order of the names asked. The reference judges and
+/// publishes the values in the wallet's key order; the crate's keyring is a
+/// map, so they are judged and published in the order of the names asked,
+/// the reference's own wallet's order (`MasterCertificate.ts:348`, `:370`).
 pub(super) fn check_keyring(
     keyring: &HashMap<String, String>,
     fields_to_reveal: &[String],
-) -> Result<HashMap<String, String>> {
+) -> Result<Vec<(String, String)>> {
     if keyring.keys().any(|k| is_unsafe_record_key(k)) {
         return Err(refused(
             "Invalid display identity: proof result keyringForVerifier contains an unsafe field",
@@ -203,4 +212,96 @@ fn keyring_value(value: &str, name: &str) -> Result<String> {
 /// without U+0085, which Rust's `char::is_whitespace` has the other way.
 fn is_js_whitespace(c: char) -> bool {
     c == '\u{feff}' || (c.is_whitespace() && c != '\u{85}')
+}
+
+/// The certificate JSON the identity token carries, the reference's
+/// `JSON.stringify({ ...certificate, keyring })` (`IdentityClient.ts:502`):
+/// the wallet certificate's members in `WalletCertificate`'s order
+/// (`Wallet.interfaces.ts:851`), then the keyring in the order of the names
+/// asked. The fields are written by name, since the crate's map keeps no
+/// order of the wallet's.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct Published<'a> {
+    #[serde(rename = "type")]
+    certificate_type: &'a str,
+    subject: &'a str,
+    serial_number: &'a str,
+    certifier: &'a str,
+    revocation_outpoint: &'a str,
+    signature: &'a str,
+    fields: BTreeMap<&'a str, &'a str>,
+    keyring: InOrder<'a>,
+}
+
+/// A keyring written in the order it is held.
+struct InOrder<'a>(&'a [(String, String)]);
+
+impl Serialize for InOrder<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
+        serializer.collect_map(self.0.iter().map(|(name, value)| (name, value)))
+    }
+}
+
+/// The identity token, as the reference's `PushDrop.lock(fields, protocolID,
+/// keyID, 'anyone', true, true)` builds it (`IdentityClient.ts:501-509`,
+/// `PushDrop.ts:146-202`): the key `getPublicKey` answers for the client's
+/// protocol and key ID, counterparty `anyone`, `forSelf: true`; the
+/// certificate JSON and `createSignature`'s signature over it (the same
+/// protocol, key ID and counterparty) pushed and dropped. The overlay's
+/// identity reader asks this shape and that the key and signature be the
+/// subject's under `[1, 'identity']` key `1` (`identityTokenValidation.ts:92-136`).
+pub(super) async fn identity_token<W: WalletInterface + ?Sized>(
+    wallet: &W,
+    originator: &str,
+    (level, name): (u8, &str),
+    key_id: &str,
+    certificate: &WalletCertificate,
+    keyring: &[(String, String)],
+) -> Result<LockingScript> {
+    let published = Published {
+        certificate_type: &certificate.certificate_type,
+        subject: &certificate.subject,
+        serial_number: &certificate.serial_number,
+        certifier: &certificate.certifier,
+        revocation_outpoint: &certificate.revocation_outpoint,
+        signature: &certificate.signature,
+        fields: certificate
+            .fields
+            .iter()
+            .map(|(k, v)| (k.as_str(), v.as_str()))
+            .collect(),
+        keyring: InOrder(keyring),
+    };
+    let json = serde_json::to_vec(&published)
+        .map_err(|e| refused(format!("Failed to serialize certificate: {e}")))?;
+    let protocol = Protocol::from_tuple((level, name))
+        .ok_or_else(|| refused(format!("Invalid protocol ID: ({level}, {name})")))?;
+    let key = wallet
+        .get_public_key(
+            GetPublicKeyArgs {
+                protocol_id: Some(protocol.clone()),
+                key_id: Some(key_id.to_string()),
+                counterparty: Some(Counterparty::Anyone),
+                for_self: Some(true),
+                ..Default::default()
+            },
+            originator,
+        )
+        .await?;
+    let signature = wallet
+        .create_signature(
+            CreateSignatureArgs {
+                data: Some(json.clone()),
+                protocol_id: protocol,
+                key_id: key_id.to_string(),
+                counterparty: Some(Counterparty::Anyone),
+                ..Default::default()
+            },
+            originator,
+        )
+        .await?
+        .signature;
+    let key = PublicKey::from_hex(&key.public_key)?;
+    Ok(PushDrop::new(key, vec![json, signature]).lock())
 }
