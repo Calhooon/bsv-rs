@@ -27,11 +27,11 @@
 
 use crate::primitives::BigNumber;
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource, ScriptResourceLimit};
-use crate::script::op::{opcode_to_name, OP_DIV, OP_MOD, OP_MUL};
+use crate::script::op::{opcode_to_name, OP_1ADD, OP_1SUB, OP_ADD, OP_DIV, OP_MOD, OP_MUL, OP_SUB};
 use crate::script::script_num::ScriptNum;
 
 use super::limits::MAX_SCRIPT_ELEMENT_SIZE;
-use super::reference_read::magnitude_bits;
+use super::reference_read::{self, magnitude_bits};
 use super::Spend;
 #[cfg(test)]
 use std::cell::Cell;
@@ -103,7 +103,9 @@ impl Spend {
     }
 
     /// Pushes `opcode`'s result: in the default mode a result longer than the
-    /// element bound declined by its length, then
+    /// element bound declined by its length, then a sum or difference the
+    /// reference cannot build invalid in its words
+    /// ([`reference_read::result_refusal`]; the budget's decline first), then
     /// [`push_number`](Self::push_number)'s limit and charge.
     pub(super) fn push_arithmetic_result(
         &mut self,
@@ -117,6 +119,14 @@ impl Spend {
         if self.flags.is_none() && bytes.len() > element_bound() {
             let len = bytes.len() as u64;
             return Err(self.result_declined(opcode, operands, len, ""));
+        }
+        if self.flags.is_none() && matches!(opcode, OP_ADD | OP_SUB | OP_1ADD | OP_1SUB) {
+            if let Some(words) = reference_read::result_refusal(value.as_bigint().bits()) {
+                // A caller's budget that refuses the push declines first, as
+                // a budget's refusal is never read as a verdict (#38).
+                self.ensure_stack_mem(bytes.len())?;
+                return Err(self.error(words));
+            }
         }
         self.push_encoded_number(bytes)
     }

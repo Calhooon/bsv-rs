@@ -202,6 +202,44 @@ word.
   The review's three scripts are now that verdict at their first read
   (`Err("Invalid string length")` on the review's allocator at 4 GiB, this
   tip).
+- A result past the figure is invalid at its push in the same words (the
+  keeper's word of 2026-10-27, 21:5xZ, under the owner's ruling (c), the
+  symmetric reading: a script number the reference cannot encode is one it
+  never judges valid): `OP_ADD`, `OP_SUB`, `OP_1ADD` and `OP_1SUB`, whose
+  results the reference's `add` and `sub` set through
+  `#_setValueFromSigned`, so through `toString(2)` (`BigNumber.ts:771-781`,
+  `:912-924`), and `OP_LSHIFTNUM`, whose result it builds as `new
+  BigNumber(value << bits)` (`Spend.ts:1066`). There each throws `RangeError:
+  Invalid string length` past 536,870,888 bits, outside `#readScriptNumber`'s
+  rethrow, uncaught out of its `validate` and `Transaction.verify`, neither
+  of its two classes (the re-review ran it: an at-limit operand's `OP_DUP
+  OP_ADD` in 4.5 s, its `OP_1ADD` in 3.5 s, `1 <536,870,888> OP_LSHIFTNUM`
+  in 6 ms); here the push is a verdict with the same text, never an abort
+  (`reference_read::result_refusal`, at `push_arithmetic_result` and the
+  numeric left shift). These are the opcodes whose result can cross the
+  figure through the reference's `toString(2)`: `OP_MUL` and `OP_2MUL` can
+  pass it, but `mul` sets its magnitude without a string (`:926-933`), so
+  their result is pushed there and here (an at-limit `OP_2MUL` is `true`
+  there; the result is invalid at its next read on both sides); `OP_DIV`,
+  `OP_MOD`, `OP_2DIV`, `OP_RSHIFTNUM`, `OP_NEGATE`, `OP_ABS`, `OP_MIN`,
+  `OP_MAX` and the comparisons give no magnitude past their operands'. A
+  sum's bits are judged after the arithmetic (at most one past the longest
+  operand's), the shift's before it allocates (the value's plus the count).
+  The order, in the default mode: the element bound at the shift as before,
+  then the caller's budget (`Some(n)`) on the result's push, its decline as
+  #331 has it, then the verdict: a budget's refusal is never read as
+  invalid (#38), and the verdict is the judgment of a step its budget
+  admits. For `OP_ADD` and `OP_SUB` that is the reference's order
+  (`#ensureStackMem(predictedLen)` at `Spend.ts:1573` before `add`); for
+  `OP_1ADD`, `OP_1SUB` and `OP_LSHIFTNUM` the reference's throw precedes its
+  push's budget (`:1510`, `:1066`, before `#pushStack`'s `#ensureStackMem`,
+  `:448`). A budget that admitted a sum's operands admits its result (no
+  longer than both together), so the order is observable at the shift
+  alone. Under a word nothing moves: the node's number length bounds every
+  operand and result (32,000,000 bytes after Chronicle, #38's entry; the
+  result's test at `script_num.cpp:164`, `194`, `214`, `315-316`), so the
+  node never holds such a number and refuses it as
+  `SCRIPT_ERR_SCRIPTNUM_OVERFLOW` first, in its words.
 
 Pinned by `tests/transaction_verify_budget_331.rs` (#38's shape, 33 copies
 of a 1,000,000-byte element: `Ok(true)` under `None`, the decline at
@@ -241,11 +279,21 @@ declined at 805,306,344 under a ceiling of 512 MiB; 0.45 s together in
 release), the two unit tests of `src/script/spend/reference_read.rs` (the
 figure on one 67,108,862-byte buffer: 536,870,888 bits read, a 536,870,889th
 refused, a byte more refused; padding no bit),
-`tests/script_reference_read_limit_331.rs` (4 ignored, by hand, 0.14 s and
-472 MB resident: an operand of 67,108,863 bytes invalid with the
-reference's words, one of 67,108,862 at 536,870,888 bits read, one bit more
-invalid, the node's overflow under a word; red 2 of the 4 on the code
-before, the read and the word's overflow holding either way),
+`tests/script_reference_read_limit_331.rs` (10 tests, 8 ignored, by hand,
+0.63 s and 1.01 GB resident in release under `--test-threads=1`: an operand
+of 67,108,863 bytes invalid with the reference's words, one of 67,108,862
+at 536,870,888 bits read (the negative one's `OP_1ADD`, `true` in the
+reference), one bit more invalid, the node's overflow under a word; the
+results: the at-limit `OP_1ADD`, `OP_DUP OP_ADD`, `OP_SUB` and the
+negative's `OP_1SUB` invalid at the push, `OP_2MUL` pushed, `1
+<536,870,888> OP_LSHIFTNUM` invalid before it allocates and `1
+<536,870,887>` pushed, and under a budget of 67,108,870 bytes the shift's
+push declined beside a 100-byte element, the verdict without it; red 2 of
+the first 4 on the code before the read limit, and 4 of the 10 on the code
+before the results' verdict: the increment, the sum, the shift and the
+budget's order, the at-limit `OP_1ADD` `Ok(true)` there),
+the unit test `a_result_past_v8s_longest_string_is_refused`
+(`reference_read.rs`),
 `test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks`
 (`tests/memory_profiling.rs`, dhat: each step's peak of the heap past its
 operands at most
@@ -338,7 +386,19 @@ readable operands give at most 2^30 - 48 bits, and `mul` sets the product's
 magnitude without `toString(2)` (`:926-933`), so a 32 MiB by 32 MiB product
 is pushed there and judged the same here, only slower (#378). Since the
 keeper's word the default mode gives the reference's verdict, in its
-words, on an operand past 536,870,888 bits. Two differences stay, stated:
+words, on an operand past 536,870,888 bits, and since its second word
+(21:5xZ) on a result past the figure where the reference builds it through
+`toString(2)` (`OP_ADD`, `OP_SUB`, `OP_1ADD`, `OP_1SUB`, `BigNumber.ts:771-781`;
+`OP_LSHIFTNUM`, `Spend.ts:1066`). The reference's form there is an uncaught
+`RangeError: Invalid string length` out of its `verify`, neither of its
+classes, where this crate answers a verdict with the same text; the node
+never holds such a number (its number length after Chronicle, 32,000,000
+bytes, #38's entry, refuses it as `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`), so the
+row is the reference's against the node; an `OP_MUL` or `OP_2MUL` result
+past the figure is pushed on both sides (`mul`, `:926-933`), and under a
+caller's budget a result's push is declined before its verdict where the
+reference's `OP_1ADD`, `OP_1SUB` and `OP_LSHIFTNUM` throw before their
+push's budget. Two differences stay, stated:
 a non-minimal operand past 268,435,443 bytes, which the reference's hex
 text would refuse, is read here while its magnitude is within the figure;
 and an element of 2^27 bytes or more, which the reference cannot hold

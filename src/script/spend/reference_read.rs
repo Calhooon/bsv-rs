@@ -16,6 +16,19 @@
 //! (`ScriptFlags::max_script_num_length`): the reference reads numbers the
 //! node refuses, and the default mode follows the reference. Under a word
 //! the node's rules alone apply.
+//!
+//! The same figure bounds a result where the reference builds it through
+//! `toString(2)` (the keeper's word of 2026-10-27, the symmetric reading: a
+//! number the reference cannot encode is one it never judges valid): `add`
+//! and `sub` (`OP_ADD`, `OP_SUB`, `OP_1ADD`, `OP_1SUB`) set their result
+//! with `#_setValueFromSigned` (`BigNumber.ts:771-781`, `:912-924`), and
+//! `OP_LSHIFTNUM` with `new BigNumber(value << bits)` (`Spend.ts:1066`):
+//! past 536,870,888 bits each throws `RangeError: Invalid string length`,
+//! uncaught, out of the reference's `verify`; here it is a verdict in those
+//! words at the push ([`result_refusal`]). `mul` sets its magnitude without
+//! a string (`BigNumber.ts:926-933`), so an `OP_MUL` or `OP_2MUL` result past
+//! the figure is pushed there and here (and invalid at its next read); no
+//! other result can pass its operands' magnitude.
 
 /// V8's longest string, `String::kMaxLength` on a 64-bit host (Node's
 /// `buffer.constants.MAX_STRING_LENGTH`, v22.18.0).
@@ -25,7 +38,14 @@ const MAX_STRING_LENGTH: u64 = 536_870_888;
 /// its minimal-encoding check, which the caller makes first.
 pub(super) fn refusal(bytes: &[u8]) -> Option<&'static str> {
     // `toString(2)` of the magnitude (`BigNumber.ts:450`)
-    (magnitude_bits(bytes) > MAX_STRING_LENGTH).then_some("Invalid string length")
+    result_refusal(magnitude_bits(bytes))
+}
+
+/// The reference's words for a number of `bits` bits of magnitude it cannot
+/// build, or `None`: an operand's read, or a result `add`, `sub` or the
+/// left shift's constructor builds.
+pub(super) fn result_refusal(bits: u64) -> Option<&'static str> {
+    (bits > MAX_STRING_LENGTH).then_some("Invalid string length")
 }
 
 /// The bits of a script number's magnitude, read from its bytes without
@@ -62,6 +82,13 @@ mod tests {
         bytes[67_108_861] = 0x00;
         bytes.push(0x01);
         assert_eq!(refusal(&bytes), Some("Invalid string length"));
+    }
+
+    /// A result's bits on the same figure.
+    #[test]
+    fn a_result_past_v8s_longest_string_is_refused() {
+        assert_eq!(result_refusal(536_870_888), None);
+        assert_eq!(result_refusal(536_870_889), Some("Invalid string length"));
     }
 
     /// Padding counts no bit: a long non-minimal zero is read.
