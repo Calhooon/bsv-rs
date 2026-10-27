@@ -189,7 +189,7 @@ async fn a_trackers_transport_fault_reaches_the_crate_error_typed() {
     tx.merkle_path = Some(MerklePath::from_coinbase_txid(&tx.id(), 800_000));
 
     let tracker = WhatsOnChainTracker::with_base_url(&closed_port_url(), WocNetwork::Mainnet);
-    let err = tx.verify(&tracker, None).await.unwrap_err();
+    let err = tx.verify(&tracker, None, None).await.unwrap_err();
     assert_eq!(
         err.transport_fault(),
         Some(TransportFault::NeverSent),

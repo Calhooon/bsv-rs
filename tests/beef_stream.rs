@@ -2088,7 +2088,7 @@ fn mined(n_inputs: usize, outputs: &[u64]) -> (Transaction, MockChainTracker) {
 
 /// `verify`'s answer: `Ok(valid)`, or the error's text.
 fn walk(tx: &Transaction, tracker: &MockChainTracker) -> Result<bool, String> {
-    futures::executor::block_on(tx.verify(tracker, None)).map_err(|e| e.to_string())
+    futures::executor::block_on(tx.verify(tracker, None, None)).map_err(|e| e.to_string())
 }
 
 /// The refusal names the kind and the transaction.

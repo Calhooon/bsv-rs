@@ -88,7 +88,10 @@ Script defaults follow SDK evaluation mode; callers modelling node validation
 select explicit `ScriptFlags` and interpret resource limits separately from
 validity. `Transaction::verify` keeps the two apart: an invalid script is
 `TransactionError`, an input whose evaluation stopped at a budget is
-`Error::ScriptEvaluationDeclined`. On the block path
+`Error::ScriptEvaluationDeclined`. Its third parameter is that budget, the
+reference's `memoryLimit`: `None` runs uncapped, as the reference does, and
+`Some(n)` is `n` bytes per stack, the figure a door judging untrusted
+transactions passes. On the block path
 `Spend::set_stack_memory_consensus` is a node's
 `-maxstackmemoryusageconsensus`, a verdict; `memory_limit` only declines. The flag and resource witnesses live in [tests](./tests).
 
@@ -331,7 +334,7 @@ fn main() {
     // and its own ancestry is not needed.
     let mut tracker = MockChainTracker::new(800_000);
     tracker.add_root(800_000, funding_txid);
-    let ok = futures::executor::block_on(spend.verify(&tracker, None)).unwrap();
+    let ok = futures::executor::block_on(spend.verify(&tracker, None, None)).unwrap();
     assert!(ok);
     println!("verified {ok}");
 }
@@ -480,7 +483,7 @@ fn main() {
     // descended.
     let mut tracker = MockChainTracker::new(800_000);
     tracker.add_root(800_000, funding_txid);
-    let ok = futures::executor::block_on(tx.verify(&tracker, None)).unwrap();
+    let ok = futures::executor::block_on(tx.verify(&tracker, None, None)).unwrap();
     assert!(ok);
     println!("verified {ok}");
 }

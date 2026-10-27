@@ -8,9 +8,11 @@
 //! input N: …")`, so a caller read a script nobody judged as invalid.
 //!
 //! The child spends a proven parent; its one input pushes 1,000,000 bytes and
-//! the parent's lock `OP_DUP`s it. `verify` runs the default mode, whose local
-//! budget is 32,000,000 bytes on the main stack: 32 copies reach it exactly, a
-//! 33rd is the decline.
+//! the parent's lock `OP_DUP`s it. `verify` runs the default mode under the
+//! caller's budget, 32,000,000 bytes on the main stack here (the budget that was
+//! `verify`'s own until bsv-rs#331, whose default is now uncapped:
+//! `tests/transaction_verify_budget_331.rs`): 32 copies reach it exactly, a 33rd
+//! is the decline.
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -57,16 +59,19 @@ fn dup_lock(dups: usize, drops: usize) -> Vec<u8> {
     lock
 }
 
+/// The budget this file pins, passed as `verify`'s third parameter.
+const BUDGET: Option<usize> = Some(32_000_000);
+
 fn verify(tx: &Transaction) -> Result<bool, Error> {
     tokio::runtime::Builder::new_current_thread()
         .build()
         .unwrap()
-        .block_on(tx.verify(&MockChainTracker::always_valid(800_010), None))
+        .block_on(tx.verify(&MockChainTracker::always_valid(800_010), None, BUDGET))
 }
 
-/// 32 copies on the stack are 32,000,000 bytes, the budget exactly: valid.
+/// 32 copies on the stack are 32,000,000 bytes, the caller's budget exactly: valid.
 #[test]
-fn a_stack_at_the_default_budget_verifies() {
+fn a_stack_at_the_callers_budget_verifies() {
     assert_eq!(verify(&child_of(&dup_lock(31, 31))), Ok(true));
 }
 

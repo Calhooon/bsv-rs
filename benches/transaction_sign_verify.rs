@@ -56,7 +56,7 @@ fn bench(c: &mut Criterion) {
     println!(
         "BSV_BENCH_FIXTURE transaction_sign_verify inputs={} verify={:?}",
         signed.inputs.len(),
-        futures::executor::block_on(signed.verify(&tracker, None))
+        futures::executor::block_on(signed.verify(&tracker, None, None))
     );
     let mut group = c.benchmark_group("transaction_sign_verify");
     group.throughput(Throughput::Elements(100));
@@ -70,7 +70,7 @@ fn bench(c: &mut Criterion) {
     group.bench_function("verify_100_p2pkh", |b| {
         b.iter(|| {
             black_box(futures::executor::block_on(
-                black_box(&signed).verify(&tracker, None),
+                black_box(&signed).verify(&tracker, None, None),
             ))
         })
     });

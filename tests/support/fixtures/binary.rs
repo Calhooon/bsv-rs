@@ -43,7 +43,7 @@ fn readme_chain() -> (Transaction, Transaction) {
     futures::executor::block_on(spend.sign()).unwrap();
     let mut tracker = MockChainTracker::new(800_000);
     tracker.add_root(800_000, funding_txid);
-    assert!(futures::executor::block_on(spend.verify(&tracker, None)).unwrap());
+    assert!(futures::executor::block_on(spend.verify(&tracker, None, None)).unwrap());
     (funding, spend)
 }
 
@@ -160,11 +160,11 @@ pub fn record(suite: &mut Suite) {
     for (source, expected) in [
         (
             "examples/transaction.rs",
-            "f592e06733160b618e3e002ffab42fb5d6c5d547fa995a008df8ad468324fda7",
+            "1770c00127209c9453f28208473b1704bb69c1e39ea15ab75e46e4ad589e0d58",
         ),
         (
             "examples/beef_spv.rs",
-            "38f468b6942f27988a763e28646def62209685a1fb12a83d9e7c8850a612ce6a",
+            "43982508603af6aa998cf61ed37ae694e26749689f1307f292c5590a02f18b84",
         ),
         (
             "examples/overlay.rs",
