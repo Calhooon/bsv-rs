@@ -472,6 +472,26 @@ property`). The #261 test read the reference's JSON through a helper that
 renamed `type` and decoded the signature; it passes the JSON as given, its
 vector unchanged.
 
+A certificateResponse now crosses in both directions, where #280's entry
+(above) said it did not until this change. A reference certificateResponse
+parses here, its signature verifies over the `certificates` text the reference
+signed and its certificate verifies
+(`a_reference_certificate_response_parses_and_verifies_since_268`, the
+renamed `..._is_refused_by_its_certificate_shape_until_268`). The reference
+`Peer` verifies this crate's certificateResponse over the bytes sent, its
+signature valid (before, it rebuilt the certificate without `certType` and
+refused it). `tests/vectors/auth_signed_text_280.json` is re-recorded with
+the verify session holding this crate's certificateRequest policy as a request
+the reference sent (`reference_pending_request`, `Peer.ts:474-477`), so the
+verdict is the whole path's. The certificate matches the policy
+(`:1234-1241`) and its own signature verifies (`validateCertificates`); the
+reference then stops at `decryptFields` (`Failed to decrypt selectively
+revealed certificate fields using keyring: Decryption failed!`), because the
+test's keyring holds placeholder bytes, not field keys encrypted to the
+verifier. Outside the two entries of `this_crate_messages` the vector is
+byte for byte the same. Red on the base (2 of the 8 run: the reference's
+certificates refused at the parse, `expected a sequence`).
+
 ### Notes: cross-SDK parity (#268)
 
 `VerifiableCertificate`'s cached plaintexts are not in its JSON in either

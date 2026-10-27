@@ -18,8 +18,10 @@
 // bytes each wallet signed and verified (`Peer.ts:453`, `:1068`, `:1140`,
 // `:1203`), and a session nonce the verifier's wallet made for `verify`.
 // `verify` hands each message this crate wrote (`crate.json`, the ignored
-// Rust test's output) to a reference `Peer` holding that session and records
-// the bytes its wallet verified and the verdict.
+// Rust test's output) to a reference `Peer` holding that session, with this
+// crate's certificateRequest policy pending on it as if the reference had sent
+// that request (`reference_pending_request`), and records the bytes its wallet
+// verified and the verdict.
 import fs from 'fs'
 import { pathToFileURL } from 'url'
 
@@ -176,6 +178,12 @@ if (mode === 'record') {
 } else if (mode === 'verify') {
   const vector = JSON.parse(fs.readFileSync(referencePath, 'utf8'))
   const crate = JSON.parse(fs.readFileSync(cratePath, 'utf8'))
+  // The policy this crate's certificateRequest carries, held as the reference
+  // holds a request it sent (`Peer.ts:474-477`): a response is matched to it
+  // (`:1234-1241`) and its certificates validated (`:1242`)
+  const request = crate.messages.find(m => m.messageType === 'certificateRequest')
+  const policy = JSON.parse(request.text).requestedCertificates
+  const requestNonce = b64(57)
   const results = []
   for (const m of crate.messages) {
     const log = { messages: [], signed: [], verified: [] }
@@ -189,7 +197,8 @@ if (mode === 'record') {
       lastUpdate: Date.now(),
       certificatesRequired: false,
       certificatesValidated: true,
-      certificatePolicy: { certifiers: [], types: {} }
+      certificatePolicy: { certifiers: [], types: {} },
+      pendingCertificateRequests: { [requestNonce]: policy }
     })
     const transport = new TextTransport('verifier', log)
     transport.other = { errors: [], callback: async () => {} }
@@ -208,6 +217,7 @@ if (mode === 'record') {
       reference_verified_bytes: check === undefined ? null : check.data,
       reference_verified_bytes_equal_member_text: check === undefined ? null : check.data === m.member_text,
       reference_signature_valid: check === undefined ? null : check.valid,
+      reference_pending_request: policy,
       reference_error: error
     })
   }

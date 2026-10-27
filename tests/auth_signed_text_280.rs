@@ -154,7 +154,7 @@ fn certificate(subject: &PublicKey, certifier: &PrivateKey) -> VerifiableCertifi
     let keyring = names
         .iter()
         .enumerate()
-        .map(|(i, n)| (n.to_string(), vec![i as u8 + 0x40; 48]))
+        .map(|(i, n)| (n.to_string(), to_base64(&[i as u8 + 0x40; 48])))
         .collect();
     VerifiableCertificate::new(certificate, keyring)
 }
@@ -241,20 +241,29 @@ fn a_reference_certificate_response_signs_the_certificates_text_it_sends() {
 }
 
 #[test]
-fn a_reference_certificate_response_is_refused_by_its_certificate_shape_until_268() {
+fn a_reference_certificate_response_parses_and_verifies_since_268() {
     // The reference writes `type`, base64 field values, a hex signature and
-    // base64 keyrings; this crate's certificate JSON is #261's and #268's to
-    // change. When they land this test turns red: the message then parses,
-    // and verifies over its text as the certificateRequest does.
+    // base64 keyrings, the certificate JSON this crate reads since #268: the
+    // message parses, its signature verifies over the `certificates` text
+    // the reference signed, and its certificate verifies
     let vector = vector();
     let text = reference_text(&vector, "certificateResponse");
-    let error = serde_json::from_str::<AuthMessage>(&text).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .starts_with("certificates: invalid type: string"),
-        "{error}"
+    let message: AuthMessage = serde_json::from_str(&text).unwrap();
+    let key_id = message.get_key_id(message.your_nonce.as_deref());
+    let signed = reference_signed(&vector, &key_id);
+    assert_eq!(String::from_utf8(message.signing_data()).unwrap(), signed);
+    assert!(verifies(
+        &key(&vector, "verifier"),
+        &message,
+        &message.signing_data()
+    ));
+    let certificates = message.certificates.as_ref().unwrap();
+    assert_eq!(certificates.len(), 1);
+    assert_eq!(
+        certificates[0].certificate.certifier,
+        key(&vector, "certifier").public_key()
     );
+    assert!(certificates[0].verify().unwrap());
 }
 
 // ---------------------------------------------------------------------------
@@ -383,23 +392,25 @@ fn this_crates_texts_carry_the_reference_peers_verdicts() {
                 assert_eq!(m["reference_error"], Value::Null);
             }
             // The reference rebuilds each certificate as its class before it
-            // verifies (`Peer.ts:341-357`, `:768`): this crate's `certType`
-            // is no member of it, so it verifies other bytes, the text
-            // without `certType` (#268's shape; the inner order is kept)
+            // verifies (`Peer.ts:341-357`, `:768`): with #268's JSON that is
+            // the text sent, so the signature is valid; the certificate
+            // matches the request's policy held on the session (`:1234-1241`)
+            // and its own signature verifies (`validateCertificates`), and the
+            // reference stops at decrypting the fields, this crate's keyring
+            // being placeholder bytes, no keys encrypted for the verifier
             "certificateResponse" => {
-                let verified = m["reference_verified_bytes"].as_str().unwrap();
-                let mut sent: Value =
-                    serde_json::from_str(m["member_text"].as_str().unwrap()).unwrap();
-                sent[0].as_object_mut().unwrap().remove("certType");
-                assert_eq!(serde_json::from_str::<Value>(verified).unwrap(), sent);
-                assert!(!verified.contains("certType"));
-                assert_eq!(m["reference_signature_valid"], false);
+                let requested: Value =
+                    serde_json::from_str(messages[0]["member_text"].as_str().unwrap()).unwrap();
+                assert_eq!(m["reference_pending_request"], requested);
+                assert_eq!(
+                    m["reference_verified_bytes"],
+                    m["member_text"].as_str().unwrap()
+                );
+                assert_eq!(m["reference_verified_bytes_equal_member_text"], true);
+                assert_eq!(m["reference_signature_valid"], true);
                 assert_eq!(
                     m["reference_error"],
-                    format!(
-                        "Unable to verify certificate response signature for peer: {}",
-                        receiver.public_key().to_hex()
-                    )
+                    "Failed to decrypt selectively revealed certificate fields using keyring: Decryption failed!"
                 );
             }
             other => panic!("unexpected {other}"),
