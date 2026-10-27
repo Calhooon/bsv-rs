@@ -136,10 +136,10 @@ pub(crate) fn integer_refusal(
 // each refusal in the reference's words.
 
 /// `Certificate.ts:25-28`, `WalletWireTransceiver.ts:67`.
-const MAX_CERTIFICATE_BINARY_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_CERTIFICATE_BINARY_BYTES: usize = 16 * 1024 * 1024;
 pub(crate) const MAX_CERTIFICATE_FIELDS: usize = 100_000;
 pub(crate) const MAX_CERTIFICATE_FIELD_VALUE_BYTES: usize = 1024 * 1024;
-const MAX_CERTIFICATE_SIGNATURE_BYTES: usize = 72;
+pub(crate) const MAX_CERTIFICATE_SIGNATURE_BYTES: usize = 72;
 const MAX_WIRE_RESPONSE_COLLECTION_ITEMS: usize = 100_000;
 /// `Number.MAX_SAFE_INTEGER`, the strict varint reader's bound.
 const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
@@ -153,6 +153,28 @@ pub(crate) fn certificate_field_value_refusal(name: &str) -> String {
         "Certificate field {name} exceeds the maximum of {MAX_CERTIFICATE_FIELD_VALUE_BYTES} bytes"
     )
 }
+
+/// The reference writer's text for a frame over 16 MiB, its length taken
+/// once the frame is written (`Certificate.ts:315-319`): the wire's writer
+/// and `Certificate::to_binary` (bsv-rs#301).
+pub(crate) fn certificate_binary_written_refusal() -> String {
+    format!("Certificate binary exceeds the maximum of {MAX_CERTIFICATE_BINARY_BYTES} bytes")
+}
+
+/// The reference reader's text for a frame over 16 MiB, refused before a
+/// byte is read (`snapshotCertificateBinary`, `Certificate.ts:87-91`): the
+/// wire's reader and `Certificate::from_binary` (bsv-rs#301).
+pub(crate) fn certificate_binary_read_refusal() -> String {
+    format!(
+        "Certificate binary must be a byte array of at most {MAX_CERTIFICATE_BINARY_BYTES} bytes"
+    )
+}
+
+/// The reference reader's text for a signature over 72 bytes
+/// (`Certificate.ts:391-394`): the wire's readers and writer and
+/// `Certificate::from_binary` (bsv-rs#301).
+pub(crate) const CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL: &str =
+    "Certificate signature exceeds the DER size limit";
 
 /// A wire record: a key to its value.
 type Record = HashMap<String, String>;
@@ -317,9 +339,7 @@ impl WireReader<'_> {
     /// The certificate's fields (`Certificate.ts:356-387`).
     pub(crate) fn read_certificate_fields(&mut self) -> Result<HashMap<String, String>, Error> {
         if self.remaining() > MAX_CERTIFICATE_BINARY_BYTES {
-            return Err(refused(format!(
-                "Certificate binary must be a byte array of at most {MAX_CERTIFICATE_BINARY_BYTES} bytes"
-            )));
+            return Err(refused(certificate_binary_read_refusal()));
         }
         let count = self.read_var_int_num_strict()?;
         if count > MAX_CERTIFICATE_FIELDS {
@@ -404,7 +424,7 @@ pub(crate) fn require_safe_certificate_field_name(name: &str) -> Result<(), Erro
 /// (`Certificate.ts:390-397`, `:300-312`), as `toDER` re-encodes it.
 pub(crate) fn certificate_signature_der(bytes: &[u8]) -> Result<Vec<u8>, Error> {
     if bytes.len() > MAX_CERTIFICATE_SIGNATURE_BYTES {
-        return Err(refused("Certificate signature exceeds the DER size limit"));
+        return Err(refused(CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL));
     }
     reference_der(bytes)
 }
