@@ -53,7 +53,7 @@ fn main() {
     // and its own ancestry is not needed.
     let mut tracker = MockChainTracker::new(800_000);
     tracker.add_root(800_000, funding_txid);
-    let ok = futures::executor::block_on(spend.verify(&tracker, None)).unwrap();
+    let ok = futures::executor::block_on(spend.verify(&tracker, None, None)).unwrap();
     assert!(ok);
     println!("verified {ok}");
 }

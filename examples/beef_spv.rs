@@ -69,7 +69,7 @@ fn main() {
     // descended.
     let mut tracker = MockChainTracker::new(800_000);
     tracker.add_root(800_000, funding_txid);
-    let ok = futures::executor::block_on(tx.verify(&tracker, None)).unwrap();
+    let ok = futures::executor::block_on(tx.verify(&tracker, None, None)).unwrap();
     assert!(ok);
     println!("verified {ok}");
 }

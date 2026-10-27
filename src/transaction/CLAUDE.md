@@ -184,9 +184,10 @@ impl Transaction {
     pub fn estimate_size(&self) -> usize
 
     // SPV Verification
-    pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>) -> Result<bool>
+    pub async fn verify(&self, chain_tracker: &dyn ChainTracker, fee_model: Option<&dyn FeeModel>, memory_limit: Option<usize>) -> Result<bool>
+    // memory_limit: the reference's third parameter; None uncapped, as its default (#331), Some(n) n bytes per stack
     // an invalid script: Err(TransactionError("Script validation failed for input N: …"));
-    // an input stopped at the default mode's 32 MB budget: Err(ScriptEvaluationDeclined { input_index, limit }) (#38)
+    // an input stopped at the caller's budget, or by the allocator: Err(ScriptEvaluationDeclined { input_index, limit }) (#38)
 }
 
 pub enum ChangeDistribution { Equal, Random }  // Random uses Benford's law
@@ -397,8 +398,8 @@ let atomic = tx.to_atomic_beef(false)?;
 
 // SPV Verification (Transaction-level, by txid over the whole ancestry)
 let tracker = WhatsOnChainTracker::mainnet();
-let is_valid = tx.verify(&tracker, None).await?;              // SPV verify of the ancestry
-let is_valid = tx.verify(&tracker, Some(&fee_model)).await?;  // With fee validation
+let is_valid = tx.verify(&tracker, None, None).await?;              // SPV verify of the ancestry
+let is_valid = tx.verify(&tracker, Some(&fee_model), None).await?;  // With fee validation
 
 // SPV Verification (BEEF-level, manual root checking)
 let validation = beef.verify_valid(false);

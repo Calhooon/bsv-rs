@@ -291,7 +291,7 @@ fn the_atomic_form_of_a_ring_is_refused_by_the_readers_and_from_atomic_beef_stop
                         .build()
                         .unwrap();
                     runtime
-                        .block_on(tx.verify(&MockChainTracker::always_valid(900_010), None))
+                        .block_on(tx.verify(&MockChainTracker::always_valid(900_010), None, None))
                         .is_ok_and(|v| v)
                 });
                 assert!(!verified, "{label}: the subject must not verify");

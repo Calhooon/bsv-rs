@@ -2389,6 +2389,7 @@ mod merkle_path_reattach_tests {
                 parsed
                     .verify(
                         &crate::transaction::MockChainTracker::always_valid(800_010),
+                        None,
                         None
                     )
                     .await,
@@ -2420,6 +2421,7 @@ mod merkle_path_reattach_tests {
         let verified = parsed
             .verify(
                 &crate::transaction::MockChainTracker::always_valid(800_010),
+                None,
                 None,
             )
             .await;
@@ -2460,6 +2462,7 @@ mod merkle_path_reattach_tests {
         match parsed
             .verify(
                 &crate::transaction::MockChainTracker::always_valid(800_010),
+                None,
                 None,
             )
             .await
@@ -2516,6 +2519,7 @@ mod merkle_path_reattach_tests {
         let verified = parsed
             .verify(
                 &crate::transaction::MockChainTracker::always_valid(800_010),
+                None,
                 None,
             )
             .await;

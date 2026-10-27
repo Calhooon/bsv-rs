@@ -243,7 +243,7 @@ fn a_deep_chain_verifies_on_a_small_stack() {
             .build()
             .expect("a current-thread runtime");
         let verified = runtime
-            .block_on(tx.verify(&MockChainTracker::always_valid(800_010), None))
+            .block_on(tx.verify(&MockChainTracker::always_valid(800_010), None, None))
             .map_err(|e| e.to_string());
         (tx, verified)
     });

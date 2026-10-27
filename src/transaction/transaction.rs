@@ -1818,17 +1818,17 @@ impl Transaction {
     /// order (`ts-stack@edf6e03` `Transaction.ts:1336-1342`); this walk asks
     /// it of a proven one too, as the streaming reader does.
     ///
-    /// Scripts run in the default mode, its 32,000,000-byte local budget. An
-    /// invalid script is `Err(TransactionError("Script validation failed for
-    /// input N: …"))`; one stopped at the budget `Err(ScriptEvaluationDeclined)`,
-    /// a decline, never to be read as invalid (bsv-rs#38).
-    ///
-    /// * `chain_tracker` - The chain tracker for verifying merkle roots
-    /// * `fee_model` - Optional fee model for fee validation
+    /// Scripts run in the default mode under `memory_limit`, the reference's third parameter
+    /// (`ts-stack@edf6e03` `Transaction.ts:1685-1697`): `None` uncapped, its default
+    /// (`Spend.ts:295-296`), `Some(n)` `n` bytes per stack (bsv-rs#331); `fee_model`, when
+    /// given, is checked. An invalid script is `Err(TransactionError("Script validation failed
+    /// for input N: …"))`; one stopped at the budget or by the allocator is
+    /// `Err(ScriptEvaluationDeclined)`, a decline, never to be read as invalid (bsv-rs#38).
     pub async fn verify(
         &self,
         chain_tracker: &dyn super::ChainTracker,
         fee_model: Option<&dyn super::FeeModel>,
+        memory_limit: Option<usize>,
     ) -> Result<bool> {
         use crate::primitives::bsv::sighash::{TxInput, TxOutput, TxSighashCache};
         use crate::script::{Spend, TxSpendParams};
@@ -1973,7 +1973,7 @@ impl Transaction {
                     unlocking_script: UnlockingScript::from_script(
                         crate::script::Script::from_binary(&unlocking_script.to_binary())?,
                     ),
-                    memory_limit: None,
+                    memory_limit: Some(memory_limit.unwrap_or(usize::MAX)),
                     work_limit: None,
                 })?;
 
