@@ -1,0 +1,11 @@
+# #339 rebase: `lane/fix-339-review-actions-body` (at 172b090 on 1cdd149) onto beta after #329 landed (6c7596a)
+
+The branch (nine commits: the five members and the code-5 reading, three folds; the third fold re-reviewed MERGE on Opus with notes, PR #355 at 172b0907) conflicts with #329 (landed at 6c7596a: `WalletInterface`'s `originator: Option<&str>`) in `src/wallet/substrates/http_json.rs`, and its tests that call `create_action`/`sign_action` with `""` must pass `None`. Rebase it onto `origin/beta`, resolving `http_json.rs` so both hold (#329's `Option` on the trait methods and the substrate's handling, #339's code-5 reading and the typed-first success path), the tests' `""` to `None` (or `Some(..)` where an originator is configured, as #329's rule), the CHANGELOG with #339's sections above #329's (keep both, no heading split, no line lost: diff against `origin/beta`'s file, only #339's sections added), the rows; then re-gate, including the memory test. Read `src/wallet/substrates/CLAUDE.md`, `tests/CLAUDE.md`, both entries. Do not read `~/bsv/bsv-low/` or `~/vault/`. Run every gate in the foreground; never end your turn with a gate running in the background. Never push. No test or probe on a default URL (a MetaNet Client listens on 3301, 3321 and 2121 on this host); every HTTP test binds its own wiremock server. Use your own `CARGO_TARGET_DIR` under `~/bsv/targets/bsv-rs-lanes/<lane>` as the lanes do.
+
+## Gate
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http"` on every test file matching `wallet_*`, `wire_*`, `identity_*`, `transport_fault_*`, `arch_*` (not the `arch_support` module), `fixtures_replay`; `cargo test --features "full,http,dhat-profiling" --test memory_profiling`; `--lib wallet`; `--lib identity`; the doc tests; the wasm32 build of the CLAUDE.md feature set; `cargo semver-checks --release-type minor --baseline-rev 6c7596a`; the ratchet against `origin/beta`.
+
+## Report
+
+A REPORT: the base rebased onto, the tip, each conflict and the text taken, the tests moved to the `Option`, the diff of the rebased tip against the reviewed 172b090 (the resolutions only), the gate's results, anything unverified.

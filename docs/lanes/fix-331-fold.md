@@ -1,0 +1,29 @@
+# #331 fold: the keeper's ruling on the default mode's budget, and the cold review's findings, on `lane/fix-331-verify-budget` (at ffb583e on 6c7596a)
+
+Work in this worktree on the branch as it stands (three commits; the review's REPORT is in `cca runs --show review-331` on the studio, or read PR #370's and issue #331's comments). Read `CLAUDE.md` (the contracts), `src/script/CLAUDE.md`, `src/transaction/CLAUDE.md`, `tests/CLAUDE.md`, the module doc of `src/script/spend/mod.rs`, the branch's changelog entry and issue #331 with both rulings. Do not read `~/bsv/bsv-low/` or `~/vault/`. Run every gate in the foreground; never end your turn with a gate running in the background. Never push. A MetaNet Client listens on 3301, 3321 and 2121 on the studio: no test or probe on a default URL. Use your own `CARGO_TARGET_DIR` under `~/bsv/targets/bsv-rs-lanes/<lane>`.
+
+## The keeper's ruling (2026-10-27 15:1xZ, under the owner's ruling (c))
+
+`SpendParams::memory_limit: None` in the default mode is uncapped, as the reference's `Spend` has it (`Spend.ts:295-296` at `edf6e03`: `hasExplicitMemoryLimit` and `Number.POSITIVE_INFINITY`), the same reading the 12:5xZ ruling applied to `verify`. A budget is the caller's `Some(n)`. The 32,000,000 figure is the node's policy default, named only where a caller passes it and cited at the sibling issue (#38, the policy word), never a library default and never called consensus. `set_stack_memory_consensus` stays the block-path word. The branch lists the default mode's 32,000,000 as a divergence: that row closes with the change.
+
+## What to do
+
+0. Rebase onto `origin/beta` at your start (11c1b9f4 at this writing; #339's PR #355 may land during your run: rebase again before the REPORT if `origin/beta` moved). The CHANGELOG conflict: this branch's entry above the landed ones, nothing lost (diff against `origin/beta`: only this branch's own sections added). The gate's semver baseline and the ratchet are against that tip.
+
+1. The default mode's `None` runs uncapped (the local budget off, the 1 GiB element bound and `OP_NUM2BIN`'s `INT32_MAX` as before, the fallible allocations of 9df2f72 the only limit): `Spend::memory_limit()`'s reading of `None` in the default mode, the module doc's paragraphs (the budget sentences), `SpendParams::memory_limit`'s doc, `CLAUDE.md`'s contracts sentence ("in the default mode a 1 GiB max element and a 32 MB memory budget per stack" goes), `README.md`'s matching prose, `src/script/CLAUDE.md`, `docs/`; the divergence row in `CLAUDE.md` closed; under a word the node's count and `WORD_MEMORY_LIMIT` unchanged (the policy word's own figure, the keeper's "named only where a caller passes it": read whether `WORD_MEMORY_LIMIT`'s use under the mempool word is the policy's verdict figure, which stays, and whether any default-mode constant still names 32,000,000 as a cap: `DEFAULT_MEMORY_LIMIT` goes or becomes the caller's example).
+2. Tests RED before green (a scratch copy without the fold, its own `CARGO_TARGET_DIR`): a default-mode spend growing a stack past 32,000,000 bytes evaluates (valid or invalid by the script, never a decline) under `None`; declines under `Some(32_000_000)` as before; `script_stack_memory_witness` and `conformance_*` unchanged (the corpus at `../ts-stack/conformance` or the lane's export at `edf6e03`; the pins must hold); the memory profile of the default mode's tests stays bounded (the suite's own budgets: say what the largest default-mode test allocates now).
+3. The review's findings on ffb583e (`review-331`, Opus, MERGE with four notes; its REPORT is in `cca runs --show review-331` on the studio and in PR #370's comments), each applied as file:line:
+   - `CHANGELOG.md` (this branch's entry) and `src/script/spend/mod.rs:34-35` overstate the 1 GiB element bound: read `src/script/spend/num.rs:77-84` and say where the bound holds and where it does not, in both places.
+   - The migration line omits the CPU cost of an uncapped run: say it (a caller's budget bounds memory, never time; name what bounds time, the opcode and element budgets, and where a caller who wants a time bound puts it).
+   - `src/script/spend/mod.rs:572-577` clones each chunk infallibly: the fallible-allocation rule of 9df2f72 reaches it (`try_reserve`, or the reading that makes the clone bounded by the bytes already read), with a test if one can be afforded, else the REPORT says why not.
+   - The shift bound's affordable RED (2^33+8 bits) becomes a hand-run `#[ignore]` test naming the finding, as `tests/CLAUDE.md` has for the others; the REPORT names its runtime.
+   The reviewer recommended keeping 32 MB as the default; the keeper's ruling above decides it: `None` uncapped. The entry says the ruling, not the recommendation.
+4. The changelog entry amended (the ruling quoted, the divergence closed, the migration line: a caller that relied on the default mode's decline above 32,000,000 bytes passes `Some(32_000_000)`), the rows, the ratchet.
+
+## Gate
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http"` on every test file matching `transaction_*`, `beef_*`, `script_*`, `identity_spend_witness`, `conformance_*`, `memory_*` (behind `dhat-profiling` where the file asks), `arch_*` (not the `arch_support` module), `fixtures_replay`; `--lib transaction`; `--lib script`; the doc tests; `cargo build --examples --all-features`; `cargo test --test readme_examples`; the wasm32 build of the CLAUDE.md feature set; `cargo semver-checks --release-type minor --baseline-rev <the sha of `origin/beta` at your start>`; the ratchet against `origin/beta`.
+
+## Report
+
+A REPORT: the tip, each commit, the default mode's reading before and after with the constants' fate, the docs sentences changed, the review's findings applied, RED then green, the gate's results, anything unverified.
