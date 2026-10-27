@@ -6,7 +6,11 @@
 //! evaluation runs, a counting allocator holds the largest single request
 //! and the peak of the bytes it added, and both must stay within a bound
 //! that is the budget's, plus a term linear in the input (the parsed chunks
-//! and an error's rendering of the scripts).
+//! and an error's rendering of the scripts). The live bound adds
+//! [`ARITHMETIC_WORKING_SET`] budgets for the big-number library's working
+//! memory in one arithmetic opcode, which the budget leaves out by design: a
+//! tolerance for what the accounting leaves out, not a budget miss
+//! (bsv-rs#348, the keeper's word of 2026-10-27).
 //!
 //! The input: byte 0 picks the word (bit 0: block or standard), the era
 //! (bit 1: post-Genesis or post-Chronicle) and the spending transaction's
@@ -42,6 +46,28 @@ use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicUsize, Ordering};
 const MEMORY_LIMIT: usize = 1 << 20;
 /// The work budget: one unit per opcode plus the bytes hashed.
 const WORK_LIMIT: u64 = 50_000;
+/// The budgets of live bytes allowed above the interpreter's four for one
+/// arithmetic opcode's working memory (bsv-rs#348): a tolerance for what the
+/// accounting leaves out by design (the keeper's word of 2026-10-27, under
+/// the owner's ruling (c)). The budget means what the node's
+/// `limitedstack.cpp` and the reference's `Spend.ts:1562-1573`
+/// (`ts-stack@edf6e03`) make it mean, the bytes of the stack's elements: an
+/// operand and a result are elements, charged; what num-bigint 0.4.8 holds
+/// while it computes is not, and charging it would decline scripts both of
+/// them judge valid. The abort path is guarded separately, by the step
+/// probe's room check (`arithmetic_room.rs`, bsv-rs#374). Measured on operands of
+/// 2^16 to 2^24 bytes: a quotient or a remainder peaks at 8.5 times its
+/// operands (a divisor of 0.03 to 1 percent of the dividend), a product at
+/// 5.2 times; a 68-byte script squaring to a 1,015,808-byte dividend held
+/// 7,667,840 bytes live under this budget after the #348 fix (the corpus's
+/// `3093a2154cceb4c44c01807a9cac0fadfef57ae1`). The operands
+/// are on the budget, so the working set is at most 8.5 budgets, and the
+/// stack it runs beside at most 1.5 (32 bytes charged per element against a
+/// 24-byte slot in a doubling vector). The side effect: this bound no longer
+/// catches #348's shape (a pushed number holding twice its charge, 4,815,906
+/// bytes live, under ten budgets); `tests/script_budget_before_allocation_348.rs`
+/// holds that input to one allocation site under the budget itself.
+const ARITHMETIC_WORKING_SET: usize = 6;
 
 struct Counting;
 
@@ -169,7 +195,7 @@ fn evaluate(word: ScriptFlags, version: i32, unlocking: &[u8], locking: &[u8]) {
         "one allocation of {largest} bytes under a budget of {MEMORY_LIMIT}"
     );
     assert!(
-        peak <= 4 * MEMORY_LIMIT + slack,
+        peak <= (4 + ARITHMETIC_WORKING_SET) * MEMORY_LIMIT + slack,
         "{peak} bytes live under a budget of {MEMORY_LIMIT}"
     );
 }

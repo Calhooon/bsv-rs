@@ -106,22 +106,25 @@ impl Spend {
     /// element bound declined by its length, then a sum or difference the
     /// reference cannot build invalid in its words
     /// ([`reference_read::result_refusal`]; the budget's decline first), then
-    /// [`push_number`](Self::push_number)'s limit and charge.
+    /// [`push_number`](Self::push_number)'s limit and charge. The number is
+    /// freed once encoded, before its bytes join the stack (bsv-rs#348).
     pub(super) fn push_arithmetic_result(
         &mut self,
         opcode: u8,
         operands: &[usize],
-        value: &BigNumber,
+        value: BigNumber,
     ) -> Result<(), ScriptEvaluationError> {
-        let len = encoded_len(value.as_bigint().bits());
-        let bytes = ScriptNum::try_to_bytes(value)
+        let bits = value.as_bigint().bits();
+        let len = encoded_len(bits);
+        let bytes = ScriptNum::try_to_bytes(&value)
             .map_err(|_| self.allocation_declined_holding(len, len as usize))?;
+        drop(value);
         if self.flags.is_none() && bytes.len() > element_bound() {
             let len = bytes.len() as u64;
             return Err(self.result_declined(opcode, operands, len, ""));
         }
         if self.flags.is_none() && matches!(opcode, OP_ADD | OP_SUB | OP_1ADD | OP_1SUB) {
-            if let Some(words) = reference_read::result_refusal(value.as_bigint().bits()) {
+            if let Some(words) = reference_read::result_refusal(bits) {
                 // A caller's budget that refuses the push declines first, as
                 // a budget's refusal is never read as a verdict (#38).
                 self.ensure_stack_mem(bytes.len())?;
