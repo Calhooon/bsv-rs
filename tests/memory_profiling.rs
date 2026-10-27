@@ -703,6 +703,8 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         array_peak < 4 * array.len() as u64,
         "array form: peak {array_peak} B for {} B of text",
         array.len()
+    );
+}
 
 /// An executed push copies its bytes once, onto the stack (bsv-rs#331, the review of PR
 /// #370's third note): each step cloned its chunk, the push's data with it, before the
