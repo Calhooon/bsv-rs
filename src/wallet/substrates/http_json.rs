@@ -24,11 +24,12 @@ use crate::wallet::{
 };
 
 use crate::transaction::broadcasters::transport_fault::{self as fault, delta_seconds_ms};
-use crate::{Error, TransportFault, WalletRefusalClass};
+use crate::{Error, WalletRefusalClass};
 use async_trait::async_trait;
-use reqwest::{Client, StatusCode};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
+mod answer;
 mod key_requests;
 mod review_actions;
 use key_requests::{
@@ -176,83 +177,9 @@ impl HttpWalletJson {
             return Err(super::origin::redirect_refused(response.status(), method));
         }
         if !response.status().is_success() {
-            let status = response.status();
-            let transport = fault::status_fault(status, response.headers());
-            let retry_after = fault::retry_after(response.headers()).map(str::to_owned);
-            let text = response.text().await.unwrap_or_default();
-
-            // The body's busy word, at any status, is the wallet's promise
-            // that it took no action; the status alone promises nothing
-            if let Some(busy) = wallet_busy_from_response(&text, retry_after.as_deref()) {
-                return Err(busy);
-            }
-            // A 400's code-5 body with its results is the reference's
-            // WERR_REVIEW_ACTIONS, every member read as it reads them (#339)
-            if let Ok(body) = serde_json::from_str::<serde_json::Value>(&text) {
-                if review_actions::is_review_body(status.as_u16(), &body) {
-                    return Err(review_actions::read(&body, method, review));
-                }
-            }
-            let detail = format!("HTTP {} for {}: {}", status, method, text);
-
-            // A 429, whatever the body, is a rate limit with its wait
-            if let (
-                Some(fault @ TransportFault::RateLimited { .. }),
-                StatusCode::TOO_MANY_REQUESTS,
-            ) = (transport, status)
-            {
-                let status = Some(status.as_u16());
-                return Err(Error::TransportFault {
-                    fault,
-                    status,
-                    detail,
-                });
-            }
-
-            // The wallet's error body: its class by name or code (#137), else
-            // a numeric code with its description
-            if let Some(error) = wallet_error_from_body(&text) {
-                return Err(error);
-            }
-
-            // A gateway status without the wallet's word is the edge's
-            // answer: the way failed, and nothing is promised
-            if transport.is_some() {
-                return Err(Error::WalletTransport {
-                    status: Some(status.as_u16()),
-                    detail,
-                });
-            }
-
-            return Err(Error::WalletError(detail));
+            return Err(answer::refusal(response, method, review).await);
         }
-
-        // Parse response
-        if review.is_none() {
-            return response
-                .json::<R>()
-                .await
-                .map_err(|e| request_error(e, "failed to parse JSON response"));
-        }
-        // createAction's and signAction's `tx` read by the error path's
-        // byte reader, as the reference normalizes both (#339); the answer
-        // the typed reading takes costs what it cost, the byte reader's
-        // `Value` tree (about 32 bytes a byte) built only for one it refuses
-        let text = response
-            .bytes()
-            .await
-            .map_err(|e| request_error(e, "failed to parse JSON response"))?;
-        let typed = match serde_json::from_slice::<R>(&text) {
-            Ok(result) => return Ok(result),
-            Err(e) => e,
-        };
-        let parse_error = |e| Error::WalletError(format!("failed to parse JSON response: {e}"));
-        let Ok(mut body) = serde_json::from_slice::<serde_json::Value>(&text) else {
-            return Err(parse_error(typed));
-        };
-        drop(text);
-        review_actions::normalize_success_tx(&mut body);
-        serde_json::from_value(body).map_err(parse_error)
+        answer::success(response, review).await
     }
 
     // =========================================================================
