@@ -16,7 +16,7 @@ use crate::primitives::bsv::sighash::{
     parse_transaction, SighashParams, SIGHASH_ALL, SIGHASH_FORKID,
 };
 use crate::primitives::bsv::tx_signature::TransactionSignature;
-use crate::primitives::{from_base64, from_hex, to_hex, PrivateKey, PublicKey, Signature};
+use crate::primitives::{from_base64, from_hex, to_base64, PrivateKey, PublicKey, Signature};
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Broadcaster, Transaction};
 use crate::wallet::{
@@ -344,9 +344,16 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         }
     }
 
+    /// The originator every wallet call carries: the configured one, or none
+    /// (`""`), as the reference passes its constructor's (#318;
+    /// `IdentityClient.ts:369-377`).
+    fn originator(&self) -> &str {
+        self.config.originator.as_deref().unwrap_or("")
+    }
+
     /// Get the wallet's identity key.
     pub async fn get_identity_key(&self) -> Result<String> {
-        let originator = self.config.originator.as_deref().unwrap_or("");
+        let originator = self.originator();
         let result = self
             .wallet
             .get_public_key(
@@ -403,11 +410,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         // The reference's checks, the signature last, before any wallet call (#307)
         super::reveal::check_master_certificate(&certificate, &fields_to_reveal)?;
 
-        let originator = self
-            .config
-            .originator
-            .as_deref()
-            .unwrap_or("identity-client");
+        let originator = self.originator();
 
         // Create the "anyone" verifier public key (using scalar 1)
         // This allows anyone to decrypt the revealed fields
@@ -550,11 +553,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     /// client.revoke_certificate_revelation("abc123...").await?;
     /// ```
     pub async fn revoke_certificate_revelation(&self, serial_number: &str) -> Result<()> {
-        let originator = self
-            .config
-            .originator
-            .as_deref()
-            .unwrap_or("identity-client");
+        let originator = self.originator();
 
         // Step 1: Find the existing UTXO via lookup
         let question = LookupQuestion::new(
@@ -620,7 +619,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
         let outpoint_str = format!("{}.{}", txid, output_index);
         let outpoint = Outpoint::from_string(&outpoint_str)?;
 
-        // Step 3: Create signable transaction with createAction (noSend=true)
+        // Step 3: Create signable transaction with createAction (noSend=true):
+        // the reference's arguments and no others (`IdentityClient.ts:845-863`,
+        // #318): no label, no signAndProcess (the input has no unlocking
+        // script, so the wallet answers a signable transaction either way)
         let create_result = self
             .wallet
             .create_action(
@@ -637,17 +639,12 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
                     outputs: None, // No outputs - just spending
                     lock_time: None,
                     version: None,
-                    labels: Some(vec!["identity".to_string(), "revocation".to_string()]),
+                    labels: None,
                     options: Some(CreateActionOptions {
-                        sign_and_process: Some(false),
-                        accept_delayed_broadcast: Some(false),
-                        trust_self: None,
-                        known_txids: None,
-                        return_txid_only: None,
-                        no_send: Some(true),
-                        no_send_change: None,
-                        send_with: None,
                         randomize_outputs: Some(false),
+                        accept_delayed_broadcast: Some(false),
+                        no_send: Some(true),
+                        ..Default::default()
                     }),
                 },
                 originator,
@@ -731,15 +728,17 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             },
         );
 
+        // The reference as createAction answered it, its base64 text, and
+        // `returnTXIDOnly: false` (`IdentityClient.ts:896-911`, #318)
         let sign_result = self
             .wallet
             .sign_action(
                 SignActionArgs {
                     spends,
-                    reference: to_hex(&signable_tx.reference),
+                    reference: to_base64(&signable_tx.reference),
                     options: Some(SignActionOptions {
                         accept_delayed_broadcast: Some(false),
-                        return_txid_only: None,
+                        return_txid_only: Some(false),
                         no_send: Some(true),
                         send_with: None,
                     }),
@@ -1224,11 +1223,7 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
 
         // Step 8: Decrypt fields using 'anyone' wallet
         let anyone_wallet = ProtoWallet::anyone();
-        let originator = self
-            .config
-            .originator
-            .as_deref()
-            .unwrap_or("identity-client");
+        let originator = self.originator();
 
         let decrypted_fields: HashMap<String, String> = verifiable_cert
             .decrypt_fields(&anyone_wallet, None, None, originator)

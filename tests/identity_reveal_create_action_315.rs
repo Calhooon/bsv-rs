@@ -47,12 +47,19 @@ fn vector() -> Vector {
     serde_json::from_str(text).unwrap()
 }
 
+/// The configuration the reference's recorder gave its client: the
+/// originator `identity-client` (`new IdentityClient(wallet, {},
+/// 'identity-client')`); this crate sends none by default since #318.
+fn config() -> IdentityClientConfig {
+    IdentityClientConfig::with_originator("identity-client")
+}
+
 /// The subject's wallet (key 9) revealing the witness's names; the
 /// createAction arguments it received, as JSON, and the originator.
 async fn created(certificate: &WalletCertificate, w: &Witness) -> (Value, String) {
     let mut wallet = Counting::of_scalar(9);
     wallet.keyring = Some(w.keyring.clone());
-    let client = IdentityClient::new(wallet.clone(), IdentityClientConfig::default());
+    let client = IdentityClient::new(wallet.clone(), config());
     let _ = client
         .publicly_reveal_attributes(certificate.clone(), w.fields_to_reveal.clone())
         .await;
@@ -150,7 +157,7 @@ async fn the_left_out_options_are_the_wallets_to_decide() {
         assert_eq!(read["output_tags"], serde_json::json!([]), "{}", w.name);
         let mut wallet = Counting::of_scalar(9);
         wallet.keyring = Some(w.keyring.clone());
-        let client = IdentityClient::new(wallet.clone(), IdentityClientConfig::default());
+        let client = IdentityClient::new(wallet.clone(), config());
         let _ = client
             .publicly_reveal_attributes(v.certificate.clone(), w.fields_to_reveal.clone())
             .await;

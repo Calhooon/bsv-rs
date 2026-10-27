@@ -14,6 +14,7 @@
 
 use super::*;
 use crate::overlay::OutputListItem;
+use crate::primitives::to_hex;
 use crate::script::templates::PushDrop;
 use crate::transaction::{Beef, Transaction, TransactionInput, TransactionOutput};
 use crate::wallet::types::Outpoint;
