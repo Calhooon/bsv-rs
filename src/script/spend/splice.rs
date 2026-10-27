@@ -28,8 +28,10 @@ impl Spend {
             return Err(self.error("OP_CAT requires at least two items to be on the stack."));
         }
         let buf2 = self.pop_stack()?;
-        let buf1 = self.pop_stack()?;
-        let mut result = buf1;
+        let mut result = self.pop_stack()?;
+        result
+            .try_reserve_exact(buf2.len())
+            .map_err(|_| self.allocation_declined(buf2.len()))?;
         result.extend(buf2);
         // The default mode's 1 GiB element bound; under a word an element
         // after Genesis is bounded by the stack memory budget alone
@@ -53,8 +55,8 @@ impl Spend {
 
         let pos_bn = self.read_number(&pos_bytes)?;
         let split_idx = self.split_position(&pos_bn, data.len())?;
-        let left = data[..split_idx].to_vec();
-        let right = data[split_idx..].to_vec();
+        let left = self.copy_element(&data[..split_idx])?;
+        let right = self.copy_element(&data[split_idx..])?;
         self.push_stack(left)?;
         self.push_stack(right)?;
         Ok(())
@@ -90,7 +92,9 @@ impl Spend {
         if minimal.len() == size {
             self.push_stack(minimal)?;
         } else {
-            self.push_stack(padded(&minimal, size))?;
+            let mut result = self.zeroed_element(size)?;
+            pad_into(&minimal, &mut result);
+            self.push_stack(result)?;
         }
         Ok(())
     }
@@ -203,7 +207,8 @@ impl Spend {
                     )));
                 }
                 let (o, l) = (offset as usize, len as usize);
-                self.push_stack(data[o..o + l].to_vec())?;
+                let out = self.copy_element(&data[o..o + l])?;
+                self.push_stack(out)?;
             }
             OP_NOP5 | OP_NOP6 => {
                 // (data len -- the first / last len bytes)
@@ -218,9 +223,9 @@ impl Spend {
                 }
                 let l = len as usize;
                 let out = if opcode == OP_NOP5 {
-                    data[..l].to_vec()
+                    self.copy_element(&data[..l])?
                 } else {
-                    data[data.len() - l..].to_vec()
+                    self.copy_element(&data[data.len() - l..])?
                 };
                 self.push_stack(out)?;
             }
@@ -289,11 +294,23 @@ impl Spend {
                         x.shl_bits(n)
                     } else {
                         // the default mode: the result's size, before allocating
-                        // it, against the LOCAL budget
+                        // it, against the LOCAL budget, then the 1 GiB element
+                        // bound (OP_CAT's and OP_NUM2BIN's, the only bound an
+                        // uncapped budget leaves, bsv-rs#331; the exact length
+                        // is the word branch's)
                         let bits = (x.bit_length() as u64).saturating_add(n);
-                        let bytes = (bits / 8 + 2) as usize;
-                        if bytes > self.memory_limit() {
-                            return Err(self.resource_error(ScriptResource::ElementSize, bytes));
+                        let bytes = bits / 8 + 2;
+                        if bytes > self.memory_limit() as u64 {
+                            return Err(self.resource_error(
+                                ScriptResource::ElementSize,
+                                usize::try_from(bytes).unwrap_or(usize::MAX),
+                            ));
+                        }
+                        if bits / 8 + 1 > MAX_SCRIPT_ELEMENT_SIZE as u64 {
+                            return Err(self.error(&format!(
+                                "It's not currently possible to push data larger than {} bytes.",
+                                MAX_SCRIPT_ELEMENT_SIZE
+                            )));
                         }
                         x.shl_bits(n)
                     }
@@ -355,24 +372,20 @@ impl Spend {
     }
 }
 
-/// `OP_NUM2BIN`'s result: `minimal` padded with zero bytes to `size`, its
-/// sign bit moved to the last byte.
-fn padded(minimal: &[u8], size: usize) -> Vec<u8> {
-    // Pad to size, preserving sign
-    let mut result = vec![0u8; size];
+/// `OP_NUM2BIN`'s result: `minimal` written into `result`, zero bytes of the
+/// size asked (allocated by the caller, fallibly), its sign bit moved to the
+/// last byte.
+fn pad_into(minimal: &[u8], result: &mut [u8]) {
+    let size = result.len();
     let mut signbit = 0u8;
 
-    if !minimal.is_empty() {
-        signbit = minimal[minimal.len() - 1] & 0x80;
-        let mut minimal_copy = minimal.to_vec();
-        if let Some(last) = minimal_copy.last_mut() {
-            *last &= 0x7f;
-        }
-        result[..minimal_copy.len()].copy_from_slice(&minimal_copy);
+    if let Some(&last) = minimal.last() {
+        signbit = last & 0x80;
+        result[..minimal.len()].copy_from_slice(minimal);
+        result[minimal.len() - 1] &= 0x7f;
     }
 
     if signbit != 0 {
         result[size - 1] |= 0x80;
     }
-    result
 }

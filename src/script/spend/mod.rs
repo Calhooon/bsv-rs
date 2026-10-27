@@ -29,8 +29,10 @@
 //! `SpendParams::memory_limit` is a LOCAL budget: exhausting it stops the
 //! evaluation with a resource limit
 //! ([`ScriptEvaluationError::resource_limit`]), never a verdict, and `Some(n)`
-//! wins in every mode. With `None`, the default mode keeps the TypeScript
-//! SDK's 32,000,000 bytes for each stack apart, counting the bytes alone.
+//! wins in every mode. With `None`, the default mode keeps 32,000,000 bytes per stack, the
+//! bytes alone (the TypeScript `Spend` default until `ts-stack@30210fe`, uncapped since).
+//! `Some(usize::MAX)` is uncapped, `Transaction::verify`'s default (bsv-rs#331): an element
+//! the allocator refuses is a decline, never an abort, the 1 GiB element bound the only bound.
 //! Under a word the count is the node's (one budget over the main and the alt
 //! stack, 32 bytes of overhead per element, every growth charged before it
 //! happens, `src/script/limitedstack.cpp`) and `None` selects 100,000,000
@@ -166,7 +168,7 @@ pub struct SpendParams {
     /// ([`ScriptEvaluationError::resource_limit`]), never a verdict, and
     /// `Some(n)` wins in every mode. `None` selects the mode's figure: 32,000,000
     /// bytes in the default mode, 100,000,000 on the node's count under a word
-    /// ([`Spend::memory_limit`]). Under the block word `Some(X)` models a node's
+    /// ([`Spend::memory_limit`]); `Some(usize::MAX)` uncapped (#331). Under the block word `Some(X)` models a node's
     /// `-maxstackmemoryusageconsensus=X` as a decline, not its verdict
     /// ([`Spend::set_stack_memory_consensus`] is the verdict); `Some(usize::MAX)`
     /// models a node run with 0.
@@ -621,7 +623,7 @@ impl Spend {
                     self.program_counter
                 )));
             }
-            let data = operation.data.clone().unwrap_or_default();
+            let data = self.copy_element(operation.data.as_deref().unwrap_or_default())?;
             self.push_stack(data)?;
         } else if is_executing || (OP_IF..=OP_ENDIF).contains(&current_opcode) {
             // Execute the opcode
@@ -759,8 +761,8 @@ impl Spend {
             self.source_output_index,
             self.context,
             self.program_counter,
-            self.stack.clone(),
-            self.alt_stack.clone(),
+            stack::snapshot(&self.stack),
+            stack::snapshot(&self.alt_stack),
             self.if_stack.clone(),
             self.stack_mem,
             self.alt_stack_mem,

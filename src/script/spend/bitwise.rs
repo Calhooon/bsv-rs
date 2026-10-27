@@ -12,9 +12,9 @@ impl Spend {
         if self.stack.is_empty() {
             return Err(self.error("OP_INVERT requires at least one item to be on the stack."));
         }
-        let buf = self.pop_stack()?;
-        let result: Vec<u8> = buf.iter().map(|&b| !b).collect();
-        self.push_stack(result)?;
+        let mut buf = self.pop_stack()?;
+        buf.iter_mut().for_each(|b| *b = !*b);
+        self.push_stack(buf)?;
         Ok(())
     }
 
@@ -26,23 +26,21 @@ impl Spend {
             )));
         }
         let buf2 = self.pop_stack()?;
-        let buf1 = self.pop_stack()?;
+        let mut buf1 = self.pop_stack()?;
         if buf1.len() != buf2.len() {
             return Err(self.error(&format!(
                 "{} requires the top two stack items to be the same size.",
                 opcode_to_name(opcode).unwrap_or("OP")
             )));
         }
-        let result: Vec<u8> = buf1
-            .iter()
-            .zip(buf2.iter())
-            .map(|(&a, &b)| match opcode {
-                OP_AND => a & b,
-                OP_OR => a | b,
-                _ => a ^ b, // OP_XOR
-            })
-            .collect();
-        self.push_stack(result)?;
+        for (a, &b) in buf1.iter_mut().zip(buf2.iter()) {
+            *a = match opcode {
+                OP_AND => *a & b,
+                OP_OR => *a | b,
+                _ => *a ^ b, // OP_XOR
+            };
+        }
+        self.push_stack(buf1)?;
         Ok(())
     }
 
@@ -90,7 +88,8 @@ impl Spend {
             // overflow ("BigNumber requires N bytes") and clamped the
             // shift count to 63 bits (conformance vectors
             // lshift-truncation.0001/.0003).
-            let result = shifted(&buf, n, opcode);
+            let mut result = self.zeroed_element(buf.len())?;
+            shift_into(&buf, n, opcode, &mut result);
             self.push_stack(result)?;
         }
         Ok(())
@@ -98,15 +97,13 @@ impl Spend {
 }
 
 /// `OP_LSHIFT` / `OP_RSHIFT` on the raw bytes: a width-preserving shift of
-/// `buf` by `n` bits (`n` not negative), the result exactly `buf.len()` bytes.
-fn shifted(buf: &[u8], n: i64, opcode: u8) -> Vec<u8> {
+/// `buf` by `n` bits (`n` not negative) into `out`, `buf.len()` zero bytes
+/// (allocated by the caller, fallibly).
+fn shift_into(buf: &[u8], n: i64, opcode: u8, out: &mut [u8]) {
     let len = buf.len();
-    if (n as u128) >= (len as u128) * 8 {
-        vec![0u8; len]
-    } else {
+    if (n as u128) < (len as u128) * 8 {
         let byte_shift = (n as usize) / 8;
         let bit_shift = (n as usize) % 8;
-        let mut out = vec![0u8; len];
         #[allow(clippy::needless_range_loop)]
         for i in 0..len {
             if opcode == OP_LSHIFT {
@@ -140,6 +137,5 @@ fn shifted(buf: &[u8], n: i64, opcode: u8) -> Vec<u8> {
                 }
             }
         }
-        out
     }
 }

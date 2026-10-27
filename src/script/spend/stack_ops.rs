@@ -42,8 +42,8 @@ impl Spend {
         if self.stack.len() < 2 {
             return Err(self.error("OP_2DUP requires at least two items to be on the stack."));
         }
-        let buf1 = self.stack_top_n(2)?.to_vec();
-        let buf2 = self.stack_top()?.to_vec();
+        let buf1 = self.copy_element(self.stack_top_n(2)?)?;
+        let buf2 = self.copy_element(self.stack_top()?)?;
         self.push_stack(buf1)?;
         self.push_stack(buf2)?;
         Ok(())
@@ -53,9 +53,9 @@ impl Spend {
         if self.stack.len() < 3 {
             return Err(self.error("OP_3DUP requires at least three items to be on the stack."));
         }
-        let buf1 = self.stack_top_n(3)?.to_vec();
-        let buf2 = self.stack_top_n(2)?.to_vec();
-        let buf3 = self.stack_top()?.to_vec();
+        let buf1 = self.copy_element(self.stack_top_n(3)?)?;
+        let buf2 = self.copy_element(self.stack_top_n(2)?)?;
+        let buf3 = self.copy_element(self.stack_top()?)?;
         self.push_stack(buf1)?;
         self.push_stack(buf2)?;
         self.push_stack(buf3)?;
@@ -66,8 +66,8 @@ impl Spend {
         if self.stack.len() < 4 {
             return Err(self.error("OP_2OVER requires at least four items to be on the stack."));
         }
-        let buf1 = self.stack_top_n(4)?.to_vec();
-        let buf2 = self.stack_top_n(3)?.to_vec();
+        let buf1 = self.copy_element(self.stack_top_n(4)?)?;
+        let buf2 = self.copy_element(self.stack_top_n(3)?)?;
         self.push_stack(buf1)?;
         self.push_stack(buf2)?;
         Ok(())
@@ -111,7 +111,7 @@ impl Spend {
         if self.stack.is_empty() {
             return Err(self.error("OP_IFDUP requires at least one item to be on the stack."));
         }
-        let top = self.stack_top()?.to_vec();
+        let top = self.copy_element(self.stack_top()?)?;
         if ScriptNum::cast_to_bool(&top) {
             self.push_stack(top)?;
         }
@@ -136,7 +136,7 @@ impl Spend {
         if self.stack.is_empty() {
             return Err(self.error("OP_DUP requires at least one item to be on the stack."));
         }
-        let top = self.stack_top()?.to_vec();
+        let top = self.copy_element(self.stack_top()?)?;
         self.push_stack(top)?;
         Ok(())
     }
@@ -155,7 +155,7 @@ impl Spend {
         if self.stack.len() < 2 {
             return Err(self.error("OP_OVER requires at least two items to be on the stack."));
         }
-        let second = self.stack_top_n(2)?.to_vec();
+        let second = self.copy_element(self.stack_top_n(2)?)?;
         self.push_stack(second)?;
         Ok(())
     }
@@ -174,7 +174,7 @@ impl Spend {
         }
 
         let n_idx = n as usize;
-        let item = self.stack[self.stack.len() - 1 - n_idx].clone();
+        let item = self.copy_element(&self.stack[self.stack.len() - 1 - n_idx])?;
 
         if opcode == OP_ROLL {
             let remove_idx = self.stack.len() - 1 - n_idx;
@@ -217,11 +217,15 @@ impl Spend {
         if self.stack.len() < 2 {
             return Err(self.error("OP_TUCK requires at least two items to be on the stack."));
         }
-        let top = self.stack_top()?.to_vec();
-        self.reserve_stack(top.len())?;
+        let top = self.copy_element(self.stack_top()?)?;
+        let len = top.len();
+        self.stack
+            .try_reserve(1)
+            .map_err(|_| self.allocation_declined(len))?;
+        self.reserve_stack(len)?;
         let insert_idx = self.stack.len() - 2;
-        self.stack.insert(insert_idx, top.clone());
-        self.stack_mem += top.len();
+        self.stack.insert(insert_idx, top);
+        self.stack_mem += len;
         Ok(())
     }
 }

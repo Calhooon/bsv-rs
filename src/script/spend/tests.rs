@@ -144,3 +144,54 @@ fn test_failing_script() {
     let result = spend.validate();
     assert!(result.is_err(), "Expected failed validation");
 }
+
+/// With no local budget (`memory_limit: Some(usize::MAX)`, `Transaction::verify`'s
+/// default since bsv-rs#331) an element the allocator cannot give is a decline,
+/// never an abort: its limit the bytes both stacks held, its attempt those and
+/// the size asked. No script reaches the allocator's refusal on a 64-bit host
+/// (the default mode bounds an element at 1 GiB), so the helper is asked for
+/// more than `isize::MAX` bytes, which every allocator refuses.
+#[test]
+fn an_allocation_the_allocator_refuses_is_a_decline_not_an_abort() {
+    let mut spend = Spend::new(SpendParams {
+        source_txid: [0u8; 32],
+        source_output_index: 0,
+        source_satoshis: 0,
+        locking_script: LockingScript::from_asm("OP_DROP OP_1").unwrap(),
+        transaction_version: 1,
+        other_inputs: vec![],
+        outputs: vec![],
+        input_index: 0,
+        unlocking_script: UnlockingScript::from_asm("OP_1").unwrap(),
+        input_sequence: 0xffffffff,
+        lock_time: 0,
+        memory_limit: Some(usize::MAX),
+        work_limit: None,
+    });
+    spend.push_stack(vec![0x01; 7]).unwrap();
+    let asked = isize::MAX as usize + 1;
+    let declined = spend.zeroed_element(asked).unwrap_err();
+    assert_eq!(
+        declined.resource_limit,
+        Some(super::super::evaluation_error::ScriptResourceLimit {
+            resource: ScriptResource::Stack,
+            limit: 7,
+            attempted: 7 + asked as u64,
+            work_spent: None,
+        })
+    );
+    assert!(declined.is_resource_limit());
+    assert_eq!(declined.message, "Stack memory usage has exceeded 7 bytes");
+    assert!(spend.copy_element(&[1, 2, 3]).is_ok());
+}
+
+/// An error's copy of the stacks, made fallibly since bsv-rs#331 (left empty
+/// when the allocator refuses it), is the stacks' copy.
+#[test]
+fn an_error_snapshot_copies_the_stack() {
+    assert_eq!(
+        stack::snapshot(&[vec![1], vec![2, 3]]),
+        vec![vec![1], vec![2, 3]]
+    );
+    assert!(stack::snapshot(&[]).is_empty());
+}
