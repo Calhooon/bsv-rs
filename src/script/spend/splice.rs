@@ -291,6 +291,7 @@ impl Spend {
                         self.check_node_budget(
                             self.node_mem + len + STACK_ELEMENT_OVERHEAD as u64,
                         )?;
+                        self.number_room(2 * len + 16)?;
                         x.shl_bits(n)
                     } else {
                         // the default mode: the result's size, before allocating
@@ -312,11 +313,13 @@ impl Spend {
                                 MAX_SCRIPT_ELEMENT_SIZE
                             )));
                         }
+                        self.number_room(2 * bytes + 16)?;
                         x.shl_bits(n)
                     }
                 } else if n >= x.bit_length() as u64 {
                     BigNumber::zero()
                 } else {
+                    self.number_room(2 * x_bytes.len() as u64 + 16)?;
                     x.shr_bits_toward_zero(n)
                 };
                 self.push_number(&out)?;

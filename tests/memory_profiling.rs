@@ -746,3 +746,89 @@ fn test_an_executed_push_copies_its_bytes_once() {
         "the evaluation's peak: {peak} bytes for a {ELEMENT}-byte push"
     );
 }
+
+/// #374: the guard's own bookkeeping beside its probe (the operands' lengths and
+/// bits, 128 bytes for two), with room to spare.
+const STEP_SLACK: u64 = 4096;
+
+/// An operand of `len` bytes, negative, its magnitude `8 * len - 2` bits.
+fn step_operand(len: usize) -> Vec<u8> {
+    let mut bytes = vec![0x5a; len];
+    bytes[len - 1] = 0xd5;
+    bytes
+}
+
+/// The heap's peak past the operands while `opcode` runs on them.
+fn step_peak(opcode: u8, lens: &[usize]) -> u64 {
+    use bsv_rs::script::op::{OP_1, OP_DROP};
+    use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
+
+    let mut unlock = Script::new();
+    for &len in lens {
+        unlock.write_bin(&step_operand(len));
+    }
+    let mut lock = Script::new();
+    lock.write_opcode(opcode)
+        .write_opcode(OP_DROP)
+        .write_opcode(OP_1);
+    let mut spend = Spend::new(SpendParams {
+        source_txid: [0u8; 32],
+        source_output_index: 0,
+        source_satoshis: 1000,
+        locking_script: LockingScript::from_script(lock),
+        transaction_version: 2,
+        other_inputs: vec![],
+        outputs: vec![],
+        input_index: 0,
+        unlocking_script: UnlockingScript::from_script(unlock),
+        input_sequence: 0xffff_ffff,
+        lock_time: 0,
+        memory_limit: None,
+        work_limit: None,
+    });
+    let profiler = dhat::Profiler::builder().testing().build();
+    assert_eq!(spend.validate().map_err(|e| e.message), Ok(true));
+    let peak = dhat::HeapStats::get().max_bytes as u64;
+    drop(profiler);
+    peak.saturating_sub(lens.iter().sum::<usize>() as u64)
+}
+
+/// An arithmetic step's peak of the heap against the room its guard asks of
+/// the allocator first (bsv-rs#374, the review of PR #370's fold 2): the
+/// operands' bytes times 6 for `OP_MUL`, 12 for `OP_DIV` and `OP_MOD`, 2 for
+/// the rest (`src/script/spend/arithmetic_room.rs`, `STEP_PEAK_*`). Each case
+/// is the worst shape found for its opcode: `OP_MUL` where the shorter operand
+/// is just over half the longer (5.1 times the operands), `OP_DIV` a dividend
+/// just past a power of two of digits over a divisor just past
+/// Burnikel-Ziegler's 64 digits (10.0 times). The operands are pushed by the
+/// unlocking script, built before the profiler starts, so the peak past the
+/// operands' stack copies is the step's own: the guard's probe (the declared
+/// room, held and released before the arithmetic, beside the guard's few
+/// bytes of bookkeeping, `STEP_SLACK`) or the arithmetic after it, whichever
+/// is higher. A step that passed its declared room would show here.
+#[test]
+fn test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks() {
+    use bsv_rs::script::op::{OP_1ADD, OP_ADD, OP_DIV, OP_MOD, OP_MUL};
+
+    let _serial = serial();
+    let cases: [(u8, &str, &[usize], u64); 5] = [
+        (OP_MUL, "OP_MUL", &[262_144, 131_098], 6),
+        (OP_DIV, "OP_DIV", &[2_098_000, 513], 12),
+        (OP_MOD, "OP_MOD", &[2_098_000, 513], 12),
+        (OP_ADD, "OP_ADD", &[1 << 20, 1 << 20], 2),
+        (OP_1ADD, "OP_1ADD", &[1 << 20], 2),
+    ];
+    for (opcode, name, lens, multiple) in cases {
+        let operands = lens.iter().sum::<usize>() as u64;
+        let peak = step_peak(opcode, lens);
+        println!(
+            "{name} of {lens:?}: the step's peak {peak} bytes, {:.3} times the operands; its guard asks {multiple} times",
+            peak as f64 / operands as f64
+        );
+        assert!(
+            peak <= multiple * operands + STEP_SLACK,
+            "{name}: a peak of {peak} bytes past the {} its guard asks",
+            multiple * operands
+        );
+    }
+}

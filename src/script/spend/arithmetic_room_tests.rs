@@ -9,7 +9,10 @@
 use super::{ALLOCATOR_CEILING, ELEMENT_BOUND};
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource, ScriptResourceLimit};
 use crate::script::flags::{ProtocolEra, ScriptFlags};
-use crate::script::op::{OP_1, OP_1ADD, OP_DROP, OP_MUL, OP_NUMEQUALVERIFY, OP_SIZE};
+use crate::script::op::{
+    OP_1, OP_1ADD, OP_ADD, OP_DIV, OP_DROP, OP_DUP, OP_INVERT, OP_MOD, OP_MUL, OP_NOP7, OP_NUM2BIN,
+    OP_NUMEQUALVERIFY, OP_SIZE, OP_WITHIN,
+};
 use crate::script::spend::{Spend, SpendParams};
 use crate::script::{LockingScript, Script, UnlockingScript};
 
@@ -166,30 +169,185 @@ fn an_operands_encoding_verdict_precedes_the_bound() {
     );
 }
 
-/// An allocator that refuses the result's 80,000 bytes: the decline names
-/// them and the operands, where the arithmetic would have aborted.
-#[test]
-fn an_allocator_that_refuses_the_results_room_is_a_decline() {
-    ALLOCATOR_CEILING.with(|c| c.set(70_000));
-    let result = run(
-        &[widest(40_000), widest(40_000)],
-        &then_true(OP_MUL),
-        2,
-        None,
-    );
+/// Runs `operands` then `lock` under a modelled allocator that refuses more
+/// than `ceiling` bytes at once.
+fn under_ceiling(
+    ceiling: usize,
+    operands: &[Vec<u8>],
+    lock: &Script,
+) -> Result<bool, ScriptEvaluationError> {
+    ALLOCATOR_CEILING.with(|c| c.set(ceiling));
+    let result = run(operands, lock, 2, None);
     ALLOCATOR_CEILING.with(|c| c.set(usize::MAX));
+    result
+}
+
+/// The decline of a step the modelled allocator refused: no budget's limit,
+/// the step's bytes attempted.
+fn refused(result: Result<bool, ScriptEvaluationError>, attempted: u64) -> String {
     let (message, limit) = declined(result);
     assert_eq!(
         limit,
         ScriptResourceLimit {
             resource: ScriptResource::Stack,
             limit: 0,
-            attempted: 80_000,
+            attempted,
             work_spent: None,
         }
     );
+    message
+}
+
+/// `OP_MUL` of two 40,000-byte operands: the product needs at most 80,000
+/// bytes, which a ceiling of 100,000 grants, and the step six times the
+/// operands' 80,000 (num-bigint's Toom-3 scratch), which it refuses: the
+/// decline names the step's 480,000 bytes, where the arithmetic would have
+/// asked past the ceiling (bsv-rs#374, the review of PR #370's fold 2).
+#[test]
+fn a_product_whose_step_passes_the_allocators_ceiling_is_declined() {
+    let message = refused(
+        under_ceiling(
+            100_000,
+            &[widest(40_000), widest(40_000)],
+            &then_true(OP_MUL),
+        ),
+        480_000,
+    );
     assert_eq!(
         message,
-        "Stack memory usage has exceeded 0 bytes: the allocator refused the 80000 bytes OP_MUL's result may need, from operands of 40000 and 40000 bytes."
+        "Stack memory usage has exceeded 0 bytes: the allocator refused the 480000 bytes OP_MUL's step may need, from operands of 40000 and 40000 bytes."
     );
+}
+
+/// `OP_DIV` and `OP_MOD` of a 40,000-byte dividend by a 600-byte divisor: a
+/// quotient or remainder of at most 40,000 bytes, and a step twelve times the
+/// operands' 40,600 (Burnikel-Ziegler's padded copies), refused.
+#[test]
+fn a_division_whose_step_passes_the_allocators_ceiling_is_declined() {
+    for (opcode, name) in [(OP_DIV, "OP_DIV"), (OP_MOD, "OP_MOD")] {
+        let message = refused(
+            under_ceiling(100_000, &[widest(40_000), widest(600)], &then_true(opcode)),
+            487_200,
+        );
+        assert_eq!(
+            message,
+            format!("Stack memory usage has exceeded 0 bytes: the allocator refused the 487200 bytes {name}'s step may need, from operands of 40000 and 600 bytes.")
+        );
+    }
+}
+
+/// `OP_ADD` of two 40,000-byte operands and `OP_1ADD` of one: results of
+/// 40,001 bytes, under the 64 KiB a result was asked of the allocator from,
+/// and steps twice the operands' bytes (their digits, the result's encoding
+/// beside them), refused under a ceiling of 70,000.
+#[test]
+fn a_sum_whose_step_passes_the_allocators_ceiling_is_declined() {
+    let message = refused(
+        under_ceiling(
+            70_000,
+            &[widest(40_000), widest(40_000)],
+            &then_true(OP_ADD),
+        ),
+        160_000,
+    );
+    assert!(message.ends_with("the allocator refused the 160000 bytes OP_ADD's step may need, from operands of 40000 and 40000 bytes."), "{message}");
+    let message = refused(
+        under_ceiling(70_000, &[widest(40_000)], &then_true(OP_1ADD)),
+        80_000,
+    );
+    assert!(message.ends_with("the allocator refused the 80000 bytes OP_1ADD's step may need, from an operand of 40000 bytes."), "{message}");
+}
+
+/// The steps above under a ceiling that grants them: computed, not declined.
+#[test]
+fn a_step_the_allocator_grants_is_computed() {
+    let operands = [widest(40_000), widest(40_000)];
+    for opcode in [OP_MUL, OP_DIV, OP_MOD, OP_ADD] {
+        let verdict = under_ceiling(1_000_000, &operands, &then_true(opcode));
+        assert_eq!(verdict.map_err(|e| e.message), Ok(true));
+    }
+}
+
+/// A number read outside the arithmetic opcodes (`OP_WITHIN`'s three) asks
+/// the allocator for its digits first: 50,000 bytes read as 75,008, refused
+/// under a ceiling of 70,000.
+#[test]
+fn a_number_read_the_allocator_refuses_is_a_decline() {
+    let operand = widest(50_000);
+    let message = refused(
+        under_ceiling(
+            70_000,
+            &[operand.clone(), operand.clone(), operand],
+            &then_true(OP_WITHIN),
+        ),
+        75_008,
+    );
+    assert_eq!(message, "Stack memory usage has exceeded 0 bytes");
+}
+
+/// `OP_LSHIFTNUM` of 1 by 320,000 bits: a result of 40,001 bytes, its digits
+/// and its encoding asked first (80,020 bytes), refused under 70,000.
+#[test]
+fn a_left_shift_the_allocator_refuses_is_a_decline() {
+    let message = refused(
+        under_ceiling(70_000, &[vec![1], encode(320_000)], &then_true(OP_NOP7)),
+        80_020,
+    );
+    assert_eq!(message, "Stack memory usage has exceeded 0 bytes");
+}
+
+/// `n` as a minimal script number.
+fn encode(n: i64) -> Vec<u8> {
+    crate::script::script_num::ScriptNum::to_bytes(&crate::primitives::BigNumber::from_i64(n))
+}
+
+/// The review's three scripts (PR #370, fold 2), by hand: an operand of `len`
+/// bytes made by `OP_NUM2BIN` and `OP_INVERT` (`fe ff .. ff`), then `tail`,
+/// under the modelled allocator at the review's 4 GiB less the operands the
+/// stack holds at the step (the review's allocator counts everything held).
+/// Without the step's probe each aborted under the review's allocator (exit
+/// 134); the real ceiling's reproduction is the review's harness.
+fn review_script(len: u32, tail: &[u8], held: usize) -> Result<bool, ScriptEvaluationError> {
+    let mut lock = Script::new();
+    lock.write_opcode(OP_1)
+        .write_bin(&len.to_le_bytes())
+        .write_opcode(OP_NUM2BIN)
+        .write_opcode(OP_INVERT);
+    for &opcode in tail {
+        lock.write_opcode(opcode);
+    }
+    lock.write_opcode(OP_DROP).write_opcode(OP_1);
+    under_ceiling((4usize << 30) - held, &[], &lock)
+}
+
+/// `OP_1 <2^29> OP_NUM2BIN OP_INVERT OP_DUP OP_ADD`: 1 GiB held, the step's
+/// 2 GiB granted, the sum computed (about 1.3 s, 2.1 GB resident).
+#[test]
+#[ignore = "by hand: about 2 GB resident"]
+fn the_reviews_sum_of_two_half_gib_operands_is_computed_under_4_gib() {
+    let verdict = review_script(1 << 29, &[OP_DUP, OP_ADD], 1 << 30);
+    assert_eq!(verdict.map_err(|e| e.message), Ok(true));
+}
+
+/// `OP_MUL` of two 300 MiB operands: 600 MiB held, the step's 3,774,873,600
+/// bytes refused, a decline before either operand is decoded.
+#[test]
+#[ignore = "by hand: about 630 MB resident"]
+fn the_reviews_product_of_two_300_mib_operands_is_declined_under_4_gib() {
+    let len = 300 << 20;
+    let message = refused(
+        review_script(len, &[OP_DUP, OP_MUL], 2 * len as usize),
+        3_774_873_600,
+    );
+    assert!(message.ends_with("the allocator refused the 3774873600 bytes OP_MUL's step may need, from operands of 314572800 and 314572800 bytes."), "{message}");
+}
+
+/// `OP_1ADD` of an operand 16 bytes under 1 GiB: 1 GiB held, the step's
+/// 2 GiB granted, computed (about 1.4 s, 2.1 GB resident).
+#[test]
+#[ignore = "by hand: about 2 GB resident"]
+fn the_reviews_increment_near_1_gib_is_computed_under_4_gib() {
+    let len = (1 << 30) - 16;
+    let verdict = review_script(len, &[OP_1ADD], len as usize);
+    assert_eq!(verdict.map_err(|e| e.message), Ok(true));
 }

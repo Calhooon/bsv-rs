@@ -10,6 +10,8 @@ use crate::script::op::{
     OP_NUMNOTEQUAL, OP_SUB,
 };
 use crate::script::script_num::ScriptNum;
+use num_bigint::BigInt;
+use num_traits::Zero;
 
 use super::Spend;
 
@@ -25,58 +27,56 @@ impl Spend {
             )));
         }
         let buf = self.pop_stack()?;
+        let lens = [buf.len()];
         self.arithmetic_room(opcode, &[&buf])?;
-        let mut bn = self.read_number(&buf)?;
+        let n = BigInt::from(self.read_number(&buf)?);
+        drop(buf);
 
-        bn = match opcode {
-            OP_1ADD => bn.add(&BigNumber::one()),
-            OP_1SUB => bn.sub(&BigNumber::one()),
-            OP_2MUL => bn.add(&bn),
-            OP_2DIV => bn.div(&BigNumber::from_i64(2)),
-            OP_NEGATE => bn.neg(),
-            OP_ABS => bn.abs(),
-            OP_NOT => {
-                if bn.is_zero() {
-                    BigNumber::one()
-                } else {
-                    BigNumber::zero()
-                }
-            }
-            OP_0NOTEQUAL => {
-                if bn.is_zero() {
-                    BigNumber::zero()
-                } else {
-                    BigNumber::one()
-                }
-            }
-            _ => bn,
+        // Owned arithmetic: the result takes the operand's digits, whose
+        // capacity holds the one bit `OP_1ADD`, `OP_1SUB` and `OP_2MUL` may
+        // add (bsv-rs#374).
+        let n = match opcode {
+            OP_1ADD => n + 1u32,
+            OP_1SUB => n - 1u32,
+            OP_2MUL => n << 1u32,
+            OP_2DIV => n / 2u32,
+            OP_NEGATE => -n,
+            OP_ABS => BigInt::from(n.into_parts().1),
+            OP_NOT => BigInt::from(u8::from(n.is_zero())),
+            OP_0NOTEQUAL => BigInt::from(u8::from(!n.is_zero())),
+            _ => n,
         };
-        self.push_arithmetic_result(opcode, &[&buf], &bn)
+        self.push_arithmetic_result(opcode, &lens, &BigNumber::from_bigint(n))
     }
 
     pub(super) fn op_binary_number(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         self.require_two_items(opcode, "OP")?;
         let buf2 = self.pop_stack()?;
         let buf1 = self.pop_stack()?;
+        let lens = [buf1.len(), buf2.len()];
         self.arithmetic_room(opcode, &[&buf1, &buf2])?;
-        let bn1 = self.read_number(&buf1)?;
-        let bn2 = self.read_number(&buf2)?;
+        // Each operand's bytes leave as its number arrives (bsv-rs#374).
+        let bn1 = BigInt::from(self.read_number(&buf1)?);
+        drop(buf1);
+        let bn2 = BigInt::from(self.read_number(&buf2)?);
+        drop(buf2);
 
+        // Owned where num-bigint reuses an operand's digits for the result.
         let result = match opcode {
-            OP_ADD => bn1.add(&bn2),
-            OP_SUB => bn1.sub(&bn2),
-            OP_MUL => bn1.mul(&bn2),
+            OP_ADD => bn1 + bn2,
+            OP_SUB => bn1 - bn2,
+            OP_MUL => bn1 * bn2,
             OP_DIV => {
                 if bn2.is_zero() {
                     return Err(self.error("OP_DIV cannot divide by zero!"));
                 }
-                bn1.div(&bn2)
+                bn1 / bn2
             }
             OP_MOD => {
                 if bn2.is_zero() {
                     return Err(self.error("OP_MOD cannot divide by zero!"));
                 }
-                bn1.mod_floor(&bn2)
+                bn1 % bn2
             }
             OP_BOOLAND => truth(!bn1.is_zero() && !bn2.is_zero()),
             OP_BOOLOR => truth(!bn1.is_zero() || !bn2.is_zero()),
@@ -88,10 +88,10 @@ impl Spend {
             OP_GREATERTHANOREQUAL => truth(bn1 >= bn2),
             OP_MIN => bn1.min(bn2),
             OP_MAX => bn1.max(bn2),
-            _ => BigNumber::zero(),
+            _ => BigInt::zero(),
         };
 
-        self.push_arithmetic_result(opcode, &[&buf1, &buf2], &result)?;
+        self.push_arithmetic_result(opcode, &lens, &BigNumber::from_bigint(result))?;
 
         if opcode == OP_NUMEQUALVERIFY {
             if !ScriptNum::cast_to_bool(self.stack_top()?) {
@@ -122,10 +122,6 @@ impl Spend {
 }
 
 /// A comparison's result as a script number: 1 when it holds, 0 otherwise.
-fn truth(holds: bool) -> BigNumber {
-    if holds {
-        BigNumber::one()
-    } else {
-        BigNumber::zero()
-    }
+fn truth(holds: bool) -> BigInt {
+    BigInt::from(u8::from(holds))
 }

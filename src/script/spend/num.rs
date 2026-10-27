@@ -52,6 +52,10 @@ impl Spend {
                 return Err(self.overflow_error(bytes.len(), max));
             }
         }
+        // the digits, at most 7 bytes past the operand's, and a non-minimal
+        // operand's shrink half again, asked first (bsv-rs#374)
+        let len = bytes.len() as u64;
+        self.number_room(len + len / 2 + 8)?;
         ScriptNum::from_bytes(bytes, self.require_minimal)
             .map_err(|e| self.error(&format!("Invalid script number: {}", e)))
     }
@@ -89,7 +93,9 @@ impl Spend {
     /// `-`, `*` and the numeric shifts: `script_num.cpp:164`, `194`, `214`,
     /// `301-315`).
     pub(super) fn push_number(&mut self, value: &BigNumber) -> Result<(), ScriptEvaluationError> {
-        self.push_encoded_number(ScriptNum::to_bytes(value))
+        let bytes = ScriptNum::try_to_bytes(value)
+            .map_err(|_| self.allocation_declined(value.byte_length() + 1))?;
+        self.push_encoded_number(bytes)
     }
 
     /// [`push_number`](Self::push_number) of a number already encoded.

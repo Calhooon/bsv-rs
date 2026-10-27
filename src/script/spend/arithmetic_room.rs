@@ -13,9 +13,13 @@
 //! reads judge them (their verdicts first), then, in the default mode, a
 //! result whose least possible length passes the element bound is declined
 //! from the operands' bytes alone, and in every mode the allocator is asked
-//! for the result's greatest possible length with `try_reserve_exact`, its
-//! refusal a decline. After the arithmetic the default mode declines a result
-//! longer than the bound by its exact length (at most two bytes past it).
+//! with `try_reserve_exact`, then released, for the most the step holds past
+//! its operands (`step_peak`, a multiple of their bytes, `STEP_PEAK_*`:
+//! the decode, the arithmetic's scratch, the result and its encoding, not
+//! the result alone), its refusal a decline. After the arithmetic the
+//! default mode declines a result longer than the bound by its exact length
+//! (at most two bytes past it).
+//!
 //! Under a word the element bound does not apply (an element after Genesis is
 //! bounded by the stack memory budget alone, `src/consensus/consensus.h:81-82`):
 //! the number-length limit bounds every operand at its read and the node's
@@ -23,7 +27,7 @@
 
 use crate::primitives::BigNumber;
 use crate::script::evaluation_error::{ScriptEvaluationError, ScriptResource, ScriptResourceLimit};
-use crate::script::op::{opcode_to_name, OP_1ADD, OP_1SUB, OP_2MUL, OP_ADD, OP_MUL, OP_SUB};
+use crate::script::op::{opcode_to_name, OP_DIV, OP_MOD, OP_MUL};
 use crate::script::script_num::ScriptNum;
 
 use super::limits::MAX_SCRIPT_ELEMENT_SIZE;
@@ -32,9 +36,28 @@ use super::Spend;
 use std::cell::Cell;
 use std::collections::TryReserveError;
 
-/// A result of fewer bytes than this is not asked of the allocator ahead of
-/// the arithmetic: the step's other allocations are of its order.
+/// A step of fewer bytes than this is not asked of the allocator ahead of
+/// the arithmetic: the interpreter's other allocations are of its order.
 const RESERVATION_FLOOR: u64 = 1 << 16;
+
+/// Every arithmetic opcode but the three below: an operand's digits read
+/// while its bytes are held (`BigUint::from_bytes_le`, at most 7 bytes past
+/// them, a non-minimal operand's shrink half again), the result computed in
+/// one operand's digits (`+`, `-`, `<< 1`, `/ 2`, negation owned), then
+/// encoded beside them; measured 1.0 times the operands' bytes.
+const STEP_PEAK_LINEAR: u64 = 2;
+/// `OP_MUL`: the product's digits (both operands' length) and num-bigint
+/// 0.4.8's Toom-3 scratch (the six parts, the four sums, the five point
+/// products, a third the size at each level of its recursion); measured at
+/// most 5.12 times the operands' bytes, where the shorter is just over half
+/// the longer.
+const STEP_PEAK_MUL: u64 = 6;
+/// `OP_DIV`, `OP_MOD`: num-bigint 0.4.8's Burnikel-Ziegler division, which
+/// pads the dividend to a power of two of digits (doubled once when its top
+/// block is not below the divisor) and recurses on copies of those blocks;
+/// measured at most 10.0 times the operands' bytes, a dividend just past a
+/// power of two over a divisor just past its 64-digit threshold.
+const STEP_PEAK_DIV: u64 = 12;
 
 impl Spend {
     /// Room for `opcode`'s result on `operands` (in the order the opcode reads
@@ -48,16 +71,29 @@ impl Spend {
             self.check_number(operand)?;
         }
         let bits: Vec<u64> = operands.iter().map(|o| magnitude_bits(o)).collect();
+        let lens: Vec<usize> = operands.iter().map(|o| o.len()).collect();
         if self.flags.is_none() {
             let least = encoded_len(least_result_bits(opcode, &bits));
             if least > element_bound() as u64 {
-                return Err(self.result_declined(opcode, operands, least, "at least "));
+                return Err(self.result_declined(opcode, &lens, least, "at least "));
             }
         }
-        let most = encoded_len(most_result_bits(opcode, &bits));
-        if most >= RESERVATION_FLOOR {
-            let room = usize::try_from(most).unwrap_or(usize::MAX);
-            reserve(room).map_err(|_| self.room_refused(opcode, operands, most))?;
+        let peak = step_peak(opcode, &lens);
+        if peak >= RESERVATION_FLOOR {
+            let room = usize::try_from(peak).unwrap_or(usize::MAX);
+            reserve(room).map_err(|_| self.room_refused(opcode, &lens, peak))?;
+        }
+        Ok(())
+    }
+
+    /// Room for a step outside the arithmetic opcodes that allocates at most
+    /// `len` bytes past its operands (a number's read, a numeric shift's
+    /// result and its encoding), asked of the allocator first: its refusal is
+    /// [`allocation_declined`](Self::allocation_declined), never an abort.
+    pub(super) fn number_room(&self, len: u64) -> Result<(), ScriptEvaluationError> {
+        if len >= RESERVATION_FLOOR {
+            let room = usize::try_from(len).unwrap_or(usize::MAX);
+            reserve(room).map_err(|_| self.allocation_declined(room))?;
         }
         Ok(())
     }
@@ -68,10 +104,12 @@ impl Spend {
     pub(super) fn push_arithmetic_result(
         &mut self,
         opcode: u8,
-        operands: &[&[u8]],
+        operands: &[usize],
         value: &BigNumber,
     ) -> Result<(), ScriptEvaluationError> {
-        let bytes = ScriptNum::to_bytes(value);
+        let bytes = ScriptNum::try_to_bytes(value).map_err(|_| {
+            self.allocation_declined(encoded_len(value.as_bigint().bits()) as usize)
+        })?;
         if self.flags.is_none() && bytes.len() > element_bound() {
             let len = bytes.len() as u64;
             return Err(self.result_declined(opcode, operands, len, ""));
@@ -86,7 +124,7 @@ impl Spend {
     fn result_declined(
         &self,
         opcode: u8,
-        operands: &[&[u8]],
+        operands: &[usize],
         len: u64,
         qualifier: &str,
     ) -> ScriptEvaluationError {
@@ -104,14 +142,14 @@ impl Spend {
         .with_resource_limit(limit)
     }
 
-    /// The allocator's refusal of `len` bytes for `opcode`'s result:
+    /// The allocator's refusal of `len` bytes for `opcode`'s step:
     /// [`allocation_declined`](Self::allocation_declined)'s limit, with the
     /// opcode and the sizes.
-    fn room_refused(&self, opcode: u8, operands: &[&[u8]], len: u64) -> ScriptEvaluationError {
+    fn room_refused(&self, opcode: u8, operands: &[usize], len: u64) -> ScriptEvaluationError {
         let declined = self.allocation_declined(usize::try_from(len).unwrap_or(usize::MAX));
         let name = opcode_to_name(opcode).unwrap_or("OP");
         let message = format!(
-            "{}: the allocator refused the {len} bytes {name}'s result may need, from {}.",
+            "{}: the allocator refused the {len} bytes {name}'s step may need, from {}.",
             declined.message,
             describe(operands)
         );
@@ -123,11 +161,11 @@ impl Spend {
 }
 
 /// `operands of A and B bytes`, or `an operand of A bytes`.
-fn describe(operands: &[&[u8]]) -> String {
+fn describe(operands: &[usize]) -> String {
     match operands {
-        [one] => format!("an operand of {} bytes", one.len()),
+        [one] => format!("an operand of {one} bytes"),
         _ => {
-            let lens: Vec<String> = operands.iter().map(|o| o.len().to_string()).collect();
+            let lens: Vec<String> = operands.iter().map(usize::to_string).collect();
             format!("operands of {} bytes", lens.join(" and "))
         }
     }
@@ -165,15 +203,16 @@ fn least_result_bits(opcode: u8, bits: &[u64]) -> u64 {
     }
 }
 
-/// The most bits `opcode`'s result can have.
-fn most_result_bits(opcode: u8, bits: &[u64]) -> u64 {
-    let longest = bits.iter().copied().max().unwrap_or(0);
-    match opcode {
-        OP_MUL => bits.iter().sum(),
-        OP_ADD | OP_SUB | OP_2MUL => longest + 1,
-        OP_1ADD | OP_1SUB => longest.max(1) + 1,
-        _ => longest,
-    }
+/// The most bytes `opcode`'s step holds past its operands' own, from their
+/// lengths: a multiple of their sum (`STEP_PEAK_*`).
+fn step_peak(opcode: u8, lens: &[usize]) -> u64 {
+    let total: u64 = lens.iter().map(|&len| len as u64).sum();
+    let multiple = match opcode {
+        OP_MUL => STEP_PEAK_MUL,
+        OP_DIV | OP_MOD => STEP_PEAK_DIV,
+        _ => STEP_PEAK_LINEAR,
+    };
+    total.saturating_mul(multiple)
 }
 
 /// The default mode's element bound on an arithmetic result.
