@@ -3,11 +3,13 @@
 //! `packages/sdk/src/identity/IdentityClient.ts:420-499`; #307): the
 //! certificate's fields and the names to reveal, then the master
 //! certificate's signature, all before the wallet is asked for anything;
-//! after `proveCertificate`, the keyring's names against the names asked.
+//! after `proveCertificate`, the keyring's names against the names asked
+//! and each value's base64 form and size, the trimmed values published.
 //!
 //! [`IdentityClient::publicly_reveal_attributes`]: super::IdentityClient::publicly_reveal_attributes
 
 use crate::auth::certificates::Certificate;
+use crate::error::WalletRefusalClass;
 use crate::wallet::WalletCertificate;
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
@@ -115,18 +117,90 @@ fn master_signature_verifies(certificate: &WalletCertificate) -> bool {
         .is_ok_and(|master| matches!(master.verify(), Ok(true)))
 }
 
-/// The wallet's keyring names exactly the names asked
-/// (`IdentityClient.ts:487-491`); the reference's base64 bound on each
-/// value (`:492-499`) is not followed (the changelog's #307 note).
-pub(super) fn check_keyring_fields(
+/// The wallet's keyring after `proveCertificate` (`IdentityClient.ts:478-499`):
+/// a name `__proto__`, `constructor` or `prototype` refused first, as
+/// `identityRecord` refuses it (`:480-483`, `:45-65`), whether or not the
+/// count matches; then any other name than those asked, or one missing
+/// (`:484-491`); then each value through [`keyring_value`] (`:492-499`).
+/// The answer is the keyring with each value trimmed, the one the PushDrop
+/// carries. The reference judges the values in the wallet's key order; the
+/// crate's keyring is a map, so they are judged in the order of the names
+/// asked, which differs only in which of two bad values is named.
+pub(super) fn check_keyring(
     keyring: &HashMap<String, String>,
     fields_to_reveal: &[String],
-) -> Result<()> {
+) -> Result<HashMap<String, String>> {
+    if keyring.keys().any(|k| is_unsafe_record_key(k)) {
+        return Err(refused(
+            "Invalid display identity: proof result keyringForVerifier contains an unsafe field",
+        ));
+    }
     let requested: HashSet<&str> = fields_to_reveal.iter().map(String::as_str).collect();
     if keyring.len() != requested.len() || keyring.keys().any(|k| !requested.contains(k.as_str())) {
         return Err(refused(
             "Public reveal failed: wallet returned a keyring for unrequested fields!",
         ));
     }
-    Ok(())
+    fields_to_reveal
+        .iter()
+        .filter_map(|name| keyring.get_key_value(name))
+        .map(|(name, value)| Ok((name.clone(), keyring_value(value, name)?)))
+        .collect()
+}
+
+/// The most bytes a keyring value may decode to (`IdentityClient.ts:497`).
+const MAX_KEYRING_VALUE_BYTES: usize = 2048;
+
+/// The reference's `validateBase64String(value, 'keyringForVerifier.<name>',
+/// 1, 2048)` (`validationHelpers.ts:488-498`, its helpers at `:439-476`):
+/// the value trimmed as JavaScript's `trim` trims, then base64 by its
+/// shape (letters, digits, `+`, `/`, at most two `=` at the end, a length
+/// the padding allows) and 1 to 2048 bytes by `floor(3 * unpadded / 4)`,
+/// nothing decoded. A refusal is `WERR_INVALID_PARAMETER` (code 6,
+/// `WERR_INVALID_PARAMETER.ts`): `The keyringForVerifier.<name> parameter
+/// must be valid base64 string`, `.. at least 1 bytes`, `.. no more than
+/// 2048 bytes`. The answer is the trimmed text.
+fn keyring_value(value: &str, name: &str) -> Result<String> {
+    let invalid = |must_be: &str| Error::WalletRefusal {
+        class: WalletRefusalClass::InvalidParameter,
+        message: format!("The keyringForVerifier.{name} parameter must be {must_be}"),
+    };
+    let value = value.trim_matches(is_js_whitespace);
+    let not_base64 = || invalid("valid base64 string");
+    if value.is_empty() {
+        return Err(not_base64());
+    }
+    let length = value.len();
+    let mut padding = 0;
+    for (index, byte) in value.bytes().enumerate() {
+        if byte.is_ascii_alphanumeric() || byte == b'+' || byte == b'/' {
+            continue;
+        }
+        if byte != b'=' || index + 2 < length {
+            return Err(not_base64());
+        }
+        padding += 1;
+    }
+    let remainder = length % 4;
+    if padding > 2
+        || (padding > 0 && remainder != 0)
+        || (remainder != 0 && remainder != 4 - padding)
+    {
+        return Err(not_base64());
+    }
+    let bytes = (length - padding) * 3 / 4;
+    if bytes < 1 {
+        return Err(invalid("at least 1 bytes"));
+    }
+    if bytes > MAX_KEYRING_VALUE_BYTES {
+        return Err(invalid("no more than 2048 bytes"));
+    }
+    Ok(value.to_string())
+}
+
+/// What JavaScript's `String.prototype.trim` removes: `WhiteSpace` and
+/// `LineTerminator` (ECMA-262), Unicode's `White_Space` with U+FEFF and
+/// without U+0085, which Rust's `char::is_whitespace` has the other way.
+fn is_js_whitespace(c: char) -> bool {
+    c == '\u{feff}' || (c.is_whitespace() && c != '\u{85}')
 }

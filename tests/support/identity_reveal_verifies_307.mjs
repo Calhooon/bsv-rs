@@ -1,7 +1,8 @@
 // The #307 witnesses: the reference's `publiclyRevealAttributes` checks the
 // certificate's fields and the names to reveal, then verifies the master
 // certificate, before it calls the wallet (`ts-stack@edf6e03`
-// `packages/sdk/src/identity/IdentityClient.ts:420-467`).
+// `packages/sdk/src/identity/IdentityClient.ts:420-467`), and after
+// proveCertificate checks the keyring's names and values (`:478-499`).
 //
 // Run against @bsv/sdk at ts-stack@edf6e03 bundled with bun (no node_modules):
 //   git -C ~/bsv/ts-stack archive edf6e03 packages/sdk | tar -x -C "$W"
@@ -17,11 +18,14 @@
 // the names asked, getPublicKey and createSignature with key 5's, and
 // createAction with no transaction; `refusal` is the reference's words
 // (`null` when it reached createAction), `wallet_calls` the calls it made
-// before the refusal or before createAction. The signatures are RFC 6979's, so two runs print the same file.
+// before the refusal or before createAction. A keyring witness names the
+// keyring the wallet answers instead (`keyring`), the refusal's class
+// (`refusal_name`, `Error` or `WERR_INVALID_PARAMETER`) and, when it
+// reached createAction, the keyring the PushDrop carries (`published_keyring`). The signatures are RFC 6979's, so two runs print the same file.
 import { pathToFileURL } from 'url'
 
 const [sdkPath] = process.argv.slice(2)
-const { Certificate, IdentityClient, ProtoWallet, PrivateKey, Utils } =
+const { Certificate, IdentityClient, LockingScript, ProtoWallet, PrivateKey, PushDrop, Utils } =
   await import(pathToFileURL(sdkPath).href)
 
 const key = (n) => new PrivateKey(n)
@@ -70,48 +74,80 @@ const cases = [
   ['unsafe_name', 'the name constructor', good, ['constructor']],
   ['duplicate_name', 'email twice', good, ['email', 'email']],
   ['absent_name', 'a name the certificate does not carry', good, ['phone']],
-  ['unsigned_absent_name', 'the empty signature and an absent name: the name refused first', { ...good, signature: '' }, ['phone']]
+  ['unsigned_absent_name', 'the empty signature and an absent name: the name refused first', { ...good, signature: '' }, ['phone']],
+  ['keyring_unsafe_proto', 'the keyring carrying __proto__ beside email', good, ['email'], JSON.parse('{"email":"AAAA","__proto__":"AAAA"}')],
+  ['keyring_unsafe_constructor', 'the keyring naming constructor alone, one name as asked', good, ['email'], { constructor: 'AAAA' }],
+  ['keyring_unrequested', 'the keyring naming email and name, email asked', good, ['email'], { email: 'AAAA', name: 'AAAA' }],
+  ['keyring_other_name', 'the keyring naming name alone, email asked', good, ['email'], { name: 'AAAA' }],
+  ['keyring_missing', 'the empty keyring', good, ['email'], {}],
+  ['keyring_not_base64', 'a value with !', good, ['email'], { email: 'AA!A' }],
+  ['keyring_empty', 'the empty value', good, ['email'], { email: '' }],
+  ['keyring_whitespace_only', 'a value of whitespace alone', good, ['email'], { email: ' \t\n' }],
+  ['keyring_padding_inside', 'a = before the last two places', good, ['email'], { email: 'A=AA' }],
+  ['keyring_short', 'three characters, no padding', good, ['email'], { email: 'AAA' }],
+  ['keyring_one_char', 'one character', good, ['email'], { email: 'A' }],
+  ['keyring_oversized', '2732 characters, 2049 bytes', good, ['email'], { email: 'A'.repeat(2732) }],
+  ['keyring_at_bound', '2731 characters and =, 2048 bytes', good, ['email'], { email: 'A'.repeat(2731) + '=' }],
+  ['keyring_trimmed', 'a value with whitespace around it', good, ['email'], { email: ' \tAAAA\n ' }],
+  ['keyring_bom_trimmed', 'a value after U+FEFF, which JavaScript trims', good, ['email'], { email: '\uFEFFAAAA' }],
+  ['keyring_nel_kept', 'a value after U+0085, which JavaScript does not trim', good, ['email'], { email: '\u0085AAAA' }],
+  ['keyring_noncanonical', 'AB==, its last bits not zero, read by shape only', good, ['email'], { email: 'AB==' }],
+  ['keyring_both_fields_trimmed', 'both fields revealed, each value padded with spaces', good, ['email', 'name'], { email: ' AAAA', name: 'AAAA ' }]
 ]
 
-function countingWallet () {
+function countingWallet (keyring) {
   const inner = new ProtoWallet(key(5))
   const wallet = {
     calls: [],
+    published: undefined,
     async proveCertificate (args) {
       wallet.calls.push('proveCertificate')
-      return { keyringForVerifier: Object.fromEntries(args.fieldsToReveal.map((f) => [f, 'AAAA'])) }
+      return { keyringForVerifier: keyring ?? Object.fromEntries(args.fieldsToReveal.map((f) => [f, 'AAAA'])) }
     },
     async getPublicKey (args) { wallet.calls.push('getPublicKey'); return inner.getPublicKey(args) },
     async createSignature (args) { wallet.calls.push('createSignature'); return inner.createSignature(args) },
-    async createAction () { wallet.calls.push('createAction'); return {} }
+    async createAction (args) {
+      wallet.calls.push('createAction')
+      const script = LockingScript.fromHex(args.outputs[0].lockingScript)
+      wallet.published = JSON.parse(Utils.toUTF8(PushDrop.decode(script).fields[0])).keyring
+      return {}
+    }
   }
   return wallet
 }
 
 const witnesses = []
-for (const [name, origin, certificate, fieldsToReveal] of cases) {
-  const wallet = countingWallet()
+for (const [name, origin, certificate, fieldsToReveal, keyring] of cases) {
+  const wallet = countingWallet(keyring)
   const client = new IdentityClient(wallet, {}, 'identity-client')
   let refusal = null
+  let refusalName = null
   try {
     await client.publiclyRevealAttributes(structuredClone(certificate), [...fieldsToReveal])
   } catch (e) {
     refusal = e.message
+    refusalName = e.name
   }
   const reached = wallet.calls.includes('createAction')
-  witnesses.push({
+  const witness = {
     name,
     origin,
     certificate,
     fieldsToReveal,
     refusal: reached ? null : refusal,
     wallet_calls: reached ? wallet.calls.indexOf('createAction') : wallet.calls.length
-  })
+  }
+  if (keyring !== undefined) {
+    witness.keyring = keyring
+    witness.refusal_name = reached ? null : refusalName
+    witness.published_keyring = reached ? wallet.published : null
+  }
+  witnesses.push(witness)
 }
 
 console.log(JSON.stringify({
-  description: 'publiclyRevealAttributes refuses before any wallet call a certificate whose fields, names to reveal or signature the reference refuses (#307)',
+  description: 'publiclyRevealAttributes refuses before any wallet call a certificate whose fields, names to reveal or signature the reference refuses, and before createAction a keyring whose names or values it refuses, publishing the values trimmed (#307)',
   reference: '@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), run under Node ' + process.version + ' by tests/support/identity_reveal_verifies_307.mjs',
-  site: 'ts-stack@edf6e03 packages/sdk/src/identity/IdentityClient.ts:420-467',
+  site: 'ts-stack@edf6e03 packages/sdk/src/identity/IdentityClient.ts:420-499',
   witnesses
 }, null, 2))
