@@ -105,12 +105,14 @@ fn a_field_value_one_byte_over_one_mib_is_refused_by_the_writer_in_the_reference
 }
 
 #[test]
-fn a_signed_certificate_given_a_field_value_over_one_mib_is_refused_by_verify_275() {
+fn a_signed_certificate_given_a_field_value_over_one_mib_is_false_at_verify_275() {
     let mut cert = certificate();
     cert.set_field("big", "QQ==");
     cert.sign(&key(4)).unwrap();
     cert.fields.insert("big".into(), "A".repeat(MIB + 1));
-    assert_eq!(cert.verify(), Err(refused(OVER)));
+    // The reference's `verify` answers `false` to every failure under it
+    // (`Certificate.ts:435-439`), the bound's refusal with them.
+    assert_eq!(cert.verify(), Ok(false));
 }
 
 #[test]
