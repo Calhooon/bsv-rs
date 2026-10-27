@@ -1,0 +1,11 @@
+# #353 rebase: `lane/fix-353-peer-client-verifies` onto beta after #329 landed (6c7596a)
+
+The branch (seven commits on 1cdd149: the verifying client path, its fold and the docs folds; reviewed MERGE on Opus after the folds; PR #361 at 419d5e9) meets a code conflict in `src/auth/peer.rs` with #329 (landed at 6c7596a: `WalletInterface`'s 28 methods take `originator: Option<&str>`, every caller in `peer.rs` moved to the `Option`, `None` where no originator is configured). Rebase it onto `origin/beta`, resolving `peer.rs` so both hold: #329's `Option` on every wallet call (the Peer's configured originator as `Option`, `.as_deref()` where #329 wrote it) and #353's one verifying path for both roles; the tests of both (`tests/wallet_originator_option_329.rs`'s `Peer` cases and `tests/auth_peer_client_verifies_353.rs`, `tests/auth_peer_http_signing_server_353.rs`) green; the docs conflicts (the CHANGELOG with #353's entry above #329's, the rows) kept both sides, no heading split, no line lost (diff against `origin/beta`'s CHANGELOG: only #353's sections added); `docs/ratchets.json` re-recorded by the tool on the rebased docs commit if the counters moved (never hand-edited), else left. Read `src/auth/CLAUDE.md`, `tests/CLAUDE.md`, both entries. Do not read `~/bsv/bsv-low/` or `~/vault/`. Run every gate in the foreground; never end your turn with a gate running in the background. Never push. No test or probe on a default URL or a live host.
+
+## Gate
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http"` on every test file matching `auth_*`, `wallet_*`, `socketio_*`, `transport_*`, `identity_*`, `arch_*` (not the `arch_support` module), `fixtures_replay`; `--lib auth`; `--lib wallet`; the doc tests; `cargo build --examples --all-features`; `cargo test --test readme_examples`; the wasm32 build of the CLAUDE.md feature set; `cargo semver-checks --release-type minor --baseline-rev 6c7596a`; the ratchet against `origin/beta`.
+
+## Report
+
+A REPORT: the base rebased onto, the tip, each conflict and the text taken, the diff of the rebased tip against the reviewed 419d5e9 (the resolutions only), the gate's results, anything unverified.

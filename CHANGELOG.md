@@ -832,6 +832,7 @@ signAction the hex of the reference (`src/identity/contacts.rs:447`,
 `:732`, `src/kvstore/global.rs:281`, `:409`, `src/kvstore/local.rs:331`,
 `:438`), the same fault as the revocation's: a finding outside #318,
 closed by #326.
+
 ### Fixed: the Socket.IO codec reads a frame as `socket.io-parser` reads it, and carries the id on every packet (#110)
 
 `SocketIoPacket::decode` (`src/auth/transports/socketio/codec.rs`) read
