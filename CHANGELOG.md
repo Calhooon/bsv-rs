@@ -142,20 +142,18 @@ response's `get_session_mut` looks up by an identity key where the
 manager keys by nonce), so the wait would time out every message of a
 session that requires certificates; it goes with that finding, #364.
 
-Two refusals are in other words. An HTTP response without the auth
-headers (#354, its refusal in flight) (`x-bsv-auth-version`, `x-bsv-auth-identity-key`,
-`x-bsv-auth-signature`) is refused by the reference's transport
-(`Received HTTP <status> from <url> without valid BSV authentication
-(missing headers: ...)`, `SimplifiedFetchTransport.ts:220-232`,
-`:464-485`); this crate's transport gives a response with no identity
-header the client's own key (`src/auth/transports/http.rs`,
-`response_identity`) and the Peer refuses it (`Unable to verify nonce for
-general message from: <the client's key>`, pinned by
-`an_unsigned_server_response_is_refused_353`). An initial response or a
-general message without `yourNonce` is read as the empty nonce and
-refused by the nonce check (`Initial response nonce verification failed`,
-`Unable to verify nonce for general message`), where the reference's
-message snapshot refuses the absent member first (`Peer.ts:767`).
+One refusal is in other words. An HTTP response without the auth
+headers (`x-bsv-auth-version`, `x-bsv-auth-identity-key`,
+`x-bsv-auth-signature`) is refused by the transport in the reference's
+words since #354 (`Received HTTP <status> from <url> without valid BSV
+authentication (missing headers: ...)`, `SimplifiedFetchTransport.ts:220-232`,
+`:464-494`; pinned by `an_unsigned_server_response_is_refused_353`), where
+#353 alone gave it the client's own key and the Peer refused it. An
+initial response or a general message without `yourNonce` is read as the
+empty nonce and refused by the nonce check (`Initial response nonce
+verification failed`, `Unable to verify nonce for general message`), where
+the reference's message snapshot refuses the absent member first
+(`Peer.ts:767`).
 
 Go's `Peer` (`go-sdk@2ca481c` `auth/peer.go`) verifies an initial
 response's `yourNonce` against its own wallet (`ErrInvalidNonce`,
