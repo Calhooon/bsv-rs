@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use std::sync::OnceLock;
 
 /// The cases' ids, in the vector's order.
-const IDS: [&str; 12] = [
+const IDS: [&str; 13] = [
     "canonical",
     "r_without_its_zero_byte",
     "high_s",
@@ -43,6 +43,7 @@ const IDS: [&str; 12] = [
     "trailing_byte",
     "sequence_length_short",
     "s_length_long",
+    "s_length_missing",
     "set_tag",
     "r_tag",
 ];
@@ -95,7 +96,7 @@ fn refusal(verdict: &Value) -> Option<Error> {
 }
 
 #[test]
-fn the_vector_holds_the_twelve_cases_and_this_crates_unsigned_prefix() {
+fn the_vector_holds_the_thirteen_cases_and_this_crates_unsigned_prefix() {
     let ids: Vec<&str> = cases().iter().map(|c| c["id"].as_str().unwrap()).collect();
     assert_eq!(ids, IDS);
     assert_eq!(
@@ -194,6 +195,24 @@ fn a_der_out_of_form_written_as_given_reads_back_re_encoded() {
     let read = Certificate::from_binary(&written).unwrap();
     assert_eq!(read.signature.unwrap(), signature(case("canonical")));
     assert_eq!(given.verify(), Ok(true));
+}
+
+#[test]
+fn a_der_cut_after_its_second_tag_is_refused_in_the_reference_words() {
+    // `getLength` reads past the end (`undefined`), and the length check
+    // after it throws (`Signature.ts:76-78`), at every site.
+    let c = case("s_length_missing");
+    let words = Error::CertificateValidationError("Invalid R-length in signature DER".into());
+    assert_eq!(c["from_der"]["error"], "Invalid R-length in signature DER");
+    assert_eq!(
+        Certificate::from_binary(&frame(c)).err(),
+        Some(words.clone())
+    );
+    assert_eq!(
+        certificate(Some(signature(c))).to_binary(true).err(),
+        Some(words)
+    );
+    assert_eq!(certificate(Some(signature(c))).verify(), Ok(false));
 }
 
 #[test]

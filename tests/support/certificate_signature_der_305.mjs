@@ -80,6 +80,9 @@ const signatures = [
   ['sequence_length_short', hex([0x30, der[1] - 1, ...der.slice(2)])],
   // s's length one longer than its bytes.
   ['s_length_long', hex([...der.slice(0, 5 + rLen), s.length + 1, ...s])],
+  // The DER cut after s's tag, the sequence's length its own: `getLength`
+  // reads past the end and the length check after it throws.
+  ['s_length_missing', hex([0x30, 3 + rLen, ...der.slice(2, 5 + rLen)])],
   // A set tag where the sequence's goes.
   ['set_tag', '31' + canonical.slice(2)],
   // An integer tag on r other than 02.

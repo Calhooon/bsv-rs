@@ -476,7 +476,13 @@ pub(crate) fn reference_der(der: &[u8]) -> Result<Vec<u8>, String> {
     if der.get(r_end) != Some(&0x02) {
         return Err(invalid());
     }
-    let s_len = length(r_end + 1)?;
+    // `getLength` past the end reads `undefined`, and the length check that
+    // follows throws its own words (`Signature.ts:76-78`).
+    let s_len = match der.get(r_end + 1) {
+        Some(b) if b & 0x80 == 0 => *b as usize,
+        Some(_) => return Err("Invalid DER entity length".to_string()),
+        None => return Err("Invalid R-length in signature DER".to_string()),
+    };
     if der.len() != r_end + 2 + s_len {
         return Err("Invalid R-length in signature DER".to_string());
     }
