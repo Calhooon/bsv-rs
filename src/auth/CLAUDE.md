@@ -121,11 +121,9 @@ impl AuthMessage {
 - `InitialResponse` - `your_nonce || initial_nonce` (base64-decoded, initiator nonce then responder nonce; matches Go/TS)
 - `General` - The payload bytes
 - `CertificateRequest` - the `requestedCertificates` JSON text as transmitted (`requested_certificates_text`)
-- `CertificateResponse` - the `certificates` JSON text as transmitted (`certificates_text`)
+- `CertificateResponse` - the `certificates` JSON text as transmitted (`certificates_text`) (the reference's certificate JSON since #268)
 
 The signed certificate texts (#280): BRC-103 names no serialization (`0103.md:133-137`, `:172`); the reference signs `JSON.stringify` of the member it sends and verifies `JSON.stringify` of the member it parsed (`Peer.ts:453`, `:1068`, `:1140`, `:1203`), the received text when it is compact. `AuthMessage`'s serde is hand-written (JSON only, `serde_json` raw values): the deserializer keeps each member's text as received and parses the value from it; the serializer writes a carried text as it stands while it reads back to the value (parsed as the type, the same `serde_json::Value`), the value otherwise; `signing_data` signs the same bytes. A member changed after receipt is serialized afresh. `Peer` builds with the setters, so it signs the compact text it sends. Reading an `AuthMessage` from a `serde_json::Value` (`from_value`) still parses, but the text is then the `Value`'s key-sorted re-serialization: read a certificate message from its text. A struct literal adds `certificates_text: None, requested_certificates_text: None`.
-- `CertificateRequest` - JSON-serialized `requested_certificates`
-- `CertificateResponse` - JSON-serialized `certificates` (the reference's certificate JSON since #268)
 
 **get_key_id()** behavior by message type:
 - `InitialResponse` - `"{your_nonce} {initial_nonce}"` (uses the message's own fields, ignoring `peer_session_nonce` param)
