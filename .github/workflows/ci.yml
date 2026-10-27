@@ -37,8 +37,8 @@ permissions:
 # The group carries the event, and a bench baseline record its own mark: a
 # dispatch (the nightly's dispatch of this workflow, a record for
 # benches/baseline.json) is never cancelled by a push to the same ref and
-# never cancels one, a record never cancels the nightly's run nor the nightly
-# a record; a pull request's own ref keeps each PR in a group of its own.
+# never cancels one, a record never cancels the nightly's dispatch nor the
+# nightly's dispatch a record; a pull request's own ref keeps each PR in a group of its own.
 concurrency:
   group: ci-${{ github.event_name }}-${{ inputs.bench_baseline_record && 'record-' || '' }}${{ github.ref }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}

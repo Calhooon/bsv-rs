@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed: CI's concurrency group carries the event, so a dispatch and a push to one ref never cancel each other
+### Changed: CI's concurrency group carries the event, so a dispatch and a
+push to one ref never cancel each other
 
 `ci.yml`'s concurrency group was `ci-<ref>`: a `workflow_dispatch` on `beta`
 (the bench baseline's record mode, `bench_baseline_record`; the nightly's
