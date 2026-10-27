@@ -235,14 +235,24 @@ impl HttpWalletJson {
                 .map_err(|e| request_error(e, "failed to parse JSON response"));
         }
         // createAction's and signAction's `tx` read by the error path's
-        // byte reader, as the reference normalizes both (#339)
-        let mut body = response
-            .json::<serde_json::Value>()
+        // byte reader, as the reference normalizes both (#339); the answer
+        // the typed reading takes costs what it cost, the byte reader's
+        // `Value` tree (about 32 bytes a byte) built only for one it refuses
+        let text = response
+            .bytes()
             .await
             .map_err(|e| request_error(e, "failed to parse JSON response"))?;
+        let typed = match serde_json::from_slice::<R>(&text) {
+            Ok(result) => return Ok(result),
+            Err(e) => e,
+        };
+        let parse_error = |e| Error::WalletError(format!("failed to parse JSON response: {e}"));
+        let Ok(mut body) = serde_json::from_slice::<serde_json::Value>(&text) else {
+            return Err(parse_error(typed));
+        };
+        drop(text);
         review_actions::normalize_success_tx(&mut body);
-        serde_json::from_value(body)
-            .map_err(|e| Error::WalletError(format!("failed to parse JSON response: {e}")))
+        serde_json::from_value(body).map_err(parse_error)
     }
 
     // =========================================================================

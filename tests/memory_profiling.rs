@@ -630,3 +630,78 @@ fn test_beef_stream_memory_on_a_reversed_chain() {
         assert!(whole < 64.0, "N={n}: {whole:.1} B per held link");
     }
 }
+
+/// `HttpWalletJson` reads a createAction answer's `tx` in the array form at
+/// the cost of the typed reading (#339): the byte reader's `Value` tree
+/// (about 32 bytes a byte, 48 MB at its peak for a 1 MiB `tx`, the second
+/// fold's) is built only for an answer the typed reading refuses (the
+/// historical object form, a byte written `1.0`). The peak counts the
+/// mock's copy of the body and the client's: the 1 MiB `tx` is about
+/// 3.6 MB of text.
+#[cfg(all(feature = "wallet", feature = "http"))]
+#[test]
+fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
+    use bsv_rs::wallet::substrates::HttpWalletJson;
+    use bsv_rs::wallet::CreateActionArgs;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    let _serial = serial();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let tx: Vec<u8> = (0..1usize << 20).map(|i| (i % 256) as u8).collect();
+    let txid = "11".repeat(32);
+    let answer = |tx: serde_json::Value| {
+        serde_json::to_vec(&serde_json::json!({ "txid": txid, "tx": tx })).unwrap()
+    };
+    let array = answer(serde_json::json!(tx));
+    let object = answer(serde_json::Value::Object(
+        tx.iter()
+            .enumerate()
+            .map(|(i, b)| (i.to_string(), serde_json::json!(b)))
+            .collect(),
+    ));
+
+    let peak = |body: &[u8]| -> u64 {
+        runtime.block_on(async {
+            let server = MockServer::start().await;
+            Mock::given(method("POST"))
+                .and(path("/createAction"))
+                .respond_with(
+                    ResponseTemplate::new(200).set_body_raw(body.to_vec(), "application/json"),
+                )
+                .mount(&server)
+                .await;
+            let wallet =
+                HttpWalletJson::new(Some("example.com".into()), Some(server.uri())).unwrap();
+            let args: CreateActionArgs =
+                serde_json::from_value(serde_json::json!({ "description": "a 1 MiB tx" })).unwrap();
+            let _profiler = dhat::Profiler::builder().testing().build();
+            let result = wallet.create_action(args, None).await.unwrap();
+            assert_eq!(result.tx.as_deref(), Some(&tx[..]));
+            dhat::HeapStats::get().max_bytes as u64
+        })
+    };
+
+    println!("\n=== HttpWalletJson, a createAction answer's 1 MiB tx ===");
+    let array_peak = peak(&array);
+    println!(
+        "  array form ({} B of text): peak {array_peak} B",
+        array.len()
+    );
+    let object_peak = peak(&object);
+    println!(
+        "  object form ({} B of text): peak {object_peak} B",
+        object.len()
+    );
+    // The body's text twice (the mock's copy and the client's) and the
+    // bytes read, with room for the client's buffers; the `Value` tree is
+    // more than four times the text.
+    assert!(
+        array_peak < 4 * array.len() as u64,
+        "array form: peak {array_peak} B for {} B of text",
+        array.len()
+    );
+}
