@@ -169,10 +169,12 @@ replayed on every PR, recorded only by `BSV_FIXTURES_RECORD=1` in a behavior
 PR's own commit, the census refusing a silent addition or loss.
 [FIXTURES.md](FIXTURES.md).
 
-**The nightly.** Mutants on five surfaces (script, BEEF, merkle path, wallet
-wire, wallet substrates) with a floor per file, and one hour of fuzzing per
-target from its checked-in corpus, each crash filed as an issue naming the
-panic site; never on a PR. [NIGHTLY.md](NIGHTLY.md), [`fuzz/fuzz_targets/CLAUDE.md`](../fuzz/fuzz_targets/CLAUDE.md).
+**The oracles, on demand.** Mutants on five surfaces (script, BEEF, merkle path,
+wallet wire, wallet substrates) with a floor per file, and one hour of fuzzing
+per target from its checked-in corpus, each crash filed as an issue naming the
+panic site; never on a PR, never on a schedule (the owner's word of 2026-10-27):
+one dispatched measurement before each minor tag, none for a prerelease.
+[NIGHTLY.md](NIGHTLY.md), [`fuzz/fuzz_targets/CLAUDE.md`](../fuzz/fuzz_targets/CLAUDE.md).
 
 **The dependents.** Every admitted consumer built against the PR tree with a
 `patch.crates-io` override proven to resolve, each failure naming its consumer;

@@ -232,6 +232,16 @@ struct with no constructor and no default URL (GorillaPool appears only in
 `docs/examples/broadcaster/broadcaster_gp/broadcaster_gp.go:16`), and Go has no
 `LivePolicy` (`transaction/fee_model/` holds `sats_per_kb.go` alone): the
 caller names every ARC URL there, as this crate now asks.
+### Changed: the oracles run on demand, the nightly schedule removed (the owner's word of 2026-10-27)
+
+The owner's fleet word of 2026-10-27: the nightly runs were a waste of
+resources. The `schedule` trigger is gone from `.github/workflows/nightly.yml`
+on both lines (the 03:00 UTC cron of #283 and #284 and its cap are moot);
+`workflow_dispatch` stays, so the mutation shards, the fuzz hours, the
+scoreboard and `ci.yml`'s full set on each line run when asked: one dispatched
+measurement before each minor tag, none for a prerelease. The push matrix on
+the protected branches is unchanged (the rule of 2026-10-26). `docs/NIGHTLY.md`
+and `docs/ARCHITECTURE.md` say so.
 
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 
