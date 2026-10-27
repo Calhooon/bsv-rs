@@ -68,14 +68,14 @@ macro_rules! wallet {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for Wallet {
-            $(async fn $method(&self, _: $args, _: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, _: $args, _: Option<&str>) -> bsv_rs::Result<$result> {
                 unreachable!()
             })*
 
             async fn get_public_key(
                 &self,
                 args: GetPublicKeyArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<GetPublicKeyResult> {
                 self.called()?;
                 let mut result = WalletInterface::get_public_key(&self.inner, args, o).await?;
@@ -84,18 +84,18 @@ macro_rules! wallet {
                 }
                 Ok(result)
             }
-            async fn encrypt(&self, args: EncryptArgs, o: &str) -> bsv_rs::Result<EncryptResult> {
+            async fn encrypt(&self, args: EncryptArgs, o: Option<&str>) -> bsv_rs::Result<EncryptResult> {
                 self.called()?;
                 WalletInterface::encrypt(&self.inner, args, o).await
             }
-            async fn decrypt(&self, args: DecryptArgs, o: &str) -> bsv_rs::Result<DecryptResult> {
+            async fn decrypt(&self, args: DecryptArgs, o: Option<&str>) -> bsv_rs::Result<DecryptResult> {
                 self.called()?;
                 WalletInterface::decrypt(&self.inner, args, o).await
             }
             async fn create_hmac(
                 &self,
                 args: CreateHmacArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<CreateHmacResult> {
                 self.called()?;
                 WalletInterface::create_hmac(&self.inner, args, o).await
@@ -103,7 +103,7 @@ macro_rules! wallet {
             async fn verify_hmac(
                 &self,
                 args: VerifyHmacArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<VerifyHmacResult> {
                 self.called()?;
                 WalletInterface::verify_hmac(&self.inner, args, o).await
@@ -111,7 +111,7 @@ macro_rules! wallet {
             async fn create_signature(
                 &self,
                 args: CreateSignatureArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<CreateSignatureResult> {
                 self.called()?;
                 let mut result = WalletInterface::create_signature(&self.inner, args, o).await?;
@@ -123,7 +123,7 @@ macro_rules! wallet {
             async fn verify_signature(
                 &self,
                 args: VerifySignatureArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<VerifySignatureResult> {
                 self.called()?;
                 WalletInterface::verify_signature(&self.inner, args, o).await
@@ -131,7 +131,7 @@ macro_rules! wallet {
             async fn reveal_counterparty_key_linkage(
                 &self,
                 args: WalletRevealCounterpartyArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
                 self.called()?;
                 let mut result =
@@ -151,7 +151,7 @@ macro_rules! wallet {
             async fn reveal_specific_key_linkage(
                 &self,
                 args: WalletRevealSpecificArgs,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
                 self.called()?;
                 let mut result =
@@ -171,15 +171,15 @@ macro_rules! wallet {
                 }
                 Ok(result)
             }
-            async fn is_authenticated(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 self.called()?;
                 Ok(AuthenticatedResult { authenticated: true })
             }
-            async fn wait_for_authentication(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn wait_for_authentication(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 self.called()?;
                 Ok(AuthenticatedResult { authenticated: true })
             }
-            async fn get_height(&self, _: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, _: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 self.called()?;
                 let height = self.answers.lock().unwrap().height.unwrap_or(800_000);
                 Ok(GetHeightResult { height })
@@ -187,12 +187,12 @@ macro_rules! wallet {
             async fn get_header_for_height(
                 &self,
                 _: GetHeaderArgs,
-                _: &str,
+                _: Option<&str>,
             ) -> bsv_rs::Result<GetHeaderResult> {
                 self.called()?;
                 Ok(GetHeaderResult { header: "00".repeat(80) })
             }
-            async fn get_network(&self, o: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, o: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 self.called()?;
                 let mut result = WalletInterface::get_network(&self.inner, o).await?;
                 if let Some(network) = self.answers.lock().unwrap().network {
@@ -200,7 +200,7 @@ macro_rules! wallet {
                 }
                 Ok(result)
             }
-            async fn get_version(&self, o: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, o: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 self.called()?;
                 let mut result = WalletInterface::get_version(&self.inner, o).await?;
                 if let Some(version) = self.answers.lock().unwrap().version.clone() {

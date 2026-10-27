@@ -382,7 +382,7 @@ pub struct IdentityClientConfig {
     pub key_id: String,                 // Default: "1"
     pub token_amount: u64,              // Satoshis for revelation outputs (default: 1)
     pub output_index: u32,              // Output index for identity token (default: 0)
-    pub originator: Option<String>,     // Application originator for audit trails
+    pub originator: Option<String>,     // Application originator; None: none to the wallet (#318, #329)
 }
 
 // Builder methods
@@ -397,7 +397,7 @@ let config = IdentityClientConfig::with_originator("myapp.com")
 pub struct ContactsManagerConfig {
     pub protocol_id: (u8, String),  // Default: (2, "contact")
     pub basket: String,             // Default: "contacts"
-    pub originator: Option<String>, // Application originator
+    pub originator: Option<String>, // Application originator; None: none to the wallet (#329)
 }
 
 let config = ContactsManagerConfig::with_originator("myapp.com");

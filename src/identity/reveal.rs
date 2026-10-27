@@ -272,7 +272,7 @@ impl Serialize for InOrder<'_> {
 /// subject's under `[1, 'identity']` key `1` (`identityTokenValidation.ts:92-136`).
 pub(super) async fn identity_token<W: WalletInterface + ?Sized>(
     wallet: &W,
-    originator: &str,
+    originator: Option<&str>,
     (level, name): (u8, &str),
     key_id: &str,
     certificate: &WalletCertificate,

@@ -163,7 +163,7 @@ async fn validate_certificates_refuses_an_unsigned_certificate_in_the_references
         )]);
         let verifier = ProtoWallet::new(Some(key(5)));
         assert_eq!(
-            validate_certificates(&verifier, &message, None, "test").await,
+            validate_certificates(&verifier, &message, None, Some("test")).await,
             Err(Error::AuthError(format!(
                 "The signature for the certificate with serial number {serial} is invalid!"
             )))

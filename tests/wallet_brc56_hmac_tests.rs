@@ -241,8 +241,11 @@ fn a_minimal_length_key_tag_is_refused_through_the_async_interface() {
         counterparty: Some(counterparty(row)),
         ..Default::default()
     };
-    let result =
-        futures::executor::block_on(WalletInterface::verify_hmac(&wallet, args, "brc56.test"));
+    let result = futures::executor::block_on(WalletInterface::verify_hmac(
+        &wallet,
+        args,
+        Some("brc56.test"),
+    ));
     assert_eq!(
         result.unwrap_err(),
         Error::HmacMinimalLengthKey {

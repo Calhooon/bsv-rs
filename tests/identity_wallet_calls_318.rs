@@ -96,9 +96,10 @@ fn config(w: &Witness) -> IdentityClientConfig {
     }
 }
 
-/// The originator the reference passed: `null` (absent) is this crate's `""`.
-fn sent(call: &Call) -> String {
-    call.originator.clone().unwrap_or_default()
+/// The originator the reference passed: `null` (absent) is this crate's
+/// `None` (#329).
+fn sent(call: &Call) -> Option<String> {
+    call.originator.clone()
 }
 
 /// Answers every lookup with the reference's BEEF at output 0.
@@ -301,7 +302,7 @@ async fn no_originator_is_sent_unless_one_is_configured() {
         Some("identity-client")
     );
     for w in &v.witnesses {
-        let expected = w.configured_originator.clone().unwrap_or_default();
+        let expected = w.configured_originator.clone();
         // the reference passes the configured originator, or none, on every call
         for call in w.reveal_calls.iter().chain(&w.revoke_calls) {
             assert_eq!(sent(call), expected, "{}: {}", w.name, call.name);
@@ -316,7 +317,7 @@ async fn no_originator_is_sent_unless_one_is_configured() {
             "{}",
             w.name
         );
-        let reference_sent: Vec<String> = w.reveal_calls.iter().map(sent).collect();
+        let reference_sent: Vec<Option<String>> = w.reveal_calls.iter().map(sent).collect();
         assert_eq!(wallet.originators(), reference_sent, "{}", w.name);
 
         // the revocation: each call this crate makes is one the reference

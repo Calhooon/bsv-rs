@@ -91,7 +91,7 @@ async fn a_reference_issued_certificate_published_for_anyone_parses_to_a_verifyi
         .expect("the reference's certificate verifies here");
     assert!(cert.verify().unwrap());
     let decrypted = cert
-        .decrypt_fields(&ProtoWallet::anyone(), None, None, "test")
+        .decrypt_fields(&ProtoWallet::anyone(), None, None, Some("test"))
         .await
         .unwrap();
     assert_eq!(decrypted, plaintexts(&r));

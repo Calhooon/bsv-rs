@@ -217,7 +217,8 @@ pub struct KVStoreConfig {
     pub token_amount: u64,
     /// Topics for broadcasting (default: ["tm_kvstore"])
     pub topics: Vec<String>,
-    /// Originator for wallet operations
+    /// Originator for wallet operations; `None` passes no originator to the
+    /// wallet (`"kvstore"` until #329), as the reference's `originator?`
     pub originator: Option<String>,
     /// Whether to encrypt values (LocalKVStore only, default: true)
     pub encrypt: bool,

@@ -169,33 +169,33 @@ macro_rules! height_wallet {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for HeightWallet {
-            $(async fn $method(&self, _: $args, _: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, _: $args, _: Option<&str>) -> bsv_rs::Result<$result> {
                 unreachable!()
             })*
 
-            async fn is_authenticated(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 unreachable!()
             }
-            async fn wait_for_authentication(&self, _: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn wait_for_authentication(&self, _: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 unreachable!()
             }
-            async fn get_height(&self, _: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, _: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 unreachable!()
             }
             async fn get_header_for_height(
                 &self,
                 args: GetHeaderArgs,
-                _: &str,
+                _: Option<&str>,
             ) -> bsv_rs::Result<GetHeaderResult> {
                 *self.asked.lock().unwrap() = Some(args.height);
                 Ok(GetHeaderResult {
                     header: "00".repeat(80),
                 })
             }
-            async fn get_network(&self, _: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, _: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 unreachable!()
             }
-            async fn get_version(&self, _: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, _: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 unreachable!()
             }
         }
@@ -311,7 +311,7 @@ async fn list_actions(total: u64) -> bsv_rs::Result<ListActionsResult> {
         offset: None,
         seek_permission: None,
     };
-    canned(total, &[]).list_actions(args, "").await
+    canned(total, &[]).list_actions(args, None).await
 }
 
 /// listActions' result: `totalActions`, VarInt
@@ -342,7 +342,7 @@ async fn list_outputs(total: u64) -> bsv_rs::Result<ListOutputsResult> {
     };
     // [totalOutputs][BEEF: VarInt(MaxUint64) for absent]
     canned(total, &var_int(u64::MAX))
-        .list_outputs(args, "")
+        .list_outputs(args, None)
         .await
 }
 
@@ -369,7 +369,7 @@ async fn list_certificates(total: u64) -> bsv_rs::Result<ListCertificatesResult>
         privileged: None,
         privileged_reason: None,
     };
-    canned(total, &[]).list_certificates(args, "").await
+    canned(total, &[]).list_certificates(args, None).await
 }
 
 /// listCertificates' result: `totalCertificates`, VarInt
@@ -399,7 +399,9 @@ async fn discover_by_identity_key(total: u64) -> bsv_rs::Result<DiscoverCertific
         offset: None,
         seek_permission: None,
     };
-    canned(total, &[]).discover_by_identity_key(args, "").await
+    canned(total, &[])
+        .discover_by_identity_key(args, None)
+        .await
 }
 
 /// discoverByIdentityKey's result: `totalCertificates`, VarInt

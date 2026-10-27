@@ -149,12 +149,10 @@ impl<W: WalletInterface> RegistryClient<W> {
         }
     }
 
-    /// Returns the originator string for wallet operations.
-    fn originator(&self) -> &str {
-        self.config
-            .originator
-            .as_deref()
-            .unwrap_or("registry-client")
+    /// Returns the configured originator for wallet operations, `None` when
+    /// none is configured, as the reference's `#originator` (#329).
+    fn originator(&self) -> Option<&str> {
+        self.config.originator.as_deref()
     }
 
     /// Gets the identity key for the wallet as hex string.

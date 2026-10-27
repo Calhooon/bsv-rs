@@ -201,7 +201,7 @@ async fn issued() -> (MasterCertificate, VerifiableCertificate) {
         HashMap::from([("name".to_string(), "Alice".to_string())]),
         [8u8; 32],
         Some([9u8; 32]),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -215,7 +215,7 @@ async fn issued() -> (MasterCertificate, VerifiableCertificate) {
         &master.serial_number,
         None,
         None,
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -268,14 +268,14 @@ async fn a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275() 
                 "name",
                 None,
                 None,
-                "test"
+                Some("test")
             )
             .await,
         Ok("Alice".to_string())
     );
     assert_eq!(
         verifiable
-            .decrypt_field(&verifier_wallet, "name", None, None, "test")
+            .decrypt_field(&verifier_wallet, "name", None, None, Some("test"))
             .await,
         Ok("Alice".to_string())
     );
@@ -289,7 +289,7 @@ async fn a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275() 
                 "name",
                 None,
                 None,
-                "test"
+                Some("test")
             )
             .await,
             Err(refused("Failed to decrypt certificate field!")),
@@ -298,7 +298,7 @@ async fn a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275() 
         let mut v = verifiable.clone();
         v.certificate.fields.insert("name".into(), bad.clone());
         assert_eq!(
-            v.decrypt_field(&verifier_wallet, "name", None, None, "test")
+            v.decrypt_field(&verifier_wallet, "name", None, None, Some("test"))
                 .await,
             Err(refused(&format!(
                 "Failed to decrypt selectively revealed certificate fields using keyring: {words}"
@@ -323,7 +323,7 @@ async fn a_keyring_for_a_verifier_refuses_a_non_canonical_field_it_does_not_reve
         &master.serial_number,
         None,
         None,
-        "test",
+        Some("test"),
     )
     .await;
     assert_eq!(

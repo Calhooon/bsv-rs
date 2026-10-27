@@ -134,7 +134,7 @@ impl HttpWalletJson {
         &self,
         method: &str,
         args: &T,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<R, Error> {
         let Some(originator) = self.originator.as_deref() else {
             return Err(Error::WalletError(ORIGINATOR_REQUIRED.to_string()));
@@ -221,7 +221,7 @@ impl HttpWalletJson {
     pub async fn get_public_key(
         &self,
         args: GetPublicKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetPublicKeyResult, Error> {
         let request = JsonGetPublicKeyRequest {
             identity_key: args.identity_key,
@@ -244,7 +244,7 @@ impl HttpWalletJson {
     pub async fn encrypt(
         &self,
         args: EncryptArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<EncryptResult, Error> {
         let request = JsonEncryptRequest {
             key: key_params!(args),
@@ -263,7 +263,7 @@ impl HttpWalletJson {
     pub async fn decrypt(
         &self,
         args: DecryptArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DecryptResult, Error> {
         let request = JsonDecryptRequest {
             key: key_params!(args),
@@ -282,7 +282,7 @@ impl HttpWalletJson {
     pub async fn create_hmac(
         &self,
         args: CreateHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateHmacResult, Error> {
         let request = JsonCreateHmacRequest {
             key: key_params!(args),
@@ -310,7 +310,7 @@ impl HttpWalletJson {
     pub async fn verify_hmac(
         &self,
         args: VerifyHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifyHmacResult, Error> {
         let request = JsonVerifyHmacRequest {
             key: key_params!(args),
@@ -331,7 +331,7 @@ impl HttpWalletJson {
     pub async fn create_signature(
         &self,
         args: CreateSignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateSignatureResult, Error> {
         let request = JsonCreateSignatureRequest {
             key: key_params!(args),
@@ -353,7 +353,7 @@ impl HttpWalletJson {
     pub async fn verify_signature(
         &self,
         args: VerifySignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifySignatureResult, Error> {
         let request = JsonVerifySignatureRequest {
             key: key_params!(args),
@@ -374,7 +374,7 @@ impl HttpWalletJson {
     }
 
     /// Checks if the wallet is authenticated.
-    pub async fn is_authenticated(&self, originator: &str) -> Result<bool, Error> {
+    pub async fn is_authenticated(&self, originator: Option<&str>) -> Result<bool, Error> {
         #[derive(Serialize)]
         struct EmptyRequest {}
 
@@ -391,7 +391,7 @@ impl HttpWalletJson {
     }
 
     /// Gets the current block height.
-    pub async fn get_height(&self, originator: &str) -> Result<u64, Error> {
+    pub async fn get_height(&self, originator: Option<&str>) -> Result<u64, Error> {
         #[derive(Serialize)]
         struct EmptyRequest {}
 
@@ -408,7 +408,7 @@ impl HttpWalletJson {
     }
 
     /// Gets the network the wallet is connected to.
-    pub async fn get_network(&self, originator: &str) -> Result<Network, Error> {
+    pub async fn get_network(&self, originator: Option<&str>) -> Result<Network, Error> {
         #[derive(Serialize)]
         struct EmptyRequest {}
 
@@ -432,7 +432,7 @@ impl HttpWalletJson {
     }
 
     /// Gets the wallet version.
-    pub async fn get_version(&self, originator: &str) -> Result<String, Error> {
+    pub async fn get_version(&self, originator: Option<&str>) -> Result<String, Error> {
         #[derive(Serialize)]
         struct EmptyRequest {}
 
@@ -456,7 +456,7 @@ impl HttpWalletJson {
     pub async fn create_action(
         &self,
         args: CreateActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateActionResult, Error> {
         self.request("createAction", &args, originator).await
     }
@@ -465,7 +465,7 @@ impl HttpWalletJson {
     pub async fn sign_action(
         &self,
         args: SignActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<SignActionResult, Error> {
         self.request("signAction", &args, originator).await
     }
@@ -474,7 +474,7 @@ impl HttpWalletJson {
     pub async fn abort_action(
         &self,
         args: AbortActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<AbortActionResult, Error> {
         self.request("abortAction", &args, originator).await
     }
@@ -483,7 +483,7 @@ impl HttpWalletJson {
     pub async fn list_actions(
         &self,
         args: ListActionsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListActionsResult, Error> {
         self.request("listActions", &args, originator).await
     }
@@ -492,7 +492,7 @@ impl HttpWalletJson {
     pub async fn internalize_action(
         &self,
         args: InternalizeActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<InternalizeActionResult, Error> {
         crate::wallet::validation::validate_internalize_action_args(&args)?;
         self.request("internalizeAction", &args, originator).await
@@ -506,7 +506,7 @@ impl HttpWalletJson {
     pub async fn list_outputs(
         &self,
         args: ListOutputsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListOutputsResult, Error> {
         self.request("listOutputs", &args, originator).await
     }
@@ -515,7 +515,7 @@ impl HttpWalletJson {
     pub async fn relinquish_output(
         &self,
         args: RelinquishOutputArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RelinquishOutputResult, Error> {
         self.request("relinquishOutput", &args, originator).await
     }
@@ -528,7 +528,7 @@ impl HttpWalletJson {
     pub async fn acquire_certificate(
         &self,
         args: AcquireCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<WalletCertificate, Error> {
         self.request("acquireCertificate", &args, originator).await
     }
@@ -537,7 +537,7 @@ impl HttpWalletJson {
     pub async fn list_certificates(
         &self,
         args: ListCertificatesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListCertificatesResult, Error> {
         self.request("listCertificates", &args, originator).await
     }
@@ -546,7 +546,7 @@ impl HttpWalletJson {
     pub async fn prove_certificate(
         &self,
         args: ProveCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ProveCertificateResult, Error> {
         self.request("proveCertificate", &args, originator).await
     }
@@ -555,7 +555,7 @@ impl HttpWalletJson {
     pub async fn relinquish_certificate(
         &self,
         args: RelinquishCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RelinquishCertificateResult, Error> {
         self.request("relinquishCertificate", &args, originator)
             .await
@@ -569,7 +569,7 @@ impl HttpWalletJson {
     pub async fn discover_by_identity_key(
         &self,
         args: DiscoverByIdentityKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult, Error> {
         self.request("discoverByIdentityKey", &args, originator)
             .await
@@ -579,7 +579,7 @@ impl HttpWalletJson {
     pub async fn discover_by_attributes(
         &self,
         args: DiscoverByAttributesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult, Error> {
         self.request("discoverByAttributes", &args, originator)
             .await
@@ -593,13 +593,13 @@ impl HttpWalletJson {
     pub async fn get_header(
         &self,
         args: GetHeaderArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetHeaderResult, Error> {
         self.request("getHeaderForHeight", &args, originator).await
     }
 
     /// Waits for authentication.
-    pub async fn wait_for_authentication(&self, originator: &str) -> Result<bool, Error> {
+    pub async fn wait_for_authentication(&self, originator: Option<&str>) -> Result<bool, Error> {
         #[derive(Serialize)]
         struct EmptyRequest {}
 
@@ -623,7 +623,7 @@ impl HttpWalletJson {
     pub async fn reveal_counterparty_key_linkage(
         &self,
         args: RevealCounterpartyKeyLinkageArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RevealCounterpartyKeyLinkageResult, Error> {
         let request = JsonRevealCounterpartyRequest {
             counterparty: crate::primitives::to_hex(&args.counterparty.to_compressed()),
@@ -640,7 +640,7 @@ impl HttpWalletJson {
     pub async fn reveal_specific_key_linkage(
         &self,
         args: RevealSpecificKeyLinkageArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RevealSpecificKeyLinkageResult, Error> {
         let request = JsonRevealSpecificRequest {
             counterparty: counterparty_to_string(&args.counterparty),
@@ -665,23 +665,31 @@ impl WalletInterface for HttpWalletJson {
     async fn get_public_key(
         &self,
         args: GetPublicKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<GetPublicKeyResult> {
         self.get_public_key(args, originator).await
     }
 
-    async fn encrypt(&self, args: EncryptArgs, originator: &str) -> crate::Result<EncryptResult> {
+    async fn encrypt(
+        &self,
+        args: EncryptArgs,
+        originator: Option<&str>,
+    ) -> crate::Result<EncryptResult> {
         self.encrypt(args, originator).await
     }
 
-    async fn decrypt(&self, args: DecryptArgs, originator: &str) -> crate::Result<DecryptResult> {
+    async fn decrypt(
+        &self,
+        args: DecryptArgs,
+        originator: Option<&str>,
+    ) -> crate::Result<DecryptResult> {
         self.decrypt(args, originator).await
     }
 
     async fn create_hmac(
         &self,
         args: CreateHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<CreateHmacResult> {
         self.create_hmac(args, originator).await
     }
@@ -689,7 +697,7 @@ impl WalletInterface for HttpWalletJson {
     async fn verify_hmac(
         &self,
         args: VerifyHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<VerifyHmacResult> {
         self.verify_hmac(args, originator).await
     }
@@ -697,7 +705,7 @@ impl WalletInterface for HttpWalletJson {
     async fn create_signature(
         &self,
         args: CreateSignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<CreateSignatureResult> {
         self.create_signature(args, originator).await
     }
@@ -705,7 +713,7 @@ impl WalletInterface for HttpWalletJson {
     async fn verify_signature(
         &self,
         args: VerifySignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<VerifySignatureResult> {
         self.verify_signature(args, originator).await
     }
@@ -713,7 +721,7 @@ impl WalletInterface for HttpWalletJson {
     async fn reveal_counterparty_key_linkage(
         &self,
         args: RevealCounterpartyKeyLinkageArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<RevealCounterpartyKeyLinkageResult> {
         self.reveal_counterparty_key_linkage(args, originator).await
     }
@@ -721,7 +729,7 @@ impl WalletInterface for HttpWalletJson {
     async fn reveal_specific_key_linkage(
         &self,
         args: RevealSpecificKeyLinkageArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<RevealSpecificKeyLinkageResult> {
         self.reveal_specific_key_linkage(args, originator).await
     }
@@ -729,7 +737,7 @@ impl WalletInterface for HttpWalletJson {
     async fn create_action(
         &self,
         args: CreateActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<CreateActionResult> {
         self.create_action(args, originator).await
     }
@@ -737,7 +745,7 @@ impl WalletInterface for HttpWalletJson {
     async fn sign_action(
         &self,
         args: SignActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<SignActionResult> {
         self.sign_action(args, originator).await
     }
@@ -745,7 +753,7 @@ impl WalletInterface for HttpWalletJson {
     async fn abort_action(
         &self,
         args: AbortActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<AbortActionResult> {
         self.abort_action(args, originator).await
     }
@@ -753,7 +761,7 @@ impl WalletInterface for HttpWalletJson {
     async fn list_actions(
         &self,
         args: ListActionsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<ListActionsResult> {
         self.list_actions(args, originator).await
     }
@@ -761,7 +769,7 @@ impl WalletInterface for HttpWalletJson {
     async fn internalize_action(
         &self,
         args: InternalizeActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<InternalizeActionResult> {
         self.internalize_action(args, originator).await
     }
@@ -769,7 +777,7 @@ impl WalletInterface for HttpWalletJson {
     async fn list_outputs(
         &self,
         args: ListOutputsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<ListOutputsResult> {
         self.list_outputs(args, originator).await
     }
@@ -777,7 +785,7 @@ impl WalletInterface for HttpWalletJson {
     async fn relinquish_output(
         &self,
         args: RelinquishOutputArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<RelinquishOutputResult> {
         self.relinquish_output(args, originator).await
     }
@@ -785,7 +793,7 @@ impl WalletInterface for HttpWalletJson {
     async fn acquire_certificate(
         &self,
         args: AcquireCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<WalletCertificate> {
         self.acquire_certificate(args, originator).await
     }
@@ -793,7 +801,7 @@ impl WalletInterface for HttpWalletJson {
     async fn list_certificates(
         &self,
         args: ListCertificatesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<ListCertificatesResult> {
         self.list_certificates(args, originator).await
     }
@@ -801,7 +809,7 @@ impl WalletInterface for HttpWalletJson {
     async fn prove_certificate(
         &self,
         args: ProveCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<ProveCertificateResult> {
         self.prove_certificate(args, originator).await
     }
@@ -809,7 +817,7 @@ impl WalletInterface for HttpWalletJson {
     async fn relinquish_certificate(
         &self,
         args: RelinquishCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<RelinquishCertificateResult> {
         self.relinquish_certificate(args, originator).await
     }
@@ -817,7 +825,7 @@ impl WalletInterface for HttpWalletJson {
     async fn discover_by_identity_key(
         &self,
         args: DiscoverByIdentityKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<DiscoverCertificatesResult> {
         self.discover_by_identity_key(args, originator).await
     }
@@ -825,12 +833,15 @@ impl WalletInterface for HttpWalletJson {
     async fn discover_by_attributes(
         &self,
         args: DiscoverByAttributesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<DiscoverCertificatesResult> {
         self.discover_by_attributes(args, originator).await
     }
 
-    async fn is_authenticated(&self, originator: &str) -> crate::Result<AuthenticatedResult> {
+    async fn is_authenticated(
+        &self,
+        originator: Option<&str>,
+    ) -> crate::Result<AuthenticatedResult> {
         Ok(AuthenticatedResult {
             authenticated: self.is_authenticated(originator).await?,
         })
@@ -838,14 +849,14 @@ impl WalletInterface for HttpWalletJson {
 
     async fn wait_for_authentication(
         &self,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<AuthenticatedResult> {
         Ok(AuthenticatedResult {
             authenticated: self.wait_for_authentication(originator).await?,
         })
     }
 
-    async fn get_height(&self, originator: &str) -> crate::Result<GetHeightResult> {
+    async fn get_height(&self, originator: Option<&str>) -> crate::Result<GetHeightResult> {
         Ok(GetHeightResult {
             height: self.get_height(originator).await? as u32,
         })
@@ -854,18 +865,18 @@ impl WalletInterface for HttpWalletJson {
     async fn get_header_for_height(
         &self,
         args: GetHeaderArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> crate::Result<GetHeaderResult> {
         self.get_header(args, originator).await
     }
 
-    async fn get_network(&self, originator: &str) -> crate::Result<GetNetworkResult> {
+    async fn get_network(&self, originator: Option<&str>) -> crate::Result<GetNetworkResult> {
         Ok(GetNetworkResult {
             network: self.get_network(originator).await?,
         })
     }
 
-    async fn get_version(&self, originator: &str) -> crate::Result<GetVersionResult> {
+    async fn get_version(&self, originator: Option<&str>) -> crate::Result<GetVersionResult> {
         Ok(GetVersionResult {
             version: self.get_version(originator).await?,
         })

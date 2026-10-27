@@ -76,7 +76,7 @@ impl WalletWire for ReplyWire {
 /// What this crate's transceiver reads from a frame (its reader unchanged).
 async fn read_back(frame: Vec<u8>) -> Result<u64, Error> {
     WalletWireTransceiver::new(ReplyWire(frame))
-        .get_height("test")
+        .get_height(Some("test"))
         .await
 }
 
@@ -166,7 +166,7 @@ async fn a_wallet_erring_on_a_verdict_call_is_the_constant() {
                 counterparty: Some(Counterparty::Self_),
                 ..Default::default()
             },
-            "test",
+            Some("test"),
         )
         .await
         .map(|r| r.valid);
@@ -250,7 +250,7 @@ async fn the_three_false_verdicts_are_framed_in_the_references_words() {
                 counterparty: Some(Counterparty::Self_),
                 ..Default::default()
             },
-            "test",
+            Some("test"),
         )
         .await
         .map(|r| r.valid);
@@ -269,14 +269,14 @@ async fn the_three_false_verdicts_are_framed_in_the_references_words() {
                 for_self: None,
                 ..Default::default()
             },
-            "test",
+            Some("test"),
         )
         .await
         .map(|r| r.valid);
     let signature_frame = tape.lock().unwrap().clone();
 
     let (client, tape) = taped(json!({"authenticated": false}));
-    let authenticated = client.wait_for_authentication("test").await;
+    let authenticated = client.wait_for_authentication(Some("test")).await;
     let authenticated_frame = tape.lock().unwrap().clone();
 
     for (result, frame, words) in [
@@ -359,7 +359,7 @@ async fn an_aborted_action_is_the_success_frame_and_reads_aborted_true() {
             bsv_rs::wallet::AbortActionArgs {
                 reference: "Zml4dHVyZQ==".into(),
             },
-            "test",
+            Some("test"),
         )
         .await
         .map(|r| r.aborted);
@@ -410,14 +410,17 @@ async fn the_transceiver_reads_code_8_as_aborted_false() {
         reference_frame(8, b"any words"),
     ] {
         let result = WalletWireTransceiver::new(ReplyWire(frame.clone()))
-            .abort_action(args(), "test")
+            .abort_action(args(), Some("test"))
             .await
             .map(|r| r.aborted);
         assert_eq!(result, Ok(false), "{}", hex::encode(&frame));
     }
 
     let (client, tape) = taped(json!({"aborted": false}));
-    let result = client.abort_action(args(), "test").await.map(|r| r.aborted);
+    let result = client
+        .abort_action(args(), Some("test"))
+        .await
+        .map(|r| r.aborted);
     assert_eq!(
         hex::encode(tape.lock().unwrap().as_slice()),
         ABORT_REFUSED_FRAME
@@ -452,7 +455,7 @@ async fn every_other_abort_frame_is_the_error_it_was() {
         ),
     ] {
         let result = WalletWireTransceiver::new(ReplyWire(frame))
-            .abort_action(args(), "test")
+            .abort_action(args(), Some("test"))
             .await
             .map(|r| r.aborted);
         assert_eq!(result, Err(error.clone()), "{error}");

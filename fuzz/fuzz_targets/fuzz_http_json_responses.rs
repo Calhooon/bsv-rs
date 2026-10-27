@@ -132,15 +132,15 @@ fuzz_target!(|data: &[u8]| {
         match call % (support::SHARED_CALLS + 2) {
             26 => drop(
                 wallet
-                    .reveal_counterparty_key_linkage(support::reveal_counterparty(), "fuzz.example")
+                    .reveal_counterparty_key_linkage(support::reveal_counterparty(), Some("fuzz.example"))
                     .await,
             ),
             27 => drop(
                 wallet
-                    .reveal_specific_key_linkage(support::reveal_specific(), "fuzz.example")
+                    .reveal_specific_key_linkage(support::reveal_specific(), Some("fuzz.example"))
                     .await,
             ),
-            index => support::call_shared!(wallet, index, "fuzz.example"),
+            index => support::call_shared!(wallet, index, Some("fuzz.example")),
         }
     });
 });

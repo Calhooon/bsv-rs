@@ -246,7 +246,7 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
         ($method:ident, $args:ty) => {
             written_fixture(
                 wallet
-                    .$method(<$args>::from_fixture(args.clone()), ORIGINATOR)
+                    .$method(<$args>::from_fixture(args.clone()), Some(ORIGINATOR))
                     .await,
             )
         };
@@ -254,27 +254,30 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
     let result = match call {
         "createAction" => written(
             wallet
-                .create_action(parsed::<CreateActionArgs>(case), ORIGINATOR)
+                .create_action(parsed::<CreateActionArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "signAction" => written(
             wallet
-                .sign_action(parsed::<SignActionArgs>(case), ORIGINATOR)
+                .sign_action(parsed::<SignActionArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "internalizeAction" => written(
             wallet
-                .internalize_action(parsed::<InternalizeActionArgs>(case), ORIGINATOR)
+                .internalize_action(parsed::<InternalizeActionArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "listOutputs" => written(
             wallet
-                .list_outputs(parsed::<ListOutputsArgs>(case), ORIGINATOR)
+                .list_outputs(parsed::<ListOutputsArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "discoverByIdentityKey" => written(
             wallet
-                .discover_by_identity_key(parsed::<DiscoverByIdentityKeyArgs>(case), ORIGINATOR)
+                .discover_by_identity_key(
+                    parsed::<DiscoverByIdentityKeyArgs>(case),
+                    Some(ORIGINATOR),
+                )
                 .await,
         ),
         "getPublicKey" => key_call!(get_public_key, GetPublicKeyArgs),
@@ -286,22 +289,22 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
         "verifySignature" => key_call!(verify_signature, VerifySignatureArgs),
         "acquireCertificate" => written(
             wallet
-                .acquire_certificate(parsed::<AcquireCertificateArgs>(case), ORIGINATOR)
+                .acquire_certificate(parsed::<AcquireCertificateArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "listCertificates" => written(
             wallet
-                .list_certificates(parsed::<ListCertificatesArgs>(case), ORIGINATOR)
+                .list_certificates(parsed::<ListCertificatesArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "proveCertificate" => written(
             wallet
-                .prove_certificate(parsed::<ProveCertificateArgs>(case), ORIGINATOR)
+                .prove_certificate(parsed::<ProveCertificateArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "relinquishCertificate" => written(
             wallet
-                .relinquish_certificate(parsed::<RelinquishCertificateArgs>(case), ORIGINATOR)
+                .relinquish_certificate(parsed::<RelinquishCertificateArgs>(case), Some(ORIGINATOR))
                 .await,
         ),
         "revealCounterpartyKeyLinkage" => written(
@@ -313,7 +316,7 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
                         privileged: None,
                         privileged_reason: None,
                     },
-                    ORIGINATOR,
+                    Some(ORIGINATOR),
                 )
                 .await,
         ),
@@ -332,7 +335,7 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
                         privileged: None,
                         privileged_reason: None,
                     },
-                    ORIGINATOR,
+                    Some(ORIGINATOR),
                 )
                 .await,
         ),

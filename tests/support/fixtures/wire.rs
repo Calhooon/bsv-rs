@@ -52,7 +52,8 @@ impl WalletWire for ReplyWire {
 // use the public low-level codec for these two processor-supported calls, in the
 // reference's order (`WalletWireTransceiver.ts:809-811`, `:874-883` at
 // ts-stack@edf6e03; #191). It is not a new production client API.
-fn linkage_request(call: WalletCall, originator: &str) -> WireWriter {
+fn linkage_request(call: WalletCall, originator: Option<&str>) -> WireWriter {
+    let originator = originator.unwrap_or_default();
     let mut w = WireWriter::new();
     w.write_u8(call.as_u8())
         .write_u8(originator.len() as u8)
@@ -81,7 +82,7 @@ async fn linkage_response<T: WalletWire>(
     }
     // Use the production common error decoder, also for malformed envelopes.
     let decoder = WalletWireTransceiver::new(ReplyWire(bytes));
-    Err(decoder.get_version("").await.unwrap_err())
+    Err(decoder.get_version(None).await.unwrap_err())
 }
 
 // The three keys open both results, in the reference's order
@@ -112,7 +113,7 @@ fn read_linkage(r: &mut WireReader<'_>, keys: [PublicKey; 3]) -> bsv_rs::Result<
 pub async fn counterparty<T: WalletWire>(
     client: &WalletWireTransceiver<T>,
     args: RevealCounterpartyKeyLinkageArgs,
-    originator: &str,
+    originator: Option<&str>,
 ) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
     let mut w = linkage_request(WalletCall::RevealCounterpartyKeyLinkage, originator);
     privileged_params(&mut w, args.privileged, args.privileged_reason.as_deref());
@@ -131,7 +132,7 @@ pub async fn counterparty<T: WalletWire>(
 pub async fn specific<T: WalletWire>(
     client: &WalletWireTransceiver<T>,
     args: RevealSpecificKeyLinkageArgs,
-    originator: &str,
+    originator: Option<&str>,
 ) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
     let mut w = linkage_request(WalletCall::RevealSpecificKeyLinkage, originator);
     w.write_protocol_id(&args.protocol_id)

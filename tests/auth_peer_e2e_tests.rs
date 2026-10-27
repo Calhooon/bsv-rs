@@ -1092,7 +1092,7 @@ async fn test_ts_style_server_no_nonce_field() {
         .clone();
 
     // Now act as a TS-style server: build InitialResponse WITHOUT nonce field
-    let responder_nonce = create_nonce(&bob_wallet, None, "ts-compat-test")
+    let responder_nonce = create_nonce(&bob_wallet, None, Some("ts-compat-test"))
         .await
         .unwrap();
 

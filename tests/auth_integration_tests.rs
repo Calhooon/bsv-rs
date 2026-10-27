@@ -845,13 +845,13 @@ async fn test_nonce_create_verify_roundtrip() {
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 
     // Create a nonce with self counterparty (no counterparty = self)
-    let nonce = create_nonce(&wallet, None, "test-app").await.unwrap();
+    let nonce = create_nonce(&wallet, None, Some("test-app")).await.unwrap();
 
     // Nonce should not be empty
     assert!(!nonce.is_empty(), "Created nonce should not be empty");
 
     // Verify the nonce with the same wallet and same counterparty
-    let is_valid = verify_nonce(&nonce, &wallet, None, "test-app")
+    let is_valid = verify_nonce(&nonce, &wallet, None, Some("test-app"))
         .await
         .unwrap();
     assert!(
@@ -867,8 +867,8 @@ async fn test_nonce_uniqueness() {
 
     let wallet = ProtoWallet::new(Some(PrivateKey::random()));
 
-    let nonce1 = create_nonce(&wallet, None, "test-app").await.unwrap();
-    let nonce2 = create_nonce(&wallet, None, "test-app").await.unwrap();
+    let nonce1 = create_nonce(&wallet, None, Some("test-app")).await.unwrap();
+    let nonce2 = create_nonce(&wallet, None, Some("test-app")).await.unwrap();
 
     assert_ne!(
         nonce1, nonce2,
@@ -885,10 +885,10 @@ async fn test_nonce_verify_fails_with_wrong_counterparty() {
     let other_key = PrivateKey::random().public_key();
 
     // Create nonce with self counterparty (None)
-    let nonce = create_nonce(&wallet, None, "test-app").await.unwrap();
+    let nonce = create_nonce(&wallet, None, Some("test-app")).await.unwrap();
 
     // Verify with a different counterparty should fail
-    let is_valid = verify_nonce(&nonce, &wallet, Some(&other_key), "test-app")
+    let is_valid = verify_nonce(&nonce, &wallet, Some(&other_key), Some("test-app"))
         .await
         .unwrap();
     assert!(
@@ -906,10 +906,12 @@ async fn test_nonce_verify_fails_with_different_wallet() {
     let wallet2 = ProtoWallet::new(Some(PrivateKey::random()));
 
     // Create nonce with wallet1
-    let nonce = create_nonce(&wallet1, None, "test-app").await.unwrap();
+    let nonce = create_nonce(&wallet1, None, Some("test-app"))
+        .await
+        .unwrap();
 
     // Verify with wallet2 should fail
-    let is_valid = verify_nonce(&nonce, &wallet2, None, "test-app")
+    let is_valid = verify_nonce(&nonce, &wallet2, None, Some("test-app"))
         .await
         .unwrap();
     assert!(!is_valid, "Nonce should not verify with a different wallet");
@@ -924,19 +926,19 @@ async fn test_nonce_with_specific_counterparty_roundtrip() {
     let counterparty_key = PrivateKey::random().public_key();
 
     // Create nonce with specific counterparty
-    let nonce = create_nonce(&wallet, Some(&counterparty_key), "test-app")
+    let nonce = create_nonce(&wallet, Some(&counterparty_key), Some("test-app"))
         .await
         .unwrap();
 
     // Verify with same counterparty should succeed
-    let is_valid = verify_nonce(&nonce, &wallet, Some(&counterparty_key), "test-app")
+    let is_valid = verify_nonce(&nonce, &wallet, Some(&counterparty_key), Some("test-app"))
         .await
         .unwrap();
     assert!(is_valid, "Nonce should verify with the same counterparty");
 
     // Verify with different counterparty should fail
     let other_key = PrivateKey::random().public_key();
-    let is_valid2 = verify_nonce(&nonce, &wallet, Some(&other_key), "test-app")
+    let is_valid2 = verify_nonce(&nonce, &wallet, Some(&other_key), Some("test-app"))
         .await
         .unwrap();
     assert!(
@@ -954,7 +956,7 @@ async fn test_nonce_verify_invalid_format() {
 
     // Verify a too-short nonce should return an error
     let short_nonce = bsv_rs::primitives::to_base64(&[0u8; 16]);
-    let result = verify_nonce(&short_nonce, &wallet, None, "test-app").await;
+    let result = verify_nonce(&short_nonce, &wallet, None, Some("test-app")).await;
     assert!(
         result.is_err(),
         "Verifying a too-short nonce should return an error"
@@ -989,7 +991,7 @@ async fn test_master_certificate_issue_for_subject() {
         plain_fields.clone(),
         cert_type,
         Some(serial_number),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1079,7 +1081,7 @@ async fn test_master_certificate_decrypt_fields() {
         plain_fields.clone(),
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1091,7 +1093,7 @@ async fn test_master_certificate_decrypt_fields() {
             &certifier_key.public_key(),
             None,
             None,
-            "test-app",
+            Some("test-app"),
         )
         .await
         .unwrap();
@@ -1135,7 +1137,7 @@ async fn test_master_certificate_decrypt_single_field() {
         plain_fields,
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1148,7 +1150,7 @@ async fn test_master_certificate_decrypt_single_field() {
             "name",
             None,
             None,
-            "test-app",
+            Some("test-app"),
         )
         .await
         .unwrap();
@@ -1161,7 +1163,7 @@ async fn test_master_certificate_decrypt_single_field() {
             "email",
             None,
             None,
-            "test-app",
+            Some("test-app"),
         )
         .await
         .unwrap();
@@ -1194,7 +1196,7 @@ async fn test_master_certificate_create_keyring_for_verifier() {
         plain_fields,
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1211,7 +1213,7 @@ async fn test_master_certificate_create_keyring_for_verifier() {
         &master_cert.certificate.serial_number,
         None,
         None,
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1265,7 +1267,7 @@ async fn test_verifiable_certificate_full_chain() {
         plain_fields.clone(),
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1282,7 +1284,7 @@ async fn test_verifiable_certificate_full_chain() {
         &master_cert.certificate.serial_number,
         None,
         None,
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1298,7 +1300,7 @@ async fn test_verifiable_certificate_full_chain() {
 
     // Step 4: Verifier decrypts fields
     let decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, None, None, "test-app")
+        .decrypt_fields(&verifier_wallet, None, None, Some("test-app"))
         .await
         .unwrap();
 
@@ -1345,7 +1347,7 @@ async fn test_verifiable_certificate_selective_disclosure() {
         plain_fields.clone(),
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1362,7 +1364,7 @@ async fn test_verifiable_certificate_selective_disclosure() {
         &master_cert.certificate.serial_number,
         None,
         None,
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1371,7 +1373,7 @@ async fn test_verifiable_certificate_selective_disclosure() {
 
     // Verifier can only decrypt revealed fields
     let decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, None, None, "test-app")
+        .decrypt_fields(&verifier_wallet, None, None, Some("test-app"))
         .await
         .unwrap();
 
@@ -1420,7 +1422,7 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
         plain_fields,
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1437,7 +1439,7 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
         &master_cert.certificate.serial_number,
         None,
         None,
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1446,7 +1448,7 @@ async fn test_verifiable_certificate_wrong_key_decryption_fails() {
 
     // Try to decrypt with verifier B's wallet (wrong key) -- should fail
     let result = verifiable
-        .decrypt_fields(&wrong_wallet, None, None, "test-app")
+        .decrypt_fields(&wrong_wallet, None, None, Some("test-app"))
         .await;
 
     assert!(
@@ -1488,7 +1490,7 @@ async fn test_full_issuance_to_verification_chain() {
         plain_fields.clone(),
         cert_type,
         Some(serial_number),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1513,7 +1515,7 @@ async fn test_full_issuance_to_verification_chain() {
             &certifier_key.public_key(),
             None,
             None,
-            "test-app",
+            Some("test-app"),
         )
         .await
         .unwrap();
@@ -1536,7 +1538,7 @@ async fn test_full_issuance_to_verification_chain() {
         &master_cert.certificate.serial_number,
         None,
         None,
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1562,7 +1564,7 @@ async fn test_full_issuance_to_verification_chain() {
 
     // === Phase 5: Verifier decrypts only revealed fields ===
     let verifier_decrypted = verifiable
-        .decrypt_fields(&verifier_wallet, None, None, "test-app")
+        .decrypt_fields(&verifier_wallet, None, None, Some("test-app"))
         .await
         .unwrap();
 
@@ -1748,7 +1750,7 @@ async fn test_master_certificate_issue_with_random_serial() {
         plain_fields.clone(),
         [1u8; 32],
         None, // Random serial
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1760,7 +1762,7 @@ async fn test_master_certificate_issue_with_random_serial() {
         plain_fields,
         [1u8; 32],
         None, // Random serial
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1797,7 +1799,7 @@ async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
         plain_fields,
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1809,7 +1811,7 @@ async fn test_master_certificate_decrypt_with_wrong_wallet_fails() {
             &certifier_key.public_key(),
             None,
             None,
-            "test-app",
+            Some("test-app"),
         )
         .await;
 
@@ -1845,7 +1847,7 @@ async fn test_self_signed_master_certificate() {
         plain_fields.clone(),
         cert_type,
         Some(serial_number),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -1882,7 +1884,13 @@ async fn test_self_signed_master_certificate() {
 
     // Subject can decrypt its own fields (same wallet used for both roles)
     let decrypted = master_cert
-        .decrypt_fields(&self_wallet, &self_key.public_key(), None, None, "test-app")
+        .decrypt_fields(
+            &self_wallet,
+            &self_key.public_key(),
+            None,
+            None,
+            Some("test-app"),
+        )
         .await
         .unwrap();
 
@@ -1899,7 +1907,7 @@ async fn test_self_signed_master_certificate() {
             "name",
             None,
             None,
-            "test-app",
+            Some("test-app"),
         )
         .await
         .unwrap();
@@ -2036,7 +2044,7 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
         plain_fields,
         [1u8; 32],
         Some([2u8; 32]),
-        "test-app",
+        Some("test-app"),
     )
     .await
     .unwrap();
@@ -2056,7 +2064,7 @@ async fn test_verifiable_certificate_garbage_keyring_decrypt_fails() {
 
     // Attempting to decrypt with garbage keyring should fail
     let result = verifiable
-        .decrypt_fields(&verifier_wallet, None, None, "test-app")
+        .decrypt_fields(&verifier_wallet, None, None, Some("test-app"))
         .await;
 
     assert!(

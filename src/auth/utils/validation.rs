@@ -30,7 +30,7 @@ pub async fn validate_certificates<W: WalletInterface>(
     verifier_wallet: &W,
     message: &AuthMessage,
     certificates_requested: Option<&RequestedCertificateSet>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<()> {
     let certs = match &message.certificates {
         Some(c) if !c.is_empty() => c,
@@ -76,7 +76,7 @@ pub async fn validate_certificate<W: WalletInterface>(
     cert: &VerifiableCertificate,
     sender_key: &PublicKey,
     certificates_requested: Option<&RequestedCertificateSet>,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<()> {
     // 1. Verify subject matches sender
     if &cert.certificate.subject != sender_key {
@@ -153,7 +153,7 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
     wallet: &W,
     requested: &RequestedCertificateSet,
     verifier_identity_key: &PublicKey,
-    originator: &str,
+    originator: Option<&str>,
 ) -> Result<Vec<VerifiableCertificate>> {
     use crate::wallet::{ListCertificatesArgs, ProveCertificateArgs};
 

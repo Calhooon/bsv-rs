@@ -144,21 +144,21 @@ impl WalletInterface for MockWallet {
     async fn get_public_key(
         &self,
         _args: GetPublicKeyArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<GetPublicKeyResult> {
         Ok(GetPublicKeyResult {
             public_key: self.public_key_hex.clone(),
         })
     }
 
-    async fn encrypt(&self, args: EncryptArgs, _originator: &str) -> Result<EncryptResult> {
+    async fn encrypt(&self, args: EncryptArgs, _originator: Option<&str>) -> Result<EncryptResult> {
         // Mock encryption: just return the plaintext (no actual encryption)
         Ok(EncryptResult {
             ciphertext: args.plaintext,
         })
     }
 
-    async fn decrypt(&self, args: DecryptArgs, _originator: &str) -> Result<DecryptResult> {
+    async fn decrypt(&self, args: DecryptArgs, _originator: Option<&str>) -> Result<DecryptResult> {
         // Mock decryption: just return the ciphertext (no actual decryption)
         Ok(DecryptResult {
             plaintext: args.ciphertext,
@@ -168,7 +168,7 @@ impl WalletInterface for MockWallet {
     async fn create_hmac(
         &self,
         _args: CreateHmacArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<CreateHmacResult> {
         Ok(CreateHmacResult { hmac: [0u8; 32] })
     }
@@ -176,7 +176,7 @@ impl WalletInterface for MockWallet {
     async fn verify_hmac(
         &self,
         _args: VerifyHmacArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<VerifyHmacResult> {
         Ok(VerifyHmacResult { valid: true })
     }
@@ -184,7 +184,7 @@ impl WalletInterface for MockWallet {
     async fn create_signature(
         &self,
         _args: CreateSignatureArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<CreateSignatureResult> {
         Ok(CreateSignatureResult {
             signature: vec![0u8; 64],
@@ -194,7 +194,7 @@ impl WalletInterface for MockWallet {
     async fn verify_signature(
         &self,
         _args: VerifySignatureArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<VerifySignatureResult> {
         Ok(VerifySignatureResult { valid: true })
     }
@@ -202,7 +202,7 @@ impl WalletInterface for MockWallet {
     async fn reveal_counterparty_key_linkage(
         &self,
         _args: WalletRevealCounterpartyArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RevealCounterpartyKeyLinkageResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -210,7 +210,7 @@ impl WalletInterface for MockWallet {
     async fn reveal_specific_key_linkage(
         &self,
         _args: WalletRevealSpecificArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RevealSpecificKeyLinkageResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -219,7 +219,7 @@ impl WalletInterface for MockWallet {
     async fn create_action(
         &self,
         args: CreateActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<CreateActionResult> {
         let counter = self.create_action_count.fetch_add(1, Ordering::SeqCst);
         if self.create_action_error.load(Ordering::SeqCst) {
@@ -284,7 +284,7 @@ impl WalletInterface for MockWallet {
     async fn sign_action(
         &self,
         _args: SignActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<SignActionResult> {
         Ok(SignActionResult {
             txid: Some([0u8; 32]),
@@ -296,7 +296,7 @@ impl WalletInterface for MockWallet {
     async fn abort_action(
         &self,
         _args: AbortActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<AbortActionResult> {
         Ok(AbortActionResult { aborted: true })
     }
@@ -304,7 +304,7 @@ impl WalletInterface for MockWallet {
     async fn list_actions(
         &self,
         _args: ListActionsArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ListActionsResult> {
         Ok(ListActionsResult {
             actions: vec![],
@@ -315,7 +315,7 @@ impl WalletInterface for MockWallet {
     async fn internalize_action(
         &self,
         _args: InternalizeActionArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<InternalizeActionResult> {
         Ok(InternalizeActionResult { accepted: true })
     }
@@ -324,7 +324,7 @@ impl WalletInterface for MockWallet {
     async fn list_outputs(
         &self,
         args: ListOutputsArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ListOutputsResult> {
         self.list_outputs_count.fetch_add(1, Ordering::SeqCst);
         if self.list_outputs_error.load(Ordering::SeqCst) {
@@ -378,7 +378,7 @@ impl WalletInterface for MockWallet {
     async fn relinquish_output(
         &self,
         _args: RelinquishOutputArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RelinquishOutputResult> {
         Ok(RelinquishOutputResult { relinquished: true })
     }
@@ -387,7 +387,7 @@ impl WalletInterface for MockWallet {
     async fn acquire_certificate(
         &self,
         _args: AcquireCertificateArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<WalletCertificate> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -395,7 +395,7 @@ impl WalletInterface for MockWallet {
     async fn list_certificates(
         &self,
         _args: ListCertificatesArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ListCertificatesResult> {
         Ok(ListCertificatesResult {
             certificates: vec![],
@@ -406,7 +406,7 @@ impl WalletInterface for MockWallet {
     async fn prove_certificate(
         &self,
         _args: ProveCertificateArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<ProveCertificateResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
@@ -414,7 +414,7 @@ impl WalletInterface for MockWallet {
     async fn relinquish_certificate(
         &self,
         _args: RelinquishCertificateArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<RelinquishCertificateResult> {
         Ok(RelinquishCertificateResult { relinquished: true })
     }
@@ -423,7 +423,7 @@ impl WalletInterface for MockWallet {
     async fn discover_by_identity_key(
         &self,
         _args: DiscoverByIdentityKeyArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult> {
         Ok(DiscoverCertificatesResult {
             certificates: vec![],
@@ -434,7 +434,7 @@ impl WalletInterface for MockWallet {
     async fn discover_by_attributes(
         &self,
         _args: DiscoverByAttributesArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult> {
         Ok(DiscoverCertificatesResult {
             certificates: vec![],
@@ -443,37 +443,40 @@ impl WalletInterface for MockWallet {
     }
 
     // Status Operations
-    async fn is_authenticated(&self, _originator: &str) -> Result<AuthenticatedResult> {
+    async fn is_authenticated(&self, _originator: Option<&str>) -> Result<AuthenticatedResult> {
         Ok(AuthenticatedResult {
             authenticated: true,
         })
     }
 
-    async fn wait_for_authentication(&self, _originator: &str) -> Result<AuthenticatedResult> {
+    async fn wait_for_authentication(
+        &self,
+        _originator: Option<&str>,
+    ) -> Result<AuthenticatedResult> {
         Ok(AuthenticatedResult {
             authenticated: true,
         })
     }
 
-    async fn get_height(&self, _originator: &str) -> Result<GetHeightResult> {
+    async fn get_height(&self, _originator: Option<&str>) -> Result<GetHeightResult> {
         Ok(GetHeightResult { height: 800000 })
     }
 
     async fn get_header_for_height(
         &self,
         _args: GetHeaderArgs,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Result<GetHeaderResult> {
         Err(Error::WalletError("not implemented".to_string()))
     }
 
-    async fn get_network(&self, _originator: &str) -> Result<GetNetworkResult> {
+    async fn get_network(&self, _originator: Option<&str>) -> Result<GetNetworkResult> {
         Ok(GetNetworkResult {
             network: Network::Mainnet,
         })
     }
 
-    async fn get_version(&self, _originator: &str) -> Result<GetVersionResult> {
+    async fn get_version(&self, _originator: Option<&str>) -> Result<GetVersionResult> {
         Ok(GetVersionResult {
             version: "mock-1.0".to_string(),
         })

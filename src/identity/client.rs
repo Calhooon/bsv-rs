@@ -354,10 +354,10 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
     }
 
     /// The originator every wallet call carries: the configured one, or none
-    /// (`""`), as the reference passes its constructor's (#318;
+    /// (`None`), as the reference passes its constructor's (#318, #329;
     /// `IdentityClient.ts:369-377`).
-    fn originator(&self) -> &str {
-        self.config.originator.as_deref().unwrap_or("")
+    fn originator(&self) -> Option<&str> {
+        self.config.originator.as_deref()
     }
 
     /// Get the wallet's identity key.

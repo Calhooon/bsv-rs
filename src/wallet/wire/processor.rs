@@ -119,11 +119,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         let call_code = reader.read_u8()?;
         let call = WalletCall::try_from(call_code)?;
 
-        // Read originator
+        // Read originator: length 0 is an absent one, `None` (#329)
         let originator_len = reader.read_u8()? as usize;
-        let originator_bytes = reader.read_bytes(originator_len)?;
-        let originator = String::from_utf8(originator_bytes.to_vec())
+        let originator = std::str::from_utf8(reader.read_bytes(originator_len)?)
             .map_err(|_| Error::WalletError("invalid originator UTF-8".to_string()))?;
+        let originator = (!originator.is_empty()).then_some(originator);
 
         // The calls with no parameters read none (`#assertRequestConsumed`,
         // `WalletWireProcessor.ts:1610-1719`); every other call this
@@ -142,81 +142,78 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         // Dispatch based on call type
         match call {
             // Key Operations
-            WalletCall::GetPublicKey => self.handle_get_public_key(&mut reader, &originator).await,
-            WalletCall::Encrypt => self.handle_encrypt(&mut reader, &originator).await,
-            WalletCall::Decrypt => self.handle_decrypt(&mut reader, &originator).await,
-            WalletCall::CreateHmac => self.handle_create_hmac(&mut reader, &originator).await,
-            WalletCall::VerifyHmac => self.handle_verify_hmac(&mut reader, &originator).await,
+            WalletCall::GetPublicKey => self.handle_get_public_key(&mut reader, originator).await,
+            WalletCall::Encrypt => self.handle_encrypt(&mut reader, originator).await,
+            WalletCall::Decrypt => self.handle_decrypt(&mut reader, originator).await,
+            WalletCall::CreateHmac => self.handle_create_hmac(&mut reader, originator).await,
+            WalletCall::VerifyHmac => self.handle_verify_hmac(&mut reader, originator).await,
             WalletCall::CreateSignature => {
-                self.handle_create_signature(&mut reader, &originator).await
+                self.handle_create_signature(&mut reader, originator).await
             }
             WalletCall::VerifySignature => {
-                self.handle_verify_signature(&mut reader, &originator).await
+                self.handle_verify_signature(&mut reader, originator).await
             }
             WalletCall::RevealCounterpartyKeyLinkage => {
-                self.handle_reveal_counterparty_key_linkage(&mut reader, &originator)
+                self.handle_reveal_counterparty_key_linkage(&mut reader, originator)
                     .await
             }
             WalletCall::RevealSpecificKeyLinkage => {
-                self.handle_reveal_specific_key_linkage(&mut reader, &originator)
+                self.handle_reveal_specific_key_linkage(&mut reader, originator)
                     .await
             }
 
             // Chain/Status Operations
-            WalletCall::IsAuthenticated => self.handle_is_authenticated(&originator).await,
-            WalletCall::GetHeight => self.handle_get_height(&originator).await,
-            WalletCall::GetNetwork => self.handle_get_network(&originator).await,
-            WalletCall::GetVersion => self.handle_get_version(&originator).await,
+            WalletCall::IsAuthenticated => self.handle_is_authenticated(originator).await,
+            WalletCall::GetHeight => self.handle_get_height(originator).await,
+            WalletCall::GetNetwork => self.handle_get_network(originator).await,
+            WalletCall::GetVersion => self.handle_get_version(originator).await,
             WalletCall::WaitForAuthentication => {
-                self.handle_wait_for_authentication(&originator).await
+                self.handle_wait_for_authentication(originator).await
             }
             WalletCall::GetHeaderForHeight => {
-                self.handle_get_header_for_height(&mut reader, &originator)
+                self.handle_get_header_for_height(&mut reader, originator)
                     .await
             }
 
             // Action Operations - delegated to wallet
-            WalletCall::CreateAction => self.handle_create_action(&mut reader, &originator).await,
-            WalletCall::SignAction => self.handle_sign_action(&mut reader, &originator).await,
-            WalletCall::AbortAction => self.handle_abort_action(&mut reader, &originator).await,
-            WalletCall::ListActions => self.handle_list_actions(&mut reader, &originator).await,
+            WalletCall::CreateAction => self.handle_create_action(&mut reader, originator).await,
+            WalletCall::SignAction => self.handle_sign_action(&mut reader, originator).await,
+            WalletCall::AbortAction => self.handle_abort_action(&mut reader, originator).await,
+            WalletCall::ListActions => self.handle_list_actions(&mut reader, originator).await,
             WalletCall::InternalizeAction => {
-                self.handle_internalize_action(&mut reader, &originator)
+                self.handle_internalize_action(&mut reader, originator)
                     .await
             }
 
             // Output Operations - delegated to wallet
-            WalletCall::ListOutputs => self.handle_list_outputs(&mut reader, &originator).await,
+            WalletCall::ListOutputs => self.handle_list_outputs(&mut reader, originator).await,
             WalletCall::RelinquishOutput => {
-                self.handle_relinquish_output(&mut reader, &originator)
-                    .await
+                self.handle_relinquish_output(&mut reader, originator).await
             }
 
             // Certificate Operations - delegated to wallet
             WalletCall::AcquireCertificate => {
-                self.handle_acquire_certificate(&mut reader, &originator)
+                self.handle_acquire_certificate(&mut reader, originator)
                     .await
             }
             WalletCall::ListCertificates => {
-                self.handle_list_certificates(&mut reader, &originator)
-                    .await
+                self.handle_list_certificates(&mut reader, originator).await
             }
             WalletCall::ProveCertificate => {
-                self.handle_prove_certificate(&mut reader, &originator)
-                    .await
+                self.handle_prove_certificate(&mut reader, originator).await
             }
             WalletCall::RelinquishCertificate => {
-                self.handle_relinquish_certificate(&mut reader, &originator)
+                self.handle_relinquish_certificate(&mut reader, originator)
                     .await
             }
 
             // Discovery Operations - delegated to wallet
             WalletCall::DiscoverByIdentityKey => {
-                self.handle_discover_by_identity_key(&mut reader, &originator)
+                self.handle_discover_by_identity_key(&mut reader, originator)
                     .await
             }
             WalletCall::DiscoverByAttributes => {
-                self.handle_discover_by_attributes(&mut reader, &originator)
+                self.handle_discover_by_attributes(&mut reader, originator)
                     .await
             }
         }
@@ -307,7 +304,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Key Operation Handlers
     // =========================================================================
 
-    async fn handle_get_public_key(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+    async fn handle_get_public_key(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: Option<&str>,
+    ) -> Answer {
         let args = read_get_public_key_args(reader)?;
         assert_request_consumed(reader, "getPublicKey")?;
         validation::get_public_key_args(&args)?;
@@ -322,7 +323,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         validation::public_key_result(&result.public_key)
     }
 
-    async fn handle_encrypt(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+    async fn handle_encrypt(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: Option<&str>,
+    ) -> Answer {
         let args = read_encrypt_args(reader)?;
         assert_request_consumed(reader, "encrypt")?;
         validation::encrypt_args(&args)?;
@@ -334,7 +339,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(write_encrypt_result(&result))
     }
 
-    async fn handle_decrypt(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+    async fn handle_decrypt(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: Option<&str>,
+    ) -> Answer {
         let args = read_decrypt_args(reader)?;
         assert_request_consumed(reader, "decrypt")?;
         validation::decrypt_args(&args)?;
@@ -346,7 +355,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(write_decrypt_result(&result))
     }
 
-    async fn handle_create_hmac(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+    async fn handle_create_hmac(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: Option<&str>,
+    ) -> Answer {
         let args = read_create_hmac_args(reader)?;
         assert_request_consumed(reader, "createHmac")?;
         validation::create_hmac_args(&args)?;
@@ -360,7 +373,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(write_create_hmac_result(&result))
     }
 
-    async fn handle_verify_hmac(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+    async fn handle_verify_hmac(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: Option<&str>,
+    ) -> Answer {
         let args = read_verify_hmac_args(reader)?;
         assert_request_consumed(reader, "verifyHmac")?;
         validation::verify_hmac_args(&args)?;
@@ -377,7 +394,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_create_signature(
         &self,
         reader: &mut WireReader<'_>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Answer {
         let args = read_create_signature_args(reader)?;
         assert_request_consumed(reader, "createSignature")?;
@@ -396,7 +413,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_verify_signature(
         &self,
         reader: &mut WireReader<'_>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Answer {
         let args = read_verify_signature_args(reader)?;
         assert_request_consumed(reader, "verifySignature")?;
@@ -414,7 +431,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_reveal_counterparty_key_linkage(
         &self,
         reader: &mut WireReader<'_>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Answer {
         let request = read_reveal_counterparty_key_linkage_args(reader)?;
         assert_request_consumed(reader, "revealCounterpartyKeyLinkage")?;
@@ -435,7 +452,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_reveal_specific_key_linkage(
         &self,
         reader: &mut WireReader<'_>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Answer {
         let request = read_reveal_specific_key_linkage_args(reader)?;
         assert_request_consumed(reader, "revealSpecificKeyLinkage")?;
@@ -456,7 +473,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Chain/Status Operation Handlers
     // =========================================================================
 
-    async fn handle_is_authenticated(&self, originator: &str) -> Answer {
+    async fn handle_is_authenticated(&self, originator: Option<&str>) -> Answer {
         let result = self
             .invoke_wallet(
                 WalletCall::IsAuthenticated,
@@ -468,7 +485,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(writer.into_bytes())
     }
 
-    async fn handle_wait_for_authentication(&self, originator: &str) -> Answer {
+    async fn handle_wait_for_authentication(&self, originator: Option<&str>) -> Answer {
         let result = self
             .invoke_wallet(
                 WalletCall::WaitForAuthentication,
@@ -478,7 +495,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(write_wait_for_authentication_result(&result)?)
     }
 
-    async fn handle_get_height(&self, originator: &str) -> Answer {
+    async fn handle_get_height(&self, originator: Option<&str>) -> Answer {
         let result = self
             .invoke_wallet(WalletCall::GetHeight, self.wallet.get_height(originator))
             .await?;
@@ -490,7 +507,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_get_header_for_height(
         &self,
         reader: &mut WireReader<'_>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Answer {
         let height = validation::read_header_height(reader)?;
         assert_request_consumed(reader, "getHeaderForHeight")?;
@@ -509,7 +526,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(super::header_result(&result.header)?)
     }
 
-    async fn handle_get_network(&self, originator: &str) -> Answer {
+    async fn handle_get_network(&self, originator: Option<&str>) -> Answer {
         // The wallet's answer forwarded (`WalletWireProcessor.ts:1701-1705` at
         // `ts-stack@edf6e03`, bsv-rs#222), one byte: 0 mainnet, 1 testnet
         // (`:1710`); the result's rule is the `Network` type's
@@ -519,7 +536,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         Ok(vec![u8::from(result.network == Network::Testnet)])
     }
 
-    async fn handle_get_version(&self, originator: &str) -> Answer {
+    async fn handle_get_version(&self, originator: Option<&str>) -> Answer {
         // The wallet's answer forwarded (`:1721-1725`), 7 to 30 UTF-8 bytes
         // (`WalletResultValidation.ts:2304-2306`), written with no length
         // prefix (`:1730`)
@@ -540,7 +557,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_create_action(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(
             Error::WalletError("createAction requires a full wallet implementation".to_string())
@@ -548,14 +565,22 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         )
     }
 
-    async fn handle_sign_action(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+    async fn handle_sign_action(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: Option<&str>,
+    ) -> Answer {
         Err(
             Error::WalletError("signAction requires a full wallet implementation".to_string())
                 .into(),
         )
     }
 
-    async fn handle_abort_action(&self, reader: &mut WireReader<'_>, originator: &str) -> Answer {
+    async fn handle_abort_action(
+        &self,
+        reader: &mut WireReader<'_>,
+        originator: Option<&str>,
+    ) -> Answer {
         // The rest of the request as base64 (`WalletWireProcessor.ts:785-790`; #206)
         let reference = to_base64(reader.read_remaining());
         validation::abort_action_args(&reference)?;
@@ -565,7 +590,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
         write_abort_action_result(&result)
     }
 
-    async fn handle_list_actions(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+    async fn handle_list_actions(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: Option<&str>,
+    ) -> Answer {
         Err(
             Error::WalletError("listActions requires a full wallet implementation".to_string())
                 .into(),
@@ -575,7 +604,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_internalize_action(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "internalizeAction requires a full wallet implementation".to_string(),
@@ -587,7 +616,11 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     // Output Operation Handlers
     // =========================================================================
 
-    async fn handle_list_outputs(&self, _reader: &mut WireReader<'_>, _originator: &str) -> Answer {
+    async fn handle_list_outputs(
+        &self,
+        _reader: &mut WireReader<'_>,
+        _originator: Option<&str>,
+    ) -> Answer {
         Err(
             Error::WalletError("listOutputs requires a full wallet implementation".to_string())
                 .into(),
@@ -597,7 +630,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_relinquish_output(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "relinquishOutput requires a full wallet implementation".to_string(),
@@ -612,7 +645,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_acquire_certificate(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "acquireCertificate requires a full wallet implementation".to_string(),
@@ -623,7 +656,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_list_certificates(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "listCertificates requires a full wallet implementation".to_string(),
@@ -634,7 +667,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_prove_certificate(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "proveCertificate requires a full wallet implementation".to_string(),
@@ -645,7 +678,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_relinquish_certificate(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "relinquishCertificate requires a full wallet implementation".to_string(),
@@ -660,7 +693,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_discover_by_identity_key(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "discoverByIdentityKey requires a full wallet implementation".to_string(),
@@ -671,7 +704,7 @@ impl<W: WalletInterface> WalletWireProcessor<W> {
     async fn handle_discover_by_attributes(
         &self,
         _reader: &mut WireReader<'_>,
-        _originator: &str,
+        _originator: Option<&str>,
     ) -> Answer {
         Err(Error::WalletError(
             "discoverByAttributes requires a full wallet implementation".to_string(),

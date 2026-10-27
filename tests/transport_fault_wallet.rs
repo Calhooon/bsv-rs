@@ -45,7 +45,7 @@ async fn both_at(url: &str, timeout: Duration) -> [(&'static str, Error); 2] {
     )
     .expect("the substrate is configured");
     let json_err = json
-        .create_action(create_action_args(), "app.example.com")
+        .create_action(create_action_args(), Some("app.example.com"))
         .await
         .expect_err("the JSON substrate fails");
     let wire = HttpWalletWire::with_client(client(timeout), None, Some(url.to_string()))
@@ -153,7 +153,7 @@ async fn store_busy_on_a_503_is_wallet_busy_where_the_substrate_reads_one() {
     let json = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
         .expect("the substrate is configured");
     let err = json
-        .create_action(create_action_args(), "app.example.com")
+        .create_action(create_action_args(), Some("app.example.com"))
         .await
         .unwrap_err();
     assert_eq!(
@@ -239,7 +239,7 @@ mod body_cut {
             .await;
         let err = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
             .expect("the substrate is configured")
-            .create_action(create_action_args(), "app.example.com")
+            .create_action(create_action_args(), Some("app.example.com"))
             .await
             .unwrap_err();
         assert!(matches!(err, Error::WalletError(_)), "{err:?}");

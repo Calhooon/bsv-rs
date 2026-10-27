@@ -48,36 +48,36 @@ macro_rules! recording {
     ($(($method:ident, $args:ty, $result:ty)),* $(,)?) => {
         #[async_trait::async_trait]
         impl WalletInterface for Recording {
-            $(async fn $method(&self, args: $args, o: &str) -> bsv_rs::Result<$result> {
+            $(async fn $method(&self, args: $args, o: Option<&str>) -> bsv_rs::Result<$result> {
                 WalletInterface::$method(&self.inner, args, o).await
             })*
 
-            async fn encrypt(&self, args: EncryptArgs, o: &str) -> bsv_rs::Result<EncryptResult> {
+            async fn encrypt(&self, args: EncryptArgs, o: Option<&str>) -> bsv_rs::Result<EncryptResult> {
                 let call = ("encrypt", args.privileged, args.privileged_reason.clone());
                 self.calls.lock().unwrap().push(call);
                 WalletInterface::encrypt(&self.inner, args, o).await
             }
-            async fn decrypt(&self, args: DecryptArgs, o: &str) -> bsv_rs::Result<DecryptResult> {
+            async fn decrypt(&self, args: DecryptArgs, o: Option<&str>) -> bsv_rs::Result<DecryptResult> {
                 let call = ("decrypt", args.privileged, args.privileged_reason.clone());
                 self.calls.lock().unwrap().push(call);
                 WalletInterface::decrypt(&self.inner, args, o).await
             }
-            async fn is_authenticated(&self, o: &str) -> bsv_rs::Result<AuthenticatedResult> {
+            async fn is_authenticated(&self, o: Option<&str>) -> bsv_rs::Result<AuthenticatedResult> {
                 WalletInterface::is_authenticated(&self.inner, o).await
             }
             async fn wait_for_authentication(
                 &self,
-                o: &str,
+                o: Option<&str>,
             ) -> bsv_rs::Result<AuthenticatedResult> {
                 WalletInterface::wait_for_authentication(&self.inner, o).await
             }
-            async fn get_height(&self, o: &str) -> bsv_rs::Result<GetHeightResult> {
+            async fn get_height(&self, o: Option<&str>) -> bsv_rs::Result<GetHeightResult> {
                 WalletInterface::get_height(&self.inner, o).await
             }
-            async fn get_network(&self, o: &str) -> bsv_rs::Result<GetNetworkResult> {
+            async fn get_network(&self, o: Option<&str>) -> bsv_rs::Result<GetNetworkResult> {
                 WalletInterface::get_network(&self.inner, o).await
             }
-            async fn get_version(&self, o: &str) -> bsv_rs::Result<GetVersionResult> {
+            async fn get_version(&self, o: Option<&str>) -> bsv_rs::Result<GetVersionResult> {
                 WalletInterface::get_version(&self.inner, o).await
             }
         }
@@ -148,7 +148,7 @@ async fn issued(p: &Parties) -> MasterCertificate {
         plaintexts(),
         [8u8; 32],
         Some([9u8; 32]),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap()
@@ -168,7 +168,7 @@ async fn create_certificate_fields_passes_privileged_and_its_reason_to_each_encr
         plaintexts(),
         Some(true),
         Some(REASON),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -191,7 +191,7 @@ async fn create_keyring_for_verifier_passes_privileged_and_its_reason_to_each_de
         &master.serial_number,
         Some(true),
         Some(REASON),
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -204,7 +204,7 @@ async fn create_keyring_for_verifier_passes_privileged_and_its_reason_to_each_de
             &ProtoWallet::new(Some(p.verifier.clone())),
             None,
             None,
-            "test",
+            Some("test"),
         )
         .await
         .unwrap();
@@ -225,7 +225,7 @@ async fn master_decrypt_field_and_decrypt_fields_pass_privileged_and_its_reason_
             "name",
             Some(true),
             Some(REASON),
-            "test",
+            Some("test"),
         )
         .await
         .unwrap();
@@ -233,7 +233,7 @@ async fn master_decrypt_field_and_decrypt_fields_pass_privileged_and_its_reason_
     assert_privileged(&subject.take(), 0, 1);
 
     let all = master
-        .decrypt_fields(&subject, &certifier, Some(true), Some(REASON), "test")
+        .decrypt_fields(&subject, &certifier, Some(true), Some(REASON), Some("test"))
         .await
         .unwrap();
     assert_eq!(all, plaintexts());
@@ -255,7 +255,7 @@ async fn verifiable_decrypt_field_and_decrypt_fields_pass_privileged_and_its_rea
         &master.serial_number,
         None,
         None,
-        "test",
+        Some("test"),
     )
     .await
     .unwrap();
@@ -263,14 +263,14 @@ async fn verifiable_decrypt_field_and_decrypt_fields_pass_privileged_and_its_rea
     let verifier = Recording::new(&p.verifier);
 
     let email = verifiable
-        .decrypt_field(&verifier, "email", Some(true), Some(REASON), "test")
+        .decrypt_field(&verifier, "email", Some(true), Some(REASON), Some("test"))
         .await
         .unwrap();
     assert_eq!(email, "alice@example.com");
     assert_privileged(&verifier.take(), 0, 1);
 
     let all = verifiable
-        .decrypt_fields(&verifier, Some(true), Some(REASON), "test")
+        .decrypt_fields(&verifier, Some(true), Some(REASON), Some("test"))
         .await
         .unwrap();
     assert_eq!(all, plaintexts());
@@ -283,7 +283,13 @@ async fn an_unprivileged_call_passes_neither_privileged_nor_a_reason() {
     let master = issued(&p).await;
     let subject = Recording::new(&p.subject);
     master
-        .decrypt_fields(&subject, &p.certifier.public_key(), None, None, "test")
+        .decrypt_fields(
+            &subject,
+            &p.certifier.public_key(),
+            None,
+            None,
+            Some("test"),
+        )
         .await
         .unwrap();
     let calls = subject.take();

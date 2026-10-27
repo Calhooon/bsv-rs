@@ -7,6 +7,120 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `WalletInterface` takes `originator: Option<&str>`, the reference's optional, so an absent originator and an empty one are two values (#329)
+
+`WalletInterface`'s 28 methods took `originator: &str`, so an absent
+originator and `""` reached a wallet as one value, and a wallet behind the
+trait could not give the reference's two verdicts: `validateOriginator`
+accepts `undefined` and refuses `""` by its 1 to 250 length rule
+(`ts-stack@edf6e03` `packages/sdk/src/wallet/validationHelpers.ts:1003-1006`).
+The reference's interface carries `originator?:
+OriginatorDomainNameStringUnder250Bytes` on all 28 methods
+(`packages/sdk/src/wallet/Wallet.interfaces.ts`, 28 sites). The keeper's
+ruling of 2026-10-27, under the owner's ruling (c) of 2026-10-26, carries
+the change on the 0.9.0 line before the 0.9.0-beta.2 cut.
+
+- The trait's 28 methods take `originator: Option<&str>`; `ProtoWallet`
+  (which ignores it, as before) and `HttpWalletJson` implement it so, and
+  `WalletWireTransceiver`'s 28 methods and the auth helpers that hand an
+  originator to a wallet (`create_nonce`, `verify_nonce`,
+  `validate_certificates`, `validate_certificate`,
+  `get_verifiable_certificates`, `MasterCertificate`'s and
+  `VerifiableCertificate`'s certificate methods) take the same type.
+- A client passes `None` when it has no originator configured, the
+  reference's `undefined`, and its configured one as given otherwise,
+  `Some("")` included, never mapped to `None`: `WalletClient` (`""` before),
+  `IdentityClient` (`""`, #318's absent originator, before),
+  `ContactsManager` (`""` before), `LocalKVStore`
+  and `GlobalKVStore` (`"kvstore"` before), `RegistryClient`
+  (`"registry-client"` before) and `Peer` (`"unknown"` before), as the
+  reference's `IdentityClient`, `ContactsManager`, `LocalKVStore`,
+  `GlobalKVStore`, `RegistryClient` and `Peer` pass their constructor's
+  `originator?` (`Peer.ts:145-152`, `ContactsManager.ts:288-290`,
+  `LocalKVStore.ts:116-126`, `RegistryClient.ts:271-274`).
+- The binary wire: the transceiver writes `None` (and `Some("")`) as the
+  length-0 originator, as it wrote `""`, and the processor reads length 0
+  back as `None`, a named originator as given (`""` before).
+- The HTTP JSON substrate sends a call's non-empty `Some` as its
+  `Originator` header, and for `None` (or `Some("")`, which no header
+  carries apart from absence) its configured originator, else no header,
+  as it did for `""`. The substrate's own rule (the configured originator
+  required, both headers) is #323's.
+
+Migration, one line per downstream (counted at their beta lines,
+`bsv-wallet-toolbox-rs@0daecd0` and `bsv-wallet-cli@2f8e6cf`, both
+pinning `=0.9.0-beta.1`, and `bsv-overlay-cloudflare@c51e161d`,
+`rust-message-box@44a6320` at main):
+
+- `bsv-wallet-toolbox-rs`: `originator: Option<&str>` at the two impls,
+  `Wallet` (`src/wallet/wallet.rs:1755`) and the test `MockWallet`
+  (`src/managers/permissions_manager.rs:1219`), 28 methods each; its
+  `validate_originator` then reads `None` as absent and `Some("")` as the
+  reference's refusal, and the interim `""`-as-absent reading of #329
+  goes; `Some(originator)` (or `None`) at each call: 92 sites the compiler
+  names in the library and its unit tests against this tree (56 of them
+  the two impls' signatures; 29 other errors there are beta's own since
+  0.9.0-beta.1 and appear against beta's tip too), its `tests/` and
+  `benches/` not reached past the library (about 15 calls there by grep).
+- `bsv-wallet-cli`: `Some(&originator)` at each wallet call, about 55
+  calls by grep (26 in `src/server/handlers.rs`); it implements no trait.
+- `bsv-overlay-cloudflare`: nothing; its wallet calls are `ProtoWallet`'s
+  inherent methods and its `PeerOptions` already carry `Option<String>`.
+- `rust-message-box`: `Some(..)` at its 5 `create_nonce` calls
+  (`src/engineio/auth.rs`): four pass the constant `ORIGINATOR`
+  (`:247`, `:563`, `:610`, `:670`) and one the literal
+  `"bsv-auth-cloudflare"` (`:787`), when it moves from `=0.6.0`.
+- A `PeerOptions`, kvstore, registry, identity or contacts configuration
+  that relied on the old default originator (`"unknown"`, `"kvstore"`,
+  `"registry-client"`, `"identity-client"`) now sends none; configure it
+  to keep sending one.
+
+The change is a major: every implementer and every caller of the trait
+changes. `cargo semver-checks` does not name it (`--release-type minor
+--baseline-rev f0f236e`: 202 checks pass, "no semver update required"; it
+has no lint for a changed parameter type), so this sentence is the record;
+the keeper's ruling under (c) carries it on the 0.9.0 line.
+
+Pinned by `tests/wallet_originator_option_329.rs` (12 tests): `None`
+written on the binary wire as the length-0 originator and read back by the
+processor as `None` (and a frame of length 0 written by hand); a named
+originator round-tripped byte for byte; `Some("")` written as length 0 and
+read back as `None`; `Some("")` reaching an in-process wallet as
+`Some("")`; the JSON substrate sending no `Originator` header for `None`
+with none configured and the configured one for `None`; the identity
+client (`""` configured reaching the wallet as `Some("")`), the contacts
+manager, the local and global kvstores (the overlay a facilitator that
+cannot succeed), the registry client and `Peer` passing `None` with none
+configured and `Some` when configured, each through a recording wallet.
+On beta's tip (`f0f236e`) the file does not compile (62 errors: the trait takes no
+`Option`); on this tree with the behaviour reverted (the processor's
+length 0 read as `Some("")`, the clients' old defaults back) 8 of the 12
+fail, the 4 others pinning what held before (a named originator, the
+in-process call, the JSON substrate's two header cases). Every mock and
+caller in `tests/`, the fuzz targets and the doc examples moved with the
+trait; #318's counting wallet (`tests/support/identity_reveal_wallet.rs`)
+keeps each call's originator as an `Option`, and
+`tests/identity_wallet_calls_318.rs` reads the reference's `null` as
+`None` where it read it as `""`, its 4 tests unchanged otherwise.
+
+### Notes: cross-SDK parity (#329)
+
+go-sdk@2ca481c's `wallet.Interface` takes `originator string` on all 28
+methods (`wallet/interfaces.go`), `""` for none: one value for absence and
+an empty string, as this crate had; the reference's optional is followed.
+
+The reference's processor reads a length-0 originator as `''`
+(`WalletWireProcessor.ts:292-294`, `decodedOriginator === '' ? '' :
+validateOriginator(...)`) and hands `''` to its wallet; this crate's
+processor hands `None`, the reading the ruling asks, so a wallet behind it
+accepts a wire call that names no originator where a reference wallet that
+validates `''` refuses it. The reference's transceiver writes `''` for an
+absent one (`WalletWireTransceiver.ts:92-100`), as this crate's writes
+`None` and `Some("")`: on the wire the two are one value in both SDKs. The
+reference's processor also refuses a length above 250 and normalizes a
+named originator through `validateOriginator` (`:286-294`); this crate's
+does neither: a finding outside #329.
+
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
 Six signAction calls sent the reference createAction answered as the hex

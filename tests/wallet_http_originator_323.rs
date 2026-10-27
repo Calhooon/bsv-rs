@@ -86,7 +86,7 @@ async fn a_json_call_with_no_originator_configured_is_refused_in_the_references_
     let server = version_server().await;
     let client = json(None, &server.uri()).unwrap();
     assert_eq!(
-        client.get_version("example.com").await,
+        client.get_version(Some("example.com")).await,
         Err(wallet_error(ORIGINATOR_REQUIRED))
     );
     assert!(server.received_requests().await.unwrap().is_empty());
@@ -106,7 +106,7 @@ async fn the_json_substrate_sends_both_headers_in_the_origin_form_with_the_port_
             Some(origin.trim_start_matches("http://"))
         );
         // The call's originator is not the one sent: the constructor's is
-        let version = client.get_version("other.example").await.unwrap();
+        let version = client.get_version(Some("other.example")).await.unwrap();
         assert_eq!(version, "wallet-1.0.0");
         assert_eq!(
             header_values(&server, "origin").await,
@@ -213,7 +213,7 @@ async fn a_redirect_is_answered_and_not_followed_by_either_substrate() {
 
     let client = json(Some("example.com"), &server.uri()).unwrap();
     assert_eq!(
-        client.get_version("example.com").await,
+        client.get_version(Some("example.com")).await,
         Err(refused.clone())
     );
     let wire = wire(Some("example.com"), &server.uri()).unwrap();
@@ -317,7 +317,10 @@ async fn a_json_request_over_256_mib_is_refused_unsent() {
     let rest = serde_json::to_vec(&args).unwrap().len();
     args.description = "a".repeat(MAX_WALLET_JSON_REQUEST_BYTES + 1 - rest);
     assert_eq!(
-        client.create_action(args, "example.com").await.map(|_| ()),
+        client
+            .create_action(args, Some("example.com"))
+            .await
+            .map(|_| ()),
         Err(wallet_error(
             "HTTPWalletJSON request exceeds the maximum permitted size"
         ))

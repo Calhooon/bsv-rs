@@ -75,7 +75,7 @@ fn frame_error(code: u8, message: String) -> Error {
 ///     key_id: Some("key-1".to_string()),
 ///     for_self: Some(true),
 ///     ..Default::default()
-/// }, "originator").await?;
+/// }, Some("example.com")).await?;
 /// ```
 pub struct WalletWireTransceiver<T: WalletWire> {
     wire: T,
@@ -96,7 +96,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     async fn transmit(
         &self,
         call: WalletCall,
-        originator: &str,
+        originator: Option<&str>,
         params: &[u8],
     ) -> Result<Vec<u8>, Error> {
         self.exchange(call, originator, params)
@@ -109,7 +109,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     async fn exchange(
         &self,
         call: WalletCall,
-        originator: &str,
+        originator: Option<&str>,
         params: &[u8],
     ) -> Result<Result<Vec<u8>, (u8, String)>, Error> {
         let mut writer = WireWriter::new();
@@ -117,8 +117,8 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         // Write call code
         writer.write_u8(call.as_u8());
 
-        // Write originator
-        let originator_bytes = originator.as_bytes();
+        // Write originator: `None` is the length-0 originator (#329)
+        let originator_bytes = originator.unwrap_or_default().as_bytes();
         writer.write_u8(originator_bytes.len() as u8);
         writer.write_bytes(originator_bytes);
 
@@ -156,7 +156,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn get_public_key(
         &self,
         args: GetPublicKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetPublicKeyResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -201,7 +201,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn encrypt(
         &self,
         args: EncryptArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<EncryptResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -230,7 +230,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn decrypt(
         &self,
         args: DecryptArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DecryptResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -259,7 +259,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn create_hmac(
         &self,
         args: CreateHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateHmacResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -290,7 +290,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn verify_hmac(
         &self,
         args: VerifyHmacArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifyHmacResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -323,7 +323,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn create_signature(
         &self,
         args: CreateSignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateSignatureResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -356,7 +356,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn verify_signature(
         &self,
         args: VerifySignatureArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<VerifySignatureResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -394,7 +394,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     }
 
     /// Checks if the wallet is authenticated.
-    pub async fn is_authenticated(&self, originator: &str) -> Result<bool, Error> {
+    pub async fn is_authenticated(&self, originator: Option<&str>) -> Result<bool, Error> {
         let response = self
             .transmit(WalletCall::IsAuthenticated, originator, &[])
             .await?;
@@ -404,7 +404,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     }
 
     /// Gets the current block height.
-    pub async fn get_height(&self, originator: &str) -> Result<u64, Error> {
+    pub async fn get_height(&self, originator: Option<&str>) -> Result<u64, Error> {
         let response = self
             .transmit(WalletCall::GetHeight, originator, &[])
             .await?;
@@ -416,7 +416,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     /// Gets the network the wallet is connected to.
     ///
     /// Go uses single byte: 0x00=mainnet, 0x01=testnet.
-    pub async fn get_network(&self, originator: &str) -> Result<Network, Error> {
+    pub async fn get_network(&self, originator: Option<&str>) -> Result<Network, Error> {
         let response = self
             .transmit(WalletCall::GetNetwork, originator, &[])
             .await?;
@@ -437,7 +437,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     /// Gets the wallet version.
     ///
     /// Go writes raw UTF-8 bytes with NO length prefix.
-    pub async fn get_version(&self, originator: &str) -> Result<String, Error> {
+    pub async fn get_version(&self, originator: Option<&str>) -> Result<String, Error> {
         let response = self
             .transmit(WalletCall::GetVersion, originator, &[])
             .await?;
@@ -455,7 +455,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn create_action(
         &self,
         args: CreateActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<CreateActionResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -656,7 +656,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn sign_action(
         &self,
         args: SignActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<SignActionResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -728,7 +728,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn abort_action(
         &self,
         args: AbortActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<AbortActionResult, Error> {
         let reference_bytes = from_base64(&args.reference)
             .map_err(|e| Error::WalletError(format!("invalid reference base64: {}", e)))?;
@@ -754,7 +754,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn list_actions(
         &self,
         args: ListActionsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListActionsResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -806,7 +806,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn internalize_action(
         &self,
         args: InternalizeActionArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<InternalizeActionResult, Error> {
         crate::wallet::validation::validate_internalize_action_args(&args)?;
         let mut writer = WireWriter::new();
@@ -877,7 +877,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn list_outputs(
         &self,
         args: ListOutputsArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListOutputsResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -949,7 +949,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn relinquish_output(
         &self,
         args: RelinquishOutputArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RelinquishOutputResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -970,7 +970,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn acquire_certificate(
         &self,
         args: AcquireCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<WalletCertificate, Error> {
         let mut writer = WireWriter::new();
 
@@ -1090,7 +1090,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn list_certificates(
         &self,
         args: ListCertificatesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ListCertificatesResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -1185,7 +1185,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn prove_certificate(
         &self,
         args: ProveCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<ProveCertificateResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -1265,7 +1265,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn relinquish_certificate(
         &self,
         args: RelinquishCertificateArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<RelinquishCertificateResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -1301,7 +1301,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn discover_by_identity_key(
         &self,
         args: DiscoverByIdentityKeyArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -1328,7 +1328,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn discover_by_attributes(
         &self,
         args: DiscoverByAttributesArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<DiscoverCertificatesResult, Error> {
         let mut writer = WireWriter::new();
 
@@ -1362,7 +1362,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     pub async fn get_header(
         &self,
         args: GetHeaderArgs,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<GetHeaderResult, Error> {
         let mut writer = WireWriter::new();
         writer.write_var_int(args.height as u64);
@@ -1382,7 +1382,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
     }
 
     /// Waits for authentication.
-    pub async fn wait_for_authentication(&self, originator: &str) -> Result<bool, Error> {
+    pub async fn wait_for_authentication(&self, originator: Option<&str>) -> Result<bool, Error> {
         let response = self
             .transmit(WalletCall::WaitForAuthentication, originator, &[])
             .await?;
@@ -1491,7 +1491,7 @@ mod tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test.example.com",
+                Some("test.example.com"),
             )
             .await
             .unwrap();
@@ -1516,7 +1516,7 @@ mod tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -1531,7 +1531,7 @@ mod tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -1554,7 +1554,7 @@ mod tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -1570,7 +1570,7 @@ mod tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -1594,7 +1594,7 @@ mod tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -1612,7 +1612,7 @@ mod tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -1623,21 +1623,21 @@ mod tests {
     #[tokio::test]
     async fn test_roundtrip_is_authenticated() {
         let transceiver = create_loopback();
-        let result = transceiver.is_authenticated("test").await.unwrap();
+        let result = transceiver.is_authenticated(Some("test")).await.unwrap();
         assert!(result);
     }
 
     #[tokio::test]
     async fn test_roundtrip_get_network() {
         let transceiver = create_loopback();
-        let result = transceiver.get_network("test").await.unwrap();
+        let result = transceiver.get_network(Some("test")).await.unwrap();
         assert_eq!(result, Network::Mainnet);
     }
 
     #[tokio::test]
     async fn test_roundtrip_get_version() {
         let transceiver = create_loopback();
-        let result = transceiver.get_version("test").await.unwrap();
+        let result = transceiver.get_version(Some("test")).await.unwrap();
         assert!(!result.is_empty());
     }
 }

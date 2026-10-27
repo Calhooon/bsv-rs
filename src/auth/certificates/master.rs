@@ -94,7 +94,7 @@ impl MasterCertificate {
         fields: HashMap<String, String>,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<(HashMap<String, String>, HashMap<String, String>)> {
         bounds::snapshot_record(&fields, "Certificate plaintext fields")?;
         let mut encrypted_fields = HashMap::new();
@@ -191,7 +191,7 @@ impl MasterCertificate {
         serial_number: &[u8; 32],
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<HashMap<String, String>> {
         bounds::require_keyring_for_verifier_inputs(fields, fields_to_reveal, master_keyring)?;
         let mut keyring = HashMap::new();
@@ -254,7 +254,7 @@ impl MasterCertificate {
         field_value: Option<&String>,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<(Vec<u8>, String)> {
         let field_value = field_value.ok_or_else(|| refused(MASTER_FIELD_DECRYPT_FAILED))?;
         Self::decrypt_with_master_keyring(
@@ -290,7 +290,7 @@ impl MasterCertificate {
         field_value: &str,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<(Vec<u8>, String)> {
         bounds::require_master_field_name(field_name)?;
         bounds::snapshot_record(master_keyring, "Master certificate keyring")?;
@@ -350,7 +350,7 @@ impl MasterCertificate {
         plain_fields: HashMap<String, String>,
         cert_type: [u8; 32],
         serial_number: Option<[u8; 32]>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<Self> {
         // Generate serial number if not provided
         let serial_number = serial_number.unwrap_or_else(|| {
@@ -412,7 +412,7 @@ impl MasterCertificate {
         field_name: &str,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<String> {
         let (_, plaintext) = Self::decrypt_field_wrapped(
             subject_wallet,
@@ -444,7 +444,7 @@ impl MasterCertificate {
         certifier: &PublicKey,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
-        originator: &str,
+        originator: Option<&str>,
     ) -> Result<HashMap<String, String>> {
         let fields = &self.certificate.fields;
         bounds::snapshot_record(&self.master_keyring, "Master certificate keyring")?;

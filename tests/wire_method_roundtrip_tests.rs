@@ -139,7 +139,7 @@ mod get_public_key_tests {
                     for_self: None,
                     ..Default::default()
                 },
-                "test.app",
+                Some("test.app"),
             )
             .await
             .unwrap();
@@ -163,7 +163,7 @@ mod get_public_key_tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "originator.example.com",
+                Some("originator.example.com"),
             )
             .await
             .unwrap();
@@ -186,7 +186,7 @@ mod get_public_key_tests {
                     for_self: Some(false),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -212,7 +212,7 @@ mod get_public_key_tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -234,7 +234,7 @@ mod get_public_key_tests {
                     for_self: None,
                     ..Default::default()
                 },
-                "",
+                None,
             )
             .await
             .unwrap();
@@ -261,7 +261,7 @@ mod encrypt_decrypt_tests {
                     counterparty: None, // defaults to Self_
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -278,7 +278,7 @@ mod encrypt_decrypt_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -301,7 +301,7 @@ mod encrypt_decrypt_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -315,7 +315,7 @@ mod encrypt_decrypt_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -338,7 +338,7 @@ mod encrypt_decrypt_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -352,7 +352,7 @@ mod encrypt_decrypt_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -379,7 +379,7 @@ mod hmac_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -397,7 +397,7 @@ mod hmac_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -419,7 +419,7 @@ mod hmac_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -434,7 +434,7 @@ mod hmac_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -478,7 +478,7 @@ mod signature_tests {
                     counterparty: None, // defaults to Anyone for create_signature
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -504,7 +504,7 @@ mod signature_tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -528,7 +528,7 @@ mod signature_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -547,7 +547,7 @@ mod signature_tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -570,7 +570,7 @@ mod signature_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -588,7 +588,7 @@ mod signature_tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -665,7 +665,7 @@ mod reference_request_frames {
                     counterparty: None,
                     ..Default::default()
                 },
-                "",
+                None,
             )
             .await
             .unwrap()
@@ -680,7 +680,7 @@ mod reference_request_frames {
                     counterparty: None,
                     ..Default::default()
                 },
-                "",
+                None,
             )
             .await
             .unwrap();
@@ -714,7 +714,7 @@ mod reference_request_frames {
                         counterparty: None,
                         ..Default::default()
                     },
-                    "",
+                    None,
                 )
                 .await
                 .unwrap()
@@ -734,7 +734,7 @@ mod reference_request_frames {
                         for_self: Some(true),
                         ..Default::default()
                     },
-                    "",
+                    None,
                 )
                 .await
                 .unwrap();
@@ -767,7 +767,7 @@ mod reference_request_frames {
                         counterparty: None,
                         ..Default::default()
                     },
-                    "",
+                    None,
                 )
                 .await;
             assert_eq!(
@@ -788,7 +788,7 @@ mod reference_request_frames {
                         for_self: None,
                         ..Default::default()
                     },
-                    "",
+                    None,
                 )
                 .await;
             assert_eq!(
@@ -848,8 +848,11 @@ mod permission_field_tests {
             ..Default::default()
         };
         for args in [key(Some(true)), identity] {
-            let plain = client.get_public_key(args.clone(), "").await.unwrap();
-            let with = client.get_public_key(with_fields!(args), "").await.unwrap();
+            let plain = client.get_public_key(args.clone(), None).await.unwrap();
+            let with = client
+                .get_public_key(with_fields!(args), None)
+                .await
+                .unwrap();
             assert_eq!(plain.public_key, with.public_key);
         }
 
@@ -861,7 +864,7 @@ mod permission_field_tests {
             ..Default::default()
         };
         for args in [encrypt.clone(), with_fields!(encrypt)] {
-            let ciphertext = client.encrypt(args, "").await.unwrap().ciphertext;
+            let ciphertext = client.encrypt(args, None).await.unwrap().ciphertext;
             let decrypt = DecryptArgs {
                 ciphertext,
                 protocol_id: protocol(),
@@ -869,7 +872,7 @@ mod permission_field_tests {
                 ..Default::default()
             };
             for args in [decrypt.clone(), with_fields!(decrypt)] {
-                assert_eq!(client.decrypt(args, "").await.unwrap().plaintext, data);
+                assert_eq!(client.decrypt(args, None).await.unwrap().plaintext, data);
             }
         }
 
@@ -880,12 +883,12 @@ mod permission_field_tests {
             ..Default::default()
         };
         let hmac = client
-            .create_hmac(hmac_args.clone(), "")
+            .create_hmac(hmac_args.clone(), None)
             .await
             .unwrap()
             .hmac;
         let with = client
-            .create_hmac(with_fields!(hmac_args), "")
+            .create_hmac(with_fields!(hmac_args), None)
             .await
             .unwrap();
         assert_eq!(hmac, with.hmac);
@@ -897,7 +900,7 @@ mod permission_field_tests {
             ..Default::default()
         };
         for args in [verify.clone(), with_fields!(verify)] {
-            assert!(client.verify_hmac(args, "").await.unwrap().valid);
+            assert!(client.verify_hmac(args, None).await.unwrap().valid);
         }
 
         let sign = CreateSignatureArgs {
@@ -906,9 +909,9 @@ mod permission_field_tests {
             key_id: "k".to_string(),
             ..Default::default()
         };
-        let signature = client.create_signature(sign.clone(), "").await.unwrap();
+        let signature = client.create_signature(sign.clone(), None).await.unwrap();
         let with = client
-            .create_signature(with_fields!(sign), "")
+            .create_signature(with_fields!(sign), None)
             .await
             .unwrap();
         assert_eq!(signature.signature, with.signature);
@@ -922,7 +925,7 @@ mod permission_field_tests {
             ..Default::default()
         };
         for args in [verify.clone(), with_fields!(verify)] {
-            assert!(client.verify_signature(args, "").await.unwrap().valid);
+            assert!(client.verify_signature(args, None).await.unwrap().valid);
         }
     }
 
@@ -940,7 +943,7 @@ mod permission_field_tests {
                     privileged_reason: Some("r".repeat(128)),
                     ..Default::default()
                 },
-                "",
+                None,
             )
             .await
             .unwrap_err();
@@ -1107,7 +1110,7 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_is_authenticated() {
         let transceiver = create_loopback();
-        let result = transceiver.is_authenticated("test").await.unwrap();
+        let result = transceiver.is_authenticated(Some("test")).await.unwrap();
         assert!(result);
     }
 
@@ -1115,7 +1118,10 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_wait_for_authentication() {
         let transceiver = create_loopback();
-        let result = transceiver.wait_for_authentication("test").await.unwrap();
+        let result = transceiver
+            .wait_for_authentication(Some("test"))
+            .await
+            .unwrap();
         assert!(result);
     }
 
@@ -1125,7 +1131,7 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_get_height() {
         let transceiver = create_loopback();
-        let error = transceiver.get_height("test").await.unwrap_err();
+        let error = transceiver.get_height(Some("test")).await.unwrap_err();
         assert_eq!(
             error,
             Error::WalletError(
@@ -1139,7 +1145,7 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_get_network_mainnet() {
         let transceiver = create_loopback();
-        let result = transceiver.get_network("test").await.unwrap();
+        let result = transceiver.get_network(Some("test")).await.unwrap();
         assert_eq!(result, Network::Mainnet);
     }
 
@@ -1147,11 +1153,11 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_get_network_is_the_wallets_answer() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let expected = wallet.get_network("test").await.unwrap().network;
+        let expected = wallet.get_network(Some("test")).await.unwrap().network;
         let processor = Arc::new(WalletWireProcessor::new(wallet));
         let wire = LoopbackWire { processor };
         let transceiver = WalletWireTransceiver::new(wire);
-        let result = transceiver.get_network("test").await.unwrap();
+        let result = transceiver.get_network(Some("test")).await.unwrap();
         assert_eq!(result, expected);
     }
 
@@ -1159,7 +1165,7 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_get_version() {
         let transceiver = create_loopback();
-        let result = transceiver.get_version("test").await.unwrap();
+        let result = transceiver.get_version(Some("test")).await.unwrap();
         assert_eq!(result, concat!("bsv-rs-", env!("CARGO_PKG_VERSION")));
     }
 
@@ -1167,11 +1173,11 @@ mod status_tests {
     #[tokio::test]
     async fn test_roundtrip_get_version_is_the_wallets_answer() {
         let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let expected = wallet.get_version("test").await.unwrap().version;
+        let expected = wallet.get_version(Some("test")).await.unwrap().version;
         let processor = Arc::new(WalletWireProcessor::new(wallet));
         let wire = LoopbackWire { processor };
         let transceiver = WalletWireTransceiver::new(wire);
-        let result = transceiver.get_version("test").await.unwrap();
+        let result = transceiver.get_version(Some("test")).await.unwrap();
         assert_eq!(result, expected);
     }
 
@@ -1181,7 +1187,7 @@ mod status_tests {
     async fn test_roundtrip_get_header_for_height_error() {
         let transceiver = create_loopback();
         let result = transceiver
-            .get_header(GetHeaderArgs { height: 100 }, "test")
+            .get_header(GetHeaderArgs { height: 100 }, Some("test"))
             .await;
 
         // ProtoWallet doesn't support get_header_for_height, so we expect an error
@@ -1241,7 +1247,7 @@ mod action_tests {
                         randomize_outputs: Some(true),
                     }),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1265,7 +1271,7 @@ mod action_tests {
                     labels: None,
                     options: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1304,7 +1310,7 @@ mod action_tests {
                         send_with: Some(vec![sample_txid()]),
                     }),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1320,7 +1326,7 @@ mod action_tests {
                 AbortActionArgs {
                     reference: bsv_rs::primitives::to_base64(&[0xAA, 0xBB, 0xCC]),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1346,7 +1352,7 @@ mod action_tests {
                     offset: Some(10),
                     seek_permission: Some(true),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1372,7 +1378,7 @@ mod action_tests {
                     offset: None,
                     seek_permission: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1401,7 +1407,7 @@ mod action_tests {
                     labels: Some(vec!["income".to_string()]),
                     seek_permission: Some(false),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1432,7 +1438,7 @@ mod action_tests {
                     labels: None,
                     seek_permission: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1465,7 +1471,7 @@ mod output_tests {
                     offset: Some(0),
                     seek_permission: Some(true),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1490,7 +1496,7 @@ mod output_tests {
                     offset: None,
                     seek_permission: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1515,7 +1521,7 @@ mod output_tests {
                     offset: Some(-10),
                     seek_permission: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1532,7 +1538,7 @@ mod output_tests {
                     basket: "tokens".to_string(),
                     output: Outpoint::new(sample_txid(), 3),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1579,7 +1585,7 @@ mod certificate_tests {
                     privileged: Some(false),
                     privileged_reason: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1607,7 +1613,7 @@ mod certificate_tests {
                     privileged: None,
                     privileged_reason: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1628,7 +1634,7 @@ mod certificate_tests {
                     privileged: Some(false),
                     privileged_reason: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1649,7 +1655,7 @@ mod certificate_tests {
                     privileged: None,
                     privileged_reason: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1670,7 +1676,7 @@ mod certificate_tests {
                     privileged: Some(false),
                     privileged_reason: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1689,7 +1695,7 @@ mod certificate_tests {
                     serial_number: bsv_rs::primitives::to_base64(&[1u8; 32]),
                     certifier: bsv_rs::primitives::to_hex(&certifier_key.to_compressed()),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1716,7 +1722,7 @@ mod discovery_tests {
                     offset: Some(5),
                     seek_permission: Some(true),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1735,7 +1741,7 @@ mod discovery_tests {
                     offset: None,
                     seek_permission: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1758,7 +1764,7 @@ mod discovery_tests {
                     offset: Some(0),
                     seek_permission: Some(false),
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -1780,7 +1786,7 @@ mod discovery_tests {
                     offset: None,
                     seek_permission: None,
                 },
-                "test",
+                Some("test"),
             )
             .await;
 
@@ -2953,7 +2959,7 @@ mod counterparty_variant_tests {
                     counterparty: Some(Counterparty::Self_),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
         assert!(result.is_ok());
@@ -2968,7 +2974,7 @@ mod counterparty_variant_tests {
                     counterparty: Some(Counterparty::Anyone),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
         assert!(result.is_ok());
@@ -2983,7 +2989,7 @@ mod counterparty_variant_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
         assert!(result.is_ok());
@@ -2999,7 +3005,7 @@ mod counterparty_variant_tests {
                     counterparty: Some(Counterparty::Other(other_key)),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
         assert!(result.is_ok());
@@ -3205,7 +3211,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -3219,7 +3225,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -3241,7 +3247,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -3257,7 +3263,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -3280,7 +3286,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -3298,7 +3304,7 @@ mod result_frame_tests {
                     for_self: Some(true),
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .unwrap();
@@ -3310,7 +3316,7 @@ mod result_frame_tests {
     #[tokio::test]
     async fn the_wait_for_authentication_frame_is_the_error_byte_alone() {
         let client = taped();
-        assert!(client.wait_for_authentication("test").await.unwrap());
+        assert!(client.wait_for_authentication(Some("test")).await.unwrap());
         assert_eq!(last_frame(&client), vec![0]);
     }
 
@@ -3327,7 +3333,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .map(|r| r.valid);
@@ -3343,11 +3349,11 @@ mod result_frame_tests {
                     for_self: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await
             .map(|r| r.valid);
-        let authenticated = client.wait_for_authentication("test").await;
+        let authenticated = client.wait_for_authentication(Some("test")).await;
         [hmac, signature, authenticated]
     }
 
@@ -3417,7 +3423,7 @@ mod result_frame_tests {
                     counterparty: None,
                     ..Default::default()
                 },
-                "test",
+                Some("test"),
             )
             .await;
         assert_eq!(

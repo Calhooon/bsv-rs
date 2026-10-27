@@ -51,7 +51,7 @@ fuzz_target!(|data: &[u8]| {
         };
         let transceiver = WalletWireTransceiver::new(Answer(answer.to_vec()));
         futures::executor::block_on(async {
-            support::call_shared!(&transceiver, call, "fuzz.example");
+            support::call_shared!(&transceiver, call, Some("fuzz.example"));
         });
     }
 });

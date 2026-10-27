@@ -76,8 +76,8 @@ impl<W: WalletInterface> ContactsManager<W> {
     }
 
     /// Get the originator string for wallet calls.
-    fn originator(&self) -> &str {
-        self.config.originator.as_deref().unwrap_or("")
+    fn originator(&self) -> Option<&str> {
+        self.config.originator.as_deref()
     }
 
     // =========================================================================

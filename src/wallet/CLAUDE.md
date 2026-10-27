@@ -13,7 +13,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `types.rs` | Core wallet type definitions (70+ types, hex serde helpers) | ~1919 |
 | `types/json_forms.rs` | The JSON forms of #105 that are neither serde's default nor the hex helpers: `hex_txid_option`, `base64_bytes` (the signable reference) and `KeyringRevealer`'s serde (`"certifier"` or the key's hex) | ~95 |
 | `types/linkage.rs` | The two key-linkage results and `KeyLinkageResult`, re-exported from `types`; their JSON flat with byte arrays, `protocolID` through the private `protocol_tuple` helper, `keyID` (#105) | ~83 |
-| `interface.rs` | WalletInterface async trait (28 methods) + marker traits | ~297 |
+| `interface.rs` | WalletInterface async trait (28 methods, `originator: Option<&str>`, #329) + marker traits | ~319 |
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
 | `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
@@ -48,7 +48,7 @@ Wire protocol implementation for binary wallet communication:
 
 ### WalletInterface Trait
 
-The `WalletInterface` trait defines all 28 wallet operations (async with `originator: &str` parameter):
+The `WalletInterface` trait defines all 28 wallet operations (async with `originator: Option<&str>`, the reference's optional `originator?`: `None` absent, `Some("")` empty, two values a wallet can give two verdicts on; #329):
 
 | Category | Methods |
 |----------|---------|
@@ -76,7 +76,7 @@ pub enum SubstrateType {
 pub struct WalletClient {
     pub fn new(substrate_type: SubstrateType, originator: Option<String>) -> Self
     pub fn substrate_type(&self) -> SubstrateType
-    pub fn originator(&self) -> Option<&str>
+    pub fn originator(&self) -> Option<&str>   // passed to every call as given; None when none is set (#329)
     // All wallet operations as async methods (connect lazily on first call)
 }
 ```

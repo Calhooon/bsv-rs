@@ -53,7 +53,7 @@ fn refused(words: impl Into<String>) -> Error {
 /// What the revocation reads of its client.
 pub(super) struct Revocation<'a, W: ?Sized> {
     pub wallet: &'a W,
-    pub originator: &'a str,
+    pub originator: Option<&'a str>,
     pub config: &'a IdentityClientConfig,
     pub resolver: &'a LookupResolver,
     pub facilitator: Option<Arc<dyn OverlayBroadcastFacilitator>>,
