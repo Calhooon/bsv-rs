@@ -96,7 +96,8 @@ entry is canonical base64 of 1 to 2048 bytes and a plaintext at most 64 KiB
 asks), and a decrypt failure reaches the caller in the reference's wrapper
 (`Failed to decrypt certificate field!`, `Failed to decrypt all master
 certificate fields.`, `Failed to decrypt selectively revealed certificate
-fields using keyring: <words>`; #297):
+fields using keyring: <words>`, the cipher's two refusals quoted in the
+reference's words, `Decryption failed!` and `Ciphertext too short`; #297):
 
 **Master Certificate Key IDs:**
 - Protocol: `"certificate field encryption"`
@@ -153,7 +154,7 @@ fields using keyring: <words>`; #297):
 | `has_keyring()` | Check if keyring has any keys |
 | `revealable_fields()` | List fields that can be decrypted |
 | `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt`; the counterparty the certificate's subject, no parameter (`VerifiableCertificate.ts:152-198`); a failure in `decryptFields`' wrapper (#297) |
-| `decrypt_fields()` | Decrypt all fields in keyring (async, cached); the same pair; an empty keyring or one over 100 entries refused, every failure `Failed to decrypt selectively revealed certificate fields using keyring: <words>` (#297) |
+| `decrypt_fields()` | Decrypt all fields in keyring (async, cached); the same pair; an empty keyring or one over 100 entries refused, every failure `Failed to decrypt selectively revealed certificate fields using keyring: <words>`, the cipher's `Decryption failed!` and `Ciphertext too short` as the reference's (`SymmetricKey.ts:205`, `:217`, `:232`), a revelation key other than 32 bytes refused (`VerifiableCertificate.ts:203`) (#297) |
 | `get_decrypted_fields()` | Get cached decrypted fields if available |
 | `clear_decrypted_cache()` | Clear the cached decrypted fields |
 | `verify()` | Verify underlying certificate signature |
