@@ -1,0 +1,146 @@
+{
+  "issue": "bsv-rs#294",
+  "description": "The reference Peer's verdicts on a requested certificate set: constructor, a Peer built with the policy as its own (Peer.ts:158); sender, requestCertificates after a handshake (Peer.ts:434), signatures made and messages sent after the call; receiver, a signed certificateRequest carrying the policy handed to a Peer holding the requester's session (snapshotAuthMessage, Peer.ts:767; AuthMessageValidation.ts:345-346, :367). given_types is the order the policy was written in; policy_text is JSON.stringify of it (an integer-like key moves first).",
+  "node": "v22.18.0",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "keys": {
+    "requester": "0000000000000000000000000000000000000000000000000000000000000029",
+    "verifier": "000000000000000000000000000000000000000000000000000000000000002a",
+    "certifier": "000000000000000000000000000000000000000000000000000000000000002b"
+  },
+  "cases": [
+    {
+      "name": "type_id_of_31_bytes",
+      "given_types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=="
+      ],
+      "policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\":[\"name\"]}}",
+      "constructor": {
+        "error": "certificate type must encode exactly 32 bytes."
+      },
+      "sender": {
+        "error": "certificate type must encode exactly 32 bytes.",
+        "signatures_made": 0,
+        "messages_sent": [],
+        "holder_received_policy_text": null
+      },
+      "receiver": {
+        "message_text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"q/iK6+C2RdzckZhxdqknkUTlDSbR9BZ5pTbE6wYOSlWpShG9acK22bRJyIDc25uC\",\"requestedCertificates\":{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ==\":[\"name\"]}},\"signature\":[48,68,2,32,5,62,44,35,119,182,229,171,189,248,60,25,80,116,103,216,27,65,244,83,72,107,58,20,122,233,203,217,9,200,28,174,2,32,125,92,28,107,211,74,53,252,149,174,200,14,209,181,214,158,250,247,198,98,59,216,194,26,184,127,228,135,83,81,114,200]}",
+        "session_nonce": "q/iK6+C2RdzckZhxdqknkUTlDSbR9BZ5pTbE6wYOSlWpShG9acK22bRJyIDc25uC",
+        "requester_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+        "error": "certificate type must encode exactly 32 bytes.",
+        "signatures_checked": 0,
+        "listener_received_policy_text": null
+      }
+    },
+    {
+      "name": "type_id_of_33_bytes",
+      "given_types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+      ],
+      "policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB\":[\"name\"]}}",
+      "constructor": {
+        "error": "certificate type must encode exactly 32 bytes."
+      },
+      "sender": {
+        "error": "certificate type must encode exactly 32 bytes.",
+        "signatures_made": 0,
+        "messages_sent": [],
+        "holder_received_policy_text": null
+      },
+      "receiver": {
+        "message_text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"AfZSE8eSF73Q4b/lXv2iyjSCWc5uwL3qzjbyXuZFWzfKPpDZE5QRcsK+RgaDiof+\",\"requestedCertificates\":{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB\":[\"name\"]}},\"signature\":[48,68,2,32,34,71,34,187,157,227,243,160,137,132,103,98,90,219,79,105,179,151,144,165,112,75,227,95,122,66,126,188,43,159,213,66,2,32,12,166,220,154,73,184,186,106,29,182,107,76,201,69,95,199,80,136,173,228,147,171,209,245,229,19,156,117,246,87,223,217]}",
+        "session_nonce": "AfZSE8eSF73Q4b/lXv2iyjSCWc5uwL3qzjbyXuZFWzfKPpDZE5QRcsK+RgaDiof+",
+        "requester_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+        "error": "certificate type must encode exactly 32 bytes.",
+        "signatures_checked": 0,
+        "listener_received_policy_text": null
+      }
+    },
+    {
+      "name": "type_id_not_base64",
+      "given_types": [
+        "not base64!"
+      ],
+      "policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"not base64!\":[\"name\"]}}",
+      "constructor": {
+        "error": "certificate type must be canonical base64."
+      },
+      "sender": {
+        "error": "certificate type must be canonical base64.",
+        "signatures_made": 0,
+        "messages_sent": [],
+        "holder_received_policy_text": null
+      },
+      "receiver": {
+        "message_text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"hKphV3iFcPiTLE3cJ1ylzH/LAV5RiPDvbgZezayqXdNnkrvpxa9WyMai2y3Dq+4q\",\"requestedCertificates\":{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"not base64!\":[\"name\"]}},\"signature\":[48,69,2,33,0,183,82,232,248,154,232,181,8,52,126,203,194,42,34,253,183,208,20,134,4,204,17,149,146,120,17,71,149,216,31,167,169,2,32,28,234,148,9,206,93,199,245,208,247,198,30,208,91,84,206,226,237,56,114,175,4,188,231,162,63,35,79,101,122,158,242]}",
+        "session_nonce": "hKphV3iFcPiTLE3cJ1ylzH/LAV5RiPDvbgZezayqXdNnkrvpxa9WyMai2y3Dq+4q",
+        "requester_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+        "error": "certificate type must be canonical base64.",
+        "signatures_checked": 0,
+        "listener_received_policy_text": null
+      }
+    },
+    {
+      "name": "type_id_integer_like",
+      "given_types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=",
+        "42"
+      ],
+      "policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"42\":[\"name\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"name\"]}}",
+      "constructor": {
+        "error": "certificate type must be canonical base64."
+      },
+      "sender": {
+        "error": "certificate type must be canonical base64.",
+        "signatures_made": 0,
+        "messages_sent": [],
+        "holder_received_policy_text": null
+      },
+      "receiver": {
+        "message_text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"A4qa/RfBXqiRmYlTUIn5pX9QeCR5NtJV7aLFY7ZxNAMn1OwMUaTDj4jlkGUUWshv\",\"requestedCertificates\":{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"42\":[\"name\"],\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"name\"]}},\"signature\":[48,68,2,32,57,250,113,254,227,80,8,93,172,100,182,177,12,162,23,160,69,76,179,35,220,239,219,212,125,204,78,18,107,66,65,60,2,32,108,55,206,164,95,219,123,8,177,30,211,241,93,202,166,79,220,158,27,214,1,85,232,72,83,29,24,150,174,87,99,111]}",
+        "session_nonce": "A4qa/RfBXqiRmYlTUIn5pX9QeCR5NtJV7aLFY7ZxNAMn1OwMUaTDj4jlkGUUWshv",
+        "requester_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+        "error": "certificate type must be canonical base64.",
+        "signatures_checked": 0,
+        "listener_received_policy_text": null
+      }
+    },
+    {
+      "name": "type_id_of_32_bytes",
+      "given_types": [
+        "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+      ],
+      "policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"name\"]}}",
+      "constructor": {
+        "error": null
+      },
+      "sender": {
+        "error": null,
+        "signatures_made": 1,
+        "messages_sent": [
+          "certificateRequest"
+        ],
+        "holder_received_policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"name\"]}}"
+      },
+      "receiver": {
+        "message_text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"qRWKIgqfVK2ql4O9tIAp4D7e4rw7u3okQmPV4JmCGvPRsXQWSwM78wn88L+FNFYh\",\"requestedCertificates\":{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"name\"]}},\"signature\":[48,68,2,32,101,196,118,127,104,210,67,253,202,174,163,140,103,225,192,113,14,1,96,238,152,214,188,27,158,160,34,141,216,56,14,255,2,32,108,46,120,242,156,87,255,53,110,31,253,122,173,188,225,250,91,222,41,52,54,93,95,222,15,146,187,73,21,0,139,50]}",
+        "session_nonce": "qRWKIgqfVK2ql4O9tIAp4D7e4rw7u3okQmPV4JmCGvPRsXQWSwM78wn88L+FNFYh",
+        "requester_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+        "error": null,
+        "signatures_checked": 1,
+        "listener_received_policy_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=\":[\"name\"]}}"
+      }
+    }
+  ],
+  "absent_requested_certificates": {
+    "receiver": {
+      "message_text": "{\"version\":\"0.1\",\"messageType\":\"certificateRequest\",\"identityKey\":\"037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb\",\"nonce\":\"OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk5OTk=\",\"initialNonce\":\"TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N\",\"yourNonce\":\"D2Myl3TKm9o+5FBmw7zxoL4PuyMiCKuYMwTqx4LNxJheKAbWMeuIsJSy65gbq7Bd\",\"signature\":[48,68,2,32,22,187,195,72,218,208,14,15,136,13,194,85,50,164,228,77,248,63,224,174,26,148,225,28,211,49,142,163,166,51,36,113,2,32,42,164,238,160,200,250,251,50,213,218,28,34,59,72,105,21,160,255,40,130,132,155,30,138,148,75,167,79,225,47,120,149]}",
+      "session_nonce": "D2Myl3TKm9o+5FBmw7zxoL4PuyMiCKuYMwTqx4LNxJheKAbWMeuIsJSy65gbq7Bd",
+      "requester_session_nonce": "TU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1NTU1N",
+      "error": "requestedCertificates must be an object.",
+      "signatures_checked": 0,
+      "listener_received_policy_text": null
+    }
+  }
+}
