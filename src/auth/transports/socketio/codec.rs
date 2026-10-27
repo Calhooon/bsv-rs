@@ -53,6 +53,16 @@
 //!   - `2/admin,["x"]`  → EVENT `[x]` on /admin
 //!   - `212["foo"]`     → EVENT `[foo]` on default ns with ack id 12
 //!
+//! The reader is the reference's, `socket.io-parser` 4.2.7's
+//! `decodeString` (bsv-rs#110): the run after the namespace is the id on
+//! every type (`00` is a CONNECT with the id 0, written back by
+//! [`SocketIoPacket::encode`]), and the payload must have the type's shape
+//! (`isPayloadValid`: CONNECT an object, DISCONNECT none, CONNECT_ERROR a
+//! string or an object, EVENT an array headed by a number or an unreserved
+//! name, ACK an array), else `invalid payload`. The rules are in
+//! `packet_rules.rs`; the frames the reference reads and this codec refuses
+//! are listed in `CLAUDE.md`'s cross-SDK divergences.
+//!
 //! Only the no-namespace and default-`/` namespace cases are exercised
 //! by [`SocketIoTransport`](super::SocketIoTransport), but the parser
 //! handles arbitrary namespaces correctly so non-standard clients still
@@ -73,6 +83,8 @@
 
 use serde_json::value::RawValue;
 use serde_json::Value;
+
+use super::packet_rules;
 
 /// U+001E record separator used between concatenated Engine.IO
 /// packets in HTTP polling bodies.
@@ -190,13 +202,18 @@ pub enum SocketIoPacket {
     Connect {
         /// Namespace this packet targets (`/` for default).
         nsp: String,
-        /// Optional JSON payload (auth on client side, `{sid}` on server side).
+        /// The id the frame carries after the namespace: the reference
+        /// reads and writes one on every packet type (bsv-rs#110).
+        ack_id: Option<u64>,
+        /// Optional JSON object (auth on client side, `{sid}` on server side).
         data: Option<Value>,
     },
     /// DISCONNECT (type 1). No payload.
     Disconnect {
         /// Namespace being disconnected.
         nsp: String,
+        /// The id the frame carries after the namespace (bsv-rs#110).
+        ack_id: Option<u64>,
     },
     /// EVENT (type 2). Payload is the JSON array `[event_name, ...args]`.
     Event {
@@ -220,7 +237,9 @@ pub enum SocketIoPacket {
     ConnectError {
         /// Namespace the connection was rejected on.
         nsp: String,
-        /// Optional rejection reason JSON.
+        /// The id the frame carries after the namespace (bsv-rs#110).
+        ack_id: Option<u64>,
+        /// Optional rejection reason: a JSON string or object.
         data: Option<Value>,
     },
 }
@@ -232,10 +251,21 @@ impl SocketIoPacket {
     pub fn nsp(&self) -> &str {
         match self {
             SocketIoPacket::Connect { nsp, .. }
-            | SocketIoPacket::Disconnect { nsp }
+            | SocketIoPacket::Disconnect { nsp, .. }
             | SocketIoPacket::Event { nsp, .. }
             | SocketIoPacket::Ack { nsp, .. }
             | SocketIoPacket::ConnectError { nsp, .. } => nsp,
+        }
+    }
+
+    /// The packet's id, on every type as the reference carries it.
+    pub fn ack_id(&self) -> Option<u64> {
+        match self {
+            SocketIoPacket::Connect { ack_id, .. }
+            | SocketIoPacket::Disconnect { ack_id, .. }
+            | SocketIoPacket::Event { ack_id, .. }
+            | SocketIoPacket::ConnectError { ack_id, .. } => *ack_id,
+            SocketIoPacket::Ack { ack_id, .. } => Some(*ack_id),
         }
     }
 
@@ -253,23 +283,18 @@ impl SocketIoPacket {
         };
         out.push(type_code);
 
-        // Namespace prefix: only present when non-default. Followed by `,`.
+        // Namespace prefix: only present when non-default (the reference
+        // omits an empty one too, `encodeAsString`). Followed by `,`.
         let nsp = self.nsp();
-        if nsp != DEFAULT_NSP {
+        if !nsp.is_empty() && nsp != DEFAULT_NSP {
             out.push_str(nsp);
             out.push(',');
         }
 
-        // Ack id (decimal) — encoded between the namespace and the JSON
-        // payload, with no separator.
-        if let SocketIoPacket::Event {
-            ack_id: Some(id), ..
-        } = self
-        {
+        // Ack id (decimal), on every type that carries one, between the
+        // namespace and the JSON payload with no separator.
+        if let Some(id) = self.ack_id() {
             out.push_str(&id.to_string());
-        }
-        if let SocketIoPacket::Ack { ack_id, .. } = self {
-            out.push_str(&ack_id.to_string());
         }
 
         // JSON payload — only present for some packet types.
@@ -290,96 +315,63 @@ impl SocketIoPacket {
     }
 
     /// Decode a Socket.IO packet from the payload of an Engine.IO message
-    /// packet (i.e. without the leading `4`).
+    /// packet (i.e. without the leading `4`), as the reference's
+    /// `decodeString` reads it (bsv-rs#110): the namespace, the id on every
+    /// type, the payload judged by `isPayloadValid` (`invalid payload`).
     pub fn decode(raw: &str) -> Result<Self, CodecError> {
         let mut chars = raw.chars();
         let type_ch = chars.next().ok_or(CodecError::EmptyPacket)?;
-
-        // Optional namespace: if next char is `/`, read up to the first
-        // `,` (or end of string for type-only packets like CONNECT to
-        // /custom with no payload, where the wire form is `0/custom,`).
-        let mut rest: String = chars.collect();
-        let nsp = if rest.starts_with('/') {
-            // Find the comma that ends the namespace; if there's no
-            // comma, the entire remainder is the namespace.
-            if let Some(comma_idx) = rest.find(',') {
-                let ns = rest[..comma_idx].to_string();
-                rest = rest[comma_idx + 1..].to_string();
-                ns
-            } else {
-                let ns = rest.clone();
-                rest.clear();
-                ns
-            }
-        } else {
-            DEFAULT_NSP.to_string()
-        };
-
-        // Optional ack id: leading run of decimal digits.
-        let ack_digit_count = rest.chars().take_while(|c| c.is_ascii_digit()).count();
-        let ack_id: Option<u64> = if ack_digit_count > 0 {
-            rest[..ack_digit_count].parse().ok()
-        } else {
-            None
-        };
-        let payload = &rest[ack_digit_count..];
-
-        // Parse JSON payload if present.
-        let data: Option<Value> = if payload.is_empty() {
-            None
-        } else {
-            Some(serde_json::from_str(payload).map_err(|e| {
-                CodecError::Malformed(format!("invalid JSON in socket.io payload: {e}"))
-            })?)
-        };
-
+        if !('0'..='4').contains(&type_ch) {
+            return Err(CodecError::UnknownType(type_ch));
+        }
+        let (nsp, rest) = split_namespace(chars.as_str());
+        let (run, payload) = packet_rules::split_id_run(rest);
+        let ack_id = packet_rules::read_id(run)?;
+        let data = packet_rules::read_payload(type_ch, payload)?;
+        let nsp = nsp.to_string();
         Ok(match type_ch {
-            '0' => SocketIoPacket::Connect { nsp, data },
-            '1' => SocketIoPacket::Disconnect { nsp },
-            '2' => {
-                let arr = match data {
-                    Some(Value::Array(a)) if !a.is_empty() => a,
-                    Some(_) => {
-                        return Err(CodecError::Malformed(
-                            "socket.io EVENT payload must be a non-empty array".into(),
-                        ))
-                    }
-                    None => {
-                        return Err(CodecError::Malformed(
-                            "socket.io EVENT requires a payload".into(),
-                        ))
-                    }
-                };
-                SocketIoPacket::Event {
-                    nsp,
-                    ack_id,
-                    data: arr,
-                }
-            }
-            '3' => {
-                let arr = match data {
-                    Some(Value::Array(a)) => a,
-                    Some(_) => {
-                        return Err(CodecError::Malformed(
-                            "socket.io ACK payload must be an array".into(),
-                        ))
-                    }
-                    None => Vec::new(),
-                };
-                let id = ack_id.ok_or_else(|| {
+            '0' => SocketIoPacket::Connect { nsp, ack_id, data },
+            '1' => SocketIoPacket::Disconnect { nsp, ack_id },
+            '2' => SocketIoPacket::Event {
+                nsp,
+                ack_id,
+                data: carried_array(data, "EVENT")?,
+            },
+            '3' => SocketIoPacket::Ack {
+                nsp,
+                ack_id: ack_id.ok_or_else(|| {
                     CodecError::Malformed("socket.io ACK requires an ack id".into())
-                })?;
-                SocketIoPacket::Ack {
-                    nsp,
-                    ack_id: id,
-                    data: arr,
-                }
-            }
-            '4' => SocketIoPacket::ConnectError { nsp, data },
-            other => {
-                return Err(CodecError::UnknownType(other));
-            }
+                })?,
+                data: carried_array(data, "ACK")?,
+            },
+            _ => SocketIoPacket::ConnectError { nsp, ack_id, data },
         })
+    }
+}
+
+/// The namespace and the text after it: a leading `/` up to the first `,`
+/// (consumed) or the end, else the default namespace (`decodeString`,
+/// `:206-219`).
+fn split_namespace(rest: &str) -> (&str, &str) {
+    if !rest.starts_with('/') {
+        return (DEFAULT_NSP, rest);
+    }
+    match rest.find(',') {
+        Some(comma) => (&rest[..comma], &rest[comma + 1..]),
+        None => (rest, ""),
+    }
+}
+
+/// An EVENT's or ACK's array, already judged by `isPayloadValid`. A frame
+/// without a payload is a packet the reference reads (its `data`
+/// undefined) and this crate's `Vec` cannot tell from an empty array, so it
+/// is refused.
+fn carried_array(data: Option<Value>, kind: &str) -> Result<Vec<Value>, CodecError> {
+    match data {
+        Some(Value::Array(a)) => Ok(a),
+        _ => Err(CodecError::Malformed(format!(
+            "socket.io {kind} requires a payload"
+        ))),
     }
 }
 
@@ -401,14 +393,8 @@ pub fn decode_event_args_text(raw: &str) -> Result<Vec<Box<RawValue>>, CodecErro
         }
     }
     // The type digit is one ASCII byte
-    let mut rest = &raw[1..];
-    if rest.starts_with('/') {
-        rest = match rest.find(',') {
-            Some(comma) => &rest[comma + 1..],
-            None => "",
-        };
-    }
-    let rest = rest.trim_start_matches(|c: char| c.is_ascii_digit());
+    let (_, rest) = split_namespace(&raw[1..]);
+    let (_, rest) = packet_rules::split_id_run(rest);
     serde_json::from_str(rest)
         .map_err(|e| CodecError::Malformed(format!("invalid JSON in socket.io payload: {e}")))
 }
@@ -583,6 +569,7 @@ mod tests {
         // Client→server CONNECT: bare `0` (default namespace, no auth).
         let p = SocketIoPacket::Connect {
             nsp: "/".into(),
+            ack_id: None,
             data: None,
         };
         assert_eq!(p.encode(), "0");
@@ -594,6 +581,7 @@ mod tests {
         // Server→client CONNECT ack: `0{"sid":"..."}`.
         let p = SocketIoPacket::Connect {
             nsp: "/".into(),
+            ack_id: None,
             data: Some(json!({"sid":"wZX3oN0bSVIhsaknAAAI"})),
         };
         let s = p.encode();
@@ -605,6 +593,7 @@ mod tests {
     fn socketio_connect_custom_namespace_with_payload() {
         let p = SocketIoPacket::Connect {
             nsp: "/admin".into(),
+            ack_id: None,
             data: Some(json!({"token":"123"})),
         };
         let s = p.encode();
@@ -614,7 +603,10 @@ mod tests {
 
     #[test]
     fn socketio_disconnect_default_namespace() {
-        let p = SocketIoPacket::Disconnect { nsp: "/".into() };
+        let p = SocketIoPacket::Disconnect {
+            nsp: "/".into(),
+            ack_id: None,
+        };
         assert_eq!(p.encode(), "1");
         assert_eq!(SocketIoPacket::decode("1").unwrap(), p);
     }
@@ -623,6 +615,7 @@ mod tests {
     fn socketio_disconnect_custom_namespace_round_trips() {
         let p = SocketIoPacket::Disconnect {
             nsp: "/admin".into(),
+            ack_id: None,
         };
         // Wire form per spec sample: `1/admin,`
         assert_eq!(p.encode(), "1/admin,");
@@ -682,6 +675,7 @@ mod tests {
     fn socketio_connect_error_round_trips() {
         let p = SocketIoPacket::ConnectError {
             nsp: "/".into(),
+            ack_id: None,
             data: Some(json!({"message":"Not authorized"})),
         };
         let s = p.encode();
@@ -691,7 +685,7 @@ mod tests {
 
     #[test]
     fn socketio_event_rejects_non_array_payload() {
-        // Per spec: EVENT payload MUST be a non-empty array.
+        // `isPayloadValid`: an EVENT's payload is an array with a head.
         assert!(SocketIoPacket::decode("2{\"foo\":1}").is_err());
         assert!(SocketIoPacket::decode("2[]").is_err());
     }
