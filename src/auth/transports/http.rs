@@ -817,13 +817,7 @@ impl Transport for SimplifiedFetchTransport {
                     }
 
                     // Extract signature
-                    if let Some(sig) = response_headers.get(headers::SIGNATURE) {
-                        let sig_str = sig.to_str().unwrap_or_default();
-                        // Try hex first, then base64
-                        response_message.signature = crate::primitives::from_hex(sig_str)
-                            .or_else(|_| crate::primitives::from_base64(sig_str))
-                            .ok();
-                    }
+                    response_message.signature = unauthenticated::signature(&response_headers);
 
                     // Check for certificate request in response
                     if let Some(msg_type) = response_headers.get(headers::MESSAGE_TYPE) {
