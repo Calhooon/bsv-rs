@@ -9,7 +9,6 @@
 use crate::primitives::PublicKey;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::value::RawValue;
-use std::collections::HashMap;
 
 /// Protocol version for BRC-31 authentication.
 pub const AUTH_VERSION: &str = "0.1";
@@ -535,10 +534,19 @@ impl PeerSession {
     }
 }
 
+/// A requested certificate set's types: certificate type ID (base64) ->
+/// the field names to reveal, in insertion order, as the reference's
+/// `RequestedCertificateTypeIDAndFieldList` (a `Record`) holds them
+/// (`ts-stack@edf6e03` `packages/sdk/src/auth/types.ts:21-23`, bsv-rs#288).
+pub type RequestedCertificateTypes = indexmap::IndexMap<String, Vec<String>>;
+
 /// Certificate request specification.
 ///
 /// Specifies which certificates are required from a peer, including
 /// trusted certifiers and the certificate types with fields to reveal.
+/// `types` keeps its order: a JSON read keeps the text's, `add_type`
+/// appends, and the JSON written (the bytes a certificateRequest signs,
+/// `Peer.ts:451-453`) is that order.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RequestedCertificateSet {
@@ -546,9 +554,10 @@ pub struct RequestedCertificateSet {
     #[serde(default)]
     pub certifiers: Vec<String>,
 
-    /// Map of certificate type ID (base64) -> list of field names to reveal.
+    /// Map of certificate type ID (base64) -> list of field names to reveal,
+    /// in insertion order (#288).
     #[serde(default)]
-    pub types: HashMap<String, Vec<String>>,
+    pub types: RequestedCertificateTypes,
 }
 
 impl RequestedCertificateSet {
@@ -567,7 +576,9 @@ impl RequestedCertificateSet {
         self.certifiers.push(certifier_hex.into());
     }
 
-    /// Adds a certificate type with fields to reveal.
+    /// Adds a certificate type with fields to reveal: a new type goes
+    /// last; a type already present keeps its place and takes these fields,
+    /// as a `Record`'s assignment does.
     pub fn add_type(&mut self, type_id: impl Into<String>, fields: Vec<String>) {
         self.types.insert(type_id.into(), fields);
     }
