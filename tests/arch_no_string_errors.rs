@@ -16,15 +16,33 @@ const HOMES: &[&str] = &[
 // (docs/ARCH-RULES.md section 3): every line a protocol comparison, no
 // error-message allowance.
 const ALLOWED: &[(&str, &str, usize)] = &[
+    // The constructors' base URL and originator (#323): the caller's own
+    // strings read at construction, the reference's
+    // `normalizeWalletHttpBaseUrl` and `isLoopbackHostname`; no answer read.
     (
-        "src/wallet/substrates/http_json.rs",
-        "if originator.starts_with(\"http://\") || originator.starts_with(\"https://\") {",
-        2,
+        "src/wallet/substrates/origin.rs",
+        "&& parsed.path() == \"/\"",
+        1,
     ),
     (
-        "src/wallet/substrates/http_wire.rs",
-        "if originator.starts_with(\"http://\") || originator.starts_with(\"https://\") {",
-        2,
+        "src/wallet/substrates/origin.rs",
+        "if parsed.scheme() == \"http\" && !is_loopback_hostname(host) {",
+        1,
+    ),
+    (
+        "src/wallet/substrates/origin.rs",
+        "normalized == \"localhost\"",
+        1,
+    ),
+    (
+        "src/wallet/substrates/origin.rs",
+        "|| normalized == \"127.0.0.1\"",
+        1,
+    ),
+    (
+        "src/wallet/substrates/origin.rs",
+        "|| normalized == \"[::1]\"",
+        1,
     ),
     (
         "src/auth/transports/websocket_transport.rs",
@@ -155,7 +173,7 @@ fn transport_code_adds_no_text_classification() {
     }
     arch_support::check_sites("text classification in a transport", &sites, ALLOWED);
     println!(
-        "text comparison exceptions: {} sites in 6 files",
+        "text comparison exceptions: {} sites in 5 files",
         sites.len()
     );
 }
