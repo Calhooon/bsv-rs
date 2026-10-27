@@ -77,7 +77,7 @@ pinning `=0.9.0-beta.1`, and `bsv-overlay-cloudflare@c51e161d`,
 
 The change is a major: every implementer and every caller of the trait
 changes. `cargo semver-checks` does not name it (`--release-type minor
---baseline-rev f0f236e`: 202 checks pass, "no semver update required"; it
+--baseline-rev b09a81a`: 202 checks pass, "no semver update required"; it
 has no lint for a changed parameter type), so this sentence is the record;
 the keeper's ruling under (c) carries it on the 0.9.0 line.
 
@@ -86,17 +86,18 @@ written on the binary wire as the length-0 originator and read back by the
 processor as `None` (and a frame of length 0 written by hand); a named
 originator round-tripped byte for byte; `Some("")` written as length 0 and
 read back as `None`; `Some("")` reaching an in-process wallet as
-`Some("")`; the JSON substrate sending no `Originator` header for `None`
-with none configured and the configured one for `None`; the identity
+`Some("")`; the JSON substrate refusing a call with no originator configured
+before any request (#323's rule, in the reference's words) and sending the
+configured one as both headers for `None`; the identity
 client (`""` configured reaching the wallet as `Some("")`), the contacts
 manager, the local and global kvstores (the overlay a facilitator that
 cannot succeed), the registry client and `Peer` passing `None` with none
 configured and `Some` when configured, each through a recording wallet.
-On beta's tip (`f0f236e`) the file does not compile (62 errors: the trait takes no
+On beta's tip (`b09a81a`) the file does not compile (62 errors: the trait takes no
 `Option`); on this tree with the behaviour reverted (the processor's
 length 0 read as `Some("")`, the clients' old defaults back) 8 of the 12
 fail, the 4 others pinning what held before (a named originator, the
-in-process call, the JSON substrate's two header cases). Every mock and
+in-process call, the JSON substrate's refusal and its configured-header case). Every mock and
 caller in `tests/`, the fuzz targets and the doc examples moved with the
 trait; #318's counting wallet (`tests/support/identity_reveal_wallet.rs`)
 keeps each call's originator as an `Option`, and
