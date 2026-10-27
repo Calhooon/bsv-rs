@@ -31,6 +31,7 @@ use crate::script::op::{opcode_to_name, OP_DIV, OP_MOD, OP_MUL};
 use crate::script::script_num::ScriptNum;
 
 use super::limits::MAX_SCRIPT_ELEMENT_SIZE;
+use super::reference_read::magnitude_bits;
 use super::Spend;
 #[cfg(test)]
 use std::cell::Cell;
@@ -169,19 +170,6 @@ fn describe(operands: &[usize]) -> String {
             format!("operands of {} bytes", lens.join(" and "))
         }
     }
-}
-
-/// The bits of a script number's magnitude, read from its bytes without
-/// decoding them (a non-minimal encoding's padding counts nothing).
-fn magnitude_bits(bytes: &[u8]) -> u64 {
-    let last = bytes.len().saturating_sub(1);
-    for (i, &byte) in bytes.iter().enumerate().rev() {
-        let byte = if i == last { byte & 0x7f } else { byte };
-        if byte != 0 {
-            return 8 * i as u64 + u64::from(8 - byte.leading_zeros());
-        }
-    }
-    0
 }
 
 /// The minimal encoding's length for a magnitude of `bits` bits: one byte for

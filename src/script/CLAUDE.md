@@ -310,7 +310,11 @@ first (`try_reserve_exact`, released), its refusal a decline: 6 times the operan
 `OP_MUL`, 12 for `OP_DIV` and `OP_MOD`, 2 for the rest (measured at most 5.12, 10.0 and 1.0:
 the decode reads the element without a copy, the arithmetic is owned, the encoding sized up
 front); a number's read (1.5 times its bytes) and the numeric shifts' results are asked the
-same way, and every encoded number is allocated fallibly. A memory budget bounds memory, never time: `work_limit` does. Under a word the count is the
+same way, and every encoded number is allocated fallibly. The default mode reads a number as
+the reference does (`reference_read.rs`, the keeper's word of 2026-10-27): an operand whose
+magnitude passes 536,870,888 bits, V8's longest string at `ts-stack@edf6e03` under Node 22
+(`BigNumber.ts:450`), is invalid at its read, `Invalid string length`, a verdict, after the
+minimal-encoding check; under a word the node's number length decides. A memory budget bounds memory, never time: `work_limit` does. Under a word the count is the
 node's (`LimitedStack`: one budget over both stacks, `STACK_ELEMENT_OVERHEAD` = 32
 bytes per element, every growth charged before it happens, an unlocking script's alt
 stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's policy
@@ -455,6 +459,7 @@ direct call (no trait object, no table of function pointers, no clone added).
 | `crypto.rs` | The hashes (each charged to the work budget before it runs), `OP_CODESEPARATOR`, `OP_CHECKSIG` and `OP_CHECKMULTISIG` with NULLFAIL and NULLDUMMY, the signature encoding (DER, LOW_S at the order, STRICTENC's defined base type and CHRONICLE bit, FORKID), the public key encoding (COMPRESSED_PUBKEYTYPE), the scriptCode (`build_subscript`, a FORKID signature's push kept) and `verify_signature` (the CHRONICLE-bit dispatch through `TxSighashCache`) |
 | `stack.rs` | The main and alt stacks: push, pop, peek, `require_two_items` (the two-operand guard), and the memory each element is charged: per stack in the default mode, the node's one count with `STACK_ELEMENT_OVERHEAD` under a word (`charge`, `release`) |
 | `limits.rs` | The budgets and their declines: `MAX_SCRIPT_ELEMENT_SIZE`, `WORD_MEMORY_LIMIT`, `MAX_MULTISIG_KEY_COUNT`; `memory_limit`, `stack_memory_policy` (the mempool path's verdict), `stack_memory_consensus` (the block path's, #38), `check_node_budget`, `resource_error` (every `ScriptResourceLimit` the memory budget raises), the work budget (`work_spent`, `charge_work`, `work_error`); both errors' messages are the limit's `Display` |
+| `reference_read.rs` | The default mode's read limit, the reference's (#331, the keeper's word of 2026-10-27): `refusal` (`Invalid string length` for a magnitude past 536,870,888 bits, V8's longest string, `toString(2)` at `BigNumber.ts:450`), `magnitude_bits` (the magnitude's bits from the bytes, padding none); `num.rs`'s `check_reference_read` applies it at every read in the default mode, after the minimal-encoding check |
 | `num.rs` | Script numbers under the length limit in force: `max_script_num_length`, `set_script_num_length_policy`, `read_number` (its digits asked of the allocator first, #374), `check_number` (the read's verdicts without the decode, #374), `read_count` (CHECKMULTISIG's 4-byte counts), `push_number` and `push_encoded_number`, the overflow error. The encoding is `ScriptNum`'s (`script_num.rs`), not repeated here |
 | `tests.rs`, `flag_tests.rs`, `chronicle_tests.rs`, `low_s_order_tests.rs`, `script_num_length_tests.rs`, `fixed_width_operand_tests.rs` | The unit tests, one file per former inline module; their paths (`script::spend::flag_tests::...`) are unchanged |
 

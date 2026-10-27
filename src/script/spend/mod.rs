@@ -111,6 +111,7 @@ mod flow;
 mod limits;
 mod num;
 mod push;
+mod reference_read;
 mod splice;
 mod stack;
 mod stack_ops;

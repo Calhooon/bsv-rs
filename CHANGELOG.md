@@ -161,6 +161,37 @@ word.
   operands, 6.11 and 5.12 at its worst shape; `OP_DIV` 11.0 before, 10.0
   after at its worst shape. An operand's decoding stays infallible (num-bigint
   builds its digits with no fallible form), and is covered by the probe.
+- The default mode reads a script number as the reference does (the
+  keeper's word of 2026-10-27, 19:4xZ, under the owner's ruling (c): "a
+  script number the reference cannot read is invalid there and so invalid
+  here in that mode"): an operand whose magnitude passes 536,870,888 bits,
+  a minimal encoding past 67,108,862 bytes, is invalid with the
+  reference's words, `Invalid string length`, a verdict, never a decline,
+  judged at every read after the minimal-encoding check, as the reference
+  judges it (`src/script/spend/reference_read.rs`; the arithmetic guard's
+  operand check too, so the verdict precedes any decline). The figure is
+  V8's longest string at the reference's pin, not a BRC's rule: under
+  Node v22.18.0 at `ts-stack@edf6e03` `#_finishInitialization` takes
+  `toString(2)` of every magnitude it is given (`BigNumber.ts:450`) and
+  `#readScriptNumber` rethrows the `RangeError`'s words
+  (`Spend.ts:525-535`). The node's number length after Chronicle is
+  32,000,000 bytes (#38's entry; `ScriptFlags::max_script_num_length`):
+  the reference reads numbers the node refuses, and the default mode
+  follows the reference; under a word nothing moves. With it the
+  arithmetic's peak is bounded by construction for a minimal operand
+  (`OP_MUL`'s room at most 6 times 134,217,724 bytes, 805,306,344), and the
+  element bound at an arithmetic result is unreachable by operands the
+  default mode reads (two give at most 2^30 - 48 bits, 134,217,722 bytes;
+  kept, and modelled by the unit tests). A non-minimal operand (the default
+  mode relaxes minimal encoding at version 2 and above) is read while its
+  magnitude is within the figure, whatever its length: the reference's hex
+  text (`fromSm`, `:1518-1527`) would refuse one past 268,435,443 bytes,
+  but no script holds such an element there (a `number[]` of 2^27 entries
+  is `RangeError: Invalid array length` under Node 22), so that bound is
+  not followed; here the 1 GiB element bound and the step's probe bound it.
+  The review's three scripts are now that verdict at their first read
+  (`Err("Invalid string length")` on the review's allocator at 4 GiB, this
+  tip).
 
 Pinned by `tests/transaction_verify_budget_331.rs` (#38's shape, 33 copies
 of a 1,000,000-byte element: `Ok(true)` under `None`, the decline at
@@ -192,19 +223,31 @@ under a ceiling of 100,000, `OP_DIV` and `OP_MOD` of 40,000 by 600 at
 487,200, `OP_ADD` at 160,000 and `OP_1ADD` at 80,000 under 70,000, the four
 computed under 1,000,000; `OP_WITHIN`'s read of three 50,000-byte operands
 declined at 75,008, `OP_LSHIFTNUM` of 1 by 320,000 bits at 80,020) and
-three ignored ones (the review's three scripts under the modelled ceiling
-of 4 GiB less the operands held: computed, declined at 3,774,873,600,
-computed; 3.3 s together in release),
+four ignored ones (the review's three scripts under the modelled ceiling
+of 4 GiB less the operands held: computed, declined at 3,774,873,600 and
+computed under the step's probe alone, now each invalid at its read; the
+largest product the default mode reads, two operands of 67,108,862 bytes,
+declined at 805,306,344 under a ceiling of 512 MiB; 0.45 s together in
+release), the two unit tests of `src/script/spend/reference_read.rs` (the
+figure on one 67,108,862-byte buffer: 536,870,888 bits read, a 536,870,889th
+refused, a byte more refused; padding no bit),
+`tests/script_reference_read_limit_331.rs` (4 ignored, by hand, 0.14 s and
+472 MB resident: an operand of 67,108,863 bytes invalid with the
+reference's words, one of 67,108,862 at 536,870,888 bits read, one bit more
+invalid, the node's overflow under a word; red 2 of the 4 on the code
+before, the read and the word's overflow holding either way),
 `test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks`
-(`tests/memory_profiling.rs`, dhat: each step's peak of the heap past its operands at most
+(`tests/memory_profiling.rs`, dhat: each step's peak of the heap past its
+operands at most
 its declared room and 4 KiB of the guard's bookkeeping, on `OP_MUL` of
 262,144 by 131,098 bytes, `OP_DIV` and `OP_MOD` of 2,098,000 by 513,
-`OP_ADD` of two 1 MiB operands and `OP_1ADD` of one; 4.7 s) and the ignored `tests/script_arithmetic_result_bound_374.rs`
-(by hand: `OP_MUL` of two operands of 2^29 + 1 bytes declined at 2^30 + 2,
-0.69 s and 1.04 GB resident; with `dhat-profiling` a peak heap of
-1,073,751,978 bytes, the operands and no allocation of the product's size;
-without the guard still multiplying after 60 s at a peak footprint of
-5.4 GB, 3.7 GB resident). Red on the code before the guard: 3 of the 6
+`OP_ADD` of two 1 MiB operands and `OP_1ADD` of one; 4.7 s) and the
+ignored `tests/script_arithmetic_result_bound_374.rs` (by hand: `OP_MUL` of
+two operands of 2^29 + 1 bytes declined at 2^30 + 2, 0.69 s and 1.04 GB
+resident, until the read limit, now invalid at the first read, 0.12 s;
+with `dhat-profiling` a peak heap of 1,073,742,431 bytes, the operands and
+no allocation of the product's size; without the guard still multiplying
+after 60 s at a peak footprint of 5.4 GB, 3.7 GB resident). Red on the code before the guard: 3 of the 6
 (the two acceptances and the encoding's verdict hold either way) and the
 ignored test; on a copy of this tip with the result's probe in place of the
 step's and no read or shift probe, 5 of the 11 (the six that pass either
@@ -283,12 +326,16 @@ at `fromSm`'s hex text (`:1520`, Node's `Cannot create a string longer than
 exceeded` this entry named before is unreachable through `OP_MUL`: two
 readable operands give at most 2^30 - 48 bits, and `mul` sets the product's
 magnitude without `toString(2)` (`:926-933`), so a 32 MiB by 32 MiB product
-is pushed there and judged the same here, only slower (#378). The
-difference: for an operand past those figures the reference gives a
-verdict where this crate computes the result or, past the element bound
-or the allocator's room, declines. The V8 figures were measured with
-those lines' expressions under Node v22.18.0, the read through the
-reference's `Spend` by #378. go-sdk@2ca481c's
+is pushed there and judged the same here, only slower (#378). Since the
+keeper's word the default mode gives the reference's verdict, in its
+words, on an operand past 536,870,888 bits. Two differences stay, stated:
+a non-minimal operand past 268,435,443 bytes, which the reference's hex
+text would refuse, is read here while its magnitude is within the figure;
+and an element of 2^27 bytes or more, which the reference cannot hold
+(`RangeError: Invalid array length` for a `number[]` of 2^27 entries under
+Node 22), is held here up to the 1 GiB element bound. The V8 figures were
+measured with those lines' expressions under Node v22.18.0, the read through
+the reference's `Spend` by #378. go-sdk@2ca481c's
 `spv.Verify` takes no caller's budget and runs the interpreter at the relay
 policy's 100,000,000 bytes (`interpreter.DefaultMaxStackMemory`,
 `spv/verify.go:64-68`).

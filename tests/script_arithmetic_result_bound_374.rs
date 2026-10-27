@@ -1,20 +1,26 @@
-//! An arithmetic result at the default mode's 1 GiB element bound (bsv-rs#374,
-//! by hand: it holds 1 GiB of operands). Uncapped (`memory_limit: None`, the
-//! reference's `Spend`, bsv-rs#331) `OP_MUL` of two operands of 2^29 + 1
-//! bytes needs at least 2^30 + 2 bytes; it is declined from the operands'
-//! bytes before either is decoded, where `BigNumber`'s infallible allocations
-//! would have asked about 2 GiB more and an allocator that refused them would
-//! have aborted the process. With `dhat-profiling` the peak of the heap is
-//! counted too: the operands, and no allocation of the product's size.
+//! An arithmetic product past the default mode's 1 GiB element bound
+//! (bsv-rs#374, by hand: it holds 1 GiB of operands). Uncapped
+//! (`memory_limit: None`, the reference's `Spend`, bsv-rs#331) `OP_MUL` of two
+//! operands of 2^29 + 1 bytes needs at least 2^30 + 2 bytes; until the
+//! default mode read an operand as the reference does it was declined from
+//! the operands' bytes before either was decoded, where `BigNumber`'s
+//! infallible allocations would have asked about 2 GiB more and an allocator
+//! that refused them would have aborted the process. Now each operand's
+//! magnitude, 4,294,967,303 bits, passes the reference's read (536,870,888
+//! bits, V8's longest string), and the script is invalid there, in the
+//! reference's words, before the bound is judged: the bound at an arithmetic
+//! result is unreachable by operands the default mode reads (two give at most
+//! 2^30 - 48 bits, 134,217,722 bytes), and stays as the unit tests' model
+//! (`src/script/spend/arithmetic_room_tests.rs`). With `dhat-profiling` the
+//! peak of the heap is counted too: the operands, and no allocation of the
+//! product's size.
 //!
 //! `cargo test --test script_arithmetic_result_bound_374 -- --ignored`, or
 //! with `--features dhat-profiling` for the count.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::script::op::{OP_1, OP_DROP, OP_DUP, OP_INVERT, OP_MUL, OP_NUM2BIN};
-use bsv_rs::script::{
-    LockingScript, Script, ScriptResource, ScriptResourceLimit, Spend, SpendParams, UnlockingScript,
-};
+use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
 
 #[cfg(feature = "dhat-profiling")]
 #[global_allocator]
@@ -42,7 +48,7 @@ fn lock() -> LockingScript {
 
 #[test]
 #[ignore = "by hand: it holds 1 GiB of operands; its RED asks gigabytes more"]
-fn an_uncapped_product_past_the_1_gib_element_bound_is_declined_before_it_allocates() {
+fn an_uncapped_product_of_operands_past_the_references_read_is_invalid_before_it_allocates() {
     let mut spend = Spend::new(SpendParams {
         source_txid: [0u8; 32],
         source_output_index: 0,
@@ -60,7 +66,7 @@ fn an_uncapped_product_past_the_1_gib_element_bound_is_declined_before_it_alloca
     });
     #[cfg(feature = "dhat-profiling")]
     let profiler = dhat::Profiler::builder().testing().build();
-    let error = spend.validate().expect_err("the element bound's decline");
+    let error = spend.validate().expect_err("the reference's verdict");
     #[cfg(feature = "dhat-profiling")]
     {
         let peak = dhat::HeapStats::get().max_bytes as u64;
@@ -73,17 +79,6 @@ fn an_uncapped_product_past_the_1_gib_element_bound_is_declined_before_it_alloca
             "peak heap of {peak} bytes"
         );
     }
-    assert_eq!(
-        error.resource_limit,
-        Some(ScriptResourceLimit {
-            resource: ScriptResource::ElementSize,
-            limit: 1 << 30,
-            attempted: 2 * OPERAND as u64,
-            work_spent: None,
-        })
-    );
-    assert_eq!(
-        error.message,
-        "Script element allocation has exceeded 1073741824 bytes: OP_MUL needs at least 1073741826 bytes for its result, from operands of 536870913 and 536870913 bytes."
-    );
+    assert!(error.resource_limit.is_none(), "a verdict, not a decline");
+    assert_eq!(error.message, "Invalid string length");
 }
