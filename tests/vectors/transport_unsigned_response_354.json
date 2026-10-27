@@ -6,6 +6,7 @@
     {
       "name": "no_auth_headers_json",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "application/json"
       },
@@ -16,6 +17,7 @@
     {
       "name": "no_auth_headers_empty_body",
       "status": 200,
+      "reason": null,
       "headers": {},
       "body_hex": "",
       "refusal": "Received HTTP 200 OK from {url}/no_auth_headers_empty_body without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature)",
@@ -24,6 +26,7 @@
     {
       "name": "signature_missing",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "text/plain",
         "x-bsv-auth-version": "0.1",
@@ -36,6 +39,7 @@
     {
       "name": "identity_key_missing",
       "status": 200,
+      "reason": null,
       "headers": {
         "x-bsv-auth-version": "0.1",
         "x-bsv-auth-signature": "3006020101020101"
@@ -47,6 +51,7 @@
     {
       "name": "version_blank",
       "status": 200,
+      "reason": null,
       "headers": {
         "x-bsv-auth-version": " ",
         "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
@@ -59,6 +64,7 @@
     {
       "name": "unauthorized_text",
       "status": 401,
+      "reason": null,
       "headers": {
         "content-type": "text/plain"
       },
@@ -69,6 +75,7 @@
     {
       "name": "unavailable_no_content_type",
       "status": 503,
+      "reason": null,
       "headers": {},
       "body_hex": "62757379",
       "refusal": "Received HTTP 503 Service Unavailable from {url}/unavailable_no_content_type without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature) - body preview: busy",
@@ -77,6 +84,7 @@
     {
       "name": "binary_truncated",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "application/octet-stream"
       },
@@ -87,6 +95,7 @@
     {
       "name": "binary_short",
       "status": 200,
+      "reason": null,
       "headers": {},
       "body_hex": "000102ff",
       "refusal": "Received HTTP 200 OK from {url}/binary_short without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature) - body preview: 0x000102ff",
@@ -95,6 +104,7 @@
     {
       "name": "text_truncated",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "text/plain"
       },
@@ -105,6 +115,7 @@
     {
       "name": "text_split_pair",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "text/plain"
       },
@@ -115,6 +126,7 @@
     {
       "name": "text_cut_multibyte",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "text/plain; charset=utf-8"
       },
@@ -125,6 +137,7 @@
     {
       "name": "bom_and_invalid",
       "status": 200,
+      "reason": null,
       "headers": {
         "content-type": "text/plain"
       },
@@ -135,6 +148,91 @@
     {
       "name": "all_three_present",
       "status": 200,
+      "reason": null,
+      "headers": {
+        "x-bsv-auth-version": "0.1",
+        "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+        "x-bsv-auth-signature": "3006020101020101",
+        "content-type": "text/plain"
+      },
+      "body_hex": "7369676e6564",
+      "refusal": null,
+      "reached_on_data": true
+    },
+    {
+      "name": "custom_reason_phrase",
+      "status": 200,
+      "reason": "Fine By Me",
+      "headers": {},
+      "body_hex": "78",
+      "refusal": "Received HTTP 200 Fine By Me from {url}/custom_reason_phrase without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature) - body preview: x",
+      "reached_on_data": false
+    },
+    {
+      "name": "blank_reason_phrase",
+      "status": 401,
+      "reason": " ",
+      "headers": {},
+      "body_hex": "",
+      "refusal": "Received HTTP 401 from {url}/blank_reason_phrase without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature)",
+      "reached_on_data": false
+    },
+    {
+      "name": "latin1_reason_phrase",
+      "status": 401,
+      "reason": "Café",
+      "headers": {},
+      "body_hex": "",
+      "refusal": "Received HTTP 401 Caf� from {url}/latin1_reason_phrase without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature)",
+      "reached_on_data": false
+    },
+    {
+      "name": "rate_limited_retry_after",
+      "status": 429,
+      "reason": null,
+      "headers": {
+        "retry-after": "7",
+        "content-type": "text/plain"
+      },
+      "body_hex": "736c6f7720646f776e",
+      "refusal": "Received HTTP 429 Too Many Requests from {url}/rate_limited_retry_after without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature) - body preview: slow down",
+      "reached_on_data": false
+    },
+    {
+      "name": "bad_gateway",
+      "status": 502,
+      "reason": null,
+      "headers": {},
+      "body_hex": "",
+      "refusal": "Received HTTP 502 Bad Gateway from {url}/bad_gateway without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature)",
+      "reached_on_data": false
+    },
+    {
+      "name": "unavailable_retry_after",
+      "status": 503,
+      "reason": null,
+      "headers": {
+        "retry-after": "3"
+      },
+      "body_hex": "62757379",
+      "refusal": "Received HTTP 503 Service Unavailable from {url}/unavailable_retry_after without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature) - body preview: busy",
+      "reached_on_data": false
+    },
+    {
+      "name": "gateway_timeout",
+      "status": 504,
+      "reason": null,
+      "headers": {
+        "content-type": "text/html"
+      },
+      "body_hex": "3c68746d6c3e74696d656f75743c2f68746d6c3e",
+      "refusal": "Received HTTP 504 Gateway Timeout from {url}/gateway_timeout without valid BSV authentication (missing headers: x-bsv-auth-version, x-bsv-auth-identity-key, x-bsv-auth-signature) - body preview: <html>timeout</html>",
+      "reached_on_data": false
+    },
+    {
+      "name": "signed_unavailable",
+      "status": 503,
+      "reason": null,
       "headers": {
         "x-bsv-auth-version": "0.1",
         "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",

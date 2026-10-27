@@ -30,7 +30,9 @@ const signed = {
 }
 const binary = Array.from({ length: 2000 }, (_, i) => i % 256)
 
-// Each case: its name, status, headers and body bytes.
+// Each case: its name, status, headers, body bytes and, when given, the
+// reason phrase the status line carries (`writeHead(status, reason, ..)`;
+// otherwise node's canonical one).
 const cases = [
   ['no_auth_headers_json', 200, { 'content-type': 'application/json' }, Utils.toArray('{"ok":true}', 'utf8')],
   ['no_auth_headers_empty_body', 200, {}, []],
@@ -45,15 +47,24 @@ const cases = [
   ['text_split_pair', 200, { 'content-type': 'text/plain' }, Utils.toArray('x'.repeat(511) + '\u{1F600}' + 'y'.repeat(100), 'utf8')],
   ['text_cut_multibyte', 200, { 'content-type': 'text/plain; charset=utf-8' }, Utils.toArray('a' + '\u{1F600}'.repeat(300), 'utf8')],
   ['bom_and_invalid', 200, { 'content-type': 'text/plain' }, [0xef, 0xbb, 0xbf, 0x68, 0x69, 0xc3, 0x28, 0xf0, 0x9f, 0x98]],
-  ['all_three_present', 200, { ...signed, 'content-type': 'text/plain' }, Utils.toArray('signed', 'utf8')]
+  ['all_three_present', 200, { ...signed, 'content-type': 'text/plain' }, Utils.toArray('signed', 'utf8')],
+  ['custom_reason_phrase', 200, {}, Utils.toArray('x', 'utf8'), 'Fine By Me'],
+  ['blank_reason_phrase', 401, {}, [], ' '],
+  ['latin1_reason_phrase', 401, {}, [], 'Caf\u00e9'],
+  ['rate_limited_retry_after', 429, { 'retry-after': '7', 'content-type': 'text/plain' }, Utils.toArray('slow down', 'utf8')],
+  ['bad_gateway', 502, {}, []],
+  ['unavailable_retry_after', 503, { 'retry-after': '3' }, Utils.toArray('busy', 'utf8')],
+  ['gateway_timeout', 504, { 'content-type': 'text/html' }, Utils.toArray('<html>timeout</html>', 'utf8')],
+  ['signed_unavailable', 503, { ...signed, 'content-type': 'text/plain' }, Utils.toArray('signed', 'utf8')]
 ]
 
-const served = new Map(cases.map(([name, status, headers, body]) => [`/${name}`, { status, headers, body }]))
+const served = new Map(cases.map(([name, status, headers, body, reason]) => [`/${name}`, { status, headers, body, reason }]))
 const server = http.createServer((req, res) => {
   req.resume()
   req.on('end', () => {
     const answer = served.get(new URL(req.url, 'http://x').pathname)
-    res.writeHead(answer.status, answer.headers)
+    if (answer.reason === undefined) res.writeHead(answer.status, answer.headers)
+    else res.writeHead(answer.status, answer.reason, answer.headers)
     res.end(Buffer.from(answer.body))
   })
 })
@@ -92,7 +103,7 @@ function generalMessage (path) {
 }
 
 const recorded = []
-for (const [name, status, headers, body] of cases) {
+for (const [name, status, headers, body, reason] of cases) {
   const transport = new SimplifiedFetchTransport(origin)
   let reached = false
   await transport.onData(async () => { reached = true })
@@ -105,6 +116,7 @@ for (const [name, status, headers, body] of cases) {
   recorded.push({
     name,
     status,
+    reason: reason ?? null,
     headers,
     body_hex: Utils.toHex(body),
     refusal,
