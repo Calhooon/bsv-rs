@@ -608,7 +608,12 @@ arguments and return `Result<Self, Error>` (add `?`), the Rust form of the
 reference's throwing constructor (the owner's ruling (c) of 2026-10-26,
 recorded on the issue). A `None` originator now fails at the first
 `HttpWalletJson` call in the reference's words (`WalletClient` with `None`
-on a JSON substrate too); a base URL with a path or a cleartext non-loopback
+on a JSON substrate too), so `WalletClient`'s auto-detection
+(`SubstrateType::Auto`) with a `None` originator now passes over both JSON
+substrates, whose `getVersion` probe is refused unsent, and lands on the wire
+substrate at `http://localhost:3301`, or fails when no wallet answers there,
+where it used to connect to the first JSON wallet that answered: pass an
+originator to keep the JSON substrate; a base URL with a path or a cleartext non-loopback
 host is refused at construction; a wire frame whose originator differs from
 the configured one is refused. No downstream constructs either substrate or
 calls `validate_originator` (`bsv-wallet-toolbox-rs` `6317222`, which has
@@ -616,10 +621,17 @@ its own `validate_originator`; `bsv-wallet-cli` `a55990c`;
 `bsv-overlay-cloudflare` `9a0f3c29`; `rust-message-box` `419bf18`; grepped
 2026-10-27).
 
-Pinned by `tests/wallet_http_originator_323.rs` (9 tests, wiremock): 9 of
-9 red on the tree before the fix (the constructors' `Result` shape shimmed
-in, the behaviour the old), green after; the rules' unit tests in
-`wallet/substrates/origin.rs` and `wallet/validation/originator.rs`. The
+Pinned by `tests/wallet_http_originator_323.rs` (10 tests, wiremock): 10 of
+10 red on the tree before the fix (the constructors' `Result` shape shimmed
+in, the behaviour the old; the tenth, a wire frame of 256 MiB + 1 bytes
+refused unsent, added by the review's fold), green after; the rules' unit
+tests in `wallet/substrates/origin.rs` and `wallet/validation/originator.rs`.
+Both rules trim as JavaScript's `String.prototype.trim` does, one helper
+(`validation::trim_js`): U+FEFF trimmed and U+0085 kept, where Rust's
+`str::trim` does the reverse, measured with the reference's
+`validateOriginator` and `HTTPWalletJSON` constructor under Node 22.18.0
+(`the_trim_is_javascripts_feff_trimmed_and_u0085_kept`,
+`a_base_url_is_trimmed_as_javascript_trims_feff_and_not_u0085`). The
 existing `wallet_http_*`, `transport_fault_wallet`, `wallet_internalize_*`
 and two `auth_certificate_*` files configure an originator and are
 otherwise unchanged.

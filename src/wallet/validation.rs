@@ -35,6 +35,8 @@ mod internalize;
 mod originator;
 pub use create_action_input::validate_create_action_input;
 pub use internalize::validate_internalize_action_args;
+#[cfg(feature = "http")]
+pub(crate) use originator::trim_js;
 pub use originator::validate_originator;
 
 // =============================================================================
