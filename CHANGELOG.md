@@ -44,7 +44,8 @@ one it did not know. `bsv-wallet-toolbox-rs` (`6317222`) keys its pending
 signs by its text (`src/wallet/wallet.rs:1860-1878`; the text a random
 base64 of 12 bytes, `src/storage/sqlx/create_action.rs:352-363`) and holds
 `SignableTransaction.reference` in-process as the text's UTF-8 bytes
-(`src/wallet/wallet.rs:1526`, `:1629`), not its decoded bytes. Behind
+(`src/wallet/wallet.rs:1526`, `:1629`), not its decoded bytes, until its
+beta at `37e27ab` (PR #288, its #285), which holds the decoded bytes. Behind
 `bsv-wallet-cli` (`a55990c`), whose createAction answers the toolbox's text
 on the HTTP JSON wire (`src/server/handlers.rs:698-706`,
 `src/spend_gate.rs:699-701`) and whose signAction hands the text received
@@ -54,8 +55,8 @@ transaction found for reference`). An in-process toolbox `Wallet` under
 these clients is sent the base64 of its text's bytes where it was sent
 their hex, and refuses both; behind this crate's binary wire the same
 bytes cross (the processor writes them, the transceiver reads them) and
-the processor hands the toolbox `to_base64` of them
-(`src/wallet/wire/processor.rs:560`), refused the same. The in-process
+the processor refuses createAction's and signAction's reference
+(`src/wallet/wire/processor.rs:545-556`; `:560` is abortAction's), the same. The in-process
 reference is the toolbox's difference from this crate's type; a toolbox
 holding `from_base64(text)` would be found on every path, as the registry
 client's `String::from_utf8` of the bytes (`src/registry/client.rs:699`,
