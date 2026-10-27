@@ -6,7 +6,7 @@
 //! it on a trait impl block) do not choose ARC's URL.
 #![allow(clippy::expect_used, clippy::panic)] // Source reads are test assertions.
 
-use std::path::Path;
+mod arch_support;
 
 /// `(file, the item's first line)`: every ARC item a caller can name.
 const DEPRECATED: &[(&str, &str)] = &[
@@ -36,10 +36,7 @@ const DEPRECATED: &[(&str, &str)] = &[
     ),
 ];
 
-fn read(file: &str) -> String {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
-    std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()))
-}
+use arch_support::read;
 
 /// The attribute and doc lines directly above `item`, joined.
 fn attributes_of(source: &str, item: &str) -> Option<String> {
@@ -87,6 +84,17 @@ fn every_arc_client_item_is_deprecated_since_0_9_0_naming_arcade() {
     );
 }
 
+/// The `impl` block opened by `header`, up to its closing brace at column 0.
+/// `source` is read through `arch_support`, its line endings `\n`.
+fn impl_body<'a>(source: &'a str, header: &str) -> &'a str {
+    let start = source
+        .find(header)
+        .unwrap_or_else(|| panic!("live_policy.rs: no `{header}`"));
+    let body = &source[start..];
+    let end = body.find("\n}\n").expect("the impl's closing brace");
+    &body[..end]
+}
+
 #[test]
 fn no_live_policy_default_chooses_the_arc_policy_url() {
     let source = read("src/transaction/fee_models/live_policy.rs");
@@ -94,12 +102,7 @@ fn no_live_policy_default_chooses_the_arc_policy_url() {
         "impl Default for LivePolicyConfig {",
         "impl Default for LivePolicy {",
     ] {
-        let start = source
-            .find(header)
-            .unwrap_or_else(|| panic!("live_policy.rs: no `{header}`"));
-        let body = &source[start..];
-        let end = body.find("\n}\n").expect("the impl's closing brace");
-        let body = &body[..end];
+        let body = impl_body(&source, header);
         for arc in ["DEFAULT_POLICY_URL", "arc.", "Self::new()"] {
             assert!(
                 !body.contains(arc),
@@ -107,4 +110,21 @@ fn no_live_policy_default_chooses_the_arc_policy_url() {
             );
         }
     }
+}
+
+/// A Windows checkout holds the source in CRLF (run 40513515368's two Windows
+/// cells, bsv-rs#367): the reader's normalization lets the `\n}\n` search find
+/// the closing brace there as on a LF checkout.
+#[test]
+fn a_crlf_checkout_finds_the_impl_closing_brace_as_lf_does() {
+    let crlf = "impl Default for LivePolicy {\r\n    fn default() -> Self {\r\n        \
+                Self::with_config(LivePolicyConfig::default())\r\n    }\r\n}\r\n\r\nfn after() {}\r\n";
+    let source = arch_support::normalize(crlf);
+    let body = impl_body(&source, "impl Default for LivePolicy {");
+    assert!(body.contains("Self::with_config("), "{body}");
+    assert!(!body.contains("fn after"), "{body}");
+    assert_eq!(
+        body,
+        impl_body(&crlf.replace("\r\n", "\n"), "impl Default for LivePolicy {")
+    );
 }
