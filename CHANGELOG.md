@@ -56,9 +56,22 @@ the checks in `src/auth/certificates/bounds.rs`:
    all master certificate fields.` (`:525-561`), and
    `VerifiableCertificate::decrypt_fields` and `decrypt_field` as `Failed to
    decrypt selectively revealed certificate fields using keyring: <words>`
-   (`VerifiableCertificate.ts:214-217`), the inner refusal's words quoted.
-   #275's canonical-base64 refusals are now inside them, as in the
-   reference.
+   (`VerifiableCertificate.ts:214-217`), the inner refusal's words quoted,
+   the cipher's in the reference's (`Decryption failed!` for a tag that does
+   not match, `Ciphertext too short` under 48 bytes, `SymmetricKey.ts:205`,
+   `:217`, `:232`; they were `decryption failed` and `invalid data length:
+   expected 48, got N`). #275's canonical-base64 refusals are now inside
+   them, as in the reference. The texts that changed, old beside new: the
+   master's `decrypt_field` on a field the certificate does not carry,
+   `AuthError("Field '<name>' not found in certificate")`, and on one its
+   master keyring does not carry, `AuthError("Field '<name>' not found in
+   master keyring")`, are each `Failed to decrypt certificate field!` (the
+   keyring's one `Failed to decrypt all master certificate fields.` from
+   `decrypt_fields`); the verifier's `decrypt_field` and `decrypt_fields` on
+   a keyring entry the certificate carries no field for, `AuthError("Field
+   '<name>' not found in certificate")`, are `Failed to decrypt selectively
+   revealed certificate fields using keyring: Certificate field <name> must
+   be an own string data property` (`VerifiableCertificate.ts:36`, `:187-191`).
 
 With them, the reference's sequence around each: `create_keyring_for_verifier`
 refuses more than 100 fields to reveal or one named twice
@@ -75,7 +88,7 @@ the verifier's revelation key must be exactly 32 bytes (`:203`), the
 master's 1 to 32 (`MasterCertificate.ts:600-611`, the shorter one's zeros
 restored as before).
 
-Pinned by `tests/auth_certificate_bounds_297.rs` (11 tests over 64 cases of
+Pinned by `tests/auth_certificate_bounds_297.rs` (11 tests over 72 cases of
 `tests/vectors/auth_certificate_bounds_297.json`, the reference's verdicts
 recorded by `tests/support/certificate_bounds_297.mjs` at `ts-stack@edf6e03`
 under Node v22.18.0: each bound at its edge and one past it, at its site; 10
@@ -123,8 +136,11 @@ issued here and refused at the master's decrypt and keyring, as there (the
 vector's `plaintext_of_0_bytes`). Residuals: where several names break a
 bound the reference names the first in its object's key order, this crate
 the first in the names' order (`localeCompare`'s for `to_binary`, bytes for
-the records); a wallet's or the cipher's failure quoted by the verifier's
-wrapper is in this crate's words. Not carried, outside #297's five and
+the records); a plaintext that is not UTF-8, quoted by the verifier's
+wrapper, is refused in each platform's words (Node's `TextDecoder`, `The
+encoded data was not valid for encoding utf-8`, there; this crate's
+`InvalidUtf8` text here), a platform residual, and a wallet's own error is
+quoted as the wallet prints it, on both sides. Not carried, outside #297's five and
 carried on the wire since #246: `Certificate::to_binary`'s 16 MiB frame
 bound (`Certificate.ts:314-319`) and `from_binary`'s (`:86-92`, the input),
 and the 72-byte signature bound and DER re-encoding at both
