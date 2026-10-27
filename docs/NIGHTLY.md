@@ -1,26 +1,22 @@
 # Nightly oracles
 
-`.github/workflows/nightly.yml` carries the scheduled mutation check for
+`.github/workflows/nightly.yml` carries the on-demand mutation check for
 [bsv-rs #81](https://github.com/Calhooon/bsv-rs/issues/81) and the fuzz matrix
 for [bsv-rs #82](https://github.com/Calhooon/bsv-rs/issues/82), part of
 [the north-star programme](https://github.com/Calhooon/bsv-rs/issues/101).
-Never on a push or a PR: the gate is `ci.yml`. Its `ci-full` job dispatches
-`ci.yml` on `beta` and on `main`, so each line's whole matrix runs once a day
-at its tip whether or not anything was pushed (a pull request runs only its
-line's required set). GitHub loads the schedule from `main`'s copy of this file.
-Its cron requests 03:00 UTC daily; `workflow_dispatch` supports a manual run.
-The scheduled run resolves `beta` once, then every mutation shard, the score
-job and every fuzz job check out that same commit. A manual run tests the
-selected ref.
+Never on a push or a PR: the gate is `ci.yml`. It runs on demand only,
+`workflow_dispatch` on the line to measure (`gh workflow run nightly.yml --ref
+beta`), never on a schedule: the owner's word of 2026-10-27 (the nightly runs
+were a waste of resources) took the 03:00 UTC cron off both lines. One
+dispatched measurement before each minor tag (0.9.0 to `main` gets one), none
+for a prerelease; the push matrix on the protected branches is `ci.yml`'s own.
+Its `ci-full` job dispatches `ci.yml` on `beta` and on `main`, so each line's
+whole matrix runs at its tip (a pull request runs only its line's required
+set). A dispatched run resolves the selected ref once, then every mutation
+shard, the score job and every fuzz job check out that same commit.
 
-GitHub only schedules workflows present on the repository's default branch
-(`main` at this lane's baseline). Landing this file on `beta` does not activate
-its cron. The captain must arrange the default-branch scheduler before calling
-the schedule live. The schedule deliberately checks out `beta`; this lane does
-not change the default branch or write to `main`.
-See [GitHub's schedule rules](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
-GitHub also requires the workflow on the default branch to enable manual
-dispatch, so a new file on `beta` alone cannot be dispatched yet.
+GitHub requires the workflow on the default branch (`main`) to enable manual
+dispatch, so the file lives on both lines, ported by `git cherry-pick -x`.
 See [manual dispatch](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_dispatch).
 
 Permissions are scoped per job: every job has `contents: read`; only the fuzz
@@ -79,7 +75,7 @@ credentials and makes no live wallet call.
 The globs include files directly in each directory and its descendants.
 `tests/CLAUDE.md` documents these suites. The conformance targets also exercise
 the committed vectors; their external ts-stack corpus portions skip unless
-`BSV_CONFORMANCE_DIR` is supplied. The scheduled job does not claim those skipped
+`BSV_CONFORMANCE_DIR` is supplied. The dispatched job does not claim those skipped
 portions as evidence. CI's separate vector job supplies its pinned corpus.
 The sibling script harness remains the other oracle; production edits under
 `src/script/` or `src/transaction/` still require its before/after seed run.
