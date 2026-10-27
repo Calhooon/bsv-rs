@@ -1,0 +1,1422 @@
+{
+  "source": "ts-stack@edf6e03",
+  "cases": [
+    {
+      "name": "sign_double_spend",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        },
+        "options": {
+          "sendWith": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "failed"
+          },
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "sending"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          },
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "serviceError"
+          }
+        ]
+      },
+      "reference": {
+        "review": {
+          "message": "Undelayed createAction or signAction results require review.",
+          "reviewActionResults": [
+            {
+              "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "status": "doubleSpend",
+              "competingTxs": [
+                "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+              ],
+              "competingBeef": "0100beef000201000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000fdc90321021e1637225bc4b5647944f2480dac02197a86d53dbb8216bc3853739552e798afac4d5b037b2274797065223a22415145424151454241514542415145424151454241514542415145424151454241514542415145424151453d222c227375626a656374223a22303361636434383465326630633766363533303961643137386139663535396162646530393739363937346335376537313463333566313130646663323763636265222c2273657269616c4e756d626572223a22416749434167494341674943416749434167494341674943416749434167494341674943416749434167493d222c22636572746966696572223a22303235636264663036343665356462346561613339386633363566326561376130653364343139623765303333306533396365393262646465646361633466396263222c227265766f636174696f6e4f7574706f696e74223a22303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030302e30222c227369676e6174757265223a2233303435303232313030636236366337396363646161643331396236356632386262643562626461663762313739613733353230303333326163383765643338666664373532646664363032323032613331356338356663346133333866313837383366326538646130636161626536373731316633623566323638333831363536653962626435323733643163222c226669656c6473223a7b22656d61696c223a22613158334841755934672b6f77417174544356474f41765270412b557547533032734d7851684168486e486749346c41527670306d49746f655a346c7436544a6e6d62522f7838787665655666686e6a38674257326f6f3d222c226e616d65223a222f6e42462f385a2b4f4352506138794c7874636d47445969514f533937614d4647676151675a6143494a78485a6f514f68323855594c4141514a4932333675664a7a4636356d2f3367576e726f6f7a6d58413d3d227d2c226b657972696e67223a7b22656d61696c223a2271497235745674696957734c773379702f7949766553367848732f7644397863374a42574c4654766947324b6b6a43716b5142726b5169657876344f5a70774e3054674c4a6c76535250554736343753674170685242757a386f41365855594438377a712f3441765370493d227d7d463044022026cea6df795489bc9c4eea9f1df1ed135d77ef179374f467aeb31f47dd4e2e9002200dc6379934ae47ca2b3258c732e3561daba59ba4ddfb5df6804445deb0da23156d00000000000100000001aeebc3a0a22cdb11891da59107d918f34d87a7e7330acc436aaddd2bfb9b3280000000000151ffffffff01000000000000000005006a02cccc0000000000"
+            },
+            {
+              "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "status": "serviceError"
+            }
+          ],
+          "sendWithResults": [
+            {
+              "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "status": "failed"
+            },
+            {
+              "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "status": "sending"
+            }
+          ],
+          "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "tx": null,
+          "noSendChange": null
+        }
+      }
+    },
+    {
+      "name": "create_txid_and_change",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "noSend": true
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "noSendChange": [
+          "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4.1"
+        ],
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "review": {
+          "message": "Undelayed createAction or signAction results require review.",
+          "reviewActionResults": [
+            {
+              "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+              "status": "success"
+            }
+          ],
+          "sendWithResults": [],
+          "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+          "tx": null,
+          "noSendChange": [
+            "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4.1"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create_five_members",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "006a02cccc",
+            "satoshis": 0,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "noSend": true
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "tx": "$BEEF",
+        "noSendChange": [
+          "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4.0"
+        ],
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "invalidTx"
+          }
+        ]
+      },
+      "reference": {
+        "review": {
+          "message": "Undelayed createAction or signAction results require review.",
+          "reviewActionResults": [
+            {
+              "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+              "status": "invalidTx"
+            }
+          ],
+          "sendWithResults": [],
+          "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+          "tx": "0100beef000201000000011111111111111111111111111111111111111111111111111111111111111111000000000151ffffffff010100000000000000fdc90321021e1637225bc4b5647944f2480dac02197a86d53dbb8216bc3853739552e798afac4d5b037b2274797065223a22415145424151454241514542415145424151454241514542415145424151454241514542415145424151453d222c227375626a656374223a22303361636434383465326630633766363533303961643137386139663535396162646530393739363937346335376537313463333566313130646663323763636265222c2273657269616c4e756d626572223a22416749434167494341674943416749434167494341674943416749434167494341674943416749434167493d222c22636572746966696572223a22303235636264663036343665356462346561613339386633363566326561376130653364343139623765303333306533396365393262646465646361633466396263222c227265766f636174696f6e4f7574706f696e74223a22303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030302e30222c227369676e6174757265223a2233303435303232313030636236366337396363646161643331396236356632386262643562626461663762313739613733353230303333326163383765643338666664373532646664363032323032613331356338356663346133333866313837383366326538646130636161626536373731316633623566323638333831363536653962626435323733643163222c226669656c6473223a7b22656d61696c223a22613158334841755934672b6f77417174544356474f41765270412b557547533032734d7851684168486e486749346c41527670306d49746f655a346c7436544a6e6d62522f7838787665655666686e6a38674257326f6f3d222c226e616d65223a222f6e42462f385a2b4f4352506138794c7874636d47445969514f533937614d4647676151675a6143494a78485a6f514f68323855594c4141514a4932333675664a7a4636356d2f3367576e726f6f7a6d58413d3d227d2c226b657972696e67223a7b22656d61696c223a2271497235745674696957734c773379702f7949766553367848732f7644397863374a42574c4654766947324b6b6a43716b5142726b5169657876344f5a70774e3054674c4a6c76535250554736343753674170685242757a386f41365855594438377a712f3441765370493d227d7d463044022026cea6df795489bc9c4eea9f1df1ed135d77ef179374f467aeb31f47dd4e2e9002200dc6379934ae47ca2b3258c732e3561daba59ba4ddfb5df6804445deb0da23156d00000000000100000001aeebc3a0a22cdb11891da59107d918f34d87a7e7330acc436aaddd2bfb9b3280000000000151ffffffff01000000000000000005006a02cccc0000000000",
+          "noSendChange": [
+            "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4.0"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create_tx_outputs_not_requested",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "noSend": true
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "tx": "$BEEF",
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "invalidTx"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result tx.outputs: expected every requested output with its requested amount and script"
+      }
+    },
+    {
+      "name": "envelope_is_error_not_true",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": "yes",
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error envelope"
+      }
+    },
+    {
+      "name": "message_over_4096_bytes",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error message"
+      }
+    },
+    {
+      "name": "send_with_results_absent",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error sendWithResults"
+      }
+    },
+    {
+      "name": "review_results_not_an_array",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": {}
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults"
+      }
+    },
+    {
+      "name": "review_result_not_an_object",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          7
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0]"
+      }
+    },
+    {
+      "name": "review_result_txid_unknown",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].txid"
+      }
+    },
+    {
+      "name": "review_result_txid_repeated",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "success"
+          },
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[1].txid"
+      }
+    },
+    {
+      "name": "review_result_status_unknown",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "pending"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].status"
+      }
+    },
+    {
+      "name": "competing_on_success",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "success",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingTxs"
+      }
+    },
+    {
+      "name": "competing_txs_not_hex",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "zz"
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingTxs[0]"
+      }
+    },
+    {
+      "name": "competing_txs_the_reviewed",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingTxs"
+      }
+    },
+    {
+      "name": "competing_txs_repeated",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingTxs"
+      }
+    },
+    {
+      "name": "competing_beef_without_txs",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingBeef"
+      }
+    },
+    {
+      "name": "competing_beef_without_the_txid",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingBeef"
+      }
+    },
+    {
+      "name": "competing_beef_not_a_beef",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": [
+              1,
+              2,
+              3
+            ]
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid wallet error reviewActionResults[0].competingBeef"
+      }
+    },
+    {
+      "name": "sign_txid_absent",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result txid: expected the completed signed transaction"
+      }
+    },
+    {
+      "name": "sign_txid_31_bytes",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result txid: expected 32 hexadecimal bytes"
+      }
+    },
+    {
+      "name": "sign_txid_odd_length",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "abc",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result txid: expected an even-length hex string"
+      }
+    },
+    {
+      "name": "sign_no_send_change",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ],
+        "noSendChange": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.0"
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result noSendChange: expected an absent field"
+      }
+    },
+    {
+      "name": "no_send_change_not_canonical",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "noSend": true
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "noSendChange": [
+          "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4.01"
+        ],
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result noSendChange[0]: expected a canonical transaction outpoint"
+      }
+    },
+    {
+      "name": "no_send_change_of_another_tx",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "noSend": true
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "noSendChange": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.0"
+        ],
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result noSendChange[0]: expected an outpoint of the returned transaction"
+      }
+    },
+    {
+      "name": "send_with_status_unknown",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "done"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result sendWithResults[0].status: expected a supported status"
+      }
+    },
+    {
+      "name": "send_with_txid_unknown",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result sendWithResults[0].txid: expected a submitted or returned transaction"
+      }
+    },
+    {
+      "name": "send_with_txid_repeated",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          },
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "sending"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid signAction result sendWithResults[1].txid: expected a unique transaction"
+      }
+    },
+    {
+      "name": "create_deferred_signing",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "signAndProcess": false
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result signableTransaction: expected the requested deferred-signing transaction"
+      }
+    },
+    {
+      "name": "create_txid_absent",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ]
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "sendWithResults": [],
+        "reviewActionResults": []
+      },
+      "reference": {
+        "error": "Invalid createAction result txid: expected the requested completed transaction"
+      }
+    },
+    {
+      "name": "create_tx_of_another_txid",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ]
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "tx": "$BEEF",
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result tx: expected a BEEF transaction matching txid"
+      }
+    },
+    {
+      "name": "create_tx_not_a_beef",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "51",
+            "satoshis": 1,
+            "outputDescription": "an output"
+          }
+        ]
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+        "tx": [
+          1,
+          2,
+          3
+        ],
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result tx: expected a complete, exactly framed BEEF transaction"
+      }
+    },
+    {
+      "name": "create_tx_without_txid",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "options": {
+          "sendWith": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "tx": "$BEEF",
+        "sendWithResults": [
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "sending"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result txid: expected present with tx"
+      }
+    },
+    {
+      "name": "create_no_outcome",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "options": {
+          "sendWith": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ]
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "sendWithResults": [],
+        "reviewActionResults": [
+          {
+            "txid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "status": "success"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid createAction result outcome: expected a transaction, signable transaction, or batch-send result"
+      }
+    },
+    {
+      "name": "another_call",
+      "call": "listActions",
+      "args": {
+        "labels": [
+          "a label"
+        ]
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "Invalid listActions wallet error code"
+      }
+    },
+    {
+      "name": "review_at_status_500",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 500,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review.",
+        "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sendWithResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "failed"
+          }
+        ],
+        "reviewActionResults": [
+          {
+            "txid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "status": "doubleSpend",
+            "competingTxs": [
+              "773a9ef2f41caa8612c327036f8b789470d1d01ac1a98781ea824d9c871de6a4"
+            ],
+            "competingBeef": "$BEEF"
+          }
+        ]
+      },
+      "reference": {
+        "error": "HTTPWalletJSON signAction failed with HTTP status 500"
+      }
+    },
+    {
+      "name": "no_results",
+      "call": "signAction",
+      "args": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "51"
+          }
+        }
+      },
+      "status": 400,
+      "body": {
+        "isError": true,
+        "code": 5,
+        "name": "WERR_REVIEW_ACTIONS",
+        "message": "Undelayed createAction or signAction results require review."
+      },
+      "reference": {
+        "error": "Invalid wallet error sendWithResults"
+      }
+    }
+  ]
+}
