@@ -16,7 +16,8 @@ The `compat` module provides implementations of Bitcoin compatibility standards 
 | `bip32.rs` | BIP-32 HD key derivation (~1512 lines) |
 | `bip39/` | BIP-39 mnemonic submodule (see `bip39/CLAUDE.md`) |
 | `bsm.rs` | Bitcoin Signed Message (~713 lines) |
-| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1188 lines) |
+| `ecies.rs` | ECIES encryption - Electrum + Bitcore (~1164 lines) |
+| `ecies_envelope.rs` | The frame of an Electrum envelope read the reference's way (#109): the embedded key found by the byte after the magic and the bytes left over, the expected sender, the ciphertext's 16-byte framing |
 
 ## Submodules
 
@@ -332,6 +333,8 @@ pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) 
 ```
 
 **Format**: `"BIE1" || [ephemeral_pubkey (33)] || ciphertext || mac (32)`
+
+**Reading** (#109, `ts-stack@edf6e03` `ECIES.ts:607-656`): with `available = len - 36`, a compressed key when the byte at 4 is `02`/`03`, `available >= 49` and `(available - 33) % 16 == 0`; an uncompressed one when it is `04`, `available >= 81` and `(available - 65) % 16 == 0`; else none. No key and no sender: `Sender public key is required`; an embedded key that is not the expected sender: `Embedded sender public key does not match the expected sender`; a ciphertext empty or not 16-aligned: `Invalid Electrum ECIES ciphertext framing`, before the MAC (`EciesHmacMismatch`). An envelope `electrum_encrypt` writes is never misread: a ciphertext is 0 and a key 1 modulo 16. Pinned by `tests/compat_ecies_envelope_109.rs`.
 
 **Algorithm**:
 1. ECDH: `shared = from_privkey * to_pubkey`

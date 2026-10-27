@@ -49,6 +49,7 @@
 
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine};
 
+use super::ecies_envelope::read_frame;
 use crate::error::{Error, Result};
 use crate::primitives::ec::{PrivateKey, PublicKey};
 use crate::primitives::encoding::fixed_bytes;
@@ -187,36 +188,10 @@ pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) 
         ));
     }
 
-    // Determine shared secret and ciphertext location
-    let (shared_secret, ciphertext) = if let Some(from_pubkey) = from {
-        // Use provided counterparty public key
-        let shared = to.derive_shared_secret(from_pubkey)?;
-
-        // Ciphertext location depends on whether ephemeral key is present
-        // If data is large enough to contain pubkey (4 + 33 + 32 = 69 min with pubkey)
-        let ct = if data.len() > 69 {
-            // Has pubkey embedded
-            &data[37..data.len() - 32]
-        } else {
-            // No pubkey (noKey mode)
-            &data[4..data.len() - 32]
-        };
-
-        (shared, ct.to_vec())
-    } else {
-        // Extract ephemeral public key from data
-        if data.len() < 69 {
-            return Err(Error::EciesDecryptionFailed(
-                "Data too short for embedded public key".to_string(),
-            ));
-        }
-
-        let ephemeral_pubkey = PublicKey::from_bytes(&data[4..37])?;
-        let shared = to.derive_shared_secret(&ephemeral_pubkey)?;
-        let ct = &data[37..data.len() - 32];
-
-        (shared, ct.to_vec())
-    };
+    // The key, the sender and the ciphertext's framing, the reference's way
+    // (bsv-rs#109, `ecies_envelope`)
+    let frame = read_frame(data, from)?;
+    let shared_secret = to.derive_shared_secret(&frame.sender)?;
 
     // Derive keys
     let shared_compressed = shared_secret.to_compressed();
@@ -235,7 +210,7 @@ pub fn electrum_decrypt(data: &[u8], to: &PrivateKey, from: Option<&PublicKey>) 
     }
 
     // Decrypt
-    aes_128_cbc_decrypt(&ciphertext, &aes_key, &iv)
+    aes_128_cbc_decrypt(frame.ciphertext, &aes_key, &iv)
 }
 
 /// Encrypts a message using Bitcore ECIES.

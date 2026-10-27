@@ -16,6 +16,7 @@ pub mod bip32;
 pub mod bip39;
 pub mod bsm;
 pub mod ecies;
+mod ecies_envelope;
 
 // Re-exports for convenience
 pub use bip32::{

@@ -264,6 +264,91 @@ within `u64` is exact here and the nearest double there, so
 `18446744073709551615` is written back as given here and as
 `18446744073709552000` there. The JSON numbers' differences are #285's.
 go-sdk@2ca481c carries no Socket.IO codec.
+### Fixed: `electrum_decrypt` finds an embedded key the reference's way, so a no-key envelope of any length opens (#109)
+
+With an expected sender, `compat::ecies::electrum_decrypt` decided from the
+length alone that an envelope embeds a public key (`data.len() > 69`) and
+read the ciphertext from byte 37. A no-key envelope is `4 + ciphertext +
+32` bytes, so every one sealed over a plaintext of 32 bytes or more lost 33
+bytes of its ciphertext to a key; the MAC passed (it covers the whole
+prefix) and the AES unpadding failed, `EciesDecryptionFailed("AES
+decryption failed")` (the oracle-fuzz lane's input, #82). Without a sender
+it read bytes 4 to 37 as a key whatever they were. The reference's
+`electrumDecrypt` (`ts-stack@edf6e03` `packages/sdk/src/compat/ECIES.ts:607-656`)
+decides by the byte after the magic and the bytes left over: with
+`available = length - 36`, a compressed key when `available >= 49`, the
+byte is `02` or `03` and `(available - 33) % 16 == 0`; an uncompressed one
+when it is `04`, `available >= 81` and `(available - 65) % 16 == 0`; else
+none. The reader now does the same (`src/compat/ecies_envelope.rs`), in its
+order and words: no key and no expected sender, `Sender public key is
+required`; an embedded key beside an expected sender that is not the same
+key (compared compressed, in constant time), `Embedded sender public key
+does not match the expected sender`; the expected sender's key derives the
+secret when given, else the embedded one; a ciphertext empty or not a
+whole number of 16-byte blocks, `Invalid Electrum ECIES ciphertext
+framing`, before the MAC; then the MAC (`EciesHmacMismatch`, the
+reference's `Invalid checksum`) and AES. An envelope embedding the sender's
+65-byte uncompressed key, which `PublicKey::from_bytes` reads, now opens
+with the sender and without; it never did.
+
+The rule cannot misread an envelope `electrum_encrypt` writes: its
+ciphertext is a non-empty multiple of 16 and a key is 33 or 65 bytes, both
+1 modulo 16. A no-key envelope's `available` is 0 modulo 16, so
+`available - 33` and `available - 65` are 15 modulo 16 and no key is found
+whatever its first byte; an envelope with a key has `available - 33` the
+ciphertext's length, a multiple of 16 of at least 16, and its first byte
+`02` or `03`, so the key is always found. The same holds for any writer of
+a compressed or uncompressed key.
+
+Migration: an envelope that opened before opens to the same plaintext; a
+no-key envelope of a plaintext of 32 bytes or more now opens where it was
+refused. A caller matching a refusal sees: a no-key envelope without a
+sender `Sender public key is required` where it read `Data too short for
+embedded public key` (under 69 bytes) or a key refusal, MAC mismatch or
+`AES decryption failed` (69 or more); an embedded key beside another
+expected sender the mismatch words where it read `EciesHmacMismatch`; a
+ciphertext out of framing the framing words where it read
+`EciesHmacMismatch`. `Data too short`, `Invalid magic bytes` and
+`EciesHmacMismatch` keep their words. No downstream calls
+`electrum_decrypt` or matches `EciesDecryptionFailed` or
+`EciesHmacMismatch` (`bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
+`bsv-overlay-cloudflare` grepped 2026-10-27).
+
+Pinned by `tests/compat_ecies_envelope_109.rs` (10 tests, 1 ignored
+recorder) on `tests/vectors/compat_ecies_envelope_109.json`: for fixed
+keys and plaintexts of 1, 15, 16, 17, 31, 32 (the issue's input), 33, 47,
+48, 64 and 96 bytes, the reference's envelopes with the key and without
+equal this crate's byte for byte, open here to the reference's verdicts
+with the sender and without, and this crate's envelopes open in the
+reference; ten refusals and the uncompressed key (another expected sender,
+a no-key envelope without one, a 17-byte ciphertext, a key and no
+ciphertext, a flipped MAC byte, a key off the curve, the uncompressed key
+with, without and beside another sender) read here as there; recorded by
+`tests/support/compat_ecies_envelope_109.mjs` at `ts-stack@edf6e03` under
+Node v22.18.0. 7 of the 10 red on the tree before the fix (the three
+green: the encryptor's bytes, unchanged, and the round trips with a key).
+`fuzz_ecies` drops its #109 skip, so every sealed envelope must open, with
+the issue's input as a seed (`plain-32-bsv-rs-109`, written by
+`fuzz/corpus-gen`, whose certificate seed line now unwraps `to_binary`'s
+`Result` of #275).
+
+### Notes: cross-SDK parity (#109)
+
+go-sdk@2ca481c's `ElectrumDecrypt` keeps the length rule
+(`compat/ecies/ecies.go:117-135`: with a sender the ciphertext from byte 37
+when the envelope is over 69 bytes, without one bytes 4 to 37 parsed as a
+key), so it refuses the no-key envelope of a plaintext of 32 bytes or more
+(`AESCBCDecrypt`'s unpadding error) and an uncompressed key, never compares
+an embedded key with the sender, and checks no framing; its refusals carry
+its own words (`incorrect password` for the MAC). An embedded compressed
+key whose x is at or above the field prime is refused here by
+`PublicKey::from_bytes` (`InvalidPublicKey`), where the reference's
+`PublicKey.fromString` reduces x modulo p and refuses later: the mismatch
+with an expected sender, `Invalid checksum` without (the vector's two
+off-curve rows), the difference CLAUDE.md lists for certificate keys
+(#183). The reference bounds an envelope at 16 MiB + 160 bytes
+(`ECIES.ts:12`, `:589-594`, `CompatValidation.ts:1`), which this crate
+does not: a finding outside #109.
 
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 

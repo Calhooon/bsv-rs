@@ -37,11 +37,6 @@ fuzz_target!(|data: &[u8]| {
     let to_public = to.public_key();
     for no_key in [false, true] {
         let sealed = electrum_encrypt(data, &to_public, from, no_key).expect("electrum seals");
-        if no_key && sealed.len() > 69 {
-            // bsv-rs#109: a no-key envelope over 69 bytes reads as one that
-            // embeds a key; skipped until the ruling, so the rest is fuzzed.
-            continue;
-        }
         let sender = no_key.then_some(&from_public);
         assert_eq!(
             electrum_decrypt(&sealed, to, sender).expect("electrum opens"),
