@@ -7,14 +7,45 @@
 //! arguments are kept, signAction answering no transaction (#318); every
 //! createAction, signAction and abortAction's arguments kept in order,
 //! signAction answering from a queue when one is set, abortAction
-//! answering `aborted: true` (#327).
+//! answering `aborted: true` (#327); with a listing set listOutputs answers
+//! it, and with a source set createAction answers a signable transaction
+//! spending its output 0, so the contacts manager and the key-value stores
+//! reach signAction (#326).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
-use bsv_rs::primitives::PrivateKey;
+use bsv_rs::primitives::{from_base64, PrivateKey};
+use bsv_rs::script::LockingScript;
+use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::*;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
+
+/// The reference text the #326 wallet answers createAction with: the
+/// recorder's, the base64 of eight bytes of 0x52.
+pub const SIGNABLE_REFERENCE: &str = "UlJSUlJSUlI=";
+
+/// A signable transaction spending output 0 of `source` to `outputs`.
+fn spending_signable(source: &Transaction, outputs: &[CreateActionOutput]) -> SignableTransaction {
+    let mut partial = Transaction::new();
+    partial
+        .add_input(TransactionInput::with_source_transaction(source.clone(), 0))
+        .unwrap();
+    if outputs.is_empty() {
+        let data = LockingScript::from_binary(&[0x00, 0x6a]).unwrap();
+        partial.add_output(TransactionOutput::new(0, data)).unwrap();
+    }
+    for output in outputs {
+        let lock = LockingScript::from_binary(&output.locking_script).unwrap();
+        partial
+            .add_output(TransactionOutput::new(output.satoshis, lock))
+            .unwrap();
+    }
+    SignableTransaction {
+        tx: partial.to_beef(true).unwrap(),
+        reference: from_base64(SIGNABLE_REFERENCE).unwrap(),
+    }
+}
 
 /// A ProtoWallet that records each call by name; proveCertificate answers
 /// a keyring of the names asked (or of `keyring` when set), createAction
@@ -28,6 +59,14 @@ pub struct Counting {
     /// reference), none by default (#318).
     pub signable: Option<SignableTransaction>,
     pub signed: Arc<Mutex<Option<SignActionArgs>>>,
+    /// What listOutputs answers when set; the ProtoWallet's answer otherwise
+    /// (#326).
+    pub listed: Arc<Mutex<Option<ListOutputsResult>>>,
+    /// A source transaction: when set, createAction answers a signable
+    /// transaction spending its output 0 to the outputs asked (one
+    /// `OP_FALSE OP_RETURN` when none), its reference `SIGNABLE_REFERENCE`
+    /// decoded, as a substrate hands the wallet's text over (#326).
+    pub spending: Arc<Mutex<Option<Transaction>>>,
     pub keyring: Option<HashMap<String, String>>,
     pub created: Arc<Mutex<Option<CreateActionArgs>>>,
     pub created_originator: Arc<Mutex<Option<String>>>,
@@ -38,6 +77,13 @@ pub struct Counting {
     pub creates: Arc<Mutex<Vec<CreateActionArgs>>>,
     pub signs: Arc<Mutex<Vec<SignActionArgs>>>,
     pub aborts: Arc<Mutex<Vec<AbortActionArgs>>>,
+}
+
+// The key-value stores ask their wallet for `Debug` (#326).
+impl std::fmt::Debug for Counting {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Counting")
+    }
 }
 
 impl Counting {
@@ -60,6 +106,8 @@ impl Counting {
             originators: Arc::default(),
             signable: None,
             signed: Arc::default(),
+            listed: Arc::default(),
+            spending: Arc::default(),
             keyring: None,
             created: Arc::default(),
             created_originator: Arc::default(),
@@ -121,10 +169,17 @@ macro_rules! counting {
             ) -> bsv_rs::Result<CreateActionResult> {
                 self.note("create_action", o);
                 self.creates.lock().unwrap().push(args.clone());
+                let spent = self.spending.lock().unwrap().clone();
+                let signable = match spent {
+                    Some(source) => {
+                        Some(spending_signable(&source, args.outputs.as_deref().unwrap_or(&[])))
+                    }
+                    None => self.signable.clone(),
+                };
                 *self.created.lock().unwrap() = Some(args);
                 *self.created_originator.lock().unwrap() = Some(o.to_string());
                 Ok(CreateActionResult {
-                    signable_transaction: self.signable.clone(),
+                    signable_transaction: signable,
                     ..Default::default()
                 })
             }
@@ -150,6 +205,17 @@ macro_rules! counting {
                 self.note("abort_action", o);
                 self.aborts.lock().unwrap().push(args);
                 Ok(AbortActionResult { aborted: true })
+            }
+            async fn list_outputs(
+                &self,
+                args: ListOutputsArgs,
+                o: &str,
+            ) -> bsv_rs::Result<ListOutputsResult> {
+                self.note("list_outputs", o);
+                if let Some(listed) = self.listed.lock().unwrap().clone() {
+                    return Ok(listed);
+                }
+                WalletInterface::list_outputs(&*self.inner, args, o).await
             }
             async fn get_public_key(
                 &self,
@@ -206,7 +272,6 @@ counting! {
     (reveal_specific_key_linkage, WalletRevealSpecificArgs, RevealSpecificKeyLinkageResult),
     (list_actions, ListActionsArgs, ListActionsResult),
     (internalize_action, InternalizeActionArgs, InternalizeActionResult),
-    (list_outputs, ListOutputsArgs, ListOutputsResult),
     (relinquish_output, RelinquishOutputArgs, RelinquishOutputResult),
     (acquire_certificate, AcquireCertificateArgs, WalletCertificate),
     (list_certificates, ListCertificatesArgs, ListCertificatesResult),

@@ -7,7 +7,7 @@ use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::{from_hex, to_hex, PublicKey};
+use crate::primitives::{from_hex, to_base64, to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::transaction::Broadcaster;
 use crate::transaction::Transaction;
@@ -17,6 +17,7 @@ use crate::wallet::{
 };
 use crate::{Error, Result};
 
+use super::bound::bound_sign_options;
 use super::interpreter::{KVStoreContext, KVStoreInterpreter};
 use super::types::{
     KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions,
@@ -275,10 +276,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             )
             .await?;
 
-        // Sign if needed
+        // Sign if needed: the reference as answered, its base64 text (#326)
         if let Some(signable) = &create_result.signable_transaction {
-            // Convert reference Vec<u8> to hex string for SignActionArgs
-            let reference_str = to_hex(&signable.reference);
+            let reference_str = to_base64(&signable.reference);
 
             let spends = HashMap::from([(
                 0u32,
@@ -293,7 +293,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                     SignActionArgs {
                         reference: reference_str,
                         spends,
-                        options: None,
+                        options: Some(bound_sign_options(None)),
                     },
                     self.originator(),
                 )
@@ -404,9 +404,9 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             )
             .await?;
 
-        // Sign if needed
+        // Sign if needed: the reference as answered, its base64 text (#326)
         if let Some(signable) = &create_result.signable_transaction {
-            let reference_str = to_hex(&signable.reference);
+            let reference_str = to_base64(&signable.reference);
 
             let spends = HashMap::from([(
                 0u32,
@@ -421,7 +421,7 @@ impl<W: WalletInterface> GlobalKVStore<W> {
                     SignActionArgs {
                         reference: reference_str,
                         spends,
-                        options: None,
+                        options: Some(bound_sign_options(None)),
                     },
                     self.originator(),
                 )

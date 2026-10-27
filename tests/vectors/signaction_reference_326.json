@@ -1,0 +1,389 @@
+{
+  "description": "the signAction arguments the reference's ContactsManager (updating and removing a contact) and its GlobalKVStore and LocalKVStore (through completeBoundAction: a set with no token, an update, a removal) send their wallet: the reference as createAction answered it, its base64 text; the contacts manager no options; the stores { acceptDelayedBroadcast, returnTXIDOnly: false, noSend, sendWith } carried from the createAction (#326)",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (bundled with bun build, an entry re-exporting mod.ts and ContactsManager as ContactsManager326), run under Node v22.18.0 by tests/support/signaction_reference_326.mjs",
+  "site": "ts-stack@edf6e03 packages/sdk/src/identity/ContactsManager.ts:776-834,941-1001; packages/sdk/src/wallet/completeBoundAction.ts:1022-1032,1111-1120; packages/sdk/src/kvstore/GlobalKVStore.ts:319-389,473-488; packages/sdk/src/kvstore/LocalKVStore.ts:413-425,515-537",
+  "wallet_key": 9,
+  "signable_reference": "UlJSUlJSUlI=",
+  "contacts": {
+    "update": {
+      "stopped": "Failed to update contact output",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "473044022066718d7fc81946bcc4e25b9a9c6f8c63d6273654fcffabd7f0df5f31a9108779022036627be0d5a40a10bc02914365fc7092ce1121ab0f96569df6ec7eaca100f8dc41"
+          }
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"473044022066718d7fc81946bcc4e25b9a9c6f8c63d6273654fcffabd7f0df5f31a9108779022036627be0d5a40a10bc02914365fc7092ce1121ab0f96569df6ec7eaca100f8dc41\"}}}",
+      "sign_action_members": [
+        "reference",
+        "spends"
+      ],
+      "sign_action_option_members": null,
+      "spend_indexes": [
+        "0"
+      ],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "2102facba6435b7a40579a20ceffc3c5111f76d38c3e60c9cb6c5855b6cfa1a9a732ac4d0c01743b75bd47990303b04e77816d107f01bbbe42825c3670c3f4f67724c7895357672f8086309ba77d6cab4382d4995375b29932e580ecc432bd5c4f8ebb8d5dbb84d0b83d2d51e39d1e7c6795ee30c19f47b0598e6eab1edb833e3dc3c2aef9550da0fcd628366c05aa62e1cdcf9e772bcab5f692b8f6d0b46ed8ce0ddf335b9220fbc8f4d3165e18c1f89a6de8030a055e03d155376978279571b1fa0f64561f8f24df85af634b45fda95663bf6123fc6563d12bcaee62578c3386ff6727809d1a794a88a4642de4e236c9617df6794daa493ed99062cb87d9aeaa382c34b11a1311b45b8ddbf6139d1bf99783c3d24dfdf57d2f4811d4768e73fc9a36e19437b78b03f72a8b4feab814ce0e46304402202e9780f6143f934b199437f00c2544881f1177f431849ba08843cc65822e35cf022043c7ecabed0ac52ffe04246567f3a9b02e748f3ebf8277ed42002cbcece260496d"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    "remove": {
+      "stopped": "Unable to authenticate or remove a contact output",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "48304502210085210bf36637b5a69a5508fe17427e8d4447ae32b820f826809a47fdd4c85ea4022004288bd9a707dc188745cf902161dc9856546965731870129b3792ea24593bb141"
+          }
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"48304502210085210bf36637b5a69a5508fe17427e8d4447ae32b820f826809a47fdd4c85ea4022004288bd9a707dc188745cf902161dc9856546965731870129b3792ea24593bb141\"}}}",
+      "sign_action_members": [
+        "reference",
+        "spends"
+      ],
+      "sign_action_option_members": null,
+      "spend_indexes": [
+        "0"
+      ],
+      "create_action_outputs": [],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    }
+  },
+  "global": {
+    "set_new": {
+      "stopped": "Wallet signed transaction must be a bounded non-empty byte array",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {},
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false,
+          "noSend": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false,\"noSend\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "noSend": false,
+        "randomizeOutputs": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "noSend",
+        "randomizeOutputs",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    "set_update": {
+      "stopped": "Wallet signed transaction must be a bounded non-empty byte array",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "48304502210092d517e49002da05d17cbded2eca049b1269daeec17a6a0e2f92c415304ace230220322518c1dde8f2603ceb3e54ca4fb51ddffa46f606eae8504addd825934a66a941"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false,
+          "noSend": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"48304502210092d517e49002da05d17cbded2eca049b1269daeec17a6a0e2f92c415304ace230220322518c1dde8f2603ceb3e54ca4fb51ddffa46f606eae8504addd825934a66a941\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false,\"noSend\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0"
+      ],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c7068610374776f2103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe473045022100c1681fe3dd4a9d50b6b812021a8b22ae5f230c36f11ec5f3db99235d76698d0a022019d03134a404093126dbd8cc98a17706db7e91607241edcd6e97cf17b4d87cbf6d6d75"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "noSend": false,
+        "randomizeOutputs": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "noSend",
+        "randomizeOutputs",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    "remove": {
+      "stopped": "Wallet signed transaction must be a bounded non-empty byte array",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "473044022031c996c270bbf582bd8741f3a7279588dbc362bd531140b72a98debed2dce19c0220139df2e96caed73d5f44158983c38119380f7a4ba71ee56ef274f4686941745f41"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false,
+          "noSend": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"473044022031c996c270bbf582bd8741f3a7279588dbc362bd531140b72a98debed2dce19c0220139df2e96caed73d5f44158983c38119380f7a4ba71ee56ef274f4686941745f41\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false,\"noSend\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0"
+      ],
+      "create_action_outputs": [],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false,
+        "noSend": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs",
+        "noSend",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    }
+  },
+  "local": {
+    "set_new": {
+      "stopped": "There are 0 outputs with tag alpha that cannot be unlocked. Original error: Wallet signed transaction must be a bounded non-empty byte array",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {},
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "2102a29308e5590d4656f5592107744ea41c2a317e5e04d919d6bc54c195d3a61bcdac33591fe3293d0b1d922d52069dc90591e72a5246b59b72083f1c5bf695df5f4c59c206deb926e15351212c6d6c430b9970c7068f47304502210097fc18f71f2863f7a55df49735bd9835b400f94e7d6c5b336a223ce95f24e86c022005fce9cda1088a3a11c83d38531317e564198eec5b3c76a4abee76d5f7678fa46d"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    "set_update": {
+      "stopped": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Wallet signed transaction must be a bounded non-empty byte array",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "4730440220175fbf7fb316dca50759a811a45d83414af6e67fe85f9fdd5aaf375fb4432722022077b6f60693abb1f1ac5eaa28861ed7eb7ad249bfe1e4f4bbc143019980f26c1141"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"4730440220175fbf7fb316dca50759a811a45d83414af6e67fe85f9fdd5aaf375fb4432722022077b6f60693abb1f1ac5eaa28861ed7eb7ad249bfe1e4f4bbc143019980f26c1141\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0"
+      ],
+      "create_action_outputs": [
+        {
+          "satoshis": 1,
+          "lockingScript": "2102a29308e5590d4656f5592107744ea41c2a317e5e04d919d6bc54c195d3a61bcdac336b55f71c0b98e20fa8c00aad4c2546380bd1a40f94b864b4dac3314210211e71bf0850938753a5033ae77bc223a292addbfbe64630440220613795dad852cc492fe1c7f0b147c1717b499355aa423f03157b884c4e92176b02204ddacb819c9fb821bc37bc6e2b29747b93aa281baf0015a4a5a9d2b6f5d156296d"
+        }
+      ],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "randomizeOutputs": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "randomizeOutputs",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    },
+    "remove": {
+      "stopped": "There are 1 outputs with tag alpha that cannot be unlocked. Original error: Wallet signed transaction must be a bounded non-empty byte array",
+      "sign_action": {
+        "reference": "UlJSUlJSUlI=",
+        "spends": {
+          "0": {
+            "unlockingScript": "47304402207ce5332a05c71d05fbef3c7ce664a6a7f796e2f0892f6d2f35a22e58f93c3d140220065659a5f2f99fad35df035a5317d7980210aed78110f98acc7a5222736c6b5741"
+          }
+        },
+        "options": {
+          "acceptDelayedBroadcast": false,
+          "returnTXIDOnly": false
+        }
+      },
+      "sign_action_json": "{\"reference\":\"UlJSUlJSUlI=\",\"spends\":{\"0\":{\"unlockingScript\":\"47304402207ce5332a05c71d05fbef3c7ce664a6a7f796e2f0892f6d2f35a22e58f93c3d140220065659a5f2f99fad35df035a5317d7980210aed78110f98acc7a5222736c6b5741\"}},\"options\":{\"acceptDelayedBroadcast\":false,\"returnTXIDOnly\":false}}",
+      "sign_action_members": [
+        "reference",
+        "spends",
+        "options"
+      ],
+      "sign_action_option_members": [
+        "acceptDelayedBroadcast",
+        "returnTXIDOnly",
+        "noSend",
+        "sendWith"
+      ],
+      "spend_indexes": [
+        "0"
+      ],
+      "create_action_outputs": [],
+      "create_action_options": {
+        "acceptDelayedBroadcast": false,
+        "signAndProcess": false,
+        "returnTXIDOnly": false
+      },
+      "create_action_option_members": [
+        "acceptDelayedBroadcast",
+        "signAndProcess",
+        "returnTXIDOnly"
+      ],
+      "abort_action": [
+        {
+          "reference": "UlJSUlJSUlI="
+        }
+      ]
+    }
+  }
+}
