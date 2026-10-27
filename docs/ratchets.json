@@ -1,28 +1,28 @@
 {
   "schema": 1,
-  "source_commit": "8b7517b78cf8ae3f2e2e10e7180695e869462062",
+  "source_commit": "543274f9d60d5cde7a2eb0c6a614b132900f7f80",
   "toolchain": "1.95.0",
   "metrics": {
-    "files_over_800": 39,
+    "files_over_800": 38,
     "unwrap_expect": 40,
-    "functions_over_60": 92,
+    "functions_over_60": 89,
     "cognitive_complexity_over_25": 1,
     "missing_docs": 0,
-    "duplicate_windows_40": 8666,
-    "pedantic_warnings": 2675
+    "duplicate_windows_40": 8325,
+    "pedantic_warnings": 2661
   },
   "files_over_800": [
     {
       "path": "src/auth/peer.rs",
-      "lines": 942
+      "lines": 970
     },
     {
       "path": "src/auth/transports/http.rs",
-      "lines": 1252
+      "lines": 1245
     },
     {
       "path": "src/auth/utils/validation.rs",
-      "lines": 972
+      "lines": 964
     },
     {
       "path": "src/compat/bip32.rs",
@@ -30,19 +30,19 @@
     },
     {
       "path": "src/compat/bip39/mnemonic.rs",
-      "lines": 963
+      "lines": 961
     },
     {
       "path": "src/compat/ecies.rs",
-      "lines": 1189
+      "lines": 1164
     },
     {
       "path": "src/identity/client.rs",
-      "lines": 2052
+      "lines": 1793
     },
     {
       "path": "src/identity/contacts.rs",
-      "lines": 1278
+      "lines": 1267
     },
     {
       "path": "src/identity/types.rs",
@@ -54,7 +54,7 @@
     },
     {
       "path": "src/kvstore/local.rs",
-      "lines": 1730
+      "lines": 1729
     },
     {
       "path": "src/kvstore/types.rs",
@@ -71,10 +71,6 @@
     {
       "path": "src/primitives/bignum.rs",
       "lines": 1578
-    },
-    {
-      "path": "src/primitives/bsv/shamir.rs",
-      "lines": 1026
     },
     {
       "path": "src/primitives/bsv/sighash.rs",
@@ -126,15 +122,15 @@
     },
     {
       "path": "src/transaction/beef.rs",
-      "lines": 3087
+      "lines": 3074
     },
     {
       "path": "src/transaction/beef_stream.rs",
-      "lines": 3617
+      "lines": 3605
     },
     {
       "path": "src/transaction/merkle_path.rs",
-      "lines": 1465
+      "lines": 1463
     },
     {
       "path": "src/transaction/transaction.rs",
@@ -142,31 +138,31 @@
     },
     {
       "path": "src/wallet/proto_wallet.rs",
-      "lines": 1403
+      "lines": 1294
     },
     {
       "path": "src/wallet/substrates/http_json.rs",
-      "lines": 1205
+      "lines": 1102
     },
     {
       "path": "src/wallet/types.rs",
-      "lines": 1951
+      "lines": 1912
     },
     {
       "path": "src/wallet/validation.rs",
-      "lines": 1171
+      "lines": 1113
     },
     {
       "path": "src/wallet/wire/encoding.rs",
-      "lines": 2560
+      "lines": 2490
     },
     {
       "path": "src/wallet/wire/processor.rs",
-      "lines": 949
+      "lines": 901
     },
     {
       "path": "src/wallet/wire/transceiver.rs",
-      "lines": 1666
+      "lines": 1643
     }
   ]
 }
