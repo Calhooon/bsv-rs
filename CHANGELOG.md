@@ -187,7 +187,7 @@ decode at all (the oracle-fuzz lane's two inputs, #82). The reference,
 every type and keeps it on the packet (`decodeString`,
 `build/cjs/index.js:220-234`), writes the id of every packet that has one
 (`encodeAsString`, `:90-93`), and judges the payload by the type
-(`isPayloadValid`, `:256-275`): CONNECT an object, DISCONNECT none,
+(`isPayloadValid`, `:256-274`): CONNECT an object, DISCONNECT none,
 CONNECT_ERROR a string or an object, EVENT an array whose head is a number
 or a string outside its reserved names (`:16-23`), ACK an array; anything
 else, and a payload that is not JSON, is `invalid payload`. Its id run
@@ -258,7 +258,8 @@ reads and then waits for attachments (no AuthSocket peer sends them); an
 empty frame and a frame whose type character is white space, which the
 reference's `Number(str.charAt(0))` reads as `0`, a CONNECT; a JSON string
 with a lone surrogate escape, which `JSON.parse` keeps and a Rust string
-cannot. Where both read a frame, one difference: an id above 2^53 and
+cannot; a payload nested deeper than 128 levels, which `serde_json`
+refuses by its recursion limit and `JSON.parse` reads. Where both read a frame, one difference: an id above 2^53 and
 within `u64` is exact here and the nearest double there, so
 `18446744073709551615` is written back as given here and as
 `18446744073709552000` there. The JSON numbers' differences are #285's.
