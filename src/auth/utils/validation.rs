@@ -434,7 +434,7 @@ pub fn validate_certificate_encoding(cert: &crate::auth::certificates::Certifica
 /// validate_requested_certificate_set(&req)?;
 /// ```
 ///
-/// The reference's `Peer` calls [`assert_requested_certificate_set`] (its
+/// The reference's `Peer` calls [`assert_requested_certificate_set`](super::assert_requested_certificate_set) (its
 /// `assertRequestedCertificateSet`, in its words) on its own policy and on
 /// a received certificateRequest (#294); this checker is the stricter one
 /// kept for callers that want it, and `Peer` does not call it.
