@@ -66,7 +66,7 @@ The `Error` enum provides unified error handling across all modules using `thise
 |---------|----------------|
 | (core) | `InvalidKeyLength`, `InvalidDataLength`, `InvalidHex`, `InvalidBase58`, `InvalidBase64`, `CryptoError`, `InvalidSignature`, `InvalidPublicKey`, `InvalidPrivateKey`, `PointAtInfinity`, `DecryptionFailed`, `InvalidNonce`, `InvalidTag`, `InvalidUtf8`, `ReaderUnderflow`, `InvalidChecksum` |
 | `script` | `ScriptParseError`, `ScriptExecutionError`, `InvalidOpcode`, `DisabledOpcode`, `StackUnderflow`, `StackOverflow`, `Bip276Error`, `InvalidAddress`, `InvalidAddressLength`, `UnsupportedAddress` |
-| `transaction` | `TransactionError`, `MerklePathError`, `BeefError`, `FeeModelError` |
+| `transaction` | `TransactionError`, `ScriptEvaluationDeclined` (`Transaction::verify`'s decline, #38), `MerklePathError`, `BeefError`, `FeeModelError` |
 | `wallet` | `WalletError`, `WalletBusy`, `WalletTransport`, `TransportFault` (with the `TransportFault` class of `transaction`, #87), `HmacMinimalLengthKey`, `KeyDerivationError`, `ProtocolValidationError`, `InvalidCounterparty` |
 | `messages` | `MessageVersionMismatch`, `MessageError`, `MessageRecipientMismatch` |
 | `compat` | `InvalidMnemonic`, `InvalidEntropyLength`, `InvalidMnemonicWord`, `InvalidExtendedKey`, `HardenedFromPublic`, `InvalidDerivationPath`, `EciesDecryptionFailed`, `EciesHmacMismatch` |
