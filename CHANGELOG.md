@@ -70,6 +70,94 @@ field!` and `Failed to decrypt all master certificate fields.`,
 `MasterCertificate.ts:622`, `:560`; `Failed to decrypt selectively
 revealed certificate fields using keyring: <words>`,
 `VerifiableCertificate.ts:214-217`): the inner refusal is returned as is.
+### Fixed: `Peer` refuses a malformed requested certificate set where the reference does, on its own policy and on receipt (#294)
+
+`validate_requested_certificate_set` refuses a type ID that is not base64
+of 32 bytes, but `Peer` (`src/auth/peer.rs`) called no validator: it
+signed and sent a certificateRequest whose policy names a 31-byte, a
+33-byte, a non-base64 or an integer-like (`"42"`) type ID, which a
+reference peer refuses, and handed such a request from a peer to its
+listener unchecked. The reference refuses the set with
+`assertRequestedCertificateSet` (`ts-stack@edf6e03`
+`packages/sdk/src/auth/AuthMessageValidation.ts:107-162`) on its own policy
+at construction (`Peer.ts:158`), at each snapshot (`:332`, through
+`#snapshotCertificatePolicy`, in `initiateHandshake` `:630` and
+`processInitialRequest` `:811`) and first thing in `requestCertificates`
+(`:434`), each a throw before any signature; and on receipt in
+`snapshotAuthMessage` (`Peer.ts:767`), the first line of
+`#handleIncomingMessage`, before any handler: on any message carrying
+`requestedCertificates` (`AuthMessageValidation.ts:345-346`) and required
+on a certificateRequest (`:367`).
+
+`bsv_rs::auth::assert_requested_certificate_set` (new) is that validator,
+its rules and words: the certifiers at most 100, each `02`/`03` and 64
+lowercase hex digits on the curve, unique; the types at most 100, each
+canonical base64 (`base64ToBytes`, `WalletByteEncoding.ts:39-64`: padded,
+no whitespace or URL-safe alphabet, zero bits under the padding, at most
+128 characters) of exactly 32 bytes, an unsafe key (`__proto__`,
+`constructor`, `prototype`) refused in the bounded-data walk's words, which
+reach it first; each type's fields at most 100, unique, non-empty, at most
+50 UTF-8 bytes and safe; an empty set valid (the reference's default
+policy, `Peer.ts:154-157`). It refuses as `Error::AuthError` with the
+reference's message (`certificate type must encode exactly 32 bytes.`,
+`certificate type must be canonical base64.`, ...). `Peer` calls it at the
+reference's sites: `request_certificates` before it seeks a session or
+signs; the peer's own policy in `initiate_handshake` before a nonce is made
+or an initialRequest sent, and on a received initialRequest before
+`process_initial_request` makes a session or signs the response
+(`Peer::new` returns `Self`, so the refusal the reference makes at
+construction is made at the policy's first snapshot); and a received
+message's `requestedCertificates` in `handle_incoming_message` (after the
+version check) and the `start` callback, before the message is routed, a
+certificateRequest without one refused as `requestedCertificates must be
+an object.`. A refusal on receipt is the `Err` the transport's callback
+returns, as for a wrong version; a refused initialResponse on the `start`
+path leaves the handshake to its timeout, as the reference's throw in
+`#handleIncomingMessage` leaves its waiter.
+The validator lives in `src/auth/utils/requested_set.rs` and `Peer`'s unit
+tests moved to `src/auth/peer_tests.rs`, so neither `validation.rs` nor
+`peer.rs` grows past its ratchet bound.
+`validate_requested_certificate_set` is unchanged: its words are this
+crate's and it refuses an empty set, the reference's default, so `Peer`
+does not call it.
+
+Pinned by `tests/auth_requested_set_validation_294.rs` with
+`tests/vectors/auth_requested_set_validation_294.json` (new), recorded by
+`tests/support/requested_set_validation_294.mjs` under Node v22.18.0: for
+the four malformed type IDs, the reference's words equal this crate's at
+the validator, at `request_certificates` after a handshake (no message
+sent; the reference signed nothing), at a peer's own policy before the
+initialRequest and before the initialResponse, and on the reference's
+signed certificateRequest read by the server path and the `start` path
+(the listener not called; the reference checked no signature); a request
+without `requestedCertificates` refused in the reference's words; the
+32-byte ID signed, sent and received at both ends, this crate verifying the
+reference's signature; and the unit tests in `src/auth/utils/requested_set.rs`
+for every other rule's words, each input's verdict checked against the
+reference at `edf6e03`. With `Peer`'s calls removed, the five `Peer` tests
+are RED (the validator kept); with the validator's body removed as well,
+seven of the nine integration tests and three of the four unit tests are
+RED, the passing ones the acceptances. `fuzz_auth_messages` now calls
+`assert_requested_certificate_set` on every set it reads, alone and in a
+message (951,920 runs in 120 s on a corpus copy, no crash).
+
+### Notes: cross-SDK parity (#294)
+
+Go's `Peer` calls no validator of the set (`go-sdk@2ca481c`
+`auth/peer.go:1074-1110` sends `certificateRequirements` as given; its
+`ValidateRequestedCertificateSet`, `auth/utils/validate_certificates.go:312-336`,
+which refuses an empty set, is called by nothing); a Go type ID is a
+`[32]byte` (`:20`), so a sender cannot name a malformed one, and its JSON
+reader refuses a key that is not base64 of 32 bytes
+(`validate_certificates.go:30-51`, `invalid base64 key`, `expected 32
+bytes`). What this crate does not model of the reference's receipt check:
+the set is typed after the JSON read, so an absent `certifiers` or `types`
+member reads as empty and a `null` set as absent, where the reference
+refuses them (`AuthMessageValidation.ts:119-121`, `:131-134`, `:111-113`);
+and the bounded-data walk's budgets over the whole message (16 MiB, depth
+64, 100,000 nodes, `:7-9`) are not applied to the set, whose own limits
+(100 certifiers, 100 types, 100 fields) bind first on any set those budgets
+pass but one of more than 100,000 nodes, which both refuse in other words.
 
 ### Fixed: a JSON number reads to the correctly rounded double, so a Socket.IO frame round-trips every finite `f64` (#285)
 
@@ -182,13 +270,14 @@ insertion order but for an integer-like key, which a JavaScript object
 moves first in ascending order. The reference's validator refuses such a
 key: a type is canonical base64 of 32 bytes
 (`AuthMessageValidation.ts:141-144`), 44 characters ending in `=`, never
-integer-like. This crate's `validate_requested_certificate_set` refuses
-the same form (`src/auth/utils/validation.rs`), but `Peer` never calls it
-where the reference validates on snapshot (`Peer.ts:332`) and on receipt
-(`AuthMessageValidation.ts:345-346`, `:367`; bsv-rs#294), so a set the
-reference refuses (a type `"1"` after a type `"2"`) is written here in
-insertion order where a JavaScript object would write `"1"` first; on every set the reference accepts the two write the
-same bytes. Go holds `types` as a `map[wallet.CertificateType][]string`
+integer-like. Since #294 this crate's `Peer` refuses the same form at the
+same sites, on snapshot (`Peer.ts:332`) and on receipt
+(`AuthMessageValidation.ts:345-346`, `:367`), with
+`assert_requested_certificate_set`, so neither side signs an integer-like
+key and the difference closes: on every set either side signs, the two
+write the same bytes. (Until #294 a set the reference refuses, a type
+`"1"` after a type `"2"`, was signed here in insertion order where a
+JavaScript object writes `"1"` first.) Go holds `types` as a `map[wallet.CertificateType][]string`
 (`go-sdk@2ca481c` `auth/utils/validate_certificates.go:20`, `:54`) and
 `json.Marshal` writes a map's keys sorted, so
 a Go sender's order is the sorted one; a text it sends verifies here as
