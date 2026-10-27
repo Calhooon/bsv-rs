@@ -169,10 +169,10 @@ cargo bench -- --baseline main
 
 ## CI Benchmark Regression Detection
 
-The CI workflow's `Benchmark Regression Check` compares a pull request's base and head. It is not a required context, so since 2026-10-26 no pull request runs it (a pull request runs exactly its line's required set); on `main`'s line it does not run:
+`bench.yml`'s `Benchmark Regression Check` compares the commit with the last release tag before it. It runs on no pull request and no push, only on a dispatch and before every tag (2026-10-27):
 
-1. Checks out the base branch (main) and runs benchmarks
-2. Checks out the PR branch and runs benchmarks
+1. Checks out the last release tag and runs benchmarks
+2. Checks out the commit and runs benchmarks
 3. Compares results using `critcmp`
 
 This approach cancels out VM noise since both measurements happen on the same machine.

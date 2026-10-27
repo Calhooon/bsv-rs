@@ -1,0 +1,46 @@
+name: Unused dependencies
+
+# cargo-machete, non-blocking. Off the push run (ci.yml runs the required set, nothing more;
+# the owner's word of 2026-10-27); on demand (`gh workflow run machete.yml --ref <line>`) and
+# called by release.yml on every version tag before it publishes.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -Dwarnings
+
+# a newer dispatch on the same ref waits for the one running; a tag's call is never cancelled
+concurrency:
+  group: machete-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # the unused dependencies (bsv-stack-lean #137): cargo-machete reads the manifests and the
+  # sources of the crate and fuzz/, no build; non-blocking until a captain asks. The tool is
+  # installed by version from crates.io with its own lock, without the workflow's -Dwarnings
+  machete:
+    name: unused dependencies
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # v1
+        with:
+          toolchain: stable
+
+      - name: Install cargo-machete 0.9.2
+        env:
+          RUSTFLAGS: ""
+        run: cargo install cargo-machete --version 0.9.2 --locked --root "$RUNNER_TEMP/tools"
+
+      - name: Run cargo-machete
+        run: '"$RUNNER_TEMP/tools/bin/cargo-machete" --with-metadata'
