@@ -802,12 +802,7 @@ impl Transport for SimplifiedFetchTransport {
                     };
 
                     // Build response AuthMessage, its sender the answer's identity key (#354)
-                    let response_identity = crate::primitives::PublicKey::from_hex(
-                        response_headers
-                            .get(headers::IDENTITY_KEY)
-                            .and_then(|v| v.to_str().ok())
-                            .unwrap_or_default(),
-                    )?;
+                    let response_identity = unauthenticated::sender(&response_headers)?;
 
                     let mut response_message =
                         AuthMessage::new(MessageType::General, response_identity);
