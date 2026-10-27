@@ -713,41 +713,63 @@ class from `HttpWalletJson`'s createAction or signAction gets
 `WalletReviewActions` when the body carries results, or the reference's
 refusal of a malformed member (`WalletError` with its words).
 
-Pinned by `tests/wallet_http_json_review_actions_339.rs` (5 tests) on
-`tests/vectors/wallet_http_json_review_actions_339.json`: 37 code-5 bodies
+Pinned by `tests/wallet_http_json_review_actions_339.rs` (7 tests) on
+`tests/vectors/wallet_http_json_review_actions_339.json`: 39 code-5 bodies
 answered to signAction, createAction and listActions, each with the
 reference's `HTTPWalletJSON` outcome (its `WERR_REVIEW_ACTIONS` members, or
 the words it threw) at `ts-stack@edf6e03` under Node v22.18.0, recorded by
 `tests/support/wallet_http_json_review_actions_339.mjs` (the competing
-transaction and BEEF #327's), each served through wiremock here: 34 read
+transaction and BEEF #327's), each served through wiremock here: 36 read
 to the reference's outcome, 3 otherwise and enumerated with their reasons
 (below); the five members on signAction (a double spend with its BEEF, two
 send results) and on createAction (txid, BEEF, change outpoint); five
-refusals named; a body without results the `WalletRefusal` of before; and
+refusals named; a `tx` and a `competingBeef` in the historical object form
+(`{"0": 1, "1": 0, ..}`, what `JSON.stringify(new Uint8Array(..))` wrote),
+which the reference's `normalizeBRC100WalletByteFields` reads back as
+bytes before it reads the error (`BRC100ByteEncoding.ts:52-71`, `:164-190`;
+`HTTPWalletJSON.ts:326-328`): at least one key, the keys exactly `"0"` to
+`"n-1"` whatever their order in the text (`Object.keys` lists integer keys
+ascending), each value an integer from 0 to 255 (`isByte`, so `1.0` too),
+an empty object refused (`a_byte_field_in_the_historical_object_form_is_read_as_its_bytes`,
+and two unit tests in `review_actions.rs` for the rule's edges); a body
+without results the `WalletRefusal` of before; a 400 body whose `code` is
+absent, `"5"` or `5.5` the same (the parity note's fourth shape,
+`a_review_body_whose_code_is_not_a_safe_integer_is_the_class_refusal`,
+green before and after: it pins #137's reading); and
 the revocation of #327's run `double_spend_then_accepted` with signAction
 answered through the substrate under wiremock (a code-5 body with the
 competing transaction, then the signed one; #327's recording wallet gains
 `sign_via`): the reference's calls, broadcasts and both signAction bodies.
 4 of the 5 red on a copy with the substrate's reading removed (the struct
 kept so the file compiles; the fifth pins the old reading, green on both).
+The object form, the cold review's finding, was red on the reader before
+it (`Invalid createAction result tx: expected an array of bytes`,
+`Invalid wallet error reviewActionResults[0].competingBeef`), and so was
+the unit test of its acceptance; the unit test of its refusals is green on
+both.
 
 ### Notes: cross-SDK parity (#339)
 
 Three bodies are read otherwise than the reference reads them, enumerated
-in the test: a code-5 body without `reviewActionResults` stays the class
+in the test, and a fourth shape is stated here: a code-5 body without `reviewActionResults` stays the class
 refusal of #137 (`WalletRefusal`; the reference refuses it,
 `Invalid wallet error sendWithResults` or `reviewActionResults`); a code-5
 body at a status other than 400 is the class refusal at any status, as
 #137 reads every class (the reference: `HTTPWalletJSON <call> failed with
-HTTP status <n>`); and the checks `validateWalletResult` makes of a
+HTTP status <n>`); a 400 body with an own `isError` whose `code` is
+absent, not a number (`"5"`) or not an integer (`5.5`) is read by #137's
+rule, its class by `name` (`WalletRefusal`, `ReviewActions` for a
+`WERR_REVIEW_ACTIONS` name), where the reference answers the one sentence
+`Invalid wallet error envelope` for each (`HTTPWalletJSON.ts:204-206`,
+`Number.isSafeInteger`; the cold review ran the three): conforming the
+words would refuse the toolbox's `asStatus` bodies too, whose `code` is
+the class's name, which #137 reads by design; and the checks `validateWalletResult` makes of a
 returned `tx`'s transaction against the request
 (`validateCreateActionTransaction`, `validateSignActionTransaction`,
 `validateTransactionValueConservation`) are not ported, as the success
 path makes none of them either: a `tx` is read as a BEEF and bound to
-`txid`, its outputs, inputs and values not compared with the request. A
-`tx` or `competingBeef` is read as an array of byte numbers alone (the
-reference's `normalizeBRC100ByteArray` reads its historical byte objects
-too), and `actionBeefTransaction`'s three readings (strict atomic, partial
+`txid`, its outputs, inputs and values not compared with the request.
+`actionBeefTransaction`'s three readings (strict atomic, partial
 atomic, plain) are this crate's one `Beef::from_binary`, the subject the
 transaction of `txid`, else the atomic subject, else the last full one.
 go-sdk@2ca481c's JSON substrate reads no error body as a typed error
