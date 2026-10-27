@@ -121,6 +121,22 @@ absent one (`WalletWireTransceiver.ts:92-100`), as this crate's writes
 reference's processor also refuses a length above 250 and normalizes a
 named originator through `validateOriginator` (`:286-294`); this crate's
 does neither: a finding outside #329.
+### Fixed: the ARC default arch test reads a CRLF checkout as it reads LF (#367)
+
+`no_live_policy_default_chooses_the_arc_policy_url`
+(`tests/arch_arc_deprecated.rs`, #350) found each `impl Default` block's end
+with `find("\n}\n")` on the raw text of `live_policy.rs`; a Windows checkout
+holds it in CRLF, so the `expect("the impl's closing brace")` panicked on the
+`Test Suite (windows-latest, stable)` and `(windows-latest, beta)` cells (run
+40513515368; not in beta's required set, so no PR went red). The test now reads
+through `arch_support::read`, which normalizes `\r\n` to `\n` before any
+search, as `arch_ci_lines`, `arch_ci_pr_runs_the_required_set` and
+`arch_secrets_scan_scope` already did for the workflows; `arch_support::sources()`,
+the lexical rules' reader, normalizes the same way (their lexer already
+tolerated a CR, so no verdict moves). Pinned by
+`a_crlf_checkout_finds_the_impl_closing_brace_as_lf_does`, red without the
+normalization. No other test under `tests/` searches raw file text for a
+LF-only needle.
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 

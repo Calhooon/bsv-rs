@@ -20,6 +20,20 @@ pub struct Token<'a> {
     pub literal: bool,
 }
 
+/// A crate file's text with its line endings normalized to `\n`: a Windows
+/// checkout converts the sources to CRLF (`.gitattributes` keeps only the
+/// vectors, fixtures and corpora byte for byte), and the rules' needles are
+/// written with `\n` (bsv-rs#367).
+pub fn read(file: &str) -> String {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
+    normalize(&fs::read_to_string(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display())))
+}
+
+/// `\r\n` to `\n`, before any search.
+pub fn normalize(text: &str) -> String {
+    text.replace("\r\n", "\n")
+}
+
 pub fn sources() -> Vec<Source> {
     fn visit(root: &Path, dir: &Path, out: &mut Vec<Source>) {
         for entry in fs::read_dir(dir).expect("read source directory") {
@@ -33,7 +47,7 @@ pub fn sources() -> Vec<Source> {
                         .expect("source inside crate")
                         .to_string_lossy()
                         .replace('\\', "/"),
-                    text: fs::read_to_string(path).expect("read Rust source"),
+                    text: normalize(&fs::read_to_string(path).expect("read Rust source")),
                 });
             }
         }
