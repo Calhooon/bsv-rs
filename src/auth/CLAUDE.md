@@ -33,6 +33,7 @@ Certificate types for BRC-52/53 selective disclosure:
 Transport layer implementations for auth messages:
 - `mod.rs` - Transport trait and re-exports (conditionally exports WebSocket types)
 - `http.rs` - SimplifiedFetchTransport for HTTP (BRC-104), MockTransport for testing, HttpRequest/HttpResponse types
+- `http/client.rs` - the transport's client (`http` feature, #320): `new`'s default (30 s and 10 s timeouts, no idle reuse, no redirect followed), `with_client(base_url, client)` (the reference's `fetchClient`, the caller's client used as given), and the refusal of an answer with a redirect status on both paths (`AuthError`, `Network error while sending authenticated request to {url}: redirect refused: {status}`)
 - `websocket_transport.rs` - WebSocketTransport for full-duplex WebSocket communication (requires `websocket` feature)
 - `socketio/` - SocketIoTransport (`socketio` feature) and the Engine.IO/Socket.IO codec: send writes the message's text through `SocketIoSink::send_socketio_text` (default: decode and `send_socketio`, whose `Value` sorts keys; a sink that writes text overrides it), the dispatch reads the event argument's text (`codec::decode_event_args_text`), so the signed certificate texts pass through unchanged (#280); `packet_rules.rs` is the reference's reading of a packet's id and payload (#110: `socket.io-parser` 4.2.7's `decodeString` id run, white space included, and `isPayloadValid` in its words, `invalid payload`), the id carried on every packet (`Connect`, `Disconnect`, `ConnectError` take `ack_id: Option<u64>`) and written back by `encode`
 - See `transports/CLAUDE.md` for detailed transport documentation
@@ -301,7 +302,7 @@ pub type TransportCallback = dyn Fn(AuthMessage) -> Pin<Box<dyn Future<Output = 
 ```
 
 Three implementations:
-- **SimplifiedFetchTransport** - HTTP transport (BRC-104): `new(base_url)`, `message_to_headers()`, `headers_to_message_fields()`
+- **SimplifiedFetchTransport** - HTTP transport (BRC-104): `new(base_url)`, `with_client(base_url, client)` (`http`, #320), `message_to_headers()`, `headers_to_message_fields()`
 - **WebSocketTransport** - Full-duplex WebSocket (requires `websocket` feature): lazy connect on first `send()`, background receive loop, JSON payloads, connection dropped on errors. Config via `WebSocketTransportOptions { base_url, read_deadline_secs }`
 - **MockTransport** - Testing: `queue_response()`, `get_sent_messages()`, `receive_message()`
 

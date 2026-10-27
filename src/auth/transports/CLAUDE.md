@@ -10,7 +10,8 @@ This module provides transport layer implementations for sending and receiving a
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~49 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1229 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1245 |
+| `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | ~80 |
 | `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
 
 ## Key Exports
@@ -58,6 +59,8 @@ pub struct SimplifiedFetchTransport {
 
 impl SimplifiedFetchTransport {
     pub fn new(base_url: &str) -> Self
+    #[cfg(feature = "http")]
+    pub fn with_client(base_url: &str, client: reqwest::Client) -> Self   // #320
     pub fn base_url(&self) -> &str
     pub fn message_to_headers(&self, message: &AuthMessage) -> Vec<(String, String)>
     pub fn headers_to_message_fields(&self, header_map: &[(String, String)])
@@ -69,7 +72,8 @@ Features:
 - Sends handshake messages (InitialRequest, InitialResponse, CertificateRequest, CertificateResponse) as JSON POST to `/.well-known/auth`
 - Sends General messages via BRC-104: deserializes payload as `HttpRequest`, makes actual HTTP request with auth headers, wraps response in `HttpResponse` payload
 - Automatically strips trailing slashes from base URL
-- Uses `reqwest` client (requires `http` feature)
+- Uses `reqwest` client (requires `http` feature): `new` builds one with a 30 s request and 10 s connect timeout, `pool_max_idle_per_host(0)` and `redirect(Policy::none())`; `with_client` takes the caller's, used as given (its timeouts, proxy, resolution and redirect policy the caller's), the reference's `fetchClient` (`ts-stack@edf6e03` `SimplifiedFetchTransport.ts:64-67`; #320)
+- Refuses an answer with a redirect status (301, 302, 303, 307, 308) on both paths before its body, whatever the client, as the reference's `redirect: 'error'` (`:128`, `:212`) does; a client that follows redirects has followed them before the transport sees the answer
 - Uses `std::sync::RwLock` for callback storage (synchronous access, no tokio::spawn needed)
 - Invokes registered callback with response messages
 - Implements `Debug` trait with redacted internal fields
@@ -390,11 +394,12 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `AuthError("HTTP transport requires the 'http' feature")` | Sending without `http` feature |
 | `TransportFault { fault, status: None, detail: "HTTP request failed: {}" }` | A connection error (`NeverSent`) or a timeout, reset or other send failure (`MayHaveBeenReceived`), both paths (#87); a request that could not be built stays `AuthError` with the same text |
 | `TransportFault { fault, status: Some(s), detail: "Auth endpoint returned {status}: {body}" }` | A handshake answered 429, or 503 with `Retry-After` (`RateLimited` with its wait), or 502, 503, 504 (`MayHaveBeenReceived`); the status read before the body (#87) |
+| `AuthError("Network error while sending authenticated request to {url}: redirect refused: {status}")` | An answer with a redirect status (301, 302, 303, 307, 308) on either path, read before the body; the named host's answer, not a `TransportFault` (#320) |
 | `AuthError("Auth endpoint returned {status}: {body}")` | Any other non-2xx handshake HTTP response |
 | `TransportFault`, else `AuthError("Failed to read auth response: {}")` | Failed to read handshake response body |
 | `AuthError("Failed to parse auth response: {} - body: {}")` | Invalid JSON in handshake response |
 | `AuthError("General message must have payload")` | General message missing payload |
-| `TransportFault`, else `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body (a General answer of any status is passed to the caller as its `HttpResponse`, unchanged) |
+| `TransportFault`, else `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body (a General answer of any status but a redirect is passed to the caller as its `HttpResponse`, unchanged) |
 | `TransportFault { fault: MayHaveBeenReceived, status: None, detail: "SocketIoTransport::send: ws: {e}" }` | The Socket.IO sink failed (it cannot say how much of the frame it wrote; was `AuthError`, #87) |
 | `AuthError("Payload too short for ...")` | Malformed payload during deserialization |
 | `AuthError("Invalid ... UTF-8: {}")` | Non-UTF8 string in payload |

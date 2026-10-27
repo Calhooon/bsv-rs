@@ -349,6 +349,90 @@ off-curve rows), the difference CLAUDE.md lists for certificate keys
 (#183). The reference bounds an envelope at 16 MiB + 160 bytes
 (`ECIES.ts:12`, `:589-594`, `CompatValidation.ts:1`), which this crate
 does not: a finding outside #109.
+### Fixed: `SimplifiedFetchTransport` takes a caller's client, as the reference takes a `fetchClient`, and refuses a redirect (#320)
+
+`SimplifiedFetchTransport::new` built its private `reqwest::Client` inside
+and set no redirect policy, so reqwest followed up to ten hops: a
+handshake or a general message answered `3xx` with a `Location` on
+another host was replayed there, its auth headers, signature and body
+with it, and a wrapper over `Peer<W, SimplifiedFetchTransport>` (the
+toolbox's `StorageClient`) could check the base URL before a send but set
+no redirect, proxy or resolution policy on the transport's own requests,
+the general message's URL built from the payload's path included. The
+reference's constructor takes the fetch as its second parameter
+(`fetchClient: typeof fetch = defaultFetch`, `ts-stack@edf6e03`
+`packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:64-67`, the
+default the global fetch, `:16-19`; `AuthFetch.ts:197`, `:569` passes its
+own to the transport it builds) and both of its fetches set `redirect:
+'error'` (`:128`, `:212`; the comment at `:125-127`: a fetch follows
+redirects by default and can replay them elsewhere).
+
+`SimplifiedFetchTransport::with_client(base_url, client)` (behind `http`,
+as the field is) sends every request through the caller's client, used as
+given: its timeouts, pool, proxy, resolution and redirect policy are the
+caller's. `new` keeps its client (the 30 s and 10 s timeouts and
+`pool_max_idle_per_host(0)` of the Cloudflare Containers hang) and adds
+`redirect(Policy::none())`. On both paths, whatever the client, an answer
+with a redirect status (the fetch standard's 301, 302, 303, 307, 308) is
+refused before its body is read, as `Error::AuthError("Network error while
+sending authenticated request to {url}: redirect refused: {status}")`, the
+reference's words for its thrown fetch (`:453-462`) with this crate's
+reason. The class: the named host answered, so it is that host's answer
+(`AuthError`, `transport_fault()` `None`), not a `TransportFault`; the
+reference's `redirect: 'error'` makes it a network error by the fetch
+standard's name for every failure, and the reference has no fault classes
+to read it by: its `Network error` words are kept, its class is not. A
+general message answered `3xx` was handed to the caller as an
+`HttpResponse` of that status before; it is now refused. A `300` or `304`
+is not a redirect status and is read as before.
+
+Migration: none for `new`. A caller with its own policy passes its
+client: the toolbox's `StorageClient` (`bsv-wallet-toolbox-rs`, its
+#182 policy) replaces `SimplifiedFetchTransport::new(&url)`
+(`src/storage/client/storage_client.rs:291` at `6317222`) with
+`SimplifiedFetchTransport::with_client(&url, client)`, the client built
+with `reqwest::Client::builder().no_proxy().resolve(host, addr)
+.redirect(reqwest::redirect::Policy::none())` and the timeouts it wants
+(`new`'s are not applied to a supplied client). `bsv-wallet-cli`
+(`a55990c`) and `bsv-overlay-cloudflare` (`9a0f3c29`) build no
+`SimplifiedFetchTransport`.
+
+wasm32: the `http` feature does not build there (`build.rs`, #152), so
+neither constructor's client exists on wasm32; reqwest's wasm builder has
+no redirect policy either (`reqwest-0.12.28/src/wasm/client.rs`: the
+browser's fetch follows), so a wasm32 transport would have to be the
+host's `fetch` with `redirect: 'error'`.
+
+Pinned by `tests/transport_client_hook_320.rs` (5 tests, wiremock): a
+handshake answered 301, 302, 303, 307 and 308 to a second server is
+refused in those words and the second server sees no request; a general
+message answered 302 and 307 the same; a client supplied through
+`with_client` is the one used (a `default_headers` marker the mock
+matches on), the base URL's trailing slash trimmed; a supplied client
+that follows redirects carries its own policy (the second server answers);
+a supplied client that does not is refused by the transport. 3 of the 5
+red on the tree with the redirect policy and the two refusals removed (the
+handshake followed to the second server, the general message's 302 handed
+on), the two policy-of-the-caller tests green on both; `transport_fault_auth`
+(9) and `auth_integration_tests` (70) unchanged.
+
+### Notes: cross-SDK parity (#320)
+
+go-sdk@2ca481c's `NewSimplifiedHTTPTransport` takes a caller's
+`*http.Client` in `SimplifiedHTTPTransportOptions.Client`
+(`auth/transports/simplified_http_transport.go:31-34`), building
+`&http.Client{}` when none is given (`:41-44`), and sets no
+`CheckRedirect`: `net/http`'s default follows up to ten redirects on both
+of its sends (`:111`, `:175`), as this crate's did. The reference passes
+`redirect: 'error'` to a caller's fetch too, so a caller's fetch refuses
+a redirect unless it ignores the option; reqwest has no per-request
+redirect policy, so a caller's client that follows redirects follows them
+here before the transport sees the answer, the transport refusing only the
+redirect statuses it is handed. The reference's third parameter
+(`SimplifiedFetchTransportOptions`: the response byte limits and the
+request timeout, `:30-37`) is not this crate's: outside #320. The tail of the reference's words is the
+runtime's (`fetch failed` under Node); this crate's is `redirect refused:
+{status}`.
 
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 
