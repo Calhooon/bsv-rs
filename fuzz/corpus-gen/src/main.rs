@@ -38,7 +38,7 @@ use bsv_rs::compat::{bsm, ecies};
 use bsv_rs::messages;
 use bsv_rs::primitives::bsv::shamir::split_private_key_with;
 use bsv_rs::primitives::bsv::sighash::parse_transaction;
-use bsv_rs::primitives::{from_hex, to_base64, PrivateKey};
+use bsv_rs::primitives::{from_base64, from_hex, to_base64, PrivateKey};
 use bsv_rs::transaction::{
     verify_stream, verify_stream_structure, Beef, Headers, Kind, MerklePath, MerklePathLeaf,
     Verdict,
@@ -479,6 +479,9 @@ fn key_corpora(base: &Path) {
         ecies_corpus.add(&format!("shared-base64-{n}"), sealed.as_bytes());
         ecies_corpus.add(&format!("plain-{n}"), message);
     }
+    // bsv-rs#109: the plaintext whose no-key envelope the length rule misread
+    let issue = from_base64("r68gn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+9z8I=").unwrap();
+    ecies_corpus.add("plain-32-bsv-rs-109", &issue);
     ecies_corpus.report("fuzz_ecies");
 }
 
@@ -491,7 +494,10 @@ fn auth_corpus(base: &Path) {
         let mut v = v.clone();
         v.as_object_mut().unwrap().remove("description");
         if let Ok(cert) = serde_json::from_value::<Certificate>(v.clone()) {
-            auth.add(&format!("certificate-{i}-binary"), &cert.to_binary(true));
+            auth.add(
+                &format!("certificate-{i}-binary"),
+                &cert.to_binary(true).unwrap(),
+            );
             auth.add(
                 &format!("certificate-{i}-json"),
                 serde_json::to_string(&cert).unwrap().as_bytes(),
