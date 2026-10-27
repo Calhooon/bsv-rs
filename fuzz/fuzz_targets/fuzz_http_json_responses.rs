@@ -10,6 +10,10 @@
 //! two key-linkage reveals), byte 1 the status, byte 2's low bit a
 //! `Retry-After` header whose value is the body's bytes up to the leading
 //! newline; the rest is the body. The assertion is that each call returns.
+//!
+//! The wallet is built with the originator `fuzz.invalid`: the substrate
+//! refuses a call with none configured before any request (#323), which would
+//! fuzz nothing. The calls' own `originator` argument is not sent.
 use bsv_rs::wallet::substrates::HttpWalletJson;
 use libfuzzer_sys::fuzz_target;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -80,8 +84,15 @@ fn harness() -> &'static Harness {
             .timeout(Duration::from_secs(5))
             .build()
             .expect("a client");
-        let wallet =
-            HttpWalletJson::with_client(client, None, Some(format!("http://127.0.0.1:{port}")));
+        // The substrate sends the constructor's originator and refuses a call
+        // with none before any request (#323), so the harness names one; the
+        // base URL is its own loopback, which the constructor accepts.
+        let wallet = HttpWalletJson::with_client(
+            client,
+            Some("fuzz.invalid".to_string()),
+            Some(format!("http://127.0.0.1:{port}")),
+        )
+        .expect("the harness's originator and loopback base URL");
         Harness { runtime, wallet }
     })
 }
