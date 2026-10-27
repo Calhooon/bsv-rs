@@ -113,6 +113,21 @@ all before `ProveCertificate` (`:109`): the verification at the
 reference's site; it checks no name against the certificate, no repeat, no
 count or length, and not the keyring the wallet returns.
 
+Where two or more keyring values are refused, the reference names the
+first in the wallet's key order (`Object.keys` of the keyring,
+`IdentityClient.ts:485`, walked at `:492`: an integer-like name first,
+then insertion order) and this crate the first in the order the names
+were asked (`check_keyring`, `src/identity/reveal.rs`):
+`ProveCertificateResult::keyring_for_verifier` is a `HashMap`, and the
+JSON substrate and the wire reader fill it without the wallet's order.
+The reference's own wallet answers in the order asked
+(`MasterCertificate.createKeyringForVerifier` walks `fieldsToReveal`,
+`MasterCertificate.ts:348`, `:370`; the toolbox's `proveCertificate.ts:31`),
+so on its keyrings the two name the same value unless a name is
+integer-like; a wallet of another order (a Go map's) is named otherwise
+here, the bound in the message that value's. Every value is refused in
+either order.
+
 ### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
 
 `Certificate::verify` answered `Err(InvalidSignature("Certificate not
