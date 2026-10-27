@@ -114,7 +114,7 @@ fn a_signed_certificate_given_a_field_value_over_one_mib_is_false_at_verify_275(
     // (`Certificate.ts:435-439`), the bound's refusal with them. This pins
     // `Ok(false)`, never an error: the signature does not cover the mutated
     // value, so the verdict is `false` on the base too; the bound's own
-    // witnesses are the refusals above.
+    // witnesses are this file's refusals.
     assert_eq!(cert.verify(), Ok(false));
 }
 
