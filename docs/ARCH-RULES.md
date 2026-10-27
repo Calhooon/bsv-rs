@@ -95,13 +95,14 @@ equality on either side, `Some(literal)` comparisons, and equality involving
 `to_string`/`to_owned`. It intentionally checks more than variables named
 `error`: renaming an error to `message` must not bypass the guard.
 
-The conservative scan needs **18 protocol comparisons in 5 files** allowed
+The conservative scan needs **19 protocol comparisons in 6 files** allowed
 as whole source lines, with duplicate-count ceilings:
 
 | File | Sites | Existing purpose |
 | --- | ---: | --- |
 | `src/wallet/substrates/origin.rs` | 5 | The constructors' base URL path, scheme and loopback hosts (#323) |
 | `src/auth/transports/http.rs` | 8 | Auth header names and message types |
+| `src/auth/transports/http/unauthenticated.rs` | 1 | The answer's `Content-Type` `charset=`, for the refusal's body preview (#354) |
 | `src/auth/transports/socketio/mod.rs` | 1 | Socket.IO event name |
 | `src/auth/transports/websocket_transport.rs` | 2 | WebSocket URL schemes |
 | `src/transaction/broadcasters/arc.rs` | 2 | Structured ARC status values |
@@ -134,6 +135,15 @@ of `origin.rs` took their place, the reference's `normalizeWalletHttpBaseUrl`
 (`localhost`, `127.0.0.1`, `[::1]`): the caller's own constructor arguments
 read once at construction, no answer read. They stay in `substrates/` beside
 the client and the redirect refusal they are built with.
+
+**#354 (2026-10-27).** One line of `http/unauthenticated.rs`: the
+reference's `#isTextualContent` asks whether the answer's `Content-Type`
+carries `charset=` (`SimplifiedFetchTransport.ts:559`) to write the unsigned
+answer's body preview as text or hex. A header value read for the refusal's
+words, not an error's text, and no class depends on it (the class is the
+status's, by `status_fault`). The eight content types beside it are matched
+from a constant, as the reference's `textualTokens` are, and are the same
+kind of read.
 
 ## 4. Environment belongs to the caller
 

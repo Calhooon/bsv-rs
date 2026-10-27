@@ -12,7 +12,7 @@ This module provides transport layer implementations for sending and receiving a
 | `mod.rs` | Module root with exports and usage examples | ~49 |
 | `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1250 |
 | `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | ~80 |
-| `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `refuse_unauthenticated`, the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview | ~165 |
+| `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `head` (the status, the status line's own reason phrase from hyper's `ext::ReasonPhrase`, the headers), `refuse_unauthenticated`, the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview, an unsigned 429, 502, 503 or 504 a transport fault by `status_fault` | ~205 |
 | `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
 
 ## Key Exports
@@ -75,7 +75,7 @@ Features:
 - Automatically strips trailing slashes from base URL
 - Uses `reqwest` client (requires `http` feature): `new` builds one with a 30 s request and 10 s connect timeout, `pool_max_idle_per_host(0)` and `redirect(Policy::none())`; `with_client` takes the caller's, used as given (its timeouts, proxy, resolution and redirect policy the caller's), the reference's `fetchClient` (`ts-stack@edf6e03` `SimplifiedFetchTransport.ts:64-67`; #320)
 - Refuses an answer with a redirect status (301, 302, 303, 307, 308) on both paths before its body, whatever the client, as the reference's `redirect: 'error'` (`:128`, `:212`) does; a client that follows redirects has followed them before the transport sees the answer
-- Refuses a general answer missing any of `x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-signature` (absent, or white space alone) after its body is read and before a message is built, in the reference's words (`SimplifiedFetchTransport.ts:220-232`, `:464-494`, the body preview `:512-579`; #354); the handshake's answer has no header check, as in the reference
+- Refuses a general answer missing any of `x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-signature` (absent, or white space alone) after its body is read and before a message is built, in the reference's words (`SimplifiedFetchTransport.ts:220-232`, `:464-494`, the body preview `:512-579`; #354), the reason phrase the status line's own (the canonical one when the line carries that one), an unsigned 429, 502, 503 or 504 a `TransportFault` of #87's class with those words its detail; the handshake's answer has no header check, as in the reference
 - Uses `std::sync::RwLock` for callback storage (synchronous access, no tokio::spawn needed)
 - Invokes registered callback with response messages
 - Implements `Debug` trait with redacted internal fields
@@ -402,7 +402,8 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `AuthError("Failed to parse auth response: {} - body: {}")` | Invalid JSON in handshake response |
 | `AuthError("General message must have payload")` | General message missing payload |
 | `TransportFault`, else `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body (a signed General answer of any status but a redirect is passed to the caller as its `HttpResponse`, unchanged) |
-| `AuthError("Received HTTP {status} {reason} from {url} without valid BSV authentication (missing headers: {names})")`, then ` - body preview: {preview}` for a body | A General answer missing any of the three auth headers, named in the reference's order; the named host's answer, `transport_fault()` `None`, whatever the status (#354) |
+| `TransportFault { fault, status: Some(s), detail: "Received HTTP {status} {reason} from {url} without valid BSV authentication (missing headers: {names})" }`, then ` - body preview: {preview}` for a body | A General answer missing any of the three auth headers with status 429, or 503 with `Retry-After` (`RateLimited` with its wait), or 502, 503, 504 (`MayHaveBeenReceived`): a gateway's or a limiter's answer, not the named host's (#354, #87) |
+| `AuthError("Received HTTP {status} {reason} from {url} without valid BSV authentication (missing headers: {names})")`, then ` - body preview: {preview}` for a body | The same answer with any other status, the named host's answer; the missing names in the reference's order, `{reason}` the status line's own phrase, the canonical one when the line carries that one, none when it is blank or carries a byte above `0x7e` (#354) |
 | `TransportFault { fault: MayHaveBeenReceived, status: None, detail: "SocketIoTransport::send: ws: {e}" }` | The Socket.IO sink failed (it cannot say how much of the frame it wrote; was `AuthError`, #87) |
 | `AuthError("Payload too short for ...")` | Malformed payload during deserialization |
 | `AuthError("Invalid ... UTF-8: {}")` | Non-UTF8 string in payload |
