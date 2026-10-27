@@ -713,14 +713,24 @@ class from `HttpWalletJson`'s createAction or signAction gets
 `WalletReviewActions` when the body carries results, or the reference's
 refusal of a malformed member (`WalletError` with its words).
 
-Pinned by `tests/wallet_http_json_review_actions_339.rs` (7 tests) on
-`tests/vectors/wallet_http_json_review_actions_339.json`: 39 code-5 bodies
-answered to signAction, createAction and listActions, each with the
+A 200 createAction or signAction answer's `tx` is read by the same byte
+reader (`normalize_success_tx`, then the result's type): the reference's
+`HTTPWalletJSON` runs `normalizeBRC100WalletByteFields` on the success
+body as on the error body, before `validateWalletResult`
+(`HTTPWalletJSON.ts:322-341`), so a `tx` in the historical object form or
+with a byte written `1.0`, which this crate refused as `failed to parse
+JSON response`, is its bytes (the re-review's finding).
+
+Pinned by `tests/wallet_http_json_review_actions_339.rs` (8 tests) on
+`tests/vectors/wallet_http_json_review_actions_339.json`: 41 bodies, 39
+code-5 bodies answered to signAction, createAction and listActions and two
+200 answers (a createAction's `tx` in the object form, a signAction's with
+every byte written as an integral float, `$BEEF_FLOAT`), each with the
 reference's `HTTPWalletJSON` outcome (its `WERR_REVIEW_ACTIONS` members, or
 the words it threw) at `ts-stack@edf6e03` under Node v22.18.0, recorded by
 `tests/support/wallet_http_json_review_actions_339.mjs` (the competing
-transaction and BEEF #327's), each served through wiremock here: 36 read
-to the reference's outcome, 3 otherwise and enumerated with their reasons
+transaction and BEEF #327's), each served through wiremock here: 38 read
+to the reference's outcome (the two answers as their `txid` and `tx`), 3 otherwise and enumerated with their reasons
 (below); the five members on signAction (a double spend with its BEEF, two
 send results) and on createAction (txid, BEEF, change outpoint); five
 refusals named; a `tx` and a `competingBeef` in the historical object form
@@ -746,7 +756,12 @@ The object form, the cold review's finding, was red on the reader before
 it (`Invalid createAction result tx: expected an array of bytes`,
 `Invalid wallet error reviewActionResults[0].competingBeef`), and so was
 the unit test of its acceptance; the unit test of its refusals is green on
-both.
+both. The two 200 answers were red on the substrate before
+`normalize_success_tx` (`failed to parse JSON response: error decoding
+response body`, both) and are green after
+(`a_success_tx_in_the_object_form_or_integral_floats_is_read_as_its_bytes`);
+the recorder before them reproduces the 39-case vector byte for byte, and
+the 41-case vector is identical on a rerun.
 
 ### Notes: cross-SDK parity (#339)
 
@@ -762,8 +777,12 @@ rule, its class by `name` (`WalletRefusal`, `ReviewActions` for a
 `WERR_REVIEW_ACTIONS` name), where the reference answers the one sentence
 `Invalid wallet error envelope` for each (`HTTPWalletJSON.ts:204-206`,
 `Number.isSafeInteger`; the cold review ran the three): conforming the
-words would refuse the toolbox's `asStatus` bodies too, whose `code` is
-the class's name, which #137 reads by design; and the checks `validateWalletResult` makes of a
+words would refuse the toolbox's `toJson` bodies too (`isError`, `name`,
+`message`, no `code`; the reference answers `Invalid wallet error
+envelope` to one at 400, the re-review ran it), which #137 reads by their
+`name` by design (the toolbox's `asStatus` bodies carry no `isError` and
+never reach the envelope's words: the reference answers them
+`HTTPWalletJSON <call> failed with HTTP status 400`); and the checks `validateWalletResult` makes of a
 returned `tx`'s transaction against the request
 (`validateCreateActionTransaction`, `validateSignActionTransaction`,
 `validateTransactionValueConservation`) are not ported, as the success
@@ -772,6 +791,15 @@ path makes none of them either: a `tx` is read as a BEEF and bound to
 `actionBeefTransaction`'s three readings (strict atomic, partial
 atomic, plain) are this crate's one `Beef::from_binary`, the subject the
 transaction of `txid`, else the atomic subject, else the last full one.
+A byte written past the double range (`1e400`) fails the whole body's
+parse here (`serde_json`, #285), so a code-5 body holding one is answered
+`HTTP 400 for <call>: <body>`, where the reference reads `Infinity` and
+refuses the member (`Invalid createAction result tx: expected an array of
+bytes`): both refuse, in other words. On the success path only
+createAction's and signAction's `tx` is normalized; the other byte fields
+the reference's `normalizeBRC100WalletByteFields` cleans (`signature`,
+`ciphertext`, `hmac` and the rest) are read here as plain arrays of
+integers, a stated difference this change leaves as it was.
 go-sdk@2ca481c's JSON substrate reads no error body as a typed error
 (`wallet/substrates/http_wallet_json.go:62-64`: `HTTP request failed with
 status <n>: <body>`).
