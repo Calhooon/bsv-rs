@@ -321,10 +321,10 @@ impl Spend {
                             )));
                         }
                         // the reference's `new BigNumber(value << bits)`
-                        // (`Spend.ts:1066`) past V8's longest string, its
-                        // words before the shift allocates; the budget's
-                        // decline first
-                        if let Some(words) = reference_read::result_refusal(bits) {
+                        // (`Spend.ts:1066`) past V8's largest `BigInt` or its
+                        // longest string, its words before the shift
+                        // allocates; the budget's decline first
+                        if let Some(words) = reference_read::shift_refusal(bits) {
                             self.ensure_stack_mem(
                                 usize::try_from(bits / 8 + 1).unwrap_or(usize::MAX),
                             )?;

@@ -25,7 +25,13 @@
 //! `OP_LSHIFTNUM` with `new BigNumber(value << bits)` (`Spend.ts:1066`):
 //! past 536,870,888 bits each throws `RangeError: Invalid string length`,
 //! uncaught, out of the reference's `verify`; here it is a verdict in those
-//! words at the push ([`result_refusal`]). `mul` sets its magnitude without
+//! words at the push ([`result_refusal`]). The shift's `BigInt` is built
+//! first, and V8 caps a `BigInt` at 2^30 bits of magnitude: past it the
+//! shift throws `RangeError: Maximum BigInt size exceeded` before any
+//! string is written, so a shifted magnitude past 2^30 bits is invalid in
+//! those words, one from 536,870,889 to 2^30 bits in the string's
+//! ([`shift_refusal`]). No other result can pass 2^30 bits in one step:
+//! two readable operands' product is at most 2^30 - 48 bits. `mul` sets its magnitude without
 //! a string (`BigNumber.ts:926-933`), so an `OP_MUL` or `OP_2MUL` result past
 //! the figure is pushed there and here (and invalid at its next read); no
 //! other result can pass its operands' magnitude.
@@ -33,6 +39,11 @@
 /// V8's longest string, `String::kMaxLength` on a 64-bit host (Node's
 /// `buffer.constants.MAX_STRING_LENGTH`, v22.18.0).
 const MAX_STRING_LENGTH: u64 = 536_870_888;
+
+/// V8's largest `BigInt`, `BigInt::kMaxLengthBits` on a 64-bit host: 2^30
+/// bits of magnitude (Node v22.18.0: `1n << (2n ** 30n - 1n)` builds,
+/// `1n << (2n ** 30n)` throws).
+const MAX_BIGINT_BITS: u64 = 1 << 30;
 
 /// The reference's words for an operand it cannot read, or `None`; after
 /// its minimal-encoding check, which the caller makes first.
@@ -46,6 +57,16 @@ pub(super) fn refusal(bytes: &[u8]) -> Option<&'static str> {
 /// left shift's constructor builds.
 pub(super) fn result_refusal(bits: u64) -> Option<&'static str> {
     (bits > MAX_STRING_LENGTH).then_some("Invalid string length")
+}
+
+/// The reference's words for a left shift whose result has `bits` bits of
+/// magnitude, or `None`: `value << bits` past V8's largest `BigInt`, else
+/// the constructor's string (`Spend.ts:1066`).
+pub(super) fn shift_refusal(bits: u64) -> Option<&'static str> {
+    if bits > MAX_BIGINT_BITS {
+        return Some("Maximum BigInt size exceeded");
+    }
+    result_refusal(bits)
 }
 
 /// The bits of a script number's magnitude, read from its bytes without
@@ -89,6 +110,23 @@ mod tests {
     fn a_result_past_v8s_longest_string_is_refused() {
         assert_eq!(result_refusal(536_870_888), None);
         assert_eq!(result_refusal(536_870_889), Some("Invalid string length"));
+    }
+
+    /// A shift's bits on both figures: the string's past 536,870,888, the
+    /// `BigInt`'s past 2^30.
+    #[test]
+    fn a_shift_past_v8s_largest_bigint_has_the_bigint_words() {
+        assert_eq!(shift_refusal(536_870_888), None);
+        assert_eq!(shift_refusal(536_870_889), Some("Invalid string length"));
+        assert_eq!(shift_refusal(1 << 30), Some("Invalid string length"));
+        assert_eq!(
+            shift_refusal((1 << 30) + 1),
+            Some("Maximum BigInt size exceeded")
+        );
+        assert_eq!(
+            shift_refusal(u64::MAX),
+            Some("Maximum BigInt size exceeded")
+        );
     }
 
     /// Padding counts no bit: a long non-minimal zero is read.
