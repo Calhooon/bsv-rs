@@ -84,6 +84,93 @@ runs the interpreter at the relay policy's 100,000,000 bytes and wraps its
 error with two `%w`, `ErrScriptVerificationFailed` and the interpreter's own,
 so `errors.Is(err, ctx.Err())` tells a stopped evaluation from an invalid
 script (`spv/verify.go:64-76`, `:547-560`); it carries no consensus figure.
+### Fixed: the identity client's wallet calls send what the reference sends (#318)
+
+`IdentityClient` passed `"identity-client"` as the originator on every
+wallet call of the reveal, the revocation and the certificate parser when
+none was configured, and `""` on `get_identity_key` and the contacts
+manager; the reference's `IdentityClient` passes its constructor's
+`originator` as given to every `wallet.*` call, `undefined` when the caller
+named none (`ts-stack@edf6e03` `packages/sdk/src/identity/IdentityClient.ts:369-377`,
+`:471-477`, `:502`, `:527`, `:718-729`, `:813`, `:862`, `:884`, `:910`,
+`:942`). Every call now carries the configured originator or none (`""`,
+this crate's absent originator: the binary wire writes length 0 and the
+HTTP substrates send no `Originator` header unless their own is set).
+`revoke_certificate_revelation`'s createAction carried the labels
+`identity` and `revocation` and `signAndProcess: false` beside the
+reference's arguments; the reference's (`:845-863`) sends the description,
+`inputBEEF`, one input (`inputDescription`, `outpoint`,
+`unlockingScriptLength: 74`) and `options: { randomizeOutputs: false,
+acceptDelayedBroadcast: false, noSend: true }`, nothing else. Its
+signAction left `returnTXIDOnly` absent and sent the reference createAction
+answered as the hex of its bytes; the reference's (`:896-911`) sends
+`returnTXIDOnly: false` and the reference as it was answered, its base64
+text, which is what the binary wire's transceiver decodes
+(`src/wallet/wire/transceiver.rs:733`) and the HTTP JSON substrate carries:
+the hex text named an action no wallet had made. Both calls now send the
+reference's arguments alone.
+
+Migration: a client built with `IdentityClientConfig::default()` now
+sends no originator. A wallet that requires one refuses the call where it
+accepted `"identity-client"`: `bsv-wallet-toolbox-rs`'s `Wallet`
+(`6317222`) refuses `""` on every call (`validate_originator`,
+`src/wallet/wallet.rs:2811-2816`; its reference's `validateOriginator`
+accepts `undefined`, `ts-stack@edf6e03` `validationHelpers.ts:1003-1004`),
+as it already refused `get_identity_key` and the contacts manager's calls;
+`bsv-wallet-cli` (`a55990c`) answers 400 `Origin header required` to a
+request with neither `Origin` nor `Originator` (`src/server/handlers.rs:101-123`)
+where it read `http://identity-client` and wrote that into its audit
+record (`src/server/audit.rs:54`). Name the caller's own domain with
+`IdentityClientConfig::with_originator` (or the substrate's originator).
+The revocation's actions carry no label: the toolbox persisted the two
+(`src/storage/sqlx/create_action.rs:777-780`), a `listActions` by the label
+`identity` or `revocation` finds them no more. `signAndProcess: false`
+was not load-bearing: the input carries no unlocking script, so the
+toolbox's wallet answers a signable transaction whatever the flag
+(`is_sign_action`, `src/wallet/wallet.rs:3322-3327`, the reference's
+`isSignAction` rule), and the client signs and sends the action itself as
+before. No downstream calls the identity client (`bsv-wallet-toolbox-rs`,
+`bsv-wallet-cli`, `rust-message-box`, `bsv-overlay-cloudflare`,
+`bsv-middleware-cloudflare-public`, `rust-chaintracks` grepped).
+
+Pinned by `tests/identity_wallet_calls_318.rs` (4 tests) on
+`tests/vectors/identity_wallet_calls_318.json`: the reference's client
+built with no originator and with `identity-client`, the wallet calls of
+its reveal (#310's certificate, `email`) and its revocation each with the
+originator received, and the revocation's createAction and signAction
+arguments, its lookup answered with a source transaction carrying the
+reveal's token and its createAction with a signable transaction spending
+it; recorded by `tests/support/identity_wallet_calls_318.mjs` at
+`ts-stack@edf6e03` under Node v22.18.0, the randomness #310's SHA-256
+counter stream (two runs byte for byte). Answered here with the
+reference's lookup BEEF and signable transaction, this crate's revocation
+sends createAction arguments equal to the reference's member by member and
+a signAction with the same reference, options and unlocking script; every
+call of the reveal, the revocation, `get_identity_key` and the contacts
+manager carries the configured originator or none. The counting wallet
+(`tests/support/identity_reveal_wallet.rs`) keeps every call's originator
+now, and answers a signable transaction when given one. 4 of the 4 red on
+the tree before the fix; the #307, #310 and #315 witnesses unchanged (10,
+6 and 3 green; #315's test now builds its client with the originator its
+recorder gave the reference, `identity-client`).
+
+### Notes: cross-SDK parity (#318)
+
+#315's two items are closed. go-sdk@2ca481c has no revocation; its
+`NewClient` keeps the originator the caller passes and passes it on every
+call (`identity/client.go:33-63`, `:113`, `:144`, `:175`, `:191`, `:244`,
+`:262`), `""` when none: the reference's rule. The revocation still differs
+from the reference outside its arguments: the reference authenticates each
+lookup output before spending it (two getPublicKey calls, the token's
+locking key, subject and serial number, `Certificate.verify` and a
+verifySignature over the token, `:711-830`), spends at the input that
+matches the outpoint, aborts the action when signing or broadcasting fails
+(`:942`) and retries a double spend (`withDoubleSpendRetry`); this crate
+spends the first output listed, at input 0, and does none of these (a finding
+outside #318). The contacts manager and the key-value stores send
+signAction the hex of the reference (`src/identity/contacts.rs:447`,
+`:732`, `src/kvstore/global.rs:281`, `:409`, `src/kvstore/local.rs:331`,
+`:438`), the same fault as the revocation's: a finding outside #318.
 
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 
@@ -133,14 +220,14 @@ go-sdk@2ca481c's `PubliclyRevealAttributes` sends the reference's
 arguments (`identity/client.go:163-174`: the description, one output of
 `Satoshis`, `LockingScript` and `OutputDescription`, `RandomizeOutputs`
 false); no difference. `revoke_certificate_revelation`'s createAction still
-carries the labels `identity` and `revocation` and `signAndProcess: false`
+carried the labels `identity` and `revocation` and `signAndProcess: false`
 beside the reference's arguments (`IdentityClient.ts:845-863`): a finding
-outside #315.
+outside #315, closed by #318.
 
 The originator: the recorder's reference was configured with
 `"identity-client"`, so the two calls carry the same originator in the
-vector; by default the reference sends none where this crate sends
-`"identity-client"`, the difference of #318.
+vector; by default the reference sends none where this crate sent
+`"identity-client"`, the difference of #318, closed there.
 
 ### Fixed: `Certificate` parses its signature's DER and re-encodes it on read, as the reference does (#305)
 
