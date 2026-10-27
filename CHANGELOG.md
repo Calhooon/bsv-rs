@@ -72,7 +72,7 @@ there, it meant nothing before this change and the `Peer` verifies
 whatever it says after it; nothing in this crate is named by it, and its
 removal is the toolbox's.
 
-Pinned by `tests/auth_peer_client_verifies_353.rs` (8 tests) on
+Pinned by `tests/auth_peer_client_verifies_353.rs` (8 tests; 10 with the drop below) on
 `tests/vectors/auth_peer_client_verifies_353.json`, recorded by
 `tests/support/auth_peer_client_verifies_353.mjs` at `ts-stack@edf6e03`
 under Node v22.18.0: a reference client `Peer` (scalar 41) pinned to its
@@ -93,6 +93,27 @@ vector's check pass on both). `auth_integration_tests.rs`'s TS-style
 response and `auth_peer_e2e_tests.rs`'s session-less general message now
 carry a nonce the receiving wallet made, the nonce being checked first.
 
+The callback `start` installs owns a Peer over the same state, its
+transport held weakly (`TransportHold::Callback`, upgraded for each send):
+a Peer holding the transport strongly from inside the transport's own
+callback is a cycle, and a Peer dropped after `start` (or an
+`Arc<Peer>` after `start_server`, a cycle already at `1cdd149`) never
+freed its transport, wallet, sessions or listeners, as the reference's
+`Peer`, which holds no reference to itself, is freed. Pinned by
+`a_dropped_peer_on_start_frees_its_transport_353` and
+`a_dropped_peer_on_start_server_frees_its_transport_353` (the transport's
+marker count back to 1 after the drop; both red on this branch before the
+weak hold, `left: 2`). A signing server's acceptance over HTTP is pinned
+by `tests/auth_peer_http_signing_server_353.rs` (3 tests, wiremock): a
+server whose initial response and general response this crate's writer
+and signer build (the payload `HttpResponse::to_payload` writes from the
+request ID, status, `x-bsv-*` header and body, the reference client's
+`SimplifiedFetchTransport.ts:289-323`, signed under
+`<nonce> <clientSessionNonce>`) answers a client on `start` over
+`SimplifiedFetchTransport`, the listener given the response; the same
+server signing with another key is refused (a `ProtoWallet`'s
+`Signature is not valid`), and not signing is refused.
+
 ### Notes: cross-SDK parity (#353)
 
 The verdicts are the reference's; three words are not. The reference's
@@ -110,6 +131,31 @@ every message nonce (`#claimIncomingMessageNonce`, `:258-272`; Go's
 `claimMessageNonce`), and the `yourNonce` and identity checks of a
 certificate request and response (`:1044-1068`, `:1177-1200`), which here
 still find their session by the sender's key and verify its signature.
+A third is not here either: the reference awaits a session's pending
+certificate validation before it hands a general message to its listeners
+when the session requires certificates (`#waitForCertificateValidation`,
+`Peer.ts:1318-1325`, a 30-second timeout resolved by the certificate
+response's processing, `:286-329`); here the listeners are called at
+once. It is not one guarded await: this crate has no pending-validation
+registry, and `certificates_validated` is never set (the certificate
+response's `get_session_mut` looks up by an identity key where the
+manager keys by nonce), so the wait would time out every message of a
+session that requires certificates; it goes with that finding.
+
+Two refusals are in other words. An HTTP response without the auth
+headers (`x-bsv-auth-version`, `x-bsv-auth-identity-key`,
+`x-bsv-auth-signature`) is refused by the reference's transport
+(`Received HTTP <status> from <url> without valid BSV authentication
+(missing headers: ...)`, `SimplifiedFetchTransport.ts:220-232`,
+`:464-485`); this crate's transport gives a response with no identity
+header the client's own key (`src/auth/transports/http.rs`,
+`response_identity`) and the Peer refuses it (`Unable to verify nonce for
+general message from: <the client's key>`, pinned by
+`an_unsigned_server_response_is_refused_353`). An initial response or a
+general message without `yourNonce` is read as the empty nonce and
+refused by the nonce check (`Initial response nonce verification failed`,
+`Unable to verify nonce for general message`), where the reference's
+message snapshot refuses the absent member first (`Peer.ts:767`).
 
 Go's `Peer` (`go-sdk@2ca481c` `auth/peer.go`) verifies an initial
 response's `yourNonce` against its own wallet (`ErrInvalidNonce`,
