@@ -177,17 +177,42 @@ fn txid_of(text: &str) -> Option<TxId> {
     from_hex(text).ok()?.try_into().ok()
 }
 
-/// `bytes(value, call, field)` (`WalletResultValidation.ts:868-906`) for a
-/// JSON value: an array of integers 0 to 255, at most 256 MiB.
+/// `normalizeBRC100ByteArray` (`BRC100ByteEncoding.ts:81-86`), which the
+/// reference's `normalizeBRC100WalletByteFields` runs on the body's `tx`
+/// and `competingBeef` before the error is read (`HTTPWalletJSON.ts:326-328`),
+/// then `bytes(value, call, field)` (`WalletResultValidation.ts:868-906`): an
+/// array of integers 0 to 255, or the historical object form, at most 256 MiB.
 fn byte_array(value: &Value) -> Option<Vec<u8>> {
-    let items = value.as_array()?;
-    if items.len() > MAX_BYTES {
-        return None;
-    }
-    items
-        .iter()
-        .map(|item| item.as_u64().and_then(|b| u8::try_from(b).ok()))
+    let bytes: Vec<u8> = match value {
+        Value::Array(items) if items.len() <= MAX_BYTES => {
+            items.iter().map(byte).collect::<Option<_>>()?
+        }
+        Value::Object(_) => historical_bytes(value)?,
+        _ => return None,
+    };
+    (bytes.len() <= MAX_BYTES).then_some(bytes)
+}
+
+/// `normalizeHistoricalByteObject` (`BRC100ByteEncoding.ts:52-71`): the
+/// object `JSON.stringify(new Uint8Array(..))` writes, at least one key, its
+/// keys exactly `"0"` to `"n-1"`, each a byte. `Object.keys` lists integer
+/// keys ascending whatever their order in the text, so each index is looked
+/// up; `n` keys holding every index below `n` are exactly those. An empty
+/// object is refused, as the reference refuses it at these two fields.
+fn historical_bytes(value: &Value) -> Option<Vec<u8>> {
+    let keys = value.as_object().filter(|keys| !keys.is_empty())?;
+    (0..keys.len())
+        .map(|i| keys.get(&i.to_string()).and_then(byte))
         .collect()
+}
+
+/// `isByte` (`BRC100ByteEncoding.ts:32-34`): `Number.isInteger` from 0 to
+/// 255, so `1.0` and `-0` are bytes as `JSON.parse` reads them.
+fn byte(value: &Value) -> Option<u8> {
+    let n = value.as_f64()?;
+    // the range checked first, so the cast is exact
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    ((0.0..=255.0).contains(&n) && n.fract() == 0.0).then_some(n as u8)
 }
 
 /// `optionalArray` (`WalletResultValidation.ts:971-976`).
@@ -504,4 +529,49 @@ fn competing_beef(index: usize, value: &Value, txids: Option<&[String]>) -> Resu
 /// `/^[0-9a-fA-F]{64}$/`.
 fn is_txid_hex(text: &str) -> bool {
     text.len() == 64 && text.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn the_historical_object_form_is_read_by_its_indexes_in_any_text_order() {
+        let read = |text: &str| byte_array(&serde_json::from_str(text).unwrap());
+        assert_eq!(read(r#"{"0":1,"1":2,"2":255}"#), Some(vec![1, 2, 255]));
+        assert_eq!(read(r#"{"2":255,"0":1,"1":2}"#), Some(vec![1, 2, 255]));
+        // a repeated key is its last value, as JSON.parse keeps it
+        assert_eq!(read(r#"{"0":9,"0":1}"#), Some(vec![1]));
+        assert_eq!(read("[1,2,255]"), Some(vec![1, 2, 255]));
+        assert_eq!(read("[]"), Some(vec![]));
+        // `Number.isInteger`: an integral float and negative zero are bytes
+        assert_eq!(read("[1.0,-0.0,2e0]"), Some(vec![1, 0, 2]));
+        assert_eq!(read(r#"{"0":255.0}"#), Some(vec![255]));
+    }
+
+    #[test]
+    fn an_object_not_the_historical_form_is_refused() {
+        for text in [
+            "{}",
+            r#"{"1":1}"#,
+            r#"{"0":1,"2":2}"#,
+            r#"{"00":1}"#,
+            r#"{"0":1,"01":2}"#,
+            r#"{"0":1,"length":1}"#,
+            r#"{"0":256}"#,
+            r#"{"0":-1}"#,
+            r#"{"0":"1"}"#,
+            r#"{"0":null}"#,
+            r#"{"0":1.5}"#,
+        ] {
+            assert_eq!(
+                byte_array(&serde_json::from_str(text).unwrap()),
+                None,
+                "{text}"
+            );
+        }
+        assert_eq!(byte_array(&json!("0102")), None);
+        assert_eq!(byte_array(&json!([1, 256])), None);
+    }
 }

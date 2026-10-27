@@ -14,7 +14,11 @@
 // members (`review`; bytes as hex) or the words of what it threw
 // (`error`). The competing transaction and its BEEF are #327's
 // (`identity_revocation_checks_327.json`); a body holds the BEEF as
-// `$BEEF`, an outcome as hex.
+// `$BEEF`, an outcome as hex. Two bodies hold it in the historical object
+// form `JSON.stringify(new Uint8Array(..))` wrote (`{"0": .., "1": ..}`),
+// which the reference's `normalizeBRC100WalletByteFields` reads back as
+// bytes before the error is read (`BRC100ByteEncoding.ts:52-71`, `:164-190`;
+// `HTTPWalletJSON.ts:326-328`), as `$BEEF_OBJECT`.
 
 import { readFileSync, writeFileSync } from 'node:fs'
 
@@ -62,6 +66,7 @@ const createCompeting = {
   options: { noSend: true }
 }
 const result = (members) => ({ txid: A, status: 'doubleSpend', ...members })
+const BEEF_OBJECT = Object.fromEntries(BEEF.map((b, i) => [String(i), b]))
 
 const cases = [
   ['sign_double_spend', 'signAction', sign({ sendWith: [B] }), 400, signBody({
@@ -77,6 +82,10 @@ const cases = [
   })],
   ['create_five_members', 'createAction', createCompeting, 400, envelope({
     txid: C, tx: BEEF, noSendChange: [`${C}.0`], sendWithResults: [],
+    reviewActionResults: [{ txid: C, status: 'invalidTx' }]
+  })],
+  ['create_tx_object_form', 'createAction', createCompeting, 400, envelope({
+    txid: C, tx: BEEF_OBJECT, noSendChange: [`${C}.0`], sendWithResults: [],
     reviewActionResults: [{ txid: C, status: 'invalidTx' }]
   })],
   ['create_tx_outputs_not_requested', 'createAction', create({ noSend: true }), 400, envelope({
@@ -110,6 +119,13 @@ const cases = [
   })],
   ['competing_beef_without_txs', 'signAction', sign(), 400, signBody({
     reviewActionResults: [result({ competingBeef: BEEF })]
+  })],
+  ['competing_beef_object_form', 'signAction', sign({ sendWith: [B] }), 400, signBody({
+    sendWithResults: [{ txid: B, status: 'failed' }, { txid: A, status: 'sending' }],
+    reviewActionResults: [
+      result({ competingTxs: [C], competingBeef: BEEF_OBJECT }),
+      { txid: B, status: 'serviceError' }
+    ]
   })],
   ['competing_beef_without_the_txid', 'signAction', sign(), 400, signBody({
     reviewActionResults: [result({ competingTxs: [B], competingBeef: BEEF })]
@@ -205,9 +221,10 @@ for (const [name, call, args, status, body] of cases) {
       outcome = { error: e.message }
     }
   }
-  // the competing BEEF written once, as `$BEEF` in a body (the reader
-  // substitutes the bytes of #327's vector)
-  const recorded = JSON.parse(JSON.stringify(body, (_, v) => (v === BEEF ? '$BEEF' : v)))
+  // the competing BEEF written once, as `$BEEF` (or `$BEEF_OBJECT`) in a
+  // body (the reader substitutes the bytes of #327's vector)
+  const recorded = JSON.parse(JSON.stringify(body, (_, v) =>
+    v === BEEF ? '$BEEF' : v === BEEF_OBJECT ? '$BEEF_OBJECT' : v))
   out.push({ name, call, args, status, body: recorded, reference: outcome })
 }
 writeFileSync(outPath, JSON.stringify({ source: 'ts-stack@edf6e03', cases: out }, null, 2) + '\n')

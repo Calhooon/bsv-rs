@@ -4,7 +4,7 @@
 //! body with its `reviewActionResults` is `Error::WalletReviewActions`
 //! carrying the reference's five members, each member validated and a
 //! malformed one refused in the reference's words, against
-//! `wallet_http_json_review_actions_339.json` (37 bodies, Node v22.18.0,
+//! `wallet_http_json_review_actions_339.json` (39 bodies, Node v22.18.0,
 //! `tests/support/wallet_http_json_review_actions_339.mjs`), each served
 //! through wiremock to the call the reference was asked. A body without
 //! results is the `WalletRefusal` of before; the identity revocation's
@@ -71,10 +71,17 @@ fn competing_beef() -> Vec<u8> {
     from_hex(revocation()["competing"]["beef"].as_str().unwrap()).unwrap()
 }
 
-/// The body with the competing BEEF where it holds `$BEEF`.
+/// The body with the competing BEEF where it holds `$BEEF`, and in the
+/// historical object form (`{"0": .., "1": ..}`) where it holds
+/// `$BEEF_OBJECT`.
 fn with_beef(body: &Value, beef: &[u8]) -> Value {
     match body {
         Value::String(s) if s == "$BEEF" => json!(beef),
+        Value::String(s) if s == "$BEEF_OBJECT" => Value::Object(
+            (beef.iter().enumerate())
+                .map(|(i, b)| (i.to_string(), json!(b)))
+                .collect(),
+        ),
         Value::Array(items) => Value::Array(items.iter().map(|v| with_beef(v, beef)).collect()),
         Value::Object(map) => Value::Object(
             map.iter()
@@ -174,7 +181,7 @@ fn review_json(r: &ReviewActionsRefusal) -> Value {
 #[tokio::test]
 async fn each_code_5_body_is_read_as_the_reference_reads_it() {
     let v = vector();
-    assert_eq!(v.cases.len(), 37);
+    assert_eq!(v.cases.len(), 39);
     let mut divergent = 0;
     for c in &v.cases {
         let ours = answer(c).await;
@@ -236,6 +243,31 @@ async fn a_review_body_answered_to_sign_action_carries_its_five_members() {
     assert_eq!(ours, c.reference);
 }
 
+/// The review's finding: a `tx` and a `competingBeef` in the historical
+/// object form are read as their bytes, as the reference's
+/// `normalizeBRC100WalletByteFields` reads them before the error is read
+/// (`BRC100ByteEncoding.ts:52-71`, `HTTPWalletJSON.ts:326-328`).
+#[tokio::test]
+async fn a_byte_field_in_the_historical_object_form_is_read_as_its_bytes() {
+    let beef = json!(to_hex(&competing_beef()));
+    let mut wrong = Vec::new();
+    for (name, read) in [
+        ("create_tx_object_form", "/review/tx"),
+        (
+            "competing_beef_object_form",
+            "/review/reviewActionResults/0/competingBeef",
+        ),
+    ] {
+        let c = case(name);
+        assert_eq!(c.reference.pointer(read), Some(&beef), "{name}");
+        let ours = answer(&c).await;
+        if ours != c.reference {
+            wrong.push(format!("{name}: {ours}"));
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 #[tokio::test]
 async fn a_malformed_member_is_refused_in_the_references_words() {
     for (name, words) in [
@@ -272,6 +304,41 @@ async fn a_code_5_body_without_results_is_the_class_refusal_of_before() {
             message: "Undelayed createAction or signAction results require review.".to_string(),
         }
     );
+}
+
+/// The stated divergence of the parity note: a 400 body whose `code` is
+/// absent, `"5"` or `5.5` is read by #137's rule (its class by `name`),
+/// where the reference answers `Invalid wallet error envelope`
+/// (`HTTPWalletJSON.ts:204-206`).
+#[tokio::test]
+async fn a_review_body_whose_code_is_not_a_safe_integer_is_the_class_refusal() {
+    let c = case("sign_double_spend");
+    for code in [None, Some(json!("5")), Some(json!(5.5))] {
+        let mut body = with_beef(&c.body, &competing_beef());
+        match &code {
+            None => drop(body.as_object_mut().unwrap().remove("code")),
+            Some(code) => body["code"] = code.clone(),
+        }
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/signAction"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(&body))
+            .mount(&server)
+            .await;
+        let wallet = HttpWalletJson::new(Some("example.com".into()), Some(server.uri())).unwrap();
+        let error = wallet
+            .sign_action(serde_json::from_value(c.args.clone()).unwrap(), None)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error,
+            Error::WalletRefusal {
+                class: WalletRefusalClass::ReviewActions,
+                message: "Undelayed createAction or signAction results require review.".to_string(),
+            },
+            "{code:?}"
+        );
+    }
 }
 
 // The revocation over the substrate: #327's run `double_spend_then_accepted`
