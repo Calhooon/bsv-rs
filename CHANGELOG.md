@@ -81,6 +81,62 @@ reference holds hex text and answers `false` at `verify`; this crate holds
 bytes and refuses the text where it reads it (`Certificate`'s JSON), as Go,
 whose `Signature` is a `util.ByteString`, refuses it at its JSON
 (`util/bytestring.go:26-42`).
+### Fixed: `Certificate::to_binary` and `from_binary` carry the reference's 16 MiB frame and 72-byte signature bounds (#301)
+
+`Certificate::to_binary` wrote and `from_binary` read a frame of any length
+and a signature of any length after the fields, where the reference refuses
+both (`ts-stack@edf6e03` `Certificate.ts:25`, `:28`), each in its words,
+every refusal `CertificateValidationError`:
+
+- `to_binary` refuses a signature over 72 bytes before it writes it,
+  `Invalid certificate signature encoding` (`:300-307`, the reference's
+  check of the hex at most 144 characters), and the frame it wrote over 16
+  MiB once it has the length, `Certificate binary exceeds the maximum of
+  16777216 bytes` (`:315-319`), with the signature or without. The reference's
+  `sign` and `verify` write `toBinary(false)` (`:458`, `:427`), so here
+  `signing_hash` and `sign` refuse an unsigned prefix over the bound in the
+  same words (nothing signed) and `verify` answers `Ok(false)` to it, as the
+  reference's answers `false` (`:435-439`).
+- `from_binary` refuses a frame over 16 MiB before it reads a byte,
+  `Certificate binary must be a byte array of at most 16777216 bytes`
+  (`snapshotCertificateBinary`, `:87-91`), and more than 72 bytes after the
+  fields before it reads them, `Certificate signature exceeds the DER size
+  limit` (`:390-394`).
+
+The wallet wire's writer and reader keep their own checks (#189, #246, its
+class `WalletError`); the texts are now one function's at both:
+`wallet::wire::certificate_binary_written_refusal`,
+`certificate_binary_read_refusal` and
+`CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL`. `Invalid certificate signature
+encoding` is `to_binary`'s alone: the wire's writer refuses a long signature
+in the reader's words, as it has since #189.
+
+Pinned by `tests/auth_certificate_frame_bounds_301.rs` (7 tests over 13
+cases of `tests/vectors/auth_certificate_frame_bounds_301.json`, the
+reference's verdicts recorded by `tests/support/certificate_frame_bounds_301.mjs`
+at `ts-stack@edf6e03` under Node v22.18.0): a frame of exactly 16,777,216
+bytes written (the reference's SHA-256) and read back byte for byte, one byte
+more refused on both; a 72-byte DER signature written and read, 73 refused
+on both; an unsigned prefix of 16,777,217 bytes refused by `to_binary(false)`,
+`signing_hash` and `sign`, and `false` at `verify` with the certifier's
+BRC-52 child's signature over it (the reference's RFC 6979 bytes, made over
+the preimage built by hand); 6 red on the tree before the fix (`cdd52b8`),
+the seventh the vector's census. The 1 MiB text is built once and every
+value sliced from it; the file runs in about 1.2 s. The #249, #251, #261,
+#262, #268, #275 and #297 vectors are unchanged.
+
+### Notes: cross-SDK parity (#301)
+
+go-sdk@2ca481c bounds neither: `Certificate.ToBinary` and
+`CertificateFromBinary` (`auth/certificates/certificate.go:114-131`,
+`:134-146`) hand the bytes to the serializer, which writes the parsed
+signature's `Serialize()` and reads the bytes remaining through
+`ec.ParseSignature` with no length bound and no frame bound
+(`wallet/serializer/certificate.go:64-66`, `:118-123`). Not carried: the
+reference's `Signature.fromDER` at both sites (`Certificate.ts:310`, `:396`)
+and its re-encoding on read (`sig.toString('hex')`, `:397`); `Certificate`
+keeps the signature's bytes as given, the wire's reader and writer alone
+parse the DER (#183, #189).
 
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
@@ -219,7 +275,8 @@ quoted as the wallet prints it, on both sides. Not carried, outside #297's five 
 carried on the wire since #246: `Certificate::to_binary`'s 16 MiB frame
 bound (`Certificate.ts:314-319`) and `from_binary`'s (`:86-92`, the input),
 and the 72-byte signature bound and DER re-encoding at both
-(`:300-312`, `:389-398`).
+(`:300-312`, `:389-398`); the two bounds are carried since #301, the DER
+parse and re-encoding remain the wire's alone.
 
 ### Fixed: a certificate field value is bounded at 1 MiB on write and read, and decrypted only from canonical base64 (#275)
 

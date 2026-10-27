@@ -7,7 +7,10 @@
 //! decrypt failure in its own words (`ErrFieldDecryption`, `master.go:22`).
 
 use crate::wallet::wire::{
-    certificate_field_value_refusal, MAX_CERTIFICATE_FIELDS, MAX_CERTIFICATE_FIELD_VALUE_BYTES,
+    certificate_binary_read_refusal, certificate_binary_written_refusal,
+    certificate_field_value_refusal, CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL,
+    MAX_CERTIFICATE_BINARY_BYTES, MAX_CERTIFICATE_FIELDS, MAX_CERTIFICATE_FIELD_VALUE_BYTES,
+    MAX_CERTIFICATE_SIGNATURE_BYTES,
 };
 use crate::{Error, Result};
 use std::collections::HashMap;
@@ -302,6 +305,44 @@ pub(crate) fn require_field_name_length(length: usize) -> Result<()> {
 pub(crate) fn require_safe_field_name(name: &str) -> Result<()> {
     if is_unsafe_record_key(name) {
         return Err(refused(format!("Unsafe certificate field name: {name}")));
+    }
+    Ok(())
+}
+
+/// `Certificate.toBinary`'s frame, its length taken once it is written
+/// (`Certificate.ts:315-319`): at most 16 MiB (bsv-rs#301).
+pub(crate) fn require_written_frame(length: usize) -> Result<()> {
+    if length > MAX_CERTIFICATE_BINARY_BYTES {
+        return Err(refused(certificate_binary_written_refusal()));
+    }
+    Ok(())
+}
+
+/// `Certificate.fromBinary`'s frame, before a byte is read
+/// (`snapshotCertificateBinary`, `Certificate.ts:87-91`): at most 16 MiB
+/// (bsv-rs#301).
+pub(crate) fn require_read_frame(length: usize) -> Result<()> {
+    if length > MAX_CERTIFICATE_BINARY_BYTES {
+        return Err(refused(certificate_binary_read_refusal()));
+    }
+    Ok(())
+}
+
+/// `Certificate.toBinary`'s signature, at most 72 bytes, checked as the
+/// reference checks its hex, at most 144 characters, before it is written
+/// (`Certificate.ts:300-307`; bsv-rs#301).
+pub(crate) fn require_written_signature(signature: &[u8]) -> Result<()> {
+    if signature.len() > MAX_CERTIFICATE_SIGNATURE_BYTES {
+        return Err(refused("Invalid certificate signature encoding"));
+    }
+    Ok(())
+}
+
+/// `Certificate.fromBinary`'s signature, the bytes after the fields, at
+/// most 72 before they are read (`Certificate.ts:390-394`; bsv-rs#301).
+pub(crate) fn require_read_signature(remaining: usize) -> Result<()> {
+    if remaining > MAX_CERTIFICATE_SIGNATURE_BYTES {
+        return Err(refused(CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL));
     }
     Ok(())
 }

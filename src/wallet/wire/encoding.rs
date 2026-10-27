@@ -1406,10 +1406,7 @@ fn certificate_bytes(cert: &WalletCertificate) -> Result<Vec<u8>, Error> {
     // The frame: at most 16 MiB (`Certificate.ts:315-319`), in the
     // reference writer's words (the reader's are `snapshotCertificateBinary`'s)
     if w.as_bytes().len() > super::MAX_CERTIFICATE_BINARY_BYTES {
-        return Err(super::refused(format!(
-            "Certificate binary exceeds the maximum of {} bytes",
-            super::MAX_CERTIFICATE_BINARY_BYTES
-        )));
+        return Err(super::refused(super::certificate_binary_written_refusal()));
     }
 
     Ok(w.into_bytes())

@@ -10,8 +10,8 @@ This module implements identity certificates for the BSV authentication system, 
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, re-exports, protocol constants | ~45 |
-| `bounds.rs` | The reference's certificate bounds and decrypt wrappers in its words (#297): `canonical_base64`, `field_ciphertext` (1 byte to 1 MiB, #275), `keyring_ciphertext` (1 to 2048), `dense_bytes`, `snapshot_record` (100 entries, safe names), `snapshot_fields_to_reveal`, `require_master_certificate` (the constructor's), `require_keyring_for_verifier_inputs`, `checked_field_names` (`to_binary`'s), `require_field_count` and `require_field_name_length` (`from_binary`'s), the wrappers' words | 302 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 705 |
+| `bounds.rs` | The reference's certificate bounds and decrypt wrappers in its words (#297): `canonical_base64`, `field_ciphertext` (1 byte to 1 MiB, #275), `keyring_ciphertext` (1 to 2048), `dense_bytes`, `snapshot_record` (100 entries, safe names), `snapshot_fields_to_reveal`, `require_master_certificate` (the constructor's), `require_keyring_for_verifier_inputs`, `checked_field_names` (`to_binary`'s), `require_field_count` and `require_field_name_length` (`from_binary`'s), the wrappers' words; the 16 MiB frame and 72-byte signature at `to_binary` and `from_binary` (`require_written_frame`, `require_read_frame`, `require_written_signature`, `require_read_signature`, #301), the texts the wire's | 348 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 730 |
 | `certificate_tests.rs` | `certificate.rs`'s unit tests (`#![cfg(test)]`, included by `#[path]`; the file-size ratchet) | 146 |
 | `certificate_json.rs` | `Certificate`'s JSON (#268): the serde impls (a remote derive over its fields), `base64_32_bytes`, `revocation_outpoint_from_str`, `revocation_outpoint_json` (the sentinel), `signature_hex` | 195 |
 | `master.rs` | `MasterCertificate` with field encryption and keyring management | 549 |

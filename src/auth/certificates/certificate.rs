@@ -207,25 +207,42 @@ impl Certificate {
     /// bsv-rs#297); `Certificate::new` and `set_field` check nothing, as the
     /// reference's constructor checks nothing (`:197-213`).
     ///
+    /// A signature over 72 bytes is refused before it is written (`Invalid
+    /// certificate signature encoding`, `Certificate.ts:300-307`), and the
+    /// frame written, its length taken once it is whole, over 16 MiB
+    /// (`Certificate binary exceeds the maximum of 16777216 bytes`, `:315-319`),
+    /// with or without the signature; `signing_hash`, `sign` and `verify` over
+    /// it as over a value past its bound (bsv-rs#301).
+    ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
     pub fn to_binary(&self, include_signature: bool) -> Result<Vec<u8>> {
-        let mut buf = self.unsigned_bytes()?;
+        let mut buf = self.unsigned_prefix()?;
 
         // Signature: raw bytes, no length prefix (matches TypeScript SDK)
         if include_signature {
             if let Some(ref sig) = self.signature {
+                bounds::require_written_signature(sig)?;
                 buf.extend_from_slice(sig);
             }
             // If no signature, write nothing (not even a marker byte)
         }
 
+        bounds::require_written_frame(buf.len())?;
         Ok(buf)
+    }
+
+    /// The unsigned prefix, its frame bounded as `toBinary(false)` bounds it
+    /// (bsv-rs#301).
+    fn unsigned_bytes(&self) -> Result<Vec<u8>> {
+        let bytes = self.unsigned_prefix()?;
+        bounds::require_written_frame(bytes.len())?;
+        Ok(bytes)
     }
 
     /// The unsigned prefix: the retained bytes when they bind to the
     /// current values, the serializer's otherwise.
-    fn unsigned_bytes(&self) -> Result<Vec<u8>> {
+    fn unsigned_prefix(&self) -> Result<Vec<u8>> {
         match self.received_unsigned {
             Some(ref bytes) if self.binds(bytes) => Ok(bytes.clone()),
             _ => self.serialize_unsigned(),
@@ -330,12 +347,19 @@ impl Certificate {
     /// A field count over 100,000 or over a third of the bytes after it, a
     /// declared name length outside 1 to 50 before the name is read, and an
     /// unsafe name are refused in the reader's words (`:357-373`; bsv-rs#297).
+    /// A frame over 16 MiB is refused before a byte is read (`Certificate
+    /// binary must be a byte array of at most 16777216 bytes`,
+    /// `snapshotCertificateBinary`, `:87-91`), and more than 72 bytes after
+    /// the fields before they are read (`Certificate signature exceeds the DER
+    /// size limit`, `:390-394`; bsv-rs#301).
     pub fn from_binary(data: &[u8]) -> Result<Self> {
+        bounds::require_read_frame(data.len())?;
         let mut reader = BinaryReader::new(data);
         let unsigned = read_unsigned(&mut reader)?;
         let received_unsigned = data.get(..reader.pos).unwrap_or_default().to_vec();
 
         // Signature: remaining bytes (no length prefix) - matches TypeScript SDK
+        bounds::require_read_signature(reader.remaining())?;
         let signature = if reader.remaining() > 0 {
             Some(reader.read_remaining())
         } else {
@@ -401,6 +425,7 @@ impl Certificate {
             &Counterparty::Anyone,
         )?;
         let preimage = self.serialize_unsigned()?;
+        bounds::require_written_frame(preimage.len())?;
         let sig = child.sign(&sha256(&preimage))?;
         self.signature = Some(sig.to_der());
         self.received_unsigned = Some(preimage);
