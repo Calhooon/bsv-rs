@@ -10,7 +10,8 @@
 //! answering `aborted: true` (#327); with a listing set listOutputs answers
 //! it, and with a source set createAction answers a signable transaction
 //! spending its output 0, so the contacts manager and the key-value stores
-//! reach signAction (#326).
+//! reach signAction (#326); signAction answered by another wallet when one
+//! is set, the JSON substrate under wiremock (#339).
 #![allow(dead_code)]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
@@ -77,6 +78,8 @@ pub struct Counting {
     pub creates: Arc<Mutex<Vec<CreateActionArgs>>>,
     pub signs: Arc<Mutex<Vec<SignActionArgs>>>,
     pub aborts: Arc<Mutex<Vec<AbortActionArgs>>>,
+    /// The wallet that answers signAction in place of the queue (#339).
+    pub sign_via: Option<Arc<dyn WalletInterface>>,
 }
 
 // The key-value stores ask their wallet for `Debug` (#326).
@@ -117,6 +120,7 @@ impl Counting {
             creates: Arc::default(),
             signs: Arc::default(),
             aborts: Arc::default(),
+            sign_via: None,
         }
     }
 
@@ -191,7 +195,10 @@ macro_rules! counting {
             ) -> bsv_rs::Result<SignActionResult> {
                 self.note("sign_action", o);
                 self.signs.lock().unwrap().push(args.clone());
-                *self.signed.lock().unwrap() = Some(args);
+                *self.signed.lock().unwrap() = Some(args.clone());
+                if let Some(via) = &self.sign_via {
+                    return via.sign_action(args, o).await;
+                }
                 self.sign_answers.lock().unwrap().pop_front().unwrap_or(Ok(SignActionResult {
                     txid: None,
                     tx: None,
