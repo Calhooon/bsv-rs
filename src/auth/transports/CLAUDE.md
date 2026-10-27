@@ -10,8 +10,9 @@ This module provides transport layer implementations for sending and receiving a
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~49 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1245 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1250 |
 | `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | ~80 |
+| `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `refuse_unauthenticated`, the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview | ~165 |
 | `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
 
 ## Key Exports
@@ -74,6 +75,7 @@ Features:
 - Automatically strips trailing slashes from base URL
 - Uses `reqwest` client (requires `http` feature): `new` builds one with a 30 s request and 10 s connect timeout, `pool_max_idle_per_host(0)` and `redirect(Policy::none())`; `with_client` takes the caller's, used as given (its timeouts, proxy, resolution and redirect policy the caller's), the reference's `fetchClient` (`ts-stack@edf6e03` `SimplifiedFetchTransport.ts:64-67`; #320)
 - Refuses an answer with a redirect status (301, 302, 303, 307, 308) on both paths before its body, whatever the client, as the reference's `redirect: 'error'` (`:128`, `:212`) does; a client that follows redirects has followed them before the transport sees the answer
+- Refuses a general answer missing any of `x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-signature` (absent, or white space alone) after its body is read and before a message is built, in the reference's words (`SimplifiedFetchTransport.ts:220-232`, `:464-494`, the body preview `:512-579`; #354); the handshake's answer has no header check, as in the reference
 - Uses `std::sync::RwLock` for callback storage (synchronous access, no tokio::spawn needed)
 - Invokes registered callback with response messages
 - Implements `Debug` trait with redacted internal fields
@@ -349,11 +351,11 @@ Varint sizes (Bitcoin-style):
 3. Add auth headers (version, identity_key, nonce, your_nonce, signature, request_id)
 4. Include original headers (`x-bsv-*`, `authorization`, `content-type`) excluding `x-bsv-auth-*`
 5. Send request with body from payload
-6. Parse response: extract request ID from headers (falls back to original if absent)
+6. Read the body, then refuse the answer unless it carries `x-bsv-auth-version`, `x-bsv-auth-identity-key` and `x-bsv-auth-signature` (#354); parse response: extract request ID from headers (falls back to original if absent)
 7. Filter response headers: include `x-bsv-*` (excluding `x-bsv-auth-*`) and `authorization`, sorted alphabetically
 8. Build `HttpResponse` payload with status, filtered headers, body
-9. Create response `AuthMessage`: identity key from response header if present, otherwise uses request's identity key (auth headers on response are optional)
-10. Extract optional nonce, your_nonce, signature from response headers; check for certificate request in response message type header
+9. Create the response `AuthMessage` with the answer's identity key as its sender (until 0.9.0-beta.1 the request's own key when the header was absent)
+10. Extract the nonce, your_nonce and signature from response headers; check for certificate request in response message type header
 11. Invoke callback with response message
 
 ## Feature Flags
@@ -399,7 +401,8 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `TransportFault`, else `AuthError("Failed to read auth response: {}")` | Failed to read handshake response body |
 | `AuthError("Failed to parse auth response: {} - body: {}")` | Invalid JSON in handshake response |
 | `AuthError("General message must have payload")` | General message missing payload |
-| `TransportFault`, else `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body (a General answer of any status but a redirect is passed to the caller as its `HttpResponse`, unchanged) |
+| `TransportFault`, else `AuthError("Failed to read response: {}")` | Failed to read General message HTTP response body (a signed General answer of any status but a redirect is passed to the caller as its `HttpResponse`, unchanged) |
+| `AuthError("Received HTTP {status} {reason} from {url} without valid BSV authentication (missing headers: {names})")`, then ` - body preview: {preview}` for a body | A General answer missing any of the three auth headers, named in the reference's order; the named host's answer, `transport_fault()` `None`, whatever the status (#354) |
 | `TransportFault { fault: MayHaveBeenReceived, status: None, detail: "SocketIoTransport::send: ws: {e}" }` | The Socket.IO sink failed (it cannot say how much of the frame it wrote; was `AuthError`, #87) |
 | `AuthError("Payload too short for ...")` | Malformed payload during deserialization |
 | `AuthError("Invalid ... UTF-8: {}")` | Non-UTF8 string in payload |
