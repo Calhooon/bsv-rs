@@ -169,7 +169,7 @@ binds no signature: the signature read is the re-encoding, the prefix the
 bytes. The fuzz target `fuzz_auth_messages` asserts the prefix byte for
 byte and the whole frame where the signature read back is the one written.
 
-Pinned by `tests/auth_certificate_signature_der_305.rs` (7 tests over 12
+Pinned by `tests/auth_certificate_signature_der_305.rs` (8 tests over 13
 signatures of `tests/vectors/auth_certificate_signature_der_305.json`, the
 reference's verdicts at `fromBinary` (the signature held, its `verify`, its
 `toBinary(true)`), `toBinary(true)` and `verify` recorded by
@@ -190,6 +190,16 @@ byte for byte, and the prefix kept is untouched; the #251, #261, #262, #268,
 #275, #297, #299 and #301 vectors are unchanged (#301's 72-byte signature is
 canonical DER, its 73-byte one refused by the length first; #299's non-DER
 signatures were `false` and stay `false`).
+
+A DER cut right after its second `02` tag (`s_length_missing`, `30 24 02 21
+<r> 02`, the sequence length its own) is refused in the reference's words,
+`Invalid R-length in signature DER`, at `from_binary` and `to_binary` and on
+the wallet wire, where `reference_der` said `Signature DER invalid`: the
+reference's `getLength` reads `undefined` past the end and the length check
+after it throws (`Signature.ts:76-78`); the verdict was the same. Found by
+the cold review's 11,039-input differential, the case added to the recorder
+and the vector re-recorded (the twelve earlier cases byte for byte); 3 of the
+8 tests red on the words before the change.
 
 ### Notes: cross-SDK parity (#305)
 

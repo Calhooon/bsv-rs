@@ -200,6 +200,23 @@
       }
     },
     {
+      "id": "s_length_missing",
+      "signature": "3024022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a3502",
+      "length": 38,
+      "from_binary": {
+        "error": "Invalid R-length in signature DER"
+      },
+      "to_binary": {
+        "error": "Invalid R-length in signature DER"
+      },
+      "verify": {
+        "ok": false
+      },
+      "from_der": {
+        "error": "Invalid R-length in signature DER"
+      }
+    },
+    {
       "id": "set_tag",
       "signature": "3145022100a7197ffe33060ea5f83b75480c4f875f0a004c15fe114a4a320cd2755b934a35022036978a0ad3309f2234cfe4c4baf5c332b5b222ad2566a035ddcfdc6abf3a1b72",
       "length": 71,
