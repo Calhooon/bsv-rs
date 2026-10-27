@@ -9,12 +9,13 @@ This module implements identity certificates for the BSV authentication system, 
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, re-exports, protocol constants | ~43 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 689 |
+| `mod.rs` | Module root, re-exports, protocol constants | ~45 |
+| `bounds.rs` | The reference's certificate bounds and decrypt wrappers in its words (#297): `canonical_base64`, `field_ciphertext` (1 byte to 1 MiB, #275), `keyring_ciphertext` (1 to 2048), `dense_bytes`, `snapshot_record` (100 entries, safe names), `snapshot_fields_to_reveal`, `require_master_certificate` (the constructor's), `require_keyring_for_verifier_inputs`, `checked_field_names` (`to_binary`'s), `require_field_count` and `require_field_name_length` (`from_binary`'s), the wrappers' words | 302 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 705 |
 | `certificate_tests.rs` | `certificate.rs`'s unit tests (`#![cfg(test)]`, included by `#[path]`; the file-size ratchet) | 146 |
 | `certificate_json.rs` | `Certificate`'s JSON (#268): the serde impls (a remote derive over its fields), `base64_32_bytes`, `revocation_outpoint_from_str`, `revocation_outpoint_json` (the sentinel), `signature_hex` | 195 |
-| `master.rs` | `MasterCertificate` with field encryption and keyring management; `field_ciphertext`, a field's text decoded as canonical base64 of 1 byte to 1 MiB (#275) | 459 |
-| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | 308 |
+| `master.rs` | `MasterCertificate` with field encryption and keyring management | 549 |
+| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | 382 |
 
 ## Certificate Flow
 
@@ -89,7 +90,13 @@ time and nowhere earlier (#261), as canonical base64 of 1 byte to 1 MiB or
 refused before the wallet's decrypt (`Certificate field <name> must use
 canonical base64 encoding`, `... is empty, oversized, or non-canonical`;
 the reference's `canonicalBase64`, `MasterCertificate.ts:63-74`;
-`create_keyring_for_verifier` checks every field first; #275):
+`create_keyring_for_verifier` checks every field first; #275). A keyring
+entry is canonical base64 of 1 to 2048 bytes and a plaintext at most 64 KiB
+(at least a byte on the master's side, as the reference's `denseBytes`
+asks), and a decrypt failure reaches the caller in the reference's wrapper
+(`Failed to decrypt certificate field!`, `Failed to decrypt all master
+certificate fields.`, `Failed to decrypt selectively revealed certificate
+fields using keyring: <words>`; #297):
 
 **Master Certificate Key IDs:**
 - Protocol: `"certificate field encryption"`
@@ -113,12 +120,12 @@ the reference's `canonicalBase64`, `MasterCertificate.ts:63-74`;
 | `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251); a certificate already signed refused, `CertificateValidationError` in the reference's words (`Certificate has already been signed! Signature present: <hex>`), cleared with `set_signature(None)` to re-sign (#262) |
 | `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249); an over-bound field value is `Ok(false)` too, as the reference's `verify` answers `false` to every failure under it (`Certificate.ts:435-439`, #275) |
 | `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
-| `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249); `Result` since #275: a field value whose text is over 1 MiB of UTF-8 refused before the buffer, `CertificateValidationError("Certificate field <name> exceeds the maximum of 1048576 bytes")`, the reference's words (`Certificate.ts:76-79`) and the wire's (`wallet::wire::certificate_field_value_refusal`); `sign` and `verify` through it |
-| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249); a field value that is not UTF-8 refused as `InvalidUtf8` (`Certificate.ts:384`, #261); a declared value length over 1 MiB refused before the bytes are read, in the writer's words (`:377-381`, #275) |
+| `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249); `Result` since #275: a field value whose text is over 1 MiB of UTF-8 refused before the buffer, `CertificateValidationError("Certificate field <name> exceeds the maximum of 1048576 bytes")`, the reference's words (`Certificate.ts:76-79`) and the wire's (`wallet::wire::certificate_field_value_refusal`); `sign` and `verify` through it; ahead of the values, more than 100,000 fields and a name outside 1 to 50 bytes or unsafe refused in `toBinary`'s words (`Certificate.ts:44-129`, #297) |
+| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249); a field value that is not UTF-8 refused as `InvalidUtf8` (`Certificate.ts:384`, #261); a declared value length over 1 MiB refused before the bytes are read, in the writer's words (`:377-381`, #275); a field count over 100,000 or over a third of the bytes after it, a declared name length outside 1 to 50 before the name is read, an unsafe name, in the reader's words (`:357-373`, #297) |
 | `signing_hash()` | Get SHA-256 hash for signing; `Result` since #275, refusing as `to_binary` refuses |
 | `type_base64()` | Get certificate type as base64 string |
 | `serial_number_base64()` | Get serial number as base64 string |
-| `set_field()` | Set a field value: its base64 text (`impl Into<String>`), any string accepted as the reference accepts it (#261); clears `received_unsigned` |
+| `set_field()` | Set a field value: its base64 text (`impl Into<String>`), any string accepted as the reference's constructor accepts it (#261; it checks nothing, `Certificate.ts:197-213`, #297); clears `received_unsigned` |
 | `get_field()` | Get a field value as held (its base64 text) |
 | `field_names()` | Get all field names |
 | `get_field_encryption_key_id_master()` | Key ID for master encryption |
@@ -129,12 +136,12 @@ the reference's `canonicalBase64`, `MasterCertificate.ts:63-74`;
 
 | Method | Purpose |
 |--------|---------|
-| `new()` | Create from base certificate and keyring |
-| `issue_for_subject()` | Issue new certificate (async) |
-| `create_certificate_fields()` | Encrypt fields and create keyring (async); `privileged`, `privileged_reason` to each `encrypt` |
-| `create_keyring_for_verifier()` | Create verifier-specific keyring from the master keyring (async); the reference's parameters in its order (`MasterCertificate.ts:325-346`), then `originator` |
-| `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt` |
-| `decrypt_fields()` | Decrypt all fields (async); the same pair |
+| `new()` | Create from base certificate and keyring; `Result` since #297, refused as the reference's constructor refuses (`MasterCertificate.ts:195-233`): over 100 entries, an unsafe name, a field with no or an empty keyring entry, a field's text not canonical base64 of 1 byte to 1 MiB, a keyring entry's not of 1 to 2048 bytes |
+| `issue_for_subject()` | Issue new certificate (async), through `new()`'s checks |
+| `create_certificate_fields()` | Encrypt fields and create keyring (async); `privileged`, `privileged_reason` to each `encrypt`; over 100 fields, a plaintext over 64 KiB, a wallet ciphertext over 2048 bytes refused (#297) |
+| `create_keyring_for_verifier()` | Create verifier-specific keyring from the master keyring (async); the reference's parameters in its order (`MasterCertificate.ts:325-346`), then `originator`; the fields to reveal (100, safe, none twice), every field and keyring entry checked first, a field not carried refused in the reference's words, a failed decrypt `Failed to decrypt certificate field!` (#297) |
+| `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt`; every failure `Failed to decrypt certificate field!` (#297) |
+| `decrypt_fields()` | Decrypt all fields (async); the same pair; an empty keyring refused, every later failure `Failed to decrypt all master certificate fields.` (#297) |
 | `verify()` | Verify underlying certificate signature |
 
 ### VerifiableCertificate
@@ -145,8 +152,8 @@ the reference's `canonicalBase64`, `MasterCertificate.ts:63-74`;
 | `from_certificate()` | Create with empty keyring |
 | `has_keyring()` | Check if keyring has any keys |
 | `revealable_fields()` | List fields that can be decrypted |
-| `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt`; the counterparty the certificate's subject, no parameter (`VerifiableCertificate.ts:152-198`) |
-| `decrypt_fields()` | Decrypt all fields in keyring (async, cached); the same pair |
+| `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt`; the counterparty the certificate's subject, no parameter (`VerifiableCertificate.ts:152-198`); a failure in `decryptFields`' wrapper (#297) |
+| `decrypt_fields()` | Decrypt all fields in keyring (async, cached); the same pair; an empty keyring or one over 100 entries refused, every failure `Failed to decrypt selectively revealed certificate fields using keyring: <words>` (#297) |
 | `get_decrypted_fields()` | Get cached decrypted fields if available |
 | `clear_decrypted_cache()` | Clear the cached decrypted fields |
 | `verify()` | Verify underlying certificate signature |
