@@ -8,7 +8,8 @@
 //! (`:896-911`). The reference's witnesses
 //! (`vectors/identity_wallet_calls_318.json`, Node v22.18.0,
 //! `tests/support/identity_wallet_calls_318.mjs`) carry the calls and the
-//! arguments its wallet received; the revocation is answered here with the
+//! arguments its wallet received (the revocation's once, the same for both
+//! clients; bytes as hex text); the revocation is answered here with the
 //! reference's lookup BEEF and signable transaction, so the two signAction
 //! calls carry the same unlocking script.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -19,9 +20,9 @@ use bsv_rs::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     OutputListItem, OverlayLookupFacilitator,
 };
-use bsv_rs::primitives::from_base64;
+use bsv_rs::primitives::{from_base64, from_hex};
 use bsv_rs::wallet::*;
-use serde::Deserialize;
+use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -35,6 +36,7 @@ struct Vector {
     certificate: WalletCertificate,
     fields_to_reveal: Vec<String>,
     keyring: HashMap<String, String>,
+    revocation: Revocation,
     witnesses: Vec<Witness>,
 }
 
@@ -50,7 +52,14 @@ struct Witness {
     configured_originator: Option<String>,
     reveal_calls: Vec<Call>,
     revoke_calls: Vec<Call>,
+}
+
+/// The revocation's answers and arguments, the same for both witnesses.
+#[derive(Deserialize)]
+struct Revocation {
+    #[serde(deserialize_with = "hex")]
     lookup_beef: Vec<u8>,
+    #[serde(deserialize_with = "hex")]
     signable_tx: Vec<u8>,
     signable_reference: String,
     create_action: Value,
@@ -62,9 +71,17 @@ struct Witness {
     sign_action_option_members: Vec<String>,
 }
 
+fn hex<'de, D: Deserializer<'de>>(d: D) -> Result<Vec<u8>, D::Error> {
+    from_hex(&String::deserialize(d)?).map_err(serde::de::Error::custom)
+}
+
 fn vector() -> Vector {
     let text = include_str!("vectors/identity_wallet_calls_318.json");
-    serde_json::from_str(text).unwrap()
+    let mut v: Vector = serde_json::from_str(text).unwrap();
+    // `inputBEEF` is recorded as hex; this crate's arguments write its bytes
+    let beef = &mut v.revocation.create_action["inputBEEF"];
+    *beef = serde_json::to_value(from_hex(beef.as_str().unwrap()).unwrap()).unwrap();
+    v
 }
 
 fn config(w: &Witness) -> IdentityClientConfig {
@@ -109,8 +126,8 @@ impl OverlayLookupFacilitator for Lookup {
 async fn revoked(v: &Vector, w: &Witness) -> Counting {
     let mut wallet = Counting::of_scalar(9);
     wallet.signable = Some(SignableTransaction {
-        tx: w.signable_tx.clone(),
-        reference: from_base64(&w.signable_reference).unwrap(),
+        tx: v.revocation.signable_tx.clone(),
+        reference: from_base64(&v.revocation.signable_reference).unwrap(),
     });
     let mut host_overrides = HashMap::new();
     host_overrides.insert(
@@ -120,7 +137,7 @@ async fn revoked(v: &Vector, w: &Witness) -> Counting {
     let resolver = Arc::new(LookupResolver::new(LookupResolverConfig {
         network_preset: NetworkPreset::Local,
         facilitator: Some(Arc::new(Lookup {
-            beef: w.lookup_beef.clone(),
+            beef: v.revocation.lookup_beef.clone(),
         }) as Arc<dyn OverlayLookupFacilitator>),
         slap_trackers: Some(vec![]),
         host_overrides: Some(host_overrides),
@@ -182,21 +199,22 @@ fn set(names: &[String]) -> BTreeSet<String> {
 #[tokio::test]
 async fn the_revocation_create_action_sends_the_references_arguments_member_by_member() {
     let v = vector();
+    let r = &v.revocation;
     assert_eq!(v.witnesses.len(), 2);
     for w in &v.witnesses {
         let wallet = revoked(&v, w).await;
         let ours = serde_json::to_value(wallet.created.lock().unwrap().clone().unwrap()).unwrap();
-        same_members(&w.name, &ours, &w.create_action);
-        assert_eq!(keys(&ours), set(&w.create_action_members), "{}", w.name);
+        same_members(&w.name, &ours, &r.create_action);
+        assert_eq!(keys(&ours), set(&r.create_action_members), "{}", w.name);
         assert_eq!(
             keys(&ours["inputs"][0]),
-            set(&w.create_action_input_members),
+            set(&r.create_action_input_members),
             "{}",
             w.name
         );
         assert_eq!(
             keys(&ours["options"]),
-            set(&w.create_action_option_members),
+            set(&r.create_action_option_members),
             "{}",
             w.name
         );
@@ -206,15 +224,16 @@ async fn the_revocation_create_action_sends_the_references_arguments_member_by_m
 #[tokio::test]
 async fn the_revocation_sends_no_label_and_leaves_sign_and_process_to_the_wallet() {
     let v = vector();
+    let r = &v.revocation;
     for w in &v.witnesses {
         assert_eq!(
-            w.create_action_members,
+            r.create_action_members,
             ["description", "inputBEEF", "inputs", "options"],
             "{}",
             w.name
         );
         assert_eq!(
-            w.create_action_option_members,
+            r.create_action_option_members,
             ["randomizeOutputs", "acceptDelayedBroadcast", "noSend"],
             "{}",
             w.name
@@ -233,9 +252,10 @@ async fn the_revocation_sends_no_label_and_leaves_sign_and_process_to_the_wallet
 #[tokio::test]
 async fn the_revocation_sign_action_sends_the_references_arguments_and_reference() {
     let v = vector();
+    let r = &v.revocation;
     for w in &v.witnesses {
         assert_eq!(
-            w.sign_action_option_members,
+            r.sign_action_option_members,
             ["acceptDelayedBroadcast", "returnTXIDOnly", "noSend"],
             "{}",
             w.name
@@ -243,15 +263,15 @@ async fn the_revocation_sign_action_sends_the_references_arguments_and_reference
         let wallet = revoked(&v, w).await;
         let args = wallet.signed.lock().unwrap().clone().unwrap();
         // the reference as createAction answered it, not re-encoded
-        assert_eq!(args.reference, w.signable_reference, "{}", w.name);
+        assert_eq!(args.reference, r.signable_reference, "{}", w.name);
         let options = args.options.clone().unwrap();
         assert_eq!(options.return_txid_only, Some(false), "{}", w.name);
         let ours = serde_json::to_value(args).unwrap();
-        same_members(&w.name, &ours, &w.sign_action);
-        assert_eq!(keys(&ours), set(&w.sign_action_members), "{}", w.name);
+        same_members(&w.name, &ours, &r.sign_action);
+        assert_eq!(keys(&ours), set(&r.sign_action_members), "{}", w.name);
         assert_eq!(
             keys(&ours["options"]),
-            set(&w.sign_action_option_members),
+            set(&r.sign_action_option_members),
             "{}",
             w.name
         );
