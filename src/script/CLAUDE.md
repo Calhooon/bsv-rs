@@ -299,9 +299,9 @@ stack left charged) and `None` selects 100 MB (`WORD_MEMORY_LIMIT`, the node's p
 default); on the mempool path the node's stack memory policy is a verdict besides
 (`Stack size limit exceeded: …`, `SCRIPT_ERR_STACK_SIZE`), and `OP_NUM2BIN`'s size is
 bounded by `INT32_MAX` (`SCRIPT_ERR_PUSH_SIZE`). On the block path a node's budget
-is its operator's mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.2 does not
+is its operator's mandatory `-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.3 does not
 start without it, `src/bitcoind.cpp:140-157`; 0 = `INT64_MAX`,
-`src/configscriptpolicy.cpp:280-283`), no constant, so the local budget declines above
+`src/configscriptpolicy.cpp:280-287`), no constant, so the local budget declines above
 100 MB; `memory_limit: Some(X)` models a node set to `X` only as a decline above `X`,
 `Some(usize::MAX)` a node run with 0. `set_stack_memory_consensus(X)` (#38) is that
 node's verdict on the block path (`Stack size limit exceeded: N bytes, the stack memory

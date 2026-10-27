@@ -24,7 +24,8 @@
 //! resource limit (no verdict) where the reference decides. Under a word
 //! 0.3.30 counts as the node counts, with a local budget of 100,000,000 bytes
 //! on both paths (on the block path a resource limit, the node's own figure
-//! being its operator's setting, which this crate cannot know) and the
+//! being its operator's setting, which this crate cannot know until a caller
+//! gives it, `set_stack_memory_consensus`, #38) and the
 //! policy's verdict on the mempool path; the default mode keeps 0.3.29's
 //! budget and count. The two `OP_LSHIFTNUM` witnesses of
 //! the same family, by `INT_MAX` and `INT_MAX + 1`, are pinned since 0.3.29 in
