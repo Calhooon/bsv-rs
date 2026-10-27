@@ -30,7 +30,7 @@ pub fn validate_originator(s: Option<&str>) -> Result<Option<String>> {
     let Some(s) = s else {
         return Ok(None);
     };
-    let s = s.trim().to_lowercase();
+    let s = trim_js(s).to_lowercase();
     string_length(&s, "originator", 1, 250)?;
     let hostname = match s.rfind(':') {
         None => s.as_str(),
@@ -49,6 +49,15 @@ pub fn validate_originator(s: Option<&str>) -> Result<Option<String>> {
         }
     }
     Ok(Some(hostname.to_string()))
+}
+
+/// JavaScript's `String.prototype.trim`, the reference's `trim` here
+/// (`:1005`) and in `normalizeWalletHttpBaseUrl`: its white space and line
+/// terminators. Rust's `char::is_whitespace` differs on two code points:
+/// JavaScript trims U+FEFF, which Rust does not, and keeps U+0085, which
+/// Rust trims.
+pub(crate) fn trim_js(value: &str) -> &str {
+    value.trim_matches(|c: char| (c.is_whitespace() && c != '\u{85}') || c == '\u{feff}')
 }
 
 /// `^\d{1,5}$` and at most 65535 (`:1017`).
@@ -111,6 +120,27 @@ mod tests {
                 validate_originator(Some(given)),
                 Ok(Some(normalized.to_string())),
                 "{given}"
+            );
+        }
+    }
+
+    /// Measured on 2026-10-27 with the reference's `validateOriginator`
+    /// (`ts-stack@edf6e03`) under Node 22.18.0: U+FEFF is trimmed at either
+    /// end, U+0085 is kept and refused as no hostname's.
+    #[test]
+    fn the_trim_is_javascripts_feff_trimmed_and_u0085_kept() {
+        for given in ["\u{feff}Example.com", "example.com\u{feff}"] {
+            assert_eq!(
+                validate_originator(Some(given)),
+                Ok(Some("example.com".to_string())),
+                "{given:?}"
+            );
+        }
+        for given in ["\u{85}Example.com", "example.com\u{85}"] {
+            assert_eq!(
+                validate_originator(Some(given)),
+                refusal("originator", CANONICAL),
+                "{given:?}"
             );
         }
     }

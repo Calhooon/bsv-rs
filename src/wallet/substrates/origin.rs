@@ -3,6 +3,7 @@
 //! (`ts-stack@edf6e03` `packages/sdk/src/wallet/substrates/utils/toOriginHeader.ts`)
 //! and the native client they build.
 
+use crate::wallet::validation::trim_js;
 use crate::Error;
 use reqwest::{Client, Url};
 
@@ -50,11 +51,6 @@ fn is_loopback_hostname(hostname: &str) -> bool {
         || normalized.ends_with(".localhost")
         || normalized == "127.0.0.1"
         || normalized == "[::1]"
-}
-
-/// JavaScript's `String.prototype.trim`: Unicode white space and U+FEFF.
-fn trim_js(value: &str) -> &str {
-    value.trim_matches(|c: char| c.is_whitespace() || c == '\u{feff}')
 }
 
 /// The reference's `toOriginHeader(originator, 'http')`: a scheme-prefixed
@@ -171,6 +167,31 @@ mod tests {
                 "{given}"
             );
         }
+    }
+
+    /// Measured on 2026-10-27 with the reference's `HTTPWalletJSON`
+    /// constructor (`ts-stack@edf6e03`) under Node 22.18.0: U+FEFF is
+    /// trimmed, so the base URL is not exact; U+0085 is kept, so a trailing
+    /// one is a path and a leading one or one in the host does not parse.
+    #[test]
+    fn a_base_url_is_trimmed_as_javascript_trims_feff_and_not_u0085() {
+        for given in [
+            "https://wallet.example.com/\u{feff}",
+            "\u{feff}https://wallet.example.com",
+            "https://wallet.example.com\u{feff}",
+            "\u{85}https://wallet.example.com",
+            "https://wallet.example.com\u{85}",
+        ] {
+            assert_eq!(
+                normalize_wallet_http_base_url(given),
+                refused(NOT_AN_ORIGIN),
+                "{given:?}"
+            );
+        }
+        assert_eq!(
+            normalize_wallet_http_base_url("https://wallet.example.com/\u{85}"),
+            refused(NOT_A_BARE_ORIGIN)
+        );
     }
 
     #[test]

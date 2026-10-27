@@ -8,7 +8,7 @@
 //! `Originator` in the origin form and the wire the frame's raw as `Origin`,
 //! refusing a frame whose originator is not the configured one; no redirect
 //! followed; the base URL an exact origin, cleartext only to a loopback host;
-//! a JSON body over 256 MiB refused unsent.
+//! a JSON body or a wire frame over 256 MiB refused unsent.
 //!
 //! Run with: `cargo test --features "wallet,http" --test wallet_http_originator_323`
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -27,6 +27,8 @@ const NOT_CANONICAL: &str =
     "The originator parameter must be a canonical DNS hostname with an optional port";
 /// The reference's `MAX_WALLET_JSON_REQUEST_BYTES` (`HTTPWalletJSON.ts:60`).
 const MAX_WALLET_JSON_REQUEST_BYTES: usize = 256 * 1024 * 1024;
+/// The reference's `MAX_WALLET_WIRE_FRAME_BYTES` (`WalletWire.ts:9`).
+const MAX_WALLET_WIRE_FRAME_BYTES: usize = 256 * 1024 * 1024;
 const MISMATCH: &str = "Wallet Wire frame originator does not match the configured originator";
 
 fn refusal(message: &str) -> Error {
@@ -318,6 +320,23 @@ async fn a_json_request_over_256_mib_is_refused_unsent() {
         client.create_action(args, "example.com").await.map(|_| ()),
         Err(wallet_error(
             "HTTPWalletJSON request exceeds the maximum permitted size"
+        ))
+    );
+    assert!(server.received_requests().await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn a_wire_frame_over_256_mib_is_refused_unsent_before_any_allocation() {
+    let server = version_server().await;
+    let wire = wire(Some("example.com"), &server.uri()).unwrap();
+    // One byte past the reference's `MAX_WALLET_WIRE_FRAME_BYTES`
+    // (`WalletWire.ts:9`), zeroed: the bound is read from the length, before
+    // the call code, the originator or a body is read or built
+    let frame = vec![0u8; MAX_WALLET_WIRE_FRAME_BYTES + 1];
+    assert_eq!(
+        wire.transmit_to_wallet(&frame).await,
+        Err(wallet_error(
+            "HTTPWalletWire request exceeds the maximum permitted size"
         ))
     );
     assert!(server.received_requests().await.unwrap().is_empty());
