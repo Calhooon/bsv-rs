@@ -137,7 +137,7 @@ pub(crate) fn integer_refusal(
 
 /// `Certificate.ts:25-28`, `WalletWireTransceiver.ts:67`.
 const MAX_CERTIFICATE_BINARY_BYTES: usize = 16 * 1024 * 1024;
-const MAX_CERTIFICATE_FIELDS: usize = 100_000;
+pub(crate) const MAX_CERTIFICATE_FIELDS: usize = 100_000;
 pub(crate) const MAX_CERTIFICATE_FIELD_VALUE_BYTES: usize = 1024 * 1024;
 const MAX_CERTIFICATE_SIGNATURE_BYTES: usize = 72;
 const MAX_WIRE_RESPONSE_COLLECTION_ITEMS: usize = 100_000;

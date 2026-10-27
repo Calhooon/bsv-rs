@@ -3,6 +3,7 @@
 //! A certificate binds identity attributes to a public key,
 //! signed by a trusted certifier.
 
+use super::bounds::{self, checked_field_names};
 #[cfg(test)]
 use super::certificate_json::revocation_outpoint_from_str;
 use crate::primitives::{bounded_capacity, sha256, to_hex, PrivateKey, PublicKey, Signature};
@@ -197,6 +198,14 @@ impl Certificate {
     /// (`:458`); `verify` answers `false` to it, as the reference's `verify`
     /// answers `false` to every failure under it (`:435-439`); `set_field`
     /// takes any value, as the reference's constructor does (bsv-rs#275).
+    /// Ahead of the values, as that snapshot asks, more than 100,000 fields
+    /// are refused (`Certificate field count exceeds the maximum of 100000`,
+    /// `:56-58`), and a name outside 1 to 50 bytes of UTF-8 (`Invalid
+    /// certificate field name length: expected 1–50 bytes, received N`) or
+    /// one of `__proto__`, `constructor`, `prototype` (`Unsafe certificate
+    /// field name: <name>`; `assertCertificateFieldName`, `:117-126`;
+    /// bsv-rs#297); `Certificate::new` and `set_field` check nothing, as the
+    /// reference's constructor checks nothing (`:197-213`).
     ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
@@ -243,23 +252,15 @@ impl Certificate {
         }
     }
 
-    /// The serializer's unsigned prefix, every field value's bound checked
-    /// before the buffer is allocated (`Certificate.ts:281`; bsv-rs#275).
+    /// The serializer's unsigned prefix, the field count, every name and
+    /// every value's bound checked before the buffer is allocated
+    /// (`Certificate.ts:281`; bsv-rs#275, bsv-rs#297).
     fn serialize_unsigned(&self) -> Result<Vec<u8>> {
         // Fields in the reference's order: `localeCompare` under Node's
         // default collation (`ts-stack@edf6e03` `Certificate.ts:282`), not
         // the bytes (#249; the residual is `collation.rs`'s), the wire
         // writer's order too (#246)
-        let mut field_names: Vec<&str> = self.fields.keys().map(String::as_str).collect();
-        crate::wallet::collation::sort_field_names(&mut field_names);
-        if let Some(name) = field_names
-            .iter()
-            .find(|name| self.fields[**name].len() > MAX_CERTIFICATE_FIELD_VALUE_BYTES)
-        {
-            return Err(Error::CertificateValidationError(
-                certificate_field_value_refusal(name),
-            ));
-        }
+        let field_names = checked_field_names(&self.fields)?;
 
         let mut buf = Vec::new();
 
@@ -326,6 +327,9 @@ impl Certificate {
     /// retaining bytes must not make one acceptable. A field value's declared
     /// length over 1 MiB is refused before its bytes are read, as the
     /// reference's reader refuses it (`Certificate.ts:377-381`; bsv-rs#275).
+    /// A field count over 100,000 or over a third of the bytes after it, a
+    /// declared name length outside 1 to 50 before the name is read, and an
+    /// unsafe name are refused in the reader's words (`:357-373`; bsv-rs#297).
     pub fn from_binary(data: &[u8]) -> Result<Self> {
         let mut reader = BinaryReader::new(data);
         let unsigned = read_unsigned(&mut reader)?;
@@ -546,15 +550,18 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
         Some(Outpoint::new(txid, vout))
     };
 
-    // Fields
+    // Fields: at most 100,000 and a third of the bytes left, each name 1 to
+    // 50 bytes before it is read and safe after (`Certificate.ts:357-373`;
+    // bsv-rs#297)
     let field_count = reader.read_len()?;
-    // Each field is >= 2 bytes (name len varint + value len varint); bound
-    // the pre-allocation so a bogus count cannot OOM-abort before any read.
-    let mut fields = HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 2));
+    bounds::require_field_count(field_count, reader.remaining())?;
+    let mut fields = HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 3));
     for _ in 0..field_count {
         let name_len = reader.read_len()?;
+        bounds::require_field_name_length(name_len)?;
         let name = String::from_utf8(reader.read_bytes(name_len)?.to_vec())
             .map_err(|e| Error::InvalidUtf8(e.to_string()))?;
+        bounds::require_safe_field_name(&name)?;
         if fields.contains_key(&name) {
             return Err(Error::CertificateValidationError(format!(
                 "Duplicate certificate field name: {}",

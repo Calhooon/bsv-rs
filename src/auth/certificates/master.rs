@@ -3,8 +3,12 @@
 //! The master certificate contains the encryption keys for all fields,
 //! allowing the subject to create keyrings for specific verifiers.
 
+use super::bounds::{
+    self, dense_bytes, field_ciphertext, keyring_ciphertext, refused, MASTER_FIELDS_DECRYPT_FAILED,
+    MASTER_FIELD_DECRYPT_FAILED, MAX_DECRYPTED_FIELD_BYTES, MAX_KEYRING_VALUE_BYTES,
+};
 use super::{Certificate, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL};
-use crate::primitives::{from_base64, to_base64, PublicKey, SymmetricKey};
+use crate::primitives::{to_base64, PublicKey, SymmetricKey};
 use crate::wallet::wire::MAX_CERTIFICATE_FIELD_VALUE_BYTES;
 use crate::wallet::{
     Counterparty, DecryptArgs, EncryptArgs, Protocol, SecurityLevel, WalletInterface,
@@ -36,12 +40,23 @@ pub struct MasterCertificate {
 }
 
 impl MasterCertificate {
-    /// Creates a new master certificate from a base certificate and keyring.
-    pub fn new(certificate: Certificate, master_keyring: HashMap<String, String>) -> Self {
-        Self {
+    /// Creates a new master certificate from a base certificate and keyring,
+    /// refused as the reference's constructor refuses it
+    /// (`ts-stack@edf6e03` `MasterCertificate.ts:195-233`): more than 100
+    /// fields or keyring entries (`Certificate fields cannot contain more
+    /// than 100 entries`), a name that is not 1 to 50 bytes or is unsafe, a
+    /// field with no keyring entry or an empty one, a field's text that is
+    /// not canonical base64 of 1 byte to 1 MiB, a keyring entry's not of 1
+    /// to 2048 bytes (`Master certificate keyring field <name> is empty,
+    /// oversized, or non-canonical`). `Result` since bsv-rs#297; go-sdk's
+    /// `NewMasterCertificate` refuses an empty keyring and a missing entry
+    /// alone (`go-sdk@2ca481c` `auth/certificates/master.go:39-60`).
+    pub fn new(certificate: Certificate, master_keyring: HashMap<String, String>) -> Result<Self> {
+        bounds::require_master_certificate(&certificate.fields, &master_keyring)?;
+        Ok(Self {
             certificate,
             master_keyring,
-        }
+        })
     }
 
     /// Creates encrypted certificate fields and master keyring, as the
@@ -62,6 +77,15 @@ impl MasterCertificate {
     /// * `privileged_reason` - The reference's `privilegedReason`, likewise
     /// * `originator` - Application originator
     ///
+    /// The fields are snapshotted first (at most 100, each name safe and 1
+    /// to 50 bytes, `Certificate plaintext fields cannot contain more than
+    /// 100 entries`, `:261`), a plaintext over 64 KiB of UTF-8 is refused
+    /// before it is encrypted (`Certificate plaintext field <name> exceeds
+    /// the maximum of 65536 bytes`, `:271-276`), and a wallet's ciphertext
+    /// outside 1 to 2048 bytes is refused (`Encrypted master keyring field
+    /// <name> must be a non-empty byte array of at most 2048 bytes`,
+    /// `:292-298`; bsv-rs#297). The fields are taken in byte order.
+    ///
     /// # Returns
     /// Tuple of (encrypted_fields, master_keyring)
     pub async fn create_certificate_fields<W: WalletInterface>(
@@ -72,12 +96,24 @@ impl MasterCertificate {
         privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<(HashMap<String, String>, HashMap<String, String>)> {
+        bounds::snapshot_record(&fields, "Certificate plaintext fields")?;
         let mut encrypted_fields = HashMap::new();
         let mut master_keyring = HashMap::new();
+        let mut fields: Vec<(String, String)> = fields.into_iter().collect();
+        fields.sort_unstable();
 
         for (field_name, plain_value) in fields {
+            if plain_value.len() > MAX_DECRYPTED_FIELD_BYTES {
+                return Err(refused(format!(
+                    "Certificate plaintext field {field_name} exceeds the maximum of {MAX_DECRYPTED_FIELD_BYTES} bytes"
+                )));
+            }
             let field_key = SymmetricKey::random();
-            let encrypted_value = field_key.encrypt(plain_value.as_bytes())?;
+            let encrypted_value = dense_bytes(
+                field_key.encrypt(plain_value.as_bytes())?,
+                &format!("Encrypted certificate field {field_name}"),
+                MAX_CERTIFICATE_FIELD_VALUE_BYTES,
+            )?;
             encrypted_fields.insert(field_name.clone(), to_base64(&encrypted_value));
 
             // The revelation key, encrypted to the subject under the field name.
@@ -95,7 +131,12 @@ impl MasterCertificate {
                     originator,
                 )
                 .await?;
-            master_keyring.insert(field_name, to_base64(&encrypt_result.ciphertext));
+            let entry = dense_bytes(
+                encrypt_result.ciphertext,
+                &format!("Encrypted master keyring field {field_name}"),
+                MAX_KEYRING_VALUE_BYTES,
+            )?;
+            master_keyring.insert(field_name, to_base64(&entry));
         }
 
         Ok((encrypted_fields, master_keyring))
@@ -123,6 +164,19 @@ impl MasterCertificate {
     /// * `privileged_reason` - The reference's `privilegedReason`, likewise
     /// * `originator` - Application originator
     ///
+    /// Refused, in the reference's order and words: `fields_to_reveal` over
+    /// 100 names, with an unsafe name or one twice (`:125-146`); `fields` or
+    /// `master_keyring` over 100 entries or with an unsafe name (`:349-350`);
+    /// a field's text not canonical base64 of 1 byte to 1 MiB (`:351-357`,
+    /// #275) and a keyring entry's not of 1 to 2048 bytes (`:358-364`), every
+    /// one, revealed or not; a field to reveal absent or empty (`Fields to
+    /// reveal must be a subset of the certificate fields. Missing the
+    /// "<name>" field.`, `:371-380`); a field the subject cannot decrypt
+    /// (`Failed to decrypt certificate field!`, `decryptField`'s wrapper,
+    /// `:621-623`); the wallet's ciphertext for the verifier outside 1 to
+    /// 2048 bytes (`Verifier keyring field <name> must be a non-empty byte
+    /// array of at most 2048 bytes`, `:405-411`; bsv-rs#297).
+    ///
     /// # Returns
     /// Keyring for the verifier: field_name -> the base64 text of the
     /// encrypted revelation key (`:405`; #268)
@@ -139,24 +193,18 @@ impl MasterCertificate {
         privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<HashMap<String, String>> {
-        // Every field's text canonical base64 first, revealed or not, as the
-        // reference's `createKeyringForVerifier` asks (`:351-357`; bsv-rs#275)
-        for (field_name, field_value) in fields {
-            field_ciphertext(field_name, field_value)?;
-        }
+        bounds::require_keyring_for_verifier_inputs(fields, fields_to_reveal, master_keyring)?;
         let mut keyring = HashMap::new();
 
         for field_name in fields_to_reveal {
-            let field_value = fields.get(field_name).ok_or_else(|| {
-                Error::AuthError(format!("Field '{}' not found in certificate", field_name))
-            })?;
+            let field_value = bounds::field_to_reveal(fields, field_name)?;
 
-            let (revelation_key, _) = Self::decrypt_with_master_keyring(
+            let (revelation_key, _) = Self::decrypt_field_wrapped(
                 subject_wallet,
                 master_keyring,
                 certifier,
                 field_name,
-                field_value,
+                Some(field_value),
                 privileged,
                 privileged_reason,
                 originator,
@@ -179,18 +227,60 @@ impl MasterCertificate {
                     originator,
                 )
                 .await?;
+            let entry = dense_bytes(
+                re_encrypted.ciphertext,
+                &format!("Verifier keyring field {field_name}"),
+                MAX_KEYRING_VALUE_BYTES,
+            )?;
 
-            keyring.insert(field_name.clone(), to_base64(&re_encrypted.ciphertext));
+            keyring.insert(field_name.clone(), to_base64(&entry));
         }
 
         Ok(keyring)
     }
 
+    /// The reference's `MasterCertificate.decryptField`
+    /// (`MasterCertificate.ts:564-624`): every failure under it is one
+    /// refusal, `Failed to decrypt certificate field!` (`:621-623`;
+    /// bsv-rs#297). `field_value` is `None` for a field the certificate
+    /// does not carry, refused under the wrapper as the reference's
+    /// `canonicalBase64` refuses an absent value.
+    #[allow(clippy::too_many_arguments)]
+    async fn decrypt_field_wrapped<W: WalletInterface>(
+        wallet: &W,
+        master_keyring: &HashMap<String, String>,
+        counterparty: &PublicKey,
+        field_name: &str,
+        field_value: Option<&String>,
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
+        originator: &str,
+    ) -> Result<(Vec<u8>, String)> {
+        let field_value = field_value.ok_or_else(|| refused(MASTER_FIELD_DECRYPT_FAILED))?;
+        Self::decrypt_with_master_keyring(
+            wallet,
+            master_keyring,
+            counterparty,
+            field_name,
+            field_value,
+            privileged,
+            privileged_reason,
+            originator,
+        )
+        .await
+        .map_err(|_| refused(MASTER_FIELD_DECRYPT_FAILED))
+    }
+
     /// Decrypts a field's revelation key from the master keyring and the
-    /// field value with it (the reference's `MasterCertificate.decryptField`,
-    /// `MasterCertificate.ts:564-625`): the keyring entry's base64 text is
-    /// decoded here, for the wallet's decrypt, and nowhere earlier (#268).
-    /// Returns the revelation key, 32 bytes, and the plaintext.
+    /// field value with it, `decryptField`'s body in its order
+    /// (`MasterCertificate.ts:574-620`): the name, the keyring snapshotted
+    /// and not empty, the keyring entry canonical base64 of 1 to 2048 bytes
+    /// and the field's of 1 byte to 1 MiB, the wallet's decrypt, the key 1
+    /// to 32 bytes (a shorter one the historical minimal form, its leading
+    /// zeros restored, `:600-611`), the plaintext 1 byte to 64 KiB
+    /// (`:612-616`) and UTF-8. The keyring entry's base64 text is decoded
+    /// here, for the wallet's decrypt, and nowhere earlier (#268). Returns
+    /// the revelation key, 32 bytes, and the plaintext.
     #[allow(clippy::too_many_arguments)]
     async fn decrypt_with_master_keyring<W: WalletInterface>(
         wallet: &W,
@@ -202,18 +292,24 @@ impl MasterCertificate {
         privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<(Vec<u8>, String)> {
-        let encrypted_key = master_keyring.get(field_name).ok_or_else(|| {
-            Error::AuthError(format!(
-                "Field '{}' not found in master keyring",
-                field_name
-            ))
-        })?;
+        bounds::require_master_field_name(field_name)?;
+        bounds::snapshot_record(master_keyring, "Master certificate keyring")?;
+        if master_keyring.is_empty() {
+            return Err(refused(
+                "A MasterCertificate must have a valid masterKeyring!",
+            ));
+        }
+        let encrypted_key = keyring_ciphertext(
+            "Master certificate keyring field",
+            field_name,
+            master_keyring.get(field_name).map_or("", String::as_str),
+        )?;
         let ciphertext = field_ciphertext(field_name, field_value)?;
 
         let decrypted = wallet
             .decrypt(
                 DecryptArgs {
-                    ciphertext: from_base64(encrypted_key)?,
+                    ciphertext: encrypted_key,
                     protocol_id: field_protocol(),
                     key_id: Certificate::get_field_encryption_key_id_master(field_name),
                     counterparty: Some(Counterparty::Other(counterparty.clone())),
@@ -225,8 +321,15 @@ impl MasterCertificate {
             )
             .await?;
 
-        let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
-        let plaintext = decrypt_field_value(&key, &ciphertext)?;
+        let key = dense_bytes(decrypted.plaintext, "Certificate field revelation key", 32)?;
+        let key = SymmetricKey::from_bytes(&key)?;
+        let plaintext = dense_bytes(
+            key.decrypt(&ciphertext)?,
+            "Decrypted certificate field",
+            MAX_DECRYPTED_FIELD_BYTES,
+        )?;
+        let plaintext =
+            String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))?;
         Ok((key.as_bytes().to_vec(), plaintext))
     }
 
@@ -270,28 +373,29 @@ impl MasterCertificate {
         )
         .await?;
 
-        // Build the certificate
-        let mut certificate = Certificate::new(
+        // Build the certificate through the constructor's checks, as the
+        // reference's issuance does (`MasterCertificate.ts:474-483`)
+        let certificate = Certificate::new(
             cert_type,
             serial_number,
             subject,
             certifier_key.public_key(),
-        );
-        certificate.fields = encrypted_fields;
+        )
+        .with_fields(encrypted_fields);
+        let mut master = Self::new(certificate, master_keyring)?;
 
         // Sign the certificate
-        certificate.sign(certifier_key)?;
+        master.certificate.sign(certifier_key)?;
 
-        Ok(Self {
-            certificate,
-            master_keyring,
-        })
+        Ok(master)
     }
 
     /// Decrypts a single field using the master keyring: the field's
     /// revelation key decrypted from `master_keyring`, then the field's base64
     /// text decoded and decrypted with it (decoded here and nowhere earlier,
-    /// #261).
+    /// #261). Every failure, a field the certificate does not carry with
+    /// them, is `Failed to decrypt certificate field!`, the reference's
+    /// `decryptField` wrapper (`MasterCertificate.ts:621-623`; bsv-rs#297).
     ///
     /// # Arguments
     /// * `subject_wallet` - Subject's wallet for decryption
@@ -310,16 +414,12 @@ impl MasterCertificate {
         privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<String> {
-        let field_value = self.certificate.fields.get(field_name).ok_or_else(|| {
-            Error::AuthError(format!("Field '{}' not found in certificate", field_name))
-        })?;
-
-        let (_, plaintext) = Self::decrypt_with_master_keyring(
+        let (_, plaintext) = Self::decrypt_field_wrapped(
             subject_wallet,
             &self.master_keyring,
             certifier,
             field_name,
-            field_value,
+            self.certificate.fields.get(field_name),
             privileged,
             privileged_reason,
             originator,
@@ -330,7 +430,14 @@ impl MasterCertificate {
 
     /// Decrypts all fields using the master keyring, `privileged` and
     /// `privileged_reason` passed to each `decrypt` as the reference's
-    /// `MasterCertificate.decryptFields` passes them (`:512-555`).
+    /// `MasterCertificate.decryptFields` passes them (`:512-555`), in its
+    /// sequence (bsv-rs#297): the keyring and the fields snapshotted (at
+    /// most 100 entries, each name safe, `:520-521`), an empty keyring
+    /// refused (`A MasterCertificate must have a valid masterKeyring!`,
+    /// `:522-524`), then every keyring entry and every field's text checked
+    /// before the first decrypt, and every failure from there on one
+    /// refusal, `Failed to decrypt all master certificate fields.`
+    /// (`:525-561`).
     pub async fn decrypt_fields<W: WalletInterface>(
         &self,
         subject_wallet: &W,
@@ -339,9 +446,24 @@ impl MasterCertificate {
         privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<HashMap<String, String>> {
+        let fields = &self.certificate.fields;
+        bounds::snapshot_record(&self.master_keyring, "Master certificate keyring")?;
+        bounds::snapshot_record(fields, "Certificate fields")?;
+        if self.master_keyring.is_empty() {
+            return Err(refused(
+                "A MasterCertificate must have a valid masterKeyring!",
+            ));
+        }
+        let all_failed = |_| refused(MASTER_FIELDS_DECRYPT_FAILED);
+        for (field_name, entry) in &self.master_keyring {
+            keyring_ciphertext("Master certificate keyring field", field_name, entry)
+                .map_err(all_failed)?;
+        }
+        for (field_name, field_value) in fields {
+            field_ciphertext(field_name, field_value).map_err(all_failed)?;
+        }
         let mut decrypted = HashMap::new();
-
-        for field_name in self.certificate.fields.keys() {
+        for field_name in fields.keys() {
             let value = self
                 .decrypt_field(
                     subject_wallet,
@@ -351,7 +473,8 @@ impl MasterCertificate {
                     privileged_reason,
                     originator,
                 )
-                .await?;
+                .await
+                .map_err(all_failed)?;
             decrypted.insert(field_name.clone(), value);
         }
 
@@ -370,39 +493,6 @@ pub(crate) fn field_protocol() -> Protocol {
         SecurityLevel::Counterparty,
         CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL,
     )
-}
-
-/// A field value's ciphertext: the value held is the ciphertext's base64
-/// text (BRC-52 `0052.md:97`), decoded here, at decrypt time, and nowhere
-/// earlier (#261), as the reference's `canonicalBase64` decodes it
-/// (`ts-stack@edf6e03` `MasterCertificate.ts:63-74`, called at `:215-219`,
-/// `:352-356`, `:534-538`, `:587-591`; `VerifiableCertificate.ts:41-52`,
-/// `:187-191`): canonical base64 or refused (padded, no whitespace, no URL
-/// alphabet, the unused bits zero, `WalletByteEncoding.ts:39-64`), and the
-/// bytes 1 to 1 MiB, in its words (bsv-rs#275).
-pub(crate) fn field_ciphertext(field_name: &str, field_value: &str) -> Result<Vec<u8>> {
-    use base64::Engine;
-    let decoded = base64::engine::general_purpose::STANDARD
-        .decode(field_value)
-        .map_err(|_| {
-            Error::CertificateValidationError(format!(
-                "Certificate field {field_name} must use canonical base64 encoding"
-            ))
-        })?;
-    if decoded.is_empty() || decoded.len() > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
-        return Err(Error::CertificateValidationError(format!(
-            "Certificate field {field_name} is empty, oversized, or non-canonical"
-        )));
-    }
-    Ok(decoded)
-}
-
-/// Decrypts a field's ciphertext ([`field_ciphertext`]) with its revelation
-/// key; the plaintext is UTF-8, as the reference's `toUTF8Strict` asks
-/// (`MasterCertificate.ts:619`).
-pub(crate) fn decrypt_field_value(key: &SymmetricKey, ciphertext: &[u8]) -> Result<String> {
-    let plaintext = key.decrypt(ciphertext)?;
-    String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
 }
 
 impl std::ops::Deref for MasterCertificate {
@@ -432,7 +522,7 @@ mod tests {
         cert.sign(&certifier).unwrap();
 
         let master_keyring = HashMap::new();
-        let master_cert = MasterCertificate::new(cert, master_keyring);
+        let master_cert = MasterCertificate::new(cert, master_keyring).unwrap();
 
         assert!(master_cert.verify().unwrap());
     }
@@ -450,7 +540,7 @@ mod tests {
         );
         cert.sign(&certifier).unwrap();
 
-        let master_cert = MasterCertificate::new(cert, HashMap::new());
+        let master_cert = MasterCertificate::new(cert, HashMap::new()).unwrap();
 
         // Should be able to access Certificate fields via Deref
         assert_eq!(master_cert.subject, subject);

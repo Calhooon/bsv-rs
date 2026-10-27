@@ -1,0 +1,3846 @@
+{
+  "description": "The reference's certificate bounds and decrypt wrappers (#297), recorded by tests/support/certificate_bounds_297.mjs",
+  "reference": "ts-stack@edf6e03 packages/sdk",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "id": "name_of_50_bytes",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "ok": "83098c9b977b7bac70d2ca1409fd73eb45f7a0c46ffc44c6680305be7f027a20"
+      }
+    },
+    {
+      "id": "name_of_51_bytes",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Invalid certificate field name length: expected 1–50 bytes, received 51"
+      }
+    },
+    {
+      "id": "empty_name",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          ""
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Invalid certificate field name length: expected 1–50 bytes, received 0"
+      }
+    },
+    {
+      "id": "name_of_25_two_byte_characters",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "ééééééééééééééééééééééééé"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "ok": "f67336e40d54a4ea4f4e7dc0f5beb076987fae451d654feb91bf184b24246569"
+      }
+    },
+    {
+      "id": "name_of_51_bytes_in_two_byte_characters",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "éééééééééééééééééééééééééa"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Invalid certificate field name length: expected 1–50 bytes, received 51"
+      }
+    },
+    {
+      "id": "name___proto__",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "__proto__"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Unsafe certificate field name: __proto__"
+      }
+    },
+    {
+      "id": "name_constructor",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "constructor"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Unsafe certificate field name: constructor"
+      }
+    },
+    {
+      "id": "name_prototype",
+      "site": "to_binary",
+      "input": {
+        "names": [
+          "prototype"
+        ],
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Unsafe certificate field name: prototype"
+      }
+    },
+    {
+      "id": "100000_fields",
+      "site": "to_binary",
+      "input": {
+        "count": 100000,
+        "value": "QQ=="
+      },
+      "verdict": {
+        "ok": "7d093a0f6635035a7fdd5db2161cac6263ad15de1a3253fbda7f69ceaf46db4b"
+      }
+    },
+    {
+      "id": "100001_fields",
+      "site": "to_binary",
+      "input": {
+        "count": 100001,
+        "value": "QQ=="
+      },
+      "verdict": {
+        "error": "Certificate field count exceeds the maximum of 100000"
+      }
+    },
+    {
+      "id": "frame_name_length_0",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f200000000000000000000000000000000000000000000000000000000000000000001000141"
+      },
+      "verdict": {
+        "error": "Invalid certificate field name length: received 0"
+      }
+    },
+    {
+      "id": "frame_name_of_50_bytes",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f200000000000000000000000000000000000000000000000000000000000000000001326e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e00"
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "frame_name_of_51_bytes",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f200000000000000000000000000000000000000000000000000000000000000000001336e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e00"
+      },
+      "verdict": {
+        "error": "Invalid certificate field name length: received 51"
+      }
+    },
+    {
+      "id": "frame_name___proto__",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f200000000000000000000000000000000000000000000000000000000000000000001095f5f70726f746f5f5f00"
+      },
+      "verdict": {
+        "error": "Unsafe certificate field name: __proto__"
+      }
+    },
+    {
+      "id": "frame_count_100001",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2000000000000000000000000000000000000000000000000000000000000000000fea1860100"
+      },
+      "verdict": {
+        "error": "Certificate field count exceeds the maximum of 100000"
+      }
+    },
+    {
+      "id": "frame_count_1_in_3_bytes",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f200000000000000000000000000000000000000000000000000000000000000000001016100"
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "frame_count_2_in_5_bytes",
+      "site": "from_binary",
+      "input": {
+        "hex": "01010101010101010101010101010101010101010101010101010101010101010202020202020202020202020202020202020202020202020202020202020202022bda68b3aa0239d382f185ca2d8c31ce604cc26220cef3eb65223f47a0088d8702bb58b5feca505c74edc000d8282fc556e51a1024fc8e7d7e56c6f887c5c8d5f2000000000000000000000000000000000000000000000000000000000000000000020161000162"
+      },
+      "verdict": {
+        "error": "Certificate field count exceeds the available data"
+      }
+    },
+    {
+      "id": "keyring_entry_of_2048_bytes",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "name",
+            {
+              "bytes": 2048
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "ok": "46c315e1643e8a6ae000cd1be24725bdba466f8b4f9ba5baeaf48f4119e9d398"
+      }
+    },
+    {
+      "id": "keyring_entry_of_2049_bytes",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "name",
+            {
+              "bytes": 2049
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Master certificate keyring field name is empty, oversized, or non-canonical"
+      }
+    },
+    {
+      "id": "keyring_entry_missing",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": []
+      },
+      "verdict": {
+        "error": "Master keyring must contain a value for every field. Missing or empty key for field: \"name\"."
+      }
+    },
+    {
+      "id": "keyring_entry_empty",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "name",
+            {
+              "text": ""
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Master keyring must contain a value for every field. Missing or empty key for field: \"name\"."
+      }
+    },
+    {
+      "id": "keyring_entry_of_2049_bytes_for_no_field",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "name",
+            {
+              "bytes": 80
+            }
+          ],
+          [
+            "other",
+            {
+              "bytes": 2049
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Master certificate keyring field other is empty, oversized, or non-canonical"
+      }
+    },
+    {
+      "id": "keyring_entry_not_canonical",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "name",
+            {
+              "text": "QQ"
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Master certificate keyring field name must use canonical base64 encoding"
+      }
+    },
+    {
+      "id": "field_not_canonical",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "name",
+            {
+              "text": "QQ"
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "name",
+            {
+              "bytes": 80
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Certificate field name must use canonical base64 encoding"
+      }
+    },
+    {
+      "id": "100_fields",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "f0",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f1",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f2",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f3",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f4",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f5",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f6",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f7",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f8",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f9",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f10",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f11",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f12",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f13",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f14",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f15",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f16",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f17",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f18",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f19",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f20",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f21",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f22",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f23",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f24",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f25",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f26",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f27",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f28",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f29",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f30",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f31",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f32",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f33",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f34",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f35",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f36",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f37",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f38",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f39",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f40",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f41",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f42",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f43",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f44",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f45",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f46",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f47",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f48",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f49",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f50",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f51",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f52",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f53",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f54",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f55",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f56",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f57",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f58",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f59",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f60",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f61",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f62",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f63",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f64",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f65",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f66",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f67",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f68",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f69",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f70",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f71",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f72",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f73",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f74",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f75",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f76",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f77",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f78",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f79",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f80",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f81",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f82",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f83",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f84",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f85",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f86",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f87",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f88",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f89",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f90",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f91",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f92",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f93",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f94",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f95",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f96",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f97",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f98",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f99",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "f0",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f1",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f2",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f3",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f4",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f5",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f6",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f7",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f8",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f9",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f10",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f11",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f12",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f13",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f14",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f15",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f16",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f17",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f18",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f19",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f20",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f21",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f22",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f23",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f24",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f25",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f26",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f27",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f28",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f29",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f30",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f31",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f32",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f33",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f34",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f35",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f36",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f37",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f38",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f39",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f40",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f41",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f42",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f43",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f44",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f45",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f46",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f47",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f48",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f49",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f50",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f51",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f52",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f53",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f54",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f55",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f56",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f57",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f58",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f59",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f60",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f61",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f62",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f63",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f64",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f65",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f66",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f67",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f68",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f69",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f70",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f71",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f72",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f73",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f74",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f75",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f76",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f77",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f78",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f79",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f80",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f81",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f82",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f83",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f84",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f85",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f86",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f87",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f88",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f89",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f90",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f91",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f92",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f93",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f94",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f95",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f96",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f97",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f98",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f99",
+            {
+              "bytes": 48
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "ok": "f084b6d3dc2672e09a2e6f03db9d206f3aa75b7f038aaacbbd4d475aa9a79ab8"
+      }
+    },
+    {
+      "id": "101_fields",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "f0",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f1",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f2",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f3",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f4",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f5",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f6",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f7",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f8",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f9",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f10",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f11",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f12",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f13",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f14",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f15",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f16",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f17",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f18",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f19",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f20",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f21",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f22",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f23",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f24",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f25",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f26",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f27",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f28",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f29",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f30",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f31",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f32",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f33",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f34",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f35",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f36",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f37",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f38",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f39",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f40",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f41",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f42",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f43",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f44",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f45",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f46",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f47",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f48",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f49",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f50",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f51",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f52",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f53",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f54",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f55",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f56",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f57",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f58",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f59",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f60",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f61",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f62",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f63",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f64",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f65",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f66",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f67",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f68",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f69",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f70",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f71",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f72",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f73",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f74",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f75",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f76",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f77",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f78",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f79",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f80",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f81",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f82",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f83",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f84",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f85",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f86",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f87",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f88",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f89",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f90",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f91",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f92",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f93",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f94",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f95",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f96",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f97",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f98",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f99",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f100",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "f0",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f1",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f2",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f3",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f4",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f5",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f6",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f7",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f8",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f9",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f10",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f11",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f12",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f13",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f14",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f15",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f16",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f17",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f18",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f19",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f20",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f21",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f22",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f23",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f24",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f25",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f26",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f27",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f28",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f29",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f30",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f31",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f32",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f33",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f34",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f35",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f36",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f37",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f38",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f39",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f40",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f41",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f42",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f43",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f44",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f45",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f46",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f47",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f48",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f49",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f50",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f51",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f52",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f53",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f54",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f55",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f56",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f57",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f58",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f59",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f60",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f61",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f62",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f63",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f64",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f65",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f66",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f67",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f68",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f69",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f70",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f71",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f72",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f73",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f74",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f75",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f76",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f77",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f78",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f79",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f80",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f81",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f82",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f83",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f84",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f85",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f86",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f87",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f88",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f89",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f90",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f91",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f92",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f93",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f94",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f95",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f96",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f97",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f98",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f99",
+            {
+              "bytes": 48
+            }
+          ],
+          [
+            "f100",
+            {
+              "bytes": 48
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Certificate fields cannot contain more than 100 entries"
+      }
+    },
+    {
+      "id": "field_name_constructor",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "constructor",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "constructor",
+            {
+              "bytes": 80
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Certificate field name must be a safe UTF-8 string of 1–50 bytes"
+      }
+    },
+    {
+      "id": "field_name_of_51_bytes",
+      "site": "master_new",
+      "input": {
+        "fields": [
+          [
+            "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+            {
+              "bytes": 48
+            }
+          ]
+        ],
+        "keyring": [
+          [
+            "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn",
+            {
+              "bytes": 80
+            }
+          ]
+        ]
+      },
+      "verdict": {
+        "error": "Certificate field name must be a safe UTF-8 string of 1–50 bytes"
+      }
+    },
+    {
+      "id": "plaintext_of_65536_bytes",
+      "site": "create_certificate_fields",
+      "input": {
+        "plaintexts": [
+          [
+            "name",
+            65536
+          ]
+        ],
+        "ciphertext_bytes": null
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "plaintext_of_65537_bytes",
+      "site": "create_certificate_fields",
+      "input": {
+        "plaintexts": [
+          [
+            "name",
+            65537
+          ]
+        ],
+        "ciphertext_bytes": null
+      },
+      "verdict": {
+        "error": "Certificate plaintext field name exceeds the maximum of 65536 bytes"
+      }
+    },
+    {
+      "id": "101_plaintext_fields",
+      "site": "create_certificate_fields",
+      "input": {
+        "plaintexts": [
+          [
+            "f0",
+            1
+          ],
+          [
+            "f1",
+            1
+          ],
+          [
+            "f2",
+            1
+          ],
+          [
+            "f3",
+            1
+          ],
+          [
+            "f4",
+            1
+          ],
+          [
+            "f5",
+            1
+          ],
+          [
+            "f6",
+            1
+          ],
+          [
+            "f7",
+            1
+          ],
+          [
+            "f8",
+            1
+          ],
+          [
+            "f9",
+            1
+          ],
+          [
+            "f10",
+            1
+          ],
+          [
+            "f11",
+            1
+          ],
+          [
+            "f12",
+            1
+          ],
+          [
+            "f13",
+            1
+          ],
+          [
+            "f14",
+            1
+          ],
+          [
+            "f15",
+            1
+          ],
+          [
+            "f16",
+            1
+          ],
+          [
+            "f17",
+            1
+          ],
+          [
+            "f18",
+            1
+          ],
+          [
+            "f19",
+            1
+          ],
+          [
+            "f20",
+            1
+          ],
+          [
+            "f21",
+            1
+          ],
+          [
+            "f22",
+            1
+          ],
+          [
+            "f23",
+            1
+          ],
+          [
+            "f24",
+            1
+          ],
+          [
+            "f25",
+            1
+          ],
+          [
+            "f26",
+            1
+          ],
+          [
+            "f27",
+            1
+          ],
+          [
+            "f28",
+            1
+          ],
+          [
+            "f29",
+            1
+          ],
+          [
+            "f30",
+            1
+          ],
+          [
+            "f31",
+            1
+          ],
+          [
+            "f32",
+            1
+          ],
+          [
+            "f33",
+            1
+          ],
+          [
+            "f34",
+            1
+          ],
+          [
+            "f35",
+            1
+          ],
+          [
+            "f36",
+            1
+          ],
+          [
+            "f37",
+            1
+          ],
+          [
+            "f38",
+            1
+          ],
+          [
+            "f39",
+            1
+          ],
+          [
+            "f40",
+            1
+          ],
+          [
+            "f41",
+            1
+          ],
+          [
+            "f42",
+            1
+          ],
+          [
+            "f43",
+            1
+          ],
+          [
+            "f44",
+            1
+          ],
+          [
+            "f45",
+            1
+          ],
+          [
+            "f46",
+            1
+          ],
+          [
+            "f47",
+            1
+          ],
+          [
+            "f48",
+            1
+          ],
+          [
+            "f49",
+            1
+          ],
+          [
+            "f50",
+            1
+          ],
+          [
+            "f51",
+            1
+          ],
+          [
+            "f52",
+            1
+          ],
+          [
+            "f53",
+            1
+          ],
+          [
+            "f54",
+            1
+          ],
+          [
+            "f55",
+            1
+          ],
+          [
+            "f56",
+            1
+          ],
+          [
+            "f57",
+            1
+          ],
+          [
+            "f58",
+            1
+          ],
+          [
+            "f59",
+            1
+          ],
+          [
+            "f60",
+            1
+          ],
+          [
+            "f61",
+            1
+          ],
+          [
+            "f62",
+            1
+          ],
+          [
+            "f63",
+            1
+          ],
+          [
+            "f64",
+            1
+          ],
+          [
+            "f65",
+            1
+          ],
+          [
+            "f66",
+            1
+          ],
+          [
+            "f67",
+            1
+          ],
+          [
+            "f68",
+            1
+          ],
+          [
+            "f69",
+            1
+          ],
+          [
+            "f70",
+            1
+          ],
+          [
+            "f71",
+            1
+          ],
+          [
+            "f72",
+            1
+          ],
+          [
+            "f73",
+            1
+          ],
+          [
+            "f74",
+            1
+          ],
+          [
+            "f75",
+            1
+          ],
+          [
+            "f76",
+            1
+          ],
+          [
+            "f77",
+            1
+          ],
+          [
+            "f78",
+            1
+          ],
+          [
+            "f79",
+            1
+          ],
+          [
+            "f80",
+            1
+          ],
+          [
+            "f81",
+            1
+          ],
+          [
+            "f82",
+            1
+          ],
+          [
+            "f83",
+            1
+          ],
+          [
+            "f84",
+            1
+          ],
+          [
+            "f85",
+            1
+          ],
+          [
+            "f86",
+            1
+          ],
+          [
+            "f87",
+            1
+          ],
+          [
+            "f88",
+            1
+          ],
+          [
+            "f89",
+            1
+          ],
+          [
+            "f90",
+            1
+          ],
+          [
+            "f91",
+            1
+          ],
+          [
+            "f92",
+            1
+          ],
+          [
+            "f93",
+            1
+          ],
+          [
+            "f94",
+            1
+          ],
+          [
+            "f95",
+            1
+          ],
+          [
+            "f96",
+            1
+          ],
+          [
+            "f97",
+            1
+          ],
+          [
+            "f98",
+            1
+          ],
+          [
+            "f99",
+            1
+          ],
+          [
+            "f100",
+            1
+          ]
+        ],
+        "ciphertext_bytes": null
+      },
+      "verdict": {
+        "error": "Certificate plaintext fields cannot contain more than 100 entries"
+      }
+    },
+    {
+      "id": "wallet_ciphertext_of_2048_bytes",
+      "site": "create_certificate_fields",
+      "input": {
+        "plaintexts": [
+          [
+            "name",
+            5
+          ]
+        ],
+        "ciphertext_bytes": 2048
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "wallet_ciphertext_of_2049_bytes",
+      "site": "create_certificate_fields",
+      "input": {
+        "plaintexts": [
+          [
+            "name",
+            5
+          ]
+        ],
+        "ciphertext_bytes": 2049
+      },
+      "verdict": {
+        "error": "Encrypted master keyring field name must be a non-empty byte array of at most 2048 bytes"
+      }
+    },
+    {
+      "id": "plaintext_of_65536_bytes",
+      "site": "master_decrypt_field",
+      "input": {
+        "plaintext_bytes": 65536,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "ok": 65536
+      }
+    },
+    {
+      "id": "plaintext_of_65536_bytes",
+      "site": "master_decrypt_fields",
+      "input": {
+        "plaintext_bytes": 65536,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "plaintext_of_65536_bytes",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "plaintext_bytes": 65536,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "plaintext_of_65536_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "plaintext_bytes": 65536,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "ok": 65536
+      }
+    },
+    {
+      "id": "plaintext_of_65537_bytes",
+      "site": "master_decrypt_field",
+      "input": {
+        "plaintext_bytes": 65537,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "plaintext_of_65537_bytes",
+      "site": "master_decrypt_fields",
+      "input": {
+        "plaintext_bytes": 65537,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt all master certificate fields."
+      }
+    },
+    {
+      "id": "plaintext_of_65537_bytes",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "plaintext_bytes": 65537,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "plaintext_of_65537_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "plaintext_bytes": 65537,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Decrypted certificate field is oversized"
+      }
+    },
+    {
+      "id": "plaintext_of_0_bytes",
+      "site": "master_decrypt_field",
+      "input": {
+        "plaintext_bytes": 0,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "plaintext_of_0_bytes",
+      "site": "master_decrypt_fields",
+      "input": {
+        "plaintext_bytes": 0,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt all master certificate fields."
+      }
+    },
+    {
+      "id": "plaintext_of_0_bytes",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "plaintext_bytes": 0,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "plaintext_of_0_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "plaintext_bytes": 0,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "ok": 0
+      }
+    },
+    {
+      "id": "master_keyring_entry_of_2049_bytes",
+      "site": "master_decrypt_field",
+      "input": {
+        "master_keyring_entry_bytes": 2049,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "master_keyring_entry_of_2049_bytes",
+      "site": "master_decrypt_fields",
+      "input": {
+        "master_keyring_entry_bytes": 2049,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt all master certificate fields."
+      }
+    },
+    {
+      "id": "master_keyring_entry_of_2049_bytes",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "master_keyring_entry_bytes": 2049,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Master certificate keyring field name is empty, oversized, or non-canonical"
+      }
+    },
+    {
+      "id": "master_keyring_empty",
+      "site": "master_decrypt_field",
+      "input": {
+        "master_keyring_empty": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "master_keyring_empty",
+      "site": "master_decrypt_fields",
+      "input": {
+        "master_keyring_empty": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "A MasterCertificate must have a valid masterKeyring!"
+      }
+    },
+    {
+      "id": "field_text_unpadded",
+      "site": "master_decrypt_field",
+      "input": {
+        "field_text_unpadded": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt certificate field!"
+      }
+    },
+    {
+      "id": "field_text_unpadded",
+      "site": "master_decrypt_fields",
+      "input": {
+        "field_text_unpadded": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt all master certificate fields."
+      }
+    },
+    {
+      "id": "field_text_unpadded",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "field_text_unpadded": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Certificate field name must use canonical base64 encoding"
+      }
+    },
+    {
+      "id": "field_text_unpadded",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "field_text_unpadded": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate field name must use canonical base64 encoding"
+      }
+    },
+    {
+      "id": "verifier_keyring_entry_of_2049_bytes",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_keyring_entry_bytes": 2049,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring field name is empty, oversized, or non-canonical"
+      }
+    },
+    {
+      "id": "verifier_keyring_empty",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_keyring_empty": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "A keyring is required to decrypt certificate fields for the verifier."
+      }
+    },
+    {
+      "id": "verifier_keyring_of_101_entries",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_keyring_entries": 101,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Certificate keyring cannot contain more than 100 fields"
+      }
+    },
+    {
+      "id": "verifier_keyring_entry_for_no_field",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_keyring_ghost": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate field ghost must be an own string data property"
+      }
+    },
+    {
+      "id": "verifier_keyring_name___proto__",
+      "site": "verifiable_decrypt_fields",
+      "input": {
+        "verifier_keyring_proto": true,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Failed to decrypt selectively revealed certificate fields using keyring: Certificate keyring contains an unsafe field name"
+      }
+    },
+    {
+      "id": "reveal_a_field_not_carried",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "reveal": [
+          "ghost"
+        ]
+      },
+      "verdict": {
+        "error": "Fields to reveal must be a subset of the certificate fields. Missing the \"ghost\" field."
+      }
+    },
+    {
+      "id": "reveal_a_field_twice",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "reveal": [
+          "name",
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "fieldsToReveal contains duplicate field: name"
+      }
+    },
+    {
+      "id": "reveal_101_fields",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "reveal": [
+          "f0",
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5",
+          "f6",
+          "f7",
+          "f8",
+          "f9",
+          "f10",
+          "f11",
+          "f12",
+          "f13",
+          "f14",
+          "f15",
+          "f16",
+          "f17",
+          "f18",
+          "f19",
+          "f20",
+          "f21",
+          "f22",
+          "f23",
+          "f24",
+          "f25",
+          "f26",
+          "f27",
+          "f28",
+          "f29",
+          "f30",
+          "f31",
+          "f32",
+          "f33",
+          "f34",
+          "f35",
+          "f36",
+          "f37",
+          "f38",
+          "f39",
+          "f40",
+          "f41",
+          "f42",
+          "f43",
+          "f44",
+          "f45",
+          "f46",
+          "f47",
+          "f48",
+          "f49",
+          "f50",
+          "f51",
+          "f52",
+          "f53",
+          "f54",
+          "f55",
+          "f56",
+          "f57",
+          "f58",
+          "f59",
+          "f60",
+          "f61",
+          "f62",
+          "f63",
+          "f64",
+          "f65",
+          "f66",
+          "f67",
+          "f68",
+          "f69",
+          "f70",
+          "f71",
+          "f72",
+          "f73",
+          "f74",
+          "f75",
+          "f76",
+          "f77",
+          "f78",
+          "f79",
+          "f80",
+          "f81",
+          "f82",
+          "f83",
+          "f84",
+          "f85",
+          "f86",
+          "f87",
+          "f88",
+          "f89",
+          "f90",
+          "f91",
+          "f92",
+          "f93",
+          "f94",
+          "f95",
+          "f96",
+          "f97",
+          "f98",
+          "f99",
+          "f100"
+        ]
+      },
+      "verdict": {
+        "error": "fieldsToReveal must be an array of at most 100 strings"
+      }
+    },
+    {
+      "id": "wallet_ciphertext_of_2048_bytes",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "ciphertext_bytes": 2048,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "ok": 1
+      }
+    },
+    {
+      "id": "wallet_ciphertext_of_2049_bytes",
+      "site": "create_keyring_for_verifier",
+      "input": {
+        "ciphertext_bytes": 2049,
+        "reveal": [
+          "name"
+        ]
+      },
+      "verdict": {
+        "error": "Verifier keyring field name must be a non-empty byte array of at most 2048 bytes"
+      }
+    }
+  ]
+}

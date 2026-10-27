@@ -14,9 +14,9 @@
 #![cfg(feature = "auth")]
 
 use bsv_rs::auth::certificates::{Certificate, MasterCertificate, VerifiableCertificate};
-use bsv_rs::primitives::{to_base64, PrivateKey};
+use bsv_rs::primitives::{sha256, to_base64, PrivateKey};
 use bsv_rs::wallet::wire::{WireReader, WireWriter};
-use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::wallet::{Counterparty, KeyDeriver, ProtoWallet, Protocol, SecurityLevel};
 use bsv_rs::Error;
 use std::collections::HashMap;
 
@@ -115,6 +115,30 @@ fn a_signed_certificate_given_a_field_value_over_one_mib_is_false_at_verify_275(
     // `Ok(false)`, never an error: the signature does not cover the mutated
     // value, so the verdict is `false` on the base too; the bound's own
     // witnesses are this file's refusals.
+    assert_eq!(cert.verify(), Ok(false));
+}
+
+#[test]
+fn a_certificate_signed_over_a_field_value_one_byte_over_one_mib_is_false_at_verify_275() {
+    // The certifier's BRC-52 child signs the preimage the reference's writer
+    // would write but refuses to (`Certificate.ts:76-79`): one field `big`
+    // of 1 MiB and a byte, built by this crate's writer with the bound
+    // bypassed. The signature covers exactly these values, so a verifier
+    // that serialized past the bound (this crate before #275) answers
+    // `true`; the reference's `verify` answers `false` to the refusal
+    // under it (`:427`, `:435-439`).
+    let value = "A".repeat(MIB + 1);
+    let preimage = frame_with_one_field("big", value.len() as u64, value.as_bytes());
+    let mut cert = certificate();
+    cert.set_field("big", value);
+    let child = KeyDeriver::new(Some(key(4)))
+        .derive_private_key(
+            &Protocol::new(SecurityLevel::Counterparty, "certificate signature"),
+            &cert.signature_key_id(),
+            &Counterparty::Anyone,
+        )
+        .unwrap();
+    cert.set_signature(Some(child.sign(&sha256(&preimage)).unwrap().to_der()));
     assert_eq!(cert.verify(), Ok(false));
 }
 
@@ -225,6 +249,10 @@ fn non_canonical(text: &str) -> Vec<(String, &'static str)> {
     ]
 }
 
+/// Each refusal under the reference's decrypt wrappers since #297: the
+/// master's `decryptField` says `Failed to decrypt certificate field!` alone
+/// (`MasterCertificate.ts:621-623`), the verifier's `decryptFields` quotes
+/// the words under its own (`VerifiableCertificate.ts:214-217`).
 #[tokio::test]
 async fn a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275() {
     let (master, verifiable) = issued().await;
@@ -264,7 +292,7 @@ async fn a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275() 
                 "test"
             )
             .await,
-            Err(refused(words)),
+            Err(refused("Failed to decrypt certificate field!")),
             "master {bad:.40}"
         );
         let mut v = verifiable.clone();
@@ -272,7 +300,9 @@ async fn a_field_value_that_is_not_canonical_base64_is_refused_at_decrypt_275() 
         assert_eq!(
             v.decrypt_field(&verifier_wallet, "name", None, None, "test")
                 .await,
-            Err(refused(words)),
+            Err(refused(&format!(
+                "Failed to decrypt selectively revealed certificate fields using keyring: {words}"
+            ))),
             "verifiable {bad:.40}"
         );
     }

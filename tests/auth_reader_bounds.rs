@@ -56,9 +56,16 @@ fn a_certificate_field_length_of_usize_max_minus_k_is_refused() {
         data.extend_from_slice(b"name");
         let result = std::panic::catch_unwind(|| Certificate::from_binary(&data));
         let result = result.unwrap_or_else(|_| panic!("panicked at usize::MAX - {k}"));
-        assert!(
-            matches!(result, Err(Error::ReaderUnderflow { .. })),
-            "usize::MAX - {k}: {result:?}"
+        // Since #297 the reference's 1 to 50 byte bound refuses the name's
+        // length before the bytes remaining are asked (`Certificate.ts:367-370`):
+        // a refusal, never a wrap, as #108 asks.
+        assert_eq!(
+            result.map(drop),
+            Err(Error::CertificateValidationError(format!(
+                "Invalid certificate field name length: received {}",
+                usize::MAX as u64 - k
+            ))),
+            "usize::MAX - {k}"
         );
     }
 }
