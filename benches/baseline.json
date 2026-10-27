@@ -1105,6 +1105,1111 @@
           "samples": 100
         }
       }
+    },
+    "linux-x86_64 / AMD EPYC 7763 64-Core Processor / 4 cores": {
+      "platform": "linux-x86_64",
+      "machine": {
+        "model": "AMD EPYC 7763 64-Core Processor",
+        "cores": 4
+      },
+      "rustc": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "source_commit": "4b1c46881acf4491de7285765b286075b7b98f4f",
+      "recorded_unix_seconds": 1793106101,
+      "settings": {
+        "sample_size": 100,
+        "warm_up_seconds": 1,
+        "measurement_seconds": 3,
+        "features": "wallet",
+        "percentile": "linear interpolation of sorted sample time_ns / iterations; batch benches stay per batch"
+      },
+      "corpus": {
+        "adapter": "bsv-script-lean@8840488:engine::run_input/word_for",
+        "block_words": [
+          4015663
+        ],
+        "inputs": 10000,
+        "rows": 10000,
+        "sha256": "bc0651d0f7f8193aebbd233b258148d81ca553a8f43a01fc2594b51610f554b0"
+      },
+      "memory": [
+        {
+          "bytes": 1000000,
+          "delta_rss_bytes": 880640,
+          "entries": 1002,
+          "mode": "structure",
+          "peak_rss_bytes": 4743168,
+          "start_rss_bytes": 3862528,
+          "verdict": "Valid",
+          "wall_ns": 2438557
+        },
+        {
+          "bytes": 1000000,
+          "delta_rss_bytes": 884736,
+          "entries": 1002,
+          "mode": "scripts",
+          "peak_rss_bytes": 4751360,
+          "start_rss_bytes": 3866624,
+          "verdict": "Valid",
+          "wall_ns": 3330115
+        },
+        {
+          "bytes": 10000000,
+          "delta_rss_bytes": 2580480,
+          "entries": 10002,
+          "mode": "structure",
+          "peak_rss_bytes": 6443008,
+          "start_rss_bytes": 3862528,
+          "verdict": "Valid",
+          "wall_ns": 19675189
+        },
+        {
+          "bytes": 10000000,
+          "delta_rss_bytes": 2818048,
+          "entries": 10002,
+          "mode": "scripts",
+          "peak_rss_bytes": 6684672,
+          "start_rss_bytes": 3866624,
+          "verdict": "Valid",
+          "wall_ns": 30026358
+        }
+      ],
+      "benchmarks": {
+        "Encoding/from_base58 (1KB)": {
+          "p50_ns": 452303.46600458364,
+          "p99_ns": 456012.61250000005,
+          "samples": 100
+        },
+        "Encoding/from_hex (1KB)": {
+          "p50_ns": 3873.314928286129,
+          "p99_ns": 4379.70540522876,
+          "samples": 100
+        },
+        "Encoding/to_base58 (1KB)": {
+          "p50_ns": 1446739.7857142857,
+          "p99_ns": 1452231.383809524,
+          "samples": 100
+        },
+        "Encoding/to_hex (1KB)": {
+          "p50_ns": 4562.0671451540475,
+          "p99_ns": 4797.511682115595,
+          "samples": 100
+        },
+        "Hashing/hash160 (1KB)": {
+          "p50_ns": 933.7612858756311,
+          "p99_ns": 937.9033517329052,
+          "samples": 100
+        },
+        "Hashing/ripemd160 (1KB)": {
+          "p50_ns": 3784.6121521091527,
+          "p99_ns": 4065.9765464790044,
+          "samples": 100
+        },
+        "Hashing/sha1 (1KB)": {
+          "p50_ns": 641.4462718755182,
+          "p99_ns": 649.8909015228152,
+          "samples": 100
+        },
+        "Hashing/sha256 (1KB)": {
+          "p50_ns": 694.1644476315262,
+          "p99_ns": 698.1443691588786,
+          "samples": 100
+        },
+        "Hashing/sha256_hmac (1KB)": {
+          "p50_ns": 834.2645960403145,
+          "p99_ns": 851.6162622720898,
+          "samples": 100
+        },
+        "Hashing/sha256d (1KB)": {
+          "p50_ns": 746.1714243576617,
+          "p99_ns": 749.5871989407482,
+          "samples": 100
+        },
+        "Hashing/sha512 (1KB)": {
+          "p50_ns": 2220.6511689164217,
+          "p99_ns": 2559.3320521892974,
+          "samples": 100
+        },
+        "Hashing/sha512_hmac (1KB)": {
+          "p50_ns": 2996.2676195701924,
+          "p99_ns": 3042.841074817924,
+          "samples": 100
+        },
+        "Key Derivation/PrivateKey::derive_child": {
+          "p50_ns": 61682.31468301435,
+          "p99_ns": 65705.28100000003,
+          "samples": 100
+        },
+        "Key Derivation/PrivateKey::derive_shared_secret": {
+          "p50_ns": 60919.391659464134,
+          "p99_ns": 69493.40473684213,
+          "samples": 100
+        },
+        "Key Derivation/PublicKey::derive_child": {
+          "p50_ns": 122573.59877085162,
+          "p99_ns": 126933.45100000006,
+          "samples": 100
+        },
+        "Key Derivation/PublicKey::mul_scalar": {
+          "p50_ns": 60690.39295774648,
+          "p99_ns": 65868.94851020409,
+          "samples": 100
+        },
+        "Key Generation/P256PrivateKey::public_key": {
+          "p50_ns": 3.38904916036371,
+          "p99_ns": 3.455705524269854,
+          "samples": 100
+        },
+        "Key Generation/P256PrivateKey::random": {
+          "p50_ns": 93125.48251488095,
+          "p99_ns": 93871.71571428575,
+          "samples": 100
+        },
+        "Key Generation/PrivateKey::public_key": {
+          "p50_ns": 29935.285091480848,
+          "p99_ns": 30168.775710937512,
+          "samples": 100
+        },
+        "Key Generation/PrivateKey::random": {
+          "p50_ns": 549.2235748248249,
+          "p99_ns": 560.8024592366761,
+          "samples": 100
+        },
+        "Key Generation/SymmetricKey::random": {
+          "p50_ns": 489.89952937601447,
+          "p99_ns": 503.90034080959146,
+          "samples": 100
+        },
+        "Memory/Encryption/aes_gcm_decrypt/1024 bytes": {
+          "p50_ns": 1247.5053599564826,
+          "p99_ns": 1279.900483193278,
+          "samples": 100
+        },
+        "Memory/Encryption/aes_gcm_decrypt/16384 bytes": {
+          "p50_ns": 14125.010023498906,
+          "p99_ns": 14225.520075239401,
+          "samples": 100
+        },
+        "Memory/Encryption/aes_gcm_decrypt/64 bytes": {
+          "p50_ns": 407.50194909688014,
+          "p99_ns": 417.4730206896552,
+          "samples": 100
+        },
+        "Memory/Encryption/aes_gcm_encrypt/1024 bytes": {
+          "p50_ns": 1822.157558139535,
+          "p99_ns": 1852.551068667919,
+          "samples": 100
+        },
+        "Memory/Encryption/aes_gcm_encrypt/16384 bytes": {
+          "p50_ns": 14956.246788793103,
+          "p99_ns": 15161.384750000003,
+          "samples": 100
+        },
+        "Memory/Encryption/aes_gcm_encrypt/64 bytes": {
+          "p50_ns": 906.7717601116461,
+          "p99_ns": 918.3839196472325,
+          "samples": 100
+        },
+        "Memory/KeyDerivation/brc42_derive_child": {
+          "p50_ns": 61731.0841958042,
+          "p99_ns": 62446.50700000008,
+          "samples": 100
+        },
+        "Memory/KeyDerivation/ecdh_shared_secret": {
+          "p50_ns": 60798.984671933285,
+          "p99_ns": 63709.538857142914,
+          "samples": 100
+        },
+        "Memory/Shamir/recover_3_of_5": {
+          "p50_ns": 8046.146089271089,
+          "p99_ns": 8382.349391891898,
+          "samples": 100
+        },
+        "Memory/Shamir/split_3_of_5": {
+          "p50_ns": 6127.254992027252,
+          "p99_ns": 6231.105216836746,
+          "samples": 100
+        },
+        "Memory/Shamir/split_5_of_10": {
+          "p50_ns": 14133.846262626263,
+          "p99_ns": 15135.075714285716,
+          "samples": 100
+        },
+        "Memory/Signing/ecdsa_sign": {
+          "p50_ns": 69726.25925925926,
+          "p99_ns": 70731.61541666673,
+          "samples": 100
+        },
+        "Memory/Signing/ecdsa_verify": {
+          "p50_ns": 81328.4915460044,
+          "p99_ns": 84886.35250000002,
+          "samples": 100
+        },
+        "Schnorr Proofs/Schnorr::generate_proof": {
+          "p50_ns": 153363.82916666666,
+          "p99_ns": 162834.7380882354,
+          "samples": 100
+        },
+        "Schnorr Proofs/Schnorr::verify_proof": {
+          "p50_ns": 319808.5235507246,
+          "p99_ns": 376344.9389240507,
+          "samples": 100
+        },
+        "Script Parsing/Script::from_asm (P2PKH)": {
+          "p50_ns": 562.5243495742668,
+          "p99_ns": 769.7958512607471,
+          "samples": 100
+        },
+        "Script Parsing/Script::from_binary (P2PKH)": {
+          "p50_ns": 23.712874179088438,
+          "p99_ns": 24.125201397534244,
+          "samples": 100
+        },
+        "Script Parsing/Script::from_hex (P2PKH)": {
+          "p50_ns": 206.36714007725976,
+          "p99_ns": 208.99608650156966,
+          "samples": 100
+        },
+        "Script Serialization/to_asm (P2PKH)": {
+          "p50_ns": 314.6229681192988,
+          "p99_ns": 323.26179481346696,
+          "samples": 100
+        },
+        "Script Serialization/to_binary (P2PKH)": {
+          "p50_ns": 18.381514516793672,
+          "p99_ns": 19.773705544202944,
+          "samples": 100
+        },
+        "Script Serialization/to_binary (PushDrop 10 fields)": {
+          "p50_ns": 18.3799052818301,
+          "p99_ns": 20.247085547249377,
+          "samples": 100
+        },
+        "Script Serialization/to_hex (P2PKH)": {
+          "p50_ns": 19.61859332977258,
+          "p99_ns": 20.770084567574738,
+          "samples": 100
+        },
+        "Script Serialization/to_hex (PushDrop 10 fields)": {
+          "p50_ns": 20.83250417693417,
+          "p99_ns": 21.46069250244406,
+          "samples": 100
+        },
+        "Script Type Detection/is_multisig (2-of-3)": {
+          "p50_ns": 85.47579158866589,
+          "p99_ns": 88.14881922749221,
+          "samples": 100
+        },
+        "Script Type Detection/is_p2pk": {
+          "p50_ns": 55.099452388251436,
+          "p99_ns": 58.31801890081615,
+          "samples": 100
+        },
+        "Script Type Detection/is_p2pkh": {
+          "p50_ns": 46.59413296700982,
+          "p99_ns": 48.649403770620594,
+          "samples": 100
+        },
+        "Shamir Secret Sharing/from_backup_format": {
+          "p50_ns": 4327.570628732581,
+          "p99_ns": 4423.896506777896,
+          "samples": 100
+        },
+        "Shamir Secret Sharing/recover_private_key (3 of 5)": {
+          "p50_ns": 7771.711323915446,
+          "p99_ns": 9923.551611570254,
+          "samples": 100
+        },
+        "Shamir Secret Sharing/split_private_key (3 of 5)": {
+          "p50_ns": 6215.947305726415,
+          "p99_ns": 6498.153402061861,
+          "samples": 100
+        },
+        "Shamir Secret Sharing/split_private_key (5 of 10)": {
+          "p50_ns": 14645.504965156793,
+          "p99_ns": 14813.906905487813,
+          "samples": 100
+        },
+        "Shamir Secret Sharing/to_backup_format": {
+          "p50_ns": 7840.762418013118,
+          "p99_ns": 8373.017549652433,
+          "samples": 100
+        },
+        "Sighash/compute_sighash (5 inputs, 5 outputs)": {
+          "p50_ns": 1263.2105294951768,
+          "p99_ns": 1284.8745285087723,
+          "samples": 100
+        },
+        "Sighash/sighash x50 inputs, SighashCache (midstates once)": {
+          "p50_ns": 15007.587463924963,
+          "p99_ns": 15113.249531914898,
+          "samples": 100
+        },
+        "Sighash/sighash x50 inputs, free fn (no midstate reuse)": {
+          "p50_ns": 135430.46094911377,
+          "p99_ns": 137395.13365217394,
+          "samples": 100
+        },
+        "Sighash/sighash x50 inputs, from_raw per input (parse + no reuse)": {
+          "p50_ns": 178981.47590269276,
+          "p99_ns": 194830.71031690153,
+          "samples": 100
+        },
+        "Signing/P256PrivateKey::sign": {
+          "p50_ns": 101998.33525616578,
+          "p99_ns": 102990.64583333336,
+          "samples": 100
+        },
+        "Signing/P256PrivateKey::sign_hash": {
+          "p50_ns": 101896.39375,
+          "p99_ns": 104513.75549549551,
+          "samples": 100
+        },
+        "Signing/PrivateKey::sign (secp256k1)": {
+          "p50_ns": 69441.3878240808,
+          "p99_ns": 72694.62507246382,
+          "samples": 100
+        },
+        "Symmetric Encryption/decrypt/1024 bytes": {
+          "p50_ns": 1205.0704783637593,
+          "p99_ns": 1288.4122597780695,
+          "samples": 100
+        },
+        "Symmetric Encryption/decrypt/16384 bytes": {
+          "p50_ns": 14159.234173297966,
+          "p99_ns": 14429.352278911565,
+          "samples": 100
+        },
+        "Symmetric Encryption/decrypt/256 bytes": {
+          "p50_ns": 550.3995217426157,
+          "p99_ns": 565.0039502011526,
+          "samples": 100
+        },
+        "Symmetric Encryption/decrypt/4096 bytes": {
+          "p50_ns": 3794.141456102284,
+          "p99_ns": 3814.8273972602747,
+          "samples": 100
+        },
+        "Symmetric Encryption/decrypt/64 bytes": {
+          "p50_ns": 389.1388042229622,
+          "p99_ns": 404.00371393351077,
+          "samples": 100
+        },
+        "Symmetric Encryption/encrypt/1024 bytes": {
+          "p50_ns": 1805.2737352828144,
+          "p99_ns": 2194.5282563608243,
+          "samples": 100
+        },
+        "Symmetric Encryption/encrypt/16384 bytes": {
+          "p50_ns": 20107.78931077694,
+          "p99_ns": 20984.673455284556,
+          "samples": 100
+        },
+        "Symmetric Encryption/encrypt/256 bytes": {
+          "p50_ns": 1078.6060081954126,
+          "p99_ns": 1108.7043942831217,
+          "samples": 100
+        },
+        "Symmetric Encryption/encrypt/4096 bytes": {
+          "p50_ns": 5762.480624080379,
+          "p99_ns": 5892.831262135926,
+          "samples": 100
+        },
+        "Symmetric Encryption/encrypt/64 bytes": {
+          "p50_ns": 913.8195534244712,
+          "p99_ns": 925.0236615384619,
+          "samples": 100
+        },
+        "Template Lock/Multisig::lock_from_keys (2-of-3)": {
+          "p50_ns": 470.3644701798486,
+          "p99_ns": 493.25100976381606,
+          "samples": 100
+        },
+        "Template Lock/P2PK::lock": {
+          "p50_ns": 35.09651464097107,
+          "p99_ns": 37.10657254965717,
+          "samples": 100
+        },
+        "Template Lock/P2PKH::lock": {
+          "p50_ns": 34.9729342328562,
+          "p99_ns": 36.54136158825223,
+          "samples": 100
+        },
+        "Template Lock/PushDrop::lock (3 fields)": {
+          "p50_ns": 358.9971285140562,
+          "p99_ns": 366.90992168674745,
+          "samples": 100
+        },
+        "Template Sign/Multisig::sign_with_sighash (2 sigs)": {
+          "p50_ns": 140307.3884126984,
+          "p99_ns": 143606.85600000015,
+          "samples": 100
+        },
+        "Template Sign/P2PK::sign_with_sighash": {
+          "p50_ns": 70221.65277777778,
+          "p99_ns": 71947.86500000006,
+          "samples": 100
+        },
+        "Template Sign/P2PKH::sign_with_sighash": {
+          "p50_ns": 100622.05247311828,
+          "p99_ns": 131377.07768390805,
+          "samples": 100
+        },
+        "Verification/P256PublicKey::verify": {
+          "p50_ns": 331586.1999068033,
+          "p99_ns": 356989.9330000001,
+          "samples": 100
+        },
+        "Verification/PublicKey::verify (secp256k1)": {
+          "p50_ns": 80488.63893219887,
+          "p99_ns": 125858.43735745616,
+          "samples": 100
+        },
+        "WIF and Address/PrivateKey::from_wif": {
+          "p50_ns": 907.1336416051522,
+          "p99_ns": 934.339901633008,
+          "samples": 100
+        },
+        "WIF and Address/PrivateKey::to_wif": {
+          "p50_ns": 1880.016291786405,
+          "p99_ns": 2070.5161172261974,
+          "samples": 100
+        },
+        "WIF and Address/PublicKey::hash160": {
+          "p50_ns": 430.73700714943016,
+          "p99_ns": 443.88772202166075,
+          "samples": 100
+        },
+        "WIF and Address/PublicKey::to_address": {
+          "p50_ns": 1289.281177986872,
+          "p99_ns": 1304.4890021691986,
+          "samples": 100
+        },
+        "beef_stream/scripts/1000000": {
+          "p50_ns": 2708706.625,
+          "p99_ns": 2764703.3183333334,
+          "samples": 100
+        },
+        "beef_stream/scripts/10000000": {
+          "p50_ns": 26865829.75,
+          "p99_ns": 29546550.895000048,
+          "samples": 100
+        },
+        "beef_stream/structure/1000000": {
+          "p50_ns": 1758587.1470588236,
+          "p99_ns": 1828018.6688235325,
+          "samples": 100
+        },
+        "beef_stream/structure/10000000": {
+          "p50_ns": 18245576.0,
+          "p99_ns": 19201875.31,
+          "samples": 100
+        },
+        "hash160": {
+          "p50_ns": 296.66325349301394,
+          "p99_ns": 299.70415641543013,
+          "samples": 100
+        },
+        "merkle_path/verify_depth20_10000": {
+          "p50_ns": 224905764.0,
+          "p99_ns": 233875631.45000005,
+          "samples": 100
+        },
+        "script_spend/seed_block": {
+          "p50_ns": 60031011.5,
+          "p99_ns": 60916832.7,
+          "samples": 100
+        },
+        "sha256": {
+          "p50_ns": 71.23401455185098,
+          "p99_ns": 72.83717743281154,
+          "samples": 100
+        },
+        "sha256_hmac": {
+          "p50_ns": 215.04904778349604,
+          "p99_ns": 219.92100054328142,
+          "samples": 100
+        },
+        "sha256d": {
+          "p50_ns": 121.97177846127126,
+          "p99_ns": 124.26686992758664,
+          "samples": 100
+        },
+        "sha512": {
+          "p50_ns": 278.3821466007234,
+          "p99_ns": 281.2557793361386,
+          "samples": 100
+        },
+        "transaction_sign_verify/sign_100_p2pkh": {
+          "p50_ns": 10685295.0,
+          "p99_ns": 10756635.883333333,
+          "samples": 100
+        },
+        "transaction_sign_verify/verify_100_p2pkh": {
+          "p50_ns": 10141744.833333334,
+          "p99_ns": 10227395.77666667,
+          "samples": 100
+        },
+        "wire_codec/abortAction/request_decode": {
+          "p50_ns": 129.33394529066982,
+          "p99_ns": 132.75939479392628,
+          "samples": 100
+        },
+        "wire_codec/abortAction/request_encode": {
+          "p50_ns": 74.59772672225824,
+          "p99_ns": 77.60993436439088,
+          "samples": 100
+        },
+        "wire_codec/abortAction/result_decode": {
+          "p50_ns": 62.79187099254022,
+          "p99_ns": 63.48670912727656,
+          "samples": 100
+        },
+        "wire_codec/abortAction/result_encode": {
+          "p50_ns": 20.54256748353822,
+          "p99_ns": 20.866038675753288,
+          "samples": 100
+        },
+        "wire_codec/acquireCertificate/request_decode": {
+          "p50_ns": 875.6347167805554,
+          "p99_ns": 1186.4551671077827,
+          "samples": 100
+        },
+        "wire_codec/acquireCertificate/request_encode": {
+          "p50_ns": 319.5206521815106,
+          "p99_ns": 336.6402784161989,
+          "samples": 100
+        },
+        "wire_codec/acquireCertificate/result_decode": {
+          "p50_ns": 427.0576654131834,
+          "p99_ns": 434.3087885852538,
+          "samples": 100
+        },
+        "wire_codec/acquireCertificate/result_encode": {
+          "p50_ns": 267.60345073794093,
+          "p99_ns": 307.8431870545082,
+          "samples": 100
+        },
+        "wire_codec/createAction/request_decode": {
+          "p50_ns": 1967.5590531879275,
+          "p99_ns": 2007.055478547857,
+          "samples": 100
+        },
+        "wire_codec/createAction/request_encode": {
+          "p50_ns": 424.9521835410444,
+          "p99_ns": 436.6974387166552,
+          "samples": 100
+        },
+        "wire_codec/createAction/result_decode": {
+          "p50_ns": 608.6114861504743,
+          "p99_ns": 615.4713787479335,
+          "samples": 100
+        },
+        "wire_codec/createAction/result_encode": {
+          "p50_ns": 225.6780326845565,
+          "p99_ns": 235.30377356675677,
+          "samples": 100
+        },
+        "wire_codec/createHmac/request_decode": {
+          "p50_ns": 8189.321295143212,
+          "p99_ns": 8247.164640410962,
+          "samples": 100
+        },
+        "wire_codec/createHmac/request_encode": {
+          "p50_ns": 328.60466027874565,
+          "p99_ns": 345.55785838233885,
+          "samples": 100
+        },
+        "wire_codec/createHmac/result_decode": {
+          "p50_ns": 89.41736841871534,
+          "p99_ns": 91.56179172084619,
+          "samples": 100
+        },
+        "wire_codec/createHmac/result_encode": {
+          "p50_ns": 56.361217838306565,
+          "p99_ns": 59.21139336014133,
+          "samples": 100
+        },
+        "wire_codec/createSignature/request_decode": {
+          "p50_ns": 8244.29413892293,
+          "p99_ns": 8688.335174418611,
+          "samples": 100
+        },
+        "wire_codec/createSignature/request_encode": {
+          "p50_ns": 338.32946618287576,
+          "p99_ns": 358.7998492294881,
+          "samples": 100
+        },
+        "wire_codec/createSignature/result_decode": {
+          "p50_ns": 89.22137941113945,
+          "p99_ns": 93.87437106717687,
+          "samples": 100
+        },
+        "wire_codec/createSignature/result_encode": {
+          "p50_ns": 37.037326993462884,
+          "p99_ns": 38.51467376342118,
+          "samples": 100
+        },
+        "wire_codec/decrypt/request_decode": {
+          "p50_ns": 8174.884040359405,
+          "p99_ns": 8357.67315068494,
+          "samples": 100
+        },
+        "wire_codec/decrypt/request_encode": {
+          "p50_ns": 326.308016736327,
+          "p99_ns": 339.7742718715394,
+          "samples": 100
+        },
+        "wire_codec/decrypt/result_decode": {
+          "p50_ns": 89.02037868057964,
+          "p99_ns": 90.11456466547197,
+          "samples": 100
+        },
+        "wire_codec/decrypt/result_encode": {
+          "p50_ns": 27.384901376486447,
+          "p99_ns": 29.833517310587077,
+          "samples": 100
+        },
+        "wire_codec/discoverByAttributes/request_decode": {
+          "p50_ns": 413.61285206753837,
+          "p99_ns": 441.3955291281443,
+          "samples": 100
+        },
+        "wire_codec/discoverByAttributes/request_encode": {
+          "p50_ns": 102.72597883635368,
+          "p99_ns": 104.93740093915125,
+          "samples": 100
+        },
+        "wire_codec/discoverByAttributes/result_decode": {
+          "p50_ns": 1528.4847349833267,
+          "p99_ns": 1544.6324285714293,
+          "samples": 100
+        },
+        "wire_codec/discoverByAttributes/result_encode": {
+          "p50_ns": 567.0385726402784,
+          "p99_ns": 573.5832095010255,
+          "samples": 100
+        },
+        "wire_codec/discoverByIdentityKey/request_decode": {
+          "p50_ns": 252.6208313799031,
+          "p99_ns": 278.56573069616735,
+          "samples": 100
+        },
+        "wire_codec/discoverByIdentityKey/request_encode": {
+          "p50_ns": 162.33165442635965,
+          "p99_ns": 166.37946728302424,
+          "samples": 100
+        },
+        "wire_codec/discoverByIdentityKey/result_decode": {
+          "p50_ns": 1525.9057936881773,
+          "p99_ns": 1609.757344395619,
+          "samples": 100
+        },
+        "wire_codec/discoverByIdentityKey/result_encode": {
+          "p50_ns": 560.9018748566424,
+          "p99_ns": 568.9724952561676,
+          "samples": 100
+        },
+        "wire_codec/encrypt/request_decode": {
+          "p50_ns": 8124.444519519519,
+          "p99_ns": 9563.849422172176,
+          "samples": 100
+        },
+        "wire_codec/encrypt/request_encode": {
+          "p50_ns": 338.8755695477962,
+          "p99_ns": 343.046493989697,
+          "samples": 100
+        },
+        "wire_codec/encrypt/result_decode": {
+          "p50_ns": 89.34990988245445,
+          "p99_ns": 90.78623006159887,
+          "samples": 100
+        },
+        "wire_codec/encrypt/result_encode": {
+          "p50_ns": 56.43084552578223,
+          "p99_ns": 64.8498464261921,
+          "samples": 100
+        },
+        "wire_codec/getHeaderForHeight/request_decode": {
+          "p50_ns": 127.81190324287441,
+          "p99_ns": 129.68628911926749,
+          "samples": 100
+        },
+        "wire_codec/getHeaderForHeight/request_encode": {
+          "p50_ns": 74.35961512064407,
+          "p99_ns": 77.56042737185113,
+          "samples": 100
+        },
+        "wire_codec/getHeaderForHeight/result_decode": {
+          "p50_ns": 96.44106872424805,
+          "p99_ns": 98.62220837216776,
+          "samples": 100
+        },
+        "wire_codec/getHeaderForHeight/result_encode": {
+          "p50_ns": 57.36597221161256,
+          "p99_ns": 58.20753602862949,
+          "samples": 100
+        },
+        "wire_codec/getHeight/request_decode": {
+          "p50_ns": 98.20604094816417,
+          "p99_ns": 102.15646879128141,
+          "samples": 100
+        },
+        "wire_codec/getHeight/request_encode": {
+          "p50_ns": 38.83198444511967,
+          "p99_ns": 42.426972045624574,
+          "samples": 100
+        },
+        "wire_codec/getHeight/result_decode": {
+          "p50_ns": 90.54839974465463,
+          "p99_ns": 91.82109013177944,
+          "samples": 100
+        },
+        "wire_codec/getHeight/result_encode": {
+          "p50_ns": 25.822693723766683,
+          "p99_ns": 26.360459469000276,
+          "samples": 100
+        },
+        "wire_codec/getNetwork/request_decode": {
+          "p50_ns": 98.26345297281554,
+          "p99_ns": 102.54681640194136,
+          "samples": 100
+        },
+        "wire_codec/getNetwork/request_encode": {
+          "p50_ns": 38.84659138998961,
+          "p99_ns": 44.8229217976269,
+          "samples": 100
+        },
+        "wire_codec/getNetwork/result_decode": {
+          "p50_ns": 83.73866918462565,
+          "p99_ns": 86.60221391206,
+          "samples": 100
+        },
+        "wire_codec/getNetwork/result_encode": {
+          "p50_ns": 23.966957987750877,
+          "p99_ns": 24.41427498719298,
+          "samples": 100
+        },
+        "wire_codec/getPublicKey/request_decode": {
+          "p50_ns": 8097.007657657658,
+          "p99_ns": 8196.523676932748,
+          "samples": 100
+        },
+        "wire_codec/getPublicKey/request_encode": {
+          "p50_ns": 346.2281602185126,
+          "p99_ns": 364.45367033058153,
+          "samples": 100
+        },
+        "wire_codec/getPublicKey/result_decode": {
+          "p50_ns": 97.01327604259095,
+          "p99_ns": 98.70203755102048,
+          "samples": 100
+        },
+        "wire_codec/getPublicKey/result_encode": {
+          "p50_ns": 56.40798232130548,
+          "p99_ns": 57.32823504883136,
+          "samples": 100
+        },
+        "wire_codec/getVersion/request_decode": {
+          "p50_ns": 98.23268337088693,
+          "p99_ns": 101.79488148410734,
+          "samples": 100
+        },
+        "wire_codec/getVersion/request_encode": {
+          "p50_ns": 38.79830696584955,
+          "p99_ns": 51.75486168300658,
+          "samples": 100
+        },
+        "wire_codec/getVersion/result_decode": {
+          "p50_ns": 89.16347025893607,
+          "p99_ns": 91.34715293108994,
+          "samples": 100
+        },
+        "wire_codec/getVersion/result_encode": {
+          "p50_ns": 37.01307508844747,
+          "p99_ns": 37.83755949048157,
+          "samples": 100
+        },
+        "wire_codec/internalizeAction/request_decode": {
+          "p50_ns": 1074.335201882044,
+          "p99_ns": 1115.4862702702703,
+          "samples": 100
+        },
+        "wire_codec/internalizeAction/request_encode": {
+          "p50_ns": 305.56517145916666,
+          "p99_ns": 315.3149587416196,
+          "samples": 100
+        },
+        "wire_codec/internalizeAction/result_decode": {
+          "p50_ns": 62.757603950683134,
+          "p99_ns": 63.13166235012622,
+          "samples": 100
+        },
+        "wire_codec/internalizeAction/result_encode": {
+          "p50_ns": 20.545831501524717,
+          "p99_ns": 20.78848220154291,
+          "samples": 100
+        },
+        "wire_codec/isAuthenticated/request_decode": {
+          "p50_ns": 98.16298596815368,
+          "p99_ns": 99.12217729412289,
+          "samples": 100
+        },
+        "wire_codec/isAuthenticated/request_encode": {
+          "p50_ns": 38.847379965993106,
+          "p99_ns": 39.86111919510755,
+          "samples": 100
+        },
+        "wire_codec/isAuthenticated/result_decode": {
+          "p50_ns": 84.38926392978873,
+          "p99_ns": 85.5858878372652,
+          "samples": 100
+        },
+        "wire_codec/isAuthenticated/result_encode": {
+          "p50_ns": 24.580381443941345,
+          "p99_ns": 26.383246485567213,
+          "samples": 100
+        },
+        "wire_codec/listActions/request_decode": {
+          "p50_ns": 509.5559086318932,
+          "p99_ns": 534.7398758561645,
+          "samples": 100
+        },
+        "wire_codec/listActions/request_encode": {
+          "p50_ns": 154.6022674773361,
+          "p99_ns": 167.17195134846284,
+          "samples": 100
+        },
+        "wire_codec/listActions/result_decode": {
+          "p50_ns": 778.1684975644408,
+          "p99_ns": 811.3182519788921,
+          "samples": 100
+        },
+        "wire_codec/listActions/result_encode": {
+          "p50_ns": 308.57625478842743,
+          "p99_ns": 315.9791446411255,
+          "samples": 100
+        },
+        "wire_codec/listCertificates/request_decode": {
+          "p50_ns": 565.0838260084286,
+          "p99_ns": 576.4442431409656,
+          "samples": 100
+        },
+        "wire_codec/listCertificates/request_encode": {
+          "p50_ns": 221.2642130538519,
+          "p99_ns": 223.90340946348744,
+          "samples": 100
+        },
+        "wire_codec/listCertificates/result_decode": {
+          "p50_ns": 1056.1008533344607,
+          "p99_ns": 1074.970114490163,
+          "samples": 100
+        },
+        "wire_codec/listCertificates/result_encode": {
+          "p50_ns": 459.6852409938135,
+          "p99_ns": 498.2390497455018,
+          "samples": 100
+        },
+        "wire_codec/listOutputs/request_decode": {
+          "p50_ns": 490.6070922182482,
+          "p99_ns": 612.2629878058698,
+          "samples": 100
+        },
+        "wire_codec/listOutputs/request_encode": {
+          "p50_ns": 157.44146293726203,
+          "p99_ns": 160.20000994694968,
+          "samples": 100
+        },
+        "wire_codec/listOutputs/result_decode": {
+          "p50_ns": 370.72508167494595,
+          "p99_ns": 377.1245624794802,
+          "samples": 100
+        },
+        "wire_codec/listOutputs/result_encode": {
+          "p50_ns": 153.59566396164536,
+          "p99_ns": 177.29564791828292,
+          "samples": 100
+        },
+        "wire_codec/proveCertificate/request_decode": {
+          "p50_ns": 727.9500748643084,
+          "p99_ns": 742.6198431297225,
+          "samples": 100
+        },
+        "wire_codec/proveCertificate/request_encode": {
+          "p50_ns": 365.32167983567615,
+          "p99_ns": 398.4769463190188,
+          "samples": 100
+        },
+        "wire_codec/proveCertificate/result_decode": {
+          "p50_ns": 367.4517802622195,
+          "p99_ns": 382.52055350553525,
+          "samples": 100
+        },
+        "wire_codec/proveCertificate/result_encode": {
+          "p50_ns": 98.39658228459709,
+          "p99_ns": 114.84396315745948,
+          "samples": 100
+        },
+        "wire_codec/relinquishCertificate/request_decode": {
+          "p50_ns": 240.7618127022889,
+          "p99_ns": 245.37364436732867,
+          "samples": 100
+        },
+        "wire_codec/relinquishCertificate/request_encode": {
+          "p50_ns": 168.79928727223918,
+          "p99_ns": 174.86595924843132,
+          "samples": 100
+        },
+        "wire_codec/relinquishCertificate/result_decode": {
+          "p50_ns": 62.773658783263315,
+          "p99_ns": 63.32333876735382,
+          "samples": 100
+        },
+        "wire_codec/relinquishCertificate/result_encode": {
+          "p50_ns": 20.555355781700108,
+          "p99_ns": 24.15493867368859,
+          "samples": 100
+        },
+        "wire_codec/relinquishOutput/request_decode": {
+          "p50_ns": 162.39738526895232,
+          "p99_ns": 164.81127740595448,
+          "samples": 100
+        },
+        "wire_codec/relinquishOutput/request_encode": {
+          "p50_ns": 112.32228652432823,
+          "p99_ns": 124.40410557205644,
+          "samples": 100
+        },
+        "wire_codec/relinquishOutput/result_decode": {
+          "p50_ns": 62.763684722076285,
+          "p99_ns": 63.265994010717684,
+          "samples": 100
+        },
+        "wire_codec/relinquishOutput/result_encode": {
+          "p50_ns": 20.54911674771431,
+          "p99_ns": 22.43222400457904,
+          "samples": 100
+        },
+        "wire_codec/revealCounterpartyKeyLinkage/request_decode": {
+          "p50_ns": 289.11037055853683,
+          "p99_ns": 301.3835036674818,
+          "samples": 100
+        },
+        "wire_codec/revealCounterpartyKeyLinkage/request_encode": {
+          "p50_ns": 177.56250117039804,
+          "p99_ns": 189.0793033640965,
+          "samples": 100
+        },
+        "wire_codec/revealCounterpartyKeyLinkage/result_decode": {
+          "p50_ns": 352.5832546705998,
+          "p99_ns": 375.69000589970506,
+          "samples": 100
+        },
+        "wire_codec/revealCounterpartyKeyLinkage/result_encode": {
+          "p50_ns": 178.39838890380895,
+          "p99_ns": 183.8009695874739,
+          "samples": 100
+        },
+        "wire_codec/revealSpecificKeyLinkage/request_decode": {
+          "p50_ns": 8050.971592281938,
+          "p99_ns": 8242.34032972973,
+          "samples": 100
+        },
+        "wire_codec/revealSpecificKeyLinkage/request_encode": {
+          "p50_ns": 322.54735389463184,
+          "p99_ns": 328.0137571273127,
+          "samples": 100
+        },
+        "wire_codec/revealSpecificKeyLinkage/result_decode": {
+          "p50_ns": 495.27643735811205,
+          "p99_ns": 523.757769536448,
+          "samples": 100
+        },
+        "wire_codec/revealSpecificKeyLinkage/result_encode": {
+          "p50_ns": 208.90715485587378,
+          "p99_ns": 222.27416750178958,
+          "samples": 100
+        },
+        "wire_codec/signAction/request_decode": {
+          "p50_ns": 577.4968977321353,
+          "p99_ns": 583.9131558106176,
+          "samples": 100
+        },
+        "wire_codec/signAction/request_encode": {
+          "p50_ns": 159.39472535930813,
+          "p99_ns": 174.28494741078617,
+          "samples": 100
+        },
+        "wire_codec/signAction/result_decode": {
+          "p50_ns": 277.1842227695729,
+          "p99_ns": 314.40307636633753,
+          "samples": 100
+        },
+        "wire_codec/signAction/result_encode": {
+          "p50_ns": 182.43779886562294,
+          "p99_ns": 232.30318834000582,
+          "samples": 100
+        },
+        "wire_codec/verifyHmac/request_decode": {
+          "p50_ns": 8147.135,
+          "p99_ns": 8472.313219178084,
+          "samples": 100
+        },
+        "wire_codec/verifyHmac/request_encode": {
+          "p50_ns": 343.45262796007216,
+          "p99_ns": 362.9991133720931,
+          "samples": 100
+        },
+        "wire_codec/verifyHmac/result_decode": {
+          "p50_ns": 62.796662977305076,
+          "p99_ns": 66.90818714643422,
+          "samples": 100
+        },
+        "wire_codec/verifyHmac/result_encode": {
+          "p50_ns": 20.53182633413258,
+          "p99_ns": 20.89340034187698,
+          "samples": 100
+        },
+        "wire_codec/verifySignature/request_decode": {
+          "p50_ns": 8324.433546123764,
+          "p99_ns": 9031.161990740742,
+          "samples": 100
+        },
+        "wire_codec/verifySignature/request_encode": {
+          "p50_ns": 344.3833049939801,
+          "p99_ns": 347.58187609075054,
+          "samples": 100
+        },
+        "wire_codec/verifySignature/result_decode": {
+          "p50_ns": 62.784251270318435,
+          "p99_ns": 63.21574002398943,
+          "samples": 100
+        },
+        "wire_codec/verifySignature/result_encode": {
+          "p50_ns": 20.556618716948066,
+          "p99_ns": 22.333606443790078,
+          "samples": 100
+        },
+        "wire_codec/waitForAuthentication/request_decode": {
+          "p50_ns": 98.15352893364177,
+          "p99_ns": 100.67577952051255,
+          "samples": 100
+        },
+        "wire_codec/waitForAuthentication/request_encode": {
+          "p50_ns": 38.78655419011287,
+          "p99_ns": 39.3220126643801,
+          "samples": 100
+        },
+        "wire_codec/waitForAuthentication/result_decode": {
+          "p50_ns": 62.753150262680734,
+          "p99_ns": 68.82656703366229,
+          "samples": 100
+        },
+        "wire_codec/waitForAuthentication/result_encode": {
+          "p50_ns": 20.52557180621252,
+          "p99_ns": 23.260053233573817,
+          "samples": 100
+        }
+      }
     }
   }
 }
