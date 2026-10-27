@@ -898,23 +898,28 @@ async fn test_general_message_without_session_fails() {
         originator: Some("e2e-test".into()),
     });
 
-    // Create a General message from Alice without prior handshake
+    // Create a General message from Alice without prior handshake, its
+    // yourNonce one Bob's wallet made (checked before the session since #353)
+    let your_nonce = bsv_rs::auth::create_nonce(
+        &ProtoWallet::new(Some(bob_key.clone())),
+        None,
+        Some("e2e-test"),
+    )
+    .await
+    .unwrap();
     let alice_pub = alice_key.public_key();
     let mut msg = AuthMessage::new(MessageType::General, alice_pub);
     msg.nonce = Some("some-nonce".to_string());
+    msg.your_nonce = Some(your_nonce.clone());
     msg.payload = Some(b"Hello".to_vec());
     msg.signature = Some(vec![0x30, 0x44]); // Fake DER
 
-    let result = bob.handle_incoming_message(msg).await;
-    assert!(
-        result.is_err(),
-        "General message without a session should fail"
-    );
-    let err_msg = result.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("No session") || err_msg.contains("session"),
-        "Error should mention missing session, got: {}",
-        err_msg
+    // The reference's words (`Peer.ts:1282-1285`)
+    assert_eq!(
+        bob.handle_incoming_message(msg).await,
+        Err(bsv_rs::Error::AuthError(format!(
+            "Session not found for nonce: {your_nonce}"
+        )))
     );
 }
 

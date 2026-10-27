@@ -2246,8 +2246,15 @@ async fn test_ts_style_initial_response_through_mock_transport() {
     // queue_response because the Peer.start() callback processes it. But we can
     // test directly via handle_incoming_message with a TS-shaped response.
 
-    // First, manually create a session as if we had sent an InitialRequest
-    let our_nonce = "dGVzdC1jbGllbnQtbm9uY2U=".to_string(); // base64 of test data
+    // First, manually create a session as if we had sent an InitialRequest,
+    // its nonce one the client's wallet made (checked first since #353)
+    let our_nonce = bsv_rs::auth::create_nonce(
+        &ProtoWallet::new(Some(client_key.clone())),
+        None,
+        Some("cross-sdk-test"),
+    )
+    .await
+    .unwrap();
     {
         let mut mgr = client.session_manager().write().await;
         let session = PeerSession::with_nonce(our_nonce.clone());
