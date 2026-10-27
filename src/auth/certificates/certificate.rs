@@ -414,29 +414,31 @@ impl Certificate {
     /// certifier's raw key is `Ok(false)` (#251). The preimage is
     /// [`received_unsigned`](Self::received_unsigned) while it binds to the
     /// current values, never a re-sort of the issuer's fields (#249).
+    ///
+    /// Every failure under it is `Ok(false)`, as the reference's `verify`
+    /// answers `false` to every failure under it (`Certificate.ts:425-440`,
+    /// "the historical boolean verification contract"): an absent or empty
+    /// signature, one that is not DER, a frame that does not serialize (a
+    /// field over the bound, #275), a key that does not derive (#299). It
+    /// returns no `Err` today; the `Result` stays for semver.
     pub fn verify(&self) -> Result<bool> {
-        let sig_bytes = self
-            .signature
-            .as_ref()
-            .ok_or_else(|| Error::InvalidSignature("Certificate not signed".into()))?;
-
-        // The reference's `verify` answers `false` to every failure under it
-        // (`Certificate.ts:435-439`, "the historical boolean verification
-        // contract"): a field value over the bound is an invalid credential,
-        // not an error (#275).
-        let hash = match self.signing_hash() {
-            Ok(hash) => hash,
-            Err(Error::CertificateValidationError(_)) => return Ok(false),
-            Err(e) => return Err(e),
+        let Some(sig_bytes) = self.signature.as_ref() else {
+            return Ok(false);
         };
-        let sig = Signature::from_der(sig_bytes)?;
-
-        let child = KeyDeriver::new(None).derive_public_key(
+        let Ok(hash) = self.signing_hash() else {
+            return Ok(false);
+        };
+        let Ok(sig) = Signature::from_der(sig_bytes) else {
+            return Ok(false);
+        };
+        let Ok(child) = KeyDeriver::new(None).derive_public_key(
             &signature_protocol(),
             &self.signature_key_id(),
             &Counterparty::Other(self.certifier.clone()),
             false,
-        )?;
+        ) else {
+            return Ok(false);
+        };
         Ok(child.verify(&hash, &sig))
     }
 

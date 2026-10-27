@@ -119,7 +119,7 @@ reference's words, `Decryption failed!` and `Ciphertext too short`; #297):
 | `with_revocation_outpoint()`, `with_fields()`, `with_signature()` | Chain onto `new()` for the fields a struct literal set (#249) |
 | `set_revocation_outpoint()`, `set_fields()`, `set_signature()` | Change one after construction; the two that change the preimage clear `received_unsigned` (#249) |
 | `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251); a certificate already signed refused, `CertificateValidationError` in the reference's words (`Certificate has already been signed! Signature present: <hex>`), cleared with `set_signature(None)` to re-sign (#262) |
-| `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249); an over-bound field value is `Ok(false)` too, as the reference's `verify` answers `false` to every failure under it (`Certificate.ts:435-439`, #275) |
+| `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249); an over-bound field value is `Ok(false)` too (#275), and an absent, empty or non-DER signature or a key that does not derive (#299): the reference's `verify` answers `false` to every failure under it (`Certificate.ts:425-440`); no `Err` is returned, the `Result` kept for semver |
 | `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
 | `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249); `Result` since #275: a field value whose text is over 1 MiB of UTF-8 refused before the buffer, `CertificateValidationError("Certificate field <name> exceeds the maximum of 1048576 bytes")`, the reference's words (`Certificate.ts:76-79`) and the wire's (`wallet::wire::certificate_field_value_refusal`); `sign` and `verify` through it; ahead of the values, more than 100,000 fields and a name outside 1 to 50 bytes or unsafe refused in `toBinary`'s words (`Certificate.ts:44-129`, #297) |
 | `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249); a field value that is not UTF-8 refused as `InvalidUtf8` (`Certificate.ts:384`, #261); a declared value length over 1 MiB refused before the bytes are read, in the writer's words (`:377-381`, #275); a field count over 100,000 or over a third of the bytes after it, a declared name length outside 1 to 50 before the name is read, an unsafe name, in the reader's words (`:357-373`, #297) |
@@ -143,7 +143,7 @@ reference's words, `Decryption failed!` and `Ciphertext too short`; #297):
 | `create_keyring_for_verifier()` | Create verifier-specific keyring from the master keyring (async); the reference's parameters in its order (`MasterCertificate.ts:325-346`), then `originator`; the fields to reveal (100, safe, none twice), every field and keyring entry checked first, a field not carried refused in the reference's words, a failed decrypt `Failed to decrypt certificate field!` (#297) |
 | `decrypt_field()` | Decrypt single field (async); `privileged`, `privileged_reason` to the `decrypt`; every failure `Failed to decrypt certificate field!` (#297) |
 | `decrypt_fields()` | Decrypt all fields (async); the same pair; an empty keyring refused, every later failure `Failed to decrypt all master certificate fields.` (#297) |
-| `verify()` | Verify underlying certificate signature |
+| `verify()` | Verify underlying certificate signature; `Ok(false)` for every failure, as `Certificate::verify` (#299) |
 
 ### VerifiableCertificate
 
@@ -157,7 +157,7 @@ reference's words, `Decryption failed!` and `Ciphertext too short`; #297):
 | `decrypt_fields()` | Decrypt all fields in keyring (async, cached); the same pair; an empty keyring or one over 100 entries refused, every failure `Failed to decrypt selectively revealed certificate fields using keyring: <words>`, the cipher's `Decryption failed!` and `Ciphertext too short` as the reference's (`SymmetricKey.ts:205`, `:217`, `:232`), a revelation key other than 32 bytes refused (`VerifiableCertificate.ts:203`) (#297) |
 | `get_decrypted_fields()` | Get cached decrypted fields if available |
 | `clear_decrypted_cache()` | Clear the cached decrypted fields |
-| `verify()` | Verify underlying certificate signature |
+| `verify()` | Verify underlying certificate signature; `Ok(false)` for every failure, as `Certificate::verify` (#299) |
 | `subject()` | Get subject's public key |
 | `certifier()` | Get certifier's public key |
 | `cert_type()` | Get certificate type |

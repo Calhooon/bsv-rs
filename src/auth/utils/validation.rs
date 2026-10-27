@@ -85,9 +85,13 @@ pub async fn validate_certificate<W: WalletInterface>(
         ));
     }
 
-    // 2. Verify certificate signature
+    // 2. Verify certificate signature: `false` for every failure under it,
+    // refused in the reference's words (`validateCertificates.ts:99-104`; #299)
     if !cert.verify()? {
-        return Err(Error::AuthError("Certificate signature invalid".into()));
+        return Err(Error::AuthError(format!(
+            "The signature for the certificate with serial number {} is invalid!",
+            cert.certificate.serial_number_base64()
+        )));
     }
 
     // 3. If we have requirements, check them

@@ -192,7 +192,7 @@ Validates all certificates in an authentication message.
 **Errors:**
 - `Error::AuthError("Required certificates not provided")` - Certificates requested but none in message
 - `Error::AuthError("Certificate subject does not match message sender")` - Subject mismatch
-- `Error::AuthError("Certificate signature invalid")` - Signature verification failed
+- `Error::AuthError("The signature for the certificate with serial number <serial base64> is invalid!")` - `verify` answered `false` (any failure under it, #299), the reference's words (`validateCertificates.ts:99-104`)
 - `Error::AuthError("Certificate from untrusted certifier: {hex}")` - Certifier not in trusted list
 - `Error::AuthError("Certificate type not in requested set: {type}")` - Type not requested
 - `Error::AuthError("Required field '{name}' not revealed in certificate")` - Missing keyring entry

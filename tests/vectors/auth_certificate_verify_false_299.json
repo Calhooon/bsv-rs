@@ -1,0 +1,70 @@
+{
+  "description": "Certificate.verify answers false, never an error (#299): the reference's verdict on one certificate under nine signatures",
+  "reference": "@bsv/sdk at ts-stack@edf6e03 (packages/sdk, bundled with bun build), run under Node v22.18.0 by tests/support/certificate_verify_false_299.mjs",
+  "site": "ts-stack@edf6e03 packages/sdk/src/auth/certificates/Certificate.ts:425-440",
+  "witnesses": [
+    {
+      "name": "valid",
+      "origin": "signed by the certifier under BRC-52's derivation",
+      "signature_hex": "3045022100a72d1946328788cef452a942fd375a571fa91999157d06b419ea3ab60f4612b902204b5613a06b930d1b28253a2d606dd06e285998931407ea53222789a206ea0878",
+      "reference_verify": true,
+      "threw": false
+    },
+    {
+      "name": "absent",
+      "origin": "no signature (`undefined`)",
+      "signature_hex": null,
+      "reference_verify": false,
+      "threw": false
+    },
+    {
+      "name": "empty",
+      "origin": "the empty hex string",
+      "signature_hex": "",
+      "reference_verify": false,
+      "threw": false
+    },
+    {
+      "name": "not_der",
+      "origin": "eight bytes that are not DER",
+      "signature_hex": "3006ffffffffffff",
+      "reference_verify": false,
+      "threw": false
+    },
+    {
+      "name": "truncated_der",
+      "origin": "the valid signature less its last byte",
+      "signature_hex": "3045022100a72d1946328788cef452a942fd375a571fa91999157d06b419ea3ab60f4612b902204b5613a06b930d1b28253a2d606dd06e285998931407ea53222789a206ea08",
+      "reference_verify": false,
+      "threw": false
+    },
+    {
+      "name": "other_key",
+      "origin": "signed by key 11 under the derivation, the certificate naming key 7",
+      "signature_hex": "3045022100af21c329c698e2bccc84008dd6573ec325e6ba6b060e3b0e8b304fd6a3cbd7cb02204603b36b0d8a16ebf4a375ebf12ad688f78f99c0ad39d110fdd86693dadab4c3",
+      "reference_verify": false,
+      "threw": false
+    },
+    {
+      "name": "zero_r",
+      "origin": "DER of r = 0, s = 1",
+      "signature_hex": "3006020100020101",
+      "reference_verify": false,
+      "threw": false
+    },
+    {
+      "name": "high_s",
+      "origin": "the valid signature with s replaced by n - s",
+      "signature_hex": "3046022100a72d1946328788cef452a942fd375a571fa91999157d06b419ea3ab60f4612b9022100b4a9ec5f946cf2e4d7dac5d29f922f90925544539b40b5e89daad4eac94c38c9",
+      "reference_verify": true,
+      "threw": false
+    },
+    {
+      "name": "not_hex",
+      "origin": "a signature text that is not hex",
+      "signature_hex": "zz",
+      "reference_verify": false,
+      "threw": false
+    }
+  ]
+}
