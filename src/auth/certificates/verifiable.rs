@@ -3,9 +3,13 @@
 //! A verifiable certificate includes a keyring that allows a specific
 //! verifier to decrypt selected fields.
 
-use super::master::{decrypt_field_value, field_ciphertext, field_protocol};
+use super::bounds::{
+    self, field_ciphertext, keyring_ciphertext, refused, verifiable_decrypt_failed,
+    MAX_DECRYPTED_FIELD_BYTES, MAX_RECORD_ENTRIES,
+};
+use super::master::field_protocol;
 use super::Certificate;
-use crate::primitives::{from_base64, PublicKey, SymmetricKey};
+use crate::primitives::{PublicKey, SymmetricKey};
 use crate::wallet::{Counterparty, DecryptArgs, WalletInterface};
 use crate::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -79,6 +83,13 @@ impl VerifiableCertificate {
     /// as the reference reads `this.subject` (`:196`) and Go `vc.Subject`
     /// (`go-sdk@2ca481c` `auth/certificates/verifiable.go:76-99`).
     ///
+    /// The field's decryption is `decryptFields`' loop body for that field,
+    /// every failure in it refused as `decryptFields` refuses it
+    /// (`Failed to decrypt selectively revealed certificate fields using
+    /// keyring: <words>`, `:214-217`; bsv-rs#297); a field with no keyring
+    /// entry, which that loop never reaches, is refused in this crate's
+    /// words.
+    ///
     /// # Arguments
     /// * `verifier_wallet` - Verifier's wallet for decryption
     /// * `field_name` - Name of the field to decrypt
@@ -100,8 +111,41 @@ impl VerifiableCertificate {
                 field_name
             ))
         })?;
+        self.decrypt_keyring_field(
+            verifier_wallet,
+            field_name,
+            encrypted_key,
+            privileged,
+            privileged_reason,
+            originator,
+        )
+        .await
+        .map_err(|e| verifiable_decrypt_failed(&e))
+    }
+
+    /// `decryptFields`' loop body for one keyring entry, in its order
+    /// (`VerifiableCertificate.ts:174-211`): the name safe and 1 to 50 bytes,
+    /// the entry canonical base64 of 1 to 2048 bytes, the field present and
+    /// its text canonical base64 of 1 byte to 1 MiB, the wallet's decrypt,
+    /// the key exactly 32 bytes, the plaintext at most 64 KiB and UTF-8.
+    async fn decrypt_keyring_field<W: WalletInterface>(
+        &self,
+        verifier_wallet: &W,
+        field_name: &str,
+        encrypted_key: &str,
+        privileged: Option<bool>,
+        privileged_reason: Option<&str>,
+        originator: &str,
+    ) -> Result<String> {
+        if !bounds::is_safe_field_name(field_name) {
+            return Err(refused("Certificate keyring contains an unsafe field name"));
+        }
+        let encrypted_key =
+            keyring_ciphertext("Certificate keyring field", field_name, encrypted_key)?;
         let field_value = self.certificate.fields.get(field_name).ok_or_else(|| {
-            Error::AuthError(format!("Field '{}' not found in certificate", field_name))
+            refused(format!(
+                "Certificate field {field_name} must be an own string data property"
+            ))
         })?;
         let ciphertext = field_ciphertext(field_name, field_value)?;
 
@@ -113,7 +157,7 @@ impl VerifiableCertificate {
         let decrypted = verifier_wallet
             .decrypt(
                 DecryptArgs {
-                    ciphertext: from_base64(encrypted_key)?,
+                    ciphertext: encrypted_key,
                     protocol_id: field_protocol(),
                     key_id,
                     counterparty: Some(Counterparty::Other(self.certificate.subject.clone())),
@@ -125,13 +169,29 @@ impl VerifiableCertificate {
             )
             .await?;
 
+        if decrypted.plaintext.len() != 32 {
+            return Err(refused(
+                "Certificate field revelation key must be a 32-byte array",
+            ));
+        }
         let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
-        decrypt_field_value(&key, &ciphertext)
+        let plaintext = key.decrypt(&ciphertext)?;
+        if plaintext.len() > MAX_DECRYPTED_FIELD_BYTES {
+            return Err(refused("Decrypted certificate field is oversized"));
+        }
+        String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
     }
 
     /// Decrypts all fields that have keys in the keyring, `privileged` and
     /// `privileged_reason` passed to each `decrypt` as the reference's
-    /// `VerifiableCertificate.decryptFields` passes them (`:152-198`).
+    /// `VerifiableCertificate.decryptFields` passes them (`:152-198`). An
+    /// empty keyring is refused (`A keyring is required to decrypt
+    /// certificate fields for the verifier.`, `:161-163`), one of more than
+    /// 100 entries too (`Certificate keyring cannot contain more than 100
+    /// fields`, `:164-166`), and every failure decrypting an entry is
+    /// `Failed to decrypt selectively revealed certificate fields using
+    /// keyring: <words>` (`:168-218`; bsv-rs#297). The entries are taken in
+    /// byte order.
     ///
     /// Results are cached for subsequent calls.
     pub async fn decrypt_fields<W: WalletInterface>(
@@ -146,18 +206,32 @@ impl VerifiableCertificate {
             return Ok(cached.clone());
         }
 
+        if self.keyring.is_empty() {
+            return Err(refused(
+                "A keyring is required to decrypt certificate fields for the verifier.",
+            ));
+        }
+        if self.keyring.len() > MAX_RECORD_ENTRIES {
+            return Err(refused(format!(
+                "Certificate keyring cannot contain more than {MAX_RECORD_ENTRIES} fields"
+            )));
+        }
+        let mut entries: Vec<(&String, &String)> = self.keyring.iter().collect();
+        entries.sort_unstable();
         let mut decrypted = HashMap::new();
 
-        for field_name in self.keyring.keys() {
+        for (field_name, encrypted_key) in entries {
             let value = self
-                .decrypt_field(
+                .decrypt_keyring_field(
                     verifier_wallet,
                     field_name,
+                    encrypted_key,
                     privileged,
                     privileged_reason,
                     originator,
                 )
-                .await?;
+                .await
+                .map_err(|e| verifiable_decrypt_failed(&e))?;
             decrypted.insert(field_name.clone(), value);
         }
 

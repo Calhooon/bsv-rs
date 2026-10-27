@@ -135,7 +135,7 @@ async fn a_reference_issued_certificate_decrypts_here_to_the_reference_plaintext
     let cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
     let certifier = key(r.keys.certifier).public_key();
 
-    let master = MasterCertificate::new(cert.clone(), r.master_keyring.clone());
+    let master = MasterCertificate::new(cert.clone(), r.master_keyring.clone()).unwrap();
     let subject_wallet = ProtoWallet::new(Some(key(r.keys.subject)));
     let decrypted = master
         .decrypt_fields(&subject_wallet, &certifier, None, None, "test")

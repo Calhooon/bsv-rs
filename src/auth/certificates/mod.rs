@@ -27,6 +27,7 @@
 //! - Key ID (master): `"{field_name}"`
 //! - Key ID (verifiable): `"{serial_number_base64} {field_name}"`
 
+mod bounds;
 mod certificate;
 mod certificate_json;
 mod master;
