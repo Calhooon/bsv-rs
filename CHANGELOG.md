@@ -3705,7 +3705,7 @@ whose own refusal of a BEEF reads `invalid BEEF`), the variant
 `Error::MerklePathError` as before. A slice says its bytes are a BUMP:
 `from_binary` and `from_hex` refuse a byte after the frame, `invalid BUMP at
 byte N: TrailingBytes` at that byte's offset (the stream's refusal of a byte
-that belongs to no field; the Lean's `trailingBytes`), where through 0.9.0
+that belongs to no field; the Lean's `trailingBytes`), where through 0.8.3
 they read a prefix and dropped the rest. A reader reads one frame:
 `from_reader` leaves the cursor after the BUMP and the bytes after it to the
 caller, which is `@bsv/sdk`'s `fromBinary` (it wraps a reader,
@@ -3759,7 +3759,7 @@ its level, and a new `Reason` is a change to an exhaustive public enum, the
 owner's word); `merkle_path_root`'s pre-pass refuses it in a BUMP held in
 memory (`Beef::verify_structure`, `verify_valid`: `Kind::BadFlag`);
 `MerklePath::new` and `new_unchecked` refuse it ahead of the walk
-(`Duplicate at an even offset: N, at height: N`), a path accepted through 0.9.0 and refused now, additive within 0.x (a path built by hand puts the duplicate at the odd offset, the working hash's right, as every writer does; no corpus BUMP and no writer emits the even shape); and `RootWalker` computes no
+(`Duplicate at an even offset: N, at height: N`), a path accepted through 0.8.3 and refused now, additive within 0.x (a path built by hand puts the duplicate at the odd offset, the working hash's right, as every writer does; no corpus BUMP and no writer emits the even shape); and `RootWalker` computes no
 node from a duplicate on the left (`Missing hash at height N, offset N`,
 where the reference gives up), so `compute_root` on a struct built by hand
 gives one root or a refusal, never two. The 468 are refusals on both paths,
@@ -3785,7 +3785,7 @@ The refusals that moved, by test:
 - `merkle_path.rs`'s `the_parse_matches_the_rescan_except_the_ruled_lone_leaf`
   asserts that what the parse accepts the 0.3.34 parse accepted, to the same
   roots and bytes, and that every refusal is the decoder's (587 parsed, 87
-  refused that 0.3.34 parsed); through 0.9.0 it asserted the same verdict.
+  refused that 0.3.34 parsed); through 0.8.3 it asserted the same verdict.
 - Every other refusal named in the list above moved from the standalone
   reader's words (`Path cannot be empty`, `Invalid tree height: N, over the
   maximum height 64`, `Duplicate offset: N, at height: N`, `Missing hash at
@@ -3984,7 +3984,7 @@ what the stream said:
   (`beef_two_readers_agree`), red before the fold.
 - **The kind named when a BEEF holds two faults** is the one the stream
   meets earliest: the parse's for an earlier element's content or fold, and
-  `verify_structure`'s in the order held (through 0.9.0: no input before any
+  `verify_structure`'s in the order held (through 0.8.3: no input before any
   BUMP index, every stub before any BUMP index, every BUMP index before any
   input).
 

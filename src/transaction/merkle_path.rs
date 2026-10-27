@@ -703,7 +703,7 @@ impl<'a> RootWalker<'a> {
 
         // A duplicate on the left (an even offset) has no hash to pair, as
         // the reference's walk gives up there (`ts-stack@edf6e03`
-        // `MerklePath.ts:437`); through 0.9.0 an empty hash stood in (#167).
+        // `MerklePath.ts:437`); through 0.8.3 an empty hash stood in (#167).
         let leaf0 = self.find_or_compute(h, l)?;
         if leaf0.hash.is_none() {
             return Err(format!("Missing hash at height {}, offset {}", h, l));
