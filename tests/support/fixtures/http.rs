@@ -1,5 +1,5 @@
 use super::cases;
-use super::wallet::{calls, invoke, outcome};
+use super::wallet::{calls, invoke, outcome, ORIGINATOR};
 use super::Suite;
 use bsv_rs::wallet::substrates::HttpWalletJson;
 use bsv_rs::wallet::wire::WalletCall;
@@ -28,7 +28,7 @@ fn client(server: &MockServer, timeout: Duration) -> HttpWalletJson {
         .timeout(timeout)
         .build()
         .unwrap();
-    HttpWalletJson::with_client(client, Some("app.example.com".into()), Some(server.uri()))
+    HttpWalletJson::with_client(client, Some(ORIGINATOR.into()), Some(server.uri()))
         .expect("the substrate is configured")
 }
 
@@ -224,7 +224,7 @@ async fn errors(server: &MockServer) -> Vec<Value> {
         .unwrap();
     let wallet = HttpWalletJson::with_client(
         client,
-        Some("app.example.com".into()),
+        Some(ORIGINATOR.into()),
         Some(format!("http://{address}")),
     )
     .expect("the substrate is configured");

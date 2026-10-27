@@ -95,13 +95,12 @@ equality on either side, `Some(literal)` comparisons, and equality involving
 `to_string`/`to_owned`. It intentionally checks more than variables named
 `error`: renaming an error to `message` must not bypass the guard.
 
-The conservative scan needs **17 protocol comparisons in 6 files** allowed
+The conservative scan needs **18 protocol comparisons in 5 files** allowed
 as whole source lines, with duplicate-count ceilings:
 
 | File | Sites | Existing purpose |
 | --- | ---: | --- |
-| `src/wallet/substrates/http_json.rs` | 2 | Originator URL schemes |
-| `src/wallet/substrates/http_wire.rs` | 2 | Originator URL schemes |
+| `src/wallet/substrates/origin.rs` | 5 | The constructors' base URL path, scheme and loopback hosts (#323) |
 | `src/auth/transports/http.rs` | 8 | Auth header names and message types |
 | `src/auth/transports/socketio/mod.rs` | 1 | Socket.IO event name |
 | `src/auth/transports/websocket_transport.rs` | 2 | WebSocket URL schemes |
@@ -126,6 +125,15 @@ classified by type, in one place: `src/transaction/broadcasters/transport_fault.
 reads `reqwest::Error`'s kind and the answer's status (before the body); the
 four directories call it (rule 1 keeps the client in a transport home, and
 `transaction` is the lowest gate the four share). It adds no line to the list.
+
+**#323 (2026-10-27).** The four originator checks left `http_json.rs` and
+`http_wire.rs` with the reference's `toOriginHeader` (`origin.rs`'s
+`has_scheme`, no literal comparison) and their entries with them; five lines
+of `origin.rs` took their place, the reference's `normalizeWalletHttpBaseUrl`
+(the base URL's path `/`, its scheme `http`) and `isLoopbackHostname`
+(`localhost`, `127.0.0.1`, `[::1]`): the caller's own constructor arguments
+read once at construction, no answer read. They stay in `substrates/` beside
+the client and the redirect refusal they are built with.
 
 ## 4. Environment belongs to the caller
 
