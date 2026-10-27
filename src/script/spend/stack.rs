@@ -14,6 +14,9 @@ impl Spend {
     // ========================================================================
 
     pub(super) fn push_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {
+        self.stack
+            .try_reserve(1)
+            .map_err(|_| self.allocation_declined(item.len()))?;
         self.reserve_stack(item.len())?;
         self.stack_mem += item.len();
         self.stack.push(item);
@@ -21,7 +24,8 @@ impl Spend {
     }
 
     pub(super) fn push_stack_copy(&mut self, item: &[u8]) -> Result<(), ScriptEvaluationError> {
-        self.push_stack(item.to_vec())
+        let copy = self.copy_element(item)?;
+        self.push_stack(copy)
     }
 
     pub(super) fn pop_stack(&mut self) -> Result<Vec<u8>, ScriptEvaluationError> {
@@ -68,6 +72,9 @@ impl Spend {
     }
 
     pub(super) fn push_alt_stack(&mut self, item: Vec<u8>) -> Result<(), ScriptEvaluationError> {
+        self.alt_stack
+            .try_reserve(1)
+            .map_err(|_| self.allocation_declined(item.len()))?;
         self.reserve_alt_stack(item.len())?;
         self.alt_stack_mem += item.len();
         self.alt_stack.push(item);
@@ -130,8 +137,9 @@ impl Spend {
     }
 
     pub(super) fn ensure_stack_mem(&self, additional: usize) -> Result<(), ScriptEvaluationError> {
-        if self.stack_mem + additional > self.memory_limit() {
-            return Err(self.resource_error(ScriptResource::Stack, self.stack_mem + additional));
+        let attempted = self.stack_mem.saturating_add(additional);
+        if attempted > self.memory_limit() {
+            return Err(self.resource_error(ScriptResource::Stack, attempted));
         }
         Ok(())
     }
@@ -140,11 +148,28 @@ impl Spend {
         &self,
         additional: usize,
     ) -> Result<(), ScriptEvaluationError> {
-        if self.alt_stack_mem + additional > self.memory_limit() {
-            return Err(
-                self.resource_error(ScriptResource::AltStack, self.alt_stack_mem + additional)
-            );
+        let attempted = self.alt_stack_mem.saturating_add(additional);
+        if attempted > self.memory_limit() {
+            return Err(self.resource_error(ScriptResource::AltStack, attempted));
         }
         Ok(())
     }
+}
+
+/// A copy of `stack` for an error, or an empty one when the allocator refuses
+/// any part of it (bsv-rs#331).
+pub(super) fn snapshot(stack: &[Vec<u8>]) -> Vec<Vec<u8>> {
+    let mut copy = Vec::new();
+    if copy.try_reserve_exact(stack.len()).is_err() {
+        return Vec::new();
+    }
+    for item in stack {
+        let mut element = Vec::new();
+        if element.try_reserve_exact(item.len()).is_err() {
+            return Vec::new();
+        }
+        element.extend_from_slice(item);
+        copy.push(element);
+    }
+    copy
 }

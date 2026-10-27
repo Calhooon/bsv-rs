@@ -81,7 +81,7 @@ impl Spend {
         chunk: &ScriptChunk,
     ) -> Result<(), ScriptEvaluationError> {
         // Direct push opcodes - should have data
-        let data = chunk.data.clone().unwrap_or_default();
+        let data = self.copy_element(chunk.data.as_deref().unwrap_or_default())?;
         self.push_stack(data)?;
         Ok(())
     }

@@ -162,6 +162,52 @@ impl Spend {
         self.error(&limit.to_string()).with_resource_limit(limit)
     }
 
+    /// The decline of an allocation the allocator refused (bsv-rs#331): with
+    /// no local budget (`memory_limit: Some(usize::MAX)`, `Transaction::verify`'s
+    /// default) the allocator's ceiling is the budget, and reaching it stops the
+    /// evaluation as a budget does, never as an abort (on `wasm32` an abort
+    /// is uncatchable). `limit` is the bytes both stacks held when it refused,
+    /// `attempted` those and the `len` asked for. The reference's allocation
+    /// failure (a `RangeError` from the JavaScript engine) propagates out of
+    /// its `Transaction.verify` as neither verdict.
+    pub(super) fn allocation_declined(&self, len: usize) -> ScriptEvaluationError {
+        let held = (self.stack_mem as u64).saturating_add(self.alt_stack_mem as u64);
+        let limit = ScriptResourceLimit {
+            resource: ScriptResource::Stack,
+            limit: held,
+            attempted: held.saturating_add(len as u64),
+            work_spent: None,
+        };
+        self.error(&limit.to_string()).with_resource_limit(limit)
+    }
+
+    /// Room for an element of `len` bytes, empty, or the allocator's decline
+    /// ([`allocation_declined`](Self::allocation_declined)).
+    pub(super) fn element_with_capacity(
+        &self,
+        len: usize,
+    ) -> Result<Vec<u8>, ScriptEvaluationError> {
+        let mut element = Vec::new();
+        element
+            .try_reserve_exact(len)
+            .map_err(|_| self.allocation_declined(len))?;
+        Ok(element)
+    }
+
+    /// A copy of `bytes` for the stack, or the allocator's decline.
+    pub(super) fn copy_element(&self, bytes: &[u8]) -> Result<Vec<u8>, ScriptEvaluationError> {
+        let mut element = self.element_with_capacity(bytes.len())?;
+        element.extend_from_slice(bytes);
+        Ok(element)
+    }
+
+    /// `len` zero bytes for the stack, or the allocator's decline.
+    pub(super) fn zeroed_element(&self, len: usize) -> Result<Vec<u8>, ScriptEvaluationError> {
+        let mut element = self.element_with_capacity(len)?;
+        element.resize(len, 0);
+        Ok(element)
+    }
+
     /// Work charged in this evaluation when a work budget is configured.
     /// Unbounded evaluations do not calculate hash costs.
     pub fn work_spent(&self) -> u64 {
