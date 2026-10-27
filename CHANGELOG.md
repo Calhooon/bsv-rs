@@ -85,14 +85,44 @@ word.
   has exceeded 1073741824 bytes: OP_MUL needs at least N bytes for its
   result, from operands of A and B bytes.` (`needs N bytes` when judged
   after the arithmetic, `from an operand of A bytes` for a unary opcode).
-  In every mode a result of 64 KiB or more is asked of the allocator
-  first, `try_reserve_exact` of its greatest possible length, then
-  released: the allocator's ceiling is the one bound nothing knows before
-  the allocation, and num-bigint has no fallible form, so its refusal is a
-  decline where the arithmetic's would be an abort, `Stack memory usage has
-  exceeded H bytes: the allocator refused the N bytes OP_MUL's result may
-  need, from operands of A and B bytes.` (`limit` the bytes both stacks
-  hold, as the other allocator declines). Under a word the element bound
+  In every mode a step of 64 KiB or more asks the allocator first for the
+  most it holds past its operands, `try_reserve_exact`, then released
+  (the review of the guard's first form: it asked only for the result's
+  size, and the step needs several times that, so a refusing allocator at
+  a 4 GiB ceiling still aborted `OP_1 <2^29> OP_NUM2BIN OP_INVERT OP_DUP
+  OP_ADD`, `OP_MUL` of two 300 MiB operands and `OP_1ADD` near 1 GiB after
+  the probe had passed): the allocator's ceiling is the one bound nothing
+  knows before the allocation, and num-bigint has no fallible form, so its
+  refusal is a decline where the arithmetic's would be an abort. The room
+  asked is a multiple of the operands' bytes (`STEP_PEAK_*`): 6 for
+  `OP_MUL` (the product, both operands long, and num-bigint 0.4.8's Toom-3
+  scratch, its six parts, four sums and five point products, a third the
+  size at each level of its recursion; measured at most 5.12, where the
+  shorter operand is just over half the longer), 12 for `OP_DIV` and
+  `OP_MOD` (Burnikel-Ziegler pads the dividend to a power of two of
+  digits, doubled once when its top block is not below the divisor, and
+  recurses on copies of the blocks; measured at most 10.0, a dividend just
+  past a power of two of digits over a divisor just past its 64-digit
+  threshold, a seeded random search of 90 shapes reaching 9.93), 2 for
+  every other arithmetic opcode (an operand's digits beside its bytes, the
+  result in one operand's digits, its encoding beside them; measured
+  1.0). The margins are 17, 20 and 100 percent over the worst measured,
+  on a counting allocator whose reallocation holds both blocks. A number's
+  read outside the arithmetic opcodes (`OP_WITHIN`, the splice operands,
+  `OP_PICK`, `OP_ROLL`) asks for 1.5 times its bytes, a numeric shift for
+  twice its result's, the same way, and every encoded number is allocated
+  fallibly. The decline keeps its form, the step named where the result
+  was: `Stack memory usage has exceeded H bytes: the allocator refused the
+  N bytes OP_MUL's step may need, from operands of A and B bytes.`
+  (`limit` the bytes both stacks hold, as the other allocator declines; a
+  read or a shift the bare `Stack memory usage has exceeded H bytes`). On
+  the review's allocator refusing past 4 GiB (its harness, this tip): the
+  sum of two 2^29-byte operands and `OP_1ADD` of 2^30 - 16 bytes are
+  computed (`Ok(true)`, 1.3 s and 1.4 s, 2.1 GB resident), `OP_MUL` of two
+  300 MiB operands is declined at 3,774,873,600 bytes; before this fold all
+  three aborted (exit 134). On `wasm32` a granted probe grows the linear
+  memory, which does not shrink, by up to the room asked; the pages are not
+  touched. Under a word the element bound
   does not apply (an element after Genesis is bounded by the stack memory
   budget alone): the number length bounds each operand at its read (750,000
   bytes after Genesis, 32,000,000 after Chronicle, the policy's on the
@@ -109,9 +139,28 @@ word.
   `predictedLen` test (`Spend.ts:1562-1573`, the budget against the result's
   predicted length before the arithmetic) cannot fire under that count (the
   two operands it pops held at least as many bytes), so it is not ported.
-  An operand's decoding (`ScriptNum::from_bytes`, at most a few copies of
-  the operand, which the allocator has already given once) stays
-  infallible.
+  The step's own allocations are shrunk: `ScriptNum::from_bytes` reads the
+  magnitude from the element in place, the sign bit cleared in the digits,
+  where it copied the operand first; `ScriptNum::to_bytes` sizes its one
+  allocation up front, the sign byte's room included, where pushing the
+  sign byte onto a full vector doubled it, and the magnitude is no longer
+  cloned to take its absolute value; an operand's bytes are released as
+  its number arrives, and `+`, `-`, `OP_2MUL`'s `<< 1`, `OP_2DIV`'s `/ 2`,
+  negation and `OP_ABS` work in one operand's digits, whose capacity holds
+  the bit a sum may add. The peak of the heap per opcode on an n-byte
+  operand (the review's dhat harness, `OP_1 <n> OP_NUM2BIN OP_INVERT`, then
+  the opcode, `OP_DUP` before a binary one, the stack's copies included, n
+  = 16 MiB): `OP_1ADD` 4n before, 2n after (3n with the probe's momentary
+  reservation), `OP_ADD` 8n before, 3n after (6n), `OP_MUL` 14n before, 12n
+  after (14n); the step's own past its operands, as a multiple of their
+  bytes (operands of 4 MiB pushed as data, a counting allocator whose
+  reallocation holds both blocks): `OP_1ADD`, `OP_1SUB`, `OP_2DIV`,
+  `OP_NEGATE`, `OP_ABS` 3.0 before, 1.0 after; `OP_2MUL` 5.0 before, 1.0
+  after; `OP_ADD` 3.5 before, 0.5 after; `OP_SUB`, the comparisons, `OP_MIN`,
+  `OP_MAX` 2.0 before, 0.5 after; `OP_MUL` 5.52 before, 4.52 after on equal
+  operands, 6.11 and 5.12 at its worst shape; `OP_DIV` 11.0 before, 10.0
+  after at its worst shape. An operand's decoding stays infallible (num-bigint
+  builds its digits with no fallible form), and is covered by the probe.
 
 Pinned by `tests/transaction_verify_budget_331.rs` (#38's shape, 33 copies
 of a 1,000,000-byte element: `Ok(true)` under `None`, the decline at
@@ -132,20 +181,37 @@ peak of 8,000,096 bytes, 16,000,096 with the clone) and
 `an_allocation_the_allocator_refuses_is_a_decline_not_an_abort` (the
 `spend` unit tests: an element of `isize::MAX + 1` bytes, which no script
 reaches on a 64-bit host, is the decline at the 7 bytes held, where
-`Vec::with_capacity` panicked), and for #374 the six unit tests of
+`Vec::with_capacity` panicked), and for #374 the eleven unit tests of
 `src/script/spend/arithmetic_room_tests.rs` (the bound and the allocator's
 ceiling modelled at a small scale: two 600-byte operands under a bound of
 1,000 declined at 1,200 before either is decoded, two of 500 bytes pushed at
 1,000, `OP_1ADD` one byte past it declined at 1,001, a word not bounded, a
-non-minimal operand's verdict first, an allocator refusing 80,000 bytes
-declined) and the ignored `tests/script_arithmetic_result_bound_374.rs`
+non-minimal operand's verdict first; the step's probe on results the old
+probe granted: `OP_MUL` of two 40,000-byte operands declined at 480,000
+under a ceiling of 100,000, `OP_DIV` and `OP_MOD` of 40,000 by 600 at
+487,200, `OP_ADD` at 160,000 and `OP_1ADD` at 80,000 under 70,000, the four
+computed under 1,000,000; `OP_WITHIN`'s read of three 50,000-byte operands
+declined at 75,008, `OP_LSHIFTNUM` of 1 by 320,000 bits at 80,020) and
+three ignored ones (the review's three scripts under the modelled ceiling
+of 4 GiB less the operands held: computed, declined at 3,774,873,600,
+computed; 3.3 s together in release),
+`test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks`
+(`tests/memory_profiling.rs`, dhat: each step's peak of the heap past its operands at most
+its declared room and 4 KiB of the guard's bookkeeping, on `OP_MUL` of
+262,144 by 131,098 bytes, `OP_DIV` and `OP_MOD` of 2,098,000 by 513,
+`OP_ADD` of two 1 MiB operands and `OP_1ADD` of one; 4.7 s) and the ignored `tests/script_arithmetic_result_bound_374.rs`
 (by hand: `OP_MUL` of two operands of 2^29 + 1 bytes declined at 2^30 + 2,
 0.69 s and 1.04 GB resident; with `dhat-profiling` a peak heap of
 1,073,751,978 bytes, the operands and no allocation of the product's size;
 without the guard still multiplying after 60 s at a peak footprint of
 5.4 GB, 3.7 GB resident). Red on the code before the guard: 3 of the 6
 (the two acceptances and the encoding's verdict hold either way) and the
-ignored test. Red on the code before, the parameter
+ignored test; on a copy of this tip with the result's probe in place of the
+step's and no read or shift probe, 5 of the 11 (the six that pass either
+way the bound's, the word's, the encoding's and the granted steps'); the
+dhat test on the code before this fold, 3 of its 5 steps past their room
+(`OP_MUL` 6.11, `OP_ADD` 3.0, `OP_1ADD` 3.0 times the operands; the
+division's 11.0 under 12). Red on the code before, the parameter
 unread and allocation infallible: 3 of the 5 in the first file (the 2
 others, the 32,000,000 decline and the invalid script, hold either way) and
 the unit test (`capacity overflow`); on the code before the fold of the
@@ -204,17 +270,25 @@ None` keeping 32,000,000 bytes in the default mode where the reference's
 uncapped. Two differences stay, stated: the default mode's 1 GiB element
 bound, which the reference's default does not have (its `#maxPushSize` is
 unbounded outside explicit flags, `Spend.ts:405-409`), and the allocator's
-refusal, a decline here and a `RangeError` there. An arithmetic result
-(#374): the reference bounds none but by its engine. Its `BigNumber` holds
-the magnitude in a native `bigint` (`BigNumber.ts:97`), at most 2^30 bits
-(128 MiB) in V8: under Node v22.18.0 a product past it throws `RangeError:
-Maximum BigInt size exceeded` out of `mul` (`:926-933`) before computing,
-which `Spend` does not catch, so a 1 GiB multiply throws there and never
-exhausts memory; an operand of about 200 MB or more fails at its read
-(`fromSm`'s hex text and `BigInt('0x' + hex)`, `:1505-1530`), which
+refusal, a decline here and a `RangeError` there. An arithmetic step
+(#374): the reference bounds none but by its engine. Under Node v22.18.0 at
+`edf6e03` an operand fails at its read once its magnitude passes 536,870,888
+bits, a minimal encoding longer than 67,108,862 bytes (V8's longest string:
+`#_finishInitialization` takes `toString(2)` of every magnitude it is given,
+`BigNumber.ts:450`, and throws `RangeError: Invalid string length`), which
 `#readScriptNumber` rethrows as a script error (`Spend.ts:525-535`), a
-verdict. Here an operand is read to the element bound and a result past it
-is the decline above. go-sdk@2ca481c's
+verdict; a non-minimal operand longer than 268,435,444 bytes fails earlier,
+at `fromSm`'s hex text (`:1520`, Node's `Cannot create a string longer than
+0x1fffffe8 characters`). The 2^30-bit `RangeError: Maximum BigInt size
+exceeded` this entry named before is unreachable through `OP_MUL`: two
+readable operands give at most 2^30 - 48 bits, and `mul` sets the product's
+magnitude without `toString(2)` (`:926-933`), so a 32 MiB by 32 MiB product
+is pushed there and judged the same here, only slower (#378). The
+difference: for an operand past those figures the reference gives a
+verdict where this crate computes the result or, past the element bound
+or the allocator's room, declines. The V8 figures were measured with
+those lines' expressions under Node v22.18.0, the read through the
+reference's `Spend` by #378. go-sdk@2ca481c's
 `spv.Verify` takes no caller's budget and runs the interpreter at the relay
 policy's 100,000,000 bytes (`interpreter.DefaultMaxStackMemory`,
 `spv/verify.go:64-68`).
