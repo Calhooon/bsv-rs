@@ -10,6 +10,7 @@ use crate::script::op::{OP_NOP4, OP_NOP5, OP_NOP6, OP_NOP7};
 use crate::script::script_num::ScriptNum;
 
 use super::limits::MAX_SCRIPT_ELEMENT_SIZE;
+use super::reference_read;
 use super::Spend;
 
 impl Spend {
@@ -318,6 +319,16 @@ impl Spend {
                                 "It's not currently possible to push data larger than {} bytes.",
                                 MAX_SCRIPT_ELEMENT_SIZE
                             )));
+                        }
+                        // the reference's `new BigNumber(value << bits)`
+                        // (`Spend.ts:1066`) past V8's longest string, its
+                        // words before the shift allocates; the budget's
+                        // decline first
+                        if let Some(words) = reference_read::result_refusal(bits) {
+                            self.ensure_stack_mem(
+                                usize::try_from(bits / 8 + 1).unwrap_or(usize::MAX),
+                            )?;
+                            return Err(self.error(words));
                         }
                         self.number_room(in_hand, 2 * bytes + 16)?;
                         x.shl_bits(n)
