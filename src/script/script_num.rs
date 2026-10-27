@@ -13,6 +13,8 @@
 
 use crate::primitives::BigNumber;
 use crate::Result;
+use num_bigint::{BigInt, BigUint, Sign};
+use std::collections::TryReserveError;
 
 /// Bitcoin Script number utilities.
 ///
@@ -44,25 +46,17 @@ impl ScriptNum {
             ));
         }
 
-        // Extract sign bit from the last byte
-        let last_byte = bytes[bytes.len() - 1];
-        let is_negative = (last_byte & 0x80) != 0;
-
-        // Create magnitude bytes (clear sign bit from last byte)
-        let mut magnitude = bytes.to_vec();
-        if let Some(last) = magnitude.last_mut() {
-            *last &= 0x7f;
+        // The magnitude is read from the element itself, the sign bit cleared
+        // in place: no copy of the operand (bsv-rs#374)
+        let negative = bytes[bytes.len() - 1] & 0x80 != 0;
+        let mut magnitude = BigUint::from_bytes_le(bytes);
+        if negative {
+            magnitude.set_bit(bytes.len() as u64 * 8 - 1, false);
         }
-
-        // Convert from little-endian to BigNumber
-        let bn = BigNumber::from_bytes_le(&magnitude);
-
-        // Apply sign
-        if is_negative {
-            Ok(bn.neg())
-        } else {
-            Ok(bn)
-        }
+        let sign = if negative { Sign::Minus } else { Sign::Plus };
+        Ok(BigNumber::from_bigint(BigInt::from_biguint(
+            sign, magnitude,
+        )))
     }
 
     /// Converts a BigNumber to stack bytes (minimal encoding).
@@ -75,33 +69,44 @@ impl ScriptNum {
     ///
     /// The minimally-encoded byte array
     pub fn to_bytes(value: &BigNumber) -> Vec<u8> {
-        // Zero is represented as empty array
-        if value.is_zero() {
-            return Vec::new();
-        }
-
-        let is_negative = value.is_negative();
-        let abs_value = value.abs();
-
-        // Get magnitude bytes in little-endian
-        let mut bytes = abs_value.to_bytes_le_min();
-
-        // If the high bit of the last byte is set, we need an extra byte for the sign
-        if let Some(&last) = bytes.last() {
-            if (last & 0x80) != 0 {
-                bytes.push(if is_negative { 0x80 } else { 0x00 });
-            } else if is_negative {
-                // Set sign bit on existing last byte
-                if let Some(last_mut) = bytes.last_mut() {
-                    *last_mut |= 0x80;
-                }
-            }
-        } else if is_negative {
-            // Edge case: magnitude was zero but we're negative (shouldn't happen)
-            bytes.push(0x80);
-        }
-
+        let mut bytes = Vec::with_capacity(Self::encoded_len(value));
+        Self::write(value, &mut bytes);
         bytes
+    }
+
+    /// [`to_bytes`](Self::to_bytes) with its one allocation asked of the
+    /// allocator first: a refusal is an `Err`, never an abort (bsv-rs#374).
+    pub(crate) fn try_to_bytes(value: &BigNumber) -> std::result::Result<Vec<u8>, TryReserveError> {
+        let mut bytes = Vec::new();
+        bytes.try_reserve_exact(Self::encoded_len(value))?;
+        Self::write(value, &mut bytes);
+        Ok(bytes)
+    }
+
+    /// The minimal encoding's length: one byte for each 8 bits of the
+    /// magnitude and the sign's room (0 for zero).
+    fn encoded_len(value: &BigNumber) -> usize {
+        match value.as_bigint().bits() {
+            0 => 0,
+            bits => usize::try_from(bits / 8 + 1).unwrap_or(usize::MAX),
+        }
+    }
+
+    /// Writes the minimal encoding into `bytes`, whose capacity is already
+    /// [`encoded_len`](Self::encoded_len): the sign byte's room is reserved
+    /// before the magnitude is written, so nothing grows.
+    fn write(value: &BigNumber, bytes: &mut Vec<u8>) {
+        let len = Self::encoded_len(value);
+        for digit in value.as_bigint().iter_u64_digits() {
+            let take = (len - bytes.len()).min(8);
+            bytes.extend_from_slice(&digit.to_le_bytes()[..take]);
+        }
+        bytes.resize(len, 0);
+        if value.is_negative() {
+            if let Some(last) = bytes.last_mut() {
+                *last |= 0x80;
+            }
+        }
     }
 
     /// Checks if bytes are minimally encoded as a script number.
