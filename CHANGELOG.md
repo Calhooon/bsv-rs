@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: `Certificate::verify` answers `false`, never an error, as the reference's `verify` does (#299)
+
+`Certificate::verify` answered `Err(InvalidSignature("Certificate not
+signed"))` for an absent signature, the DER parser's `Err` for a signature
+that is not DER (an empty one, a truncated one, `r = 0`), and would have
+passed on an `Err` from the key derivation; #275 made a field over the
+bound `Ok(false)`. The reference catches every failure under its `verify`
+and answers `false` (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts:425-440`: "Preserve the
+historical boolean verification contract. Malformed or absent signatures
+are invalid credentials, not exceptional control flow."): an absent
+signature (`this.signature ?? ''`), one that is not hex or not DER
+(`Signature.fromDER`), a frame `toBinary(false)` refuses, a key
+`deriveChild` cannot derive. Now each is `Ok(false)` here
+(`src/auth/certificates/certificate.rs`). `verify` returns no `Err` today:
+its four steps are the reference's four, each a `false` there; the `Result`
+stays for semver, so a caller's `?` still compiles. `MasterCertificate::verify`
+and `VerifiableCertificate::verify` delegate and follow. Under the ruling
+(c) of #299: the reference's own contract.
+
+`validate_certificate` (through `validate_certificates`) refuses a `false`
+verdict in the reference's words, `The signature for the certificate with
+serial number <serial base64> is invalid!` (`validateCertificates.ts:99-104`),
+where it said `Certificate signature invalid`; an unsigned or non-DER
+certificate reached it as the `Err` above and now reaches this refusal.
+`get_verifiable_certificates` does not verify, as the reference's
+`getVerifiableCertificates` does not; the identity client's two parsers
+read `Ok(false) | Err(_)` as no certificate and are unchanged.
+
+Migration: a caller that matched `Err(Error::InvalidSignature(_))` (or any
+`Err`) from `verify` for an unsigned or malformed certificate reads
+`Ok(false)`: `if !cert.verify()? { /* invalid */ }`. One downstream calls it:
+`bsv-wallet-toolbox-rs` (`6317222`) `src/wallet/certificate_issuance.rs:703`
+maps an `Err` to `ValidationError("Failed to verify certificate signature:
+..")` and discards the `bool`, so a certificate whose signature is absent or
+not DER, refused there until now, passes its step 8, as one signed by
+another key already did: its fix is to refuse `Ok(false)` (the keeper's to
+file). `bsv-wallet-cli` (`a55990c`), `rust-message-box` (`419bf18`) and
+`bsv-overlay-cloudflare` (`9a0f3c29`) call neither `verify` nor
+`validate_certificates`.
+
+Pinned by `tests/auth_certificate_verify_false_299.rs` (9 tests) on
+`tests/vectors/auth_certificate_verify_false_299.json`, the reference's
+verdicts on one certificate under nine signatures (valid, absent, empty,
+not DER, truncated DER, another key's, `r = 0`, high `s`, not hex) recorded
+by `tests/support/certificate_verify_false_299.mjs` at `ts-stack@edf6e03`
+under Node v22.18.0 (two runs byte for byte): each verdict equal here save
+the non-hex text, which this crate cannot hold (the signature is bytes) and
+refuses at the certificate's JSON; the master's and verifier's `verify`; the
+validator's words. 6 of the 9 red on the tree before the fix (`cdd52b8`),
+the other three pinning what did not move (another key's signature
+`Ok(false)`, the valid one this crate's own bytes, the JSON refusal). Two
+pins in `tests/auth_integration_tests.rs` that expected the `Err` are
+rewritten with the finding in their names,
+`an_unsigned_certificate_verifies_false_not_an_error` and
+`a_certificate_with_a_non_der_signature_verifies_false_not_an_error` (both
+red on that tree). The #249, #251, #261, #262, #268, #275 and #297 vectors
+are unchanged.
+
+### Notes: cross-SDK parity (#299)
+
+go-sdk@2ca481c's `Certificate.Verify` returns an `error`, nil when valid
+(`auth/certificates/certificate.go:150-204`): `ErrNotSigned` for an absent
+or empty signature (`:152-154`), `failed to create verifier wallet`
+(`:157-160`), `failed to serialize certificate` from `ToBinary(false)`
+(`:163-166`), `failed to parse signature` for one that is not DER
+(`:169-172`), `ErrInvalidSignature` for a wrong one or a wallet's
+invalid-signature error (`:192-201`), `signature verification failed` for
+any other wallet error (`:196`). This crate follows the reference: every one of those is
+`Ok(false)` here. The non-hex signature is the residual of the type: the
+reference holds hex text and answers `false` at `verify`; this crate holds
+bytes and refuses the text where it reads it (`Certificate`'s JSON), as Go,
+whose `Signature` is a `util.ByteString`, refuses it at its JSON
+(`util/bytestring.go:26-42`).
+
 ### Fixed: the reference's remaining certificate bounds and its decrypt wrappers (#297)
 
 The five checks #275 named as not here, each now at the reference's site in

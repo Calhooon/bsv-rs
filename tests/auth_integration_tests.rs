@@ -799,7 +799,7 @@ fn test_tampered_certificate_type_fails_verification() {
 // =================
 
 #[test]
-fn test_unsigned_certificate_verify_returns_error() {
+fn an_unsigned_certificate_verifies_false_not_an_error() {
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random().public_key();
 
@@ -810,22 +810,13 @@ fn test_unsigned_certificate_verify_returns_error() {
         certifier_key.public_key(),
     );
 
-    // Certificate has no signature - verify() should return an error
-    let result = cert.verify();
-    assert!(
-        result.is_err(),
-        "Verifying an unsigned certificate should return an error"
-    );
-    let err_msg = result.unwrap_err().to_string();
-    assert!(
-        err_msg.contains("not signed"),
-        "Error should mention missing signature, got: {}",
-        err_msg
-    );
+    // No signature: an invalid credential, `false`, as the reference's
+    // `verify` answers (`Certificate.ts:425-440`; #299)
+    assert_eq!(cert.verify(), Ok(false));
 }
 
 #[test]
-fn test_certificate_with_invalid_der_signature_fails() {
+fn a_certificate_with_a_non_der_signature_verifies_false_not_an_error() {
     let certifier_key = PrivateKey::random();
     let subject_key = PrivateKey::random().public_key();
 
@@ -839,11 +830,7 @@ fn test_certificate_with_invalid_der_signature_fails() {
     // Set an invalid DER signature
     cert.signature = Some(vec![0x30, 0x06, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-    let result = cert.verify();
-    assert!(
-        result.is_err(),
-        "Certificate with invalid DER signature should fail verification"
-    );
+    assert_eq!(cert.verify(), Ok(false));
 }
 
 // =================
