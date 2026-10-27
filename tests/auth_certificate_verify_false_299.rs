@@ -5,7 +5,7 @@
 //! (`ts-stack@edf6e03` `packages/sdk/src/auth/certificates/Certificate.ts:425-440`).
 //! go-sdk@2ca481c's `Verify` returns an error instead (`ErrNotSigned`,
 //! `failed to parse signature`, `ErrInvalidSignature`;
-//! `auth/certificates/certificate.go:150-192`).
+//! `auth/certificates/certificate.go:150-204`).
 //!
 //! The witnesses are `tests/vectors/auth_certificate_verify_false_299.json`:
 //! one certificate under nine signatures, each with the reference's verdict,
