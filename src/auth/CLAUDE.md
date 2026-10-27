@@ -12,7 +12,8 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation with `start()` transport setup | 996 |
+| `peer.rs` | Core Peer implementation with `start()` transport setup | 1,029 |
+| `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 45 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
 | `utils/` | Utility functions | - |
@@ -42,6 +43,7 @@ Utility functions:
 - `mod.rs` - Re-exports
 - `nonce.rs` - Nonce creation and verification
 - `validation.rs` - Certificate validation, matching, encoding validation, and request set validation
+- `requested_set.rs` - `assert_requested_certificate_set`, the reference's `assertRequestedCertificateSet` in its words, and the receipt check `Peer` calls before any handler (#294)
 
 ## Constants
 
@@ -60,7 +62,7 @@ Re-exports from `mod.rs`:
 - `headers`, `TransportCallback`, `HttpRequest`, `HttpResponse` (transports)
 - `WebSocketTransport`, `WebSocketTransportOptions` (transports, gated behind `websocket` feature)
 - `current_time_ms`, `AuthMessage`, `MessageType`, `PeerSession`, `RequestedCertificateSet`, `RequestedCertificateTypes`, `AUTH_PROTOCOL_ID`, `AUTH_VERSION` (types)
-- `create_nonce`, `validate_certificate_encoding`, `validate_certificates`, `validate_requested_certificate_set`, `verify_nonce` (utils)
+- `assert_requested_certificate_set`, `create_nonce`, `validate_certificate_encoding`, `validate_certificates`, `validate_requested_certificate_set`, `verify_nonce` (utils)
 
 ### Types
 
@@ -244,6 +246,8 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 }
 ```
 
+`Peer` refuses a malformed requested certificate set where the reference does (#294), with `assert_requested_certificate_set`: `request_certificates` before it seeks a session or signs (`Peer.ts:434`); its own `certificates_to_request` in `initiate_handshake` before a nonce or the initialRequest (`:630`) and on a received initialRequest before `process_initial_request` signs the response (`:811`), the reference's construction-time refusal (`:158`) moved to the first snapshot since `new` cannot fail; a received message's `requestedCertificates` in `handle_incoming_message` and the `start` callback after the version check, before routing (`AuthMessageValidation.ts:345-346`; a certificateRequest without one `requestedCertificates must be an object.`, `:367`), the refusal the callback's `Err`.
+
 **Internal methods** (private):
 - `sign_message()` - Signs an AuthMessage using BRC-42 key derivation with the session's peer identity key
 - `verify_message_signature()` - Verifies an incoming AuthMessage signature
@@ -309,7 +313,7 @@ Three implementations:
 
 **Validation functions**: `validate_certificates()`, `validate_certificate()`, `get_verifiable_certificates()` (holds each field of the wallet's result as its text, #261, and the wallet's `keyringForVerifier` strings as given, #268), `certificates_match_request()`
 
-**Encoding validation**: `validate_certificate_encoding()` (structural checks on cert fields), `validate_requested_certificate_set()` (well-formedness of request sets)
+**Encoding validation**: `validate_certificate_encoding()` (structural checks on cert fields), `validate_requested_certificate_set()` (well-formedness of request sets, this crate's words; refuses an empty set; `Peer` does not call it), `assert_requested_certificate_set()` (the reference's `assertRequestedCertificateSet` in its words, `AuthMessageValidation.ts:107-162`; an empty set valid; `Error::AuthError`; the one `Peer` calls, #294)
 
 ## Usage Examples
 
