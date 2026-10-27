@@ -140,10 +140,10 @@ once. It is not one guarded await: this crate has no pending-validation
 registry, and `certificates_validated` is never set (the certificate
 response's `get_session_mut` looks up by an identity key where the
 manager keys by nonce), so the wait would time out every message of a
-session that requires certificates; it goes with that finding.
+session that requires certificates; it goes with that finding, #364.
 
 Two refusals are in other words. An HTTP response without the auth
-headers (`x-bsv-auth-version`, `x-bsv-auth-identity-key`,
+headers (#354, its refusal in flight) (`x-bsv-auth-version`, `x-bsv-auth-identity-key`,
 `x-bsv-auth-signature`) is refused by the reference's transport
 (`Received HTTP <status> from <url> without valid BSV authentication
 (missing headers: ...)`, `SimplifiedFetchTransport.ts:220-232`,
