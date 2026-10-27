@@ -369,7 +369,7 @@ error path answers without the auth middleware's headers, a 401 among
 them) now gets the refusal from `Transport::send`, and through `Peer`
 from `to_peer`; one that matched an unsigned 429, 502, 503 or 504 by its
 status reads `transport_fault()`. The toolbox's `StorageClient`
-(`bsv-wallet-toolbox-rs` beta at `55c0d1f`,
+(`bsv-wallet-toolbox-rs` beta at `a12ab5c`,
 `src/storage/client/storage_client.rs:520-616`, pinning
 `=0.9.0-beta.1`) matched an unsigned answer by its request ID and read
 its status (`HTTP error {status}: {body}`); it now sees `Failed to send
@@ -427,7 +427,7 @@ answer keeps `Auth endpoint returned {status}: {body}` and #87's fault
 classes here, where the reference's `#sendAuthMessage` throws
 `#createUnauthenticatedResponseError`'s words with `response lacked
 required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
-follow-up is the owner's).
+follow-up is #366).
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
