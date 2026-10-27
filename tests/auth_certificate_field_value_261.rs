@@ -116,8 +116,8 @@ fn a_reference_issued_encrypted_field_certificate_read_from_json_signs_the_refer
     for (name, text) in &r.certificate.fields {
         assert_eq!(&cert.fields[name], text, "field {name} held as its text");
     }
-    assert_eq!(to_hex(&cert.signing_hash()), r.preimage_sha256);
-    assert_eq!(to_hex(&cert.to_binary(true)), r.binary_hex);
+    assert_eq!(to_hex(&cert.signing_hash().unwrap()), r.preimage_sha256);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), r.binary_hex);
     assert!(cert.verify().unwrap());
 
     let read = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
@@ -208,7 +208,7 @@ async fn a_reference_issued_certificate_from_a_wallet_json_result_verifies_and_d
             .unwrap();
     assert_eq!(certs.len(), 1);
     let cert = &mut certs[0];
-    assert_eq!(to_hex(&cert.signing_hash()), r.preimage_sha256);
+    assert_eq!(to_hex(&cert.signing_hash().unwrap()), r.preimage_sha256);
     assert!(cert.verify().unwrap());
 
     let decrypted = cert
@@ -227,7 +227,7 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
 
     // The recorded certificate: its bytes are the reference's for its JSON.
     let cert: Certificate = serde_json::from_value(reference_json(&w.certificate)).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.binary_hex);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.binary_hex);
     assert_eq!(w.binary_hex, w.reference_to_binary_hex);
     assert!(cert.verify().unwrap());
 
@@ -257,12 +257,12 @@ async fn a_certificate_issued_here_holds_base64_text_and_the_reference_verifies_
         // 32-byte IV, the plaintext, a 16-byte tag
         assert_eq!(ciphertext.len(), 32 + w.plaintexts[name].len() + 16);
     }
-    let preimage = master.to_binary(false);
+    let preimage = master.to_binary(false).unwrap();
     for value in master.fields.values() {
         let value = value.as_bytes();
         assert!(preimage.windows(value.len()).any(|win| win == value));
     }
-    assert_eq!(sha256(&preimage), master.signing_hash());
+    assert_eq!(sha256(&preimage), master.signing_hash().unwrap());
     assert!(master.verify().unwrap());
     let decrypted = master
         .decrypt_fields(
@@ -285,7 +285,7 @@ fn from_binary_refuses_a_field_value_that_is_not_utf8_the_field_named() {
     let r = vectors().reference_issued;
     let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
     cert.set_field("email", "AAAA");
-    let mut bytes = cert.to_binary(true);
+    let mut bytes = cert.to_binary(true).unwrap();
     let at = bytes
         .windows(11)
         .position(|w| w == b"\x05email\x04AAAA")
@@ -308,7 +308,7 @@ fn set_field_holds_any_string_and_writes_its_bytes_as_the_reference_does() {
     let mut cert = Certificate::from_binary(&from_hex(&r.binary_hex).unwrap()).unwrap();
     cert.set_field("email", "not base64 ✓");
     assert_eq!(cert.fields["email"], "not base64 ✓");
-    let bytes = cert.to_binary(false);
+    let bytes = cert.to_binary(false).unwrap();
     let text = "not base64 ✓".as_bytes();
     assert!(bytes.windows(text.len()).any(|w| w == text));
     let read = Certificate::from_binary(&bytes).unwrap();
@@ -407,7 +407,7 @@ async fn print_a_certificate_issued_here_for_the_reference() {
         },
         "master_keyring": master.master_keyring,
         "verifier_keyring": verifier_keyring,
-        "binary_hex": to_hex(&master.to_binary(true)),
+        "binary_hex": to_hex(&master.to_binary(true).unwrap()),
     });
     println!("{}", serde_json::to_string_pretty(&out).unwrap());
 }

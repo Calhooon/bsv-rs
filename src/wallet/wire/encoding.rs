@@ -1446,10 +1446,7 @@ fn checked_field_names(fields: &HashMap<String, String>) -> Result<Vec<&str>, Er
         super::require_certificate_field_name_length(name.len())?;
         super::require_safe_certificate_field_name(name)?;
         if fields[name].len() > super::MAX_CERTIFICATE_FIELD_VALUE_BYTES {
-            return Err(super::refused(format!(
-                "Certificate field {name} exceeds the maximum of {} bytes",
-                super::MAX_CERTIFICATE_FIELD_VALUE_BYTES
-            )));
+            return Err(super::refused(super::certificate_field_value_refusal(name)));
         }
     }
     Ok(names)

@@ -69,7 +69,7 @@ async fn a_reference_issued_certificate_published_for_anyone_parses_verifies_and
         .unwrap()
         .expect("the reference's certificate verifies here");
     assert_eq!(
-        to_hex(&parsed.certificate.signing_hash()),
+        to_hex(&parsed.certificate.signing_hash().unwrap()),
         r["preimage_sha256"].as_str().unwrap()
     );
     for (name, text) in r["certificate"]["fields"].as_object().unwrap() {

@@ -3,7 +3,7 @@
 //! A verifiable certificate includes a keyring that allows a specific
 //! verifier to decrypt selected fields.
 
-use super::master::{decrypt_field_value, field_protocol};
+use super::master::{decrypt_field_value, field_ciphertext, field_protocol};
 use super::Certificate;
 use crate::primitives::{from_base64, PublicKey, SymmetricKey};
 use crate::wallet::{Counterparty, DecryptArgs, WalletInterface};
@@ -103,6 +103,7 @@ impl VerifiableCertificate {
         let field_value = self.certificate.fields.get(field_name).ok_or_else(|| {
             Error::AuthError(format!("Field '{}' not found in certificate", field_name))
         })?;
+        let ciphertext = field_ciphertext(field_name, field_value)?;
 
         let key_id = Certificate::get_field_encryption_key_id_verifiable(
             field_name,
@@ -125,7 +126,7 @@ impl VerifiableCertificate {
             .await?;
 
         let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
-        decrypt_field_value(&key, field_value)
+        decrypt_field_value(&key, &ciphertext)
     }
 
     /// Decrypts all fields that have keys in the keyring, `privileged` and

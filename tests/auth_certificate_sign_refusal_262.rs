@@ -53,13 +53,13 @@ fn a_signed_certificate_signed_again_is_refused_in_the_reference_words() {
     let certifier = key(7);
     let mut cert = email(&certifier);
     cert.sign(&certifier).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.signed_once);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.signed_once);
 
     assert_eq!(
         cert.sign(&certifier),
         Err(Error::CertificateValidationError(w.refusal))
     );
-    assert_eq!(to_hex(&cert.to_binary(true)), w.signed_once);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.signed_once);
     assert_eq!(cert.verify(), Ok(true));
 }
 
@@ -85,7 +85,10 @@ fn a_cleared_signature_signs_to_a_single_signing_bytes() {
     cert.sign(&certifier).unwrap();
     cert.set_signature(None);
     cert.sign(&certifier).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.signed_after_clearing);
+    assert_eq!(
+        to_hex(&cert.to_binary(true).unwrap()),
+        w.signed_after_clearing
+    );
     assert_eq!(w.signed_after_clearing, w.signed_once);
 }
 
@@ -97,5 +100,5 @@ fn an_empty_signature_is_no_signature_to_sign() {
     let certifier = key(7);
     let mut cert = email(&certifier).with_signature(Some(Vec::new()));
     cert.sign(&certifier).unwrap();
-    assert_eq!(to_hex(&cert.to_binary(true)), w.signed_once);
+    assert_eq!(to_hex(&cert.to_binary(true).unwrap()), w.signed_once);
 }

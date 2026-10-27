@@ -10,11 +10,11 @@ This module implements identity certificates for the BSV authentication system, 
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root, re-exports, protocol constants | ~43 |
-| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 662 |
+| `certificate.rs` | Base `Certificate` type with signing and binary serialization | 689 |
 | `certificate_tests.rs` | `certificate.rs`'s unit tests (`#![cfg(test)]`, included by `#[path]`; the file-size ratchet) | 146 |
 | `certificate_json.rs` | `Certificate`'s JSON (#268): the serde impls (a remote derive over its fields), `base64_32_bytes`, `revocation_outpoint_from_str`, `revocation_outpoint_json` (the sentinel), `signature_hex` | 195 |
-| `master.rs` | `MasterCertificate` with field encryption and keyring management | 429 |
-| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | 307 |
+| `master.rs` | `MasterCertificate` with field encryption and keyring management; `field_ciphertext`, a field's text decoded as canonical base64 of 1 byte to 1 MiB (#275) | 459 |
+| `verifiable.rs` | `VerifiableCertificate` with verifier-specific keyring | 308 |
 
 ## Certificate Flow
 
@@ -85,7 +85,11 @@ random 32-byte revelation key; the field value held, signed and written is
 the base64 text of `IV || ciphertext || tag`. The revelation keys are
 encrypted by the wallet (BRC-2) with BRC-42 key derivation, Security Level 2
 (counterparty-specific). Decryption decodes the field's text at decrypt
-time and nowhere earlier (#261):
+time and nowhere earlier (#261), as canonical base64 of 1 byte to 1 MiB or
+refused before the wallet's decrypt (`Certificate field <name> must use
+canonical base64 encoding`, `... is empty, oversized, or non-canonical`;
+the reference's `canonicalBase64`, `MasterCertificate.ts:63-74`;
+`create_keyring_for_verifier` checks every field first; #275):
 
 **Master Certificate Key IDs:**
 - Protocol: `"certificate field encryption"`
@@ -109,9 +113,9 @@ time and nowhere earlier (#261):
 | `sign()` | Sign with the certifier's BRC-52 child key: protocol `[2, "certificate signature"]`, keyID `signature_key_id()`, counterparty anyone (#251); a certificate already signed refused, `CertificateValidationError` in the reference's words (`Certificate has already been signed! Signature present: <hex>`), cleared with `set_signature(None)` to re-sign (#262) |
 | `verify()` | Verify against the certifier's public child (derived with the anyone key); a raw-key signature is `Ok(false)` (#251); over `received_unsigned` while it binds (#249) |
 | `signature_key_id()` | `"<type base64> <serial base64>"`, one space (BRC-52 `0052.md:116`) |
-| `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249) |
-| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249); a field value that is not UTF-8 refused as `InvalidUtf8` (`Certificate.ts:384`, #261) |
-| `signing_hash()` | Get SHA-256 hash for signing |
+| `to_binary()` | Serialize: `received_unsigned` while it parses to the current values, else the reference's field order (#249); `Result` since #275: a field value whose text is over 1 MiB of UTF-8 refused before the buffer, `CertificateValidationError("Certificate field <name> exceeds the maximum of 1048576 bytes")`, the reference's words (`Certificate.ts:76-79`) and the wire's (`wallet::wire::certificate_field_value_refusal`); `sign` and `verify` through it |
+| `from_binary()` | Parse, keeping the unsigned prefix in `received_unsigned`; a repeated field name refused (#249); a field value that is not UTF-8 refused as `InvalidUtf8` (`Certificate.ts:384`, #261); a declared value length over 1 MiB refused before the bytes are read, in the writer's words (`:377-381`, #275) |
+| `signing_hash()` | Get SHA-256 hash for signing; `Result` since #275, refusing as `to_binary` refuses |
 | `type_base64()` | Get certificate type as base64 string |
 | `serial_number_base64()` | Get serial number as base64 string |
 | `set_field()` | Set a field value: its base64 text (`impl Into<String>`), any string accepted as the reference accepts it (#261); clears `received_unsigned` |

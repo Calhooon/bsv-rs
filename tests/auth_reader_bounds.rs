@@ -17,7 +17,9 @@ const ISSUE_108_INPUT: &str = "ezQ0NDQ0NDQ0NDQ0NDQ0NDQidmZiZTHEMzciXSwGAABhdHVyZ
 fn certificate_head() -> Vec<u8> {
     let subject = PrivateKey::from_bytes(&[1u8; 32]).unwrap().public_key();
     let certifier = PrivateKey::from_bytes(&[2u8; 32]).unwrap().public_key();
-    let bytes = Certificate::new([3u8; 32], [4u8; 32], subject, certifier).to_binary(false);
+    let bytes = Certificate::new([3u8; 32], [4u8; 32], subject, certifier)
+        .to_binary(false)
+        .unwrap();
     assert_eq!(bytes.last(), Some(&0), "the field count closes the head");
     bytes
 }
@@ -68,9 +70,14 @@ fn a_certificate_value_length_of_usize_max_is_refused() {
     data.extend_from_slice(&[1, 1, b'a', 0xff]); // one field "a", then its value length
     data.extend_from_slice(&u64::MAX.to_le_bytes());
     let result = std::panic::catch_unwind(|| Certificate::from_binary(&data)).unwrap();
-    assert!(
-        matches!(result, Err(Error::ReaderUnderflow { .. })),
-        "{result:?}"
+    // Since #275 the reference's 1 MiB bound refuses the length before the
+    // bytes remaining are asked (`Certificate.ts:377-381`): a refusal, never
+    // a wrap, as #108 asks.
+    assert_eq!(
+        result.map(drop),
+        Err(Error::CertificateValidationError(
+            "Certificate field a exceeds the maximum of 1048576 bytes".into()
+        ))
     );
 }
 
@@ -162,9 +169,12 @@ fn a_valid_certificate_and_http_payloads_still_parse() {
     let certifier = PrivateKey::from_bytes(&[2u8; 32]).unwrap().public_key();
     let mut cert = Certificate::new([3u8; 32], [4u8; 32], subject, certifier);
     cert.set_field("name", "value");
-    let bytes = cert.to_binary(false);
+    let bytes = cert.to_binary(false).unwrap();
     assert_eq!(
-        Certificate::from_binary(&bytes).unwrap().to_binary(false),
+        Certificate::from_binary(&bytes)
+            .unwrap()
+            .to_binary(false)
+            .unwrap(),
         bytes
     );
 

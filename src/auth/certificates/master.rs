@@ -5,6 +5,7 @@
 
 use super::{Certificate, CERTIFICATE_FIELD_ENCRYPTION_PROTOCOL};
 use crate::primitives::{from_base64, to_base64, PublicKey, SymmetricKey};
+use crate::wallet::wire::MAX_CERTIFICATE_FIELD_VALUE_BYTES;
 use crate::wallet::{
     Counterparty, DecryptArgs, EncryptArgs, Protocol, SecurityLevel, WalletInterface,
 };
@@ -138,6 +139,11 @@ impl MasterCertificate {
         privileged_reason: Option<&str>,
         originator: &str,
     ) -> Result<HashMap<String, String>> {
+        // Every field's text canonical base64 first, revealed or not, as the
+        // reference's `createKeyringForVerifier` asks (`:351-357`; bsv-rs#275)
+        for (field_name, field_value) in fields {
+            field_ciphertext(field_name, field_value)?;
+        }
         let mut keyring = HashMap::new();
 
         for field_name in fields_to_reveal {
@@ -202,6 +208,7 @@ impl MasterCertificate {
                 field_name
             ))
         })?;
+        let ciphertext = field_ciphertext(field_name, field_value)?;
 
         let decrypted = wallet
             .decrypt(
@@ -219,7 +226,7 @@ impl MasterCertificate {
             .await?;
 
         let key = SymmetricKey::from_bytes(&decrypted.plaintext)?;
-        let plaintext = decrypt_field_value(&key, field_value)?;
+        let plaintext = decrypt_field_value(&key, &ciphertext)?;
         Ok((key.as_bytes().to_vec(), plaintext))
     }
 
@@ -365,13 +372,36 @@ pub(crate) fn field_protocol() -> Protocol {
     )
 }
 
-/// Decrypts a field value with its revelation key: the value held is the
-/// ciphertext's base64 text (BRC-52 `0052.md:97`), decoded here, at decrypt
-/// time, and nowhere earlier (#261); the plaintext is UTF-8, as the
-/// reference's `toUTF8Strict` asks (`MasterCertificate.ts:619`).
-pub(crate) fn decrypt_field_value(key: &SymmetricKey, field_value: &str) -> Result<String> {
-    let ciphertext = from_base64(field_value)?;
-    let plaintext = key.decrypt(&ciphertext)?;
+/// A field value's ciphertext: the value held is the ciphertext's base64
+/// text (BRC-52 `0052.md:97`), decoded here, at decrypt time, and nowhere
+/// earlier (#261), as the reference's `canonicalBase64` decodes it
+/// (`ts-stack@edf6e03` `MasterCertificate.ts:63-74`, called at `:215-219`,
+/// `:352-356`, `:534-538`, `:587-591`; `VerifiableCertificate.ts:41-52`,
+/// `:187-191`): canonical base64 or refused (padded, no whitespace, no URL
+/// alphabet, the unused bits zero, `WalletByteEncoding.ts:39-64`), and the
+/// bytes 1 to 1 MiB, in its words (bsv-rs#275).
+pub(crate) fn field_ciphertext(field_name: &str, field_value: &str) -> Result<Vec<u8>> {
+    use base64::Engine;
+    let decoded = base64::engine::general_purpose::STANDARD
+        .decode(field_value)
+        .map_err(|_| {
+            Error::CertificateValidationError(format!(
+                "Certificate field {field_name} must use canonical base64 encoding"
+            ))
+        })?;
+    if decoded.is_empty() || decoded.len() > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
+        return Err(Error::CertificateValidationError(format!(
+            "Certificate field {field_name} is empty, oversized, or non-canonical"
+        )));
+    }
+    Ok(decoded)
+}
+
+/// Decrypts a field's ciphertext ([`field_ciphertext`]) with its revelation
+/// key; the plaintext is UTF-8, as the reference's `toUTF8Strict` asks
+/// (`MasterCertificate.ts:619`).
+pub(crate) fn decrypt_field_value(key: &SymmetricKey, ciphertext: &[u8]) -> Result<String> {
+    let plaintext = key.decrypt(ciphertext)?;
     String::from_utf8(plaintext).map_err(|e| Error::InvalidUtf8(e.to_string()))
 }
 

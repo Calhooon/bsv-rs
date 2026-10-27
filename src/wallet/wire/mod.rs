@@ -138,11 +138,21 @@ pub(crate) fn integer_refusal(
 /// `Certificate.ts:25-28`, `WalletWireTransceiver.ts:67`.
 const MAX_CERTIFICATE_BINARY_BYTES: usize = 16 * 1024 * 1024;
 const MAX_CERTIFICATE_FIELDS: usize = 100_000;
-const MAX_CERTIFICATE_FIELD_VALUE_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_CERTIFICATE_FIELD_VALUE_BYTES: usize = 1024 * 1024;
 const MAX_CERTIFICATE_SIGNATURE_BYTES: usize = 72;
 const MAX_WIRE_RESPONSE_COLLECTION_ITEMS: usize = 100_000;
 /// `Number.MAX_SAFE_INTEGER`, the strict varint reader's bound.
 const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
+
+/// The reference's one text for a field value over the bound, its text's
+/// UTF-8 bytes measured on write and the declared length on read
+/// (`Certificate.ts:76-79`, `:377-381`): the wire's writer and reader and
+/// `Certificate`'s `to_binary` and `from_binary` (bsv-rs#275).
+pub(crate) fn certificate_field_value_refusal(name: &str) -> String {
+    format!(
+        "Certificate field {name} exceeds the maximum of {MAX_CERTIFICATE_FIELD_VALUE_BYTES} bytes"
+    )
+}
 
 /// A wire record: a key to its value.
 type Record = HashMap<String, String>;
@@ -333,9 +343,7 @@ impl WireReader<'_> {
             }
             let length = self.read_var_int_num_strict()?;
             if length > MAX_CERTIFICATE_FIELD_VALUE_BYTES {
-                return Err(refused(format!(
-                    "Certificate field {name} exceeds the maximum of {MAX_CERTIFICATE_FIELD_VALUE_BYTES} bytes"
-                )));
+                return Err(refused(certificate_field_value_refusal(&name)));
             }
             let value = utf8(self.read_bytes(length)?)?;
             fields.insert(name, value);
