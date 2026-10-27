@@ -1973,7 +1973,7 @@ impl Transaction {
                     unlocking_script: UnlockingScript::from_script(
                         crate::script::Script::from_binary(&unlocking_script.to_binary())?,
                     ),
-                    memory_limit: Some(memory_limit.unwrap_or(usize::MAX)),
+                    memory_limit,
                     work_limit: None,
                 })?;
 

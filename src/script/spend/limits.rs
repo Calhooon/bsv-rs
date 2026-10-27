@@ -10,10 +10,6 @@ use super::Spend;
 /// Maximum size of a single script element (1GB for BSV unlimited)
 pub(super) const MAX_SCRIPT_ELEMENT_SIZE: usize = 1024 * 1024 * 1024;
 
-/// The local memory budget of the default mode when `memory_limit` is `None`
-/// (32,000,000 bytes, each stack apart, the bytes alone).
-const DEFAULT_MEMORY_LIMIT: usize = 32_000_000;
-
 /// The local memory budget under a word when `memory_limit` is `None`: the
 /// node's policy default ([`DEFAULT_STACK_MEMORY_USAGE_POLICY`],
 /// `src/policy/policy.h:153`) on the block path as on the mempool path. The
@@ -29,9 +25,12 @@ pub(super) const MAX_MULTISIG_KEY_COUNT: i64 = i32::MAX as i64;
 
 impl Spend {
     /// The LOCAL memory budget in force: `SpendParams::memory_limit` when it
-    /// is `Some`, in every mode. Otherwise, in the TypeScript default mode,
-    /// 32,000,000 bytes for each stack apart, counting the bytes alone, as
-    /// that SDK counts; under a word, 100,000,000 bytes on the node's count,
+    /// is `Some`, in every mode (in the TypeScript default mode each stack
+    /// apart, counting the bytes alone, as that SDK counts). Otherwise, in
+    /// the default mode, none: `usize::MAX`, uncapped, as the reference's
+    /// `Spend` is without a `memoryLimit` (`Number.POSITIVE_INFINITY`,
+    /// `ts-stack@edf6e03` `Spend.ts:295-296`; bsv-rs#331), an allocation the
+    /// allocator refuses a decline; under a word, 100,000,000 bytes on the node's count,
     /// one budget over both stacks with [`STACK_ELEMENT_OVERHEAD`](crate::script::flags::STACK_ELEMENT_OVERHEAD) bytes per
     /// element (the node's policy default, `src/policy/policy.h:153`, on the
     /// block path as on the mempool path: a node's block-path budget is its
@@ -49,7 +48,7 @@ impl Spend {
         self.memory_limit.unwrap_or(if self.flags.is_some() {
             WORD_MEMORY_LIMIT
         } else {
-            DEFAULT_MEMORY_LIMIT
+            usize::MAX
         })
     }
 
@@ -163,8 +162,8 @@ impl Spend {
     }
 
     /// The decline of an allocation the allocator refused (bsv-rs#331): with
-    /// no local budget (`memory_limit: Some(usize::MAX)`, `Transaction::verify`'s
-    /// default) the allocator's ceiling is the budget, and reaching it stops the
+    /// no local budget (the default mode's `memory_limit: None`, or
+    /// `Some(usize::MAX)`) the allocator's ceiling is the budget, and reaching it stops the
     /// evaluation as a budget does, never as an abort (on `wasm32` an abort
     /// is uncatchable). `limit` is the bytes both stacks held when it refused,
     /// `attempted` those and the `len` asked for. The reference's allocation

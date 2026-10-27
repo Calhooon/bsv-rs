@@ -703,5 +703,44 @@ fn test_http_json_success_tx_in_the_array_form_costs_the_typed_reading() {
         array_peak < 4 * array.len() as u64,
         "array form: peak {array_peak} B for {} B of text",
         array.len()
+
+/// An executed push copies its bytes once, onto the stack (bsv-rs#331, the review of PR
+/// #370's third note): each step cloned its chunk, the push's data with it, before the
+/// fallible copy, an infallible allocation the size of the element that doubled the push's
+/// peak. The spend is built before the profiler starts, so the peak is the evaluation's:
+/// one 8,000,000-byte copy, not two.
+#[test]
+fn test_an_executed_push_copies_its_bytes_once() {
+    use bsv_rs::script::op::{OP_1, OP_DROP};
+    use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript};
+
+    const ELEMENT: usize = 8_000_000;
+    let _serial = serial();
+    let mut unlock = Script::new();
+    unlock.write_bin(&vec![0x01; ELEMENT]);
+    let mut lock = Script::new();
+    lock.write_opcode(OP_DROP).write_opcode(OP_1);
+    let mut spend = Spend::new(SpendParams {
+        source_txid: [0u8; 32],
+        source_output_index: 0,
+        source_satoshis: 1000,
+        locking_script: LockingScript::from_script(lock),
+        transaction_version: 1,
+        other_inputs: vec![],
+        outputs: vec![],
+        input_index: 0,
+        unlocking_script: UnlockingScript::from_script(unlock),
+        input_sequence: 0xffff_ffff,
+        lock_time: 0,
+        memory_limit: None,
+        work_limit: None,
+    });
+    let _profiler = dhat::Profiler::builder().testing().build();
+    assert_eq!(spend.validate().map_err(|e| e.message), Ok(true));
+    let peak = dhat::HeapStats::get().max_bytes;
+    println!("\n=== an 8,000,000-byte push: peak {peak} bytes ===");
+    assert!(
+        (ELEMENT..ELEMENT + ELEMENT / 2).contains(&peak),
+        "the evaluation's peak: {peak} bytes for a {ELEMENT}-byte push"
     );
 }

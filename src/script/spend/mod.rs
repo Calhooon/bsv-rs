@@ -29,10 +29,20 @@
 //! `SpendParams::memory_limit` is a LOCAL budget: exhausting it stops the
 //! evaluation with a resource limit
 //! ([`ScriptEvaluationError::resource_limit`]), never a verdict, and `Some(n)`
-//! wins in every mode. With `None`, the default mode keeps 32,000,000 bytes per stack, the
-//! bytes alone (the TypeScript `Spend` default until `ts-stack@30210fe`, uncapped since).
-//! `Some(usize::MAX)` is uncapped, `Transaction::verify`'s default (bsv-rs#331): an element
-//! the allocator refuses is a decline, never an abort, the 1 GiB element bound the only bound.
+//! wins in every mode (in the default mode per stack, the bytes alone, as the
+//! TypeScript `Spend` counts). With `None` the default mode is uncapped, as the
+//! reference's `Spend` is without a `memoryLimit` (`Number.POSITIVE_INFINITY`,
+//! `ts-stack@edf6e03` `Spend.ts:295-296`; bsv-rs#331), and so is
+//! `Some(usize::MAX)`: an element the allocator refuses is a decline, never an
+//! abort. A budget is the caller's: one that wants the node's policy figure
+//! passes it (`Some(32_000_000)`, the figure this mode's `None` read until
+//! bsv-rs#331). Uncapped, the 1 GiB element bound (`MAX_SCRIPT_ELEMENT_SIZE`)
+//! holds at a data push, `OP_CAT`, `OP_NUM2BIN` and `OP_LSHIFTNUM`; an
+//! arithmetic result (`push_number`: `OP_ADD`, `OP_MUL`, ...) is not bounded in
+//! this mode, as the reference's is not, and `BigNumber` computes it with
+//! infallible allocations, so an `OP_MUL` of two operands near 1 GiB asks for
+//! about 2 GiB that a refusal aborts. A memory budget bounds memory, never
+//! time: the work budget (`work_limit`) does.
 //! Under a word the count is the node's (one budget over the main and the alt
 //! stack, 32 bytes of overhead per element, every growth charged before it
 //! happens, `src/script/limitedstack.cpp`) and `None` selects 100,000,000
@@ -166,9 +176,10 @@ pub struct SpendParams {
     pub lock_time: u32,
     /// The LOCAL memory budget in bytes: exhausting it is a resource limit
     /// ([`ScriptEvaluationError::resource_limit`]), never a verdict, and
-    /// `Some(n)` wins in every mode. `None` selects the mode's figure: 32,000,000
-    /// bytes in the default mode, 100,000,000 on the node's count under a word
-    /// ([`Spend::memory_limit`]); `Some(usize::MAX)` uncapped (#331). Under the block word `Some(X)` models a node's
+    /// `Some(n)` wins in every mode. `None` selects the mode's figure: none in
+    /// the default mode (uncapped, the reference's `Spend` default, #331),
+    /// 100,000,000 on the node's count under a word
+    /// ([`Spend::memory_limit`]); `Some(usize::MAX)` uncapped in every mode. Under the block word `Some(X)` models a node's
     /// `-maxstackmemoryusageconsensus=X` as a decline, not its verdict
     /// ([`Spend::set_stack_memory_consensus`] is the verdict); `Some(usize::MAX)`
     /// models a node run with 0.
@@ -292,9 +303,11 @@ pub struct Spend {
     // Parsed-chunk caches. `Script::chunks()` deep-clones the whole chunk
     // vector; calling it from `step()` made execution O(N²) in script size,
     // which is prohibitive for large covenant scripts (a ~500 KB script
-    // would take hours). Cached once here; `step()` indexes the cache.
-    unlocking_chunks: Vec<crate::script::chunk::ScriptChunk>,
-    locking_chunks: Vec<crate::script::chunk::ScriptChunk>,
+    // would take hours). Cached once here; `step()` indexes the cache through
+    // a shared handle, so a step copies no chunk (a push's bytes are copied
+    // once, fallibly, onto the stack; bsv-rs#331).
+    unlocking_chunks: Arc<[ScriptChunk]>,
+    locking_chunks: Arc<[ScriptChunk]>,
 }
 
 impl Spend {
@@ -385,8 +398,8 @@ impl Spend {
             unlocking_script,
             context: ExecutionContext::UnlockingScript,
             program_counter: 0,
-            unlocking_chunks: Vec::new(),
-            locking_chunks: Vec::new(),
+            unlocking_chunks: Arc::from([]),
+            locking_chunks: Arc::from([]),
             last_code_separator: None,
             stack: Vec::new(),
             alt_stack: Vec::new(),
@@ -425,8 +438,8 @@ impl Spend {
             unlocking_truncated: None,
             locking_truncated: None,
         };
-        spend.unlocking_chunks = spend.unlocking_script.chunks();
-        spend.locking_chunks = spend.locking_script.chunks();
+        spend.unlocking_chunks = spend.unlocking_script.chunks().into();
+        spend.locking_chunks = spend.locking_script.chunks().into();
         spend.unlocking_truncated = spend.unlocking_script.as_script().truncated_push();
         spend.locking_truncated = spend.locking_script.as_script().truncated_push();
         spend.reset();
@@ -569,13 +582,11 @@ impl Spend {
         }
 
         self.charge_work(1)?;
-        let op_owned = match self.context {
-            ExecutionContext::UnlockingScript => {
-                self.unlocking_chunks[self.program_counter].clone()
-            }
-            ExecutionContext::LockingScript => self.locking_chunks[self.program_counter].clone(),
+        let chunks = match self.context {
+            ExecutionContext::UnlockingScript => Arc::clone(&self.unlocking_chunks),
+            ExecutionContext::LockingScript => Arc::clone(&self.locking_chunks),
         };
-        let operation = &op_owned;
+        let operation = &chunks[self.program_counter];
         let current_opcode = operation.op;
 
         // A push that declares more bytes than the script holds: the reference's
