@@ -216,7 +216,20 @@ word.
   OP_ADD` in 4.5 s, its `OP_1ADD` in 3.5 s, `1 <536,870,888> OP_LSHIFTNUM`
   in 6 ms); here the push is a verdict with the same text, never an abort
   (`reference_read::result_refusal`, at `push_arithmetic_result` and the
-  numeric left shift). These are the opcodes whose result can cross the
+  numeric left shift). The shift has a second figure: `value << bits` is a
+  `BigInt` before any string is written, and V8 caps a `BigInt` at 2^30
+  bits of magnitude (`BigInt::kMaxLengthBits`), so past 2^30 bits the
+  reference's shift throws `RangeError: Maximum BigInt size exceeded`, the
+  string never reached; from 536,870,889 to 2^30 bits the `BigInt` is built
+  and its string throws `Invalid string length` (Node 22.18.0 at
+  `edf6e03`: `1` and `-1` shifted by 2^30 - 1 bits, the string's words;
+  `1` and `-1` by 2^30, `3` by 2^30 - 1 and `1` by INT_MAX, the `BigInt`'s,
+  each in 1 to 37 ms). Here the shift answers each in its words, a verdict
+  both, after a caller's budget's decline (`reference_read::shift_refusal`;
+  `a_left_shift_past_2_pow_30_bits_is_invalid_with_the_bigint_words`, RED
+  on 8eb1b2c8 with the string's words). No other opcode's result passes
+  2^30 bits in one step: two readable operands' product is at most
+  2^30 - 48 bits, a sum one past the longer operand. These are the opcodes whose result can cross the
   figure through the reference's `toString(2)`: `OP_MUL` and `OP_2MUL` can
   pass it, but `mul` sets its magnitude without a string (`:926-933`), so
   their result is pushed there and here (an at-limit `OP_2MUL` is `true`

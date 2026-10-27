@@ -10,7 +10,9 @@
 //! (`BigNumber.ts:771-781`, `#_setValueFromSigned`) and `OP_LSHIFTNUM`
 //! (`Spend.ts:1066`), where the reference's `RangeError` escapes its
 //! `verify`; `OP_2MUL`'s, which the reference's `mul` builds without a
-//! string, is pushed. Under a word the node's number length decides
+//! string, is pushed. A shift's result past 2^30 bits is invalid in the
+//! words of V8's `BigInt` cap, `Maximum BigInt size exceeded`, which the
+//! reference's shift throws before its string. Under a word the node's number length decides
 //! (32,000,000 bytes after Chronicle). By hand: each operand is 64 MiB, the
 //! file 0.63 s and 1.01 GB resident in release under `--test-threads=1`
 //! (measured on the test binary alone; the figure holds one test at a time,
@@ -215,4 +217,64 @@ fn under_a_budget_the_budgets_decline_precedes_the_shifts_verdict() {
         (ScriptResource::Stack, 67_108_870, 67_108_962)
     );
     invalid(run(&[&[1], &count], &[OP_NOP7], None, budget));
+}
+
+/// The reference's other words for a shift: `value << bits` is a `BigInt`
+/// before any string is written, and V8 caps a `BigInt` at 2^30 bits of
+/// magnitude (`BigInt::kMaxLengthBits` on a 64-bit host); past it the shift
+/// throws `RangeError: Maximum BigInt size exceeded`, at or under it the
+/// constructor's `toString(2)` throws `Invalid string length` (`ts-stack@edf6e03`
+/// `Spend.ts:1066`, Node 22.18.0).
+fn invalid_bigint(result: Result<bool, Box<ScriptEvaluationError>>) {
+    let error = result.expect_err("the reference's verdict");
+    assert!(!error.is_resource_limit(), "a verdict, not a decline");
+    assert_eq!(error.message, "Maximum BigInt size exceeded");
+}
+
+/// `1 <2^30 - 1> OP_LSHIFTNUM` is 2^30 bits of magnitude: the reference
+/// builds the `BigInt` and its string throws, `Invalid string length`;
+/// `-1` the same (sign and magnitude).
+#[test]
+fn a_left_shift_to_2_pow_30_bits_is_invalid_at_the_string() {
+    let count = encode((1 << 30) - 1);
+    invalid(run(&[&[1], &count], &[OP_NOP7], None, None));
+    invalid(run(&[&[0x81], &count], &[OP_NOP7], None, None));
+}
+
+/// `1 <2^30> OP_LSHIFTNUM`, `-1 <2^30>`, `3 <2^30 - 1>` and `1 <INT_MAX>` pass
+/// 2^30 bits: the reference's shift throws `Maximum BigInt size exceeded`
+/// before any string, and the shift is invalid here in those words before
+/// it allocates.
+#[test]
+fn a_left_shift_past_2_pow_30_bits_is_invalid_with_the_bigint_words() {
+    invalid_bigint(run(&[&[1], &encode(1 << 30)], &[OP_NOP7], None, None));
+    invalid_bigint(run(&[&[0x81], &encode(1 << 30)], &[OP_NOP7], None, None));
+    invalid_bigint(run(&[&[3], &encode((1 << 30) - 1)], &[OP_NOP7], None, None));
+    invalid_bigint(run(
+        &[&[1], &encode(i32::MAX as u32)],
+        &[OP_NOP7],
+        None,
+        None,
+    ));
+}
+
+/// Past 2^30 bits too a caller's budget declines first: a 134,217,729-byte
+/// result passes a budget of 100,000,000 bytes per stack, declined; under
+/// 200,000,000 the verdict is the reference's.
+#[test]
+fn under_a_budget_the_budgets_decline_precedes_the_bigint_verdict() {
+    let error = run(
+        &[&[1], &encode(1 << 30)],
+        &[OP_NOP7],
+        None,
+        Some(100_000_000),
+    )
+    .expect_err("the budget's decline");
+    assert!(error.is_resource_limit(), "a decline: {}", error.message);
+    invalid_bigint(run(
+        &[&[1], &encode(1 << 30)],
+        &[OP_NOP7],
+        None,
+        Some(200_000_000),
+    ));
 }
