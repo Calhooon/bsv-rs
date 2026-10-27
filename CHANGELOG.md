@@ -341,10 +341,20 @@ This crate now refuses the same answer in the same words, after the body
 is read and before any message is built
 (`src/auth/transports/http/unauthenticated.rs`), and takes the sender from the answer's
 `x-bsv-auth-identity-key`, never the client's own key. The class, by
-#87's and #320's rules: the named host answered, so it is that host's
-answer, `Error::AuthError`, `transport_fault()` `None`, whatever the
-status (an unsigned 503 too: the general path reads no status as a
-fault). An answer with the three headers is read as before. The
+#87's and #73's rules (`status_fault`, `fault_or`): an unsigned 429, 502,
+503 or 504 is not the named host's own voice but a gateway's or a
+limiter's, so it is `Error::TransportFault` with the answer's status and
+those words as its detail, a 429 or a 503 with `Retry-After`
+`RateLimited` with the wait it asks, a 502, a 503 without it or a 504
+`MayHaveBeenReceived`; any other status is the named host's answer,
+`Error::AuthError`, `transport_fault()` `None`. A signed answer of any
+status, a 503 included, is read as before. The reason phrase is the
+status line's own: fetch's `statusText`, which hyper keeps in the
+answer's extensions as `hyper::ext::ReasonPhrase` when it is not the
+canonical one (`hyper` 1.12 `proto/h1/role.rs:1071-1076`, `:1176-1180`), read here
+through `reqwest::Response::extensions`, the canonical one when the line
+carries that one; `hyper` is now a direct dependency of the `http`
+feature (the one reqwest builds on, no new crate in the tree). The
 handshake path: the reference applies no header check to the
 `/.well-known/auth` answer (`:136-173`; its body is a signed
 `AuthMessage` the `Peer` verifies), so neither does this crate; its
@@ -357,31 +367,42 @@ below.
 Migration: a caller that read an unsigned general answer (a server whose
 error path answers without the auth middleware's headers, a 401 among
 them) now gets the refusal from `Transport::send`, and through `Peer`
-from `to_peer`. The toolbox's `StorageClient`
-(`bsv-wallet-toolbox-rs@a3377ef`
-`src/storage/client/storage_client.rs:478-560`) matched an unsigned
-answer by its request ID and read its status (`HTTP error {status}:
-{body}`); it now sees `Failed to send request: Received HTTP ...`. It
-pins `bsv-rs = "0.3.20"`, so the change reaches it when it moves to 0.9.
-`bsv-wallet-cli@f4285bf`, `bsv-overlay-cloudflare@8c18730c` and
-`rust-message-box@08418ec` build no `SimplifiedFetchTransport`.
+from `to_peer`; one that matched an unsigned 429, 502, 503 or 504 by its
+status reads `transport_fault()`. The toolbox's `StorageClient`
+(`bsv-wallet-toolbox-rs` beta at `55c0d1f`,
+`src/storage/client/storage_client.rs:520-616`, pinning
+`=0.9.0-beta.1`) matched an unsigned answer by its request ID and read
+its status (`HTTP error {status}: {body}`); it now sees `Failed to send
+request: Received HTTP ...` for a refusal and keeps the SDK's error for a
+transport fault (`e.transport_fault().is_some()`, `:574`). Its main
+at `3a8610f` pins `0.8.0` and does not reach 0.9 without a move.
+`bsv-wallet-cli` (main `e7844c4`, beta `687f0b6`),
+`bsv-overlay-cloudflare` (main `c51e161d`) and `rust-message-box` (main
+`44a6320`) build no `SimplifiedFetchTransport`.
 
-Pinned by `tests/transport_unsigned_response_354.rs` (5 tests, wiremock)
-against `tests/vectors/transport_unsigned_response_354.json`, the
-reference's transport driven against a local `node:http` server by
+Pinned by `tests/transport_unsigned_response_354.rs` (8 tests, wiremock,
+and a loopback listener that writes a case's own reason phrase, which
+wiremock cannot) against `tests/vectors/transport_unsigned_response_354.json`,
+the reference's transport driven against a local `node:http` server by
 `tests/support/transport_unsigned_response_354.mjs` (`ts-stack@edf6e03`,
-Node v22.18.0; 14 cases, 13 refusals): a 200 with a JSON body and no auth
+Node v22.18.0; 22 cases, 20 refusals): a 200 with a JSON body and no auth
 headers refused in those words; a 200 with two of the three (the
 signature, the identity key, a blank version) refused naming the one
-missing; every refusal the reference recorded (a 401 and a 503, an empty
-body, binary bodies short and past 1,024 bytes, text past 1,024 bytes, a
-cut through a surrogate pair, a BOM and ill-formed UTF-8) equal here byte
-for byte, nothing handed to the callback; the refusal an `AuthError`, no
-transport fault; the three headers read as before, the sender the
-answer's key. 4 of the 5 red on the tree with the check removed (the
-three-header test green on both); `transport_fault_auth` (9),
-`transport_client_hook_320` (5) and `auth_integration_tests` (70)
-unchanged.
+missing; every refusal the reference recorded (a 401, 429, 502, 503 and
+504, an empty body, binary bodies short and past 1,024 bytes, text past
+1,024 bytes, a cut through a surrogate pair, a BOM and ill-formed UTF-8,
+a custom and a blank reason phrase) equal here byte for byte but one
+(`READ_OTHERWISE`, the parity note), nothing handed to the callback; an
+unsigned 429 and 503 with `Retry-After` `RateLimited` with 7 and 3
+seconds, a 502, a bare 503 and a 504 `MayHaveBeenReceived`, each in the
+refusal's words with its status; a 200 and a 401 `AuthError`; the three
+headers read as before, the sender the answer's key, a signed 503 handed
+to the callback. On the tree with the fault classes removed 2 of the 8
+are red, with the reason phrase removed 3, both removed 4.
+The arch rule's `charset=` line (`tests/arch_no_string_errors.rs`,
+`docs/ARCH-RULES.md` section 3): the reference's `#isTextualContent` reads
+the answer's `Content-Type` for it to choose the preview's form, a header
+value, no class decided by it, now an allowed line with its reason.
 
 ### Notes: cross-SDK parity (#354)
 
@@ -393,12 +414,20 @@ missing version header in response`,
 `:205-208`), and reads an absent `x-bsv-auth-signature` as an empty
 signature (`hex.DecodeString("")`, `:214-218`), the `Peer` refusing it
 later; it names one header, not the list. This crate follows the
-reference. Two residuals: the reason phrase is the status code's
-canonical one (reqwest keeps no phrase from the wire, which fetch's
-`statusText` reports; a server's own phrase reads differently), and a
-lone high surrogate the reference's 512-unit cut leaves is U+FFFD here,
-the bytes the reference's text has once written as UTF-8. The
-handshake's non-2xx words stay this crate's (above).
+reference's words. Four residuals: an unsigned 429, 502, 503 or 504 is a
+`TransportFault` here, by #87's rule, where the reference throws the
+same plain `Error` for every status (it has no fault class); a reason
+phrase with a byte above `0x7e` (obs-text) is read as none here, the
+status alone, where fetch's `statusText` reads it as UTF-8 (`Caf\xe9` reads as
+`Caf\u{fffd}` there): hyper's parser (httparse 1.10 `parse_reason`)
+empties such a phrase, and reqwest exposes nothing else; a lone high
+surrogate the reference's 512-unit cut leaves is U+FFFD here, the bytes
+the reference's text has once written as UTF-8; and a non-2xx handshake
+answer keeps `Auth endpoint returned {status}: {body}` and #87's fault
+classes here, where the reference's `#sendAuthMessage` throws
+`#createUnauthenticatedResponseError`'s words with `response lacked
+required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
+follow-up is the owner's).
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
