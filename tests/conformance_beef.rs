@@ -208,7 +208,7 @@ const MP_KNOWN_FAILURES: &[(&str, &str)] = &[(
     "mp-compound-001",
     "single-level compound BUMP: bsv-rs lacks ts-sdk's effective-tree-height derivation; \
      from_hex fails in the parse, 'invalid BUMP at byte 71: OffsetOutsideTree { level: 0, offset: 2 }' \
-     (through 0.9.0 the four txids yielded two roots, 'Mismatched roots')",
+     (through 0.8.3 the four txids yielded two roots, 'Mismatched roots')",
 )];
 
 #[test]

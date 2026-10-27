@@ -539,7 +539,7 @@ fn hand_built(seeds: &mut Vec<(String, Vec<u8>)>) {
             repeated_sibling(flag).0,
         ));
     }
-    // A lone leaf at height 2^32: through 0.9.0 the standalone reader cut
+    // A lone leaf at height 2^32: through 0.8.3 the standalone reader cut
     // the height to its low 32 bits.
     let mut above = bsv_rs::primitives::to_var_int(1 << 32);
     above.extend_from_slice(&[0x01, 0x01, 0x00, 0x02]);
