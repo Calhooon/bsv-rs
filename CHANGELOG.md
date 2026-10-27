@@ -7,6 +7,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
+
+Six signAction calls sent the reference createAction answered as the hex
+of its bytes: the contacts manager's update and removal
+(`src/identity/contacts.rs`, `update_contact_on_chain` and
+`remove_contact`), `GlobalKVStore::set` and `remove`, and
+`LocalKVStore::set` and `remove`. A wallet answers
+`signableTransaction.reference` as a base64 text; this crate holds it as
+the text's decoded bytes (`SignableTransaction.reference`, base64 in JSON),
+the binary wire's transceiver decodes the text back
+(`src/wallet/wire/transceiver.rs:667-668`) and the HTTP JSON substrate
+carries it, so the hex text named an action no wallet made (the binary
+wire's transceiver decoded it as base64 to other bytes). Each call now sends
+the text as answered, `to_base64` of the bytes, as the registry client and
+since #318 the revocation do. The reference's contacts manager sends
+`signAction({ reference, spends })` and nothing else (`ts-stack@edf6e03`
+`packages/sdk/src/identity/ContactsManager.ts:813-834`, `:981-1001`); this
+crate's sent `options: { acceptDelayedBroadcast: false }` beside them, and
+now sends no options. The reference's stores sign through
+`completeBoundAction` (`packages/sdk/src/wallet/completeBoundAction.ts:1111-1120`;
+`kvstore/GlobalKVStore.ts:319-389`, `:473-488`;
+`kvstore/LocalKVStore.ts:413-425`, `:515-537`), whose signAction carries
+`{ acceptDelayedBroadcast, returnTXIDOnly: false, noSend, sendWith }`
+from the createAction's options; this crate's stores sent no options, and
+now send that object, carried from their createAction's
+(`kvstore::bound::bound_sign_options`). Their createAction sends no
+options, so the carried members are absent and the object is
+`{ returnTXIDOnly: false }` (the parity note).
+
+Migration: none for a caller of the six methods. A wallet that keys its
+pending actions by the text it answered (the reference's, and any behind
+the binary wire or the HTTP JSON substrate whose answer this crate decodes
+to `SignableTransaction.reference`) now finds the action where it refused
+one it did not know. `bsv-wallet-toolbox-rs` (`6317222`) keys its pending
+signs by its text (`src/wallet/wallet.rs:1860-1878`; the text a random
+base64 of 12 bytes, `src/storage/sqlx/create_action.rs:352-363`) and holds
+`SignableTransaction.reference` in-process as the text's UTF-8 bytes
+(`src/wallet/wallet.rs:1526`, `:1629`), not its decoded bytes. Behind
+`bsv-wallet-cli` (`a55990c`), whose createAction answers the toolbox's text
+on the HTTP JSON wire (`src/server/handlers.rs:698-706`,
+`src/spend_gate.rs:699-701`) and whose signAction hands the text received
+to the toolbox (`src/server/handlers.rs:1045-1049`), these clients' calls
+are now found, where the hex of the decoded bytes was refused (`No pending
+transaction found for reference`). An in-process toolbox `Wallet` under
+these clients is sent the base64 of its text's bytes where it was sent
+their hex, and refuses both; behind this crate's binary wire the same
+bytes cross (the processor writes them, the transceiver reads them) and
+the processor hands the toolbox `to_base64` of them
+(`src/wallet/wire/processor.rs:560`), refused the same. The in-process
+reference is the toolbox's difference from this crate's type; a toolbox
+holding `from_base64(text)` would be found on every path, as the registry
+client's `String::from_utf8` of the bytes (`src/registry/client.rs:699`,
+`:928`) is found in-process and not over a wire. No downstream calls the
+contacts manager or either store (`bsv-wallet-toolbox-rs`,
+`bsv-wallet-cli`, `rust-message-box`, `bsv-overlay-cloudflare` grepped;
+`bsv-middleware-cloudflare-public` and `rust-chaintracks` are not on the
+host the lane ran on).
+
+Pinned by `tests/contacts_signaction_326.rs` (2 tests) and
+`tests/kvstore_signaction_326.rs` (4 tests) on
+`tests/vectors/signaction_reference_326.json`: the reference's contacts
+manager updating and removing a contact, and its two stores setting a key
+with no token, updating it and removing it, each signAction as its wallet
+received it (the JSON text, its members, its options' members, the spend
+indexes) with the createAction options it completed; recorded by
+`tests/support/signaction_reference_326.mjs` at `ts-stack@edf6e03`
+(bundled with an entry re-exporting `ContactsManager`, which `mod.ts` does
+not export) under Node v22.18.0, the randomness #310's SHA-256 counter
+stream (two runs byte for byte). This crate's clients, over the counting
+wallet of #318 (`tests/support/identity_reveal_wallet.rs`, which now lists
+a token and answers createAction with a signable transaction spending it),
+send the reference's text, the reference's members and spend indexes, and
+the contacts manager's arguments equal to the reference's member by member
+(the unlocking scripts aside); each store's options are
+`completeBoundAction`'s rule applied to its own createAction's, as the
+reference's are to its. 6 of 6 red on the tree before the fix at the
+reference text, and 6 of 6 red at the members with the encoding alone
+fixed; the contacts and kvstore witnesses unchanged.
+
+### Notes: cross-SDK parity (#326)
+
+The reference's stores send their createAction `acceptDelayedBroadcast`
+(their configuration's, `false` by default), `randomizeOutputs: false` and
+the global store's `noSend` (`overlayBroadcast`, `false` by default), and
+`completeBoundAction` adds `signAndProcess: false` and `returnTXIDOnly:
+false` (`completeBoundAction.ts:1022-1032`); this crate's stores send no
+createAction options, so their signAction carries no
+`acceptDelayedBroadcast` or `noSend` where the reference's carries `false`
+(a reference wallet reads an absent `acceptDelayedBroadcast` as `true`),
+a finding outside #326. `completeBoundAction` makes checks this crate's
+stores do not, outside #326 too: it refuses a reference that is not
+canonical base64 of 1 to 4096 characters (`:1044-1052`); binds every
+requested input and output in the signable transaction and finds each
+requested input's index there (`bindRequestedAction`, `:1063-1069`);
+signs each requested input itself with the PushDrop unlocker
+(`inputSigners`, the stores' `anyone` or `self` key; `:1076-1106`), where
+this crate's stores send each spend an empty unlocking script for the
+wallet to fill, at indexes counted from 0 (`prepare_spends`, the global
+store input 0); refuses a signer that matches no input (`:1107-1109`);
+after signAction checks the signed transaction against the template and
+each unlocking script and txid it was given (`:1128-1146`); and aborts the
+action on any failure (`abortBestEffort`, `:1148-1151`). The reference's
+stores sign through it on a new key too, `spends: {}`; this crate's local
+store sends a new key's createAction for the wallet to sign and process,
+and its global store signs a new key at input 0. Two defects of the global
+store surfaced: its `set` looks up the key without asking for the token
+(`global.rs:184-193`), so it never spends the token it replaces, where the
+reference's spends every current one; and its reader takes an untagged
+token's signature for its tags (`KVStoreInterpreter::extract_fields`,
+`interpreter.rs:248`), so it refuses every token `set` writes without
+tags. The contacts manager still differs from the reference outside its
+signAction's arguments (its createAction's labels, `signAndProcess` and
+`noSend`, the input at index 0 where the reference finds the bound input,
+`ContactsManager.ts:689-698`, and the reference's template and signature
+checks and abort, `:836-855`, `:1003-1019`). go-sdk@2ca481c has no global store and no
+contacts manager; its `LocalKVStore` sends `SignActionArgs{ Reference,
+Spends }` (`kvstore/local_kv_store.go:342-345`, `:494-497`), the bytes
+createAction answered (`Reference []byte`, `wallet/interfaces.go:203-206`,
+`:222-226`), and no options: the reference's bytes, without
+`completeBoundAction`'s options.
+
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 
 `IdentityClient::revoke_certificate_revelation` took the first output of
@@ -287,7 +408,8 @@ spends the first output listed, at input 0, and does none of these (a finding
 outside #318). The contacts manager and the key-value stores send
 signAction the hex of the reference (`src/identity/contacts.rs:447`,
 `:732`, `src/kvstore/global.rs:281`, `:409`, `src/kvstore/local.rs:331`,
-`:438`), the same fault as the revocation's: a finding outside #318.
+`:438`), the same fault as the revocation's: a finding outside #318,
+closed by #326.
 ### Fixed: the Socket.IO codec reads a frame as `socket.io-parser` reads it, and carries the id on every packet (#110)
 
 `SocketIoPacket::decode` (`src/auth/transports/socketio/codec.rs`) read
