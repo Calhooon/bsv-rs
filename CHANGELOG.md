@@ -137,6 +137,15 @@ tolerated a CR, so no verdict moves). Pinned by
 `a_crlf_checkout_finds_the_impl_closing_brace_as_lf_does`, red without the
 normalization. No other test under `tests/` searches raw file text for a
 LF-only needle.
+### Changed: the fuzz_http_json_responses harness names an originator (#356)
+
+Since #323 `HttpWalletJson::with_client` returns `Result` and the substrate
+refuses a call with no originator configured before any request, so the
+target built with `with_client(client, None, ..)` did not compile and,
+compiled, would have fuzzed nothing. The harness now passes the originator
+`fuzz.invalid` and unwraps the constructor (its base URL is the harness's own
+loopback). CI builds no fuzz target, so only `cargo fuzz` and the nightly saw
+it.
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
