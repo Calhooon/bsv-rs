@@ -17,7 +17,7 @@
 //! rows `bump-027` and `bump-028`), and from each of those each prefix of a
 //! short one, three single-byte changes at each byte and a byte appended.
 //!
-//! No difference is stated. Through 0.9.0 the standalone reader read a leaf
+//! No difference is stated. Through 0.8.3 the standalone reader read a leaf
 //! flag by its bits, accepted an offset outside its level, a carried node
 //! that disagrees with the one its children make, a level 0 with no hash, a
 //! height above a `u32` (cut to its low bits), and named its refusals in
@@ -472,7 +472,7 @@ fn repeated_sibling(flag: u8) -> (Vec<u8>, u64) {
 /// `:628-631`), and both readers refuse `LeftDuplicateBelow` (bsv-rs#167;
 /// the vector `two-paths-level-3-computed-from-the-left-duplicate` of
 /// `tests/vectors/merkle_path_even_offset_duplicate_167.json`). Through
-/// 0.9.0 the standalone reader hashed an empty left hash there and refused
+/// 0.8.3 the standalone reader hashed an empty left hash there and refused
 /// `Mismatched roots`, the two txids climbing to two roots; until the re-read
 /// of 2026-10-26 both readers refused the duplicate's flag, `BadFlag`.
 fn even_offset_duplicate() -> Vec<u8> {
