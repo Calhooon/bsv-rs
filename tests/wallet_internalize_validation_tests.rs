@@ -137,7 +137,8 @@ mod http_json_door {
             .expect(sends)
             .mount(&server)
             .await;
-        let wallet = HttpWalletJson::new(None, Some(server.uri()));
+        let wallet = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+            .expect("the substrate is configured");
         wallet
             .internalize_action(
                 args(vec![insertion(Some(custom_instructions))]),

@@ -410,7 +410,8 @@ async fn a_wallet_certificate_with_a_txid_alone_revocation_outpoint_verifies() {
         .mount(&server)
         .await;
 
-    let wallet = HttpWalletJson::new(Some("test".into()), Some(server.uri()));
+    let wallet = HttpWalletJson::new(Some("test".into()), Some(server.uri()))
+        .expect("the substrate is configured");
     let mut requested = RequestedCertificateSet::new();
     requested.add_certifier(certifier.public_key().to_hex());
     requested.add_type(to_base64(&cert.cert_type), vec!["name".to_string()]);

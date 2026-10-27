@@ -8,6 +8,7 @@ use crate::wallet::types::{
     Counterparty, Network, Protocol, RevealCounterpartyKeyLinkageResult,
     RevealSpecificKeyLinkageResult,
 };
+use crate::wallet::validation::validate_originator;
 use crate::wallet::{
     AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
     CreateActionArgs, CreateActionResult, CreateHmacArgs, CreateHmacResult, CreateSignatureArgs,
@@ -52,28 +53,31 @@ use key_requests::{
 /// - `decrypt` -> `POST /decrypt`
 /// - etc.
 ///
+/// # The originator (#323)
+///
+/// The reference's rule (`ts-stack@edf6e03` `HTTPWalletJSON.ts:280-314`): the
+/// constructor's originator, validated there (`validate_originator`: a
+/// hostname, its port dropped), is the one sent, as both `Origin` and
+/// `Originator` in the origin form (`http://example.com`); a method's
+/// `originator` argument is not sent. A call with none configured is refused
+/// before a request is made, in the reference's words. The reference skips
+/// the rule in a browser, whose `fetch` sets `Origin` itself; this crate has
+/// no browser target (`http` is native-only, `build.rs`), so it is
+/// unconditional. The base URL is an exact origin, cleartext only to a
+/// loopback host; a body over 256 MiB is refused unsent; the client `new`
+/// builds follows no redirect (`redirect: 'error'`), a client given to
+/// `with_client` is used as given.
+///
 /// # Example
 ///
 /// ```rust,ignore
 /// use bsv_rs::wallet::substrates::HttpWalletJson;
-/// use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
+/// use bsv_rs::wallet::GetPublicKeyArgs;
 ///
-/// let client = HttpWalletJson::new(
-///     Some("myapp.example.com".into()),
-///     None, // Uses default http://localhost:3321
-/// );
-///
-/// let result = client.get_public_key(
-///     GetPublicKeyArgs {
-///         identity_key: true,
-///         protocol_id: None,
-///         key_id: None,
-///         counterparty: None,
-///         for_self: None,
-///         ..Default::default()
-///     },
-///     "myapp.example.com",
-/// ).await?;
+/// let client = HttpWalletJson::new(Some("myapp.example.com".into()), None)?;
+/// let result = client
+///     .get_public_key(GetPublicKeyArgs { identity_key: true, ..Default::default() }, "")
+///     .await?;
 /// ```
 #[derive(Clone)]
 pub struct HttpWalletJson {
@@ -82,67 +86,71 @@ pub struct HttpWalletJson {
     originator: Option<String>,
 }
 
+/// The reference's `MAX_WALLET_JSON_REQUEST_BYTES` (`HTTPWalletJSON.ts:60`).
+const MAX_WALLET_JSON_REQUEST_BYTES: usize = 256 * 1024 * 1024;
+
 impl HttpWalletJson {
-    /// Creates a new HTTP JSON wallet client.
+    /// Creates a client of the wallet at `base_url` (default
+    /// `http://localhost:3321`) on a client that follows no redirect.
     ///
-    /// # Arguments
+    /// # Errors
     ///
-    /// * `originator` - Optional originator identifier for the client
-    /// * `base_url` - Optional base URL; defaults to `http://localhost:3321`
-    pub fn new(originator: Option<String>, base_url: Option<String>) -> Self {
-        Self {
-            client: Client::new(),
-            base_url: base_url.unwrap_or_else(|| super::DEFAULT_JSON_URL.to_string()),
-            originator,
-        }
+    /// The base URL and the originator refused as the type's doc says.
+    pub fn new(originator: Option<String>, base_url: Option<String>) -> Result<Self, Error> {
+        Self::with_client(super::origin::default_client()?, originator, base_url)
     }
 
-    /// Creates a new HTTP JSON wallet client with a custom HTTP client.
+    /// Creates a client on `client`, used as given (its redirect policy too).
+    ///
+    /// # Errors
+    ///
+    /// As [`HttpWalletJson::new`].
     pub fn with_client(
         client: Client,
         originator: Option<String>,
         base_url: Option<String>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let base_url = base_url.as_deref().unwrap_or(super::DEFAULT_JSON_URL);
+        Ok(Self {
             client,
-            base_url: base_url.unwrap_or_else(|| super::DEFAULT_JSON_URL.to_string()),
-            originator,
-        }
+            base_url: super::origin::normalize_wallet_http_base_url(base_url)?,
+            originator: validate_originator(originator.as_deref())?,
+        })
     }
 
-    /// Returns the base URL.
+    /// Returns the base URL, the origin the constructor normalized.
     pub fn base_url(&self) -> &str {
         &self.base_url
     }
 
-    /// Returns the originator.
+    /// Returns the originator, as `validate_originator` normalized it.
     pub fn originator(&self) -> Option<&str> {
         self.originator.as_deref()
     }
 
-    /// Makes a JSON API request to the wallet.
+    /// Makes a JSON API request to the wallet; the call's originator is not
+    /// sent, the constructor's is (`HTTPWalletJSON.ts:296-314`).
     async fn request<T: Serialize, R: for<'de> Deserialize<'de>>(
         &self,
         method: &str,
         args: &T,
-        originator: &str,
+        _originator: &str,
     ) -> Result<R, Error> {
-        let url = format!("{}/{}", self.base_url, method);
-
-        // Build request with originator header
-        let origin = if !originator.is_empty() {
-            to_origin_header(originator)
-        } else if let Some(ref orig) = self.originator {
-            to_origin_header(orig)
-        } else {
-            String::new()
+        let Some(originator) = self.originator.as_deref() else {
+            return Err(Error::WalletError(ORIGINATOR_REQUIRED.to_string()));
         };
-
-        let mut request = self.client.post(&url).json(args);
-
-        if !origin.is_empty() {
-            request = request.header("Originator", &origin);
+        let origin = super::origin::to_origin_header(originator)?;
+        let body = serde_json::to_vec(args)
+            .map_err(|e| Error::WalletError(format!("failed to serialize request: {e}")))?;
+        if body.len() > MAX_WALLET_JSON_REQUEST_BYTES {
+            return Err(Error::WalletError(REQUEST_TOO_LARGE.to_string()));
         }
+        let request = (self.client.post(format!("{}/{}", self.base_url, method)))
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("Origin", &origin)
+            .header("Originator", &origin)
+            .body(body);
 
         // Send request
         let response = request
@@ -150,7 +158,9 @@ impl HttpWalletJson {
             .await
             .map_err(|e| request_error(e, "HTTP request failed"))?;
 
-        // Check for error status
+        if response.status().is_redirection() {
+            return Err(super::origin::redirect_refused(response.status(), method));
+        }
         if !response.status().is_success() {
             let status = response.status();
             let transport = fault::status_fault(status, response.headers());
@@ -907,14 +917,12 @@ struct JsonBusyResponse {
 // Helper Functions
 // =============================================================================
 
-/// Converts an originator domain to an origin header value.
-fn to_origin_header(originator: &str) -> String {
-    if originator.starts_with("http://") || originator.starts_with("https://") {
-        originator.to_string()
-    } else {
-        format!("http://{}", originator)
-    }
-}
+/// The reference's words for a call with no originator configured.
+const ORIGINATOR_REQUIRED: &str = "HTTPWalletJSON: originator is required when using the HTTP \
+    substrate in Node.js. Pass an originator (e.g. \"example.com\") to the constructor.";
+
+/// The reference's words for a body over the bound.
+const REQUEST_TOO_LARGE: &str = "HTTPWalletJSON request exceeds the maximum permitted size";
 
 /// Converts a Protocol to JSON tuple format.
 fn protocol_to_json(protocol: &Protocol) -> (u8, String) {
@@ -1015,16 +1023,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_to_origin_header() {
-        assert_eq!(to_origin_header("example.com"), "http://example.com");
-        assert_eq!(to_origin_header("http://example.com"), "http://example.com");
-        assert_eq!(
-            to_origin_header("https://example.com"),
-            "https://example.com"
-        );
-    }
-
-    #[test]
     fn test_protocol_to_json() {
         use crate::wallet::SecurityLevel;
 
@@ -1041,7 +1039,7 @@ mod tests {
 
     #[test]
     fn test_default_url() {
-        let client = HttpWalletJson::new(None, None);
+        let client = HttpWalletJson::new(None, None).unwrap();
         assert_eq!(client.base_url(), "http://localhost:3321");
     }
 
@@ -1098,7 +1096,7 @@ mod tests {
 
     #[test]
     fn test_custom_url() {
-        let client = HttpWalletJson::new(None, Some("https://wallet.example.com".into()));
+        let client = HttpWalletJson::new(None, Some("https://wallet.example.com".into())).unwrap();
         assert_eq!(client.base_url(), "https://wallet.example.com");
     }
 }

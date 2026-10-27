@@ -238,7 +238,8 @@ async fn exchange(case: &Value) -> (String, std::result::Result<String, String>)
         .respond_with(ResponseTemplate::new(200).set_body_json(&case["result"]))
         .mount(&server)
         .await;
-    let wallet = HttpWalletJson::new(None, Some(server.uri()));
+    let wallet = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+        .expect("the substrate is configured");
     // A key-related call's args and result as the fixtures' adapters read
     // and write them in the reference's names
     macro_rules! key_call {

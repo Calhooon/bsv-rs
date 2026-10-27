@@ -38,12 +38,18 @@ fn client(timeout: Duration) -> reqwest::Client {
 
 /// `createAction` through both substrates against `url`.
 async fn both_at(url: &str, timeout: Duration) -> [(&'static str, Error); 2] {
-    let json = HttpWalletJson::with_client(client(timeout), None, Some(url.to_string()));
+    let json = HttpWalletJson::with_client(
+        client(timeout),
+        Some("app.example.com".into()),
+        Some(url.to_string()),
+    )
+    .expect("the substrate is configured");
     let json_err = json
         .create_action(create_action_args(), "app.example.com")
         .await
         .expect_err("the JSON substrate fails");
-    let wire = HttpWalletWire::with_client(client(timeout), None, Some(url.to_string()));
+    let wire = HttpWalletWire::with_client(client(timeout), None, Some(url.to_string()))
+        .expect("the substrate is configured");
     let wire_err = wire
         .transmit_to_wallet(&[WalletCall::CreateAction as u8, 0, 1, 2, 3])
         .await
@@ -144,7 +150,8 @@ async fn store_busy_on_a_503_is_wallet_busy_where_the_substrate_reads_one() {
         )
         .mount(&server)
         .await;
-    let json = HttpWalletJson::new(None, Some(server.uri()));
+    let json = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+        .expect("the substrate is configured");
     let err = json
         .create_action(create_action_args(), "app.example.com")
         .await
@@ -230,7 +237,8 @@ mod body_cut {
             .respond_with(ResponseTemplate::new(200).set_body_string("not json"))
             .mount(&server)
             .await;
-        let err = HttpWalletJson::new(None, Some(server.uri()))
+        let err = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+            .expect("the substrate is configured")
             .create_action(create_action_args(), "app.example.com")
             .await
             .unwrap_err();

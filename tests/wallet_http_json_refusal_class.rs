@@ -46,7 +46,8 @@ async fn create_action_against(status: u16, body: Value) -> Error {
         .expect(1)
         .mount(&server)
         .await;
-    HttpWalletJson::new(None, Some(server.uri()))
+    HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+        .expect("the substrate is configured")
         .create_action(create_action_args(), "app.example.com")
         .await
         .expect_err("the wallet answered an error")

@@ -550,6 +550,94 @@ redirect statuses it is handed. The reference's third parameter
 request timeout, `:30-37`) is not this crate's: outside #320. The tail of the reference's words is the
 runtime's (`fetch failed` under Node); this crate's is `redirect refused:
 {status}`.
+### Fixed: the HTTP wallet substrates take the reference's originator rule, headers, redirect refusal and base URL form (#323)
+
+`HttpWalletJson` and `HttpWalletWire` validated nothing at construction,
+sent a call's originator in preference to the configured one, sent one
+header (`Originator` from the JSON substrate, `Origin` from the wire, both
+in the origin form), sent none when no originator was set, followed up to
+ten redirects (reqwest's default) and took any base URL;
+`validate_originator` checked lengths alone. The reference's substrates
+(`ts-stack@edf6e03` `packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:280-314`,
+`HTTPWalletWire.ts:17-20`, `:43-66`, `utils/toOriginHeader.ts`) and its
+`validateOriginator` (`validationHelpers.ts:996-1037`) do otherwise, and
+this crate now does as they do:
+
+- `validate_originator` (now `wallet/validation/originator.rs`) is the
+  reference's: trimmed, lower-cased, 1 to 250 bytes, a canonical DNS
+  hostname with an optional port (1 to 5 digits, at most 65535), the port
+  dropped from the answer (`Example.com:8080` is `example.com`), each
+  refusal `WalletRefusal` of class `InvalidParameter` in the reference's
+  words (`The originator parameter must be a canonical DNS hostname with an
+  optional port`, `The originator part parameter must be no more than 63
+  length.`). A scheme-prefixed originator is refused, as the reference
+  refuses it (the colon reads as a port separator), so `toOriginHeader`'s
+  path-trimming branch is never reached through a constructor.
+- Both constructors validate the originator and normalize the base URL to
+  its origin (`normalizeWalletHttpBaseUrl`): no credentials, path, query or
+  fragment, at most 2048 units, no surrounding whitespace, cleartext HTTP
+  only to `localhost`, `*.localhost`, `127.0.0.1` or `[::1]`, each refusal
+  in the reference's words (`Wallet HTTP baseUrl may use cleartext HTTP only
+  for a loopback host.`).
+- `HttpWalletJson` sends the constructor's originator, never a method's
+  `originator` argument, as both `Origin` and `Originator` in the origin
+  form (`http://example.com`), with `Accept: application/json`; a call with
+  none configured is refused before a request, `HTTPWalletJSON: originator
+  is required when using the HTTP substrate in Node.js. Pass an originator
+  (e.g. "example.com") to the constructor.`; a body over 256 MiB
+  (`MAX_WALLET_JSON_REQUEST_BYTES`) is refused unsent. The reference skips
+  the originator rule in a browser, whose `fetch` sets `Origin` itself;
+  `http` is native-only here (`build.rs`, #152), so the rule is
+  unconditional.
+- `HttpWalletWire` validates the frame's originator (more than 250 bytes
+  refused in the reference's words) and, when one is configured, refuses a
+  frame whose originator is not it (`Wallet Wire frame originator does not
+  match the configured originator`), so a frame with none is refused too;
+  it sends the frame's originator raw as `Origin` (`example.com`), empty
+  when the frame has none. A frame over 256 MiB is refused.
+- The client `new` builds takes `redirect::Policy::none()`, the reference's
+  `redirect: 'error'`: a 3xx is answered `WalletError("HTTP 302 Found for
+  <call>: a redirect is refused")` and never followed. A client given to
+  `with_client` is used as given, its redirect policy too. reqwest's wasm32
+  client has no redirect policy (`reqwest-0.12.28/src/wasm/client.rs`; the
+  host's `fetch` follows): moot while `http` does not build for wasm32.
+
+Migration: `HttpWalletJson::new`, `HttpWalletJson::with_client`,
+`HttpWalletWire::new` and `HttpWalletWire::with_client` keep their
+arguments and return `Result<Self, Error>` (add `?`), the Rust form of the
+reference's throwing constructor (the owner's ruling (c) of 2026-10-26,
+recorded on the issue). A `None` originator now fails at the first
+`HttpWalletJson` call in the reference's words (`WalletClient` with `None`
+on a JSON substrate too); a base URL with a path or a cleartext non-loopback
+host is refused at construction; a wire frame whose originator differs from
+the configured one is refused. No downstream constructs either substrate or
+calls `validate_originator` (`bsv-wallet-toolbox-rs` `6317222`, which has
+its own `validate_originator`; `bsv-wallet-cli` `a55990c`;
+`bsv-overlay-cloudflare` `9a0f3c29`; `rust-message-box` `419bf18`; grepped
+2026-10-27).
+
+Pinned by `tests/wallet_http_originator_323.rs` (9 tests, wiremock): 9 of
+9 red on the tree before the fix (the constructors' `Result` shape shimmed
+in, the behaviour the old), green after; the rules' unit tests in
+`wallet/substrates/origin.rs` and `wallet/validation/originator.rs`. The
+existing `wallet_http_*`, `transport_fault_wallet`, `wallet_internalize_*`
+and two `auth_certificate_*` files configure an originator and are
+otherwise unchanged.
+
+### Notes: cross-SDK parity (#323)
+
+go-sdk@2ca481c validates nothing: `NewHTTPWalletJSON` and
+`NewHTTPWalletWire` take any originator and base URL
+(`wallet/substrates/http_wallet_json.go:22-33`,
+`http_wallet_wire.go:20-31`), the JSON substrate sends `Originator` raw and
+only when set (`http_wallet_json.go:51-53`), the wire the frame's `Origin`
+raw with no comparison to the configured one (`http_wallet_wire.go:81-83`),
+and both follow redirects (`http.DefaultClient`). The redirect refusal's
+words are this crate's: the reference's `fetch` throws its runtime's
+`TypeError` (`fetch failed` under Node). The wire's response bounds
+(`HTTPWalletWire.ts:71-116`: `Content-Length` and a 256 MiB body) and the
+JSON substrate's `validateWalletArgs` before the request are not carried:
+findings outside #323.
 
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 

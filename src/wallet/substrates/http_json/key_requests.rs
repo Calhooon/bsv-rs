@@ -246,7 +246,8 @@ mod tests {
                 .mount(&server)
                 .await;
         }
-        let client = HttpWalletJson::new(None, Some(server.uri()));
+        let client = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+            .expect("the substrate is configured");
         let args = CreateSignatureArgs {
             data: Some(vec![1, 2]),
             protocol_id: Protocol::new(SecurityLevel::App, "permission fields"),

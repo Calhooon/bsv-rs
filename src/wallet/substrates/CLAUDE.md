@@ -9,9 +9,10 @@ This module provides transport substrates for communicating with BSV wallets ove
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `mod.rs` | Module root, constants, re-exports | ~64 |
-| `http_wire.rs` | Binary wire protocol over HTTP | ~238 |
-| `http_json.rs` | JSON API over HTTP; an error body read as its `WalletRefusalClass` by name or code (#137) | ~1116 |
+| `mod.rs` | Module root, constants, re-exports | ~66 |
+| `http_wire.rs` | Binary wire protocol over HTTP; the frame's originator validated, refused when not the configured one, sent raw as `Origin` (#323) | ~243 |
+| `http_json.rs` | JSON API over HTTP; an error body read as its `WalletRefusalClass` by name or code (#137); the constructor's originator sent as `Origin` and `Originator`, a call with none refused, a body over 256 MiB refused (#323) | ~1100 |
+| `origin.rs` | The two substrates' shared rules (#323): the reference's `normalizeWalletHttpBaseUrl` and `toOriginHeader`, the client `new` builds (`redirect::Policy::none()`), the redirect refusal | ~195 |
 | `http_json/key_requests.rs` | The nine key-related calls' JSON bodies; the seven key-related requests carry `privileged`, `privilegedReason` and `seekPermission` in the reference's names, an absent one omitted (`JsonPermission`, flattened; bsv-rs#193) | ~246 |
 | `CLAUDE.md` | This documentation | ~260 |
 
@@ -41,17 +42,17 @@ Binary wire protocol transport over HTTP. Implements the `WalletWire` trait.
 ### Constructors
 
 ```rust
-// Basic constructor with optional originator and base URL
-HttpWalletWire::new(originator: Option<String>, base_url: Option<String>) -> Self
+// The originator validated, the base URL normalized; a client that follows no redirect
+HttpWalletWire::new(originator: Option<String>, base_url: Option<String>) -> Result<Self, Error>
 
-// Constructor with custom reqwest::Client for timeouts, TLS, proxies
-HttpWalletWire::with_client(client: Client, originator: Option<String>, base_url: Option<String>) -> Self
+// A custom reqwest::Client (timeouts, TLS, proxies), used as given: its redirect policy too
+HttpWalletWire::with_client(client: Client, originator: Option<String>, base_url: Option<String>) -> Result<Self, Error>
 ```
 
 ### Accessors
 
-- `base_url(&self) -> &str` - Returns the base URL
-- `originator(&self) -> Option<&str>` - Returns the originator
+- `base_url(&self) -> &str` - The base URL's origin, as normalized
+- `originator(&self) -> Option<&str>` - The originator, as `validate_originator` normalized it (the port dropped)
 
 ### Usage
 
@@ -63,7 +64,7 @@ use bsv_rs::wallet::wire::WalletWireTransceiver;
 let wire = HttpWalletWire::new(
     Some("myapp.example.com".into()),
     None, // Uses default http://localhost:3301
-);
+)?;
 
 // Wrap with transceiver for wallet operations
 let wallet = WalletWireTransceiver::new(wire);
@@ -77,7 +78,7 @@ let version = wallet.get_version("myapp.example.com").await?;
 - **Method**: POST
 - **URL**: `{base_url}/{call_name}` (e.g., `http://localhost:3301/getPublicKey`)
 - **Content-Type**: `application/octet-stream`
-- **Headers**: `Origin` header set from originator (converted to URL format)
+- **Headers**: `Origin`, the frame's originator raw as validated (`example.com`), empty when the frame has none
 - **Body**: Raw binary payload (excluding call code and originator)
 
 ### Wire Message Parsing
@@ -97,17 +98,17 @@ JSON API transport over HTTP. Provides direct method implementations rather than
 ### Constructors
 
 ```rust
-// Basic constructor with optional originator and base URL
-HttpWalletJson::new(originator: Option<String>, base_url: Option<String>) -> Self
+// The base URL normalized, the originator validated; a client that follows no redirect
+HttpWalletJson::new(originator: Option<String>, base_url: Option<String>) -> Result<Self, Error>
 
-// Constructor with custom reqwest::Client for timeouts, TLS, proxies
-HttpWalletJson::with_client(client: Client, originator: Option<String>, base_url: Option<String>) -> Self
+// A custom reqwest::Client (timeouts, TLS, proxies), used as given: its redirect policy too
+HttpWalletJson::with_client(client: Client, originator: Option<String>, base_url: Option<String>) -> Result<Self, Error>
 ```
 
 ### Accessors
 
-- `base_url(&self) -> &str` - Returns the base URL
-- `originator(&self) -> Option<&str>` - Returns the originator
+- `base_url(&self) -> &str` - The base URL's origin, as normalized
+- `originator(&self) -> Option<&str>` - The originator, as `validate_originator` normalized it (the port dropped)
 
 ### Usage
 
@@ -118,7 +119,7 @@ use bsv_rs::wallet::{GetPublicKeyArgs, Protocol, SecurityLevel};
 let client = HttpWalletJson::new(
     Some("myapp.example.com".into()),
     None, // Uses default http://localhost:3321
-);
+)?;
 
 let result = client.get_public_key(
     GetPublicKeyArgs {
@@ -136,8 +137,8 @@ let result = client.get_public_key(
 
 - **Method**: POST
 - **URL**: `{base_url}/{method_name}` (e.g., `http://localhost:3321/getPublicKey`)
-- **Content-Type**: `application/json`
-- **Headers**: `Originator` header set from originator (converted to URL format)
+- **Content-Type**: `application/json`; **Accept**: `application/json`
+- **Headers**: `Origin` and `Originator`, both the constructor's originator in the origin form (`http://example.com`)
 - **Body**: JSON-encoded method arguments
 
 ### Implemented Methods
@@ -226,15 +227,12 @@ A 429 without a busy code, at either substrate, is `Error::TransportFault { faul
 
 ## Originator Handling
 
-Both substrates convert the originator string to an HTTP origin header:
-- If originator starts with `http://` or `https://`, use as-is
-- Otherwise, prepend `http://` (e.g., `example.com` → `http://example.com`)
-
-The originator can be set:
-1. At construction time (applies to all requests)
-2. Per-request (extracted from wire message or passed to method)
-
-Per-request originator takes precedence over constructor originator.
+The reference's rule (#323; `ts-stack@edf6e03` `HTTPWalletJSON.ts:280-314`, `HTTPWalletWire.ts:17-20`, `:43-66`, `utils/toOriginHeader.ts`, `validationHelpers.ts:996-1037`):
+- The constructors validate the originator with `validate_originator` (a canonical DNS hostname with an optional port, trimmed and lower-cased, the port dropped: `Example.com:8080` is `example.com`; a scheme-prefixed originator is refused, the colon read as a port separator) and normalize the base URL to its origin (no credentials, path, query or fragment; at most 2048 units; cleartext HTTP only to `localhost`, `*.localhost`, `127.0.0.1` or `[::1]`), each refusal in the reference's words; they return `Result`.
+- `HttpWalletJson` sends the constructor's originator, never a method's `originator` argument, as both `Origin` and `Originator` in the origin form (`http://example.com`); a call with none configured is refused before a request, `HTTPWalletJSON: originator is required when using the HTTP substrate in Node.js. ...`. The reference skips the rule in a browser, whose `fetch` sets `Origin`; `http` is native-only here (`build.rs`, #152), so the rule is unconditional. A body over 256 MiB is refused unsent (`HTTPWalletJSON request exceeds the maximum permitted size`).
+- `HttpWalletWire` validates the frame's originator (more than 250 bytes refused in the reference's words) and, when one is configured, refuses a frame whose originator is not it (`Wallet Wire frame originator does not match the configured originator`); it sends the frame's originator raw as `Origin`, empty when the frame has none. A frame over 256 MiB is refused.
+- The client `new` builds takes `redirect::Policy::none()` (the reference's `redirect: 'error'`); a 3xx is answered `WalletError("HTTP 302 Found for <call>: a redirect is refused")`, never followed. A client given to `with_client` is used as given, its redirect policy too. reqwest's wasm32 client has no redirect policy (the browser's `fetch` follows); moot while `http` does not build for wasm32.
+- Go (`go-sdk@2ca481c` `wallet/substrates/http_wallet_json.go:22-33`, `:51-53`; `http_wallet_wire.go:20-31`, `:81-83`) validates nothing, sends `Originator` raw only when set (JSON) and the frame's `Origin` raw (wire), takes any base URL, and follows redirects (`http.DefaultClient`).
 
 ## Testing
 
@@ -245,12 +243,11 @@ cargo test wallet::substrates --features "wallet http"
 ```
 
 Tests cover:
-- Origin header conversion
-- Default and custom URL handling
-- Originator accessor methods
+- The base-URL and origin-header rules (`origin.rs`), the originator rule (`wallet/validation/originator.rs`)
+- Default and custom URL handling, the originator accessors
 - Protocol and counterparty JSON serialization
 
-Note: Integration tests require a running wallet server.
+The integration tests run against `wiremock` (`tests/wallet_http_*`, `tests/transport_fault_wallet.rs`; the #323 rules in `tests/wallet_http_originator_323.rs`).
 
 ## Cross-SDK Compatibility
 

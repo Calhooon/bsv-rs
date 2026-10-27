@@ -42,6 +42,8 @@
 mod http_json;
 #[cfg(feature = "http")]
 mod http_wire;
+#[cfg(feature = "http")]
+mod origin;
 
 #[cfg(feature = "http")]
 pub use http_json::HttpWalletJson;

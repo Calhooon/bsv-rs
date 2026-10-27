@@ -40,7 +40,8 @@ async fn create_action_against(answer: ResponseTemplate) -> Error {
         .expect(1)
         .mount(&server)
         .await;
-    let wallet = HttpWalletJson::new(None, Some(server.uri()));
+    let wallet = HttpWalletJson::new(Some("app.example.com".into()), Some(server.uri()))
+        .expect("the substrate is configured");
     wallet
         .create_action(create_action_args(), "app.example.com")
         .await
@@ -256,7 +257,11 @@ async fn a_refused_connection_is_a_transport_fault() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         listener.local_addr().unwrap().port()
     };
-    let wallet = HttpWalletJson::new(None, Some(format!("http://127.0.0.1:{}", port)));
+    let wallet = HttpWalletJson::new(
+        Some("app.example.com".into()),
+        Some(format!("http://127.0.0.1:{}", port)),
+    )
+    .expect("the substrate is configured");
     let err = wallet
         .create_action(create_action_args(), "app.example.com")
         .await
@@ -281,7 +286,11 @@ async fn a_connection_reset_before_an_answer_is_a_transport_fault() {
         let _ = stream.read(&mut one);
         drop(stream);
     });
-    let wallet = HttpWalletJson::new(None, Some(format!("http://{}", addr)));
+    let wallet = HttpWalletJson::new(
+        Some("app.example.com".into()),
+        Some(format!("http://{}", addr)),
+    )
+    .expect("the substrate is configured");
     let err = wallet
         .create_action(create_action_args(), "app.example.com")
         .await
@@ -308,7 +317,9 @@ async fn a_timeout_is_a_transport_fault() {
         .timeout(Duration::from_millis(200))
         .build()
         .unwrap();
-    let wallet = HttpWalletJson::with_client(client, None, Some(server.uri()));
+    let wallet =
+        HttpWalletJson::with_client(client, Some("app.example.com".into()), Some(server.uri()))
+            .expect("the substrate is configured");
     let err = wallet
         .create_action(create_action_args(), "app.example.com")
         .await
