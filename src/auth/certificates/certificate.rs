@@ -193,9 +193,10 @@ impl Certificate {
     /// anything is written, in the reference's words, `Certificate field
     /// <name> exceeds the maximum of 1048576 bytes`: the reference's
     /// `toBinary` refuses it in its snapshot of the fields
-    /// (`ts-stack@edf6e03` `Certificate.ts:76-79`, `:281`), and `sign` and
-    /// `verify` with it (`:458`, `:427`); `set_field` takes any value, as the
-    /// reference's constructor does (bsv-rs#275).
+    /// (`ts-stack@edf6e03` `Certificate.ts:76-79`, `:281`), and `sign` with it
+    /// (`:458`); `verify` answers `false` to it, as the reference's `verify`
+    /// answers `false` to every failure under it (`:435-439`); `set_field`
+    /// takes any value, as the reference's constructor does (bsv-rs#275).
     ///
     /// # Arguments
     /// * `include_signature` - Whether to include signature in output
@@ -415,7 +416,15 @@ impl Certificate {
             .as_ref()
             .ok_or_else(|| Error::InvalidSignature("Certificate not signed".into()))?;
 
-        let hash = self.signing_hash()?;
+        // The reference's `verify` answers `false` to every failure under it
+        // (`Certificate.ts:435-439`, "the historical boolean verification
+        // contract"): a field value over the bound is an invalid credential,
+        // not an error (#275).
+        let hash = match self.signing_hash() {
+            Ok(hash) => hash,
+            Err(Error::CertificateValidationError(_)) => return Ok(false),
+            Err(e) => return Err(e),
+        };
         let sig = Signature::from_der(sig_bytes)?;
 
         let child = KeyDeriver::new(None).derive_public_key(

@@ -18,9 +18,11 @@ bytes (`:377-381`), both in the words `Certificate field <name> exceeds the
 maximum of 1048576 bytes`. The wallet wire's writer (#246) and reader (#189)
 already refused it; the text is now one function's
 (`wallet::wire::certificate_field_value_refusal`), at the four sites.
-`to_binary` checks every value before it allocates the buffer; `sign` and
-`verify` serialize through it, as `Certificate.ts:458` and `:427` do;
-`set_field` takes any value, as the reference's constructor does. Where a
+`to_binary` checks every value before it allocates the buffer; `sign`
+serializes through it, as `Certificate.ts:458` does, and refuses with it;
+`verify` answers `false` to an over-bound field, as the reference's `verify`
+answers `false` to every failure under it (`:435-439`, "the historical
+boolean verification contract"); `set_field` takes any value, as the reference's constructor does. Where a
 field is decrypted (`MasterCertificate::decrypt_field`, `decrypt_fields`,
 `create_keyring_for_verifier`, `VerifiableCertificate::decrypt_field`,
 `decrypt_fields`), its text was decoded leniently (whitespace stripped, the
