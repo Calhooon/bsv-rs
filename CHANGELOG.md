@@ -182,6 +182,122 @@ status <n>: <body>`).
 `notDelayedResults`, `src/storage/traits.rs:289,337`, are its own types),
 so there is nothing of its to compare.
 
+### Fixed: `SimplifiedFetchTransport` refuses a general answer without valid BSV authentication, in the reference's words (#354)
+
+A general message's answer whose auth headers were absent was read as
+optional (`src/auth/transports/http.rs:755-756` at `1cdd149`: "Auth
+headers on response are optional") and became an `AuthMessage` whose
+sender was the client's own identity key (`:794-802`), with no signature;
+`Peer::start`'s callback hands a General message to the listeners without
+verifying it, so a caller saw an unsigned answer it could not tell from a
+signed one. The reference refuses it before the body becomes a message
+(`#validateResponseAuthentication`, `ts-stack@edf6e03`
+`packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:220-232`,
+called at `:365` after the body is read): an answer missing any of
+`x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-signature`,
+absent or white space alone (`value.trim().length === 0`, `:227`), is
+thrown in `#createUnauthenticatedResponseError`'s words (`:464-494`):
+`Received HTTP <status> <statusText> from <url> without valid BSV
+authentication (missing headers: <names>)`, the missing names in that
+order joined by `, `, then ` - body preview: <preview>` when the body is
+not empty (`#getBodyPreview`, `:512-540`: the first 1,024 bytes as text
+when the content type is textual or has a `charset=`, or more than 80
+percent of them printable, `:542-574`, else `0x` and their hex,
+`:576-579`; cut at 512 UTF-16 code units with `…`; ` (truncated)` past
+1,024 bytes).
+
+This crate now refuses the same answer in the same words, after the body
+is read and before any message is built
+(`src/auth/transports/http/unauthenticated.rs`), and takes the sender from the answer's
+`x-bsv-auth-identity-key`, never the client's own key. The class, by
+#87's and #73's rules (`status_fault`, `fault_or`): an unsigned 429, 502,
+503 or 504 is not the named host's own voice but a gateway's or a
+limiter's, so it is `Error::TransportFault` with the answer's status and
+those words as its detail, a 429 or a 503 with `Retry-After`
+`RateLimited` with the wait it asks, a 502, a 503 without it or a 504
+`MayHaveBeenReceived`; any other status is the named host's answer,
+`Error::AuthError`, `transport_fault()` `None`. A signed answer of any
+status, a 503 included, is read as before. The reason phrase is the
+status line's own: fetch's `statusText`, which hyper keeps in the
+answer's extensions as `hyper::ext::ReasonPhrase` when it is not the
+canonical one (`hyper` 1.12 `proto/h1/role.rs:1071-1076`, `:1176-1180`), read here
+through `reqwest::Response::extensions`, the canonical one when the line
+carries that one; `hyper` is now a direct dependency of the `http`
+feature (the one reqwest builds on, no new crate in the tree). The
+handshake path: the reference applies no header check to the
+`/.well-known/auth` answer (`:136-173`; its body is a signed
+`AuthMessage` the `Peer` verifies), so neither does this crate; its
+non-2xx handshake answer is thrown in the same function's words with
+`response lacked required BSV auth headers` (`:143-151`), where this
+crate keeps `Auth endpoint returned {status}: {body}` and its fault
+classes (#87; `transport_fault_auth` pins them): a stated difference,
+below.
+
+Migration: a caller that read an unsigned general answer (a server whose
+error path answers without the auth middleware's headers, a 401 among
+them) now gets the refusal from `Transport::send`, and through `Peer`
+from `to_peer`; one that matched an unsigned 429, 502, 503 or 504 by its
+status reads `transport_fault()`. The toolbox's `StorageClient`
+(`bsv-wallet-toolbox-rs` beta at `a12ab5c`,
+`src/storage/client/storage_client.rs:520-616`, pinning
+`=0.9.0-beta.1`) matched an unsigned answer by its request ID and read
+its status (`HTTP error {status}: {body}`); it now sees `Failed to send
+request: Received HTTP ...` for a refusal and keeps the SDK's error for a
+transport fault (`e.transport_fault().is_some()`, `:574`). Its main
+at `3a8610f` pins `0.8.0` and does not reach 0.9 without a move.
+`bsv-wallet-cli` (main `e7844c4`, beta `687f0b6`),
+`bsv-overlay-cloudflare` (main `c51e161d`) and `rust-message-box` (main
+`44a6320`) build no `SimplifiedFetchTransport`.
+
+Pinned by `tests/transport_unsigned_response_354.rs` (8 tests, wiremock,
+and a loopback listener that writes a case's own reason phrase, which
+wiremock cannot) against `tests/vectors/transport_unsigned_response_354.json`,
+the reference's transport driven against a local `node:http` server by
+`tests/support/transport_unsigned_response_354.mjs` (`ts-stack@edf6e03`,
+Node v22.18.0; 22 cases, 20 refusals): a 200 with a JSON body and no auth
+headers refused in those words; a 200 with two of the three (the
+signature, the identity key, a blank version) refused naming the one
+missing; every refusal the reference recorded (a 401, 429, 502, 503 and
+504, an empty body, binary bodies short and past 1,024 bytes, text past
+1,024 bytes, a cut through a surrogate pair, a BOM and ill-formed UTF-8,
+a custom and a blank reason phrase) equal here byte for byte but one
+(`READ_OTHERWISE`, the parity note), nothing handed to the callback; an
+unsigned 429 and 503 with `Retry-After` `RateLimited` with 7 and 3
+seconds, a 502, a bare 503 and a 504 `MayHaveBeenReceived`, each in the
+refusal's words with its status; a 200 and a 401 `AuthError`; the three
+headers read as before, the sender the answer's key, a signed 503 handed
+to the callback. On the tree with the fault classes removed 2 of the 8
+are red, with the reason phrase removed 3, both removed 4.
+The arch rule's `charset=` line (`tests/arch_no_string_errors.rs`,
+`docs/ARCH-RULES.md` section 3): the reference's `#isTextualContent` reads
+the answer's `Content-Type` for it to choose the preview's form, a header
+value, no class decided by it, now an allowed line with its reason.
+
+### Notes: cross-SDK parity (#354)
+
+go-sdk@2ca481c's `SimplifiedHTTPTransport` refuses an answer without
+`x-bsv-auth-version` in its own words (`server failed to authenticate:
+missing version header in response`,
+`auth/transports/simplified_http_transport.go:190-193`) and one without
+`x-bsv-auth-identity-key` (`missing identity key header in response`,
+`:205-208`), and reads an absent `x-bsv-auth-signature` as an empty
+signature (`hex.DecodeString("")`, `:214-218`), the `Peer` refusing it
+later; it names one header, not the list. This crate follows the
+reference's words. Four residuals: an unsigned 429, 502, 503 or 504 is a
+`TransportFault` here, by #87's rule, where the reference throws the
+same plain `Error` for every status (it has no fault class); a reason
+phrase with a byte above `0x7e` (obs-text) is read as none here, the
+status alone, where fetch's `statusText` reads it as UTF-8 (`Caf\xe9` reads as
+`Caf\u{fffd}` there): hyper's parser (httparse 1.10 `parse_reason`)
+empties such a phrase, and reqwest exposes nothing else; a lone high
+surrogate the reference's 512-unit cut leaves is U+FFFD here, the bytes
+the reference's text has once written as UTF-8; and a non-2xx handshake
+answer keeps `Auth endpoint returned {status}: {body}` and #87's fault
+classes here, where the reference's `#sendAuthMessage` throws
+`#createUnauthenticatedResponseError`'s words with `response lacked
+required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
+follow-up is #366).
+
 ### Fixed: `Peer`'s client path verifies the initial response and general messages as the reference's `Peer` does: the nonce, the session, the pinned identity, the signature (#353)
 
 `Peer::start` installed a callback of its own (`src/auth/peer.rs:194-338`
@@ -347,6 +463,33 @@ The comment this fix removes, that Go and TS let a failed nonce pass, was
 wrong of both: each refuses it, and the nonce it checked here was the
 responder's, which neither checks.
 
+### Changed: the fuzz_http_json_responses harness names an originator (#356)
+
+Since #323 `HttpWalletJson::with_client` returns `Result` and the substrate
+refuses a call with no originator configured before any request, so the
+target built with `with_client(client, None, ..)` did not compile and,
+compiled, would have fuzzed nothing. The harness now passes the originator
+`fuzz.invalid` and unwraps the constructor (its base URL is the harness's own
+loopback). CI builds no fuzz target, so only `cargo fuzz` and the nightly saw
+it.
+
+### Fixed: the ARC default arch test reads a CRLF checkout as it reads LF (#367)
+
+`no_live_policy_default_chooses_the_arc_policy_url`
+(`tests/arch_arc_deprecated.rs`, #350) found each `impl Default` block's end
+with `find("\n}\n")` on the raw text of `live_policy.rs`; a Windows checkout
+holds it in CRLF, so the `expect("the impl's closing brace")` panicked on the
+`Test Suite (windows-latest, stable)` and `(windows-latest, beta)` cells (run
+40513515368; not in beta's required set, so no PR went red). The test now reads
+through `arch_support::read`, which normalizes `\r\n` to `\n` before any
+search, as `arch_ci_lines`, `arch_ci_pr_runs_the_required_set` and
+`arch_secrets_scan_scope` already did for the workflows; `arch_support::sources()`,
+the lexical rules' reader, normalizes the same way (their lexer already
+tolerated a CR, so no verdict moves). Pinned by
+`a_crlf_checkout_finds_the_impl_closing_brace_as_lf_does`, red without the
+normalization. No other test under `tests/` searches raw file text for a
+LF-only needle.
+
 ### Changed: `WalletInterface` takes `originator: Option<&str>`, the reference's optional, so an absent originator and an empty one are two values (#329)
 
 `WalletInterface`'s 28 methods took `originator: &str`, so an absent
@@ -461,146 +604,223 @@ absent one (`WalletWireTransceiver.ts:92-100`), as this crate's writes
 reference's processor also refuses a length above 250 and normalizes a
 named originator through `validateOriginator` (`:286-294`); this crate's
 does neither: a finding outside #329.
-### Fixed: the ARC default arch test reads a CRLF checkout as it reads LF (#367)
 
-`no_live_policy_default_chooses_the_arc_policy_url`
-(`tests/arch_arc_deprecated.rs`, #350) found each `impl Default` block's end
-with `find("\n}\n")` on the raw text of `live_policy.rs`; a Windows checkout
-holds it in CRLF, so the `expect("the impl's closing brace")` panicked on the
-`Test Suite (windows-latest, stable)` and `(windows-latest, beta)` cells (run
-40513515368; not in beta's required set, so no PR went red). The test now reads
-through `arch_support::read`, which normalizes `\r\n` to `\n` before any
-search, as `arch_ci_lines`, `arch_ci_pr_runs_the_required_set` and
-`arch_secrets_scan_scope` already did for the workflows; `arch_support::sources()`,
-the lexical rules' reader, normalizes the same way (their lexer already
-tolerated a CR, so no verdict moves). Pinned by
-`a_crlf_checkout_finds_the_impl_closing_brace_as_lf_does`, red without the
-normalization. No other test under `tests/` searches raw file text for a
-LF-only needle.
-### Changed: the fuzz_http_json_responses harness names an originator (#356)
+### Changed: the oracles run on demand, the nightly schedule removed (the owner's word of 2026-10-27)
 
-Since #323 `HttpWalletJson::with_client` returns `Result` and the substrate
-refuses a call with no originator configured before any request, so the
-target built with `with_client(client, None, ..)` did not compile and,
-compiled, would have fuzzed nothing. The harness now passes the originator
-`fuzz.invalid` and unwraps the constructor (its base URL is the harness's own
-loopback). CI builds no fuzz target, so only `cargo fuzz` and the nightly saw
-it.
-### Fixed: `SimplifiedFetchTransport` refuses a general answer without valid BSV authentication, in the reference's words (#354)
+The owner's fleet word of 2026-10-27: the nightly runs were a waste of
+resources. The `schedule` trigger is gone from `.github/workflows/nightly.yml`
+on both lines (the 03:00 UTC cron of #283 and #284 and its cap are moot);
+`workflow_dispatch` stays, so the mutation shards, the fuzz hours, the
+scoreboard and `ci.yml`'s full set on each line run when asked: one dispatched
+measurement before each minor tag, none for a prerelease. The push matrix on
+the protected branches is unchanged (the rule of 2026-10-26). `docs/NIGHTLY.md`
+and `docs/ARCHITECTURE.md` say so.
 
-A general message's answer whose auth headers were absent was read as
-optional (`src/auth/transports/http.rs:755-756` at `1cdd149`: "Auth
-headers on response are optional") and became an `AuthMessage` whose
-sender was the client's own identity key (`:794-802`), with no signature;
-`Peer::start`'s callback hands a General message to the listeners without
-verifying it, so a caller saw an unsigned answer it could not tell from a
-signed one. The reference refuses it before the body becomes a message
-(`#validateResponseAuthentication`, `ts-stack@edf6e03`
-`packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:220-232`,
-called at `:365` after the body is read): an answer missing any of
-`x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-signature`,
-absent or white space alone (`value.trim().length === 0`, `:227`), is
-thrown in `#createUnauthenticatedResponseError`'s words (`:464-494`):
-`Received HTTP <status> <statusText> from <url> without valid BSV
-authentication (missing headers: <names>)`, the missing names in that
-order joined by `, `, then ` - body preview: <preview>` when the body is
-not empty (`#getBodyPreview`, `:512-540`: the first 1,024 bytes as text
-when the content type is textual or has a `charset=`, or more than 80
-percent of them printable, `:542-574`, else `0x` and their hex,
-`:576-579`; cut at 512 UTF-16 code units with `…`; ` (truncated)` past
-1,024 bytes).
+### Fixed: the HTTP wallet substrates take the reference's originator rule, headers, redirect refusal and base URL form (#323)
 
-This crate now refuses the same answer in the same words, after the body
-is read and before any message is built
-(`src/auth/transports/http/unauthenticated.rs`), and takes the sender from the answer's
-`x-bsv-auth-identity-key`, never the client's own key. The class, by
-#87's and #73's rules (`status_fault`, `fault_or`): an unsigned 429, 502,
-503 or 504 is not the named host's own voice but a gateway's or a
-limiter's, so it is `Error::TransportFault` with the answer's status and
-those words as its detail, a 429 or a 503 with `Retry-After`
-`RateLimited` with the wait it asks, a 502, a 503 without it or a 504
-`MayHaveBeenReceived`; any other status is the named host's answer,
-`Error::AuthError`, `transport_fault()` `None`. A signed answer of any
-status, a 503 included, is read as before. The reason phrase is the
-status line's own: fetch's `statusText`, which hyper keeps in the
-answer's extensions as `hyper::ext::ReasonPhrase` when it is not the
-canonical one (`hyper` 1.12 `proto/h1/role.rs:1071-1076`, `:1176-1180`), read here
-through `reqwest::Response::extensions`, the canonical one when the line
-carries that one; `hyper` is now a direct dependency of the `http`
-feature (the one reqwest builds on, no new crate in the tree). The
-handshake path: the reference applies no header check to the
-`/.well-known/auth` answer (`:136-173`; its body is a signed
-`AuthMessage` the `Peer` verifies), so neither does this crate; its
-non-2xx handshake answer is thrown in the same function's words with
-`response lacked required BSV auth headers` (`:143-151`), where this
-crate keeps `Auth endpoint returned {status}: {body}` and its fault
-classes (#87; `transport_fault_auth` pins them): a stated difference,
-below.
+`HttpWalletJson` and `HttpWalletWire` validated nothing at construction,
+sent a call's originator in preference to the configured one, sent one
+header (`Originator` from the JSON substrate, `Origin` from the wire, both
+in the origin form), sent none when no originator was set, followed up to
+ten redirects (reqwest's default) and took any base URL;
+`validate_originator` checked lengths alone. The reference's substrates
+(`ts-stack@edf6e03` `packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:280-314`,
+`HTTPWalletWire.ts:17-20`, `:43-66`, `utils/toOriginHeader.ts`) and its
+`validateOriginator` (`validationHelpers.ts:996-1037`) do otherwise, and
+this crate now does as they do:
 
-Migration: a caller that read an unsigned general answer (a server whose
-error path answers without the auth middleware's headers, a 401 among
-them) now gets the refusal from `Transport::send`, and through `Peer`
-from `to_peer`; one that matched an unsigned 429, 502, 503 or 504 by its
-status reads `transport_fault()`. The toolbox's `StorageClient`
-(`bsv-wallet-toolbox-rs` beta at `a12ab5c`,
-`src/storage/client/storage_client.rs:520-616`, pinning
-`=0.9.0-beta.1`) matched an unsigned answer by its request ID and read
-its status (`HTTP error {status}: {body}`); it now sees `Failed to send
-request: Received HTTP ...` for a refusal and keeps the SDK's error for a
-transport fault (`e.transport_fault().is_some()`, `:574`). Its main
-at `3a8610f` pins `0.8.0` and does not reach 0.9 without a move.
-`bsv-wallet-cli` (main `e7844c4`, beta `687f0b6`),
-`bsv-overlay-cloudflare` (main `c51e161d`) and `rust-message-box` (main
-`44a6320`) build no `SimplifiedFetchTransport`.
+- `validate_originator` (now `wallet/validation/originator.rs`) is the
+  reference's: trimmed, lower-cased, 1 to 250 bytes, a canonical DNS
+  hostname with an optional port (1 to 5 digits, at most 65535), the port
+  dropped from the answer (`Example.com:8080` is `example.com`), each
+  refusal `WalletRefusal` of class `InvalidParameter` in the reference's
+  words (`The originator parameter must be a canonical DNS hostname with an
+  optional port`, `The originator part parameter must be no more than 63
+  length.`). A scheme-prefixed originator is refused, as the reference
+  refuses it (the colon reads as a port separator), so `toOriginHeader`'s
+  path-trimming branch is never reached through a constructor.
+- Both constructors validate the originator and normalize the base URL to
+  its origin (`normalizeWalletHttpBaseUrl`): no credentials, path, query or
+  fragment, at most 2048 units, no surrounding whitespace, cleartext HTTP
+  only to `localhost`, `*.localhost`, `127.0.0.1` or `[::1]`, each refusal
+  in the reference's words (`Wallet HTTP baseUrl may use cleartext HTTP only
+  for a loopback host.`).
+- `HttpWalletJson` sends the constructor's originator, never a method's
+  `originator` argument, as both `Origin` and `Originator` in the origin
+  form (`http://example.com`), with `Accept: application/json`; a call with
+  none configured is refused before a request, `HTTPWalletJSON: originator
+  is required when using the HTTP substrate in Node.js. Pass an originator
+  (e.g. "example.com") to the constructor.`; a body over 256 MiB
+  (`MAX_WALLET_JSON_REQUEST_BYTES`) is refused unsent. The reference skips
+  the originator rule in a browser, whose `fetch` sets `Origin` itself;
+  `http` is native-only here (`build.rs`, #152), so the rule is
+  unconditional.
+- `HttpWalletWire` validates the frame's originator (more than 250 bytes
+  refused in the reference's words) and, when one is configured, refuses a
+  frame whose originator is not it (`Wallet Wire frame originator does not
+  match the configured originator`), so a frame with none is refused too;
+  it sends the frame's originator raw as `Origin` (`example.com`), empty
+  when the frame has none. A frame over 256 MiB is refused.
+- The client `new` builds takes `redirect::Policy::none()`, the reference's
+  `redirect: 'error'`: a 3xx is answered `WalletError("HTTP 302 Found for
+  <call>: a redirect is refused")` and never followed. A client given to
+  `with_client` is used as given, its redirect policy too. reqwest's wasm32
+  client has no redirect policy (`reqwest-0.12.28/src/wasm/client.rs`; the
+  host's `fetch` follows): moot while `http` does not build for wasm32.
 
-Pinned by `tests/transport_unsigned_response_354.rs` (8 tests, wiremock,
-and a loopback listener that writes a case's own reason phrase, which
-wiremock cannot) against `tests/vectors/transport_unsigned_response_354.json`,
-the reference's transport driven against a local `node:http` server by
-`tests/support/transport_unsigned_response_354.mjs` (`ts-stack@edf6e03`,
-Node v22.18.0; 22 cases, 20 refusals): a 200 with a JSON body and no auth
-headers refused in those words; a 200 with two of the three (the
-signature, the identity key, a blank version) refused naming the one
-missing; every refusal the reference recorded (a 401, 429, 502, 503 and
-504, an empty body, binary bodies short and past 1,024 bytes, text past
-1,024 bytes, a cut through a surrogate pair, a BOM and ill-formed UTF-8,
-a custom and a blank reason phrase) equal here byte for byte but one
-(`READ_OTHERWISE`, the parity note), nothing handed to the callback; an
-unsigned 429 and 503 with `Retry-After` `RateLimited` with 7 and 3
-seconds, a 502, a bare 503 and a 504 `MayHaveBeenReceived`, each in the
-refusal's words with its status; a 200 and a 401 `AuthError`; the three
-headers read as before, the sender the answer's key, a signed 503 handed
-to the callback. On the tree with the fault classes removed 2 of the 8
-are red, with the reason phrase removed 3, both removed 4.
-The arch rule's `charset=` line (`tests/arch_no_string_errors.rs`,
-`docs/ARCH-RULES.md` section 3): the reference's `#isTextualContent` reads
-the answer's `Content-Type` for it to choose the preview's form, a header
-value, no class decided by it, now an allowed line with its reason.
+Migration: `HttpWalletJson::new`, `HttpWalletJson::with_client`,
+`HttpWalletWire::new` and `HttpWalletWire::with_client` keep their
+arguments and return `Result<Self, Error>` (add `?`), the Rust form of the
+reference's throwing constructor (the owner's ruling (c) of 2026-10-26,
+recorded on the issue). A `None` originator now fails at the first
+`HttpWalletJson` call in the reference's words (`WalletClient` with `None`
+on a JSON substrate too), so `WalletClient`'s auto-detection
+(`SubstrateType::Auto`) with a `None` originator now passes over both JSON
+substrates, whose `getVersion` probe is refused unsent, and lands on the wire
+substrate at `http://localhost:3301`, or fails when no wallet answers there,
+where it used to connect to the first JSON wallet that answered: pass an
+originator to keep the JSON substrate; a base URL with a path or a cleartext non-loopback
+host is refused at construction; a wire frame whose originator differs from
+the configured one is refused. No downstream constructs either substrate or
+calls `validate_originator` (`bsv-wallet-toolbox-rs` `6317222`, which has
+its own `validate_originator`; `bsv-wallet-cli` `a55990c`;
+`bsv-overlay-cloudflare` `9a0f3c29`; `rust-message-box` `419bf18`; grepped
+2026-10-27).
 
-### Notes: cross-SDK parity (#354)
+Pinned by `tests/wallet_http_originator_323.rs` (10 tests, wiremock): 10 of
+10 red on the tree before the fix (the constructors' `Result` shape shimmed
+in, the behaviour the old; the tenth, a wire frame of 256 MiB + 1 bytes
+refused unsent, added by the review's fold), green after; the rules' unit
+tests in `wallet/substrates/origin.rs` and `wallet/validation/originator.rs`.
+Both rules trim as JavaScript's `String.prototype.trim` does, one helper
+(`validation::trim_js`): U+FEFF trimmed and U+0085 kept, where Rust's
+`str::trim` does the reverse, measured with the reference's
+`validateOriginator` and `HTTPWalletJSON` constructor under Node 22.18.0
+(`the_trim_is_javascripts_feff_trimmed_and_u0085_kept`,
+`a_base_url_is_trimmed_as_javascript_trims_feff_and_not_u0085`). The
+existing `wallet_http_*`, `transport_fault_wallet`, `wallet_internalize_*`
+and two `auth_certificate_*` files configure an originator and are
+otherwise unchanged.
 
-go-sdk@2ca481c's `SimplifiedHTTPTransport` refuses an answer without
-`x-bsv-auth-version` in its own words (`server failed to authenticate:
-missing version header in response`,
-`auth/transports/simplified_http_transport.go:190-193`) and one without
-`x-bsv-auth-identity-key` (`missing identity key header in response`,
-`:205-208`), and reads an absent `x-bsv-auth-signature` as an empty
-signature (`hex.DecodeString("")`, `:214-218`), the `Peer` refusing it
-later; it names one header, not the list. This crate follows the
-reference's words. Four residuals: an unsigned 429, 502, 503 or 504 is a
-`TransportFault` here, by #87's rule, where the reference throws the
-same plain `Error` for every status (it has no fault class); a reason
-phrase with a byte above `0x7e` (obs-text) is read as none here, the
-status alone, where fetch's `statusText` reads it as UTF-8 (`Caf\xe9` reads as
-`Caf\u{fffd}` there): hyper's parser (httparse 1.10 `parse_reason`)
-empties such a phrase, and reqwest exposes nothing else; a lone high
-surrogate the reference's 512-unit cut leaves is U+FFFD here, the bytes
-the reference's text has once written as UTF-8; and a non-2xx handshake
-answer keeps `Auth endpoint returned {status}: {body}` and #87's fault
-classes here, where the reference's `#sendAuthMessage` throws
-`#createUnauthenticatedResponseError`'s words with `response lacked
-required BSV auth headers` (`SimplifiedFetchTransport.ts:115-151`; the
-follow-up is #366).
+### Notes: cross-SDK parity (#323)
+
+go-sdk@2ca481c validates nothing: `NewHTTPWalletJSON` and
+`NewHTTPWalletWire` take any originator and base URL
+(`wallet/substrates/http_wallet_json.go:22-33`,
+`http_wallet_wire.go:20-31`), the JSON substrate sends `Originator` raw and
+only when set (`http_wallet_json.go:51-53`), the wire the frame's `Origin`
+raw with no comparison to the configured one (`http_wallet_wire.go:81-83`),
+and both follow redirects (`http.DefaultClient`). The redirect refusal's
+words are this crate's: the reference's `fetch` throws its runtime's
+`TypeError` (`fetch failed` under Node). The wire's response bounds
+(`HTTPWalletWire.ts:71-116`: `Content-Length` and a 256 MiB body) and the
+JSON substrate's `validateWalletArgs` before the request are not carried:
+findings outside #323.
+
+### Deprecated: the ARC client surface, nowhere a default (#350)
+
+The owner's word of 2026-10-27: "arc is just deprecated, arcade is the
+standard"; for this crate, any ARC client surface is marked deprecated and
+is never a default. `ArcBroadcaster`, `ArcConfig`, `ArcBroadcaster::new`,
+`ArcBroadcaster::with_config`, `LivePolicy::new` and `DEFAULT_POLICY_URL`
+carry `#[deprecated(since = "0.9.0", note = "ARC is deprecated; ARCade is
+the standard (the owner's word of 2026-10-27)")]` (the two `LivePolicy`
+items add the migration: `use LivePolicy::with_url`). Nothing is removed
+and nothing ARC does changes: the broadcaster's verdict, its transport
+faults and its tests are as they were.
+
+rustc refuses `#[deprecated]` on a trait impl block, so a `Default` cannot
+be deprecated by itself. `ArcBroadcaster::default()` (`https://arc.taal.com`)
+and `ArcConfig::default()` warn through their deprecated types (naming the
+type is the use). `LivePolicy` is not ARC's (it reads any policy endpoint
+in ARC's schema, and ARCade serves that schema at `/v1/policy`,
+`arcade@1dbd889` `services/api_server/routes.go:294-297`), so the type stays
+undeprecated and its two `Default`s stop choosing ARC: `LivePolicy::default()`
+and `LivePolicyConfig::default()` carry an empty `policy_url`, which
+`refresh()` refuses before any request (`Error::FeeModelError("No policy
+URL: build the LivePolicy with with_url (ARC is deprecated and no default,
+bsv-rs#350)")`), `compute_fee` using the fallback rate as it did before a
+refresh. `LivePolicy::new()` (deprecated) still reads ARC's GorillaPool
+policy. Of the brief's two shapes for `new` (deprecated, or made to take
+the URL), deprecating it is the reference's shape minus the ARC default:
+the reference's `LivePolicy` takes no URL and reads ARC
+(`ts-stack@edf6e03` `packages/sdk/src/transaction/fee-models/LivePolicy.ts:10`),
+this crate's `new()` is that constructor and `with_url` the one with the
+URL; changing `new`'s signature would break every caller to say what the
+deprecation says, and `--release-type minor` refuses that break.
+
+The docs: the broadcasters' `CLAUDE.md` no longer calls ARC "recommended
+for production" and its examples broadcast through WhatsOnChain and
+Teranode; `Transaction::to_beef_v1` is documented by its format (BRC-62, no
+TXID-only entries), not "for ARC"; the transaction and fee models'
+`CLAUDE.md` name no ARC default. This crate adds no ARCade client (below).
+
+The crate's own uses: the module that defines the ARC items
+(`src/transaction/broadcasters/arc.rs`, `#![allow(deprecated)]`), the
+re-exports (`broadcasters/mod.rs`, `fee_models/mod.rs`, `transaction/mod.rs`,
+an `#[allow(deprecated)]` each), and the tests of ARC's wire
+(`tests/broadcaster_http_tests.rs`: the import and the ten ARC tests;
+`tests/transport_fault_broadcasters.rs`: the import and the ARC arm of
+`Service::broadcaster`) keep the ARC items under `#[allow(deprecated)]`
+with the reason. They test ARC's own wire, so no other broadcaster could
+replace them. `LivePolicy`'s fallback, rate and TTL tests (five in
+`tests/live_policy_http_tests.rs`, four in the module) move from `new()` to
+`default()`; the two that pin `new()`'s ARC URL keep it under an allow. No
+example, bench or README block names an ARC item.
+
+Pinned by `tests/arch_arc_deprecated.rs` (2 tests, read from the source as
+the other `arch_*` rules are): each of the six items carries
+`#[deprecated(since = "0.9.0", ..)]` with the note naming ARCade, and
+neither `LivePolicy` `Default` names `DEFAULT_POLICY_URL`, an ARC host or
+`Self::new()`; both red on the base (the six items listed, the config's
+`Default` naming the URL), green on the fix. The refusal:
+`a_live_policy_built_without_a_url_refuses_to_refresh_and_reads_no_arc`
+(`tests/live_policy_http_tests.rs`) and
+`a_live_policy_with_no_policy_url_refuses_to_refresh` (the module). Their
+URL assertions are red on the base, run there with the network denied (only
+localhost reachable): each fails at its first URL assertion, the base's
+`Default` holding `https://arc.gorillapool.io/v1/policy` where the fix holds
+none. A
+scratch crate under `#![deny(deprecated)]` naming each item builds on the
+base and fails on the fix with nine errors, one per use.
+
+Migration: a caller of `ArcBroadcaster` or `ArcConfig` gets a warning
+(an error under `-D warnings`) and keeps working; move to ARCade (the
+wallet toolbox's `Arcade` provider) or another `Broadcaster`, or add
+`#[allow(deprecated)]`. A caller of `LivePolicy::new()` passes the URL:
+`LivePolicy::with_url("<host>/v1/policy")`. A caller of
+`LivePolicy::default()` or of `LivePolicyConfig { .., ..Default::default() }`
+without a `policy_url` now has `refresh()` refused and stays on the
+fallback rate until it sets one. The downstreams have no site at their tips:
+`bsv-wallet-toolbox-rs` (`a3377ef`) uses its own `services::{Arc,
+ArcConfig, Arcade}`, `bsv-wallet-cli` (`f4285bf`) imports the toolbox's
+`ArcConfig` (`src/services_env.rs:21-24`), `bsv-overlay-cloudflare`
+(`8c18730c`) defines its own `overlay_engine::broadcaster::ArcBroadcaster`
+trait (`crates/overlay-engine/src/broadcaster.rs:53`) and
+`WorkerArcBroadcaster`/`ArcadeBroadcaster`, and `rust-message-box`
+(`08418ec`) names none. No downstream names `LivePolicy` or
+`DEFAULT_POLICY_URL`.
+
+### Notes: cross-SDK parity (#350)
+
+The reference keeps ARC undeprecated and as its default:
+`defaultBroadcaster` returns an `ARC` on `https://arc.gorillapool.io`
+(testnet `https://testnet.arc.gorillapool.io`; `ts-stack@edf6e03`
+`packages/sdk/src/transaction/broadcasters/DefaultBroadcaster.ts:1-12`),
+`ARC.ts` carries no deprecation, and `LivePolicy` reads
+`https://arc.gorillapool.io/v1/policy` with no way to pass another URL
+(`LivePolicy.ts:10`). This crate diverges under the owner's word: ARC
+deprecated, no default broadcaster or policy URL. ARCade is a service of
+the toolbox and the overlay layer in the reference
+(`packages/wallet/wallet-toolbox/src/services/`,
+`packages/overlays/overlay-express/src/ArcadeProvider.ts`), not an SDK
+broadcaster, so this crate adds no ARCade client; the toolbox's side has
+one. go-sdk@2ca481c keeps `broadcaster.Arc` undeprecated and makes it no
+default: `transaction/broadcaster/arc.go:37` is a plain `Arc{ApiUrl, ApiKey, ..}`
+struct with no constructor and no default URL (GorillaPool appears only in
+`docs/examples/broadcaster/broadcaster_gp/broadcaster_gp.go:16`), and Go has no
+`LivePolicy` (`transaction/fee_model/` holds `sats_per_kb.go` alone): the
+caller names every ARC URL there, as this crate now asks.
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
@@ -723,120 +943,6 @@ Spends }` (`kvstore/local_kv_store.go:342-345`, `:494-497`), the bytes
 createAction answered (`Reference []byte`, `wallet/interfaces.go:203-206`,
 `:222-226`), and no options: the reference's bytes, without
 `completeBoundAction`'s options.
-### Deprecated: the ARC client surface, nowhere a default (#350)
-
-The owner's word of 2026-10-27: "arc is just deprecated, arcade is the
-standard"; for this crate, any ARC client surface is marked deprecated and
-is never a default. `ArcBroadcaster`, `ArcConfig`, `ArcBroadcaster::new`,
-`ArcBroadcaster::with_config`, `LivePolicy::new` and `DEFAULT_POLICY_URL`
-carry `#[deprecated(since = "0.9.0", note = "ARC is deprecated; ARCade is
-the standard (the owner's word of 2026-10-27)")]` (the two `LivePolicy`
-items add the migration: `use LivePolicy::with_url`). Nothing is removed
-and nothing ARC does changes: the broadcaster's verdict, its transport
-faults and its tests are as they were.
-
-rustc refuses `#[deprecated]` on a trait impl block, so a `Default` cannot
-be deprecated by itself. `ArcBroadcaster::default()` (`https://arc.taal.com`)
-and `ArcConfig::default()` warn through their deprecated types (naming the
-type is the use). `LivePolicy` is not ARC's (it reads any policy endpoint
-in ARC's schema, and ARCade serves that schema at `/v1/policy`,
-`arcade@1dbd889` `services/api_server/routes.go:294-297`), so the type stays
-undeprecated and its two `Default`s stop choosing ARC: `LivePolicy::default()`
-and `LivePolicyConfig::default()` carry an empty `policy_url`, which
-`refresh()` refuses before any request (`Error::FeeModelError("No policy
-URL: build the LivePolicy with with_url (ARC is deprecated and no default,
-bsv-rs#350)")`), `compute_fee` using the fallback rate as it did before a
-refresh. `LivePolicy::new()` (deprecated) still reads ARC's GorillaPool
-policy. Of the brief's two shapes for `new` (deprecated, or made to take
-the URL), deprecating it is the reference's shape minus the ARC default:
-the reference's `LivePolicy` takes no URL and reads ARC
-(`ts-stack@edf6e03` `packages/sdk/src/transaction/fee-models/LivePolicy.ts:10`),
-this crate's `new()` is that constructor and `with_url` the one with the
-URL; changing `new`'s signature would break every caller to say what the
-deprecation says, and `--release-type minor` refuses that break.
-
-The docs: the broadcasters' `CLAUDE.md` no longer calls ARC "recommended
-for production" and its examples broadcast through WhatsOnChain and
-Teranode; `Transaction::to_beef_v1` is documented by its format (BRC-62, no
-TXID-only entries), not "for ARC"; the transaction and fee models'
-`CLAUDE.md` name no ARC default. This crate adds no ARCade client (below).
-
-The crate's own uses: the module that defines the ARC items
-(`src/transaction/broadcasters/arc.rs`, `#![allow(deprecated)]`), the
-re-exports (`broadcasters/mod.rs`, `fee_models/mod.rs`, `transaction/mod.rs`,
-an `#[allow(deprecated)]` each), and the tests of ARC's wire
-(`tests/broadcaster_http_tests.rs`: the import and the ten ARC tests;
-`tests/transport_fault_broadcasters.rs`: the import and the ARC arm of
-`Service::broadcaster`) keep the ARC items under `#[allow(deprecated)]`
-with the reason. They test ARC's own wire, so no other broadcaster could
-replace them. `LivePolicy`'s fallback, rate and TTL tests (five in
-`tests/live_policy_http_tests.rs`, four in the module) move from `new()` to
-`default()`; the two that pin `new()`'s ARC URL keep it under an allow. No
-example, bench or README block names an ARC item.
-
-Pinned by `tests/arch_arc_deprecated.rs` (2 tests, read from the source as
-the other `arch_*` rules are): each of the six items carries
-`#[deprecated(since = "0.9.0", ..)]` with the note naming ARCade, and
-neither `LivePolicy` `Default` names `DEFAULT_POLICY_URL`, an ARC host or
-`Self::new()`; both red on the base (the six items listed, the config's
-`Default` naming the URL), green on the fix. The refusal:
-`a_live_policy_built_without_a_url_refuses_to_refresh_and_reads_no_arc`
-(`tests/live_policy_http_tests.rs`) and
-`a_live_policy_with_no_policy_url_refuses_to_refresh` (the module). Their
-URL assertions are red on the base, run there with the network denied (only
-localhost reachable): each fails at its first URL assertion, the base's
-`Default` holding `https://arc.gorillapool.io/v1/policy` where the fix holds
-none. A
-scratch crate under `#![deny(deprecated)]` naming each item builds on the
-base and fails on the fix with nine errors, one per use.
-
-Migration: a caller of `ArcBroadcaster` or `ArcConfig` gets a warning
-(an error under `-D warnings`) and keeps working; move to ARCade (the
-wallet toolbox's `Arcade` provider) or another `Broadcaster`, or add
-`#[allow(deprecated)]`. A caller of `LivePolicy::new()` passes the URL:
-`LivePolicy::with_url("<host>/v1/policy")`. A caller of
-`LivePolicy::default()` or of `LivePolicyConfig { .., ..Default::default() }`
-without a `policy_url` now has `refresh()` refused and stays on the
-fallback rate until it sets one. The downstreams have no site at their tips:
-`bsv-wallet-toolbox-rs` (`a3377ef`) uses its own `services::{Arc,
-ArcConfig, Arcade}`, `bsv-wallet-cli` (`f4285bf`) imports the toolbox's
-`ArcConfig` (`src/services_env.rs:21-24`), `bsv-overlay-cloudflare`
-(`8c18730c`) defines its own `overlay_engine::broadcaster::ArcBroadcaster`
-trait (`crates/overlay-engine/src/broadcaster.rs:53`) and
-`WorkerArcBroadcaster`/`ArcadeBroadcaster`, and `rust-message-box`
-(`08418ec`) names none. No downstream names `LivePolicy` or
-`DEFAULT_POLICY_URL`.
-
-### Notes: cross-SDK parity (#350)
-
-The reference keeps ARC undeprecated and as its default:
-`defaultBroadcaster` returns an `ARC` on `https://arc.gorillapool.io`
-(testnet `https://testnet.arc.gorillapool.io`; `ts-stack@edf6e03`
-`packages/sdk/src/transaction/broadcasters/DefaultBroadcaster.ts:1-12`),
-`ARC.ts` carries no deprecation, and `LivePolicy` reads
-`https://arc.gorillapool.io/v1/policy` with no way to pass another URL
-(`LivePolicy.ts:10`). This crate diverges under the owner's word: ARC
-deprecated, no default broadcaster or policy URL. ARCade is a service of
-the toolbox and the overlay layer in the reference
-(`packages/wallet/wallet-toolbox/src/services/`,
-`packages/overlays/overlay-express/src/ArcadeProvider.ts`), not an SDK
-broadcaster, so this crate adds no ARCade client; the toolbox's side has
-one. go-sdk@2ca481c keeps `broadcaster.Arc` undeprecated and makes it no
-default: `transaction/broadcaster/arc.go:37` is a plain `Arc{ApiUrl, ApiKey, ..}`
-struct with no constructor and no default URL (GorillaPool appears only in
-`docs/examples/broadcaster/broadcaster_gp/broadcaster_gp.go:16`), and Go has no
-`LivePolicy` (`transaction/fee_model/` holds `sats_per_kb.go` alone): the
-caller names every ARC URL there, as this crate now asks.
-### Changed: the oracles run on demand, the nightly schedule removed (the owner's word of 2026-10-27)
-
-The owner's fleet word of 2026-10-27: the nightly runs were a waste of
-resources. The `schedule` trigger is gone from `.github/workflows/nightly.yml`
-on both lines (the 03:00 UTC cron of #283 and #284 and its cap are moot);
-`workflow_dispatch` stays, so the mutation shards, the fuzz hours, the
-scoreboard and `ci.yml`'s full set on each line run when asked: one dispatched
-measurement before each minor tag, none for a prerelease. The push matrix on
-the protected branches is unchanged (the rule of 2026-10-26). `docs/NIGHTLY.md`
-and `docs/ARCHITECTURE.md` say so.
 
 ### Fixed: the identity revocation authenticates the lookup output, spends the matching one at its index, aborts a failed action and retries a double spend as the reference does (#327)
 
@@ -955,171 +1061,176 @@ names one, so no getNetwork call is made, as in the reference's witnesses.
 The contacts manager's and key-value stores' signAction reference (#318's
 note) is unchanged.
 
-### Fixed: `Transaction::verify` answers a decline as a decline, and the block path's consensus budget can be the node's verdict (#38)
+### Fixed: `SimplifiedFetchTransport` takes a caller's client, as the reference takes a `fetchClient`, and refuses a redirect (#320)
 
-Two gaps the docs pass of #36 left. First, `Transaction::verify` evaluates
-each input under the default mode's 32,000,000-byte local budget and mapped
-every `Spend::validate` error to `TransactionError("Script validation failed
-for input N: …")`, so an evaluation stopped at the budget (`resource_limit`
-`Some`, `is_resource_limit`), a script nobody judged, reached the caller as
-invalid with its class dropped, where the crate's docs say a caller never
-reads a decline as invalid. The reference's `Transaction.verify` runs
-`Spend` per input and lets its two exceptions propagate by class,
-`ScriptEvaluationError` for an invalid script and `ScriptResourceLimitError`
-for a decline (`ts-stack@edf6e03`
-`packages/sdk/src/transaction/Transaction.ts:1441-1458`,
-`packages/sdk/src/script/Spend.ts:2020-2021`, thrown at `:433`, `:439`,
-`:745`, `:748`, `:1949`). A decline now leaves `verify` as
-`Error::ScriptEvaluationDeclined { input_index, limit }`, the input and the
-`ScriptResourceLimit` (resource, budget, attempted figure) kept, printed
-`script evaluation declined for input N: <the limit's sentence>`; an
-invalid script keeps `TransactionError("Script validation failed for input
-N: …")` byte for byte. The budget `verify` evaluates under is unchanged.
+`SimplifiedFetchTransport::new` built its private `reqwest::Client` inside
+and set no redirect policy, so reqwest followed up to ten hops: a
+handshake or a general message answered `3xx` with a `Location` on
+another host was replayed there, its auth headers, signature and body
+with it, and a wrapper over `Peer<W, SimplifiedFetchTransport>` (the
+toolbox's `StorageClient`) could check the base URL before a send but set
+no redirect, proxy or resolution policy on the transport's own requests,
+the general message's URL built from the payload's path included. The
+reference's constructor takes the fetch as its second parameter
+(`fetchClient: typeof fetch = defaultFetch`, `ts-stack@edf6e03`
+`packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:64-67`, the
+default the global fetch, `:16-19`; `AuthFetch.ts:197`, `:569` passes its
+own to the transport it builds) and both of its fetches set `redirect:
+'error'` (`:128`, `:212`; the comment at `:125-127`: a fetch follows
+redirects by default and can replay them elsewhere).
 
-Second, on the block path a node's budget is its operator's mandatory
-`-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.3, `6504a3a`:
-`src/bitcoind.cpp:140-157`; 0 means `INT64_MAX`,
-`src/consensus/consensus.h:82`, `src/configscriptpolicy.cpp:280-287`), the
-figure `GetMaxStackMemoryUsage` picks there (`:139-154`), and a growth above
-it is that node's verdict (`src/script/limitedstack.cpp:202-205`,
-`SCRIPT_ERR_STACK_SIZE`, `src/script/interpreter.cpp:1815-1817`). An
-operator may set it below 100,000,000; this crate's block word evaluated up
-to its local budget and said valid, and `memory_limit: Some(X)` modelled
-that node only as a decline above `X`, which no sentence said. The module
-doc's block-path paragraph and `SpendParams::memory_limit` now say so, and
-`Spend::set_stack_memory_consensus(bytes)` (with
-`Spend::stack_memory_consensus()`), beside `set_stack_memory_policy`, is
-the node's setting for a word without the mempool bits: a growth that would
-take the node's count above it is refused before it happens, `Stack size
-limit exceeded: N bytes, the stack memory consensus limit is M bytes.`,
-`is_resource_limit() == false`. 0, the default, selects no verdict (the
-node's `INT64_MAX`). The mempool word keeps the policy's verdict and
-ignores it; the default mode ignores both. The node refuses at start a
-policy above its consensus figure (`src/configscriptpolicy.cpp:298-305`);
-this interpreter takes both as given and judges each path by its own.
+`SimplifiedFetchTransport::with_client(base_url, client)` (behind `http`,
+as the field is) sends every request through the caller's client, used as
+given: its timeouts, pool, proxy, resolution and redirect policy are the
+caller's. `new` keeps its client (the 30 s and 10 s timeouts and
+`pool_max_idle_per_host(0)` of the Cloudflare Containers hang) and adds
+`redirect(Policy::none())`. On both paths, whatever the client, an answer
+with a redirect status (the fetch standard's 301, 302, 303, 307, 308) is
+refused before its body is read, as `Error::AuthError("Network error while
+sending authenticated request to {url}: redirect refused: {status}")`, the
+reference's words for its thrown fetch (`:453-462`) with this crate's
+reason. The class: the named host answered, so it is that host's answer
+(`AuthError`, `transport_fault()` `None`), not a `TransportFault`; the
+reference's `redirect: 'error'` makes it a network error by the fetch
+standard's name for every failure, and the reference has no fault classes
+to read it by: its `Network error` words are kept, its class is not. A
+general message answered `3xx` was handed to the caller as an
+`HttpResponse` of that status before; it is now refused. A `300` or `304`
+is not a redirect status and is read as before.
 
-Pinned by `tests/transaction_verify_decline_38.rs` (a child whose input
-pushes 1,000,000 bytes and whose parent's lock `OP_DUP`s it: 32 copies
-verify, a 33rd is `ScriptEvaluationDeclined` at 33,000,000 of 32,000,000,
-the same shape with an invalid script still `TransactionError`) and
-`tests/script_stack_memory_consensus_38.rs` (the verdict under the block
-word, the decline without the knob, the mempool word's policy verdict
-unchanged, the two figures unclamped); red on the code before (4 of 9;
-the 5 others hold either way). `tests/script_stack_memory_witness.rs` is
-unchanged.
+Migration: none for `new`. A caller with its own policy passes its
+client: the toolbox's `StorageClient` (`bsv-wallet-toolbox-rs`, its
+#182 policy) replaces `SimplifiedFetchTransport::new(&url)`
+(`src/storage/client/storage_client.rs:291` at `6317222`) with
+`SimplifiedFetchTransport::with_client(&url, client)`, the client built
+with `reqwest::Client::builder().no_proxy().resolve(host, addr)
+.redirect(reqwest::redirect::Policy::none())` and the timeouts it wants
+(`new`'s are not applied to a supplied client). `bsv-wallet-cli`
+(`a55990c`) and `bsv-overlay-cloudflare` (`9a0f3c29`) build no
+`SimplifiedFetchTransport`.
 
-Semver: `Error` is `#[non_exhaustive]`, so the new variant is additive, as
-are the two `Spend` methods.
+wasm32: the `http` feature does not build there (`build.rs`, #152), so
+neither constructor's client exists on wasm32; reqwest's wasm builder has
+no redirect policy either (`reqwest-0.12.28/src/wasm/client.rs`: the
+browser's fetch follows), so a wasm32 transport would have to be the
+host's `fetch` with `redirect: 'error'`.
 
-Migration: a caller of `Transaction::verify` that read every `Err` as an
-invalid transaction reads `Error::ScriptEvaluationDeclined` as "not
-judged" (retry under a larger budget, or let the network judge); a match
-on `TransactionError` text containing `has exceeded` finds the decline in
-the new variant. No downstream reads it: `overlay-engine`'s submit door
-walks with its own `verify_beef_linear` and the stream script door, which
-already branches on `is_resource_limit`, and its two tests that call
-`verify` expect `Ok(true)`; `bsv-wallet-cli` calls no `Transaction::verify`.
+Pinned by `tests/transport_client_hook_320.rs` (5 tests, wiremock): a
+handshake answered 301, 302, 303, 307 and 308 to a second server is
+refused in those words and the second server sees no request; a general
+message answered 302 and 307 the same; a client supplied through
+`with_client` is the one used (a `default_headers` marker the mock
+matches on), the base URL's trailing slash trimmed; a supplied client
+that follows redirects carries its own policy (the second server answers);
+a supplied client that does not is refused by the transport. 3 of the 5
+red on the tree with the redirect policy and the two refusals removed (the
+handshake followed to the second server, the general message's 302 handed
+on), the two policy-of-the-caller tests green on both; `transport_fault_auth`
+(9) and `auth_integration_tests` (70) unchanged.
 
-### Notes: cross-SDK parity (#38)
+### Notes: cross-SDK parity (#320)
 
-The reference's `Spend` defaults `memoryLimit` to `Number.POSITIVE_INFINITY`
-(`ts-stack@edf6e03` `Spend.ts:295-296`) and its `verify` imposes no SDK cap
-without a caller's `memoryLimit` (`Transaction.ts:1685-1687`); this crate's
-`verify` keeps the default mode's 32,000,000 bytes and takes no budget, so a
-script between 32,000,000 bytes and the reference's allocation failure is a
-decline here and a verdict there: a finding, not changed by #38. go-sdk@2ca481c
-runs the interpreter at the relay policy's 100,000,000 bytes and wraps its
-error with two `%w`, `ErrScriptVerificationFailed` and the interpreter's own,
-so `errors.Is(err, ctx.Err())` tells a stopped evaluation from an invalid
-script (`spv/verify.go:64-76`, `:547-560`); it carries no consensus figure.
-### Fixed: the identity client's wallet calls send what the reference sends (#318)
+go-sdk@2ca481c's `NewSimplifiedHTTPTransport` takes a caller's
+`*http.Client` in `SimplifiedHTTPTransportOptions.Client`
+(`auth/transports/simplified_http_transport.go:31-34`), building
+`&http.Client{}` when none is given (`:41-44`), and sets no
+`CheckRedirect`: `net/http`'s default follows up to ten redirects on both
+of its sends (`:111`, `:175`), as this crate's did. The reference passes
+`redirect: 'error'` to a caller's fetch too, so a caller's fetch refuses
+a redirect unless it ignores the option; reqwest has no per-request
+redirect policy, so a caller's client that follows redirects follows them
+here before the transport sees the answer, the transport refusing only the
+redirect statuses it is handed. The reference's third parameter
+(`SimplifiedFetchTransportOptions`: the response byte limits and the
+request timeout, `:30-37`) is not this crate's: outside #320. The tail of the reference's words is the
+runtime's (`fetch failed` under Node); this crate's is `redirect refused:
+{status}`.
 
-`IdentityClient` passed `"identity-client"` as the originator on every
-wallet call of the reveal, the revocation and the certificate parser when
-none was configured, and `""` on `get_identity_key` and the contacts
-manager; the reference's `IdentityClient` passes its constructor's
-`originator` as given to every `wallet.*` call, `undefined` when the caller
-named none (`ts-stack@edf6e03` `packages/sdk/src/identity/IdentityClient.ts:369-377`,
-`:471-477`, `:502`, `:527`, `:718-729`, `:813`, `:862`, `:884`, `:910`,
-`:942`). Every call now carries the configured originator or none (`""`,
-this crate's absent originator: the binary wire writes length 0 and the
-HTTP substrates send no `Originator` header unless their own is set).
-`revoke_certificate_revelation`'s createAction carried the labels
-`identity` and `revocation` and `signAndProcess: false` beside the
-reference's arguments; the reference's (`:845-863`) sends the description,
-`inputBEEF`, one input (`inputDescription`, `outpoint`,
-`unlockingScriptLength: 74`) and `options: { randomizeOutputs: false,
-acceptDelayedBroadcast: false, noSend: true }`, nothing else. Its
-signAction left `returnTXIDOnly` absent and sent the reference createAction
-answered as the hex of its bytes; the reference's (`:896-911`) sends
-`returnTXIDOnly: false` and the reference as it was answered, its base64
-text, which is what the binary wire's transceiver decodes
-(`src/wallet/wire/transceiver.rs:667-668`) and the HTTP JSON substrate carries:
-the hex text named an action no wallet had made. Both calls now send the
-reference's arguments alone.
+### Fixed: `electrum_decrypt` finds an embedded key the reference's way, so a no-key envelope of any length opens (#109)
 
-Migration: a client built with `IdentityClientConfig::default()` now
-sends no originator. A wallet that requires one refuses the call where it
-accepted `"identity-client"`: `bsv-wallet-toolbox-rs`'s `Wallet`
-(`6317222`) refuses `""` on every call (`validate_originator`,
-`src/wallet/wallet.rs:2811-2816`; its reference's `validateOriginator`
-accepts `undefined`, `ts-stack@edf6e03` `validationHelpers.ts:1003-1004`),
-as it already refused `get_identity_key` and the contacts manager's calls;
-`bsv-wallet-cli` (`a55990c`) answers 400 `Origin header required` to a
-request with neither `Origin` nor `Originator` (`src/server/handlers.rs:101-123`)
-where it read `http://identity-client` and wrote that into its audit
-record (`src/server/audit.rs:54`). Name the caller's own domain with
-`IdentityClientConfig::with_originator` (or the substrate's originator).
-The revocation's actions carry no label: the toolbox persisted the two
-(`src/storage/sqlx/create_action.rs:777-780`), a `listActions` by the label
-`identity` or `revocation` finds them no more. `signAndProcess: false`
-was not load-bearing: the input carries no unlocking script, so the
-toolbox's wallet answers a signable transaction whatever the flag
-(`is_sign_action`, `src/wallet/wallet.rs:3322-3327`, the reference's
-`isSignAction` rule), and the client signs and sends the action itself as
-before. No downstream calls the identity client (`bsv-wallet-toolbox-rs`,
-`bsv-wallet-cli`, `rust-message-box`, `bsv-overlay-cloudflare`,
-`bsv-middleware-cloudflare-public`, `rust-chaintracks` grepped).
+With an expected sender, `compat::ecies::electrum_decrypt` decided from the
+length alone that an envelope embeds a public key (`data.len() > 69`) and
+read the ciphertext from byte 37. A no-key envelope is `4 + ciphertext +
+32` bytes, so every one sealed over a plaintext of 32 bytes or more lost 33
+bytes of its ciphertext to a key; the MAC passed (it covers the whole
+prefix) and the AES unpadding failed, `EciesDecryptionFailed("AES
+decryption failed")` (the oracle-fuzz lane's input, #82). Without a sender
+it read bytes 4 to 37 as a key whatever they were. The reference's
+`electrumDecrypt` (`ts-stack@edf6e03` `packages/sdk/src/compat/ECIES.ts:607-656`)
+decides by the byte after the magic and the bytes left over: with
+`available = length - 36`, a compressed key when `available >= 49`, the
+byte is `02` or `03` and `(available - 33) % 16 == 0`; an uncompressed one
+when it is `04`, `available >= 81` and `(available - 65) % 16 == 0`; else
+none. The reader now does the same (`src/compat/ecies_envelope.rs`), in its
+order and words: no key and no expected sender, `Sender public key is
+required`; an embedded key beside an expected sender that is not the same
+key (compared compressed, in constant time), `Embedded sender public key
+does not match the expected sender`; the expected sender's key derives the
+secret when given, else the embedded one; a ciphertext empty or not a
+whole number of 16-byte blocks, `Invalid Electrum ECIES ciphertext
+framing`, before the MAC; then the MAC (`EciesHmacMismatch`, the
+reference's `Invalid checksum`) and AES. An envelope embedding the sender's
+65-byte uncompressed key, which `PublicKey::from_bytes` reads, now opens
+with the sender and without; it never did.
 
-Pinned by `tests/identity_wallet_calls_318.rs` (4 tests) on
-`tests/vectors/identity_wallet_calls_318.json`: the reference's client
-built with no originator and with `identity-client`, the wallet calls of
-its reveal (#310's certificate, `email`) and its revocation each with the
-originator received, and the revocation's createAction and signAction
-arguments, its lookup answered with a source transaction carrying the
-reveal's token and its createAction with a signable transaction spending
-it; recorded by `tests/support/identity_wallet_calls_318.mjs` at
-`ts-stack@edf6e03` under Node v22.18.0, the randomness #310's SHA-256
-counter stream (two runs byte for byte). Answered here with the
-reference's lookup BEEF and signable transaction, this crate's revocation
-sends createAction arguments equal to the reference's member by member and
-a signAction with the same reference, options and unlocking script; every
-call of the reveal, the revocation, `get_identity_key` and the contacts
-manager carries the configured originator or none. The counting wallet
-(`tests/support/identity_reveal_wallet.rs`) keeps every call's originator
-now, and answers a signable transaction when given one. 4 of the 4 red on
-the tree before the fix; the #307, #310 and #315 witnesses unchanged (10,
-6 and 3 green; #315's test now builds its client with the originator its
-recorder gave the reference, `identity-client`).
+The rule cannot misread an envelope `electrum_encrypt` writes: its
+ciphertext is a non-empty multiple of 16 and a key is 33 or 65 bytes, both
+1 modulo 16. A no-key envelope's `available` is 0 modulo 16, so
+`available - 33` and `available - 65` are 15 modulo 16 and no key is found
+whatever its first byte; an envelope with a key has `available - 33` the
+ciphertext's length, a multiple of 16 of at least 16, and its first byte
+`02` or `03`, so the key is always found. The same holds for any writer of
+a compressed or uncompressed key.
 
-### Notes: cross-SDK parity (#318)
+Migration: an envelope that opened before opens to the same plaintext; a
+no-key envelope of a plaintext of 32 bytes or more now opens where it was
+refused. A caller matching a refusal sees: a no-key envelope without a
+sender `Sender public key is required` where it read `Data too short for
+embedded public key` (under 69 bytes) or a key refusal, MAC mismatch or
+`AES decryption failed` (69 or more); an embedded key beside another
+expected sender the mismatch words where it read `EciesHmacMismatch`; a
+ciphertext out of framing the framing words where it read
+`EciesHmacMismatch`. `Data too short`, `Invalid magic bytes` and
+`EciesHmacMismatch` keep their words. No downstream calls
+`electrum_decrypt` or matches `EciesDecryptionFailed` or
+`EciesHmacMismatch` (`bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
+`bsv-overlay-cloudflare` grepped 2026-10-27).
 
-#315's two items are closed. go-sdk@2ca481c has no revocation; its
-`NewClient` keeps the originator the caller passes and passes it on every
-call (`identity/client.go:33-63`, `:113`, `:144`, `:175`, `:191`, `:244`,
-`:262`), `""` when none: the reference's rule. The revocation still differs
-from the reference outside its arguments: the reference authenticates each
-lookup output before spending it (two getPublicKey calls, the token's
-locking key, subject and serial number, `Certificate.verify` and a
-verifySignature over the token, `:711-830`), spends at the input that
-matches the outpoint, aborts the action when signing or broadcasting fails
-(`:942`) and retries a double spend (`withDoubleSpendRetry`); this crate
-spends the first output listed, at input 0, and does none of these (a finding
-outside #318). The contacts manager and the key-value stores send
-signAction the hex of the reference (`src/identity/contacts.rs:447`,
-`:732`, `src/kvstore/global.rs:281`, `:409`, `src/kvstore/local.rs:331`,
-`:438`), the same fault as the revocation's: a finding outside #318,
-closed by #326.
+Pinned by `tests/compat_ecies_envelope_109.rs` (10 tests, 1 ignored
+recorder) on `tests/vectors/compat_ecies_envelope_109.json`: for fixed
+keys and plaintexts of 1, 15, 16, 17, 31, 32 (the issue's input), 33, 47,
+48, 64 and 96 bytes, the reference's envelopes with the key and without
+equal this crate's byte for byte, open here to the reference's verdicts
+with the sender and without, and this crate's envelopes open in the
+reference; ten refusals and the uncompressed key (another expected sender,
+a no-key envelope without one, a 17-byte ciphertext, a key and no
+ciphertext, a flipped MAC byte, a key off the curve, the uncompressed key
+with, without and beside another sender) read here as there; recorded by
+`tests/support/compat_ecies_envelope_109.mjs` at `ts-stack@edf6e03` under
+Node v22.18.0. 7 of the 10 red on the tree before the fix (the three
+green: the encryptor's bytes, unchanged, and the round trips with a key).
+`fuzz_ecies` drops its #109 skip, so every sealed envelope must open, with
+the issue's input as a seed (`plain-32-bsv-rs-109`, written by
+`fuzz/corpus-gen`, whose certificate seed line now unwraps `to_binary`'s
+`Result` of #275).
+
+### Notes: cross-SDK parity (#109)
+
+go-sdk@2ca481c's `ElectrumDecrypt` keeps the length rule
+(`compat/ecies/ecies.go:117-135`: with a sender the ciphertext from byte 37
+when the envelope is over 69 bytes, without one bytes 4 to 37 parsed as a
+key), so it refuses the no-key envelope of a plaintext of 32 bytes or more
+(`AESCBCDecrypt`'s unpadding error) and an uncompressed key, never compares
+an embedded key with the sender, and checks no framing; its refusals carry
+its own words (`incorrect password` for the MAC). An embedded compressed
+key whose x is at or above the field prime is refused here by
+`PublicKey::from_bytes` (`InvalidPublicKey`), where the reference's
+`PublicKey.fromString` reduces x modulo p and refuses later: the mismatch
+with an expected sender, `Invalid checksum` without (the vector's two
+off-curve rows), the difference CLAUDE.md lists for certificate keys
+(#183). The reference bounds an envelope at 16 MiB + 160 bytes
+(`ECIES.ts:12`, `:589-594`, `CompatValidation.ts:1`), which this crate
+does not: a finding outside #109.
 
 ### Fixed: the Socket.IO codec reads a frame as `socket.io-parser` reads it, and carries the id on every packet (#110)
 
@@ -1214,275 +1325,173 @@ within `u64` is exact here and the nearest double there, so
 `18446744073709551615` is written back as given here and as
 `18446744073709552000` there. The JSON numbers' differences are #285's.
 go-sdk@2ca481c carries no Socket.IO codec.
-### Fixed: `electrum_decrypt` finds an embedded key the reference's way, so a no-key envelope of any length opens (#109)
 
-With an expected sender, `compat::ecies::electrum_decrypt` decided from the
-length alone that an envelope embeds a public key (`data.len() > 69`) and
-read the ciphertext from byte 37. A no-key envelope is `4 + ciphertext +
-32` bytes, so every one sealed over a plaintext of 32 bytes or more lost 33
-bytes of its ciphertext to a key; the MAC passed (it covers the whole
-prefix) and the AES unpadding failed, `EciesDecryptionFailed("AES
-decryption failed")` (the oracle-fuzz lane's input, #82). Without a sender
-it read bytes 4 to 37 as a key whatever they were. The reference's
-`electrumDecrypt` (`ts-stack@edf6e03` `packages/sdk/src/compat/ECIES.ts:607-656`)
-decides by the byte after the magic and the bytes left over: with
-`available = length - 36`, a compressed key when `available >= 49`, the
-byte is `02` or `03` and `(available - 33) % 16 == 0`; an uncompressed one
-when it is `04`, `available >= 81` and `(available - 65) % 16 == 0`; else
-none. The reader now does the same (`src/compat/ecies_envelope.rs`), in its
-order and words: no key and no expected sender, `Sender public key is
-required`; an embedded key beside an expected sender that is not the same
-key (compared compressed, in constant time), `Embedded sender public key
-does not match the expected sender`; the expected sender's key derives the
-secret when given, else the embedded one; a ciphertext empty or not a
-whole number of 16-byte blocks, `Invalid Electrum ECIES ciphertext
-framing`, before the MAC; then the MAC (`EciesHmacMismatch`, the
-reference's `Invalid checksum`) and AES. An envelope embedding the sender's
-65-byte uncompressed key, which `PublicKey::from_bytes` reads, now opens
-with the sender and without; it never did.
+### Fixed: the identity client's wallet calls send what the reference sends (#318)
 
-The rule cannot misread an envelope `electrum_encrypt` writes: its
-ciphertext is a non-empty multiple of 16 and a key is 33 or 65 bytes, both
-1 modulo 16. A no-key envelope's `available` is 0 modulo 16, so
-`available - 33` and `available - 65` are 15 modulo 16 and no key is found
-whatever its first byte; an envelope with a key has `available - 33` the
-ciphertext's length, a multiple of 16 of at least 16, and its first byte
-`02` or `03`, so the key is always found. The same holds for any writer of
-a compressed or uncompressed key.
+`IdentityClient` passed `"identity-client"` as the originator on every
+wallet call of the reveal, the revocation and the certificate parser when
+none was configured, and `""` on `get_identity_key` and the contacts
+manager; the reference's `IdentityClient` passes its constructor's
+`originator` as given to every `wallet.*` call, `undefined` when the caller
+named none (`ts-stack@edf6e03` `packages/sdk/src/identity/IdentityClient.ts:369-377`,
+`:471-477`, `:502`, `:527`, `:718-729`, `:813`, `:862`, `:884`, `:910`,
+`:942`). Every call now carries the configured originator or none (`""`,
+this crate's absent originator: the binary wire writes length 0 and the
+HTTP substrates send no `Originator` header unless their own is set).
+`revoke_certificate_revelation`'s createAction carried the labels
+`identity` and `revocation` and `signAndProcess: false` beside the
+reference's arguments; the reference's (`:845-863`) sends the description,
+`inputBEEF`, one input (`inputDescription`, `outpoint`,
+`unlockingScriptLength: 74`) and `options: { randomizeOutputs: false,
+acceptDelayedBroadcast: false, noSend: true }`, nothing else. Its
+signAction left `returnTXIDOnly` absent and sent the reference createAction
+answered as the hex of its bytes; the reference's (`:896-911`) sends
+`returnTXIDOnly: false` and the reference as it was answered, its base64
+text, which is what the binary wire's transceiver decodes
+(`src/wallet/wire/transceiver.rs:667-668`) and the HTTP JSON substrate carries:
+the hex text named an action no wallet had made. Both calls now send the
+reference's arguments alone.
 
-Migration: an envelope that opened before opens to the same plaintext; a
-no-key envelope of a plaintext of 32 bytes or more now opens where it was
-refused. A caller matching a refusal sees: a no-key envelope without a
-sender `Sender public key is required` where it read `Data too short for
-embedded public key` (under 69 bytes) or a key refusal, MAC mismatch or
-`AES decryption failed` (69 or more); an embedded key beside another
-expected sender the mismatch words where it read `EciesHmacMismatch`; a
-ciphertext out of framing the framing words where it read
-`EciesHmacMismatch`. `Data too short`, `Invalid magic bytes` and
-`EciesHmacMismatch` keep their words. No downstream calls
-`electrum_decrypt` or matches `EciesDecryptionFailed` or
-`EciesHmacMismatch` (`bsv-wallet-toolbox-rs`, `bsv-wallet-cli`,
-`bsv-overlay-cloudflare` grepped 2026-10-27).
+Migration: a client built with `IdentityClientConfig::default()` now
+sends no originator. A wallet that requires one refuses the call where it
+accepted `"identity-client"`: `bsv-wallet-toolbox-rs`'s `Wallet`
+(`6317222`) refuses `""` on every call (`validate_originator`,
+`src/wallet/wallet.rs:2811-2816`; its reference's `validateOriginator`
+accepts `undefined`, `ts-stack@edf6e03` `validationHelpers.ts:1003-1004`),
+as it already refused `get_identity_key` and the contacts manager's calls;
+`bsv-wallet-cli` (`a55990c`) answers 400 `Origin header required` to a
+request with neither `Origin` nor `Originator` (`src/server/handlers.rs:101-123`)
+where it read `http://identity-client` and wrote that into its audit
+record (`src/server/audit.rs:54`). Name the caller's own domain with
+`IdentityClientConfig::with_originator` (or the substrate's originator).
+The revocation's actions carry no label: the toolbox persisted the two
+(`src/storage/sqlx/create_action.rs:777-780`), a `listActions` by the label
+`identity` or `revocation` finds them no more. `signAndProcess: false`
+was not load-bearing: the input carries no unlocking script, so the
+toolbox's wallet answers a signable transaction whatever the flag
+(`is_sign_action`, `src/wallet/wallet.rs:3322-3327`, the reference's
+`isSignAction` rule), and the client signs and sends the action itself as
+before. No downstream calls the identity client (`bsv-wallet-toolbox-rs`,
+`bsv-wallet-cli`, `rust-message-box`, `bsv-overlay-cloudflare`,
+`bsv-middleware-cloudflare-public`, `rust-chaintracks` grepped).
 
-Pinned by `tests/compat_ecies_envelope_109.rs` (10 tests, 1 ignored
-recorder) on `tests/vectors/compat_ecies_envelope_109.json`: for fixed
-keys and plaintexts of 1, 15, 16, 17, 31, 32 (the issue's input), 33, 47,
-48, 64 and 96 bytes, the reference's envelopes with the key and without
-equal this crate's byte for byte, open here to the reference's verdicts
-with the sender and without, and this crate's envelopes open in the
-reference; ten refusals and the uncompressed key (another expected sender,
-a no-key envelope without one, a 17-byte ciphertext, a key and no
-ciphertext, a flipped MAC byte, a key off the curve, the uncompressed key
-with, without and beside another sender) read here as there; recorded by
-`tests/support/compat_ecies_envelope_109.mjs` at `ts-stack@edf6e03` under
-Node v22.18.0. 7 of the 10 red on the tree before the fix (the three
-green: the encryptor's bytes, unchanged, and the round trips with a key).
-`fuzz_ecies` drops its #109 skip, so every sealed envelope must open, with
-the issue's input as a seed (`plain-32-bsv-rs-109`, written by
-`fuzz/corpus-gen`, whose certificate seed line now unwraps `to_binary`'s
-`Result` of #275).
+Pinned by `tests/identity_wallet_calls_318.rs` (4 tests) on
+`tests/vectors/identity_wallet_calls_318.json`: the reference's client
+built with no originator and with `identity-client`, the wallet calls of
+its reveal (#310's certificate, `email`) and its revocation each with the
+originator received, and the revocation's createAction and signAction
+arguments, its lookup answered with a source transaction carrying the
+reveal's token and its createAction with a signable transaction spending
+it; recorded by `tests/support/identity_wallet_calls_318.mjs` at
+`ts-stack@edf6e03` under Node v22.18.0, the randomness #310's SHA-256
+counter stream (two runs byte for byte). Answered here with the
+reference's lookup BEEF and signable transaction, this crate's revocation
+sends createAction arguments equal to the reference's member by member and
+a signAction with the same reference, options and unlocking script; every
+call of the reveal, the revocation, `get_identity_key` and the contacts
+manager carries the configured originator or none. The counting wallet
+(`tests/support/identity_reveal_wallet.rs`) keeps every call's originator
+now, and answers a signable transaction when given one. 4 of the 4 red on
+the tree before the fix; the #307, #310 and #315 witnesses unchanged (10,
+6 and 3 green; #315's test now builds its client with the originator its
+recorder gave the reference, `identity-client`).
 
-### Notes: cross-SDK parity (#109)
+### Notes: cross-SDK parity (#318)
 
-go-sdk@2ca481c's `ElectrumDecrypt` keeps the length rule
-(`compat/ecies/ecies.go:117-135`: with a sender the ciphertext from byte 37
-when the envelope is over 69 bytes, without one bytes 4 to 37 parsed as a
-key), so it refuses the no-key envelope of a plaintext of 32 bytes or more
-(`AESCBCDecrypt`'s unpadding error) and an uncompressed key, never compares
-an embedded key with the sender, and checks no framing; its refusals carry
-its own words (`incorrect password` for the MAC). An embedded compressed
-key whose x is at or above the field prime is refused here by
-`PublicKey::from_bytes` (`InvalidPublicKey`), where the reference's
-`PublicKey.fromString` reduces x modulo p and refuses later: the mismatch
-with an expected sender, `Invalid checksum` without (the vector's two
-off-curve rows), the difference CLAUDE.md lists for certificate keys
-(#183). The reference bounds an envelope at 16 MiB + 160 bytes
-(`ECIES.ts:12`, `:589-594`, `CompatValidation.ts:1`), which this crate
-does not: a finding outside #109.
-### Fixed: `SimplifiedFetchTransport` takes a caller's client, as the reference takes a `fetchClient`, and refuses a redirect (#320)
+#315's two items are closed. go-sdk@2ca481c has no revocation; its
+`NewClient` keeps the originator the caller passes and passes it on every
+call (`identity/client.go:33-63`, `:113`, `:144`, `:175`, `:191`, `:244`,
+`:262`), `""` when none: the reference's rule. The revocation still differs
+from the reference outside its arguments: the reference authenticates each
+lookup output before spending it (two getPublicKey calls, the token's
+locking key, subject and serial number, `Certificate.verify` and a
+verifySignature over the token, `:711-830`), spends at the input that
+matches the outpoint, aborts the action when signing or broadcasting fails
+(`:942`) and retries a double spend (`withDoubleSpendRetry`); this crate
+spends the first output listed, at input 0, and does none of these (a finding
+outside #318). The contacts manager and the key-value stores send
+signAction the hex of the reference (`src/identity/contacts.rs:447`,
+`:732`, `src/kvstore/global.rs:281`, `:409`, `src/kvstore/local.rs:331`,
+`:438`), the same fault as the revocation's: a finding outside #318,
+closed by #326.
 
-`SimplifiedFetchTransport::new` built its private `reqwest::Client` inside
-and set no redirect policy, so reqwest followed up to ten hops: a
-handshake or a general message answered `3xx` with a `Location` on
-another host was replayed there, its auth headers, signature and body
-with it, and a wrapper over `Peer<W, SimplifiedFetchTransport>` (the
-toolbox's `StorageClient`) could check the base URL before a send but set
-no redirect, proxy or resolution policy on the transport's own requests,
-the general message's URL built from the payload's path included. The
-reference's constructor takes the fetch as its second parameter
-(`fetchClient: typeof fetch = defaultFetch`, `ts-stack@edf6e03`
-`packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:64-67`, the
-default the global fetch, `:16-19`; `AuthFetch.ts:197`, `:569` passes its
-own to the transport it builds) and both of its fetches set `redirect:
-'error'` (`:128`, `:212`; the comment at `:125-127`: a fetch follows
-redirects by default and can replay them elsewhere).
+### Fixed: `Transaction::verify` answers a decline as a decline, and the block path's consensus budget can be the node's verdict (#38)
 
-`SimplifiedFetchTransport::with_client(base_url, client)` (behind `http`,
-as the field is) sends every request through the caller's client, used as
-given: its timeouts, pool, proxy, resolution and redirect policy are the
-caller's. `new` keeps its client (the 30 s and 10 s timeouts and
-`pool_max_idle_per_host(0)` of the Cloudflare Containers hang) and adds
-`redirect(Policy::none())`. On both paths, whatever the client, an answer
-with a redirect status (the fetch standard's 301, 302, 303, 307, 308) is
-refused before its body is read, as `Error::AuthError("Network error while
-sending authenticated request to {url}: redirect refused: {status}")`, the
-reference's words for its thrown fetch (`:453-462`) with this crate's
-reason. The class: the named host answered, so it is that host's answer
-(`AuthError`, `transport_fault()` `None`), not a `TransportFault`; the
-reference's `redirect: 'error'` makes it a network error by the fetch
-standard's name for every failure, and the reference has no fault classes
-to read it by: its `Network error` words are kept, its class is not. A
-general message answered `3xx` was handed to the caller as an
-`HttpResponse` of that status before; it is now refused. A `300` or `304`
-is not a redirect status and is read as before.
+Two gaps the docs pass of #36 left. First, `Transaction::verify` evaluates
+each input under the default mode's 32,000,000-byte local budget and mapped
+every `Spend::validate` error to `TransactionError("Script validation failed
+for input N: …")`, so an evaluation stopped at the budget (`resource_limit`
+`Some`, `is_resource_limit`), a script nobody judged, reached the caller as
+invalid with its class dropped, where the crate's docs say a caller never
+reads a decline as invalid. The reference's `Transaction.verify` runs
+`Spend` per input and lets its two exceptions propagate by class,
+`ScriptEvaluationError` for an invalid script and `ScriptResourceLimitError`
+for a decline (`ts-stack@edf6e03`
+`packages/sdk/src/transaction/Transaction.ts:1441-1458`,
+`packages/sdk/src/script/Spend.ts:2020-2021`, thrown at `:433`, `:439`,
+`:745`, `:748`, `:1949`). A decline now leaves `verify` as
+`Error::ScriptEvaluationDeclined { input_index, limit }`, the input and the
+`ScriptResourceLimit` (resource, budget, attempted figure) kept, printed
+`script evaluation declined for input N: <the limit's sentence>`; an
+invalid script keeps `TransactionError("Script validation failed for input
+N: …")` byte for byte. The budget `verify` evaluates under is unchanged.
 
-Migration: none for `new`. A caller with its own policy passes its
-client: the toolbox's `StorageClient` (`bsv-wallet-toolbox-rs`, its
-#182 policy) replaces `SimplifiedFetchTransport::new(&url)`
-(`src/storage/client/storage_client.rs:291` at `6317222`) with
-`SimplifiedFetchTransport::with_client(&url, client)`, the client built
-with `reqwest::Client::builder().no_proxy().resolve(host, addr)
-.redirect(reqwest::redirect::Policy::none())` and the timeouts it wants
-(`new`'s are not applied to a supplied client). `bsv-wallet-cli`
-(`a55990c`) and `bsv-overlay-cloudflare` (`9a0f3c29`) build no
-`SimplifiedFetchTransport`.
+Second, on the block path a node's budget is its operator's mandatory
+`-maxstackmemoryusageconsensus` (bitcoin-sv v1.2.3, `6504a3a`:
+`src/bitcoind.cpp:140-157`; 0 means `INT64_MAX`,
+`src/consensus/consensus.h:82`, `src/configscriptpolicy.cpp:280-287`), the
+figure `GetMaxStackMemoryUsage` picks there (`:139-154`), and a growth above
+it is that node's verdict (`src/script/limitedstack.cpp:202-205`,
+`SCRIPT_ERR_STACK_SIZE`, `src/script/interpreter.cpp:1815-1817`). An
+operator may set it below 100,000,000; this crate's block word evaluated up
+to its local budget and said valid, and `memory_limit: Some(X)` modelled
+that node only as a decline above `X`, which no sentence said. The module
+doc's block-path paragraph and `SpendParams::memory_limit` now say so, and
+`Spend::set_stack_memory_consensus(bytes)` (with
+`Spend::stack_memory_consensus()`), beside `set_stack_memory_policy`, is
+the node's setting for a word without the mempool bits: a growth that would
+take the node's count above it is refused before it happens, `Stack size
+limit exceeded: N bytes, the stack memory consensus limit is M bytes.`,
+`is_resource_limit() == false`. 0, the default, selects no verdict (the
+node's `INT64_MAX`). The mempool word keeps the policy's verdict and
+ignores it; the default mode ignores both. The node refuses at start a
+policy above its consensus figure (`src/configscriptpolicy.cpp:298-305`);
+this interpreter takes both as given and judges each path by its own.
 
-wasm32: the `http` feature does not build there (`build.rs`, #152), so
-neither constructor's client exists on wasm32; reqwest's wasm builder has
-no redirect policy either (`reqwest-0.12.28/src/wasm/client.rs`: the
-browser's fetch follows), so a wasm32 transport would have to be the
-host's `fetch` with `redirect: 'error'`.
+Pinned by `tests/transaction_verify_decline_38.rs` (a child whose input
+pushes 1,000,000 bytes and whose parent's lock `OP_DUP`s it: 32 copies
+verify, a 33rd is `ScriptEvaluationDeclined` at 33,000,000 of 32,000,000,
+the same shape with an invalid script still `TransactionError`) and
+`tests/script_stack_memory_consensus_38.rs` (the verdict under the block
+word, the decline without the knob, the mempool word's policy verdict
+unchanged, the two figures unclamped); red on the code before (4 of 9;
+the 5 others hold either way). `tests/script_stack_memory_witness.rs` is
+unchanged.
 
-Pinned by `tests/transport_client_hook_320.rs` (5 tests, wiremock): a
-handshake answered 301, 302, 303, 307 and 308 to a second server is
-refused in those words and the second server sees no request; a general
-message answered 302 and 307 the same; a client supplied through
-`with_client` is the one used (a `default_headers` marker the mock
-matches on), the base URL's trailing slash trimmed; a supplied client
-that follows redirects carries its own policy (the second server answers);
-a supplied client that does not is refused by the transport. 3 of the 5
-red on the tree with the redirect policy and the two refusals removed (the
-handshake followed to the second server, the general message's 302 handed
-on), the two policy-of-the-caller tests green on both; `transport_fault_auth`
-(9) and `auth_integration_tests` (70) unchanged.
+Semver: `Error` is `#[non_exhaustive]`, so the new variant is additive, as
+are the two `Spend` methods.
 
-### Notes: cross-SDK parity (#320)
+Migration: a caller of `Transaction::verify` that read every `Err` as an
+invalid transaction reads `Error::ScriptEvaluationDeclined` as "not
+judged" (retry under a larger budget, or let the network judge); a match
+on `TransactionError` text containing `has exceeded` finds the decline in
+the new variant. No downstream reads it: `overlay-engine`'s submit door
+walks with its own `verify_beef_linear` and the stream script door, which
+already branches on `is_resource_limit`, and its two tests that call
+`verify` expect `Ok(true)`; `bsv-wallet-cli` calls no `Transaction::verify`.
 
-go-sdk@2ca481c's `NewSimplifiedHTTPTransport` takes a caller's
-`*http.Client` in `SimplifiedHTTPTransportOptions.Client`
-(`auth/transports/simplified_http_transport.go:31-34`), building
-`&http.Client{}` when none is given (`:41-44`), and sets no
-`CheckRedirect`: `net/http`'s default follows up to ten redirects on both
-of its sends (`:111`, `:175`), as this crate's did. The reference passes
-`redirect: 'error'` to a caller's fetch too, so a caller's fetch refuses
-a redirect unless it ignores the option; reqwest has no per-request
-redirect policy, so a caller's client that follows redirects follows them
-here before the transport sees the answer, the transport refusing only the
-redirect statuses it is handed. The reference's third parameter
-(`SimplifiedFetchTransportOptions`: the response byte limits and the
-request timeout, `:30-37`) is not this crate's: outside #320. The tail of the reference's words is the
-runtime's (`fetch failed` under Node); this crate's is `redirect refused:
-{status}`.
-### Fixed: the HTTP wallet substrates take the reference's originator rule, headers, redirect refusal and base URL form (#323)
+### Notes: cross-SDK parity (#38)
 
-`HttpWalletJson` and `HttpWalletWire` validated nothing at construction,
-sent a call's originator in preference to the configured one, sent one
-header (`Originator` from the JSON substrate, `Origin` from the wire, both
-in the origin form), sent none when no originator was set, followed up to
-ten redirects (reqwest's default) and took any base URL;
-`validate_originator` checked lengths alone. The reference's substrates
-(`ts-stack@edf6e03` `packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:280-314`,
-`HTTPWalletWire.ts:17-20`, `:43-66`, `utils/toOriginHeader.ts`) and its
-`validateOriginator` (`validationHelpers.ts:996-1037`) do otherwise, and
-this crate now does as they do:
-
-- `validate_originator` (now `wallet/validation/originator.rs`) is the
-  reference's: trimmed, lower-cased, 1 to 250 bytes, a canonical DNS
-  hostname with an optional port (1 to 5 digits, at most 65535), the port
-  dropped from the answer (`Example.com:8080` is `example.com`), each
-  refusal `WalletRefusal` of class `InvalidParameter` in the reference's
-  words (`The originator parameter must be a canonical DNS hostname with an
-  optional port`, `The originator part parameter must be no more than 63
-  length.`). A scheme-prefixed originator is refused, as the reference
-  refuses it (the colon reads as a port separator), so `toOriginHeader`'s
-  path-trimming branch is never reached through a constructor.
-- Both constructors validate the originator and normalize the base URL to
-  its origin (`normalizeWalletHttpBaseUrl`): no credentials, path, query or
-  fragment, at most 2048 units, no surrounding whitespace, cleartext HTTP
-  only to `localhost`, `*.localhost`, `127.0.0.1` or `[::1]`, each refusal
-  in the reference's words (`Wallet HTTP baseUrl may use cleartext HTTP only
-  for a loopback host.`).
-- `HttpWalletJson` sends the constructor's originator, never a method's
-  `originator` argument, as both `Origin` and `Originator` in the origin
-  form (`http://example.com`), with `Accept: application/json`; a call with
-  none configured is refused before a request, `HTTPWalletJSON: originator
-  is required when using the HTTP substrate in Node.js. Pass an originator
-  (e.g. "example.com") to the constructor.`; a body over 256 MiB
-  (`MAX_WALLET_JSON_REQUEST_BYTES`) is refused unsent. The reference skips
-  the originator rule in a browser, whose `fetch` sets `Origin` itself;
-  `http` is native-only here (`build.rs`, #152), so the rule is
-  unconditional.
-- `HttpWalletWire` validates the frame's originator (more than 250 bytes
-  refused in the reference's words) and, when one is configured, refuses a
-  frame whose originator is not it (`Wallet Wire frame originator does not
-  match the configured originator`), so a frame with none is refused too;
-  it sends the frame's originator raw as `Origin` (`example.com`), empty
-  when the frame has none. A frame over 256 MiB is refused.
-- The client `new` builds takes `redirect::Policy::none()`, the reference's
-  `redirect: 'error'`: a 3xx is answered `WalletError("HTTP 302 Found for
-  <call>: a redirect is refused")` and never followed. A client given to
-  `with_client` is used as given, its redirect policy too. reqwest's wasm32
-  client has no redirect policy (`reqwest-0.12.28/src/wasm/client.rs`; the
-  host's `fetch` follows): moot while `http` does not build for wasm32.
-
-Migration: `HttpWalletJson::new`, `HttpWalletJson::with_client`,
-`HttpWalletWire::new` and `HttpWalletWire::with_client` keep their
-arguments and return `Result<Self, Error>` (add `?`), the Rust form of the
-reference's throwing constructor (the owner's ruling (c) of 2026-10-26,
-recorded on the issue). A `None` originator now fails at the first
-`HttpWalletJson` call in the reference's words (`WalletClient` with `None`
-on a JSON substrate too), so `WalletClient`'s auto-detection
-(`SubstrateType::Auto`) with a `None` originator now passes over both JSON
-substrates, whose `getVersion` probe is refused unsent, and lands on the wire
-substrate at `http://localhost:3301`, or fails when no wallet answers there,
-where it used to connect to the first JSON wallet that answered: pass an
-originator to keep the JSON substrate; a base URL with a path or a cleartext non-loopback
-host is refused at construction; a wire frame whose originator differs from
-the configured one is refused. No downstream constructs either substrate or
-calls `validate_originator` (`bsv-wallet-toolbox-rs` `6317222`, which has
-its own `validate_originator`; `bsv-wallet-cli` `a55990c`;
-`bsv-overlay-cloudflare` `9a0f3c29`; `rust-message-box` `419bf18`; grepped
-2026-10-27).
-
-Pinned by `tests/wallet_http_originator_323.rs` (10 tests, wiremock): 10 of
-10 red on the tree before the fix (the constructors' `Result` shape shimmed
-in, the behaviour the old; the tenth, a wire frame of 256 MiB + 1 bytes
-refused unsent, added by the review's fold), green after; the rules' unit
-tests in `wallet/substrates/origin.rs` and `wallet/validation/originator.rs`.
-Both rules trim as JavaScript's `String.prototype.trim` does, one helper
-(`validation::trim_js`): U+FEFF trimmed and U+0085 kept, where Rust's
-`str::trim` does the reverse, measured with the reference's
-`validateOriginator` and `HTTPWalletJSON` constructor under Node 22.18.0
-(`the_trim_is_javascripts_feff_trimmed_and_u0085_kept`,
-`a_base_url_is_trimmed_as_javascript_trims_feff_and_not_u0085`). The
-existing `wallet_http_*`, `transport_fault_wallet`, `wallet_internalize_*`
-and two `auth_certificate_*` files configure an originator and are
-otherwise unchanged.
-
-### Notes: cross-SDK parity (#323)
-
-go-sdk@2ca481c validates nothing: `NewHTTPWalletJSON` and
-`NewHTTPWalletWire` take any originator and base URL
-(`wallet/substrates/http_wallet_json.go:22-33`,
-`http_wallet_wire.go:20-31`), the JSON substrate sends `Originator` raw and
-only when set (`http_wallet_json.go:51-53`), the wire the frame's `Origin`
-raw with no comparison to the configured one (`http_wallet_wire.go:81-83`),
-and both follow redirects (`http.DefaultClient`). The redirect refusal's
-words are this crate's: the reference's `fetch` throws its runtime's
-`TypeError` (`fetch failed` under Node). The wire's response bounds
-(`HTTPWalletWire.ts:71-116`: `Content-Length` and a 256 MiB body) and the
-JSON substrate's `validateWalletArgs` before the request are not carried:
-findings outside #323.
+The reference's `Spend` defaults `memoryLimit` to `Number.POSITIVE_INFINITY`
+(`ts-stack@edf6e03` `Spend.ts:295-296`) and its `verify` imposes no SDK cap
+without a caller's `memoryLimit` (`Transaction.ts:1685-1687`); this crate's
+`verify` keeps the default mode's 32,000,000 bytes and takes no budget, so a
+script between 32,000,000 bytes and the reference's allocation failure is a
+decline here and a verdict there: a finding, not changed by #38. go-sdk@2ca481c
+runs the interpreter at the relay policy's 100,000,000 bytes and wraps its
+error with two `%w`, `ErrScriptVerificationFailed` and the interpreter's own,
+so `errors.Is(err, ctx.Err())` tells a stopped evaluation from an invalid
+script (`spv/verify.go:64-76`, `:547-560`); it carries no consensus figure.
 
 ### Fixed: the createAction `publicly_reveal_attributes` calls sends the reference's arguments and no others (#315)
 
