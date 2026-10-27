@@ -313,6 +313,92 @@ compiled, would have fuzzed nothing. The harness now passes the originator
 `fuzz.invalid` and unwraps the constructor (its base URL is the harness's own
 loopback). CI builds no fuzz target, so only `cargo fuzz` and the nightly saw
 it.
+### Fixed: `SimplifiedFetchTransport` refuses a general answer without valid BSV authentication, in the reference's words (#354)
+
+A general message's answer whose auth headers were absent was read as
+optional (`src/auth/transports/http.rs:755-756` at `1cdd149`: "Auth
+headers on response are optional") and became an `AuthMessage` whose
+sender was the client's own identity key (`:794-802`), with no signature;
+`Peer::start`'s callback hands a General message to the listeners without
+verifying it, so a caller saw an unsigned answer it could not tell from a
+signed one. The reference refuses it before the body becomes a message
+(`#validateResponseAuthentication`, `ts-stack@edf6e03`
+`packages/sdk/src/auth/transports/SimplifiedFetchTransport.ts:220-232`,
+called at `:365` after the body is read): an answer missing any of
+`x-bsv-auth-version`, `x-bsv-auth-identity-key`, `x-bsv-auth-signature`,
+absent or white space alone (`value.trim().length === 0`, `:227`), is
+thrown in `#createUnauthenticatedResponseError`'s words (`:464-494`):
+`Received HTTP <status> <statusText> from <url> without valid BSV
+authentication (missing headers: <names>)`, the missing names in that
+order joined by `, `, then ` - body preview: <preview>` when the body is
+not empty (`#getBodyPreview`, `:512-540`: the first 1,024 bytes as text
+when the content type is textual or has a `charset=`, or more than 80
+percent of them printable, `:542-574`, else `0x` and their hex,
+`:576-579`; cut at 512 UTF-16 code units with `…`; ` (truncated)` past
+1,024 bytes).
+
+This crate now refuses the same answer in the same words, after the body
+is read and before any message is built
+(`src/auth/transports/http/unauthenticated.rs`), and takes the sender from the answer's
+`x-bsv-auth-identity-key`, never the client's own key. The class, by
+#87's and #320's rules: the named host answered, so it is that host's
+answer, `Error::AuthError`, `transport_fault()` `None`, whatever the
+status (an unsigned 503 too: the general path reads no status as a
+fault). An answer with the three headers is read as before. The
+handshake path: the reference applies no header check to the
+`/.well-known/auth` answer (`:136-173`; its body is a signed
+`AuthMessage` the `Peer` verifies), so neither does this crate; its
+non-2xx handshake answer is thrown in the same function's words with
+`response lacked required BSV auth headers` (`:143-151`), where this
+crate keeps `Auth endpoint returned {status}: {body}` and its fault
+classes (#87; `transport_fault_auth` pins them): a stated difference,
+below.
+
+Migration: a caller that read an unsigned general answer (a server whose
+error path answers without the auth middleware's headers, a 401 among
+them) now gets the refusal from `Transport::send`, and through `Peer`
+from `to_peer`. The toolbox's `StorageClient`
+(`bsv-wallet-toolbox-rs@a3377ef`
+`src/storage/client/storage_client.rs:478-560`) matched an unsigned
+answer by its request ID and read its status (`HTTP error {status}:
+{body}`); it now sees `Failed to send request: Received HTTP ...`. It
+pins `bsv-rs = "0.3.20"`, so the change reaches it when it moves to 0.9.
+`bsv-wallet-cli@f4285bf`, `bsv-overlay-cloudflare@8c18730c` and
+`rust-message-box@08418ec` build no `SimplifiedFetchTransport`.
+
+Pinned by `tests/transport_unsigned_response_354.rs` (5 tests, wiremock)
+against `tests/vectors/transport_unsigned_response_354.json`, the
+reference's transport driven against a local `node:http` server by
+`tests/support/transport_unsigned_response_354.mjs` (`ts-stack@edf6e03`,
+Node v22.18.0; 14 cases, 13 refusals): a 200 with a JSON body and no auth
+headers refused in those words; a 200 with two of the three (the
+signature, the identity key, a blank version) refused naming the one
+missing; every refusal the reference recorded (a 401 and a 503, an empty
+body, binary bodies short and past 1,024 bytes, text past 1,024 bytes, a
+cut through a surrogate pair, a BOM and ill-formed UTF-8) equal here byte
+for byte, nothing handed to the callback; the refusal an `AuthError`, no
+transport fault; the three headers read as before, the sender the
+answer's key. 4 of the 5 red on the tree with the check removed (the
+three-header test green on both); `transport_fault_auth` (9),
+`transport_client_hook_320` (5) and `auth_integration_tests` (70)
+unchanged.
+
+### Notes: cross-SDK parity (#354)
+
+go-sdk@2ca481c's `SimplifiedHTTPTransport` refuses an answer without
+`x-bsv-auth-version` in its own words (`server failed to authenticate:
+missing version header in response`,
+`auth/transports/simplified_http_transport.go:190-193`) and one without
+`x-bsv-auth-identity-key` (`missing identity key header in response`,
+`:205-208`), and reads an absent `x-bsv-auth-signature` as an empty
+signature (`hex.DecodeString("")`, `:214-218`), the `Peer` refusing it
+later; it names one header, not the list. This crate follows the
+reference. Two residuals: the reason phrase is the status code's
+canonical one (reqwest keeps no phrase from the wire, which fetch's
+`statusText` reports; a server's own phrase reads differently), and a
+lone high surrogate the reference's 512-unit cut leaves is U+FFFD here,
+the bytes the reference's text has once written as UTF-8. The
+handshake's non-2xx words stay this crate's (above).
 
 ### Fixed: the contacts manager and the key-value stores send signAction the reference as the wallet answered it, with the reference's options (#326)
 
