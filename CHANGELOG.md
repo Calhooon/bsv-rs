@@ -146,8 +146,8 @@ One refusal is in other words. An HTTP response without the auth
 headers (`x-bsv-auth-version`, `x-bsv-auth-identity-key`,
 `x-bsv-auth-signature`) is refused by the transport in the reference's
 words since #354 (`Received HTTP <status> from <url> without valid BSV
-authentication (missing headers: ...)`, `SimplifiedFetchTransport.ts:220-232`,
-`:464-494`; pinned by `an_unsigned_server_response_is_refused_353`), where
+authentication (missing headers: ...)`, `SimplifiedFetchTransport.ts:365`, the
+call into `:220-232` and `:464-494`; pinned by `an_unsigned_server_response_is_refused_353`), where
 #353 alone gave it the client's own key and the Peer refused it. An
 initial response or a general message without `yourNonce` is read as the
 empty nonce and refused by the nonce check (`Initial response nonce
