@@ -181,6 +181,96 @@ maps (`auth/certificates/certificate.go:49`, `verifiable.go:23`,
 (`encoding/json`), so a certificate's JSON with unsorted fields that this
 crate or the reference writes differs from Go's text. Go's readers require
 no order.
+### Added: `WalletClient::with_substrate` takes a `WalletInterface` instance as the client's substrate, the reference's constructor's own alternative; the client carries the two linkage calls (#335)
+
+The finding (the #323 fold re-review's note, 2026-10-27): `WalletClient::new`
+builds its substrate itself from `SubstrateType` (`Auto`, the HTTP JSON and
+wire substrates on their default URLs), so a caller holding a wallet (an
+in-process one, a substrate built with its own URL or client) could not put
+it behind the client, and no `WalletClient` test could run without reaching
+the default ports. The reference's constructor takes the instance as the
+same parameter as the names (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/WalletClient.ts:83-107`):
+
+```ts
+constructor(
+  substrate: 'auto' | 'Cicada' | 'XDM' | 'window.CWI' | 'json-api'
+    | 'react-native' | 'secure-json-api' | WalletInterface = 'auto',
+  originator?: OriginatorDomainNameStringUnder250Bytes
+)
+```
+
+and each call is `this.substrate.<call>(args, this.originator)`.
+
+- `WalletClient::with_substrate(substrate: Arc<dyn WalletInterface>,
+  originator: Option<String>) -> WalletClient`, beside `new`. A constructor,
+  not a `SubstrateType::Custom(..)` variant: `SubstrateType` is `Copy`, `Eq`
+  and exhaustive, and a variant holding a trait object would take all three
+  away from every downstream that matches or copies it; the instance is the
+  reference's parameter's other kind, not another name, and a second
+  constructor is how this crate spells a parameter of two kinds (`new` and
+  `with_client` on the substrates, #323). `Arc`, as `Peer` holds its wallet,
+  so a caller keeps using the wallet it hands over (`Arc::from(boxed)` for a
+  `Box`); `Send + Sync` come with the trait.
+- Every call goes to the instance with the client's originator, the
+  configured one or `None` (#329), exactly as to a named substrate:
+  internalizeAction's arguments validated first as before (#117, #384), the
+  status calls answered in the client's shapes (`get_height` the height,
+  `get_version` the string, `is_authenticated` and `wait_for_authentication`
+  the flag, `get_network` the `Network`), `get_header` reaching
+  `get_header_for_height`. Nothing is probed: the instance is the connected
+  substrate from construction, as the reference's `connectToSubstrate`
+  returns at once for an object (`:121-124`); `substrate_type()` answers
+  `Auto`, the reference's default parameter.
+- `WalletClient::reveal_counterparty_key_linkage` and
+  `reveal_specific_key_linkage`: the client carried 26 of the 28 calls; it
+  carries all 28, as the reference's does. The JSON substrate and an
+  instance forward them; the wire substrate refuses both before a byte is
+  sent, `WalletError("<call> is not available over the wallet wire
+  substrate")`: this crate's `WalletWireTransceiver` writes neither call
+  (its processor reads both).
+- The forwarding is one macro over the three substrates (`client.rs` 745
+  lines to 582, with the two calls); the instance's shape adapters are
+  `src/wallet/client_instance.rs`.
+
+The use: a downstream that already holds a wallet (the toolbox's and the
+CLI's in-process wallets) hands it to the code that takes a `WalletClient`:
+
+```rust,ignore
+let mut client = WalletClient::with_substrate(Arc::new(wallet), Some("myapp.com".into()));
+```
+
+Pinned by `tests/wallet_client_instance_335.rs` (4): the counting wallet of
+#318 behind the client receives all 28 calls, in a table, each with the
+client's originator, and each with `None` when none is set; a `ProtoWallet`'s
+answers and refusals come back through the client unchanged; the wire
+substrate's two linkage refusals, unsent. Red on a scratch copy of
+`485848ba` (the file does not compile: `with_substrate` and the two linkage
+methods absent, 7 errors); red 1 of 4 on the tip with the instance arm
+passing `None` for the originator. The `Auto` path and the named substrates
+on their default URLs stay unpinned: a test of them reaches whatever
+listens on 2121, 3321 and 3301, in the reference too (its `'auto'` probes
+the named substrates on their defaults, `:126-196`).
+
+Migration: none; additive (a constructor and two methods). The client stays
+behind `http`, as it was.
+
+### Notes: cross-SDK parity (#335)
+
+The reference's client validates every call's arguments and its result
+(`validateCreateActionArgs` and the rest, `validateWalletResult`,
+`WalletClient.ts:111-118`, `:200-209` and each call after) and normalizes its originator at construction
+(`validateOriginator`, `:97`) before handing it to the instance; this
+crate's client validates internalizeAction's arguments alone and hands the
+instance the originator as configured (the HTTP substrates validate theirs
+at construction since #323), the same for an instance as for its own
+substrates. `'XDM'`, `'window.CWI'` and `'react-native'` are browser and
+React Native substrates with no counterpart here. go-sdk@2ca481c has no
+multi-substrate client (its `wallet/README.md` names a
+`wallet.NewWalletClient()` no Go file defines): a caller builds a substrate
+(`substrates.NewHTTPWalletJSON(originator, baseURL, httpClient)`,
+`NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
+originator per call.
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 
