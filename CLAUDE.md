@@ -86,6 +86,7 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
   its own processor reads as absent, is refused at this crate's writer.
 
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
+- Specific-key linkage returns compressed counterparty key hex for all three variants, with one mapping in the inherent method shared by the trait adapter (#427), as `ts-stack@edf6e03` `ProtoWallet.ts:235-250` and Go `2ca481c` do. The older `ts-sdk@9e3ede6b` returns `self` and `anyone` unchanged; both references are recorded under Node 22 in `wallet_specific_linkage_427.json`.
 - BRC-56 HMAC key (`5119a9b` `wallet/0056.md:66,73`): this crate keys the HMAC with the shared X coordinate as 32 bytes, as Go (`primitives/ec/symmetric.go:82-90`), Python and rs-sdk; ts-sdk drops its leading zero bytes (`ts-stack@edf6e03` `packages/sdk/src/wallet/KeyDeriver.ts:270`), a different tag for one key in 256. `verify_hmac` accepts the 32-byte tag only and refuses the minimal-length one as `Error::HmacMinimalLengthKey` (#148).
 - Go lacks TOTP, overlay caching/historian/reputation, and the RPuzzle template.
 - TS TOTP defaults to 2 digits; this crate uses 6 (RFC 6238).

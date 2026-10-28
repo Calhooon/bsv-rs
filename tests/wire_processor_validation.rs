@@ -804,6 +804,25 @@ async fn a_specific_linkage_with_no_counterparty_is_refused_with_code_6() {
     refused(&reveal_specific_request(&short_protocol), &frame).await;
 }
 
+/// #427: the shared validator's first refusal wins even when every later
+/// argument is invalid. The wire wrapper needs no second missing-key check.
+#[tokio::test]
+async fn a_missing_specific_linkage_counterparty_is_refused_before_all_other_arguments() {
+    let key = Key {
+        counterparty: vec![0],
+        protocol: "abcd".into(),
+        key_id: String::new(),
+        privileged: 1,
+        reason: None,
+        ..Key::default()
+    };
+    refused(
+        &reveal_specific_verifier(&key, &non_points()[2]),
+        &invalid("counterparty", "a hexadecimal string"),
+    )
+    .await;
+}
+
 /// The keys that are points reach the wallet: `02` and `03` prefixes, and
 /// an absent counterparty is refused only on revealSpecificKeyLinkage.
 #[tokio::test]

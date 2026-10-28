@@ -44,7 +44,7 @@ use super::key_args::{
     DecryptResult, EncryptArgs, EncryptResult, GetPublicKeyArgs, GetPublicKeyResult,
     VerifyHmacArgs, VerifyHmacResult, VerifySignatureArgs, VerifySignatureResult,
 };
-use super::key_deriver::{verify_hmac_tag, KeyDeriverApi};
+use super::key_deriver::{verify_hmac_tag, KeyDeriver, KeyDeriverApi};
 use super::types::{Counterparty, Protocol, SecurityLevel};
 use super::validation::crypto;
 use super::CachedKeyDeriver;
@@ -99,7 +99,7 @@ pub struct RevealSpecificKeyLinkageResult {
     pub prover: String,
     /// The verifier's public key (hex).
     pub verifier: String,
-    /// The counterparty (hex or "self"/"anyone").
+    /// The counterparty's compressed public key (hex).
     pub counterparty: String,
     /// The protocol identifier.
     pub protocol_id: Protocol,
@@ -433,7 +433,8 @@ impl ProtoWallet {
     /// Reveals specific key linkage for a protocol and key ID.
     ///
     /// This reveals the specific HMAC linkage for a protocol/key combination,
-    /// encrypted for the verifier.
+    /// encrypted for the verifier. The result identifies the counterparty by
+    /// compressed public-key hex, including for `Self_` and `Anyone`.
     pub fn reveal_specific_key_linkage(
         &self,
         args: RevealSpecificKeyLinkageArgs,
@@ -478,8 +479,8 @@ impl ProtoWallet {
 
         // Format counterparty for result
         let counterparty_str = match &args.counterparty {
-            Counterparty::Self_ => "self".to_string(),
-            Counterparty::Anyone => "anyone".to_string(),
+            Counterparty::Self_ => identity_key.to_hex(),
+            Counterparty::Anyone => KeyDeriver::anyone_key().1.to_hex(),
             Counterparty::Other(pk) => pk.to_hex(),
         };
 

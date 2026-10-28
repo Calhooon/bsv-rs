@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: inherent specific-key linkage returns counterparty keys, as the trait does (#427)
+
+`ProtoWallet::reveal_specific_key_linkage` now returns the counterparty's
+compressed public-key hex: the wallet's identity key for `Self_`, the public
+key of private scalar 1 for `Anyone`, and the supplied key for `Other`.
+Previously the inherent method returned the strings `self` and `anyone`,
+disagreeing with both the current reference and its own `WalletInterface`
+adapter. The adapter now reads the inherent result's counterparty instead
+of resolving the request again, as the counterparty-linkage adapter does.
+Public types and the trait's result are unchanged.
+
+The wire wrapper's unreachable second missing-counterparty refusal is
+removed. The shared `crypto::reveal_specific_args` returns the required
+counterparty with its checked verifier; its first refusal retains code 6,
+`The counterparty parameter must be a hexadecimal string`, before checking
+the verifier, protocol, key ID or privilege.
+
+`tests/support/wallet_proto_args_415.mjs --specific-linkage` extends #420's
+recorder and records the actual ProtoWallets built from both pinned commits
+under Node v22.18.0. `tests/vectors/wallet_specific_linkage_427.json` holds
+three current-reference results and three older-reference observations;
+two recordings match byte for byte. `tests/wallet_specific_linkage_427.rs`
+checks all three counterparty forms through both entry points, including
+the decrypted linkage and proof length. On a scratch copy of base
+`3eb965cb99f288da089d47749ae8f7e0532eb1d5`, the self and anyone tests are
+RED (the aliases versus recorded keys), and the explicit-key test passes.
+The existing self-linkage unit test now expects the identity key as well.
+The #420 replay helper now reads the returned keys instead of reconstructing
+them from the request, which previously concealed this mismatch.
+
+`a_missing_specific_linkage_counterparty_is_refused_before_all_other_arguments`
+in `tests/wire_processor_validation.rs` pins the first refusal's complete
+frame and that the wallet is not called, with all later arguments invalid.
+It passes before and after removing the dead check; the existing absent-key
+and invalid-verifier ordering tests remain in place.
+
+Rows for the toolbox's operator-visible table (key 42 is the recorded prover):
+
+| Condition | Old result or words | New result or words |
+|---|---|---|
+| Inherent specific linkage with `Self_` | `self` | `02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af` (the prover's identity key) |
+| Inherent specific linkage with `Anyone` | `anyone` | `0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798` |
+| Inherent specific linkage with `Other` | Supplied compressed key hex | Unchanged |
+| Wire specific linkage without a counterparty | `The counterparty parameter must be a hexadecimal string` (InvalidParameter, code 6) | Unchanged |
+
+### Notes: cross-SDK parity (#427)
+
+Under the owner's ruling (c), the result follows `ts-stack@edf6e03`
+`packages/sdk/src/wallet/ProtoWallet.ts:235-250`: `self` becomes the identity
+key, `anyone` becomes `new PrivateKey(1).toPublicKey().toString()`, and an
+explicit key is returned as supplied. Its counterparty-linkage result also
+returns the supplied key (`:208-217`). The older `ts-sdk@9e3ede6b`
+`src/wallet/ProtoWallet.ts:161-171` returns `args.counterparty` unchanged,
+including the two aliases; that difference is retained in the recording.
+Go at `2ca481c` resolves the same three forms to public keys
+(`wallet/proto_wallet_reveal.go:121-125,169-177,195-214`). Rust's typed
+public keys serialize compressed; #420's existing input-encoding and
+type-enforced limitations still apply. No current-reference result-form
+divergence remains for the three representable counterparty variants.
+
 ### Changed: the default mode runs all ten Chronicle opcodes at every version, gates the Chronicle hash type by version, and uses the reference's non-minimal-number words (#397)
 
 The keeper's words of 2026-10-28 05:1xZ and 07:1xZ, under the owner's ruling

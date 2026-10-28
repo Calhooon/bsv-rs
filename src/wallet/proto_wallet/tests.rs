@@ -231,7 +231,7 @@ fn test_reveal_specific_key_linkage() {
 
     assert_eq!(result.prover, wallet.identity_key_hex());
     assert_eq!(result.verifier, verifier.to_hex());
-    assert_eq!(result.counterparty, "self");
+    assert_eq!(result.counterparty, wallet.identity_key_hex());
     assert_eq!(result.proof_type, 0);
     assert!(!result.encrypted_linkage.is_empty());
 }
