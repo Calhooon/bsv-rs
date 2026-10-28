@@ -373,29 +373,6 @@ impl std::fmt::Debug for KeyDeriver {
     }
 }
 
-/// Checks an HMAC-SHA256 tag under the 32-byte X-coordinate key BRC-56
-/// specifies (`5119a9b` `wallet/0056.md:66`), in constant time.
-///
-/// A miss whose key begins with zero bytes is checked once more under the
-/// minimal-length key (those bytes dropped, the key ts-sdk's `KeyDeriver`
-/// makes); a match there is [`Error::HmacMinimalLengthKey`], never an
-/// acceptance. Any other miss is `WalletError("HMAC is not valid")`.
-pub(crate) fn verify_hmac_tag(key: &SymmetricKey, data: &[u8], tag: &[u8]) -> Result<()> {
-    use subtle::ConstantTimeEq;
-    let key = key.as_bytes();
-    if bool::from(sha256_hmac(key, data).ct_eq(tag)) {
-        return Ok(());
-    }
-    let leading_zero_bytes = key.iter().take_while(|b| **b == 0).count();
-    if leading_zero_bytes > 0
-        && leading_zero_bytes < key.len()
-        && bool::from(sha256_hmac(&key[leading_zero_bytes..], data).ct_eq(tag))
-    {
-        return Err(Error::HmacMinimalLengthKey { leading_zero_bytes });
-    }
-    Err(Error::WalletError("HMAC is not valid".to_string()))
-}
-
 /// Trait for key derivation API.
 ///
 /// This trait allows both [`KeyDeriver`] and [`super::CachedKeyDeriver`] to be used
