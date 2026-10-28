@@ -101,6 +101,104 @@ parity by the new checks. The reference's output-satoshi ranges, additional
 output authorization and trusted-input-amount extension are not exposed by
 either store and are not added here. Rust errors retain the `KvStoreError`
 variant and its display prefix.
+### Fixed: Peer nonce claims, certificate-session lookup and validation waits (#362, #363, #364)
+
+`Peer` now claims every accepted message nonce in `SessionManager`: an
+initial request before wallet work, and an initial response, certificate
+request, certificate response or general message after nonce, identity and
+signature checks. Previously none was consumed, so an exact replay passed
+again. Claims are atomic under the manager's write lock. Signed claims are
+shared across message kinds within one session, fail closed at 100,000,
+and disappear on session removal or expiry after 30 minutes idle. Initial
+claims are keyed by claimed identity and nonce, expire after 30 minutes,
+and evict the oldest at 256 per identity or 100,000 overall. Session removal
+does not erase initial-request claims. These are the reference defaults
+(`ts-stack@edf6e03`, `SessionManager.ts:35-39,250-256,268-366`;
+`Peer.ts:258-283,808,935-939,1085-1089,1220-1224,1314`).
+
+Certificate requests and responses now verify `yourNonce`, find its exact
+session, require the session's identity to match the sender, then verify
+the signature and claim the message nonce (`Peer.ts:1044-1090,1177-1225`).
+Previously they selected a session by identity and ignored `yourNonce`;
+with two sessions for one peer they could verify against the wrong one.
+Both paths return a listener's error instead of discarding it
+(`:1101-1105,1253-1259`). Wallet failures still propagate unchanged.
+
+Certificate validation now marks the response's nonce-indexed session
+ready. Previously `get_session_mut` was given an identity key, so it did
+nothing. A general message authenticates and claims its nonce before
+waiting for that session's certificate validation. Successful validation
+releases the waiters; an unmet requirement fails after the reference's
+30-second deadline in its words (`Peer.ts:286-329,1227-1249,1318-1325`).
+Certificate requirements come from this peer's own policy on either side
+of the handshake, and an empty certificate response cannot authorize it.
+Incoming handlers and the wait live in new files; `peer.rs` shrinks.
+
+`tests/auth_peer_nonces_362_364.rs` pins #362 with five replay tests plus
+concurrent delivery and a rejected signature followed by acceptance;
+#363 with both `yourNonce` paths, an unknown nonce, identity mismatch,
+signature refusal, missing message nonce and both failing listeners;
+#364 with two sessions for one identity, the ready flag, a general message
+held inside real field decryption, and the timeout. Four unit tests in
+`session_nonces_tests.rs` pin capacity, expiry, eviction and removal.
+The integration witnesses are RED on scratch base `1010d4de`, with their
+own target directory. `tests/support/auth_peer_nonces_362_364.mjs` records
+19 Peer cases and eight store results from the clone's unmodified
+`edf6e03` source, bundled with Bun and executed by Node v22.18.0; the
+checked-in JSON is the recorder's output. Rust builds its own signed
+messages and encrypted certificates rather than importing nonces whose
+wallet derivation differs between SDKs. The existing #294 valid-policy
+receiver witness likewise remakes its nonce and signature while retaining
+the reference's recorded policy text; its malformed-policy witnesses and
+vector are unchanged.
+
+Operator-visible changes for the toolbox's BRC-104 client (`bsv-wallet-toolbox-rs`
+`6317222`, `src/storage/client/storage_client.rs:291-305`, constructs and starts
+this Peer, with no certificate policy by default). The existing
+`Error::AuthError` Display prefix remains `authentication error: `:
+
+| Trigger | Old words / behavior | New words / behavior |
+|---|---|---|
+| Replayed initial request | Accepted again | `Replayed initialRequest nonce.` |
+| Replayed signed message | Accepted again | `Replayed <messageType> message nonce.` |
+| Signed nonce store full | No store or limit | `BRC-103 session message nonce capacity exhausted` |
+| Bad certificate-request `yourNonce` | Ignored | `Unable to verify nonce for certificate request message from: <identityKey>` |
+| Bad certificate-response `yourNonce` | Ignored | `Unable to verify nonce for certificate response from: <identityKey>` |
+| Unknown certificate session | Lookup by sender; `No session with sender` if absent | `Session not found for nonce: <yourNonce>` |
+| Certificate sender differs from session | Lookup by sender | `<messageType> identity does not match the authenticated session.` |
+| Request signature returns false | `CertificateRequest signature invalid` | `Invalid signature in certificate request message from <identityKey>` |
+| Response signature returns false | `CertificateResponse signature invalid` | `Unable to verify certificate response signature for peer: <identityKey>` |
+| Certificate message has no nonce | No explicit check | `Certificate request message nonce is required.` / `Certificate response message nonce is required.` |
+| Certificate listener fails | Discarded; message succeeds | Listener's error returned |
+| Valid certificate response | Ready flag never set | Exact session becomes ready |
+| General message before certificate authorization | Delivered immediately | Waits; `Timeout waiting for certificate validation from peer <identityKey>` after 30 seconds |
+
+### Notes: cross-SDK parity
+
+The newer TypeScript pin supplies the claims and wait ordering. The older
+`ts-sdk@9e3ede6b` has no nonce claims, but verifies certificate `yourNonce`
+and looks up its session (`Peer.ts:694-727,795-844`); its general-message
+wait precedes signature verification (`:873-924`), unlike the newer pin.
+Go `2ca481c` claims all five kinds (`auth/peer.go:455-458,523,675,861,930,1041`),
+verifies certificate `yourNonce` and looks up by it (`:807-827,876-896`).
+Its cache evicts signed claims at capacity, has no initial-claim per-identity
+cap or expiry (`auth/nonce_claims.go:10-12,60-72,104-129`). It returns wrapped
+certificate-listener errors (`auth/peer.go:776-780,979-984`), logs general-listener
+errors, and does not wait for certificate authorization (`:991-1068`).
+Rust follows the newer TS behavior here.
+
+Existing differences remain: Rust's public session lookups retain their
+prior lifetime/admission policy (the 30-minute signed-claim expiry is
+checked at claim time), and the initial responder still marks transport
+authentication immediately. This change does not add the newer reference's
+per-session certificate-policy snapshots or dynamic-request policy matching,
+or its automatic answer to a certificate-request listener's absence.
+The certificate-response raw-text signature preimage remains #280's
+stated difference; #426's parsed certificate-request preimage is preserved.
+The recorder calls the reference's certificate handlers directly because
+its full intake requires `initialNonce` even on the certificateRequest its
+own writer emits without that field (#416). The nonce-wallet and intake
+word differences recorded by #353 remain.
 
 ### Changed: issue the amended BRC-56 minimal-length HMAC key; name and count the 32-byte-key tag as legacy (#379, PR #389)
 

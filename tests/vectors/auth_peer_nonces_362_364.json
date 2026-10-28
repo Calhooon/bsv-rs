@@ -1,0 +1,100 @@
+{
+  "reference": "ts-stack@edf6e03",
+  "node": "v22.18.0",
+  "certificate_entry": "Peer.processCertificateRequest / processCertificateResponse",
+  "cases": [
+    {
+      "id": "replay_initialRequest",
+      "error": "Replayed initialRequest nonce."
+    },
+    {
+      "id": "replay_initialResponse",
+      "error": "Replayed initialResponse message nonce."
+    },
+    {
+      "id": "replay_certificateRequest",
+      "error": "Replayed certificateRequest message nonce."
+    },
+    {
+      "id": "replay_certificateResponse",
+      "error": "Replayed certificateResponse message nonce."
+    },
+    {
+      "id": "replay_general",
+      "error": "Replayed general message nonce."
+    },
+    {
+      "id": "certificateRequest_wrong_your_nonce",
+      "error": "Unable to verify nonce for certificate request message from: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    {
+      "id": "certificateRequest_unknown_session",
+      "error": "Session not found for nonce: <nonce>"
+    },
+    {
+      "id": "certificateRequest_identity_mismatch",
+      "error": "certificateRequest identity does not match the authenticated session."
+    },
+    {
+      "id": "certificateRequest_invalid_signature",
+      "error": "Invalid signature in certificate request message from 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    {
+      "id": "certificateRequest_missing_nonce",
+      "error": "Certificate request message nonce is required."
+    },
+    {
+      "id": "certificateRequest_listener_error",
+      "error": "certificate listener failed"
+    },
+    {
+      "id": "certificateResponse_wrong_your_nonce",
+      "error": "Unable to verify nonce for certificate response from: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    {
+      "id": "certificateResponse_unknown_session",
+      "error": "Session not found for nonce: <nonce>"
+    },
+    {
+      "id": "certificateResponse_identity_mismatch",
+      "error": "certificateResponse identity does not match the authenticated session."
+    },
+    {
+      "id": "certificateResponse_invalid_signature",
+      "error": "Unable to verify certificate response signature for peer: 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    },
+    {
+      "id": "certificateResponse_missing_nonce",
+      "error": "Certificate response message nonce is required."
+    },
+    {
+      "id": "certificateResponse_listener_error",
+      "error": "certificate listener failed"
+    },
+    {
+      "id": "pending_validation",
+      "before": {
+        "calls": 0,
+        "settled": false
+      },
+      "after": {
+        "calls": 1,
+        "ready": true
+      }
+    },
+    {
+      "id": "validation_timeout",
+      "error": "Timeout waiting for certificate validation from peer 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af"
+    }
+  ],
+  "store": {
+    "capacity": "BRC-103 session message nonce capacity exhausted",
+    "replayAtCapacity": false,
+    "afterRemoval": true,
+    "duplicate": false,
+    "beforeExpiry": false,
+    "atExpiry": true,
+    "perIdentityEviction": true,
+    "globalEviction": true
+  }
+}
