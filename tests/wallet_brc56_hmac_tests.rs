@@ -1,4 +1,4 @@
-//! BRC-56's HMAC key vectors and the minimal-length-key refusal (#148).
+//! BRC-56's HMAC key vectors and the verifier of both encodings (#148, #379).
 //!
 //! The vectors are `bsv-blockchain/BRCs` at `5119a9b` (the line's pin since
 //! #154), `wallet/0056.md`, read with `git -C ~/bsv/brcs show 5119a9b:wallet/0056.md`: the key is the
@@ -6,17 +6,23 @@
 //! drops its leading zero bytes makes another tag (line 73); the inputs at
 //! lines 81-85 and the six rows at lines 91-96.
 //!
-//! `verify_hmac` accepts the 32-byte-key tag only. A tag under the
-//! minimal-length key is refused as `Error::HmacMinimalLengthKey`, naming the
-//! sender's encoding, and is never accepted; a tag matching neither key is
-//! the `WalletError("HMAC is not valid")` it always was.
+//! The table is the one ts-stack PR #1423 tests its verifier on
+//! (`packages/sdk/src/wallet/__tests/ProtoWallet.brc56-hmac-key.test.ts` at
+//! `109bc7017`): the same six keys, `tag` here its `hmac`, `minimal_tag`
+//! here its `legacyTag`. `verify_hmac` accepts both tags by default (the
+//! owner's 18.10 (a), #379), the minimal-length one counted and named
+//! (`HmacKeyEncoding::MinimalLength`); under
+//! `HmacVerifyPolicy::ThirtyTwoByteOnly` it is refused as
+//! `Error::HmacMinimalLengthKey` (#148's verdict); a tag matching neither key
+//! is `WalletError("HMAC is not valid")` under both.
 
 #![cfg(feature = "wallet")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
 use bsv_rs::primitives::{from_hex, sha256, to_hex, PrivateKey, PublicKey};
 use bsv_rs::wallet::{
-    Counterparty, CreateHmacArgs, KeyDeriver, ProtoWallet, Protocol, SecurityLevel, VerifyHmacArgs,
+    Counterparty, CreateHmacArgs, HmacKeyEncoding, HmacVerifyPolicy, KeyDeriver, ProtoWallet,
+    Protocol, SecurityLevel, VerifyHmacArgs,
 };
 use bsv_rs::Error;
 
@@ -124,17 +130,23 @@ fn tag(hex: &str) -> [u8; 32] {
     from_hex(hex).unwrap().try_into().unwrap()
 }
 
+fn args(row: &Row, hmac: [u8; 32]) -> VerifyHmacArgs {
+    VerifyHmacArgs {
+        data: DATA.to_vec(),
+        hmac,
+        protocol_id: protocol(),
+        key_id: row.key_id.to_string(),
+        counterparty: Some(counterparty(row)),
+        ..Default::default()
+    }
+}
+
 fn verify(wallet: &ProtoWallet, row: &Row, hmac: [u8; 32]) -> bsv_rs::Result<bool> {
-    wallet
-        .verify_hmac(VerifyHmacArgs {
-            data: DATA.to_vec(),
-            hmac,
-            protocol_id: protocol(),
-            key_id: row.key_id.to_string(),
-            counterparty: Some(counterparty(row)),
-            ..Default::default()
-        })
-        .map(|r| r.valid)
+    wallet.verify_hmac(args(row, hmac)).map(|r| r.valid)
+}
+
+fn strict() -> ProtoWallet {
+    ProtoWallet::new(Some(root_key())).with_hmac_verify_policy(HmacVerifyPolicy::ThirtyTwoByteOnly)
 }
 
 #[test]
@@ -206,8 +218,98 @@ fn verify_hmac_accepts_the_six_32_byte_key_tags() {
 }
 
 #[test]
-fn a_minimal_length_key_tag_is_refused_naming_the_senders_encoding() {
+fn verify_hmac_accepts_both_encodings_of_the_six_brc56_tags() {
+    // #1423's table both ways: each row's 32-byte-key tag and, where the key
+    // has a leading zero byte, its minimal-length-key tag.
     let wallet = ProtoWallet::new(Some(root_key()));
+    let mut accepted = 0;
+    for row in &ROWS {
+        let full = wallet.verify_hmac_encoding(args(row, tag(row.tag)));
+        assert_eq!(
+            full,
+            Ok(HmacKeyEncoding::ThirtyTwoByte),
+            "line {}",
+            row.line
+        );
+        accepted += 1;
+        if let Some(minimal) = row.minimal_tag {
+            assert_eq!(
+                verify(&wallet, row, tag(minimal)),
+                Ok(true),
+                "line {}",
+                row.line
+            );
+            accepted += 1;
+        }
+    }
+    assert_eq!(accepted, 10);
+}
+
+#[test]
+fn a_minimal_length_key_tag_is_accepted_named_and_counted() {
+    let wallet = ProtoWallet::new(Some(root_key()));
+    let mut named = 0;
+    for row in ROWS.iter().filter(|r| r.leading_zero_bytes > 0) {
+        let minimal = tag(row.minimal_tag.unwrap());
+        assert_eq!(
+            wallet.verify_hmac_encoding(args(row, minimal)),
+            Ok(HmacKeyEncoding::MinimalLength {
+                leading_zero_bytes: row.leading_zero_bytes
+            }),
+            "line {}",
+            row.line
+        );
+        named += 1;
+        assert_eq!(
+            wallet.minimal_length_hmac_acceptances(),
+            named,
+            "line {}",
+            row.line
+        );
+    }
+    assert_eq!(named, 4);
+    // A 32-byte-key tag is not counted; a clone shares the count.
+    for row in &ROWS {
+        assert_eq!(
+            verify(&wallet, row, tag(row.tag)),
+            Ok(true),
+            "line {}",
+            row.line
+        );
+    }
+    let clone = wallet.clone();
+    assert_eq!(
+        verify(&clone, &ROWS[1], tag(ROWS[1].minimal_tag.unwrap())),
+        Ok(true)
+    );
+    assert_eq!(wallet.minimal_length_hmac_acceptances(), 5);
+}
+
+#[test]
+fn a_minimal_length_key_tag_is_accepted_through_the_async_interface() {
+    use bsv_rs::wallet::WalletInterface;
+    let wallet = ProtoWallet::new(Some(root_key()));
+    let row = &ROWS[5];
+    let result = futures::executor::block_on(WalletInterface::verify_hmac(
+        &wallet,
+        args(row, tag(row.minimal_tag.unwrap())),
+        Some("brc56.test"),
+    ));
+    assert!(result.unwrap().valid);
+    assert_eq!(wallet.minimal_length_hmac_acceptances(), 1);
+}
+
+#[test]
+fn the_strict_policy_refuses_a_minimal_length_key_tag_by_name() {
+    let wallet = strict();
+    assert_eq!(
+        wallet.hmac_verify_policy(),
+        HmacVerifyPolicy::ThirtyTwoByteOnly
+    );
+    assert_eq!(
+        ProtoWallet::new(None).hmac_verify_policy(),
+        HmacVerifyPolicy::BothEncodings
+    );
     let mut refused = 0;
     for row in ROWS.iter().filter(|r| r.leading_zero_bytes > 0) {
         let minimal = tag(row.minimal_tag.unwrap());
@@ -226,24 +328,24 @@ fn a_minimal_length_key_tag_is_refused_naming_the_senders_encoding() {
         refused += 1;
     }
     assert_eq!(refused, 4);
+    assert_eq!(wallet.minimal_length_hmac_acceptances(), 0);
+    for row in &ROWS {
+        assert_eq!(
+            verify(&wallet, row, tag(row.tag)),
+            Ok(true),
+            "line {}",
+            row.line
+        );
+    }
 }
 
 #[test]
-fn a_minimal_length_key_tag_is_refused_through_the_async_interface() {
+fn the_strict_policy_refuses_by_name_through_the_async_interface() {
     use bsv_rs::wallet::WalletInterface;
-    let wallet = ProtoWallet::new(Some(root_key()));
     let row = &ROWS[5];
-    let args = VerifyHmacArgs {
-        data: DATA.to_vec(),
-        hmac: tag(row.minimal_tag.unwrap()),
-        protocol_id: protocol(),
-        key_id: row.key_id.to_string(),
-        counterparty: Some(counterparty(row)),
-        ..Default::default()
-    };
     let result = futures::executor::block_on(WalletInterface::verify_hmac(
-        &wallet,
-        args,
+        &strict(),
+        args(row, tag(row.minimal_tag.unwrap())),
         Some("brc56.test"),
     ));
     assert_eq!(
@@ -258,36 +360,42 @@ fn a_minimal_length_key_tag_is_refused_through_the_async_interface() {
 fn a_key_with_no_leading_zero_has_one_encoding_and_no_refusal_path() {
     // The table reads `same` for k0 and counterparty k0 (lines 91 and 94):
     // the minimal-length key is the 32-byte key, so its tag is the accepted
-    // one and there is nothing to refuse.
-    let wallet = ProtoWallet::new(Some(root_key()));
-    for row in ROWS.iter().filter(|r| r.leading_zero_bytes == 0) {
-        assert_eq!(row.minimal_tag, None, "line {}", row.line);
-        assert_eq!(
-            verify(&wallet, row, tag(row.tag)),
-            Ok(true),
-            "line {}",
-            row.line
-        );
+    // one, named the 32-byte key's, and there is nothing to refuse.
+    for wallet in [ProtoWallet::new(Some(root_key())), strict()] {
+        for row in ROWS.iter().filter(|r| r.leading_zero_bytes == 0) {
+            assert_eq!(row.minimal_tag, None, "line {}", row.line);
+            assert_eq!(
+                wallet.verify_hmac_encoding(args(row, tag(row.tag))),
+                Ok(HmacKeyEncoding::ThirtyTwoByte),
+                "line {}",
+                row.line
+            );
+        }
+        assert_eq!(wallet.minimal_length_hmac_acceptances(), 0);
     }
 }
 
 #[test]
 fn a_tag_matching_neither_key_stays_hmac_is_not_valid() {
-    let wallet = ProtoWallet::new(Some(root_key()));
     let not_valid = Err(Error::WalletError("HMAC is not valid".to_string()));
-    for row in &ROWS {
-        let mut wrong = tag(row.tag);
-        wrong[31] ^= 1;
-        assert_eq!(verify(&wallet, row, wrong), not_valid, "line {}", row.line);
-        // A row's minimal tag under another row's key is no refusal either.
-        let other = &ROWS[(ROWS.iter().position(|r| r.line == row.line).unwrap() + 1) % 6];
-        if let Some(minimal) = other.minimal_tag {
-            assert_eq!(
-                verify(&wallet, row, tag(minimal)),
-                not_valid,
-                "line {}",
-                row.line
-            );
+    for wallet in [ProtoWallet::new(Some(root_key())), strict()] {
+        for row in &ROWS {
+            for accepted in [Some(row.tag), row.minimal_tag].into_iter().flatten() {
+                let mut wrong = tag(accepted);
+                wrong[31] ^= 1;
+                assert_eq!(verify(&wallet, row, wrong), not_valid, "line {}", row.line);
+            }
+            // A row's minimal tag under another row's key is no acceptance either.
+            let other = &ROWS[(ROWS.iter().position(|r| r.line == row.line).unwrap() + 1) % 6];
+            if let Some(minimal) = other.minimal_tag {
+                assert_eq!(
+                    verify(&wallet, row, tag(minimal)),
+                    not_valid,
+                    "line {}",
+                    row.line
+                );
+            }
         }
+        assert_eq!(wallet.minimal_length_hmac_acceptances(), 0);
     }
 }

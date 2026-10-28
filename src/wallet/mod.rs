@@ -111,6 +111,7 @@ mod cached_key_deriver;
 mod client;
 mod client_instance;
 pub(crate) mod collation;
+mod hmac_tag;
 pub mod interface;
 mod key_args;
 mod key_deriver;
@@ -123,6 +124,7 @@ pub mod wire;
 
 // Re-export all public types
 pub use cached_key_deriver::{CacheConfig, CachedKeyDeriver};
+pub use hmac_tag::{HmacKeyEncoding, HmacVerifyPolicy};
 pub use interface::{
     CryptoWallet, FullWallet, RevealCounterpartyKeyLinkageArgs as WalletRevealCounterpartyArgs,
     RevealSpecificKeyLinkageArgs as WalletRevealSpecificArgs, WalletInterface,

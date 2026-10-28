@@ -39,12 +39,13 @@ use crate::primitives::bsv::schnorr::Schnorr;
 use crate::primitives::hash::sha256_hmac;
 use crate::primitives::{sha256, PrivateKey, PublicKey, Signature};
 
+use super::hmac_tag::HmacVerifier;
 use super::key_args::{
     CreateHmacArgs, CreateHmacResult, CreateSignatureArgs, CreateSignatureResult, DecryptArgs,
     DecryptResult, EncryptArgs, EncryptResult, GetPublicKeyArgs, GetPublicKeyResult,
     VerifyHmacArgs, VerifyHmacResult, VerifySignatureArgs, VerifySignatureResult,
 };
-use super::key_deriver::{verify_hmac_tag, KeyDeriver, KeyDeriverApi};
+use super::key_deriver::{KeyDeriver, KeyDeriverApi};
 use super::types::{Counterparty, Protocol, SecurityLevel};
 use super::validation::crypto;
 use super::CachedKeyDeriver;
@@ -150,6 +151,8 @@ pub struct RevealSpecificKeyLinkageResult {
 pub struct ProtoWallet {
     /// The internal key deriver (wrapped in Arc for clonability).
     key_deriver: Arc<CachedKeyDeriver>,
+    /// The HMAC verification policy and its count (`hmac_tag.rs`, #379).
+    pub(super) hmac: HmacVerifier,
 }
 
 impl ProtoWallet {
@@ -171,6 +174,7 @@ impl ProtoWallet {
     pub fn new(root_key: Option<PrivateKey>) -> Self {
         Self {
             key_deriver: Arc::new(CachedKeyDeriver::new(root_key, None)),
+            hmac: HmacVerifier::default(),
         }
     }
 
@@ -273,23 +277,16 @@ impl ProtoWallet {
         Ok(CreateHmacResult { hmac })
     }
 
-    /// Verifies an HMAC using a derived symmetric key.
+    /// Verifies an HMAC using a derived symmetric key, in constant time.
     ///
-    /// Uses constant-time comparison to prevent timing attacks. Only the tag
-    /// under the 32-byte key is accepted (BRC-56); a tag under the
-    /// minimal-length key is [`Error::HmacMinimalLengthKey`], any other miss
+    /// The tag under BRC-56's 32-byte key is accepted, and under the default
+    /// [`HmacVerifyPolicy`](super::HmacVerifyPolicy) the tag under the
+    /// minimal-length key on a miss (ts-sdk's), counted in
+    /// [`ProtoWallet::minimal_length_hmac_acceptances`] and named by
+    /// [`ProtoWallet::verify_hmac_encoding`] (#379); any other tag is
     /// `WalletError("HMAC is not valid")`.
     pub fn verify_hmac(&self, args: VerifyHmacArgs) -> Result<VerifyHmacResult> {
-        crypto::verify_hmac_args(&args)?;
-        let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
-        let symmetric_key = self.key_deriver.derive_symmetric_key(
-            &args.protocol_id,
-            &args.key_id,
-            &counterparty,
-        )?;
-
-        // Constant time; a tag under the minimal-length key is refused by name
-        verify_hmac_tag(&symmetric_key, &args.data, &args.hmac)?;
+        self.verify_hmac_encoding(args)?;
         Ok(VerifyHmacResult { valid: true })
     }
 
