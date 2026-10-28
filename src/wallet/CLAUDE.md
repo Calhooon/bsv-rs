@@ -203,7 +203,7 @@ not this validation layer.
 | `verify_signature` | `validateVerifySignatureArgs`: common encryption checks, exclusive data/hash and their bytes, signature <=72 bytes, canonical DER with scalars in 1..n-1, forSelf boolean | Shared validator before cryptography; hash/forSelf types enforced (#415) |
 
 Common encryption checks run in this order: raw protocol name 5..400 UTF-8
-bytes, key ID 1..800 bytes, optional counterparty, privilege. A present
+bytes, key ID 1..800 bytes, optional counterparty, privilege. A counterparty given as hex that is not a key is refused when the `Counterparty` is built (`src/wallet/types.rs:321`), before any call exists, so a call with both a bad protocol and a bad hex counterparty is refused for the counterparty here where the reference names the protocol. A present
 privileged reason needs 5..50 UTF-8 bytes even without privilege; true
 privilege requires a reason. All argument refusals are `WalletRefusal` of
 class `InvalidParameter`, code 6, with the reference's words. The five wire
