@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0-beta.3] - 2026-10-28
+
+The 0.9.0 line's third prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (the brief's 19.7: bsv-rs 0.9.0-beta.3, then the toolbox's 0.14.0-beta.3 carrying its re-pin, then the CLI's one pin PR) at the tip after #429 landed (a53a9492), so the canaries re-pin the interpreter's default-mode changes of #397 and #429 once. The pin set the canaries waited on: #385 and #394 (the ordered maps), #373 (the streaming reader's memory budget), #335 and #404 (`WalletClient` as a `WalletInterface` under the `wallet` feature, its methods on `&self`: the one API break of this prerelease, named in #404's entry), #415 and #420 (`ProtoWallet`'s argument validators in the reference's words), #406 (the wire transceiver's two linkage calls), #416 (the HTTP auth transport's bounds) and #417 (the script engine's version-1 words). Every entry below was cold-reviewed on a model other than its lane's and landed through the sequencer; the fixtures' diff since beta.2 is in the announcement.
+
 ### Fixed: inherent specific-key linkage returns counterparty keys, as the trait does (#427)
 
 `ProtoWallet::reveal_specific_key_linkage` now returns the counterparty's
