@@ -1,0 +1,521 @@
+{
+  "description": "#344: public KVStore tag presence, bounds and refusal order; actual SDK writer output",
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9, built from git archive with bun; Node v22.18.0",
+  "site": "kvStoreTokenValidation.ts:58-74,88-118; kvStoreInterpreter.ts:33-50; GlobalKVStore.ts:279-304,627-659",
+  "wallet_key": 9,
+  "cases": [
+    {
+      "name": "untagged",
+      "writer": "GlobalKVStore.set",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe"
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ]
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "empty_tags_omitted",
+      "writer": "GlobalKVStore.set",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe46304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d75",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe"
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ]
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "tagged",
+      "writer": "GlobalKVStore.set",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe055b2274225d46304402202f71aac6d054bdaa68e9a84688a806af052edfc4a2860b90daf157ea29b89ee5022043de7e41bbe52134e175d9ad49206bc018accef95d5ddff1a7b44dea23741c086d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b2274225d",
+        "304402202f71aac6d054bdaa68e9a84688a806af052edfc4a2860b90daf157ea29b89ee5022043de7e41bbe52134e175d9ad49206bc018accef95d5ddff1a7b44dea23741c08"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "tags": [
+          "t"
+        ]
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "tags": [
+          "t"
+        ]
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "32_tags",
+      "writer": "GlobalKVStore.set",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe4cf75b2274616730222c2274616731222c2274616732222c2274616733222c2274616734222c2274616735222c2274616736222c2274616737222c2274616738222c2274616739222c227461673130222c227461673131222c227461673132222c227461673133222c227461673134222c227461673135222c227461673136222c227461673137222c227461673138222c227461673139222c227461673230222c227461673231222c227461673232222c227461673233222c227461673234222c227461673235222c227461673236222c227461673237222c227461673238222c227461673239222c227461673330222c227461673331225d46304402203cc3f3db76bfdef9e01e32cd18cd328691a682f76a7d6dffe3e043c313f96504022048ad93499a006140e858946ab135aaf383af27d6c6ebf991833790c4877a424f6d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b2274616730222c2274616731222c2274616732222c2274616733222c2274616734222c2274616735222c2274616736222c2274616737222c2274616738222c2274616739222c227461673130222c227461673131222c227461673132222c227461673133222c227461673134222c227461673135222c227461673136222c227461673137222c227461673138222c227461673139222c227461673230222c227461673231222c227461673232222c227461673233222c227461673234222c227461673235222c227461673236222c227461673237222c227461673238222c227461673239222c227461673330222c227461673331225d",
+        "304402203cc3f3db76bfdef9e01e32cd18cd328691a682f76a7d6dffe3e043c313f96504022048ad93499a006140e858946ab135aaf383af27d6c6ebf991833790c4877a424f"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "tags": [
+          "tag0",
+          "tag1",
+          "tag2",
+          "tag3",
+          "tag4",
+          "tag5",
+          "tag6",
+          "tag7",
+          "tag8",
+          "tag9",
+          "tag10",
+          "tag11",
+          "tag12",
+          "tag13",
+          "tag14",
+          "tag15",
+          "tag16",
+          "tag17",
+          "tag18",
+          "tag19",
+          "tag20",
+          "tag21",
+          "tag22",
+          "tag23",
+          "tag24",
+          "tag25",
+          "tag26",
+          "tag27",
+          "tag28",
+          "tag29",
+          "tag30",
+          "tag31"
+        ]
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "tags": [
+          "tag0",
+          "tag1",
+          "tag2",
+          "tag3",
+          "tag4",
+          "tag5",
+          "tag6",
+          "tag7",
+          "tag8",
+          "tag9",
+          "tag10",
+          "tag11",
+          "tag12",
+          "tag13",
+          "tag14",
+          "tag15",
+          "tag16",
+          "tag17",
+          "tag18",
+          "tag19",
+          "tag20",
+          "tag21",
+          "tag22",
+          "tag23",
+          "tag24",
+          "tag25",
+          "tag26",
+          "tag27",
+          "tag28",
+          "tag29",
+          "tag30",
+          "tag31"
+        ]
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "256_byte_tag",
+      "writer": "GlobalKVStore.set",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe4d04015b22c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9225d473045022100bc7dae5fa16e3b97aa508cbe42f1b01fc0855e19cd45cf0fbeb700ee7be0126a0220408c6224f036de393e22e2069abf1e1f3f0d479e718f753bc49b871dd84d0fc36d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b22c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9225d",
+        "3045022100bc7dae5fa16e3b97aa508cbe42f1b01fc0855e19cd45cf0fbeb700ee7be0126a0220408c6224f036de393e22e2069abf1e1f3f0d479e718f753bc49b871dd84d0fc3"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "tags": [
+          "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ]
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "tags": [
+          "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+        ]
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "distinct_unicode_tags",
+      "writer": "GlobalKVStore.set",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe0c5b22c3a9222c2265cc81225d4730450221009f36159a6e77448477295466dbd051bf15aa858f7d6ae897837fc326f9ad41010220711c8d0e9ac0b94f4c5ea07b491343e467abeffba768ac97edde9b156ce529416d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b22c3a9222c2265cc81225d",
+        "30450221009f36159a6e77448477295466dbd051bf15aa858f7d6ae897837fc326f9ad41010220711c8d0e9ac0b94f4c5ea07b491343e467abeffba768ac97edde9b156ce52941"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "tags": [
+          "é",
+          "é"
+        ]
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "tags": [
+          "é",
+          "é"
+        ]
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "explicit_empty_tags",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe025b5d47304502210082b896e968189f5c2eec53765e81ef9e497ee11bfcc075e016e51cc7491a6a670220119fc87247fe1fa13b5e45d71adffb07cd96a1c4b1d2592fe07558df4e8954926d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b5d",
+        "304502210082b896e968189f5c2eec53765e81ef9e497ee11bfcc075e016e51cc7491a6a670220119fc87247fe1fa13b5e45d71adffb07cd96a1c4b1d2592fe07558df4e895492"
+      ],
+      "decoded": {
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "protocolIDText": "[1,\"kvstore\"]",
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "tags": []
+      },
+      "error": null,
+      "entry": {
+        "key": "alpha",
+        "value": "one",
+        "controller": "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "protocolID": [
+          1,
+          "kvstore"
+        ],
+        "tags": []
+      },
+      "interpreted": "one"
+    },
+    {
+      "name": "null_tags",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe046e756c6c463044022018b4752903aeac114b2fb4b460ab16080a97c3536c4e137dc6f83ffc168beef60220154946dd42f92774d0e22ed3c16beef8ec8b472741c7f3a145922947ad6727936d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "6e756c6c",
+        "3044022018b4752903aeac114b2fb4b460ab16080a97c3536c4e137dc6f83ffc168beef60220154946dd42f92774d0e22ed3c16beef8ec8b472741c7f3a145922947ad672793"
+      ],
+      "decoded": null,
+      "error": "KVStore tags must be a bounded array",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "object_tags",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe027b7d46304402200bf5453c2819448c2016f68f9fa766193e078c0d7a9bbd2d61ba0c10d6c9554302202828cf422f933a3d0c7ccb25ff192d254f94b56653829f9e187072d3f0abfd646d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "7b7d",
+        "304402200bf5453c2819448c2016f68f9fa766193e078c0d7a9bbd2d61ba0c10d6c9554302202828cf422f933a3d0c7ccb25ff192d254f94b56653829f9e187072d3f0abfd64"
+      ],
+      "decoded": null,
+      "error": "KVStore tags must be a bounded array",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "33_tags_before_bad_element",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe4cfc5b6e756c6c2c2274616730222c2274616731222c2274616732222c2274616733222c2274616734222c2274616735222c2274616736222c2274616737222c2274616738222c2274616739222c227461673130222c227461673131222c227461673132222c227461673133222c227461673134222c227461673135222c227461673136222c227461673137222c227461673138222c227461673139222c227461673230222c227461673231222c227461673232222c227461673233222c227461673234222c227461673235222c227461673236222c227461673237222c227461673238222c227461673239222c227461673330222c227461673331225d473045022100d2b193d084bc6c1071711d233980bbe8a8f67aa1ab38c0577e638bd674e08c5d02207395786e2c5aeb08e6ec5a68ba489ef3c03405201145d75137da4d6154cebc486d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b6e756c6c2c2274616730222c2274616731222c2274616732222c2274616733222c2274616734222c2274616735222c2274616736222c2274616737222c2274616738222c2274616739222c227461673130222c227461673131222c227461673132222c227461673133222c227461673134222c227461673135222c227461673136222c227461673137222c227461673138222c227461673139222c227461673230222c227461673231222c227461673232222c227461673233222c227461673234222c227461673235222c227461673236222c227461673237222c227461673238222c227461673239222c227461673330222c227461673331225d",
+        "3045022100d2b193d084bc6c1071711d233980bbe8a8f67aa1ab38c0577e638bd674e08c5d02207395786e2c5aeb08e6ec5a68ba489ef3c03405201145d75137da4d6154cebc48"
+      ],
+      "decoded": null,
+      "error": "KVStore tags must be a bounded array",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "empty_tag",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe045b22225d47304502210082f02698f568c44352d437bd6081f1aedc9601bd1175f4d8099cb6066e8e2f7a02203ef5589ca6273d7517ef5d817082d114b4db149fee43173b46acfecd62877b396d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b22225d",
+        "304502210082f02698f568c44352d437bd6081f1aedc9601bd1175f4d8099cb6066e8e2f7a02203ef5589ca6273d7517ef5d817082d114b4db149fee43173b46acfecd62877b39"
+      ],
+      "decoded": null,
+      "error": "KVStore tag has an invalid length",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "257_byte_tag",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe4d05015b22c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a978225d46304402203de8b46c274077da55327071948bd8ad024a9ef3ac10d87450d8744e53155ad502200c3f92bd02111ed3f2f00bc16ef2839ecd0115911f85330a18b9c5ee47bef1bd6d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b22c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a9c3a978225d",
+        "304402203de8b46c274077da55327071948bd8ad024a9ef3ac10d87450d8744e53155ad502200c3f92bd02111ed3f2f00bc16ef2839ecd0115911f85330a18b9c5ee47bef1bd"
+      ],
+      "decoded": null,
+      "error": "KVStore tag has an invalid length",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "non_string_tag",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe035b375d47304502210081afe10c20ce16f4b8d329c803f23d2b937baa85ce96c0c52ecb966cd55f3aa702203c23c5efd3c720c724bec0344a6878ccc5c7375289375cfeebe7e22c164788ad6d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b375d",
+        "304502210081afe10c20ce16f4b8d329c803f23d2b937baa85ce96c0c52ecb966cd55f3aa702203c23c5efd3c720c724bec0344a6878ccc5c7375289375cfeebe7e22c164788ad"
+      ],
+      "decoded": null,
+      "error": "KVStore tag has an invalid length",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "duplicate_tag",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe095b2274222c2274225d463044022028036fb4fde2f18d4965474c83e5343ab162aa0aaaf1c2e899b3a6902ca71b6b022048701e4a87e97bdf810b126d9248abec3f6981d7cfae7c6453b5596fec47e5e46d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b2274222c2274225d",
+        "3044022028036fb4fde2f18d4965474c83e5343ab162aa0aaaf1c2e899b3a6902ca71b6b022048701e4a87e97bdf810b126d9248abec3f6981d7cfae7c6453b5596fec47e5e4"
+      ],
+      "decoded": null,
+      "error": "KVStore tags must be unique",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "invalid_length_before_duplicate",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe075b22222c22225d463044022024c8bae865336f4c3d3ee6e210e6ca3ee9586e2e059e3531093fe0838433d47202205a7db14ad070a30d0df328c49ef10bfb2136f0c5d420c60857281158c2ebbb176d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b22222c22225d",
+        "3044022024c8bae865336f4c3d3ee6e210e6ca3ee9586e2e059e3531093fe0838433d47202205a7db14ad070a30d0df328c49ef10bfb2136f0c5d420c60857281158c2ebbb17"
+      ],
+      "decoded": null,
+      "error": "KVStore tag has an invalid length",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "duplicate_before_later_invalid_length",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe0c5b2274222c2274222c22225d46304402200c757a812514308728cc4a502f3748095693d83c644a012c4426b48813b504a902206ea8fc9e2087c7800b5a1b680a6fec09843801052e195eb340362c05f834e3d96d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "5b2274222c2274222c22225d",
+        "304402200c757a812514308728cc4a502f3748095693d83c644a012c4426b48813b504a902206ea8fc9e2087c7800b5a1b680a6fec09843801052e195eb340362c05f834e3d9"
+      ],
+      "decoded": null,
+      "error": "KVStore tags must be unique",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "empty_tag_bytes",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe0046304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad6d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "00",
+        "304402206b4d628da3fcf495b6806a1ff053991d7883192f0ee8b447adb2f9873cd918450220129f8c3c5900eed31da50b8df0c2b85dc209cbc753b16a44cbdfaba5e27477ad"
+      ],
+      "decoded": null,
+      "error": "Unexpected token '\u0000', \"\u0000\" is not valid JSON",
+      "entry": null,
+      "interpreted": null
+    },
+    {
+      "name": "zero_tag_byte",
+      "writer": "PushDrop.lock",
+      "script": "21033d374ff0f563951a30254cd93444373589c71bbcc30882e05e0c1fe09a83b46aac0d5b312c226b7673746f7265225d05616c706861036f6e652103acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe00473045022100a1e1411976d1fbf34f0ae82a8addd053559d2243401671f8bc2c4c3201628842022047b339bee34b480bac038b152a01a7ae8947cc929d534fd2585aa07c040a01a96d6d6d",
+      "fields": [
+        "5b312c226b7673746f7265225d",
+        "616c706861",
+        "6f6e65",
+        "03acd484e2f0c7f65309ad178a9f559abde09796974c57e714c35f110dfc27ccbe",
+        "00",
+        "3045022100a1e1411976d1fbf34f0ae82a8addd053559d2243401671f8bc2c4c3201628842022047b339bee34b480bac038b152a01a7ae8947cc929d534fd2585aa07c040a01a9"
+      ],
+      "decoded": null,
+      "error": "Unexpected token '\u0000', \"\u0000\" is not valid JSON",
+      "entry": null,
+      "interpreted": null
+    }
+  ]
+}

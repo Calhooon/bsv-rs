@@ -117,9 +117,8 @@ fn global_store(wallet: &Counting, token: Arc<Mutex<Option<Vec<u8>>>>) -> Global
 }
 
 /// A global store whose token is written (nothing found) and then found.
-/// The token carries a tag: this crate's reader takes an untagged token's
-/// signature for its tags (`KVStoreInterpreter::extract_fields`) and refuses
-/// it, a finding outside #326.
+/// The token carries a tag as in the original #326 witness. The reader also
+/// accepts untagged tokens since #344 (`kvstore_untagged_token_344.rs`).
 async fn global_with_token() -> (GlobalKVStore<Counting>, Counting) {
     let wallet = Counting::of_scalar(9);
     let token = Arc::new(Mutex::new(None));
