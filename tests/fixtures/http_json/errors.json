@@ -460,8 +460,8 @@
     {
       "expected": {
         "client_result": {
-          "display": "wallet error: failed to parse JSON response: error decoding response body",
-          "error": "WalletError(\"failed to parse JSON response: error decoding response body\")"
+          "display": "wallet error: failed to parse JSON response: expected ident at line 1 column 2",
+          "error": "WalletError(\"failed to parse JSON response: expected ident at line 1 column 2\")"
         },
         "request": {
           "headers": {
