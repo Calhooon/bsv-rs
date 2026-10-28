@@ -649,6 +649,68 @@ wallet payment protocol`, `wallet/serializer/internalize_action.go:29-30`;
 `insertion remittance is required for basket insertion protocol`, `:38-39`)
 and writes the protocol's remittance alone, dropping the other.
 
+### Added: the streaming BEEF reader takes the caller's memory budget for its scripts, as `Transaction::verify` does since #331 (#373)
+
+Since #331 `Transaction::verify` takes the caller's memory budget as the
+reference's third parameter (`None` uncapped, `Some(n)` `n` bytes per
+stack), while the streaming reader evaluated every unproven transaction's
+inputs under `memory_limit: None` (`BeefIndex::check_spends_of`) and took no
+budget from its caller: a door that reads untrusted BEEF could bound each
+input's work (`set_work_limit`) and not its memory. The keeper's word
+(2026-10-27 19:4xZ, under the owner's ruling (c)): "`verify_stream` takes
+the same `memory_limit: Option<usize>` as `verify`, `None` uncapped, the
+caller's budget per transaction; the streaming reader's own bound per
+element is the charter's structural guarantee, not a cap on a script."
+
+- `StreamVerifier::set_memory_limit(Option<usize>)` and
+  `AsyncStreamVerifier::set_memory_limit(Option<usize>)`, beside
+  `set_work_limit` and in its form: `None`, the default, uncapped, as
+  `verify`'s `None`; `Some(n)` is `n` bytes per stack for every input the
+  reading runs (a transaction read in order and one released from the held
+  set alike), handed to `TxSpendParams::memory_limit` as given. An input
+  past it is a decline, `Verdict::SpendRefused { offset, txid, input:
+  Some(i), why: SpendRefusal::Resource(limit) }`: the transaction by its
+  txid, the input, and the interpreter's `ScriptResourceLimit` (`Stack`,
+  the budget, the bytes attempted), the stream's form of `verify`'s
+  `Error::ScriptEvaluationDeclined { input_index, limit }`; never a verdict
+  on the script, never an abort.
+- Local configuration, as the work budget is: absent from the `Cursor`, set
+  again after `StreamVerifier::resume` (a decoded cursor's included). The
+  structure-only reader runs no script and spends none. The reader's own
+  bound per element (the beef-of-any-size charter, NL-3) is untouched.
+- `verify_stream`, `verify_stream_structure`, `verify_stream_two_pass`,
+  `resume` and `verify_stream_async` keep their signatures: they take no
+  work budget either, and a caller with a budget builds the reader
+  (`StreamVerifier::new`, then `set_memory_limit`, then `run`). The two
+  budgets travel as one value through the fold (`beef_stream/budget.rs`,
+  where both setters now live).
+
+Pinned by `tests/beef_stream_memory_budget_373.rs` (5): a version-2 spend
+whose unlocking script pushes 600 bytes and whose locking script
+duplicates them declines under `Some(1_000)` at 1,200 of 1,000 bytes,
+naming the subject's txid and input 0, whether its script would be valid
+or invalid, and is judged under `None` (valid, or the script's
+`SpendRefusal::Script`) and under `Some(1_200)`; the structure-only reader
+valid under `Some(1)`; a reader resumed before the subject declines with
+the budget set after resumption and is uncapped without it; the
+asynchronous reader the same decline. Red 3 of 5 on a scratch copy of
+`b744f4b6` with the setter a no-op (the declines; the structure-only and
+`None` tests pin what held).
+
+Migration: none; additive. Consumers that pass one: the relay's submit door
+(`rust-message-box@419bf18` `src/beef_door.rs:421-430` sets
+`set_work_limit` after every construction, a resumed reader's included;
+`set_memory_limit` goes beside it after its re-pin from `=0.4.5`) and the
+watchtower.
+
+Semver: two methods added; `cargo semver-checks` names nothing breaking.
+Ratchet: `src/transaction/beef_stream.rs` shrinks from 3,605 lines to 3,597
+(the two `set_work_limit` methods move to `beef_stream/budget.rs`); every
+counter at or below `docs/ratchets.json` (`tools/ratchet/run --check
+--against origin/beta`: duplicate windows 8,247 of 8,257, after the two
+`AsyncStreamVerifier` setters were put memory first in `budget.rs:58-68`, the
+natural order measuring 8,260); not re-recorded.
+
 ### Fixed: the interpreter holds no number's bytes twice and writes no huge number in an error's text, under a caller's memory budget (#348, #349)
 
 The nightly fuzz job's two crashes in `fuzz_script_spend` (run 40474836749,
@@ -742,67 +804,6 @@ counts the big-number library's working memory (BN.js, OpenSSL's `BIGNUM`).
 The reference's `OP_NUM2BIN` refusal writes no number
 (`OP_NUM2BIN size exceeds the node int32 push limit.`, `:1942`); this crate's
 words are its own.
-### Added: the streaming BEEF reader takes the caller's memory budget for its scripts, as `Transaction::verify` does since #331 (#373)
-
-Since #331 `Transaction::verify` takes the caller's memory budget as the
-reference's third parameter (`None` uncapped, `Some(n)` `n` bytes per
-stack), while the streaming reader evaluated every unproven transaction's
-inputs under `memory_limit: None` (`BeefIndex::check_spends_of`) and took no
-budget from its caller: a door that reads untrusted BEEF could bound each
-input's work (`set_work_limit`) and not its memory. The keeper's word
-(2026-10-27 19:4xZ, under the owner's ruling (c)): "`verify_stream` takes
-the same `memory_limit: Option<usize>` as `verify`, `None` uncapped, the
-caller's budget per transaction; the streaming reader's own bound per
-element is the charter's structural guarantee, not a cap on a script."
-
-- `StreamVerifier::set_memory_limit(Option<usize>)` and
-  `AsyncStreamVerifier::set_memory_limit(Option<usize>)`, beside
-  `set_work_limit` and in its form: `None`, the default, uncapped, as
-  `verify`'s `None`; `Some(n)` is `n` bytes per stack for every input the
-  reading runs (a transaction read in order and one released from the held
-  set alike), handed to `TxSpendParams::memory_limit` as given. An input
-  past it is a decline, `Verdict::SpendRefused { offset, txid, input:
-  Some(i), why: SpendRefusal::Resource(limit) }`: the transaction by its
-  txid, the input, and the interpreter's `ScriptResourceLimit` (`Stack`,
-  the budget, the bytes attempted), the stream's form of `verify`'s
-  `Error::ScriptEvaluationDeclined { input_index, limit }`; never a verdict
-  on the script, never an abort.
-- Local configuration, as the work budget is: absent from the `Cursor`, set
-  again after `StreamVerifier::resume` (a decoded cursor's included). The
-  structure-only reader runs no script and spends none. The reader's own
-  bound per element (the beef-of-any-size charter, NL-3) is untouched.
-- `verify_stream`, `verify_stream_structure`, `verify_stream_two_pass`,
-  `resume` and `verify_stream_async` keep their signatures: they take no
-  work budget either, and a caller with a budget builds the reader
-  (`StreamVerifier::new`, then `set_memory_limit`, then `run`). The two
-  budgets travel as one value through the fold (`beef_stream/budget.rs`,
-  where both setters now live).
-
-Pinned by `tests/beef_stream_memory_budget_373.rs` (5): a version-2 spend
-whose unlocking script pushes 600 bytes and whose locking script
-duplicates them declines under `Some(1_000)` at 1,200 of 1,000 bytes,
-naming the subject's txid and input 0, whether its script would be valid
-or invalid, and is judged under `None` (valid, or the script's
-`SpendRefusal::Script`) and under `Some(1_200)`; the structure-only reader
-valid under `Some(1)`; a reader resumed before the subject declines with
-the budget set after resumption and is uncapped without it; the
-asynchronous reader the same decline. Red 3 of 5 on a scratch copy of
-`b744f4b6` with the setter a no-op (the declines; the structure-only and
-`None` tests pin what held).
-
-Migration: none; additive. Consumers that pass one: the relay's submit door
-(`rust-message-box@419bf18` `src/beef_door.rs:421-430` sets
-`set_work_limit` after every construction, a resumed reader's included;
-`set_memory_limit` goes beside it after its re-pin from `=0.4.5`) and the
-watchtower.
-
-Semver: two methods added; `cargo semver-checks` names nothing breaking.
-Ratchet: `src/transaction/beef_stream.rs` shrinks from 3,605 lines to 3,597
-(the two `set_work_limit` methods move to `beef_stream/budget.rs`); every
-counter at or below `docs/ratchets.json` (`tools/ratchet/run --check
---against origin/beta`: duplicate windows 8,247 of 8,257, after the two
-`AsyncStreamVerifier` setters were put memory first in `budget.rs:58-68`, the
-natural order measuring 8,260); not re-recorded.
 
 ## [0.9.0-beta.2] - 2026-10-28
 
