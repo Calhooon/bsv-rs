@@ -37,7 +37,9 @@ pub trait OverlayLookupFacilitator: Send + Sync {
     /// Execute a lookup query whose query is sent as `query_text` when given:
     /// `question.query` with its objects' keys in the order they were built,
     /// where the `serde_json::Value` sorts them (#394). The default ignores
-    /// the text and calls `lookup`.
+    /// the text and calls `lookup`, so a facilitator that keeps it, or a wrapper
+    /// that delegates to another facilitator's `lookup`, sends the attributes
+    /// sorted; an implementation overrides this method to send `query_text`.
     async fn lookup_ordered(
         &self,
         url: &str,

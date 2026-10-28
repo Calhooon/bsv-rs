@@ -100,7 +100,13 @@ provided method whose default ignores the text and calls `lookup`.
 `HttpsOverlayLookupFacilitator` sends the text as the body's `query`.
 `LookupResolver::query` passes no text, so its bodies are the `Value`'s, as
 before. The body's members stay `query` then `service`, the order `json!`
-gave them. A single attribute is still `{"any": value}`. `query` moved, as
+gave them, where the reference writes `service` first (`LookupResolver.ts`
+at edf6e03): a residual of #400's charter, not a reading of any parser. A
+single attribute is still `{"any": value}`. A facilitator that keeps the
+default `lookup_ordered`, or a wrapper that delegates to another's `lookup`,
+sends the attributes sorted as before: a downstream facilitator overrides
+`lookup_ordered` to keep the order (the overlay engine's and the relay's at
+their re-pins). `query` moved, as
 is, to `src/overlay/lookup_resolver/query.rs`: `lookup_resolver.rs` is over
 the ratchet's 800-line bound and may not grow.
 
@@ -140,7 +146,7 @@ is complete):
 - 3 orders: `field_names`, `revealable_fields` and `to_wallet_certificate`
   now give the map's order.
 - 1 addition: `OverlayLookupFacilitator::lookup_ordered`, a provided method
-  (an implementor needs nothing new). `LookupQuestion` is unchanged.
+  (an implementor needs nothing new). `LookupQuestion` is unchanged. The JSON of the four types that carry these maps is written in insertion order where it was hash order: a consumer that compared those bodies byte for byte sees the change (#400 lists where that matters).
 
 Migration: the same as #385's. Build an `IndexMap` where you built a
 `HashMap` (`[(k, v)].into_iter().collect()` compiles unchanged;
