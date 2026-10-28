@@ -83,6 +83,10 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
   its own processor reads as absent, is refused at this crate's writer.
 
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
+- An uncompressed counterparty key (130 hex characters) parses to a `PublicKey`
+  and is accepted by ProtoWallet here, where the reference refuses it with
+  `The counterparty parameter must be no more than 66 length.` The type holds
+  a curve point, not its input encoding; #420 tracks conformance of this bound.
 - BRC-56 HMAC key (`5119a9b` `wallet/0056.md:66,73`): this crate keys the HMAC with the shared X coordinate as 32 bytes, as Go (`primitives/ec/symmetric.go:82-90`), Python and rs-sdk; ts-sdk drops its leading zero bytes (`ts-stack@edf6e03` `packages/sdk/src/wallet/KeyDeriver.ts:270`), a different tag for one key in 256. `verify_hmac` accepts the 32-byte tag only and refuses the minimal-length one as `Error::HmacMinimalLengthKey` (#148).
 - Go lacks TOTP, overlay caching/historian/reputation, and the RPuzzle template.
 - TS TOTP defaults to 2 digits; this crate uses 6 (RFC 6238).

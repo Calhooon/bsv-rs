@@ -206,11 +206,17 @@ validator. Neither path reclassifies a valid DER signature's crypto miss.
 
 The reference's JS-only checks are recorded too: a plain object, at most
 100000 properties, safe string keys and data properties; a two-element
-protocol tuple with a safe integer in 0..2; string fields; a compressed
+protocol tuple with a safe integer in 0..2; string fields; a valid
 counterparty point (or self/anyone); booleans; dense byte arrays and exact
 hash/HMAC lengths. Rust's structs, enums, parsed `PublicKey`, strings, byte
 vectors, fixed arrays and `Option<bool>` enforce these without runtime
-refusals. `tests/vectors/wallet_proto_args_415.json` records 202 cases from
+refusals. One encoding bound is a stated divergence for #420 to conform:
+an uncompressed counterparty key (130 hex characters) is refused by the
+reference with `The counterparty parameter must be no more than 66 length.`,
+but parses to a `PublicKey` and is accepted here. The type holds a curve point,
+not its input encoding.
+
+`tests/vectors/wallet_proto_args_415.json` records 202 cases from
 the actual reference under Node 22: 117 replayable and 85 type-enforced.
 `tests/wallet_proto_args_415.rs` pins each representable refusal text and
 ordering; `auth_peer_general_message_words_407.rs` pins propagation through
