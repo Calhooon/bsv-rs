@@ -62,7 +62,7 @@ returns the supplied key (`:208-217`). The older `ts-sdk@9e3ede6b`
 `src/wallet/ProtoWallet.ts:161-171` returns `args.counterparty` unchanged,
 including the two aliases; that difference is retained in the recording.
 Go at `2ca481c` resolves the same three forms to public keys
-(`wallet/proto_wallet_reveal.go:121-125,169-177,195-214`). Rust's typed
+(`wallet/proto_wallet_reveal.go:120-123,169-177,195-214`). Rust's typed
 public keys serialize compressed; #420's existing input-encoding and
 type-enforced limitations still apply. No current-reference result-form
 divergence remains for the three representable counterparty variants.
