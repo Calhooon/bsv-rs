@@ -34,19 +34,21 @@ const WALLET_BYTE_FIELD_NAMES: [&str; 17] = [
     "tx",
 ];
 
-/// A call, a field's path in its result, and whether its absence is refused.
+/// A call, a field's path in its result, and whether its absence is refused
+/// where its holder is present.
 type ResultByteField = (&'static str, &'static [&'static str], bool);
 
 /// The byte fields `validateWalletResult` reads from a call's result, in
 /// its order per call, each with whether its absence is refused
 /// (`bytes(undefined)`) or skipped (`result.tx === undefined ? ..`): the
 /// actions' `tx` (`validateActionResult`, `:1242-1273`; the signable
-/// transaction's when the member is present), the four key calls'
+/// transaction's required when the member is an object, `:1271-1272`,
+/// skipped when it is absent), the four key calls'
 /// (`:2210-2225`), the linkages' (`validateKeyLinkage`, `:2163-2173`) and
 /// listOutputs' `BEEF` (`:2082`).
 const RESULT_BYTE_FIELDS: [ResultByteField; 10] = [
     ("createAction", &["tx"], false),
-    ("createAction", &["signableTransaction", "tx"], false),
+    ("createAction", &["signableTransaction", "tx"], true),
     ("signAction", &["tx"], false),
     ("encrypt", &["ciphertext"], true),
     ("decrypt", &["plaintext"], true),
@@ -226,6 +228,15 @@ mod tests {
     fn a_result_byte_field_is_refused_by_its_path_and_an_absent_optional_one_is_not() {
         let refused = |words: &str| Some(Error::WalletError(words.into()));
         assert_eq!(refusal("createAction", &json!({"txid": "aa"})), None);
+        assert_eq!(
+            refusal(
+                "createAction",
+                &json!({"signableTransaction": {"reference": "UlJS"}})
+            ),
+            refused(
+                "Invalid createAction result signableTransaction.tx: expected an array of bytes"
+            )
+        );
         assert_eq!(
             refusal("createAction", &json!({"signableTransaction": {"tx": {}}})),
             refused(

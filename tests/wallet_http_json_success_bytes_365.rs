@@ -3,7 +3,7 @@
 //! `packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:322-341`): the
 //! body through `normalizeBRC100WalletByteFields` (`BRC100ByteEncoding.ts`),
 //! then `validateWalletResult`'s `bytes`, against
-//! `http_json_success_bytes_365.json` (109 bodies, Node v22.18.0,
+//! `http_json_success_bytes_365.json` (110 bodies, Node v22.18.0,
 //! `tests/support/http_json_success_bytes_365.mjs`), each body's text
 //! served through wiremock as the reference was served it: the twelve byte
 //! fields of nine calls (ciphertext, plaintext, hmac, signature, both
@@ -12,7 +12,9 @@
 //! historical object form and with every byte `1.0`, read to the
 //! reference's bytes; with a first byte of `256`, `-1` or `1.5` in either
 //! form refused in the reference's words; ciphertext's object form with
-//! the integer text `-0` read as its byte 0, as `isByte` reads it.
+//! the integer text `-0` read as its byte 0, as `isByte` reads it; a
+//! `signableTransaction` object without its `tx` refused in `bytes`' words
+//! (`WalletResultValidation.ts:1271-1272`).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(all(feature = "wallet", feature = "http"))]
 
@@ -161,7 +163,7 @@ fn linkage_field(linkage: KeyLinkageResult, field: &str) -> Vec<u8> {
 #[tokio::test]
 async fn every_success_byte_field_is_read_as_the_reference_reads_it() {
     let cases = cases();
-    assert_eq!(cases.len(), 109);
+    assert_eq!(cases.len(), 110);
     let mut mismatches = Vec::new();
     for c in &cases {
         let ours = answer(c).await;
@@ -179,8 +181,9 @@ async fn every_success_byte_field_is_read_as_the_reference_reads_it() {
     assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
 }
 
-/// The twelve fields of nine calls, each in ten forms or nine: the
-/// reference reads three and refuses six, ciphertext's `-0` a seventh read.
+/// The twelve fields of nine calls, each in nine forms or ten: the
+/// reference reads three and refuses six, ciphertext's `-0` a fourth read,
+/// signableTransaction.tx's absence a seventh refused.
 #[test]
 fn the_vector_names_each_field_in_every_form_and_the_reference_reads_three() {
     let mut forms: BTreeMap<(String, String), Vec<(String, bool)>> = BTreeMap::new();
@@ -199,8 +202,13 @@ fn the_vector_names_each_field_in_every_form_and_the_reference_reads_three() {
         if field == "ciphertext" {
             expected.push("object_minus_0");
         }
+        let refused = if field == "signableTransaction.tx" {
+            7
+        } else {
+            6
+        };
         assert_eq!(read, expected, "{call} {field}");
-        assert_eq!(seen.len(), expected.len() + 6, "{call} {field}");
+        assert_eq!(seen.len(), expected.len() + refused, "{call} {field}");
     }
 }
 
@@ -214,4 +222,23 @@ async fn the_integer_text_minus_zero_in_the_object_form_is_the_byte_zero() {
         .unwrap();
     assert!(c.body_text.starts_with(r#"{"ciphertext":{"0":-0,"1":1,"#));
     assert_eq!(answer(&c).await.unwrap(), "0001027f80feff");
+}
+
+/// A `signableTransaction` object without its `tx` is refused in `bytes`'
+/// words, as the reference's `actionBeefTransaction(signable.tx, ..)`
+/// refuses it (`WalletResultValidation.ts:1271-1272`, `:897`), not in
+/// `serde_json`'s `missing field` (the #365 cold review's required change).
+#[tokio::test]
+async fn a_signable_transaction_without_its_tx_is_refused_in_the_references_words() {
+    let c = cases()
+        .into_iter()
+        .find(|c| c.name == "createAction_signableTransaction_tx_absent")
+        .unwrap();
+    assert_eq!(
+        c.body_text,
+        r#"{"signableTransaction":{"reference":"UlJSUlJSUlI="}}"#
+    );
+    let words = "Invalid createAction result signableTransaction.tx: expected an array of bytes";
+    assert_eq!(c.reference["error"], words);
+    assert_eq!(answer(&c).await, Err(Error::WalletError(words.into())));
 }

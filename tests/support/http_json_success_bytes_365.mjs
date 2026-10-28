@@ -15,7 +15,8 @@
 // `JSON.stringify(new Uint8Array(..))` wrote (`{"0": .., "1": ..}`), every
 // byte an integral float (`1.0`), and the array or the object form with its
 // first byte `256`, `-1` or `1.5`; ciphertext also with its first byte the
-// integer text `-0` in the object form. The body's text is recorded as
+// integer text `-0` in the object form; signableTransaction.tx also left
+// out of its object. The body's text is recorded as
 // served (`bodyText`), so `1.0` and `-0` cross as written; the outcome is
 // the field's bytes as hex (`answered`) or the words thrown (`error`). The
 // BEEF and the action requests are #339's (#327's competing transaction).
@@ -113,15 +114,20 @@ const FORMS = [
 ]
 // the integer text `-0`, which `Number.isInteger` reads as a byte
 const NEGATIVE_ZERO = ['object_minus_0', (b) => objectText(first(b, '-0'))]
+// the member left out, which `bytes(undefined)` refuses
+const ABSENT = ['absent', null]
+const EXTRA_FORMS = { ciphertext: [NEGATIVE_ZERO], 'signableTransaction.tx': [ABSENT] }
 
 const hex = (bytes) => Utils.toHex(Array.from(bytes, (n) => n))
 const at = (value, path) => path.split('.').reduce((v, k) => v?.[k], value)
 
 const out = []
 for (const [call, args, field, bytes, body] of fields) {
-  const forms = field === 'ciphertext' ? [...FORMS, NEGATIVE_ZERO] : FORMS
+  const forms = [...FORMS, ...(EXTRA_FORMS[field] ?? [])]
   for (const [form, write] of forms) {
-    const bodyText = JSON.stringify(body).replace('"$BYTES"', write(bytes))
+    const bodyText = write === null
+      ? JSON.stringify(body, (_, v) => (v === '$BYTES' ? undefined : v))
+      : JSON.stringify(body).replace('"$BYTES"', write(bytes))
     const fetch = async () => {
       const encoded = new TextEncoder().encode(bodyText)
       return {

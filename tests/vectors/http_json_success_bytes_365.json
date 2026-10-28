@@ -1942,6 +1942,29 @@
       }
     },
     {
+      "name": "createAction_signableTransaction_tx_absent",
+      "call": "createAction",
+      "args": {
+        "description": "review the action",
+        "outputs": [
+          {
+            "lockingScript": "006a02cccc",
+            "satoshis": 0,
+            "outputDescription": "an output"
+          }
+        ],
+        "options": {
+          "signAndProcess": false
+        }
+      },
+      "field": "signableTransaction.tx",
+      "form": "absent",
+      "bodyText": "{\"signableTransaction\":{\"reference\":\"UlJSUlJSUlI=\"}}",
+      "reference": {
+        "error": "Invalid createAction result signableTransaction.tx: expected an array of bytes"
+      }
+    },
+    {
       "name": "signAction_tx_array",
       "call": "signAction",
       "args": {
