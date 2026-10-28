@@ -16,7 +16,8 @@ The WalletWire protocol provides efficient binary serialization for wallet opera
 | `validation.rs` | The processor's `validateWalletArgs` and `validateWalletResult` (`ts-stack@edf6e03` `validationHelpers.ts`, `WalletResultValidation.ts`) for the wired calls, in the reference's words: an argument refused code 6 (`WERR_INVALID_PARAMETER`), a result refused code 1; `Refusal` (the code and the words a frame carries); getHeaderForHeight's height in `#requireInteger`'s words (#216); the two linkage calls' raw keys judged as points and their args built, revealSpecificKeyLinkage's absent counterparty refused (#226); the error-to-frame conversion (`From<Error> for Refusal`, `explicit_wallet_code`: a `WalletRefusal`'s class's `wire_code`, #137) | ~738 |
 | `requests.rs` | The processor's request readers for the two linkage calls, the privileged flag and reason ahead of the keys as the reference reads them (#191), the keys 33 raw bytes in a private request type for validation to judge (#226); for verifyHmac, the 32 raw HMAC bytes ahead of the data, and for createSignature and verifySignature, the data-type flag (`1` the data, `2` the hash, another refused), verifySignature's signature ahead of it (#199); the seven key-related calls' requests whole, the privileged pair inside the key-related parameters and seekPermission last, getPublicKey's identityKey byte ahead, and `assert_request_consumed`, a byte after the last field refused (#193) | ~308 |
 | `results.rs` | The processor's result writers for the two linkage calls, the three keys ahead of everything as the reference writes them (#194); for encrypt, decrypt, createHmac and createSignature, the bytes alone, and for verifyHmac, verifySignature and waitForAuthentication, nothing after the error byte, a false verdict an error frame (#197); abortAction's, the error byte alone or a refusal framed code 8 (#206) | ~148 |
-| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods, no linkage methods (docs/FIXTURES.md F2); an error frame coded 2 to 8 read as `WalletRefusal` with its class (`frame_error`, #137) | 1652 |
+| `transceiver.rs` | Client-side message serialization: 26 of the 28 methods (the two linkage calls in `linkage.rs`); an error frame coded 2 to 8 read as `WalletRefusal` with its class (`frame_error`, #137) | 1643 |
+| `linkage.rs` | The transceiver's revealCounterpartyKeyLinkage and revealSpecificKeyLinkage (#406), the reference's request and answer (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790-924`): the arguments judged before a byte is sent and the answer after it is read (each key a point, the level 0 to 2, no trailing byte, then the result bound to the request), the processor's `validation.rs` checks reused | ~205 |
 
 ## Architecture
 
@@ -232,13 +233,13 @@ All 28 call codes are dispatched in the match statement. The twelve stub handler
 
 ## Transceiver (Client-Side)
 
-`WalletWireTransceiver<T: WalletWire>` serializes 26 of the 28 wallet methods into binary messages and deserializes responses; it has no revealCounterpartyKeyLinkage or revealSpecificKeyLinkage method (docs/FIXTURES.md F2).
+`WalletWireTransceiver<T: WalletWire>` serializes all 28 wallet methods into binary messages and deserializes responses; the two linkage calls since #406 (`linkage.rs`; until then docs/FIXTURES.md F2).
 
 - `new(wire)` - creates transceiver with wire transport
 - `wire()` - access underlying transport
 
-**The 26 methods:**
-- **Key ops:** get_public_key, encrypt, decrypt, create_hmac, verify_hmac, create_signature, verify_signature
+**The 28 methods:**
+- **Key ops:** get_public_key, encrypt, decrypt, create_hmac, verify_hmac, create_signature, verify_signature, reveal_counterparty_key_linkage, reveal_specific_key_linkage (#406: the privileged pair then the counterparty and verifier, or the key-related parameters then the verifier; the answer read as the reference's `ts-stack@edf6e03` transceiver reads it, `Wallet Wire <call> response contains trailing data` for a byte after it, `Invalid revealSpecificKeyLinkage security level: N`, the processor's result checks bound to the request in their words, an argument refused before sending as `WalletRefusal` of class `InvalidParameter`; `tests/wire_linkage_calls_406.rs`)
 - **Action ops:** create_action (with full options: sign_and_process, trust_self, known_txids, no_send, no_send_change, send_with, randomize_outputs), sign_action, abort_action (code 8 read as `aborted: false`, a byte after a success frame's error byte refused; `WalletWireTransceiver.ts:334-339`, #206), list_actions, internalize_action
 - **Output ops:** list_outputs, relinquish_output
 - **Certificate ops:** acquire_certificate (both Direct and Issuance protocols), list_certificates, prove_certificate, relinquish_certificate

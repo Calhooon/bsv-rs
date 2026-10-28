@@ -163,11 +163,13 @@ The processor refuses calls 1 through 7 and 17 through 22 with a generic
 "requires a full wallet implementation" frame, even when its wallet implements
 the whole trait. Those frames remain in `processor_response_hex`. Their client
 result cases use the public `WireWriter` type encoders and explicit framing;
-`response_encoder` identifies that path. The transceiver also has no linkage
-methods (calls 9 and 10). Those two cases reuse the low-level reader/writer
-approach of `wire_method_roundtrip_tests.rs`, and do not claim to test a missing
-production client method. BRC-100 defines all these methods in its numbered
-Method Calls Specification.
+`response_encoder` identifies that path. The linkage calls (9 and 10) go
+through the transceiver's own methods since bsv-rs#406 (F2), where a test-side
+shim of the low-level codec stood; no recording moved. Both calls are also
+recorded from the reference's transceiver and processor, outside this census,
+in `tests/vectors/wallet_wire/linkage_calls_406.json` (6 cases, 8 refusals;
+`tests/wire_linkage_calls_406.rs`). BRC-100 defines all these methods in its
+numbered Method Calls Specification.
 
 The following differences are also kept visible. Section numbers refer to
 BRC-100's Method Calls Specification at the pin above. A difference between
@@ -177,7 +179,7 @@ rather than a BRC violation.
 | Finding | Recorded behavior | BRC citation |
 | --- | --- | --- |
 | F1 | Calls 1, 2, 4 through 7 and 17 through 22 are processor refusal stubs (abortAction, call 3, calls its wallet since bsv-rs#206, F19). The client and HTTP methods exist. | Sections 1, 2, 4 through 7, 17 through 22 |
-| F2 | Linkage has no transceiver methods. Its processor reads `privileged` and `privilegedReason` in the reference's order since bsv-rs#191 (counterparty linkage: ahead of the two keys; specific linkage: within the key-related parameters, ahead of the verifier), and writes both responses in the reference's order since bsv-rs#194: the prover, verifier and counterparty, then revelationTime and the two byte strings, or the protocol, keyID, the two byte strings and proofType. | Sections 9 and 10, Return Values (`wallet/0100.md:2052-2057`, `:2088-2095`) |
+| F2 | Resolved (bsv-rs#406): linkage had no transceiver methods; `WalletWireTransceiver::reveal_counterparty_key_linkage` and `reveal_specific_key_linkage` write the reference's requests and read its answers (`ts-stack@edf6e03` `WalletWireTransceiver.ts:790-924`), the recorder calls them where its shim stood, and no recording moved (the shim wrote the reference's bytes). Its processor reads `privileged` and `privilegedReason` in the reference's order since bsv-rs#191 (counterparty linkage: ahead of the two keys; specific linkage: within the key-related parameters, ahead of the verifier), and writes both responses in the reference's order since bsv-rs#194: the prover, verifier and counterparty, then revelationTime and the two byte strings, or the protocol, keyID, the two byte strings and proofType. | Sections 9 and 10, Return Values (`wallet/0100.md:2052-2057`, `:2088-2095`) |
 | F3 | Resolved (bsv-rs#178): the header processor wrote a length before its 80 bytes, which the client read as a header byte (81 bytes); it now writes the 80 raw bytes, as the reference does, and the recorded header is the stub's. | Section 26, Return Values (`wallet/0100.md:2463`) |
 | F4 | Resolved for the reader (bsv-rs#177): the transceiver reads the certificate as `write_wallet_certificate` and the reference write it (type, serial, subject, certifier, outpoint, fields, raw signature), listCertificates' verifier as 33 raw bytes, discovery's certifier info as plain strings; every certificate case records its input result. The list frame is the recorder's explicit framing of the reference's bytes; the discovery entries are `write_identity_certificate`'s, which writes the reference's bytes since bsv-rs#182 (the recorder's own copy of the layout left; the recordings unchanged). | Sections 17, 18, 21, 22 |
 | F5 | Resolved (bsv-rs#105, F21): HTTP crypto requests used `protocolId` and `keyId`, while the BRC and CLI use `protocolID` and `keyID`, and direct-sign and direct-verify hashes were hex strings rather than byte arrays; they now use the BRC's names and byte arrays, and getPublicKey writes `identityKey` only when true, as the BRC's `identityKey?: true`. | Sections 8, 10 through 16; The Wallet Interface (`wallet/0100.md:980-982`, `:1037-1038`, `:1182-1184`, `:1213-1216`) |

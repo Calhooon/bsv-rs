@@ -2,10 +2,9 @@ use super::cases::{self, Case};
 use super::wallet::{calls, invoke, outcome, Stub, WireWallet};
 use super::wallet_json::FixtureJson;
 use super::Suite;
-use bsv_rs::primitives::{from_base64, from_hex, PublicKey};
-use bsv_rs::wallet::interface::{RevealCounterpartyKeyLinkageArgs, RevealSpecificKeyLinkageArgs};
+use bsv_rs::primitives::{from_base64, from_hex};
 use bsv_rs::wallet::wire::{
-    WalletCall, WalletWire, WalletWireProcessor, WalletWireTransceiver, WireReader, WireWriter,
+    WalletCall, WalletWire, WalletWireProcessor, WalletWireTransceiver, WireWriter,
 };
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
@@ -46,111 +45,6 @@ impl WalletWire for ReplyWire {
     async fn transmit_to_wallet(&self, _: &[u8]) -> bsv_rs::Result<Vec<u8>> {
         Ok(self.0.clone())
     }
-}
-
-// The transceiver exposes no linkage methods. As in wire_method_roundtrip_tests,
-// use the public low-level codec for these two processor-supported calls, in the
-// reference's order (`WalletWireTransceiver.ts:809-811`, `:874-883` at
-// ts-stack@edf6e03; #191). It is not a new production client API.
-fn linkage_request(call: WalletCall, originator: Option<&str>) -> WireWriter {
-    let originator = originator.unwrap_or_default();
-    let mut w = WireWriter::new();
-    w.write_u8(call.as_u8())
-        .write_u8(originator.len() as u8)
-        .write_bytes(originator.as_bytes());
-    w
-}
-
-// The reference's `#encodePrivilegedParams` (`WalletWireTransceiver.ts:1448-1462`).
-fn privileged_params(w: &mut WireWriter, privileged: Option<bool>, reason: Option<&str>) {
-    w.write_optional_bool(privileged);
-    match reason {
-        Some(reason) => w
-            .write_i8(reason.len() as i8)
-            .write_bytes(reason.as_bytes()),
-        None => w.write_i8(-1),
-    };
-}
-
-async fn linkage_response<T: WalletWire>(
-    client: &WalletWireTransceiver<T>,
-    w: WireWriter,
-) -> bsv_rs::Result<Vec<u8>> {
-    let bytes = client.wire().transmit_to_wallet(w.as_bytes()).await?;
-    if bytes.first() == Some(&0) {
-        return Ok(bytes[1..].to_vec());
-    }
-    // Use the production common error decoder, also for malformed envelopes.
-    let decoder = WalletWireTransceiver::new(ReplyWire(bytes));
-    Err(decoder.get_version(None).await.unwrap_err())
-}
-
-// The three keys open both results, in the reference's order
-// (`WalletWireTransceiver.ts:818-836`, `:890-908` at ts-stack@edf6e03; #194).
-fn read_linkage_keys(r: &mut WireReader<'_>) -> bsv_rs::Result<[PublicKey; 3]> {
-    Ok([
-        PublicKey::from_bytes(r.read_bytes(33)?)?,
-        PublicKey::from_bytes(r.read_bytes(33)?)?,
-        PublicKey::from_bytes(r.read_bytes(33)?)?,
-    ])
-}
-
-fn read_linkage(r: &mut WireReader<'_>, keys: [PublicKey; 3]) -> bsv_rs::Result<KeyLinkageResult> {
-    let [prover, verifier, counterparty] = keys;
-    let len = r.read_var_int()? as usize;
-    let encrypted_linkage = r.read_bytes(len)?.to_vec();
-    let len = r.read_var_int()? as usize;
-    let encrypted_linkage_proof = r.read_bytes(len)?.to_vec();
-    Ok(KeyLinkageResult {
-        encrypted_linkage,
-        encrypted_linkage_proof,
-        prover,
-        verifier,
-        counterparty,
-    })
-}
-
-pub async fn counterparty<T: WalletWire>(
-    client: &WalletWireTransceiver<T>,
-    args: RevealCounterpartyKeyLinkageArgs,
-    originator: Option<&str>,
-) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
-    let mut w = linkage_request(WalletCall::RevealCounterpartyKeyLinkage, originator);
-    privileged_params(&mut w, args.privileged, args.privileged_reason.as_deref());
-    w.write_bytes(&args.counterparty.to_compressed())
-        .write_bytes(&args.verifier.to_compressed());
-    let bytes = linkage_response(client, w).await?;
-    let mut r = WireReader::new(&bytes);
-    let keys = read_linkage_keys(&mut r)?;
-    let revelation_time = r.read_string()?;
-    Ok(RevealCounterpartyKeyLinkageResult {
-        linkage: read_linkage(&mut r, keys)?,
-        revelation_time,
-    })
-}
-
-pub async fn specific<T: WalletWire>(
-    client: &WalletWireTransceiver<T>,
-    args: RevealSpecificKeyLinkageArgs,
-    originator: Option<&str>,
-) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
-    let mut w = linkage_request(WalletCall::RevealSpecificKeyLinkage, originator);
-    w.write_protocol_id(&args.protocol_id)
-        .write_string(&args.key_id)
-        .write_counterparty(Some(&args.counterparty));
-    privileged_params(&mut w, args.privileged, args.privileged_reason.as_deref());
-    w.write_bytes(&args.verifier.to_compressed());
-    let bytes = linkage_response(client, w).await?;
-    let mut r = WireReader::new(&bytes);
-    let keys = read_linkage_keys(&mut r)?;
-    let protocol = r.read_protocol_id()?;
-    let key_id = r.read_string()?;
-    Ok(RevealSpecificKeyLinkageResult {
-        linkage: read_linkage(&mut r, keys)?,
-        protocol,
-        key_id,
-        proof_type: r.read_u8()?,
-    })
 }
 
 // These 12 processor handlers currently return "requires a full wallet

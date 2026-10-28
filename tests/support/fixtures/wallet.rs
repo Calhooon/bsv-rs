@@ -126,10 +126,10 @@ macro_rules! implementations {
                 self.0.get_header(args, originator).await
             }
             async fn reveal_counterparty_key_linkage(&self, args: RevealCounterpartyKeyLinkageArgs, originator: Option<&str>) -> bsv_rs::Result<RevealCounterpartyKeyLinkageResult> {
-                super::wire::counterparty(&self.0, args, originator).await
+                self.0.reveal_counterparty_key_linkage(args, originator).await
             }
             async fn reveal_specific_key_linkage(&self, args: RevealSpecificKeyLinkageArgs, originator: Option<&str>) -> bsv_rs::Result<RevealSpecificKeyLinkageResult> {
-                super::wire::specific(&self.0, args, originator).await
+                self.0.reveal_specific_key_linkage(args, originator).await
             }
         }
     };

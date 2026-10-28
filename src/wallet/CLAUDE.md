@@ -21,7 +21,7 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
-| `client.rs` | Multi-substrate WalletClient (requires `http` feature); every call forwarded by one macro over the three substrates | ~582 |
+| `client.rs` | Multi-substrate WalletClient (requires `http` feature); every call forwarded by one macro over the three substrates, including both linkage calls through the transceiver since #406 | ~633 |
 | `client_instance.rs` | The instance substrate of `WalletClient::with_substrate` (#335): `Instance`, dereferencing to the `WalletInterface` and adapting the six status and header answers to the client's shapes | ~64 |
 | `substrates/` | Transport substrate implementations | - |
 | `wire/` | Wire protocol encoding/decoding | - |
@@ -41,7 +41,7 @@ Wire protocol implementation for binary wallet communication:
 - `mod.rs` - Module definitions and re-exports
 - `encoding.rs` - Binary encoding/decoding for all wallet types (~2,493 lines)
 - `calls.rs` - Call frame definitions for all 28 wallet operations
-- `transceiver.rs` - Protocol transceiver (`WalletWireTransceiver`)
+- `transceiver.rs` - Protocol transceiver (`WalletWireTransceiver`); `linkage.rs` its two linkage calls (#406)
 - `processor.rs` - Request/response processing (`WalletWireProcessor`)
 - See `wire/CLAUDE.md` for details
 
@@ -81,8 +81,8 @@ pub struct WalletClient {
     pub fn with_substrate(substrate: Arc<dyn WalletInterface>, originator: Option<String>) -> Self
     pub fn substrate_type(&self) -> SubstrateType
     pub fn originator(&self) -> Option<&str>   // passed to every call as given; None when none is set (#329)
-    // All 28 wallet operations as async methods (connect lazily on first call); the wire
-    // substrate refuses the two linkage calls unsent (its transceiver writes neither, #335)
+    // All 28 wallet operations as async methods (connect lazily on first call); both
+    // linkage calls go through the transceiver on the wire substrate since #406
 }
 ```
 

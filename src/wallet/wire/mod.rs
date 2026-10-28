@@ -74,6 +74,7 @@
 
 mod calls;
 mod encoding;
+mod linkage;
 mod processor;
 mod requests;
 mod results;
