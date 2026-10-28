@@ -124,11 +124,17 @@ impl Spend {
             }
             Ok(size as usize)
         } else {
-            if size < 0 || size > MAX_SCRIPT_ELEMENT_SIZE as i64 {
-                return Err(self.error(&format!(
-                    "It's not currently possible to push data larger than {} bytes or negative size.",
-                    MAX_SCRIPT_ELEMENT_SIZE
-                )));
+            // The reference's refusals in its order and words
+            // (`ts-stack@edf6e03` `Spend.ts:1930-1950`, bsv-rs#382): a negative
+            // size in the words of its unbounded push size, then a size above
+            // INT32_MAX (`size` is -1 past an `i64`, its sign decided above).
+            if size_bn.is_negative() {
+                return Err(self.error(
+                    "It's not currently possible to push data larger than Infinity bytes or negative size.",
+                ));
+            }
+            if size < 0 || size > i64::from(i32::MAX) {
+                return Err(self.error("OP_NUM2BIN size exceeds the node int32 push limit."));
             }
             let size = size as usize;
             // Reference parity (0.3.23): the element the script asks for is
@@ -139,6 +145,14 @@ impl Spend {
             // only then trip the stack budget on the push.
             if size > self.memory_limit() {
                 return Err(self.resource_error(ScriptResource::ElementSize, size));
+            }
+            // the default mode's 1 GiB element bound, a refusal the
+            // reference does not make (its `Array.from` of the size aborts)
+            if size > MAX_SCRIPT_ELEMENT_SIZE {
+                return Err(self.error(&format!(
+                    "It's not currently possible to push data larger than {} bytes or negative size.",
+                    MAX_SCRIPT_ELEMENT_SIZE
+                )));
             }
             Ok(size)
         }
@@ -389,10 +403,27 @@ impl Spend {
     /// is SCRIPT_ERR_SCRIPTNUM_OVERFLOW (`script_num.cpp:80-91`,
     /// `interpreter.cpp:1807-1809`). `getint` then saturates to the `int` range
     /// (`script_num.cpp:396-422`).
-    /// The default mode uses the TypeScript SDK's unrestricted number reader.
+    /// The default mode reads them as the reference's `#readSpliceOperand`
+    /// does (`ts-stack@edf6e03` `Spend.ts:540-561`, bsv-rs#382): the
+    /// minimal-encoding check, then an operand of at most 8 bytes read as a
+    /// script number and a longer one as its first 8 bytes in two's
+    /// complement (`BigInt.asIntN(64, ..)`, the rest unread), the value
+    /// clamped to the `int` range.
     pub(super) fn read_splice_operand(&self, bytes: &[u8]) -> Result<i64, ScriptEvaluationError> {
         if self.flags.is_none() {
-            return Ok(self.read_number(bytes)?.to_i64().unwrap_or(-1));
+            let value = match bytes.first_chunk::<8>() {
+                Some(first) if bytes.len() > 8 => {
+                    if self.require_minimal {
+                        // the read's own refusal, made before it copies a byte
+                        ScriptNum::from_bytes(bytes, true)
+                            .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
+                    }
+                    i64::from_le_bytes(*first)
+                }
+                // eight bytes or fewer: a magnitude below 2^63
+                _ => self.read_number(bytes)?.to_i64().unwrap_or(0),
+            };
+            return Ok(value.clamp(i64::from(i32::MIN), i64::from(i32::MAX)));
         }
         // Preserve the era-width/minimality ordering and their messages.
         let as_number = self.read_number(bytes)?;

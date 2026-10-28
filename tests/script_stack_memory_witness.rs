@@ -243,6 +243,12 @@ const PUSH_SIZE_2POW31: &str = "OP_NUM2BIN requires a size from 0 to 2147483647,
 const PUSH_SIZE_NEGATIVE: &str = "OP_NUM2BIN requires a size from 0 to 2147483647, found -1.";
 const DEFAULT_PUSH_SIZE: &str =
     "It's not currently possible to push data larger than 1073741824 bytes or negative size.";
+/// The default mode's refusals of a size above `INT32_MAX` and of a negative
+/// size, the reference's words (`ts-stack@edf6e03` `Spend.ts:1930-1943`,
+/// bsv-rs#382).
+const DEFAULT_PUSH_SIZE_INT32: &str = "OP_NUM2BIN size exceeds the node int32 push limit.";
+const DEFAULT_PUSH_SIZE_NEGATIVE: &str =
+    "It's not currently possible to push data larger than Infinity bytes or negative size.";
 
 // ============================================================================
 // The witnesses
@@ -369,8 +375,9 @@ fn a_40000000_byte_element_is_valid_under_both_words() {
 }
 
 /// stack-00217: a size above `INT32_MAX` is `SCRIPT_ERR_PUSH_SIZE` under a word
-/// (0.3.29's message named its 1 GiB element bound; the default mode keeps
-/// it). Allocates nothing.
+/// (0.3.29's message named its 1 GiB element bound; the default mode kept it
+/// until bsv-rs#382 and now refuses in the reference's words). Allocates
+/// nothing.
 #[test]
 fn a_num2bin_size_above_int32_max_is_a_push_size_refusal() {
     assert_eq!(
@@ -383,7 +390,7 @@ fn a_num2bin_size_above_int32_max_is_a_push_size_refusal() {
     );
     assert_eq!(
         run(TX_NUM2BIN_2POW31, LOCK_NUM2BIN_2POW31, Mode::Default),
-        verdict(DEFAULT_PUSH_SIZE)
+        verdict(DEFAULT_PUSH_SIZE_INT32)
     );
 }
 
@@ -391,7 +398,8 @@ fn a_num2bin_size_above_int32_max_is_a_push_size_refusal() {
 // The budget's edges at the node's figures
 // ============================================================================
 
-/// A negative size is `SCRIPT_ERR_PUSH_SIZE` too. Allocates nothing.
+/// A negative size is `SCRIPT_ERR_PUSH_SIZE` too; in the default mode the
+/// reference's words (bsv-rs#382). Allocates nothing.
 #[test]
 fn a_negative_num2bin_size_is_a_push_size_refusal() {
     assert_eq!(
@@ -400,7 +408,7 @@ fn a_negative_num2bin_size_is_a_push_size_refusal() {
     );
     assert_eq!(
         run(TX_READ_32000001, LOCK_PAD_NEGATIVE, Mode::Default),
-        verdict(DEFAULT_PUSH_SIZE)
+        verdict(DEFAULT_PUSH_SIZE_NEGATIVE)
     );
 }
 

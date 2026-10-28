@@ -2,7 +2,10 @@
 //! `6504a3aff65ba97c0f6c80962b033e35ecbfed4b` (Calhooon/bsv-rs#41).
 //! `int_serialization.h:61-118` defines the checked sign-magnitude decoding;
 //! `script_num.cpp:80-91` and `interpreter.cpp:1807-1809` define its error.
-//! Both node words and the TypeScript SDK default mode are exercised.
+//! Both node words and the TypeScript SDK default mode are exercised; the
+//! default mode reads an operand past 8 bytes as the reference's
+//! `#readSpliceOperand` does since bsv-rs#382 (its first 8 bytes in two's
+//! complement, `ts-stack@edf6e03` `Spend.ts:540-561`).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
@@ -101,14 +104,12 @@ fn the_witness_is_a_range_refusal_under_the_standard_word() {
     );
 }
 
-/// The default mode keeps the TypeScript SDK's reading: −4, a range refusal
-/// under the TypeScript SDK number reader.
+/// The default mode reads the reference's way (bsv-rs#382): the first 8
+/// bytes, 4, the substring `04050607`; the reference's `ok true` under Node 22
+/// (until #382 this crate read −4 here, a range refusal).
 #[test]
-fn the_witness_is_a_range_refusal_in_the_default_mode() {
-    assert_eq!(
-        run(LOCK_9_SIGN, Mode::Default),
-        Err(RANGE_REFUSAL_MINUS_4.to_string())
-    );
+fn the_witness_is_valid_in_the_default_mode() {
+    assert_eq!(run(LOCK_9_SIGN, Mode::Default), Ok(true));
 }
 
 /// Eight bytes with the sign bit set is −4 on both sides: the ordinary
@@ -159,14 +160,10 @@ fn op_left_and_op_right_read_their_length_the_same_way() {
             Err("OP_RIGHT length (-4) must be in range [0, 16]".to_string())
         );
     }
-    assert_eq!(
-        run(LOCK_LEFT_9_SIGN, Mode::Default),
-        Err("OP_LEFT length (-4) must be in range [0, 16]".to_string())
-    );
-    assert_eq!(
-        run(LOCK_RIGHT_9_SIGN, Mode::Default),
-        Err("OP_RIGHT length (-4) must be in range [0, 16]".to_string())
-    );
+    // the default mode: the first 8 bytes, 4, as the reference reads them
+    // (bsv-rs#382; its `ok true` for both)
+    assert_eq!(run(LOCK_LEFT_9_SIGN, Mode::Default), Ok(true));
+    assert_eq!(run(LOCK_RIGHT_9_SIGN, Mode::Default), Ok(true));
 }
 
 /// An 8-byte `INT64_MAX` offset saturates to `INT_MAX` on the reference and
