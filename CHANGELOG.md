@@ -186,7 +186,7 @@ version-1 Chronicle refusal. Both references accept all six with the actual
 empty word. Rust still refuses that word before execution. #429 adds no
 DER-off API and does not change those existing findings.
 
-The default accepts a pre-fork form no BSV wallet produces because the reference's default does, and the node refuses it, so a door on a live chain passes the word.
+The default accepts a pre-fork form no BSV wallet produces because the reference's default does, and the node refuses it, so a door on a live chain passes the word. `Transaction::verify` (`src/transaction/transaction.rs:1821`) and the streaming reader take no word, so they accept a `0x01` signature over the original digest now, as the reference's `Transaction.verify` and `Beef.verifyValid` do; a door that wants the node's verdict runs `Spend::set_flags` per input.
 
 ### Changed: the default mode runs all ten Chronicle opcodes at every version, gates the Chronicle hash type by version, and uses the reference's non-minimal-number words (#397)
 
