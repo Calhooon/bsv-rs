@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 mod answer;
 mod byte_fields;
 mod key_requests;
+mod result_values;
 mod review_actions;
 use key_requests::{
     key_params, permission, JsonCreateHmacRequest, JsonCreateHmacResponse,
@@ -262,16 +263,9 @@ impl HttpWalletJson {
         let response: JsonCreateHmacResponse =
             self.request("createHmac", &request, originator).await?;
 
-        if response.hmac.len() != 32 {
-            return Err(Error::WalletError(format!(
-                "invalid HMAC length: expected 32, got {}",
-                response.hmac.len()
-            )));
-        }
-
-        let mut hmac = [0u8; 32];
-        hmac.copy_from_slice(&response.hmac);
-
+        let hmac = response.hmac.try_into().map_err(|_| {
+            Error::WalletError("Invalid createHmac result hmac: expected 32 bytes".into())
+        })?;
         Ok(CreateHmacResult { hmac })
     }
 

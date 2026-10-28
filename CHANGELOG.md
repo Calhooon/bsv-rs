@@ -10,6 +10,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0-beta.3] - 2026-10-28
 
 The 0.9.0 line's third prerelease (RELEASING.md point 14), cut from `beta` at the owner's word through the keeper (the brief's 19.7: bsv-rs 0.9.0-beta.3, then the toolbox's 0.14.0-beta.3 carrying its re-pin, then the CLI's one pin PR) at the tip after #429 landed (a53a9492), so the canaries re-pin the interpreter's default-mode changes of #397 and #429 once. The pin set the canaries waited on: #385 and #394 (the ordered maps), #373 (the streaming reader's memory budget), #335 and #404 (`WalletClient` as a `WalletInterface` under the `wallet` feature, its methods on `&self`: the one API break of this prerelease, named in #404's entry), #415 and #420 (`ProtoWallet`'s argument validators in the reference's words), #406 (the wire transceiver's two linkage calls), #416 (the HTTP auth transport's bounds) and #417 (the script engine's version-1 words). Every entry below was cold-reviewed on a model other than its lane's and landed through the sequencer; the fixtures' diff since beta.2 is in the announcement.
+### Fixed: HTTP JSON result lengths, DER signatures, containers and signed certificates follow the reference (#408)
+
+The keeper's 2026-10-28 ruling (c), parity on beta.3: the reference client's
+`validateWalletResult` bounds are this port's bounds. #365 normalized byte
+fields only after a typed read failed. A typed success could therefore hide
+a present `null` in an `Option`, return a non-DER signature, or accept a
+malformed or oversized wallet certificate. HMAC length was checked, but in
+this crate's words rather than the reference's.
+
+`http_json/result_values.rs` now checks the raw response before that typed
+read. Its modules borrow field slices; normal byte arrays avoid a `Value`
+tree, and #365's historical numeric-key objects and integral floats still
+work. The new checks are:
+
+- HMAC exactly 32 bytes; signature at most 72 bytes and strict minimal DER,
+  with both scalars nonzero and below the curve order (high S is allowed).
+- Every result is an object; every result byte, record and array site
+  rejects `null` in the reference's words. Optional arrays distinguish
+  absence from null and admit at most 100,000 entries. A signable transaction
+  is an object, is exclusive of tx/txid and belongs only to createAction.
+- Every wallet certificate returned by acquisition, listing, either
+  discovery call or proof has canonical 32-byte base64 identifiers,
+  compressed keys, the reference's revocation outpoint, 1–50-byte field names
+  and string values, a canonical DER signature and encoded length at most
+  16 MiB, including compact-size prefixes. These are structure checks;
+  the reference does not verify the signature here either.
+
+The complete dispatch inventory, with each reference line and before/after
+behavior, is in `src/wallet/substrates/CLAUDE.md` under “Result-check
+inventory (#408)”. This is the explicitly permitted four-class split:
+remaining scalar bounds, affirmative verdicts, request/filter bindings,
+transaction/BEEF checks, global graph budgets and unsafe-key checks
+are assigned to a second lane. Their behavior is unchanged. No public
+type or signature changes.
+
+`tests/wallet_http_json_result_values_408.rs` pins the four classes against
+387 bodies written by `tests/support/http_json_result_values_408.mjs` from
+the unmodified `ts-stack@edf6e03` SDK, bundled from that commit and run
+under Node 22.18.0. Of these, 56 are accepted and 331 refused. The 16 MiB
+certificate boundary (one byte below, exact, one above) and the 100,000
+array boundary use recorded expansion recipes instead of huge fixtures.
+The HMAC, signature, container and certificate regression tests all fail
+on scratch base `3eb965cb` with its own target directory (322 of 387 bodies
+differ; no setup failures), then pass here.
+#365's independent 110 byte-field cases remain pinned.
+The permission-request unit test now returns two valid DER signatures; the
+nonce safety test expects the new HMAC words. The transport architecture
+guard explicitly allows the two schema selectors (call name and output
+member name); neither classifies error text.
+The fixture writer was run in a scratch copy: only
+`tests/fixtures/http_json/createAction.json` (the full result carries both a
+signable and a completed transaction) and `http_json/errors.json` (the short
+HMAC's words) changed. Their inputs and the fixture census are unchanged.
+
+Operator-visible rows for the toolbox (`Error::WalletError` keeps its
+`wallet error: ` Display prefix):
+
+| Trigger | Old words / behavior | New words / behavior |
+|---|---|---|
+| HMAC length N ≠32 | `invalid HMAC length: expected 32, got N` | `Invalid createHmac result hmac: expected 32 bytes` |
+| Signature longer than 72 bytes | Accepted | `Invalid createSignature result signature: expected at most 72 bytes` |
+| Noncanonical signature | Accepted | `Invalid createSignature result signature: expected a canonical DER-encoded ECDSA signature` |
+| Null optional tx / BEEF | Absent | `Invalid <call> result <field>: expected an array of bytes` |
+| Null/scalar signableTransaction | Absent / serde words | `Invalid createAction result signableTransaction: expected an object` |
+| Null optional array | Absent | `Invalid <call> result <field>: expected an array` |
+| Array above 100,000 entries | Accepted | `Invalid <call> result <field>: expected at most 100000 entries` |
+| Signable transaction beside txid/tx | Accepted | `Invalid createAction result signableTransaction: expected exclusive of txid and tx` |
+| signAction carrying signableTransaction | Ignored | `Invalid signAction result signableTransaction: expected an absent field` |
+| Non-object nested record | Absent / serde words | `Invalid <call> result <field>: expected an object` |
+| Specific-linkage protocolID of the wrong shape/length | Serde words | `Invalid revealSpecificKeyLinkage result protocolID: expected a [securityLevel, protocolName] tuple` |
+| Non-object entire response | Accepted positional arrays / serde words | `Invalid HTTPWalletJSON <call> response: expected an object` |
+| Malformed / oversized certificate | Accepted / serde words | `Invalid <call> result <certificate path>: expected a canonical signed wallet certificate` |
+
+### Notes: cross-SDK parity (#408)
+
+The four classes follow `WalletResultValidation.ts:868–906`, `:971–976`,
+`:1247–1273`, `:1477–1537`, `:1919–1938`, `:2216–2225` and the HTTP wrapper's
+own `HTTPWalletJSON.ts:330–331` words. A non-object nested certificate uses
+`expected an object` outside the certificate catch. A scalar malformed
+alongside a container can still be refused in a different order until the
+second lane ports the pending scalar checks. The reference's global unsafe
+record-key check remains assigned to that lane as well.
+
+Go at `2ca481c` (`wallet/substrates/http_wallet_json.go:204–213`, `:226–235`,
+`:248–267`) reads each successful response with `json.Unmarshal`, including
+its types' custom readers; it has no separate `validateWalletResult` pass.
+Its HMAC reader already requires 32 bytes, in its own words
+(`wallet/encoding_json.go:796–811`). Its signature reader uses
+`ec.ParseSignature` (`wallet/encoding.go:141–153`), which checks scalar range
+but uses the BER path: padding is not enforced and bytes beyond the declared
+sequence are trimmed (`primitives/ec/signature.go:177–305`). Its certificate
+reader skips an empty signature and otherwise uses that same parser, with
+no 16 MiB encoded-size bound (`wallet/encoding_json.go:195–211`). `BytesList`
+is read through `[]uint8` (`wallet/encoding.go:24–31`), which also accepts
+base64 and reads null as a nil slice (the HMAC length check then refuses it).
+The outstanding differences are enumerated in the module inventory; this
+change makes no claim of complete JSON result parity.
 
 ### Fixed: inherent specific-key linkage returns counterparty keys, as the trait does (#427)
 
@@ -928,14 +1025,15 @@ renamed from `..._in_serdes_words`). No public shape moves; no migration.
 
 ### Notes: cross-SDK parity (#365)
 
-The typed reading still answers first, so an answer it takes and the
-reference refuses is read here, as before #365: `validateWalletResult`'s
-other checks of these fields are not ported (createHmac's `hmac` 32
-bytes, which the typed reading's `[u8; 32]` holds, createSignature's 72
+At the #365 landing the typed reading still answered first, so an answer
+it took and the reference refused was read here: `validateWalletResult`'s
+other checks and refusal words were not ported (createHmac's 32-byte
+refusal used the post-read check's own words, createSignature's 72
 bytes and canonical DER, `:2217-2225`; an action `tx` and a listOutputs
 `BEEF` of `null`, which the typed `Option` reads as absent where the
 reference refuses it, `:1247-1248`, `:2082`; the BEEF
-checks of listOutputs and the signable transaction). Where a byte field
+checks of listOutputs and the signable transaction). #408 above supersedes
+the HMAC/signature/null behavior; the BEEF checks remain pending. Where a byte field
 and another member are both malformed, the byte field is named here, where
 the reference names whichever it checks first (the linkages' keys before
 their bytes, `:2167-2170`). go-sdk@2ca481c's JSON substrate decodes each

@@ -11,8 +11,12 @@ This module provides transport substrates for communicating with BSV wallets ove
 |------|---------|-------|
 | `mod.rs` | Module root, constants, re-exports | ~66 |
 | `http_wire.rs` | Binary wire protocol over HTTP; the frame's originator validated, refused when not the configured one, sent raw as `Origin` (#323) | ~243 |
-| `http_json.rs` | JSON API over HTTP; an error body read as its `WalletRefusalClass` by name or code (#137); the constructor's originator sent as `Origin` and `Originator`, a call with none refused, a body over 256 MiB refused (#323); the answer read by `http_json/answer.rs` | ~1084 |
-| `http_json/answer.rs` | The answer's reading, moved out of `http_json.rs` (#339): an error status's body by its busy word, a 400 code-5 body with results handed to `review_actions.rs`, a 429's wait, its class by name or code (#137), a gateway status; a success body by its type, every call's answer the typed reading refuses read again with its byte fields normalized and refused by `byte_fields.rs` (#365), so the common answer costs no `Value` tree | ~99 |
+| `http_json.rs` | JSON API over HTTP; an error body read as its `WalletRefusalClass` by name or code (#137); the constructor's originator sent as `Origin` and `Originator`, a call with none refused, a body over 256 MiB refused (#323); the answer read by `http_json/answer.rs` | ~1078 |
+| `http_json/answer.rs` | The answer's reading (#339): busy/code-5/class/transport errors; a success body checked by `result_values.rs` before serde, then the typed reading with #365's normalized byte fallback | ~99 |
+| `http_json/result_values.rs` | #408's result dispatch and borrowed JSON records/arrays; no present byte/container `null` becomes an absent optional field; ordinary byte arrays need no `Value` tree | ~116 |
+| `http_json/result_values/bytes.rs` | Reference byte type/length checks, HMAC exactly 32, signature at most 72; the existing canonical DER checker includes scalar range and permits high S | ~87 |
+| `http_json/result_values/shapes.rs` | Action, list, certificate and proof containers in reference order, with optional arrays bounded at 100,000; signable results exclusive and createAction-only | ~123 |
+| `http_json/result_values/certificate.rs` | Signed wallet-certificate structure: base64 identifiers, compressed keys, revocation outpoint, field names/values, canonical DER and encoded size at most 16 MiB; no cryptographic signature verification | ~105 |
 | `http_json/byte_fields.rs` | The byte fields of a wallet's JSON body as the reference's `HTTPWalletJSON` reads them (#339, #365; `ts-stack@edf6e03` `HTTPWalletJSON.ts:322-341`): `byte_array` (`normalizeBRC100ByteArray`, an array of bytes or the historical object form `{"0": 1, ..}`, each `isByte`, so `1.0` and `-0` too), `normalize` (`normalizeBRC100WalletByteFields`: the seventeen `walletByteFieldNames` at any depth) and `refusal` (the byte fields `validateWalletResult` reads per call: the action results' `tx` and `signableTransaction.tx`, ciphertext, plaintext, hmac, signature, the linkages' `encryptedLinkage` and `encryptedLinkageProof`, listOutputs' `BEEF`; the first that is no array of bytes `Invalid <call> result <field>: expected an array of bytes`) | ~251 |
 | `origin.rs` | The two substrates' shared rules (#323): the reference's `normalizeWalletHttpBaseUrl` and `toOriginHeader`, the client `new` builds (`redirect::Policy::none()`), the redirect refusal | ~195 |
 | `http_json/review_actions.rs` | A wallet's code-5 body read as the reference's `HTTPWalletJSON` reads it (#339; `ts-stack@edf6e03` `HTTPWalletJSON.ts:117-241`): a 400 body with an own `isError`, code 5 and `reviewActionResults`; the envelope, the message, the call, the action-result members through `validateWalletResult`'s action checks under `returnTXIDOnly: true` (`WalletResultValidation.ts:1242-1374`; the transaction-against-request checks not ported), then the results, each refusal `WalletError` in the reference's words; the five members `Error::WalletReviewActions`; a `tx` or `competingBeef` in the historical object form (`{"0": 1, ..}`) read as its bytes by `byte_fields.rs`'s reader, the success path's too (#365) | ~493 |
@@ -191,6 +195,125 @@ The bodies are BRC-100's and the reference's `HTTPWalletJSON`'s (#105; `wallet/0
 - Base64: `signableTransaction.reference`
 - The key-related requests name `protocolID` (the `[level, name]` pair) and `keyID`; getPublicKey writes `identityKey` only when true; the options name `returnTXIDOnly`
 - A certificate's type field is `type`; list and discovery entries carry the certificate's fields flat; `keyringRevealer` is `"certifier"` or the key's hex; the linkage results are flat
+
+### Result-check inventory (#408)
+
+Read against the entire dispatch and every helper it calls in
+`ts-stack@edf6e03 packages/sdk/src/wallet/WalletResultValidation.ts`
+(2,367 lines; identical at the local clone's `4d0ea63`). Line numbers below
+refer to that file unless prefixed `HTTP:` (`substrates/HTTPWalletJSON.ts`).
+The before column is `3eb965cb`. **Done** means this lane enforces the
+reference's check in its words. **Pending** means unchanged and assigned
+to the second lane. **Typed** describes an existing serde/type restriction,
+whose refusal words are not the reference's. Related predicates are grouped
+on a row; fields and bounds are enumerated, not implied by a call name.
+This is the permitted four-class split, not a claim of complete result parity.
+
+| Check / reference site | Before | After |
+|---|---|---|
+| Entire answer is an object; HTTP:330–331, then :847–865/:2181 | Typed; arrays can also deserialize as positional structs | **Done**: `Invalid HTTPWalletJSON <call> response: expected an object` for null/scalar/array |
+| Snapshot: functions, getters, symbol keys, exotic object/array prototypes, sparse arrays, shared/detached Uint8Array; :623–645/:664–667/:718–724/:751–753/:779–821 | Not representable in JSON | Same: not representable; JSON text cannot supply JS objects or executable properties |
+| Snapshot: unsafe keys `__proto__`, `constructor`, `prototype`; object graph 1,000,000 nodes / 1,000,002 properties; dense nonbyte array 1,000,000 entries; total copied bytes 256 MiB; :215–220/:683–743/:769–818 | Not checked | **Pending**; serde's JSON depth/number/Unicode rules also differ from JS |
+| Bytes: array of integral numbers 0–255, historical numeric-key object normalization, default 256 MiB; :868–906, HTTP:322–329 | #365 fallback; typed successes bypassed the bound; wrong byte types in reference words on fallback | **Done** per field before typed reading; integral floats and negative zero still accepted; aggregate snapshot budget remains pending |
+| Optional array: absent allowed, null/nonarray refused, ≤100,000; :971–988 | Typed arrays; optional null became absent; no count bound | **Done** at every array site below; string-element bounds pending |
+| `abortAction.aborted` boolean; :2189–2191/:967–969 | Typed bool | **Pending** words |
+| `internalizeAction.accepted` true; :2192–2194 | Typed bool, false accepted | **Pending** |
+| `relinquishOutput`/`relinquishCertificate.relinquished` true; :2195–2198 | Typed bool, false accepted | **Pending** |
+| `verifyHmac`/`verifySignature.valid` true; :2199–2202 | Typed bool, false accepted | **Pending** |
+| `isAuthenticated`/`waitForAuthentication.authenticated` true; :2203–2206 | Typed bool, false accepted | **Pending** |
+| `getPublicKey.publicKey`: string, even hex, 33 bytes, canonical compressed secp256k1 point; :2207–2209/:917–933 | String only | **Pending** |
+| `encrypt.ciphertext`, `decrypt.plaintext`: required bytes; :2210–2215 | #365; null refused in byte words after typed failure | **Done** before typed reading |
+| `createHmac.hmac`: required bytes, exactly 32; :2216–2218/:902–904 | Length refused as `invalid HMAC length: expected 32, got N` | **Done**: `Invalid createHmac result hmac: expected 32 bytes` |
+| `createSignature.signature`: required bytes, ≤72, strict minimal DER, positive nonzero scalars <n; :2219–2225; `Secp256k1Validation.ts:33–53` | Arbitrary bytes accepted | **Done**, high S permitted; length check precedes byte content and DER |
+| Both linkages: prover/verifier/counterparty string, hex, 33 bytes, point; :2165–2170 | Prover/counterparty typed PublicKey; verifier String, parse words differ | **Pending** |
+| Both linkages: required encryptedLinkage/encryptedLinkageProof bytes; :2171–2172 | #365 fallback | **Done** before typed reading |
+| Counterparty linkage revelationTime: 1–64 UTF-8 bytes, ISO shape with timezone, finite Date.parse; :2226–2228/:992–999 | String only | **Pending** |
+| Counterparty linkage verifier/counterparty equal request ignoring case; :2229–2240 | Not bound | **Pending** |
+| Specific linkage protocolID array length 2, level integer 0–2, name 5–400 UTF-8 bytes; keyID 1–800; proofType integer 0–255; :2243–2249 | Tuple/level/u8 typed, strings unbounded | **Done** tuple shape/length (including null); **Pending** scalar bounds and words |
+| Specific linkage verifier equals request; self → prover, anyone → generator key, explicit counterparty → requested key; :2250–2272 | Not bound | **Pending** |
+| Specific linkage protocolID pair and keyID equal request; :2273–2281 | Not bound | **Pending** |
+| getHeight integer 1–2^32−1; :2293–2295 | Inherent u64 accepts 0 and >u32, trait truncates | **Pending** |
+| getHeaderForHeight.header string, even hex, exactly 80 bytes; :2296–2298 | String only | **Pending** |
+| getNetwork.network mainnet/testnet; :2299–2303 | Same values, `unknown network: X` | **Pending** reference words |
+| getVersion.version string 7–30 UTF-8 bytes; :2304–2306 | String only | **Pending** |
+
+| Action check / reference site | Before | After |
+|---|---|---|
+| Optional txid string/even hex/exactly 32 bytes; :1247 | Typed fixed hex, null absent | **Pending** reference words and null-scalar refusal |
+| Optional tx bytes; signableTransaction.tx required bytes; :1248/:1272 | #365; tx null absent; missing signable.tx byte refusal | **Done** bytes including null |
+| tx/signable.tx complete exactly framed atomic/partial atomic/ordinary BEEF with a subject; :1376–1418; tx matching supplied txid :1250–1256 | Byte shape only on success (review errors have #339's parser) | **Pending** |
+| noSendChange optional array and canonical `64hex.uint32` outpoints (no padded/plus-signed index); :1257–1262/:1430–1440 | Typed outpoint accepts noncanonical numeric spellings and object form; null absent | **Done** container; **Pending** canonical outpoints and words |
+| sendWithResults optional array; ≤MAXIMUM_SEND_WITH_TRANSACTIONS+1; each item object, txid hex32, status unproven/sending/failed; :1013–1034/:1263 | Typed item/hex/status; null absent, count unbounded | **Done** array ≤100,000 and object shape; **Pending** smaller transaction-result count and scalar words |
+| signableTransaction present only for createAction, exclusive of txid/tx; object shape; :1265–1271 | Typed optional object; null absent; exclusivity unchecked; signAction ignores it | **Done** |
+| signableTransaction.reference nonempty canonical base64; :1273/:1443–1448 | Base64 decoder, empty accepted | **Pending** exact grammar and words |
+| createAction requires deferred transaction when signAndProcess=false or any requested input unsigned; otherwise completed txid, no signable result; :1275–1311 | Not checked | **Pending** |
+| signAction requires completed txid; :1313–1315 | Not checked | **Pending** |
+| Request inputBEEF exactly framed; source values recovered by requested outpoints; :297–334/:1243–1246 | Not checked | **Pending** |
+| createAction transaction version/lockTime equal request (defaults 1/0); :1061–1070 | Not checked | **Pending** |
+| Transaction input sourceTXID hex32, sourceOutputIndex uint32; unique outpoints; :1036–1045/:1072–1080/:1168–1174 | Not parsed on JSON success | **Pending** |
+| Each requested input exactly once, unique requested outpoint; sequence default 0xffffffff and optional unlocking script match; :1081–1122 | Not checked | **Pending** |
+| Outputs satoshis integer 0–21e14; all requested amount/script multiplicities, position when randomizeOutputs=false; :1124–1154 | Not checked | **Pending** |
+| Completed input source evidence required; deferred sources may be unresolved; each source amount 0–21e14; input sum safe and ≤21e14; :1175–1191 | Not checked | **Pending** |
+| Each output amount 0–21e14, output sum safe and ≤21e14, sum ≤known input sum; :1193–1205 | Not checked | **Pending** |
+| signAction requested spend index canonical and present; unlocking script and supplied sequence match; :1208–1240 | Not checked | **Pending** |
+| noSendChange associated with transaction and each outpoint names returned subject; :1323–1333 | Not checked | **Pending** |
+| sendWithResults unique txid, belongs to requested or returned set when nonempty; :1334–1354 | Not checked | **Pending** |
+| tx requires txid; completed txid requires tx unless returnTXIDOnly=true; :1355–1363 | Not checked | **Pending** |
+| signAction.noSendChange absent; result has txid, signable or nonempty batch outcome; :1364–1373 | Unknown noSendChange ignored; empty results accepted | **Pending** (null noSendChange now fails earlier array check) |
+
+| List check / reference site | Before | After |
+|---|---|---|
+| totalActions/totalOutputs/totalCertificates safe integer 0–2^53−1; :1926 | u32 (too narrow), serde words | **Pending** |
+| actions/outputs/certificates required array, ≤100,000; each visited item an object; :1927–1928/:1960/:2098/:1870 | Typed Vec/struct; wrong types serde words; positional structs possible | **Done** |
+| Total at least page length; page ≤request.limit (default 10, limit integer ≤10000); :1929–1936 | Not checked | **Pending** |
+| actions[i].txid hex32; satoshis integer −21e14..21e14; status completed/unprocessed/sending/unproven/unsigned/nosend/nonfinal/failed; isOutgoing boolean; :1961–1968 | Typed hex/i64/enum/bool, amount wider | **Pending** bounds and words |
+| Action/input/output descriptions empty or 5–2000 UTF-8 bytes; :1941–1945/:1969/:2037/:2073 | String only | **Pending** |
+| Action labels optional array, each 1–300 UTF-8 bytes; labels required if includeLabels, match requested any/all filter (default any) when present; :1970–1992 | Typed Option<Vec<String>>, null absent; no bound/binding | **Done** container/count; **Pending** element lengths and binding |
+| Action version/lockTime uint32; :1993–1994 | u32 typed | **Pending** reference words / integral float acceptance |
+| Action inputs optional array, required for any input inclusion flag; :1995–2003 | Typed optional Vec, null absent; omission accepted | **Done** container/count; **Pending** required-by-request |
+| Input sourceOutpoint canonical, sourceSatoshis 0–21e14; :2009–2010 | Typed outpoint/u64, looser | **Pending** |
+| Input sourceLockingScript/unlockingScript optional even hex, required by respective inclusion flags; :2011–2036 | Hex bytes, null absent; request ignored | **Pending** words/null scalars and binding |
+| Input sequenceNumber uint32; :2038 | u32 typed | **Pending** words / integral floats |
+| Action outputs optional array, required by output inclusion flags; :2041–2047 | Typed optional Vec, null absent; omission accepted | **Done** container/count; **Pending** required-by-request |
+| Action output satoshis 0–21e14, lockingScript optional even hex / required by flag; :2053–2066 | u64 and optional hex; no amount bound or request binding | **Pending** |
+| Action output spendable boolean (reference field label is bare `spendable`); customInstructions optional string; :2067–2070 | Typed bool/string, null optional string absent | **Pending** reference words/null scalar |
+| Action output tags optional array, each 1–300 UTF-8 bytes; outputIndex uint32; basket string 0–300; :2071–2074 | Tags required Vec<String> (too strict), u32, unbounded String | **Done** present tags container/count; **Pending** absent tags compatibility, element/basket bounds and scalar words |
+| listOutputs optional BEEF bytes, exactly framed BEEF; :2082/:1421–1427 | #365 byte fallback, null absent; no parse | **Done** bytes including null; **Pending** BEEF framing |
+| Nonempty output page with include=entire transactions requires BEEF; :2091–2093 | Not checked | **Pending** |
+| Output outpoint canonical and unique ignoring txid case; :2099–2104 | Typed outpoint, uniqueness unchecked | **Pending** |
+| Output satoshis 0–21e14, spendable boolean, optional even-hex lockingScript; :2105–2112 | u64/bool/optional hex, amount unbounded, null script absent | **Pending** bounds/words/null scalar |
+| Locking script required by include=locking scripts; BEEF contains output, matches amount and supplied script; :2113–2130 | Not checked | **Pending** |
+| Output customInstructions optional string; tags/labels optional arrays, each 1–300 UTF-8 bytes; :2132–2136 | Typed optional fields, null absent | **Done** array/count; **Pending** string/element/null-scalar words |
+| Output tags/labels required by respective flags; tags match requested any/all filter (default any) when present; :2137–2160 | Not checked | **Pending** |
+
+| Certificate check / reference site | Before | After |
+|---|---|---|
+| Certificate object on acquire, list, both discovery calls, optional proof; :1478/:1870/:2308/:2352–2354 | Typed struct; optional proof null absent | **Done** `an object` outside the aggregate catch |
+| type/serialNumber canonical round-trip base64 of exactly 32 bytes; :1481–1488 | Strings only | **Done**, aggregate certificate words |
+| subject/certifier canonical compressed secp256k1 keys; :1489–1494 | Strings only | **Done**, aggregate certificate words |
+| Revocation 64hex txid, optional index default 0, canonical unsigned decimal ≤uint32, at most one dot; :1495–1506 | String only | **Done**, aggregate certificate words; txid alone accepted |
+| fields object, each name 1–50 UTF-8 bytes and safe, each value string; :1507/:1455–1474 | Typed IndexMap<String,String>, names unchecked | **Done** structure/length/value, aggregate words; **Pending** global unsafe-key check |
+| Signature even hex, strict minimal DER with scalars 1..n−1; :1529–1531 | String only | **Done**, high S accepted, aggregate words |
+| Binary encoded length ≤16 MiB including all compact-size prefixes; :1451–1453/:1479–1535 | Unbounded | **Done**, no serialization/sorting needed to count UTF-8 lengths |
+| listCertificates certifier/type filters, discoverByIdentityKey subject equals request; :1852–1887 | Not checked | **Pending** |
+| Optional keyring object with safe field names 1–50 bytes / nonempty base64-grammar values (no decode/re-encode check); :1888–1890 | Optional IndexMap, null absent; no key/value bounds | **Done** object; **Pending** field/base64 words |
+| Optional verifier public key; :1891–1893 | Optional String, null absent | **Pending** |
+| Discovery certifierInfo object; name 1–100 UTF-8 bytes; iconUrl 1–500 and absolute HTTP(S); description 5–50; trust integer 1–10; :1894–1900 | Typed struct/strings/u8; bounds unchecked | **Done** object; **Pending** all scalar bounds/words |
+| Discovery publiclyRevealedKeyring object with safe 1–50 byte names / nonempty base64-grammar values; decryptedFields object with safe 1–50 byte names / string values; :1901–1911 | Required typed maps, serde words | **Done** objects; **Pending** key/value words and bounds |
+| discoverByAttributes: `any` all searchable fields excluding profilePhoto/icon; minimum 2 characters, fuzzy for 2, English text tokens/stopwords/phrases/negative terms otherwise; :1577–1712/:1730–1735 | Not bound | **Pending**, including literal token order and diacritic/case folding |
+| Named attributes: ignore blank requested values, require usable attribute, exact normalized userName, other named fields fuzzy in order within one line; :1714–1719/:1736–1755 | Not bound | **Pending** |
+| acquireCertificate requested type and certifier; :2309–2318 | Not bound | **Pending** |
+| acquire/prove partial certificate binding: exact type/serial; case-insensitive subject/certifier/signature; canonical same outpoint; same field names and values, issuance names only; :1800–1841/:2319–2331/:2354 | Not bound | **Pending** |
+| proveCertificate.keyringForVerifier object, safe 1–50 byte keys and canonical base64 values; :2334/:1455–1474 | Required typed map, serde words | **Done** object; **Pending** names/base64 words |
+| Proof keyring has exactly requested field set (deduplicated); :2335–2350 | Not bound | **Pending** |
+| Optional proof certificate checked; optional verifier valid key / matches request ignoring case; :2352–2361 | Typed optional cert/string; null absent | **Done** certificate; **Pending** verifier scalar/binding |
+| Request snapshots preserve only binding fields; reject malformed request arrays/properties/unsafe keys; :234–508/:1540–1568 | Rust owns typed request across await, but no result-binding snapshot | Ownership already prevents JS mutation; **Pending** use of request context for all binding checks above |
+
+Tests: `tests/wallet_http_json_result_values_408.rs`, generated by
+`tests/support/http_json_result_values_408.mjs` against the pinned built SDK
+under Node 22.18.0. #365's 110 byte forms remain independently pinned.
+All pending rows (including refusal precedence when a scalar and container
+are both malformed) belong to the second lane; no second lane was spawned.
 
 ## Constants
 
