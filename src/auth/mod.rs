@@ -63,6 +63,7 @@
 
 pub mod certificates;
 pub mod peer;
+mod requested_certificates_json;
 pub mod session_manager;
 pub mod transports;
 pub mod types;

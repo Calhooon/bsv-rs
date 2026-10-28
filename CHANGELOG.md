@@ -107,6 +107,80 @@ is read through `[]uint8` (`wallet/encoding.go:24–31`), which also accepts
 base64 and reads null as a nil slice (the HMAC length check then refuses it).
 The outstanding differences are enumerated in the module inventory; this
 change makes no claim of complete JSON result parity.
+### Fixed: certificate requests verify the parsed object's JSON.stringify preimage (#426)
+
+A received certificate request now verifies the complete `requestedCertificates`
+object re-serialized as the reference's `JSON.stringify`, including properties
+outside the typed certificate set. Previously `AuthMessage::signing_data` used
+its retained raw JSON bytes under #280's precedent. That accepted a signature
+the reference refused on whitespace or redundant escapes, and refused the
+reference's valid signature over the parsed object. Neither SDK's normal
+writer emits those alternate encodings; third-party clients can send them.
+
+The new `auth/requested_certificates_json.rs` parser preserves insertion order
+with `IndexMap`, moves array-index property names ahead in numeric order, and
+keeps the last duplicate property's value in its first position. It emits
+compact separators. Node 22.18.0 measures the short escapes for backspace,
+tab, newline, form feed and carriage return; lowercase `\u00xx` for the other
+C0 controls; `\"` and `\\`; lowercase `\uXXXX` for lone UTF-16 surrogates.
+Slashes, HTML punctuation, Unicode, U+2028/U+2029 and valid surrogate pairs
+are unescaped. Numbers read as doubles and print with ECMAScript formatting
+(`ryu-js`), including negative zero as `0`, the fixed/exponent thresholds,
+and rounding beyond the safe-integer range. The original text stays available
+on `AuthMessage`; only the request's signature preimage changes. The shared
+`signing_data` path covers HTTP and JSON-message transports. CertificateResponse
+keeps its existing #280 behavior.
+
+This is #400's byte-compared body: parse it in order, never through a sorted
+`serde_json::Value`. The typed set alone loses extra properties and cannot be
+the signature preimage. No public fields or method signatures change.
+
+`tests/support/auth_http_certificate_request_416.mjs` extends the #416 recorder,
+running both archived reference SDKs under Node 22.18.0 without a socket. The
+regenerated `tests/vectors/auth_http_certificate_request_416.json` adds eight
+pairs signed over the raw and stringified forms: whitespace, reordered keys,
+an escaped string, all 32 controls plus otherwise unescaped characters, lone
+surrogates, numeric property names, duplicate keys, and fourteen number forms.
+Callback objects are recorded as JSON text to preserve lone surrogates.
+Two independent recordings match byte for byte. `tests/auth_peer_http_certificate_request_416.rs`
+asserts the real Peer's verdict equals both recorded references and checks its
+preimage bytes and callback delivery. On base `edfc442d`, eleven tests fail and
+four pass; all fifteen pass with this fix.
+
+The four #422 pins are the record of the state before this lane, not changed
+reference observations. For the toolbox's table:
+
+| Condition / pin | Before #426 (Rust / reference) | After #426 (Rust / reference) |
+| H3: whitespace header, raw signature | Accept / refuse | Refuse / refuse |
+| H3b: whitespace header, stringified signature | Refuse / accept | Accept / accept |
+| H5: escaped key, raw signature | Accept / refuse | Refuse / refuse |
+| H5b: escaped key, stringified signature | Refuse / accept | Accept / accept |
+| Reordered keys, signed in received order | Accept / accept | Accept / accept |
+| Extra property, signed with that property | Accept / accept | Accept / accept |
+
+Rust refusals in this table are `WalletError("Signature is not valid")`;
+no certificate-request or general-message callback is delivered.
+
+### Notes: cross-SDK parity (#426)
+
+Under the owner's ruling (c) and the keeper's 2026-10-28 12:1xZ word,
+this follows `ts-stack@edf6e03`
+`packages/sdk/src/auth/Peer.ts:1068`: the verifier uses
+`JSON.stringify(message.requestedCertificates)` as its preimage. `SimplifiedFetchTransport.ts:238-249`
+parses the header with `JSON.parse`, and `:349` carries that object into the
+message. The older `ts-sdk@9e3ede6b` records the same certificate-handler
+verdicts. The newer full HTTP intake still refuses its missing `initialNonce`;
+the recorder retains that observation separately and invokes its unchanged
+certificate handler, as #416 did. This change resolves the preimage divergence,
+not that separate intake difference or existing typed-schema limitations.
+
+Go at `2ca481c`, `auth/peer.go:829`, also re-serializes before verifying with
+`json.Marshal(message.RequestedCertificates)` (its writer at `:1109`). Its
+typed set drops unknown properties, sorts map keys and uses Go's JSON string
+escaping; it is not a byte oracle for JavaScript's insertion-ordered object.
+The reference writers use `JSON.stringify` (`auth-express-middleware/src/index.ts:943,1015`)
+and Rust's header writer uses `serde_json::to_string` (`http.rs:582`). #422's
+H3/H3b/H5/H5b verdicts remain historical evidence of the old behavior above.
 
 ### Fixed: inherent specific-key linkage returns counterparty keys, as the trait does (#427)
 

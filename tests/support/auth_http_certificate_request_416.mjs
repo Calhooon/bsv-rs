@@ -1,4 +1,4 @@
-// #416 fold: SimplifiedFetchTransport and the Peer's certificate handler.
+// #416 / #426: SimplifiedFetchTransport and the Peer's certificate handler.
 // Run with Node 22.18.0 and the git-archive bundles made by the #416 recorder:
 // node tests/support/auth_http_certificate_request_416.mjs "$OUT/ts-stack.mjs" "$OUT/ts-sdk.mjs"
 // No socket or default URL. The older bundle is recorded for comparison too.
@@ -27,13 +27,25 @@ async function record (bundle, reference) {
     ['property_order', JSON.stringify({ types, certifiers: [certifier] }), 'header'],
     ['extra_property', JSON.stringify({ ...requested, extension: 'kept' }), 'header'],
     ['general_payload_signature', compact, 'payload'],
-    // H3/H3b and H5/H5b: JSON.stringify removes formatting whitespace and
-    // redundant escapes in the reference; Rust verifies the received text (#280).
+    // H3/H3b and H5/H5b record the reference verdicts before and after #426.
     ['spaced_header_signature', spaced, 'header'],
     ['spaced_stringified_signature', spaced, 'stringified'],
     ['escaped_header_signature', escaped, 'header'],
     ['escaped_stringified_signature', escaped, 'stringified']
   ]
+  const paired = (name, header) => {
+    for (const signed of ['header', 'stringified']) headers.push([`${name}_${signed}`, header, signed])
+  }
+  paired('426_whitespace', `{ "types" : ${JSON.stringify(types)}, "certifiers" : [${JSON.stringify(certifier)}] }`)
+  paired('426_reordered_keys', JSON.stringify({ types, certifiers: [certifier] }))
+  paired('426_escaped_string', compact.replace('"name"', '"n\\u0061me"'))
+  const extension = text => compact.slice(0, -1) + ',"extension":' + text + '}'
+  paired('426_controls', extension('"' + Array.from({ length: 32 }, (_, n) => `\\u${n.toString(16).padStart(4, '0')}`).join('') + '\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00"'))
+  paired('426_lone_surrogates', extension('"\\uD800x\\uDC00\\uD800\\uD800\\uDC00"'))
+  paired('426_numeric_keys', extension('{"z":0,"10":"ten","2":"two","01":"one","4294967295":"max","0":"zero","a":1}'))
+  paired('426_duplicate_keys', extension('{"z":1,"a":2,"\\u007a":3}'))
+  const numbers = ['-0.0', '100.0', '1E2', '1e-6', '1e-7', '1e20', '1e21', '9007199254740993', '18446744073709551616', '7.2057594037927933e16', '1e-400', '5e-324', '1.7976931348623157e308', '0.1000000000000000055511151231257827021181583404541015625']
+  paired('426_numbers', extension('[' + numbers.join(',') + ']'))
   const cases = []
   for (const [name, header, signed] of headers) {
     const signedText = signed === 'payload' ? null
@@ -109,7 +121,9 @@ async function record (bundle, reference) {
     await peer.ready
     const requests = []
     let generalDeliveries = 0
-    peer.listenForCertificatesRequested((identity, value) => requests.push({ identity, value }))
+    // Keep callback JSON as text so lone UTF-16 surrogates remain observable
+    // in readers whose native strings only represent Unicode scalar values.
+    peer.listenForCertificatesRequested((identity, value) => requests.push({ identity, value_text: JSON.stringify(value) }))
     peer.listenForGeneralMessages(() => { generalDeliveries++ })
     const writer = new Utils.Writer()
     writer.write(Array(32).fill(7))
@@ -125,7 +139,7 @@ async function record (bundle, reference) {
       await inboundWork
     } catch (e) { error = e.message }
     assert.equal(fetches, 2, `${reference}: ${name}: ${error}`)
-    assert.equal(verified.at(-1), JSON.stringify(JSON.parse(header)))
+    assert.equal(verified.at(-1), JSON.stringify(JSON.parse(header)), `${reference}: ${name}: ${error}`)
     cases.push({ name, header, signed, signed_text: signedText, intake_error: intakeError, verified_text: verified.at(-1), error, requests, general_deliveries: generalDeliveries })
   }
   assert.equal(cases[0].error, null)
@@ -139,6 +153,10 @@ async function record (bundle, reference) {
   assert.equal(cases[5].error, 'Signature is not valid')
   assert.equal(cases[6].error, null)
   assert.equal(cases[6].requests.length, 1)
+  for (const item of cases.slice(7)) {
+    assert.equal(item.error, item.signed_text === item.verified_text ? null : 'Signature is not valid', item.name)
+    assert.equal(item.requests.length, item.error == null ? 1 : 0, item.name)
+  }
   return { reference, cases }
 }
 

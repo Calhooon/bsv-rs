@@ -278,91 +278,108 @@ async fn issue_416_http_certificate_request_refuses_a_general_payload_signature(
     assert!(observed.general.is_empty());
 }
 
-// Behavior pins, not a changed verdict: #280 preserves the signed text received.
-// The other side's verdict and actual preimage are read from the Node recorder.
-async fn raw_text_divergence(name: &str, raw_signature: bool) {
+// #426 flips #422's four behavior pins to the recorded reference verdicts.
+async fn same_as_reference(name: &str) {
     let case = witness(name);
-    let header = case["header"].as_str().unwrap();
-    let stringified = case["verified_text"].as_str().unwrap();
-    assert_ne!(header, stringified);
-    assert_eq!(
-        serde_json::from_str::<Value>(header).unwrap(),
-        serde_json::from_str::<Value>(stringified).unwrap()
-    );
-    if name.starts_with("spaced_") {
-        assert!(header.contains(' '));
-        assert!(!stringified.contains(' '));
-    } else {
-        assert!(header.contains(r"\u0074ypes"));
-        assert!(stringified.contains("\"types\""));
-        assert!(!stringified.contains(r"\u0074"));
-    }
-    assert_eq!(
-        case["signed"],
-        if raw_signature {
-            "header"
-        } else {
-            "stringified"
-        }
-    );
-    assert_eq!(
-        case["signed_text"],
-        if raw_signature { header } else { stringified }
-    );
-    let reference_verifies = case["error"].is_null();
-    assert_eq!(reference_verifies, !raw_signature);
-    if !reference_verifies {
-        assert_eq!(case["error"], "Signature is not valid");
-    }
-    assert_eq!(
-        case["requests"].as_array().unwrap().len(),
-        usize::from(reference_verifies)
-    );
-    assert_eq!(case["general_deliveries"], 0);
-
     let observed = exchange(&case).await;
+    let expected = match case["error"].as_str() {
+        Some(words) => Err(Error::WalletError(words.into())),
+        None => Ok(()),
+    };
+    assert_eq!(observed.result, expected, "{name}");
     assert_eq!(observed.messages.len(), 2);
     let message = &observed.messages[1];
     assert_eq!(message.message_type, MessageType::CertificateRequest);
     assert_eq!(
         message.requested_certificates_text.as_ref().unwrap().get(),
-        header
+        case["header"].as_str().unwrap(),
+        "{name}: received text retained"
     );
-    assert_eq!(message.signing_data(), header.as_bytes());
-    if raw_signature {
-        assert_eq!(observed.result, Ok(()), "{name}");
-        let requested: RequestedCertificateSet = serde_json::from_str(header).unwrap();
+    assert_eq!(
+        message.signing_data(),
+        case["verified_text"].as_str().unwrap().as_bytes(),
+        "{name}: JSON.stringify preimage"
+    );
+    if expected.is_ok() {
+        let requested: RequestedCertificateSet =
+            serde_json::from_str(case["header"].as_str().unwrap()).unwrap();
         assert_eq!(
             serde_json::to_value(observed.requests).unwrap(),
-            serde_json::to_value(vec![requested]).unwrap()
-        );
-    } else {
-        assert_eq!(
-            observed.result,
-            Err(Error::WalletError("Signature is not valid".into())),
+            serde_json::to_value(vec![requested]).unwrap(),
             "{name}"
         );
-        assert!(observed.requests.is_empty());
+    } else {
+        assert!(observed.requests.is_empty(), "{name}");
     }
     assert!(observed.general.is_empty());
+    assert_eq!(
+        case["requests"].as_array().unwrap().len(),
+        usize::from(expected.is_ok())
+    );
+    assert_eq!(case["general_deliveries"], 0);
+}
+
+async fn both_preimages(name: &str) {
+    same_as_reference(&format!("426_{name}_header")).await;
+    same_as_reference(&format!("426_{name}_stringified")).await;
 }
 
 #[tokio::test]
-async fn issue_416_h3_whitespace_header_signed_raw_verifies() {
-    raw_text_divergence("spaced_header_signature", true).await;
+async fn issue_416_h3_whitespace_header_signed_raw_is_refused() {
+    same_as_reference("spaced_header_signature").await;
 }
 
 #[tokio::test]
-async fn issue_416_h3b_whitespace_header_signed_stringified_is_refused() {
-    raw_text_divergence("spaced_stringified_signature", false).await;
+async fn issue_416_h3b_whitespace_header_signed_stringified_verifies() {
+    same_as_reference("spaced_stringified_signature").await;
 }
 
 #[tokio::test]
-async fn issue_416_h5_escaped_header_signed_raw_verifies() {
-    raw_text_divergence("escaped_header_signature", true).await;
+async fn issue_416_h5_escaped_header_signed_raw_is_refused() {
+    same_as_reference("escaped_header_signature").await;
 }
 
 #[tokio::test]
-async fn issue_416_h5b_escaped_header_signed_stringified_is_refused() {
-    raw_text_divergence("escaped_stringified_signature", false).await;
+async fn issue_416_h5b_escaped_header_signed_stringified_verifies() {
+    same_as_reference("escaped_stringified_signature").await;
+}
+
+#[tokio::test]
+async fn issue_426_whitespace_is_stringified_before_verifying() {
+    both_preimages("whitespace").await;
+}
+
+#[tokio::test]
+async fn issue_426_reordered_keys_keep_the_received_order() {
+    both_preimages("reordered_keys").await;
+}
+
+#[tokio::test]
+async fn issue_426_escaped_strings_are_stringified_before_verifying() {
+    both_preimages("escaped_string").await;
+}
+
+#[tokio::test]
+async fn issue_426_control_escapes_match_json_stringify() {
+    both_preimages("controls").await;
+}
+
+#[tokio::test]
+async fn issue_426_lone_surrogates_are_preserved_and_paired_surrogates_decoded() {
+    both_preimages("lone_surrogates").await;
+}
+
+#[tokio::test]
+async fn issue_426_integer_keys_precede_other_keys_in_numeric_order() {
+    both_preimages("numeric_keys").await;
+}
+
+#[tokio::test]
+async fn issue_426_duplicate_keys_keep_the_last_value_and_first_position() {
+    both_preimages("duplicate_keys").await;
+}
+
+#[tokio::test]
+async fn issue_426_numbers_use_json_stringify_rounding_and_notation() {
+    both_preimages("numbers").await;
 }

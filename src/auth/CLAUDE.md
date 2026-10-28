@@ -10,7 +10,8 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
-| `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
+| `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | ~660 |
+| `requested_certificates_json.rs` | #426: parsed-object request preimages; ordered maps, JavaScript integer keys, UTF-16 escapes and ECMAScript numbers; no recursive parser stack | 217 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
 | `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles, the callback's Peer holding the transport weakly so a dropped Peer is freed (#353); a general message propagates a wallet's error, and only `valid: false` reaches the Peer's signature words (#407) | 970 |
 | `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
@@ -34,7 +35,7 @@ Transport layer implementations for auth messages:
 - `mod.rs` - Transport trait and re-exports (conditionally exports WebSocket types)
 - `http.rs` - SimplifiedFetchTransport for HTTP (BRC-104), MockTransport for testing, HttpRequest/HttpResponse types
 - `http/client.rs` - the transport's client (`http` feature, #320): `new`'s default (30 s and 10 s timeouts, no idle reuse, no redirect followed), `with_client(base_url, client)` (the reference's `fetchClient`, the caller's client used as given), and the refusal of an answer with a redirect status on both paths (`AuthError`, `Network error while sending authenticated request to {url}: fetch failed; Node 22's wrapper, #410, without its cause chain`)
-- `http/handshake.rs` - Handshake status/JSON words and certificate-header parsing (#410); since #416 the body is capped at the configurable 1 MiB default and the certificate header at 262,144 UTF-8 bytes, before retaining `requested_certificates_text` and parsing the typed set; the fold preserves property order and extra properties for the Peer's signature
+- `http/handshake.rs` - Handshake status/JSON words and certificate-header parsing (#410); since #416 the body is capped at the configurable 1 MiB default and the certificate header at 262,144 UTF-8 bytes, before retaining `requested_certificates_text` and parsing the typed set; the Peer re-serializes the complete object for its signature with #426's ordered parser
 - `http/body.rs` - #416: streamed body caps, default 1 MiB handshake and 16 MiB application; `with_max_handshake_response_bytes` and `with_max_response_bytes` configure positive safe integers, Content-Length checked first
 - `http/body_tests.rs` - the recorded invalid and oversized declared Content-Length cases, on constructed Responses to isolate the SDK guard from native HTTP framing
 - `http/response_bounds.rs` - #416: bounded even-length hex signature, optional canonical base64 request ID of 32 bytes, signed headers bounded at 512 / 1,024-byte name / 32,768-byte value / 262,144-byte total; repeated values joined and Latin-1 header text signed as UTF-8
@@ -130,10 +131,10 @@ impl AuthMessage {
 - `InitialRequest` - Empty (not signed, starts handshake)
 - `InitialResponse` - `your_nonce || initial_nonce` (base64-decoded, initiator nonce then responder nonce; matches Go/TS)
 - `General` - The payload bytes
-- `CertificateRequest` - the `requestedCertificates` JSON text as transmitted (`requested_certificates_text`)
+- `CertificateRequest` - JSON.stringify of the parsed `requestedCertificates` object (`requested_certificates_text`), preserving insertion order and extra properties (#426)
 - `CertificateResponse` - the `certificates` JSON text as transmitted (`certificates_text`) (the reference's certificate JSON since #268)
 
-The signed certificate texts (#280): BRC-103 names no serialization (`0103.md:133-137`, `:172`); the reference signs `JSON.stringify` of the member it sends and verifies `JSON.stringify` of the member it parsed (`Peer.ts:453`, `:1068`, `:1140`, `:1203`), the received text when it is compact. `AuthMessage`'s serde is hand-written (JSON only, `serde_json` raw values): the deserializer keeps each member's text as received and parses the value from it; the serializer writes a carried text as it stands while it reads back to the value (parsed as the type, the same `serde_json::Value`), the value otherwise; `signing_data` signs the same bytes. A member changed after receipt is serialized afresh. `Peer` builds with the setters, so it signs the compact text it sends. Reading an `AuthMessage` from a `serde_json::Value` (`from_value`) still parses, but the text is then the `Value`'s key-sorted re-serialization: read a certificate message from its text. A struct literal adds `certificates_text: None, requested_certificates_text: None`.
+The signed certificate texts (#280, #426): BRC-103 names no serialization (`0103.md:133-137,172`); the reference signs and verifies `JSON.stringify` (`Peer.ts:453,1068,1140,1203`). `AuthMessage` retains raw member text and a typed view. Its serializer writes retained text while it still matches the typed member; a mutation uses the typed value. CertificateRequest signing now parses the complete retained object into ordered maps and re-serializes it: whitespace disappears, redundant escapes decode, lone UTF-16 surrogates use lowercase `\uXXXX`, control characters use JSON.stringify's escapes, finite numbers use ECMAScript notation. Array-index keys come first in numeric order; other keys keep their first insertion position, duplicates replacing values. Extra properties remain signed. CertificateResponse retains #280's raw-text preimage. This request body is #400's byte-compared exception: never parse through a sorted `serde_json::Value`. Reading a message through `from_value` has already lost its original map order; read certificate messages from their text. Setters build compact outgoing text. A struct literal adds `certificates_text: None, requested_certificates_text: None`.
 
 **get_key_id()** behavior by message type:
 - `InitialResponse` - `"{your_nonce} {initial_nonce}"` (uses the message's own fields, ignoring `peer_session_nonce` param)
@@ -519,6 +520,7 @@ The auth module uses:
 - `tokio` - Async runtime (sync primitives, time, spawn)
 - `async_trait` - Async trait support
 - `serde`, `serde_json` - Serialization
+- `ryu-js` - ECMAScript number formatting in certificate-request preimages (#426)
 - `indexmap` - `RequestedCertificateTypes`, the requested set's `types` in insertion order (#288); the certificates' field and keyring maps (#394); through `wallet` since #385
 - `rand` - Random number generation
 - `reqwest` - HTTP client (with `http` feature)

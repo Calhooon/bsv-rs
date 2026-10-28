@@ -16,16 +16,7 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                },
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ]
-              }
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
             }
           ],
           "general_deliveries": 0
@@ -41,17 +32,7 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ],
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                },
-                "extension": "kept"
-              }
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"kept\"}"
             }
           ],
           "general_deliveries": 0
@@ -89,16 +70,7 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ],
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                }
-              }
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}"
             }
           ],
           "general_deliveries": 0
@@ -125,16 +97,228 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ],
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                }
-              }
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_whitespace_header",
+          "header": "{ \"types\" : {\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}, \"certifiers\" : [\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"] }",
+          "signed": "header",
+          "signed_text": "{ \"types\" : {\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}, \"certifiers\" : [\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"] }",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_whitespace_stringified",
+          "header": "{ \"types\" : {\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}, \"certifiers\" : [\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"] }",
+          "signed": "stringified",
+          "signed_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_reordered_keys_header",
+          "header": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "signed": "header",
+          "signed_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_reordered_keys_stringified",
+          "header": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "signed": "stringified",
+          "signed_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_escaped_string_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"n\\u0061me\"]}}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"n\\u0061me\"]}}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_escaped_string_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"n\\u0061me\"]}}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_controls_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00\"}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00\"}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_controls_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00\"}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_lone_surrogates_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\uD800x\\uDC00\\uD800\\uD800\\uDC00\"}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\uD800x\\uDC00\\uD800\\uD800\\uDC00\"}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_lone_surrogates_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\uD800x\\uDC00\\uD800\\uD800\\uDC00\"}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numeric_keys_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":0,\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"4294967295\":\"max\",\"0\":\"zero\",\"a\":1}}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":0,\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"4294967295\":\"max\",\"0\":\"zero\",\"a\":1}}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numeric_keys_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":0,\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"4294967295\":\"max\",\"0\":\"zero\",\"a\":1}}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_duplicate_keys_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":1,\"a\":2,\"\\u007a\":3}}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":1,\"a\":2,\"\\u007a\":3}}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_duplicate_keys_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":1,\"a\":2,\"\\u007a\":3}}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numbers_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[-0.0,100.0,1E2,1e-6,1e-7,1e20,1e21,9007199254740993,18446744073709551616,7.2057594037927933e16,1e-400,5e-324,1.7976931348623157e308,0.1000000000000000055511151231257827021181583404541015625]}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[-0.0,100.0,1E2,1e-6,1e-7,1e20,1e21,9007199254740993,18446744073709551616,7.2057594037927933e16,1e-400,5e-324,1.7976931348623157e308,0.1000000000000000055511151231257827021181583404541015625]}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numbers_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[-0.0,100.0,1E2,1e-6,1e-7,1e20,1e21,9007199254740993,18446744073709551616,7.2057594037927933e16,1e-400,5e-324,1.7976931348623157e308,0.1000000000000000055511151231257827021181583404541015625]}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}"
             }
           ],
           "general_deliveries": 0
@@ -155,16 +339,7 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                },
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ]
-              }
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
             }
           ],
           "general_deliveries": 0
@@ -180,17 +355,7 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ],
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                },
-                "extension": "kept"
-              }
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"kept\"}"
             }
           ],
           "general_deliveries": 0
@@ -228,16 +393,7 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ],
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                }
-              }
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}"
             }
           ],
           "general_deliveries": 0
@@ -264,16 +420,228 @@
           "requests": [
             {
               "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
-              "value": {
-                "certifiers": [
-                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
-                ],
-                "types": {
-                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
-                    "name"
-                  ]
-                }
-              }
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_whitespace_header",
+          "header": "{ \"types\" : {\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}, \"certifiers\" : [\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"] }",
+          "signed": "header",
+          "signed_text": "{ \"types\" : {\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}, \"certifiers\" : [\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"] }",
+          "intake_error": null,
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_whitespace_stringified",
+          "header": "{ \"types\" : {\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}, \"certifiers\" : [\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"] }",
+          "signed": "stringified",
+          "signed_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "intake_error": null,
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_reordered_keys_header",
+          "header": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "signed": "header",
+          "signed_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "intake_error": null,
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_reordered_keys_stringified",
+          "header": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "signed": "stringified",
+          "signed_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "intake_error": null,
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_escaped_string_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"n\\u0061me\"]}}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"n\\u0061me\"]}}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_escaped_string_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"n\\u0061me\"]}}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_controls_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00\"}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00\"}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_controls_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\u0008\\u0009\\u000a\\u000b\\u000c\\u000d\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\u0022\\u005c\\u002f\\u003c\\u003e\\u0026\\u00e9\\u2028\\u2029\\ud83d\\ude00\"}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\u0000\\u0001\\u0002\\u0003\\u0004\\u0005\\u0006\\u0007\\b\\t\\n\\u000b\\f\\r\\u000e\\u000f\\u0010\\u0011\\u0012\\u0013\\u0014\\u0015\\u0016\\u0017\\u0018\\u0019\\u001a\\u001b\\u001c\\u001d\\u001e\\u001f\\\"\\\\/<>&é  😀\"}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_lone_surrogates_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\uD800x\\uDC00\\uD800\\uD800\\uDC00\"}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\uD800x\\uDC00\\uD800\\uD800\\uDC00\"}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_lone_surrogates_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\uD800x\\uDC00\\uD800\\uD800\\uDC00\"}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"\\ud800x\\udc00\\ud800𐀀\"}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numeric_keys_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":0,\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"4294967295\":\"max\",\"0\":\"zero\",\"a\":1}}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":0,\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"4294967295\":\"max\",\"0\":\"zero\",\"a\":1}}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numeric_keys_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":0,\"10\":\"ten\",\"2\":\"two\",\"01\":\"one\",\"4294967295\":\"max\",\"0\":\"zero\",\"a\":1}}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"0\":\"zero\",\"2\":\"two\",\"10\":\"ten\",\"z\":0,\"01\":\"one\",\"4294967295\":\"max\",\"a\":1}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_duplicate_keys_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":1,\"a\":2,\"\\u007a\":3}}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":1,\"a\":2,\"\\u007a\":3}}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_duplicate_keys_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":1,\"a\":2,\"\\u007a\":3}}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":{\"z\":3,\"a\":2}}"
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numbers_header",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[-0.0,100.0,1E2,1e-6,1e-7,1e20,1e21,9007199254740993,18446744073709551616,7.2057594037927933e16,1e-400,5e-324,1.7976931348623157e308,0.1000000000000000055511151231257827021181583404541015625]}",
+          "signed": "header",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[-0.0,100.0,1E2,1e-6,1e-7,1e20,1e21,9007199254740993,18446744073709551616,7.2057594037927933e16,1e-400,5e-324,1.7976931348623157e308,0.1000000000000000055511151231257827021181583404541015625]}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "426_numbers_stringified",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[-0.0,100.0,1E2,1e-6,1e-7,1e20,1e21,9007199254740993,18446744073709551616,7.2057594037927933e16,1e-400,5e-324,1.7976931348623157e308,0.1000000000000000055511151231257827021181583404541015625]}",
+          "signed": "stringified",
+          "signed_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":[0,100,100,0.000001,1e-7,100000000000000000000,1e+21,9007199254740992,18446744073709552000,72057594037927940,0,5e-324,1.7976931348623157e+308,0.1]}"
             }
           ],
           "general_deliveries": 0

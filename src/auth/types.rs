@@ -80,25 +80,21 @@ impl std::fmt::Display for MessageType {
 /// This structure represents all message types in the authentication protocol.
 /// Different fields are used depending on the message type.
 ///
-/// A certificateRequest's signature covers the UTF-8 bytes of its
-/// `requestedCertificates` JSON text and a certificateResponse's those of
-/// its `certificates` text, the text as transmitted (#280): the reference
-/// signs `JSON.stringify` of what it sends and verifies `JSON.stringify` of
-/// what it parsed (`ts-stack@edf6e03` `Peer.ts:453`, `:1068`, `:1140`,
-/// `:1203`), which is the received text when that text is compact JSON.
+/// A certificateRequest signs `JSON.stringify` of its parsed
+/// `requestedCertificates` object (ts-stack@edf6e03 `Peer.ts:453,1068`):
+/// insertion order and extra properties survive, whitespace and redundant
+/// escapes do not (#426). A certificateResponse signs its `certificates`
+/// text as transmitted (#280).
+///
 /// [`certificates_text`](Self::certificates_text) and
-/// [`requested_certificates_text`](Self::requested_certificates_text) carry
-/// those texts: a parsed message keeps them as received, a message built
-/// with [`set_certificates`](Self::set_certificates) or
-/// [`set_requested_certificates`](Self::set_requested_certificates) the
-/// compact text it will send. The serializer writes a text as it stands
-/// and [`signing_data`](Self::signing_data) signs it, while it still reads
-/// back to the member's value; a member changed since is serialized afresh.
-/// Its serde is JSON's: the texts are `serde_json` raw values.
-/// A member set directly rather than through its setter is serialized
-/// from the parsed value at signing and again at send, the same instance
-/// both times, so the signature covers what goes on the wire; a text that
-/// disagrees with its member is dropped at both points (#280).
+/// [`requested_certificates_text`](Self::requested_certificates_text) retain
+/// the JSON received, or the compact text built by the corresponding setter.
+/// The serializer writes a carried text while it reads back to the typed
+/// member; a member changed since is serialized afresh. Request signing
+/// re-serializes the complete retained object with JavaScript's string,
+/// number and property-order rules, rather than dropping extra properties
+/// through the typed set. Response signing keeps the retained bytes.
+/// The serde representation is JSON's (`serde_json` raw values).
 #[derive(Debug, Clone)]
 pub struct AuthMessage {
     /// Protocol version (e.g., "0.1").
@@ -137,7 +133,7 @@ pub struct AuthMessage {
 
     /// The `requestedCertificates` member's JSON text: as received, or as
     /// this crate sends it. The certificateRequest signature covers its
-    /// bytes.
+    /// parsed object's JSON.stringify form (#426), preserving property order.
     pub requested_certificates_text: Option<Box<RawValue>>,
 }
 
@@ -201,7 +197,7 @@ impl AuthMessage {
     /// The signing data varies by message type:
     /// - InitialResponse: yourNonce || initialNonce (initiator's nonce || responder's session nonce, decoded from base64)
     /// - General: the payload
-    /// - CertificateRequest: the `requestedCertificates` JSON text as transmitted
+    /// - CertificateRequest: JSON.stringify of the parsed `requestedCertificates`
     /// - CertificateResponse: the `certificates` JSON text as transmitted
     pub fn signing_data(&self) -> Vec<u8> {
         match self.message_type {
@@ -226,9 +222,9 @@ impl AuthMessage {
                 self.payload.clone().unwrap_or_default()
             }
             MessageType::CertificateRequest => {
-                // The requestedCertificates text as transmitted (Peer.ts:453, :1068)
+                // Re-serialize the complete parsed object, as Peer.ts:1068 does.
                 match self.current_requested_certificates_text() {
-                    Some(text) => text.get().as_bytes().to_vec(),
+                    Some(text) => super::requested_certificates_json::stringify(text),
                     None => self
                         .requested_certificates
                         .as_ref()
