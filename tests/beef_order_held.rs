@@ -40,10 +40,11 @@ use bsv_rs::primitives::bsv::sighash::{
     compute_sighash_dispatched_for_signing, SighashParams, TxInput, TxOutput,
 };
 use bsv_rs::primitives::{sha256d, to_hex, PrivateKey, Writer};
+use bsv_rs::transaction::beef_stream::SpendRefusal;
 use bsv_rs::transaction::{
     verify_stream, verify_stream_async, verify_stream_structure, AsyncByteSource, Beef, BeefTx,
-    Cursor, Kind, MerklePath, MockChainTracker, Progress, Reason, StreamVerifier, Timed, Verdict,
-    ATOMIC_BEEF, BEEF_V1, BEEF_V2,
+    Cursor, Kind, MerklePath, MockChainTracker, Progress, Reason, StreamVerifier, Timed,
+    Transaction, Verdict, ATOMIC_BEEF, BEEF_V1, BEEF_V2,
 };
 
 #[path = "support/beef_chain.rs"]
@@ -529,11 +530,11 @@ fn p2pk() -> Vec<u8> {
     lock
 }
 
-/// A raw transaction of `inputs` (outpoint, unlock) and `outputs`, version 1,
-/// every sequence final, lock time 0.
-fn raw_tx(inputs: &[(Hash32, u32, Vec<u8>)], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
+/// A raw transaction of `inputs` (outpoint, unlock) and `outputs` at
+/// `version`, every sequence final, lock time 0.
+fn raw_tx(version: i32, inputs: &[(Hash32, u32, Vec<u8>)], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
     let mut w = Writer::new();
-    w.write_u32_le(1);
+    w.write_i32_le(version);
     w.write_var_int(inputs.len() as u64);
     for (prev, vout, unlock) in inputs {
         w.write_bytes(prev);
@@ -550,11 +551,16 @@ fn raw_tx(inputs: &[(Hash32, u32, Vec<u8>)], outputs: &[(u64, Vec<u8>)]) -> Vec<
     w.into_bytes()
 }
 
-/// The transaction spending `spent` (each a parent's txid, vout and value,
-/// a P2PK output of the family key) into `outputs`, input `i` signed under
-/// hash type `types[i]` over the digest the interpreter dispatches to (the
-/// original digest for the CHRONICLE bit).
-fn signed(spent: &[(Hash32, u32, u64)], types: &[u32], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
+/// The transaction at `version` spending `spent` (each a parent's txid, vout
+/// and value, a P2PK output of the family key) into `outputs`, input `i`
+/// signed under hash type `types[i]` over the digest the interpreter
+/// dispatches to (the original digest for the CHRONICLE bit).
+fn signed(
+    version: i32,
+    spent: &[(Hash32, u32, u64)],
+    types: &[u32],
+    outputs: &[(u64, Vec<u8>)],
+) -> Vec<u8> {
     let inputs: Vec<TxInput> = spent
         .iter()
         .map(|(txid, vout, _)| TxInput {
@@ -577,7 +583,7 @@ fn signed(spent: &[(Hash32, u32, u64)], types: &[u32], outputs: &[(u64, Vec<u8>)
         .enumerate()
         .map(|(i, (txid, vout, satoshis))| {
             let digest = compute_sighash_dispatched_for_signing(&SighashParams {
-                version: 1,
+                version,
                 inputs: &inputs,
                 outputs: &tx_outputs,
                 locktime: 0,
@@ -593,17 +599,23 @@ fn signed(spent: &[(Hash32, u32, u64)], types: &[u32], outputs: &[(u64, Vec<u8>)
             (*txid, *vout, unlock)
         })
         .collect();
-    raw_tx(&unlocks, outputs)
+    raw_tx(version, &unlocks, outputs)
 }
 
-/// The signed family: the proven funding `F` (three P2PK outputs), the child
-/// `C` spending them under ALL|FORKID, SINGLE|FORKID and
+/// The signed family: the proven funding `F` (three P2PK outputs, version
+/// 1), the child `C` spending them under ALL|FORKID, SINGLE|FORKID and
 /// ALL|CHRONICLE|FORKID (the original digest, over every output, a data
 /// output among them), the grandchild `G` spending `C:0` under
-/// NONE|CHRONICLE|FORKID and `C:1` under ALL|ANYONECANPAY|FORKID. With
+/// NONE|CHRONICLE|FORKID and `C:1` under ALL|ANYONECANPAY|FORKID, `C` and
+/// `G` at `version`. The CHRONICLE bit is legal in the default mode at a
+/// version above 1 only (#397, the reference's `#isAfterChronicle()`,
+/// `ts-stack@edf6e03` `Spend.ts:338-341`, `:586-591`), so the family that
+/// verifies is written at version 2, where the dispatch to the original
+/// digest (bsv-rs#22) is still what its signatures are made over. With
 /// `tamper`, the last byte of `C`'s CHRONICLE signature's `s` is flipped.
-fn signed_family(tamper: bool) -> [Vec<u8>; 3] {
+fn signed_family(tamper: bool, version: i32) -> [Vec<u8>; 3] {
     let f = raw_tx(
+        1,
         &[([0xBB; 32], 0, Vec::new())],
         &[(1_000, p2pk()), (1_000, p2pk()), (1_000, p2pk())],
     );
@@ -611,6 +623,7 @@ fn signed_family(tamper: bool) -> [Vec<u8>; 3] {
     let mut data = vec![0x00, 0x6a, 0x4c, 200];
     data.extend_from_slice(&[0xD7; 200]);
     let mut c = signed(
+        version,
         &[(f_id, 0, 1_000), (f_id, 1, 1_000), (f_id, 2, 1_000)],
         &[0x41, 0x43, 0x61],
         &[(900, p2pk()), (900, p2pk()), (0, data)],
@@ -623,6 +636,7 @@ fn signed_family(tamper: bool) -> [Vec<u8>; 3] {
     }
     let c_id = sha256d(&c);
     let g = signed(
+        version,
         &[(c_id, 0, 900), (c_id, 1, 900)],
         &[0x62, 0xC1],
         &[(1_500, p2pk())],
@@ -659,7 +673,8 @@ fn family_beef(raws: &[&Vec<u8>]) -> (Vec<u8>, HashMap<u64, Hash32>) {
 /// signatures verify against the digests they were made over: BIP-143 from
 /// the midstates (ALL, SINGLE, ANYONECANPAY, NONE) and the original digest
 /// a CHRONICLE-bit signature dispatches to, which hashes every output after
-/// the scriptCode the parent supplies. The verdict newest first is the
+/// the scriptCode the parent supplies (the family at version 2, where the
+/// default mode admits the bit, #397). The verdict newest first is the
 /// verdict parents first, valid and with one signature broken; a cursor
 /// taken while both are held carries their entries (no transaction's bytes
 /// are in it) and resumes to the same verdict. RED on `10dd8c5` (the cursor
@@ -668,7 +683,7 @@ fn family_beef(raws: &[&Vec<u8>]) -> (Vec<u8>, HashMap<u64, Hash32>) {
 #[test]
 fn a_held_child_is_held_by_its_index_entry_and_its_signatures_verify_on_release() {
     for tamper in [false, true] {
-        let [f, c, g] = signed_family(tamper);
+        let [f, c, g] = signed_family(tamper, 2);
         let (ordered, headers) = family_beef(&[&f, &c, &g]);
         let (reversed, _) = family_beef(&[&g, &c, &f]);
         let expected = verify_stream(ordered.as_slice(), &headers, None).unwrap();
@@ -721,13 +736,70 @@ fn a_held_child_is_held_by_its_index_entry_and_its_signatures_verify_on_release(
     }
 }
 
+/// The signed family at version 1: the CHRONICLE bit is illegal at version 1
+/// in the default mode (#397), as the reference's default `Spend` refuses it
+/// (`ts-stack@edf6e03` `Spend.ts:338-341`, `#isAfterChronicle()` false at
+/// version 1 without flags; `:586-591`, the gate's words, rethrown at
+/// `:622-625` as the DER wrapper's) on the `Transaction.verify` path
+/// (`Transaction.ts:1441-1455`, `transactionVersion: tx.version`): `C`
+/// refused at its input 2 (ALL|CHRONICLE|FORKID) in the reference's visible
+/// words, parents first and newest first; `Transaction::verify` of `C` the
+/// same at its input 2, and of the version-2 family `Ok(true)`. The
+/// reference's answers on these bytes under Node 22.18.0 (`edf6e03` built
+/// with bun): `verifyValid` true for both versions (it runs no script),
+/// `Transaction.verify('scripts only')` of `C` and of `G` at version 1
+/// `Script evaluation error: The signature format is invalid.`, at version 2
+/// `true`. RED on the base `bfdd4e7f` (the family valid there).
+#[test]
+fn a_chronicle_bit_signature_in_a_version_1_family_is_refused_at_its_input_in_the_reference_words()
+{
+    let [f, c, g] = signed_family(false, 1);
+    let (ordered, headers) = family_beef(&[&f, &c, &g]);
+    let (reversed, _) = family_beef(&[&g, &c, &f]);
+    for (bytes, order) in [(&ordered, "parents first"), (&reversed, "newest first")] {
+        let verdict = verify_stream(bytes.as_slice(), &headers, None).unwrap();
+        match verdict {
+            Verdict::SpendRefused {
+                txid, input, why, ..
+            } => {
+                assert_eq!((txid, input), (sha256d(&c), Some(2)), "{order}");
+                assert_eq!(
+                    why,
+                    SpendRefusal::Script("The signature format is invalid.".to_string()),
+                    "{order}"
+                );
+            }
+            other => panic!("{order}: {other:?}"),
+        }
+    }
+    let verify = |version: i32| {
+        let [f, c, g] = signed_family(false, version);
+        let (bytes, _) = family_beef(&[&f, &c, &g]);
+        let tx = Transaction::from_beef(&bytes, Some(&display(&sha256d(&c)))).unwrap();
+        tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap()
+            .block_on(tx.verify(
+                &MockChainTracker::always_valid(beef_chain::HEIGHT as u32),
+                None,
+                None,
+            ))
+    };
+    let refused = verify(1).unwrap_err().to_string();
+    assert!(
+        refused.contains("input 2") && refused.contains("The signature format is invalid."),
+        "{refused}"
+    );
+    assert_eq!(verify(2), Ok(true));
+}
+
 /// Rule 5 on the held entries a cursor carries: every proper prefix of a
 /// BSC4 cursor holding the signed child and grandchild is refused, and every
 /// single-byte change is refused or read, never a panic, and a cursor so
 /// read resumes to a verdict, never a panic.
 #[test]
 fn a_cut_or_changed_bsc4_cursor_is_refused_or_read_never_a_panic() {
-    let [f, c, g] = signed_family(false);
+    let [f, c, g] = signed_family(false, 2);
     let (reversed, headers) = family_beef(&[&g, &c, &f]);
     let mut reader = StreamVerifier::new(reversed.as_slice(), &headers, None);
     for _ in 0..3 {
