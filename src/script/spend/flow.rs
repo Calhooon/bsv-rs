@@ -36,9 +36,12 @@ impl Spend {
     // 0xb3-0xb7: NOP4-NOP8 before Chronicle; OP_SUBSTR, OP_LEFT, OP_RIGHT,
     // OP_LSHIFTNUM, OP_RSHIFTNUM for a UTXO created after it
     // (interpreter.cpp:609-764; the NOP branch with the discouragement at
-    // each arm's head).
+    // each arm's head). The gate is its own switch (bsv-rs#397): the default
+    // mode runs them at every version, as the reference's default does
+    // (`#skipUnavailablePreChronicleOpcode`, Spend.ts:827-828); under a word,
+    // the word's UTXO_AFTER_CHRONICLE.
     pub(super) fn op_nop4_to_nop8(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
-        if !self.utxo_after_chronicle {
+        if !self.chronicle_opcodes {
             if self.discourage_upgradable_nops {
                 return Err(self.error(&format!(
                     "{} is discouraged by verification flags.",

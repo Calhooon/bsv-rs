@@ -355,7 +355,10 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
         if msg.contains("can only contain push operations") && !has("SIGPUSHONLY") {
             return Some("bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)");
         }
-        if (msg.contains("not minimally-encoded") || msg.contains("Invalid script number"))
+        // a non-minimal number in the reference's words since bsv-rs#397
+        if (msg.contains("not minimally-encoded")
+            || msg.contains("Invalid script number")
+            || msg == "non-minimally encoded script number")
             && !has("MINIMALDATA")
         {
             return Some("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)");

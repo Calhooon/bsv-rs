@@ -74,18 +74,23 @@ impl Spend {
         self.discourage_upgradable_nops = discourage_upgradable_nops;
         self.require_compressed_pubkey = compressed_pubkey;
         self.utxo_after_chronicle = utxo_after_chronicle;
+        self.chronicle_opcodes = utxo_after_chronicle;
         self.flags = Some(flags);
     }
 
     /// Overrides the UTXO's era for the re-enabled opcodes: `true` runs
     /// `OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and the
     /// Chronicle meanings of `0xb3`-`0xb7` (a coin created after Chronicle),
-    /// `false` keeps them disabled, `BAD_OPCODE` or NOPs as before it. Default:
-    /// version > 1 (the TypeScript SDK's `isAfterChronicle()`); under a word,
-    /// its `UTXO_AFTER_CHRONICLE` bit. Called after [`set_flags`](Self::set_flags),
+    /// `false` keeps them disabled, `BAD_OPCODE` or NOPs as before it; under a
+    /// word it also selects the number length. It sets both switches: the era
+    /// (default version > 1, the TypeScript SDK's `isAfterChronicle()`) and
+    /// the opcode gate of `0xb3`-`0xb7` (default on at every version, as the
+    /// reference's default runs them, bsv-rs#397); under a word both are its
+    /// `UTXO_AFTER_CHRONICLE` bit. Called after [`set_flags`](Self::set_flags),
     /// it overrides the bit.
     pub fn set_utxo_after_chronicle(&mut self, after: bool) {
         self.utxo_after_chronicle = after;
+        self.chronicle_opcodes = after;
     }
 
     /// The flag word applied by [`set_flags`](Self::set_flags), or `None` in

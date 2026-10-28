@@ -123,6 +123,9 @@ fn check_all(w: &Witness) {
 
 const CLEANSTACK: &str = "The clean stack rule requires exactly one item";
 const MINENCODE: &str = "Invalid script number";
+/// The default mode's words for the same refusal, the reference's since
+/// bsv-rs#397 (`Spend.ts:547`): the verdict 0.3.24 recorded, other words.
+const MINENCODE_DEFAULT: &str = "non-minimally encoded script number";
 const NULLDUMMY: &str = "requires the extra stack item (dummy) to be empty";
 const NULLFAIL: &str = "requires failing signatures to be empty";
 
@@ -164,7 +167,7 @@ const POLICY_AS_CONSENSUS_ARITH: Witness = Witness {
     recorded_0_3_24: Err(MINENCODE),
     block: Ok(()),
     standard: Err(MINENCODE),
-    default: Err(MINENCODE),
+    default: Err(MINENCODE_DEFAULT),
 };
 
 /// A version-1 spend running `OP_NUM2BIN` to the non-minimally encoded width
@@ -178,7 +181,7 @@ const POLICY_AS_CONSENSUS_STACK: Witness = Witness {
     recorded_0_3_24: Err(MINENCODE),
     block: Ok(()),
     standard: Err(MINENCODE),
-    default: Err(MINENCODE),
+    default: Err(MINENCODE_DEFAULT),
 };
 
 /// A version-1 1-of-2 `OP_CHECKMULTISIG` spend with a valid signature and a
@@ -285,7 +288,10 @@ fn the_default_mode_changes_exactly_one_recorded_verdict_the_nulldummy_version_g
     for w in ALL {
         let unchanged = match (run(w, Mode::Default), w.recorded_0_3_24) {
             (Ok(true), Ok(())) => true,
-            (Err(message), Err(fragment)) => message.contains(fragment),
+            (Err(message), Err(fragment)) => {
+                message.contains(fragment)
+                    || (fragment == MINENCODE && message == MINENCODE_DEFAULT)
+            }
             _ => false,
         };
         if !unchanged {

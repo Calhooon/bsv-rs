@@ -12,17 +12,16 @@
 //! Without a flag word, [`Spend`] runs the TypeScript SDK's default evaluation
 //! mode: strict for a transaction of version 1 or lower (minimal pushes and
 //! numbers, low-S, a clean stack, an empty CHECKMULTISIG dummy), relaxed for
-//! version 2 and above, push-only unlocking scripts at every version, and no
-//! NULLFAIL rule. That mode is neither of the words a node validates under.
+//! version 2 and above, push-only unlocking scripts at every version, no
+//! NULLFAIL rule, and `0xb3`-`0xb7` run as the Chronicle opcodes at every
+//! version (bsv-rs#397). That mode is neither of the words a node validates under.
 //!
-//! With [`Spend::set_flags`], every rule is derived from a
-//! [`ScriptFlags`] word and the transaction version
-//! exactly as bitcoin-sv v1.2.2 derives it at each site: the block word
-//! ([`ScriptFlags::block`]) is what a mining
-//! node applies, the standard word
-//! ([`ScriptFlags::standard`]) is what a
-//! relaying node with default policy applies. A consensus oracle selects the
-//! block word. The `flags` module documents every rule, its gate and its site.
+//! With [`Spend::set_flags`], every rule is derived from a [`ScriptFlags`] word
+//! and the transaction version exactly as bitcoin-sv v1.2.2 derives it at each
+//! site: the block word ([`ScriptFlags::block`]) is what a mining node applies,
+//! the standard word ([`ScriptFlags::standard`]) is what a relaying node with
+//! default policy applies. A consensus oracle selects the block word. The
+//! `flags` module documents every rule, its gate and its site.
 //!
 //! # The memory budget
 //!
@@ -258,12 +257,15 @@ pub struct Spend {
     /// The flag word the rules above were derived from, if `set_flags` was
     /// called; `None` in the TypeScript default mode.
     flags: Option<ScriptFlags>,
-    /// The UTXO being spent is taken as created after Chronicle: `OP_2MUL`,
-    /// `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and the Chronicle
-    /// meanings of `0xb3`-`0xb7` follow it (`interpreter.cpp:360-375`,
-    /// `598-812`). Default: the TypeScript SDK's `isAfterChronicle()`, which
-    /// is `isRelaxed()`, version > 1; under a word, its `UTXO_AFTER_CHRONICLE`.
+    /// The era switch: the coin taken as created after Chronicle for `OP_2MUL`,
+    /// `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` (`interpreter.cpp:360-375`,
+    /// `598-812`) and a word's number length. Default: `isAfterChronicle()`,
+    /// version > 1; under a word, its `UTXO_AFTER_CHRONICLE`.
     utxo_after_chronicle: bool,
+    /// The opcode gate: the Chronicle meanings of `0xb3`-`0xb7`, else NOPs
+    /// (`interpreter.cpp:609-764`). Default: on at every version, as the
+    /// reference's (`Spend.ts:827-828`, bsv-rs#397); under a word, its bit.
+    chronicle_opcodes: bool,
     /// The node's `-maxscriptnumlengthpolicy`, the script-number length limit
     /// of the mempool path (`src/policy/policy.h:156`, default 10,000; 0
     /// selects the consensus limit); read under a word carrying the mempool
@@ -400,11 +402,9 @@ impl Spend {
             alt_stack_mem: 0,
             node_mem: 0,
             require_push_only: REQUIRE_PUSH_ONLY_UNLOCKING,
-            // ts-sdk parity: transactions with version > 1 run "relaxed"
-            // (post-Genesis semantics) — MINIMALDATA, LOW_S, CLEANSTACK and
-            // NULLDUMMY are not enforced (mirrors ts-sdk Spend.isRelaxed() and
-            // its shouldEnforceNullDummy()). The reference gates the same four
-            // on the version at Chronicle (`interpreter.cpp:40-44`).
+            // ts-sdk parity (isRelaxed()): version > 1 enforces no MINIMALDATA,
+            // LOW_S, CLEANSTACK, NULLDUMMY; the node gates the same four on the
+            // version at Chronicle (`interpreter.cpp:40-44`).
             require_minimal: REQUIRE_MINIMAL_PUSH && transaction_version <= 1,
             require_low_s: REQUIRE_LOW_S_SIGNATURES && transaction_version <= 1,
             require_clean_stack: REQUIRE_CLEAN_STACK && transaction_version <= 1,
@@ -416,8 +416,9 @@ impl Spend {
             require_compressed_pubkey: false,
             discourage_upgradable_nops: false,
             flags: None,
-            // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags.
+            // ts-sdk parity: isAfterChronicle() is isRelaxed() without explicit flags
             utxo_after_chronicle: transaction_version > 1,
+            chronicle_opcodes: true,
             script_num_length_policy: DEFAULT_SCRIPT_NUM_LENGTH_POLICY,
             stack_memory_policy: DEFAULT_STACK_MEMORY_USAGE_POLICY,
             stack_memory_consensus: 0,

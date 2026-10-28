@@ -126,10 +126,11 @@ fn lshiftnum_refuses_a_result_beyond_the_memory_budget_before_computing_it() {
 
 #[test]
 fn before_chronicle_0xb3_to_0xb7_are_nops_and_discouraged_under_the_standard_word() {
-    // version 1 in the default mode: the UTXO is taken as pre-Chronicle
-    assert!(valid(
-        spend("OP_NOP4 OP_NOP5 OP_NOP6 OP_NOP7 OP_NOP8", "OP_1", 1).validate()
-    ));
+    // the default mode runs them at every version (bsv-rs#397); a coin set
+    // pre-Chronicle NOPs them
+    let mut s = spend("OP_NOP4 OP_NOP5 OP_NOP6 OP_NOP7 OP_NOP8", "OP_1", 1);
+    s.set_utxo_after_chronicle(false);
+    assert!(valid(s.validate()));
     let mut s = spend("OP_NOP7 OP_1", "", 2);
     s.set_flags(ScriptFlags::standard(ProtocolEra::PostGenesis));
     assert_eq!(
