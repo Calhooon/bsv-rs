@@ -1,0 +1,114 @@
+{
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "defined-low-s",
+      "version": 1,
+      "mode": "default",
+      "scope": 65,
+      "highS": false,
+      "unlock": "4830450221009e37a0530740b86fc3a57d487f79af894aba43f61fe134736f6c2ed9f7e3714f022070690eb64ad449133615cae33be5c14bfeb2231136ebd32fe2bd29b7063ddc1c41",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "a87749802574332a4466d67b384df6396208633452d7b8a56bbed76376649fa3",
+      "lowSChecks": 1,
+      "valid": true
+    },
+    {
+      "name": "undefined-hash-type",
+      "version": 1,
+      "mode": "default",
+      "scope": 68,
+      "highS": false,
+      "unlock": "483045022100b7f54c43a9cd5f37fe3fb85dda9cfa16e1325385169e0c3412d37e4bbcc59b8902204b94815cf810165535a6ac56bab05420bb812161ceba4eff4996080f3a2520a044",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "9cab55572a0a67b62eaed08084f011a89671fd0073bfb2d7a93d4077085e0a0f",
+      "lowSChecks": 0,
+      "error": "Script evaluation error: The signature format is invalid."
+    },
+    {
+      "name": "high-s",
+      "version": 1,
+      "mode": "default",
+      "scope": 65,
+      "highS": true,
+      "unlock": "4930460221009e37a0530740b86fc3a57d487f79af894aba43f61fe134736f6c2ed9f7e3714f0221008f96f149b52bb6ecc9ea351cc41a3eb2bbfcb9d5785ccd0bdd1534d5c9f8652541",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "a87749802574332a4466d67b384df6396208633452d7b8a56bbed76376649fa3",
+      "lowSChecks": 1,
+      "error": "Script evaluation error: The signature format is invalid."
+    },
+    {
+      "name": "undefined-hash-type-and-high-s",
+      "version": 1,
+      "mode": "default",
+      "scope": 68,
+      "highS": true,
+      "unlock": "493046022100b7f54c43a9cd5f37fe3fb85dda9cfa16e1325385169e0c3412d37e4bbcc59b89022100b46b7ea307efe9aaca5953a9454fabddff2dbb84e08e513c763c567d961120a144",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "9cab55572a0a67b62eaed08084f011a89671fd0073bfb2d7a93d4077085e0a0f",
+      "lowSChecks": 0,
+      "error": "Script evaluation error: The signature format is invalid."
+    },
+    {
+      "name": "chronicle-at-version-1",
+      "version": 1,
+      "mode": "default",
+      "scope": 97,
+      "highS": false,
+      "unlock": "483045022100acaecd58a8fbc1f3bb64a30b18191772edd72db0587d3d8da229907ef2c23c7f0220407d064043e7fcc7171a7c46de50b99ad52439e8871639ee40fc417bb314bcd161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "828ccb268c1a9be48559b7e06f9d84060d82afcfa8325c675d4919a889d59b06",
+      "lowSChecks": 0,
+      "error": "Script evaluation error: The signature format is invalid."
+    },
+    {
+      "name": "high-s-at-version-2",
+      "version": 2,
+      "mode": "default",
+      "scope": 65,
+      "highS": true,
+      "unlock": "493046022100fddb170c4cb67ac14e8cffd7b3d0d9c6f580b4d6b4b6e10fc71a7df10736faa0022100c21315352d95ff09ccd8ad4f80bb106875160a9a28a94e39909229f3f767f38741",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "de61fdca584e8f73c9025335327f5b1ff93ee1d6ce3a353d1a9f56bf704a05b6",
+      "lowSChecks": 0,
+      "valid": true
+    },
+    {
+      "name": "der-off-chronicle",
+      "version": 1,
+      "mode": "der-off",
+      "scope": 97,
+      "highS": false,
+      "unlock": "483045022100acaecd58a8fbc1f3bb64a30b18191772edd72db0587d3d8da229907ef2c23c7f0220407d064043e7fcc7171a7c46de50b99ad52439e8871639ee40fc417bb314bcd161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "828ccb268c1a9be48559b7e06f9d84060d82afcfa8325c675d4919a889d59b06",
+      "lowSChecks": 0,
+      "valid": true
+    },
+    {
+      "name": "der-off-forkid-present",
+      "version": 1,
+      "mode": "der-off",
+      "scope": 65,
+      "highS": false,
+      "unlock": "483045022100f746d1654024897eaa502fb4edff67317abcc5c8bc0d94efb5bde74cea17741b0220567c9f840600867ecfaea4db8374028ddb1f4e092db7a882d0e039c27312c0d041",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "03c1f8923c6fc38c188214d7ba79adfa17ac3ce7093303960101ae86d9b6ec21",
+      "lowSChecks": 0,
+      "valid": true
+    },
+    {
+      "name": "der-off-forkid-absent",
+      "version": 1,
+      "mode": "der-off",
+      "scope": 1,
+      "highS": false,
+      "unlock": "4830450221008c069a22ced2d83e8746c0ef302ba65d51ebc92806f9531d6e371578430304f7022079d5df4af61216bb168d95793e09714369f529e26bb914bd36b7fd272f3b40c801",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "digest": "531c1bc192cda351876f65083a8035d0f9d70488d3c8eb26844f438ba0e70f0e",
+      "lowSChecks": 0,
+      "valid": true
+    }
+  ]
+}

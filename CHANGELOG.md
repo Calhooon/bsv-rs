@@ -443,6 +443,104 @@ encoded counterparty intake now applies the bound before that information
 is lost. Each excluded recording states its reason. Later cipher misses
 (empty or wrong-key ciphertext) reach cryptography on both sides; their
 error texts are outside this argument-validation change.
+### Fixed: the default's version-1 signature refusals use the reference's visible words and check order (#417)
+
+At transaction version 1, an undefined signature hash type (the recorded
+`0x44`) and a high-S signature now answer `The signature format is invalid.`
+in the default mode. The hash type is checked before low-S, including when
+both fail. Previously this crate exposed the inner reason and checked low-S
+first; the reference catches that reason and replaces it with its DER
+wrapper's text. The version-1 Chronicle refusal from #397 keeps its words.
+The rules live in the new `src/script/spend/signature_encoding.rs`; no public
+API changes. Under an explicit word the node's low-S-before-hash-type order
+and distinct messages are unchanged.
+
+Downstream migration (the first `Display` line, byte for byte):
+
+| Version-1 default refusal | Old text | New text |
+| Undefined hash type `0x44` | `Script evaluation error: The signature's hash type (0x44) has no defined base type.` | `Script evaluation error: The signature format is invalid.` |
+| High-S | `Script evaluation error: The signature must have a low S value.` | `Script evaluation error: The signature format is invalid.` |
+| Undefined `0x44` and high-S together | `Script evaluation error: The signature must have a low S value.` | `Script evaluation error: The signature format is invalid.` |
+
+`tests/script_signature_words_417.rs` replays nine vectors from
+`tests/vectors/script_signature_words_417.json`, recorded under Node v22.18.0
+from the unmodified clone's `ts-stack@edf6e03` build by
+`tests/support/script_signature_words_417.mjs`. The three refusal tests are
+RED on `e5aa0a36` in the old words above and green here; the valid version-1
+control and version-2 high-S control keep their verdicts. The recorder
+observes the public `hasLowS` predicate: never called for an undefined hash
+type, even with high-S too; called once for high-S alone. A unit test pins
+the inner order before the wrapper erases that distinction. The explicit
+block/standard word checks and the existing
+`script_undefined_hashtype_witness.rs` and `script_low_s_order_witness.rs`
+pass on both revisions; those two files have no diff. The existing low-S
+boundary unit test's two version-1 default messages change with this fix.
+
+The census pins hold: evaluation 5,116 total, 2,851 run, 2,834 passed,
+2,228 unsupported, 37 skipped, 17 known failures, no unexplained failures
+or panics; regressions 11 total, 10 passed and one known failure.
+`tests/support/conformance_signature_words_417.rs` keeps fourteen named
+vectors in their existing classes after the wrapper hides their reasons:
+nine low-S rows (`bitcoin-sv.1424`, `teranode.1375`, and `tx-valid.shared`
+0023/0053/0073/0074/0076/0078/0080), five undefined legacy-type rows
+(`bitcoin-sv` 1435/1437/1441 and `teranode` 1386/1392). The low-S class
+stays 9, the legacy-signature class 35, and the DER/public-key class 54;
+without this attribution the generic text would misclassify all fourteen
+as DER. No vector's verdict or allowlist total changes.
+
+This correction covers the default strict set (version <= 1): #23's
+version-2 undefined hash-type message remains the old text, although the
+TypeScript catch also wraps it there. The order-overflow exception from #14 remains in both
+modes: `r` or `s` at or above the curve order passes low-S and then fails
+verification, following the node's lax parser; the TypeScript predicate
+instead judges S directly. Neither existing witness is repinned.
+
+### Notes: cross-SDK parity (#417)
+
+The authority is `ts-stack@edf6e03` `Spend.ts:609-629`: empty signatures
+return true; the DER-shape check runs before the try; parsing, hash-type
+definedness and Chronicle legality (`:577-592`), fork-ID (`:594-603`), then
+low-S (`:618-621`) run inside it. The catch (`:622-626`) exposes only
+`The signature format is invalid.` when `enforceDer` is true. Without a
+word it is always true (`#shouldEnforceDerSignatures`, `:376-386`), including
+the relaxed version-2 mode; low-S is enabled by default at version 1
+(`:350-353`). The default fork-ID helper is a no-op.
+
+`ts-sdk@9e3ede6b` `Spend.ts:435-489` has the same visible words and order
+for all three version-1 refusals (replayed from the same bytes under Node
+22). Its fork-ID checks run for any explicit word, whereas edf6e03 requires
+STRICTENC. Go at `2ca481c` has no wrapping catch: CHECKSIG checks the hash
+type before DER/low-S (`script/interpreter/operations.go:2110-2113`),
+returning `invalid hash type 0x44` or
+`signature is not canonical due to unnecessarily high S value`
+(`thread.go:768-819,842-1018`). Bitcoin-SV v1.2.2 (`879fc8b`)
+`interpreter.cpp:265-310` checks DER, low-S, then hash-type definedness,
+illegal fork ID, illegal Chronicle, and missing fork ID; under a word this
+crate retains that existing low-S-before-hash-type behavior and its node
+diagnostics. Both failures together therefore retain the low-S sentence
+under a word and use the generic wrapper in the version-1 default.
+
+The DER-off cell is unreachable without a word in either TypeScript
+revision and has no separate switch in this crate. In TypeScript it
+requires an explicit word lacking DERSIG, STRICTENC, LOW_S and
+SIGHASH_FORKID. With the empty word at version 1, edf6e03 skips the hash-type
+and fork-ID checks; 9e3ede6b can throw for the fork-ID bit and swallow it
+because `enforceDer` is false. The recorded answers are:
+
+| Vector, version 1, empty word | edf6e03 | This crate (base and fixed) |
+| `der-off-chronicle`, scope `0x61` | Valid | Refuses the word before encoding |
+| `der-off-forkid-present`, scope `0x41`, signed with fork ID disabled | Valid | Refuses the word before encoding |
+| `der-off-forkid-absent`, scope `0x01` | Valid | Refuses the word before encoding |
+
+All three Rust refusals are `Script evaluation error: Invalid verification
+flags: SIGHASH_FORKID is not set: this interpreter computes the BIP-143
+sighash only.` (`ScriptFlags::check`, before signature checking). The older
+TypeScript accepts the Chronicle and absent-bit vectors too; it rejects
+the same present-bit bytes with a false top because its formatter/verifier
+does not honor `sighashForkIdEnabled: false` for that digest. Its own
+present-bit signature is accepted; the recorder can replay the saved
+inputs against either build. No DER-off behavior or flag support is changed
+by this fix.
 
 ### Added: the wire transceiver makes revealCounterpartyKeyLinkage and revealSpecificKeyLinkage as the reference's does; the client's existing linkage arms route to it (#406)
 
