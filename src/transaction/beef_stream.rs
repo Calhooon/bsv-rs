@@ -48,6 +48,11 @@
 //! - [`Cursor`] is the state after `k` elements, serializable;
 //!   [`StreamVerifier::resume`] over the rest of the stream yields the verdict
 //!   of the whole.
+//! - The scripts run under the caller's two LOCAL budgets per input, set on
+//!   the reader and absent from the cursor ([`StreamVerifier::set_work_limit`],
+//!   [`StreamVerifier::set_memory_limit`], `Transaction::verify`'s `memory_limit`,
+//!   bsv-rs#373): `None` uncapped; one spent is [`SpendRefusal::Resource`], a
+//!   decline, never a verdict. The reader's own bound is the charter's.
 //!
 //! # The format, at the pin
 //!
@@ -118,8 +123,10 @@ pub fn display_hex(hash: &Hash32) -> String {
 // The refusal: invalid bytes, named
 // ---------------------------------------------------------------------------
 
+mod budget;
 mod deferred;
 mod reason;
+use budget::Budget;
 use deferred::{read_held, write_held, Deferred, TxFields};
 pub use reason::{Kind, Reason};
 
@@ -1927,9 +1934,10 @@ impl BeefIndex {
     /// A transaction or a txid-only entry, and every held transaction it
     /// releases (bsv-rs#240), in wire order.
     fn fold_checked(&mut self, element: &Element, tip: Option<ChainTip>) -> Result<(), Stop> {
-        self.fold_checked_from(element, 0, &mut || false, None, tip)
+        let budget = Budget::NONE;
+        self.fold_checked_from(element, 0, &mut || false, budget, tip)
             .map(|paused| debug_assert!(paused.is_none(), "a budget never spent"))?;
-        while self.release_one(0, &mut || false, None, tip)?.is_some() {}
+        while self.release_one(0, &mut || false, budget, tip)?.is_some() {}
         Ok(())
     }
 
@@ -1948,10 +1956,10 @@ impl BeefIndex {
         element: &Element,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
+        budget: Budget,
         tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
-        match self.fold_one(element, from, spent, work_limit, tip)? {
+        match self.fold_one(element, from, spent, budget, tip)? {
             Folded::Paused(input) => return Ok(Some(input)),
             Folded::In { txid, new: true } => self.deferred.wake(&txid),
             Folded::Held | Folded::In { new: false, .. } => {}
@@ -1965,7 +1973,7 @@ impl BeefIndex {
         element: &Element,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
+        budget: Budget,
         tip: Option<ChainTip>,
     ) -> Result<Folded, Stop> {
         match element {
@@ -2000,7 +2008,7 @@ impl BeefIndex {
                     body,
                     from,
                     spent,
-                    work_limit,
+                    budget,
                     tip,
                 )
             }
@@ -2052,7 +2060,7 @@ impl BeefIndex {
         body: &T,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
+        budget: Budget,
         tip: Option<ChainTip>,
     ) -> Result<Folded, Stop> {
         // A transaction read before was judged then; its bytes are the same
@@ -2110,7 +2118,7 @@ impl BeefIndex {
                     }
                 }
                 if let Some(next) =
-                    self.check_spends_of(offset, txid, body, from, spent, work_limit, tip)?
+                    self.check_spends_of(offset, txid, body, from, spent, budget, tip)?
                 {
                     return Ok(Folded::Paused(next));
                 }
@@ -2228,7 +2236,7 @@ impl BeefIndex {
         body: &T,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
+        budget: Budget,
         tip: Option<ChainTip>,
     ) -> Result<Option<u32>, Stop> {
         let refuse = |at: u64, input: Option<u32>, why: SpendRefusal| Stop::Spend {
@@ -2348,8 +2356,8 @@ impl BeefIndex {
                 source_satoshis: source.satoshis,
                 locking_script,
                 unlocking_script,
-                memory_limit: None,
-                work_limit,
+                memory_limit: budget.memory,
+                work_limit: budget.work,
             })
             .map_err(|e| script_error(e.to_string()))?;
             match spend.validate() {
@@ -3158,7 +3166,7 @@ pub struct StreamVerifier<R, H> {
     boundary: Frame,
     /// The transaction a pause left in hand and the input it reached.
     held: Option<(Element, u32)>,
-    work_limit: Option<u64>,
+    budget: Budget,
 }
 
 impl<R: Read, H: Headers> StreamVerifier<R, H> {
@@ -3173,14 +3181,6 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             source,
             headers,
         )
-    }
-
-    /// Sets the LOCAL work bound per input, before its scripts run. A
-    /// resource decline is `SpendRefusal::Resource`, naming the input, work
-    /// spent and budget. `None` is the default. This configuration is not
-    /// cursor state: reapply it after `resume`, including a decoded cursor.
-    pub fn set_work_limit(&mut self, limit: Option<u64>) {
-        self.work_limit = limit;
     }
 
     /// The same reader for the BEEF's structure alone: no script is run and
@@ -3232,7 +3232,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
             headers,
             verdict: None,
             held: None,
-            work_limit: None,
+            budget: Budget::NONE,
         }
     }
 
@@ -3281,7 +3281,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
         // step, under the caller's budget, ahead of the next element.
         if self.held.is_none() && self.judge.index.deferred.has_ready() {
             let tip = self.headers.mining_tip();
-            return Ok(match self.judge.release_next(spent, self.work_limit, tip) {
+            return Ok(match self.judge.release_next(spent, self.budget, tip) {
                 Some(Ok(true)) => Timed::Paused,
                 Some(Err(stop)) => self.latch(stop.into()),
                 Some(Ok(false)) | None => Timed::Progress(Progress::Stepped),
@@ -3316,7 +3316,7 @@ impl<R: Read, H: Headers> StreamVerifier<R, H> {
                 other,
                 from,
                 spent,
-                self.work_limit,
+                self.budget,
                 self.headers.mining_tip(),
             ),
         };
@@ -3466,7 +3466,7 @@ impl std::error::Error for AsyncVerifyError {}
 pub struct AsyncStreamVerifier {
     decoder: BeefDecoder,
     judge: Judge,
-    work_limit: Option<u64>,
+    budget: Budget,
 }
 
 impl AsyncStreamVerifier {
@@ -3475,16 +3475,8 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::new()),
-            work_limit: None,
+            budget: Budget::NONE,
         }
-    }
-
-    /// Sets the LOCAL work bound per input, before its scripts run. A
-    /// resource decline is `SpendRefusal::Resource`, naming the input, work
-    /// spent and budget. `None` is the default. This configuration is not
-    /// cursor state: reapply it after `resume`, including a decoded cursor.
-    pub fn set_work_limit(&mut self, limit: Option<u64>) {
-        self.work_limit = limit;
     }
 
     /// The same for the BEEF's structure alone.
@@ -3492,7 +3484,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::new(),
             judge: Judge::new(subject, BeefIndex::structure_only()),
-            work_limit: None,
+            budget: Budget::NONE,
         }
     }
 
@@ -3503,7 +3495,7 @@ impl AsyncStreamVerifier {
         Self {
             decoder: BeefDecoder::at(frame),
             judge,
-            work_limit: None,
+            budget: Budget::NONE,
         }
     }
 
@@ -3577,7 +3569,7 @@ impl AsyncStreamVerifier {
                         };
                         self.judge
                             .index
-                            .fold_checked_from(&other, from, &mut || false, self.work_limit, tip)
+                            .fold_checked_from(&other, from, &mut || false, self.budget, tip)
                             .map(|_| ())
                     }
                 };
