@@ -187,7 +187,7 @@ fn transport_code_adds_no_text_classification() {
     }
     arch_support::check_sites("text classification in a transport", &sites, ALLOWED);
     println!(
-        "text comparison exceptions: {} sites in 8 files",
+        "text comparison exceptions: {} sites in 9 files",
         sites.len()
     );
 }

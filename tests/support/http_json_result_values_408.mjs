@@ -3,8 +3,9 @@
 // (cd "$W/packages/sdk" && bun build mod.ts --target node --format esm --outfile "$W/sdk.mjs")
 // Node 22: node tests/support/http_json_result_values_408.mjs "$W/sdk.mjs" <output.json>
 // The fetch is injected: no URL is contacted and no listener is started.
-// Large certificate witnesses store an expansion recipe, applied to bodyText
-// identically here and in Rust, so a 16 MiB boundary costs no 16 MiB fixture.
+// Large certificate witnesses store an expansion recipe. Each marker occurs
+// once, so JS's first-match replacement and Rust's all-match replacement expand
+// the same bodyText, keeping a 16 MiB boundary out of the fixture.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
 
@@ -136,6 +137,9 @@ const certificateForms = {
 }
 for (const call of ['acquireCertificate', 'listCertificates', 'discoverByIdentityKey', 'discoverByAttributes', 'proveCertificate']) {
   for (const [form, changes] of Object.entries(certificateForms)) {
+    // Skip the txid-only proveCertificate result: the reference rejects it
+    // against the requested certificate. The acquire/prove partial certificate
+    // binding row in src/wallet/substrates/CLAUDE.md is still Pending.
     if (call === 'proveCertificate' && form === 'txid_only') continue
     const cert = { ...certificate, ...changes }
     const result = structuredClone(seeds.get(call).result)
