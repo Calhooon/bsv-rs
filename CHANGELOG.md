@@ -1194,6 +1194,12 @@ its `localeCompare` order determines the signed payload (the existing ASCII
 collation table covers HTTP names). The signature shape is checked before
 the certificate header and payload checks, as in the reference.
 
+The fold keeps the bounded certificate header as `requested_certificates_text`
+before reading its typed `RequestedCertificateSet`. The Peer verifies the
+carried text, so reordering its top-level properties or adding a property
+outside the typed set no longer changes its signature preimage. The header
+is parsed on every general reply, including a reply typed `General`.
+
 `with_max_response_bytes` and `with_max_handshake_response_bytes` configure
 the two body limits on either `new` or `with_client`. They accept positive
 `usize` values up to JavaScript's maximum safe integer; zero and larger
@@ -1218,6 +1224,12 @@ rule: `certificate_header_accepts_262144_utf8_bytes_and_refuses_one_more`,
 `0 passed; 6 failed`, with deliveries, decoded signatures and retyped
 messages printed in the failures. The three #410 divergence tests now
 assert the conforming outcomes and have names saying so.
+`auth_peer_http_certificate_request_416.rs` adds three wiremock tests through
+a signed handshake and `Peer::start`: the property-order and extra-property
+headers reach the certificate-request listener (both RED on `96cd2988` as
+`Signature is not valid`); a certificate request signed over the HTTP payload
+is refused with that wallet error, never delivered as general (RED on
+`bfdd4e7f`, which accepts it as `General`). All three are RED on `bfdd4e7f`.
 `auth_transport_body_options_416.rs` adds the configurable-limit and invalid
 option checks, including chunked responses without Content-Length.
 The two signed-response pins in `transport_unsigned_response_354.rs` now
@@ -1232,8 +1244,9 @@ four option refusals at the newer pin, under Node 22.18.0, with fake fetch
 and streaming bodies, never a listening socket. Both references were built
 from their clone's pinned commit. Large values are recipes, not copied
 blobs; successful deliveries pin message types, signature bytes and payload
-SHA-256. The Rust replay uses wiremock, HTTP/2 for large header sets so
-hyper's 100-header HTTP/1 limit cannot preempt the SDK's 512. The two fake-fetch Content-Length cases are retained in the vector and
+SHA-256. The Rust replay uses wiremock, with HTTP/2 to exercise the SDK's
+512-header bound. No HTTP/1 header-count limit is measured here.
+The two fake-fetch Content-Length cases are retained in the vector and
 tested against constructed Responses in `http/body_tests.rs`, isolating
 the SDK guard from native HTTP framing, without I/O.
 
@@ -1273,6 +1286,28 @@ outgoing request ID rather than checking the returned header. This change
 follows the newer TypeScript reference, not Go. #410's typed JSON, JS
 cause/stack, non-ASCII reason-phrase and caller-client redirect differences
 remain; they are separate from these six rules.
+
+The header's exact reference order is `headers.get` at
+`SimplifiedFetchTransport.ts:238`, byte bound at `:240`, `JSON.parse` at
+`:249`, assignment to the message at `:349`, then
+`JSON.stringify(message.requestedCertificates)` at `Peer.ts:1068` for the
+signature. The two compact headers above preserve their property order and
+extra property through that path. The reference removes JSON whitespace;
+Rust retains the received text under #280's signed-text contract, including
+whitespace. Non-compact JSON remains a difference.
+`auth_http_certificate_request_416.json`, recorded by the new support script
+under Node 22.18.0, pins both successful headers, the wrong-preimage refusal,
+and the reference's refusal of a signature over a spaced header.
+
+The newer reference's full Peer intake also refuses an HTTP certificate
+request as `certificateRequest.initialNonce must be canonical base64.`:
+its transport omits that member (`:340-352`), while
+`AuthMessageValidation.ts:365` requires it. The recorder records that refusal
+first, then calls the unmodified `processCertificateRequest` (`Peer.ts:1044-1118`)
+to measure the path Rust implements; the older reference reaches its handler
+through normal intake. This crate still implements the listener path, not
+the reference's automatic certificate response or all of its intake/replay
+checks. The Rust tests exercise its full HTTP-to-Peer path without an adapter.
 
 ### Changed: the auth and identity certificate maps and `resolve_by_attributes`'s attributes keep insertion order, the reference's `Record` order, one order through the crate after the wallet's (#394)
 

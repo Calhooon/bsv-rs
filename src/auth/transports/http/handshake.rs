@@ -1,6 +1,7 @@
 //! The handshake and malformed certificate-header words (#410).
 
 use reqwest::header::HeaderMap;
+use serde_json::value::RawValue;
 
 use super::{
     body, client, headers, json_syntax, response_bounds, unauthenticated, SimplifiedFetchTransport,
@@ -51,12 +52,13 @@ impl SimplifiedFetchTransport {
     }
 }
 
-/// The header is parsed on every general reply, whatever its message type,
-/// as in #parseRequestedCertificates (:234-258), never silently discarded.
+/// Bound the received text before parsing, then retain it beside the typed
+/// view. A certificateRequest's signature must not lose property order or
+/// extra properties through serialization of RequestedCertificateSet.
 pub(super) fn requested_certificates(
     url: &str,
     response_headers: &HeaderMap,
-) -> Result<Option<RequestedCertificateSet>> {
+) -> Result<Option<(Box<RawValue>, RequestedCertificateSet)>> {
     let Some(value) = response_bounds::value(response_headers, headers::REQUESTED_CERTIFICATES)
     else {
         return Ok(None);
@@ -69,11 +71,15 @@ pub(super) fn requested_certificates(
             "header exceeds its byte limit",
         ));
     }
-    serde_json::from_str(&value).map(Some).map_err(|error| {
+    let malformed = |error: serde_json::Error| {
         let cause = json_syntax::diagnostic(&value).unwrap_or_else(|| error.to_string());
         Error::AuthError(format!(
             "Failed to parse {} returned by {url}: {value}. {cause}",
             headers::REQUESTED_CERTIFICATES,
         ))
-    })
+    };
+    let requested_certificates_text: Box<RawValue> =
+        serde_json::from_str(&value).map_err(&malformed)?;
+    let requested = serde_json::from_str(requested_certificates_text.get()).map_err(malformed)?;
+    Ok(Some((requested_certificates_text, requested)))
 }

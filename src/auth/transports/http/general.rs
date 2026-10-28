@@ -105,7 +105,12 @@ fn response_message(url: &str, status: u16, map: &HeaderMap, body: &[u8]) -> Res
     };
     let mut message = AuthMessage::new(message_type, unauthenticated::sender(map)?);
     message.signature = Some(signature);
-    message.requested_certificates = handshake::requested_certificates(url, map)?;
+    if let Some((requested_certificates_text, requested)) =
+        handshake::requested_certificates(url, map)?
+    {
+        message.requested_certificates_text = Some(requested_certificates_text);
+        message.requested_certificates = Some(requested);
+    }
     message.payload = Some(response_payload(status, map, body)?);
     message.nonce = response_bounds::value(map, headers::NONCE);
     message.your_nonce = response_bounds::value(map, headers::YOUR_NONCE);
