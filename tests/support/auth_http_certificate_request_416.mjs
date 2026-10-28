@@ -17,15 +17,27 @@ async function record (bundle, reference) {
   const serverIdentity = serverKey.toPublicKey().toString()
   const types = { [Utils.toBase64(Array(32).fill(7))]: ['name'] }
   const requested = { certifiers: [certifier], types }
+  const compact = JSON.stringify(requested)
+  const spaced = JSON.stringify(requested, null, 1).replaceAll('\n', ' ')
+  const escaped = compact.replace('"types":', '"\\u0074ypes":')
+  assert.deepEqual(JSON.parse(spaced), requested)
+  assert.deepEqual(JSON.parse(escaped), requested)
+  assert.notEqual(escaped, compact)
   const headers = [
     ['property_order', JSON.stringify({ types, certifiers: [certifier] }), 'header'],
     ['extra_property', JSON.stringify({ ...requested, extension: 'kept' }), 'header'],
-    ['general_payload_signature', JSON.stringify(requested), 'payload'],
-    // A measured residual: JSON.stringify removes whitespace in the reference.
-    ['spaced_header_signature', JSON.stringify(requested, null, 1).replaceAll('\n', ' '), 'header']
+    ['general_payload_signature', compact, 'payload'],
+    // H3/H3b and H5/H5b: JSON.stringify removes formatting whitespace and
+    // redundant escapes in the reference; Rust verifies the received text (#280).
+    ['spaced_header_signature', spaced, 'header'],
+    ['spaced_stringified_signature', spaced, 'stringified'],
+    ['escaped_header_signature', escaped, 'header'],
+    ['escaped_stringified_signature', escaped, 'stringified']
   ]
   const cases = []
   for (const [name, header, signed] of headers) {
+    const signedText = signed === 'payload' ? null
+      : signed === 'stringified' ? JSON.stringify(JSON.parse(header)) : header
     const verified = []
     class RecordingWallet extends ProtoWallet {
       async verifySignature (args, originator) {
@@ -64,7 +76,7 @@ async function record (bundle, reference) {
       writer.writeVarIntNum(0)
       writer.writeVarIntNum(2)
       writer.write(Utils.toArray('hi', 'utf8'))
-      const data = signed === 'payload' ? writer.toArray() : Utils.toArray(header, 'utf8')
+      const data = signed === 'payload' ? writer.toArray() : Utils.toArray(signedText, 'utf8')
       return new Response('hi', { headers: {
         'x-bsv-auth-version': '0.1', 'x-bsv-auth-identity-key': serverIdentity,
         'x-bsv-auth-message-type': 'certificateRequest',
@@ -113,7 +125,8 @@ async function record (bundle, reference) {
       await inboundWork
     } catch (e) { error = e.message }
     assert.equal(fetches, 2, `${reference}: ${name}: ${error}`)
-    cases.push({ name, header, signed, intake_error: intakeError, verified_text: verified.at(-1), error, requests, general_deliveries: generalDeliveries })
+    assert.equal(verified.at(-1), JSON.stringify(JSON.parse(header)))
+    cases.push({ name, header, signed, signed_text: signedText, intake_error: intakeError, verified_text: verified.at(-1), error, requests, general_deliveries: generalDeliveries })
   }
   assert.equal(cases[0].error, null)
   assert.equal(cases[1].error, null)
@@ -121,6 +134,11 @@ async function record (bundle, reference) {
   assert.equal(cases[1].requests.length, 1)
   assert.equal(cases[2].error, 'Signature is not valid')
   assert.equal(cases[3].error, 'Signature is not valid')
+  assert.equal(cases[4].error, null)
+  assert.equal(cases[4].requests.length, 1)
+  assert.equal(cases[5].error, 'Signature is not valid')
+  assert.equal(cases[6].error, null)
+  assert.equal(cases[6].requests.length, 1)
   return { reference, cases }
 }
 

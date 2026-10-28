@@ -25,7 +25,9 @@ fn witness(name: &str) -> Value {
         "vectors/auth_http_certificate_request_416.json"
     ))
     .unwrap();
+    assert_eq!(data["node"], "v22.18.0");
     assert_eq!(data["references"][0]["reference"], "ts-stack@edf6e03");
+    assert_eq!(data["references"][1]["reference"], "ts-sdk@9e3ede6b");
     let find = |reference: &Value| {
         reference["cases"]
             .as_array()
@@ -39,6 +41,8 @@ fn witness(name: &str) -> Value {
     let older = find(&data["references"][1]);
     for key in [
         "header",
+        "signed",
+        "signed_text",
         "verified_text",
         "error",
         "requests",
@@ -50,6 +54,7 @@ fn witness(name: &str) -> Value {
         newer["intake_error"],
         "certificateRequest.initialNonce must be canonical base64."
     );
+    assert!(older["intake_error"].is_null());
     newer
 }
 
@@ -102,16 +107,18 @@ async fn server(case: &Value) -> MockServer {
             let client_nonce = client_nonce.lock().unwrap().clone();
             let request_id = request.headers[headers::REQUEST_ID].to_str().unwrap();
             let header = case["header"].as_str().unwrap();
-            let data = if case["signed"] == "payload" {
-                HttpResponse {
+            let data = match case["signed"].as_str().unwrap() {
+                "payload" => HttpResponse {
                     request_id: from_base64(request_id).unwrap().try_into().unwrap(),
                     status: 200,
                     headers: vec![],
                     body: b"hi".to_vec(),
                 }
-                .to_payload()
-            } else {
-                header.as_bytes().to_vec()
+                .to_payload(),
+                "header" | "stringified" => {
+                    case["signed_text"].as_str().unwrap().as_bytes().to_vec()
+                }
+                signed => panic!("unrecorded preimage: {signed}"),
             };
             ResponseTemplate::new(200)
                 .insert_header(headers::VERSION, "0.1")
@@ -269,4 +276,93 @@ async fn issue_416_http_certificate_request_refuses_a_general_payload_signature(
     );
     assert!(observed.requests.is_empty());
     assert!(observed.general.is_empty());
+}
+
+// Behavior pins, not a changed verdict: #280 preserves the signed text received.
+// The other side's verdict and actual preimage are read from the Node recorder.
+async fn raw_text_divergence(name: &str, raw_signature: bool) {
+    let case = witness(name);
+    let header = case["header"].as_str().unwrap();
+    let stringified = case["verified_text"].as_str().unwrap();
+    assert_ne!(header, stringified);
+    assert_eq!(
+        serde_json::from_str::<Value>(header).unwrap(),
+        serde_json::from_str::<Value>(stringified).unwrap()
+    );
+    if name.starts_with("spaced_") {
+        assert!(header.contains(' '));
+        assert!(!stringified.contains(' '));
+    } else {
+        assert!(header.contains(r"\u0074ypes"));
+        assert!(stringified.contains("\"types\""));
+        assert!(!stringified.contains(r"\u0074"));
+    }
+    assert_eq!(
+        case["signed"],
+        if raw_signature {
+            "header"
+        } else {
+            "stringified"
+        }
+    );
+    assert_eq!(
+        case["signed_text"],
+        if raw_signature { header } else { stringified }
+    );
+    let reference_verifies = case["error"].is_null();
+    assert_eq!(reference_verifies, !raw_signature);
+    if !reference_verifies {
+        assert_eq!(case["error"], "Signature is not valid");
+    }
+    assert_eq!(
+        case["requests"].as_array().unwrap().len(),
+        usize::from(reference_verifies)
+    );
+    assert_eq!(case["general_deliveries"], 0);
+
+    let observed = exchange(&case).await;
+    assert_eq!(observed.messages.len(), 2);
+    let message = &observed.messages[1];
+    assert_eq!(message.message_type, MessageType::CertificateRequest);
+    assert_eq!(
+        message.requested_certificates_text.as_ref().unwrap().get(),
+        header
+    );
+    assert_eq!(message.signing_data(), header.as_bytes());
+    if raw_signature {
+        assert_eq!(observed.result, Ok(()), "{name}");
+        let requested: RequestedCertificateSet = serde_json::from_str(header).unwrap();
+        assert_eq!(
+            serde_json::to_value(observed.requests).unwrap(),
+            serde_json::to_value(vec![requested]).unwrap()
+        );
+    } else {
+        assert_eq!(
+            observed.result,
+            Err(Error::WalletError("Signature is not valid".into())),
+            "{name}"
+        );
+        assert!(observed.requests.is_empty());
+    }
+    assert!(observed.general.is_empty());
+}
+
+#[tokio::test]
+async fn issue_416_h3_whitespace_header_signed_raw_verifies() {
+    raw_text_divergence("spaced_header_signature", true).await;
+}
+
+#[tokio::test]
+async fn issue_416_h3b_whitespace_header_signed_stringified_is_refused() {
+    raw_text_divergence("spaced_stringified_signature", false).await;
+}
+
+#[tokio::test]
+async fn issue_416_h5_escaped_header_signed_raw_verifies() {
+    raw_text_divergence("escaped_header_signature", true).await;
+}
+
+#[tokio::test]
+async fn issue_416_h5b_escaped_header_signed_stringified_is_refused() {
+    raw_text_divergence("escaped_stringified_signature", false).await;
 }
