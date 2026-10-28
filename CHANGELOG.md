@@ -744,111 +744,111 @@ requested certificates in response: %w` (`:220-227`). Its default
 (`:31-44`, `:111`, `:175`); no `CheckRedirect` is installed. Those Go words
 and policy are not the TypeScript reference's.
 ### Changed: the default mode runs `OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM` and `OP_RSHIFTNUM` at every transaction version, as the reference's default does, and refuses a non-minimal number in the reference's words (#397)
+### Changed: the default mode runs all ten Chronicle opcodes at every version, gates the Chronicle hash type by version, and uses the reference's non-minimal-number words (#397)
 
-The keeper's word (2026-10-28 05:1xZ, under the owner's ruling (c), read at
-`ts-stack@edf6e03`): "The port's default mode does what the reference's
-default does: `Spend.ts:827-828` (`#skipUnavailablePreChronicleOpcode`)
-returns false whenever there are no explicit flags, so without a word the
-reference runs `OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM` and
-`OP_RSHIFTNUM` at every transaction version; the NOP form (and the
-DISCOURAGE_UPGRADABLE_NOPS refusal) exists only under a word whose
-`UTXO_AFTER_CHRONICLE` bit is off (`:829-842`), and
-`#enforceChronicleOnlyOpcode` (`:792-803`) is word-only. [...] the opcode gate
-and the length bound are two switches in the reference and become two in the
-port." And: "The reference's text at every number site is `non-minimally
-encoded script number` (`Spend.ts:547`); the port's prefix is dropped."
+The keeper's words of 2026-10-28 05:1xZ and 07:1xZ, under the owner's ruling
+(c), read at `ts-stack@edf6e03`: without a word all ten Chronicle opcodes
+run at every version, the number-length bound is absent (the V8 read bound
+still applies), and the Chronicle hash type requires version > 1; under a
+word the opcode and number-length gates use `UTXO_AFTER_CHRONICLE`, while
+the hash-type gate independently uses `CHRONICLE`. These are three separate
+rules, not one era switch. `#scriptNumMaxSize` returns `undefined` without
+flags (`Spend.ts:393-401`); the default's number bound is not version-based.
 
-Until now one switch, `utxo_after_chronicle` (version > 1 in the default
-mode, the word's bit under one), decided both whether `0xb3`-`0xb7` run and
-the coin's era for everything else, so at version 1 the default mode ran them
-as `OP_NOP4`-`OP_NOP8`: `aabbcc 1 1 OP_SUBSTR bb OP_EQUAL` was invalid here
-and `ok true` in the reference. Two switches now, named in `Spend`:
+The first commit (`8928fd74`) split `chronicle_opcodes` from the coin's era
+and ran `OP_SUBSTR`, `OP_LEFT`, `OP_RIGHT`, `OP_LSHIFTNUM` and `OP_RSHIFTNUM`
+at every version. This fold puts the other five on that same opcode gate:
+`#skipUnavailablePreChronicleOpcode` returns before **all** its refusals
+without flags (`:827-858`), and `#enforceChronicleOnlyOpcode` is word-only
+(`:792-803`). Before this fold the default refused these five at version 1;
+now it executes the reference's semantics:
 
-- the opcode gate, `chronicle_opcodes`: on at every version in the default
-  mode; under a word the word's `UTXO_AFTER_CHRONICLE` bit, so
-  `ScriptFlags::block(ProtocolEra::PostGenesis)` keeps the NOPs and the
-  standard word's DISCOURAGE refusal, as before (`src/script/spend/flow.rs`,
-  `op_nop4_to_nop8`);
-- the era switch, `utxo_after_chronicle`: version > 1 in the default mode
-  (the reference's `#isAfterChronicle()`, `:338-341`, through `#isRelaxed()`,
-  `:319-321`), the word's bit under one; it keeps `OP_2MUL`, `OP_2DIV`,
-  `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and, under a word, the number length
-  (`ScriptFlags::max_script_num_length`).
+- `OP_VER` pushes exactly four little-endian version bytes (`:982-991`),
+  including two's-complement negative versions. A missing JS version
+  bitwise-coerces to four zero bytes; the Rust API requires a version, with
+  explicit zero producing those same bytes.
+- `OP_VERIF` and `OP_VERNOTIF` pop an element and compare its bytes only if
+  its length is exactly four (`:1141-1159`); a numeric one does not match
+  four-byte version 1. A mismatch selects the false branch (`VERNOTIF`
+  inverts it), not an opcode error. An empty stack uses the reference's
+  `OP_VERIF and OP_VERNOTIF require at least one item on the stack when they
+  are used!`; a skipped conditional still adds its nesting level.
+- `OP_2MUL` multiplies a script number by two and `OP_2DIV` divides toward
+  zero (`:1494-1536`). Arbitrary minimal bytes are numbers; non-minimal
+  encodings at version 1 use `non-minimally encoded script number`.
 
-`set_utxo_after_chronicle` names the coin's era and sets both, in either mode:
-a caller who says the coin is pre-Chronicle gets the NOPs.
+The default formerly admitted `SIGHASH_CHRONICLE` at every version. It now
+requires version > 1 (`:338-341`, `:586-591`) and at version 1 refuses with
+`The signature hash type is invalid before Chronicle.`, the exact inner
+gate words required by the keeper. `hash_type.rs` holds the check; the
+original-digest dispatch of #22 is unchanged. `set_utxo_after_chronicle`
+overrides the opcodes and a word's number length, not the transaction
+version or the separate `CHRONICLE` bit. Under a word every gate and refusal
+stays as before; `script_sighash_dispatch_witness.rs` and
+`script_flags_witnesses.rs` are unchanged and green.
 
-The node's rule is the coin's creation era (`SCRIPT_UTXO_AFTER_CHRONICLE`,
-bitcoin-sv v1.2.2 `interpreter.cpp:609-764`: NOPs for a coin created before
-Chronicle, the opcodes after), which no default can know: a default mode
-carries no era, only a transaction version. The three SDK defaults disagree
-at version 1: ts-sdk runs the five (`Spend.ts:827-828`); go-sdk@2ca481c's
-thread defaults to `beforeGenesisConfig` (`script/interpreter/thread.go:521`)
-and `opcodeSubstr` and its siblings return nil without `afterChronicle`
-(`operations.go:2612-2619`); this crate gated them by version until now. The
-keeper's cross-SDK filing is ts-stack #1437 (2026-10-28 05:13:51Z: one era for
-both switches, or a documented default the SDKs share). This crate follows
-the reference's default at its pin; if the maintainers move the opcode gate
-onto `#isAfterChronicle()`, the two switches collapse back to one at that pin.
+The first commit also changed the default's non-minimal-number refusal
+from `Invalid script number: script execution error: Non-minimally encoded
+script number` to `non-minimally encoded script number` (`BigNumber.ts:1684`,
+`Spend.ts:547`); under a word the reader's existing words are kept.
+`script_chronicle_gate_397.rs` pins the first five opcodes, the setter, the
+word's number length and the non-minimal words; its former version-1
+`OP_2MUL` refusal is replaced by this fold's execution tests.
 
-The words: in the default mode a non-minimal number under MINIMALDATA (version
-1) is refused as `non-minimally encoded script number` at every number site
-(`BigNumber.ts:1684`, rethrown by `#readScriptNumber`; `#readSpliceOperand`,
-`Spend.ts:547`), where this crate wrote `Invalid script number: script
-execution error: Non-minimally encoded script number`; under a word the
-reader's words are kept (`Spend::non_minimal`, `src/script/spend/num.rs`).
+`tests/support/script_chronicle_default_397.mjs` records 73 opcode outcomes
+and four signed CHECKSIG outcomes from the unmodified reference built from
+`edf6e03`, under Node 22.18.0. The generated JSON is never hand-edited.
+`script_chronicle_default_397.rs` pins their bytes, comparison outcomes,
+arithmetic, nesting, hash digests and the word gates. On a scratch copy of
+`8928fd74` with a separate target directory: **6 failed, 2 passed** (all
+five default opcode tests and the version-1 hash gate RED; version-2
+hash/digest and explicit-word tests GREEN). The first commit's tests were
+RED 2 of 7 on `7257d73d` (opcode gate, non-minimal words).
 
-Pinned by `tests/script_chronicle_gate_397.rs`: each of the five at version 1
-in the default mode runs (a lock valid only if it executes), and at version 2;
-under the block word of a pre-Chronicle coin each is a NOP, under the standard
-word `OP_NOP<n> is discouraged by verification flags.`, under the
-post-Chronicle word it runs, and the setter after the word turns it off; the
-setter in the default mode gives the NOPs; `OP_2MUL` still disabled at version
-1 by default and the word's number length still the bit's (750,000 bytes,
-32,000,000 with the setter); the reference's words at `OP_ADD`, `OP_PICK`,
-`OP_SPLIT`, `OP_LEFT` and `OP_CHECKMULTISIG`'s key count, and under the
-standard word the reader's words at the same five. Each default-mode verdict
-is the reference's under Node 22.18.0. Red 2 of 7 on a scratch copy of
-`7257d73d` (the five run, the words); the other five guard what does not move.
-Three older pins moved with the change: `chronicle_tests`' and `flag_tests`'
-default-mode NOP rows now set the coin pre-Chronicle,
-`arithmetic_room_tests`' and `script_splice_position_reader_382.rs`'s
-non-minimal rows carry the reference's words (the #382 row no longer marks the
-coin post-Chronicle to reach `OP_LEFT`).
+The conformance census retains its totals: evaluation 5,116 = 2,851 run
+(2,834 passed, 17 known failures) + 2,228 unsupported + 37 skipped; zero
+failures or panics. One class moves: `node.script.teranode.1388` (no flags,
+version 1, scope `0x21`) was already refused for missing FORKID, and is now
+refused earlier by the Chronicle gate. The exact-entry allowlist in
+`tests/support/conformance_script_allowlist.rs` names that reason: the
+legacy-signature class **36 to 35**, the new Chronicle-version class **1**.
+Script regressions remain 11 (10 passed, 1 known); BEEF/transaction census
+pins are unchanged. Shared `spend_valid` known divergences remain **22**
+after this fold (20 to 22 in the first commit): vectors 80 and 311 assert
+NOPs for `0xb3`-`0xb7`, whereas the reference's default executes `OP_SUBSTR`
+and refuses their missing operands. Their reference source carries
+`P2SH,STRICTENC`, a word with the UTXO bit off; the shared file lacks that
+column. No shared vector is edited.
 
-One shared-vector total moves, a finding: `tests/vectors/spend_valid.json`'s
-vectors 80 and 311 (`1 OP_NOP1 .. OP_NOP10 1 OP_EQUAL`, twins) assert
-`0xb3`-`0xb7` as NOPs and now fail in the default mode at version 1 in the
-reference's own words, `OP_SUBSTR requires at least three items to be on the
-stack.` (the reference gives the same verdict without flags; its copy of the
-vector carries `P2SH,STRICTENC`, `script.valid.vectors.ts:340`, a word with
-the bit off, which the shared file has no column for). The file is not
-edited; `tests/script_vectors_tests.rs` counts them as known divergences with
-that reason, 20 to 22.
+The historical `script_invalid` tally improves from 419/432 to 420/432:
+row 18 now runs `OP_VER` and is accepted, while rows 19 and 21 now keep
+VERIF/VERNOTIF's skipped nesting and reject the unbalanced conditional.
+The remaining 12 accepted rows are enumerated with reasons in
+`tests/support/script_invalid_allowlist.rs`, replacing the 5% tolerance.
+All three changed verdicts are recorded from the reference too.
 
-The conformance corpus (`BSV_CONFORMANCE_DIR=~/bsv/ts-stack/conformance`): no
-pin moves. The census sets each fixture's era with `set_utxo_after_chronicle`,
-which sets both switches, so the opcode gate change reaches none of its
-vectors; its MINIMALDATA class (181) recognizes the reference's words too
-(`tests/conformance_scripts.rs`), the same 181 vectors.
-
-Migration: a caller that relied on the default mode NOP-ing `0xb3`-`0xb7` at
-version 1 calls `set_utxo_after_chronicle(false)` or sets a word; a caller
-matching the default mode's non-minimal text reads the reference's now.
+Migration: callers relying on default NOPs or refusals for these ten
+opcodes select the appropriate `ScriptFlags` word or explicitly name the
+coin's era; version-1 Chronicle signatures must use a word enabling
+`CHRONICLE`, or be signed with a legal hash type.
 
 ### Notes: cross-SDK parity (#397)
 
-Outside the keeper's word, found by this lane and not changed: the
-reference's default runs `OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF` and
-`OP_VERNOTIF` at version 1 too (`#skipUnavailablePreChronicleOpcode` returns
-before its `:845-866` refusals without flags; `2 OP_2MUL 4 OP_EQUAL` at
-version 1 is `ok true` there under Node 22.18.0), where this crate's era
-switch keeps them disabled or `BAD_OPCODE` at version 1 in the default mode.
-And the reference's `#isAfterChronicle()` sets no number length in the
-default mode: `#scriptNumMaxSize` returns `undefined` without explicit flags
-(`:393-401`, the `:398-399` branch is under a word); in the default mode it
-decides the SIGHASH_CHRONICLE bit's legality (`:586-591`), which this crate's
-default admits at every version (#22). Both wait for the keeper's word.
+The keeper's cross-SDK filing is ts-stack #1437, extended by the keeper for
+all five opcodes and the hash-type gate. This crate follows the reference's
+default opcode execution. Go gates the ten opcodes and the hash type on the
+coin's era, but with no epoch option it takes the coin as created after
+Chronicle (`go-sdk@2ca481c` `script/interpreter/thread.go:370-374`, the
+`CHRONICLE` flag added at `:504-506`), so its default runs all ten and
+admits `SIGHASH_CHRONICLE` at version 1 (`:807-812`), where this crate and
+the reference refuse it.
+
+An observed words difference remains explicit: the unmodified reference
+raises the Chronicle gate's inner error at `Spend.ts:591`, then catches it
+in `#checkSignatureEncoding` (`:622-625`) and exposes `The signature format
+is invalid.`. The Node 22 recording pins that outer message too. The
+keeper explicitly requires the inner gate text in this crate; this fold
+uses it and does not claim byte-for-byte parity with that outer wrapper.
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 

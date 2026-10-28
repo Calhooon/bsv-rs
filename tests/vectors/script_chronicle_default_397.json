@@ -1,0 +1,752 @@
+{
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "node": "v22.18.0",
+  "opcodes": [
+    {
+      "name": "OP_VER-invalid-vector-18",
+      "version": 1,
+      "unlock": "51",
+      "lock": "6362675168",
+      "valid": true,
+      "stack": [
+        "01000000"
+      ]
+    },
+    {
+      "name": "OP_VERIF-invalid-vector-19",
+      "version": 1,
+      "unlock": "00",
+      "lock": "6365675168",
+      "error": "Script evaluation error: Every OP_IF, OP_NOTIF, or OP_ELSE must be terminated with OP_ENDIF prior to the end of the script.",
+      "stack": []
+    },
+    {
+      "name": "OP_VERNOTIF-invalid-vector-21",
+      "version": 1,
+      "unlock": "00",
+      "lock": "6366675168",
+      "error": "Script evaluation error: Every OP_IF, OP_NOTIF, or OP_ELSE must be terminated with OP_ENDIF prior to the end of the script.",
+      "stack": []
+    },
+    {
+      "name": "OP_VER",
+      "version": 1,
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "01000000"
+      ]
+    },
+    {
+      "name": "OP_VER",
+      "version": 2,
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "02000000"
+      ]
+    },
+    {
+      "name": "OP_VER",
+      "version": 0,
+      "unlock": "",
+      "lock": "62",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        "00000000"
+      ]
+    },
+    {
+      "name": "OP_VER",
+      "version": -1,
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "ffffffff"
+      ]
+    },
+    {
+      "name": "OP_VER",
+      "version": 305419896,
+      "unlock": "",
+      "lock": "62",
+      "valid": true,
+      "stack": [
+        "78563412"
+      ]
+    },
+    {
+      "name": "OP_VER",
+      "version": null,
+      "unlock": "",
+      "lock": "62",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        "00000000"
+      ]
+    },
+    {
+      "name": "OP_VERIF-equal",
+      "version": 1,
+      "unlock": "0401000000",
+      "lock": "6551670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERIF-different",
+      "version": 1,
+      "unlock": "0403000000",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-number",
+      "version": 1,
+      "unlock": "51",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-five-bytes",
+      "version": 1,
+      "unlock": "050100000000",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-empty-item",
+      "version": 1,
+      "unlock": "00",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-underflow",
+      "version": 1,
+      "unlock": "",
+      "lock": "6551670068",
+      "error": "Script evaluation error: OP_VERIF and OP_VERNOTIF require at least one item on the stack when they are used!",
+      "stack": []
+    },
+    {
+      "name": "OP_VERIF-skipped",
+      "version": 1,
+      "unlock": "",
+      "lock": "00636568516851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-equal",
+      "version": 1,
+      "unlock": "0401000000",
+      "lock": "6651670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-different",
+      "version": 1,
+      "unlock": "0403000000",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-number",
+      "version": 1,
+      "unlock": "51",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-five-bytes",
+      "version": 1,
+      "unlock": "050100000000",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-empty-item",
+      "version": 1,
+      "unlock": "00",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-underflow",
+      "version": 1,
+      "unlock": "",
+      "lock": "6651670068",
+      "error": "Script evaluation error: OP_VERIF and OP_VERNOTIF require at least one item on the stack when they are used!",
+      "stack": []
+    },
+    {
+      "name": "OP_VERNOTIF-skipped",
+      "version": 1,
+      "unlock": "",
+      "lock": "00636668516851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_2MUL-positive",
+      "version": 1,
+      "unlock": "57",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "0e"
+      ]
+    },
+    {
+      "name": "OP_2MUL-negative",
+      "version": 1,
+      "unlock": "0187",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "8e"
+      ]
+    },
+    {
+      "name": "OP_2MUL-negative-one",
+      "version": 1,
+      "unlock": "4f",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "82"
+      ]
+    },
+    {
+      "name": "OP_2MUL-zero",
+      "version": 1,
+      "unlock": "00",
+      "lock": "8d",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2MUL-bytes",
+      "version": 1,
+      "unlock": "026e6f",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "dcde00"
+      ]
+    },
+    {
+      "name": "OP_2MUL-non-minimal",
+      "version": 1,
+      "unlock": "020100",
+      "lock": "8d",
+      "error": "Script evaluation error: non-minimally encoded script number",
+      "stack": []
+    },
+    {
+      "name": "OP_2MUL-negative-zero",
+      "version": 1,
+      "unlock": "0180",
+      "lock": "8d",
+      "error": "Script evaluation error: non-minimally encoded script number",
+      "stack": []
+    },
+    {
+      "name": "OP_2MUL-underflow",
+      "version": 1,
+      "unlock": "",
+      "lock": "8d",
+      "error": "Script evaluation error: OP_2MUL requires at least one item to be on the stack.",
+      "stack": []
+    },
+    {
+      "name": "OP_2MUL-skipped",
+      "version": 1,
+      "unlock": "",
+      "lock": "00638d6851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_2DIV-positive",
+      "version": 1,
+      "unlock": "57",
+      "lock": "8e",
+      "valid": true,
+      "stack": [
+        "03"
+      ]
+    },
+    {
+      "name": "OP_2DIV-negative",
+      "version": 1,
+      "unlock": "0187",
+      "lock": "8e",
+      "valid": true,
+      "stack": [
+        "83"
+      ]
+    },
+    {
+      "name": "OP_2DIV-negative-one",
+      "version": 1,
+      "unlock": "4f",
+      "lock": "8e",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2DIV-zero",
+      "version": 1,
+      "unlock": "00",
+      "lock": "8e",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2DIV-bytes",
+      "version": 1,
+      "unlock": "026e6f",
+      "lock": "8e",
+      "valid": true,
+      "stack": [
+        "b737"
+      ]
+    },
+    {
+      "name": "OP_2DIV-non-minimal",
+      "version": 1,
+      "unlock": "020100",
+      "lock": "8e",
+      "error": "Script evaluation error: non-minimally encoded script number",
+      "stack": []
+    },
+    {
+      "name": "OP_2DIV-negative-zero",
+      "version": 1,
+      "unlock": "0180",
+      "lock": "8e",
+      "error": "Script evaluation error: non-minimally encoded script number",
+      "stack": []
+    },
+    {
+      "name": "OP_2DIV-underflow",
+      "version": 1,
+      "unlock": "",
+      "lock": "8e",
+      "error": "Script evaluation error: OP_2DIV requires at least one item to be on the stack.",
+      "stack": []
+    },
+    {
+      "name": "OP_2DIV-skipped",
+      "version": 1,
+      "unlock": "",
+      "lock": "00638e6851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERIF-equal",
+      "version": 2,
+      "unlock": "0402000000",
+      "lock": "6551670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERIF-different",
+      "version": 2,
+      "unlock": "0403000000",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-number",
+      "version": 2,
+      "unlock": "52",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-five-bytes",
+      "version": 2,
+      "unlock": "050200000000",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-empty-item",
+      "version": 2,
+      "unlock": "00",
+      "lock": "6551670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERIF-underflow",
+      "version": 2,
+      "unlock": "",
+      "lock": "6551670068",
+      "error": "Script evaluation error: OP_VERIF and OP_VERNOTIF require at least one item on the stack when they are used!",
+      "stack": []
+    },
+    {
+      "name": "OP_VERIF-skipped",
+      "version": 2,
+      "unlock": "",
+      "lock": "00636568516851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-equal",
+      "version": 2,
+      "unlock": "0402000000",
+      "lock": "6651670068",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-different",
+      "version": 2,
+      "unlock": "0403000000",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-number",
+      "version": 2,
+      "unlock": "52",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-five-bytes",
+      "version": 2,
+      "unlock": "050200000000",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-empty-item",
+      "version": 2,
+      "unlock": "00",
+      "lock": "6651670068",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_VERNOTIF-underflow",
+      "version": 2,
+      "unlock": "",
+      "lock": "6651670068",
+      "error": "Script evaluation error: OP_VERIF and OP_VERNOTIF require at least one item on the stack when they are used!",
+      "stack": []
+    },
+    {
+      "name": "OP_VERNOTIF-skipped",
+      "version": 2,
+      "unlock": "",
+      "lock": "00636668516851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_2MUL-positive",
+      "version": 2,
+      "unlock": "57",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "0e"
+      ]
+    },
+    {
+      "name": "OP_2MUL-negative",
+      "version": 2,
+      "unlock": "0187",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "8e"
+      ]
+    },
+    {
+      "name": "OP_2MUL-negative-one",
+      "version": 2,
+      "unlock": "4f",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "82"
+      ]
+    },
+    {
+      "name": "OP_2MUL-zero",
+      "version": 2,
+      "unlock": "00",
+      "lock": "8d",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2MUL-bytes",
+      "version": 2,
+      "unlock": "026e6f",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "dcde00"
+      ]
+    },
+    {
+      "name": "OP_2MUL-non-minimal",
+      "version": 2,
+      "unlock": "020100",
+      "lock": "8d",
+      "valid": true,
+      "stack": [
+        "02"
+      ]
+    },
+    {
+      "name": "OP_2MUL-negative-zero",
+      "version": 2,
+      "unlock": "0180",
+      "lock": "8d",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2MUL-underflow",
+      "version": 2,
+      "unlock": "",
+      "lock": "8d",
+      "error": "Script evaluation error: OP_2MUL requires at least one item to be on the stack.",
+      "stack": []
+    },
+    {
+      "name": "OP_2MUL-skipped",
+      "version": 2,
+      "unlock": "",
+      "lock": "00638d6851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    },
+    {
+      "name": "OP_2DIV-positive",
+      "version": 2,
+      "unlock": "57",
+      "lock": "8e",
+      "valid": true,
+      "stack": [
+        "03"
+      ]
+    },
+    {
+      "name": "OP_2DIV-negative",
+      "version": 2,
+      "unlock": "0187",
+      "lock": "8e",
+      "valid": true,
+      "stack": [
+        "83"
+      ]
+    },
+    {
+      "name": "OP_2DIV-negative-one",
+      "version": 2,
+      "unlock": "4f",
+      "lock": "8e",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2DIV-zero",
+      "version": 2,
+      "unlock": "00",
+      "lock": "8e",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2DIV-bytes",
+      "version": 2,
+      "unlock": "026e6f",
+      "lock": "8e",
+      "valid": true,
+      "stack": [
+        "b737"
+      ]
+    },
+    {
+      "name": "OP_2DIV-non-minimal",
+      "version": 2,
+      "unlock": "020100",
+      "lock": "8e",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2DIV-negative-zero",
+      "version": 2,
+      "unlock": "0180",
+      "lock": "8e",
+      "error": "Script evaluation error: The top stack element must be truthy after script evaluation.",
+      "stack": [
+        ""
+      ]
+    },
+    {
+      "name": "OP_2DIV-underflow",
+      "version": 2,
+      "unlock": "",
+      "lock": "8e",
+      "error": "Script evaluation error: OP_2DIV requires at least one item to be on the stack.",
+      "stack": []
+    },
+    {
+      "name": "OP_2DIV-skipped",
+      "version": 2,
+      "unlock": "",
+      "lock": "00638e6851",
+      "valid": true,
+      "stack": [
+        "01"
+      ]
+    }
+  ],
+  "signatures": [
+    {
+      "name": "CHECKSIG-41",
+      "version": 1,
+      "unlock": "4830450221009e37a0530740b86fc3a57d487f79af894aba43f61fe134736f6c2ed9f7e3714f022070690eb64ad449133615cae33be5c14bfeb2231136ebd32fe2bd29b7063ddc1c41",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "a87749802574332a4466d67b384df6396208633452d7b8a56bbed76376649fa3"
+    },
+    {
+      "name": "CHECKSIG-61",
+      "version": 1,
+      "unlock": "483045022100acaecd58a8fbc1f3bb64a30b18191772edd72db0587d3d8da229907ef2c23c7f0220407d064043e7fcc7171a7c46de50b99ad52439e8871639ee40fc417bb314bcd161",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "error": "Script evaluation error: The signature format is invalid.",
+      "stack": [],
+      "digest": "828ccb268c1a9be48559b7e06f9d84060d82afcfa8325c675d4919a889d59b06"
+    },
+    {
+      "name": "CHECKSIG-41",
+      "version": 2,
+      "unlock": "483045022100fddb170c4cb67ac14e8cffd7b3d0d9c6f580b4d6b4b6e10fc71a7df10736faa002203deceacad26a00f6332752b07f44ef964598d24c869f52022f403498d8ce4dba41",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "de61fdca584e8f73c9025335327f5b1ff93ee1d6ce3a353d1a9f56bf704a05b6"
+    },
+    {
+      "name": "CHECKSIG-61",
+      "version": 2,
+      "unlock": "473044022060a4bd7cda343c72f833225aeac5584669b1e32981b62ca9e7319a427671b0b8022047fcd65a5f43593608ab34e7dd7c74dffc11b9a5c112f798e356b541cebf187061",
+      "lock": "21025cbdf0646e5db4eaa398f365f2ea7a0e3d419b7e0330e39ce92bddedcac4f9bcac",
+      "valid": true,
+      "stack": [
+        "01"
+      ],
+      "digest": "31b3898977d877ab5015af7c145dbb6ab68d6380b384c6b9a22883f4ed73256c"
+    }
+  ]
+}

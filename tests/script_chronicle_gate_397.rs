@@ -3,16 +3,15 @@
 //! in the reference's words (bsv-rs#397, the keeper's word of 2026-10-28; the
 //! reference at `ts-stack@edf6e03` `packages/sdk/src/script/Spend.ts`).
 //!
-//! Two switches. The opcode gate of `0xb3`-`0xb7` (`OP_SUBSTR`, `OP_LEFT`,
+//! The opcode gate of `0xb3`-`0xb7` (`OP_SUBSTR`, `OP_LEFT`,
 //! `OP_RIGHT`, `OP_LSHIFTNUM`, `OP_RSHIFTNUM`): the reference's
 //! `#skipUnavailablePreChronicleOpcode` returns false without explicit flags
 //! (`:827-828`), so its default runs them at version 1; under a word the
 //! word's `UTXO_AFTER_CHRONICLE` bit decides, the NOPs and the
-//! DISCOURAGE_UPGRADABLE_NOPS refusal where it is off. The era switch,
-//! `isAfterChronicle()` (`:338-341`, version > 1 by default), keeps the rest:
-//! `OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and a word's
-//! number length. A caller's `set_utxo_after_chronicle` names the coin's era
-//! and sets both.
+//! DISCOURAGE_UPGRADABLE_NOPS refusal where it is off. The second fold extends
+//! this gate to the other five opcodes (`script_chronicle_default_397.rs`);
+//! the word's number length and the hash-type gate remain separate. A caller's
+//! `set_utxo_after_chronicle` sets the opcodes and the word's number length.
 //!
 //! Each default-mode verdict below is the one the reference gives under
 //! Node 22 for the same script (`@bsv/sdk` bundled at `edf6e03`).
@@ -133,19 +132,11 @@ fn in_the_default_mode_the_setter_names_the_coins_era_for_both_switches() {
     }
 }
 
-/// The era switch is untouched: at version 1 in the default mode `OP_2MUL`
-/// is still disabled (the reference's default runs it: `ok true`; outside
-/// the keeper's word, named in the entry), and a word's number length still
-/// follows its bit, the default mode reading any length as the reference's
+/// A word's number length still follows its bit, the default mode reading
+/// any length as the reference's
 /// `#scriptNumMaxSize` does without flags (`Spend.ts:393-401`).
 #[test]
-fn the_era_switch_keeps_op_2mul_and_the_number_length() {
-    assert_eq!(
-        verdict(spend(1, "52", "8d5487")),
-        Err("This opcode is currently disabled. (Opcode: OP_2MUL, PC: 0)".to_string())
-    );
-    assert_eq!(verdict(spend(2, "52", "8d5487")), Ok(true));
-
+fn the_words_number_length_still_follows_the_utxo_bit() {
     assert_eq!(spend(1, "", "51").max_script_num_length(), None);
     let mut s = spend(1, "", "51");
     s.set_flags(ScriptFlags::block(ProtocolEra::PostGenesis));

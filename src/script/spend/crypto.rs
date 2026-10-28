@@ -3,14 +3,11 @@
 //! scriptCode a signature commits to, and the sighash dispatch it is verified
 //! against.
 
-use crate::primitives::bsv::sighash::{
-    SIGHASH_ALL, SIGHASH_ANYONECANPAY, SIGHASH_CHRONICLE, SIGHASH_FORKID, SIGHASH_SINGLE,
-};
+use crate::primitives::bsv::sighash::SIGHASH_FORKID;
 use crate::primitives::bsv::tx_signature::TransactionSignature;
 use crate::primitives::ec::PublicKey;
 use crate::primitives::{hash160, ripemd160, sha1, sha256, sha256d, BigNumber};
 use crate::script::evaluation_error::{ExecutionContext, ScriptEvaluationError};
-use crate::script::flags::ScriptFlags;
 use crate::script::op::{opcode_to_name, OP_CHECKMULTISIGVERIFY, OP_CHECKSIGVERIFY};
 use crate::script::{Script, ScriptChunk};
 
@@ -408,40 +405,7 @@ impl Spend {
             return Err(self.error("The signature must have a low S value."));
         }
 
-        // STRICTENC (interpreter.cpp:291-294): the hash type must have a defined
-        // base once the CHRONICLE, FORKID and ANYONECANPAY bits are cleared
-        // (`SigHashType::isDefined`, sighashtype.h:82-90): ALL, NONE or SINGLE;
-        // `SCRIPT_ERR_SIG_HASHTYPE` otherwise. Both node words carry STRICTENC;
-        // the default mode tests it too, as the TypeScript SDK refuses an
-        // undefined type (Calhooon/bsv-rs#23).
-        if self
-            .flags
-            .is_none_or(|word| word.contains(ScriptFlags::STRICTENC))
-        {
-            let base =
-                tx_sig.scope() & !(SIGHASH_CHRONICLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY);
-            if !(SIGHASH_ALL..=SIGHASH_SINGLE).contains(&base) {
-                return Err(self.error(&format!(
-                    "The signature's hash type (0x{:02x}) has no defined base type.",
-                    tx_sig.scope()
-                )));
-            }
-        }
-
-        // STRICTENC (interpreter.cpp:296-303): the CHRONICLE bit is legal only
-        // when the word carries SCRIPT_CHRONICLE (the block is in the
-        // Chronicle era); `SCRIPT_ERR_ILLEGAL_CHRONICLE` otherwise. The default
-        // mode has no word and admits the bit (Calhooon/bsv-rs#22).
-        if let Some(word) = self.flags {
-            if word.contains(ScriptFlags::STRICTENC)
-                && !word.contains(ScriptFlags::CHRONICLE)
-                && (tx_sig.scope() & SIGHASH_CHRONICLE) != 0
-            {
-                return Err(
-                    self.error("The signature must not use SIGHASH_CHRONICLE before Chronicle.")
-                );
-            }
-        }
+        self.check_signature_hash_type(tx_sig.scope())?;
 
         if (tx_sig.scope() & SIGHASH_FORKID) == 0 {
             return Err(self.error("The signature must use SIGHASH_FORKID."));

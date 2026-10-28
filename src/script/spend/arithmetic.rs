@@ -16,9 +16,9 @@ use num_traits::Zero;
 use super::Spend;
 
 impl Spend {
-    // OP_2MUL / OP_2DIV run only for a UTXO created after Chronicle
-    // (interpreter.cpp:1247-1254; disabled before it, `360-375`, refused
-    // above in `step`).
+    // OP_2MUL / OP_2DIV run at every version by default (Spend.ts:828,
+    // :1494-1536). Under a word the UTXO's era gates them in `step`
+    // (interpreter.cpp:1247-1254, :360-375).
     pub(super) fn op_unary_number(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         if self.stack.is_empty() {
             return Err(self.error(&format!(

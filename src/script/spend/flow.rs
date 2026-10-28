@@ -12,8 +12,8 @@ use super::Spend;
 /// unless the UTXO was created after Chronicle. `OP_VER`, `OP_VERIF` and
 /// `OP_VERNOTIF` are not "disabled" there but `BAD_OPCODE` when executed
 /// before Chronicle, handled in their arms.
-pub(super) fn is_opcode_disabled(op: u8, utxo_after_chronicle: bool) -> bool {
-    !utxo_after_chronicle && matches!(op, OP_2MUL | OP_2DIV)
+pub(super) fn is_opcode_disabled(op: u8, chronicle_opcodes: bool) -> bool {
+    !chronicle_opcodes && matches!(op, OP_2MUL | OP_2DIV)
 }
 
 impl Spend {
@@ -54,10 +54,10 @@ impl Spend {
         Ok(())
     }
 
-    // OP_VER: the transaction version as 4 little-endian bytes for a UTXO
-    // created after Chronicle (interpreter.cpp:598-608); BAD_OPCODE before.
+    // OP_VER: four raw little-endian version bytes (Spend.ts:982-991).
+    // Under a word only, the UTXO's era gates it (interpreter.cpp:598-608).
     pub(super) fn op_ver(&mut self) -> Result<(), ScriptEvaluationError> {
-        if !self.utxo_after_chronicle {
+        if !self.chronicle_opcodes {
             return Err(self.error("OP_VER is disabled until Chronicle."));
         }
         self.push_stack(self.transaction_version.to_le_bytes().to_vec())?;
@@ -103,7 +103,7 @@ impl Spend {
         opcode: u8,
         is_executing: bool,
     ) -> Result<(), ScriptEvaluationError> {
-        if !self.utxo_after_chronicle {
+        if !self.chronicle_opcodes {
             if !is_executing {
                 return Ok(());
             }
