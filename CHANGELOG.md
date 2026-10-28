@@ -504,7 +504,11 @@ low-S (`:618-621`) run inside it. The catch (`:622-626`) exposes only
 `The signature format is invalid.` when `enforceDer` is true. Without a
 word it is always true (`#shouldEnforceDerSignatures`, `:376-386`), including
 the relaxed version-2 mode; low-S is enabled by default at version 1
-(`:350-353`). The default fork-ID helper is a no-op.
+(`:350-353`). The default fork-ID helper is a no-op. Without a word this
+crate still refuses a signature lacking the fork-ID bit outside the wrapper
+with `The signature must use SIGHASH_FORKID.`, where both pins accept it
+(`0x01` at version 1): a divergence older than this change, stated now in
+`CLAUDE.md`'s list (bsv-rs#429 asks the keeper's word).
 
 `ts-sdk@9e3ede6b` `Spend.ts:435-489` has the same visible words and order
 for all three version-1 refusals (replayed from the same bytes under Node
@@ -534,7 +538,13 @@ because `enforceDer` is false. The recorded answers are:
 
 All three Rust refusals are `Script evaluation error: Invalid verification
 flags: SIGHASH_FORKID is not set: this interpreter computes the BIP-143
-sighash only.` (`ScriptFlags::check`, before signature checking). The older
+sighash only.` (`ScriptFlags::check`, before signature checking). bitcoin-sv v1.2.2
+accepts all three as well: with none of DERSIG, LOW_S or STRICTENC set,
+`CheckSignatureEncoding` (`interpreter.cpp:265-310` at 879fc8b) runs no
+check and `SignatureHash` (`:2118`) takes the original digest, which the
+three vectors are signed over; this crate's refusal names SIGHASH_FORKID,
+and the empty word also lacks GENESIS and UTXO_AFTER_GENESIS (the documented
+limit of `src/script/flags.rs:483-506`). The older
 TypeScript accepts the Chronicle and absent-bit vectors too; it rejects
 the same present-bit bytes with a false top because its formatter/verifier
 does not honor `sighashForkIdEnabled: false` for that digest. Its own
