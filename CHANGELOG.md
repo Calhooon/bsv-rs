@@ -140,8 +140,9 @@ refusal texts, an ordering test, and valid-boundary/crypto-miss replays. The
 Node v22.18.0 recorder `tests/support/wallet_proto_args_415.mjs` calls the
 actual ProtoWallet built from `ts-stack@edf6e03`: 202 cases, 117 replayable
 here and 85 documenting JS states excluded by Rust's types. The twelve
-refusal tests and ordering test fail on base `326b0836` (the old words or
-success); the success/miss test passes. The imported #407 Peer pins and their
+refusal tests and ordering test fail on the base (the old words or
+success; `326b0836` when recorded, `1b64374f` after the rebase); the
+success/miss test passes. The #407 Peer pins, landed at `1b64374f`, and their
 two-reference recorder were re-run: the malformed-signature test is red on
 the base and green here, with no listener called on either start path.
 No current-reference DER-word divergence remains; #415 removes the old #407
@@ -209,8 +210,8 @@ to a `PublicKey` and is accepted here. The type holds a curve point, not its
 input encoding; it does not enforce the reference's compressed-key length.
 
 The older `ts-sdk@9e3ede6b` ProtoWallet has no argument validators
-(`ProtoWallet.ts:267-302` calls its DER parser directly); the re-recorded
-#407 witness still returns `Signature DER must start with 0x30` there.
+(`ProtoWallet.ts:267-302` calls its DER parser directly); the #407
+witness, unchanged, still returns `Signature DER must start with 0x30` there.
 Go at `2ca481c` likewise has no equivalent validator: `wallet/proto_wallet.go`
 rejects verification when both data/hash byte slices have zero length, checks
 a nil parsed signature, prefers a present hash, then derives and verifies. Its HMAC is `[32]byte`, and its
