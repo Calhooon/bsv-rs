@@ -83,6 +83,12 @@ tracing = ["dep:tracing"]                 # opt-in, NOT in `full`: two warn even
   its own processor reads as absent, is refused at this crate's writer.
 
 - Go defaults `counterparty` to `Anyone` in `create_signature`; Rust and TS use `Self_`.
+- A general message's unparseable signature propagates Rust's `InvalidSignature`
+  parser words (Unreleased, #407), where `ts-stack@edf6e03` throws the wallet's
+  canonical-DER parameter error and `ts-sdk@9e3ede6b` throws its DER parser's
+  words. All three throw before the Peer's `valid: false` branch. A non-verifying
+  signature keeps `ProtoWallet`'s `Signature is not valid` here and in both
+  references; #407's proposed replacement with the Peer's words is not applied.
 - BRC-56 HMAC key (`5119a9b` `wallet/0056.md:66,73`): this crate keys the HMAC with the shared X coordinate as 32 bytes, as Go (`primitives/ec/symmetric.go:82-90`), Python and rs-sdk; ts-sdk drops its leading zero bytes (`ts-stack@edf6e03` `packages/sdk/src/wallet/KeyDeriver.ts:270`), a different tag for one key in 256. `verify_hmac` accepts the 32-byte tag only and refuses the minimal-length one as `Error::HmacMinimalLengthKey` (#148).
 - Go lacks TOTP, overlay caching/historian/reputation, and the RPuzzle template.
 - TS TOTP defaults to 2 digits; this crate uses 6 (RFC 6238).
