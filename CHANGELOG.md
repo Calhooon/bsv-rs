@@ -179,7 +179,7 @@ Go at `2ca481c`, `auth/peer.go:829`, also re-serializes before verifying with
 typed set drops unknown properties, sorts map keys and uses Go's JSON string
 escaping; it is not a byte oracle for JavaScript's insertion-ordered object.
 The reference writers use `JSON.stringify` (`auth-express-middleware/src/index.ts:943,1015`)
-and Rust's header writer uses `serde_json::to_string` (`http.rs:582`). #422's
+and Rust's header writer uses `serde_json::to_string` (`http.rs:581`). #422's
 H3/H3b/H5/H5b verdicts remain historical evidence of the old behavior above.
 
 ### Fixed: inherent specific-key linkage returns counterparty keys, as the trait does (#427)
