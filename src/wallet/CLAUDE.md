@@ -17,10 +17,10 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `key_deriver.rs` | BRC-42 key derivation with KeyDeriverApi trait | ~680 |
 | `cached_key_deriver.rs` | Thread-safe LRU-cached key deriver (Mutex-based) | ~528 |
 | `key_args.rs` | The seven key-related args and results; each args type ends with `privileged`, `privileged_reason`, `seek_permission` (the reference's names and defaults) and has `Default` (bsv-rs#193) | ~209 |
-| `proto_wallet.rs` | ProtoWallet core; all nine methods validate before cryptography (#415, #420); one keyring, no permission prompts | ~583 |
-| `proto_wallet/interface.rs` | WalletInterface forwarding, linkage privilege validation, unsupported operations | ~356 |
-| `proto_wallet/tests.rs` | Existing crypto and linkage unit tests, the proof test split without changing its assertions | ~361 |
-| `validation/crypto.rs` | All nine shared argument validators; encoded counterparty bounds before parsing; protocol, key ID, privilege, byte bounds, data/hash exclusivity, canonical DER (#415, #420) | ~308 |
+| `proto_wallet.rs` | ProtoWallet core; all nine methods validate before cryptography (#415, #420); specific linkage returns compressed counterparty keys for self, anyone and other (#427); one keyring, no permission prompts | ~584 |
+| `proto_wallet/interface.rs` | WalletInterface forwarding, linkage privilege validation, unsupported operations; both linkage adapters read the inherent result's keys, without a separate counterparty mapping (#427) | ~350 |
+| `proto_wallet/tests.rs` | Crypto and linkage unit tests, the proof test split without changing its assertions; specific linkage expects the identity key for self (#427) | ~361 |
+| `validation/crypto.rs` | All nine shared argument validators; encoded counterparty bounds before parsing; protocol, key ID, privilege, byte bounds, data/hash exclusivity, canonical DER (#415, #420); specific linkage returns the required counterparty and checked verifier, eliminating the wire's dead second missing-key check (#427) | ~309 |
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
@@ -173,6 +173,16 @@ ProtoWallet implements `WalletInterface` (via `#[async_trait]`) with full suppor
 - Action/Output/Certificate/Discovery operations: Return `Error::WalletError` indicating full wallet required
 - Status operations: `is_authenticated` returns true, `wait_for_authentication` returns true, `get_network` returns `Network::Mainnet`, `get_version` returns `bsv-rs-<CARGO_PKG_VERSION>` (`bsv-rs-0.9.0`; BRC-100's vendor-1.0.0 shape, 7 to 30 bytes as the wire processor checks it, #222), `get_height` returns 0, `get_header_for_height` returns error
 
+Specific linkage returns the counterparty's compressed public-key hex in the
+inherent result and the same key as a `PublicKey` in the trait result (#427).
+`Self_` resolves to the prover's identity key, `Anyone` to private scalar 1's
+public key, and `Other` to the supplied key. This follows
+`ts-stack@edf6e03` `ProtoWallet.ts:235-250` and Go `2ca481c`; the older
+`ts-sdk@9e3ede6b` returns the request's `self`/`anyone` aliases. The Node 22
+recording and both-entry-point tests are `wallet_specific_linkage_427.json`
+and `wallet_specific_linkage_427.rs`. The #420 replay helper reads the actual
+returned keys, so it no longer hides a result mismatch by reconstructing them.
+
 #### Schnorr Proof for Counterparty Key Linkage
 
 `reveal_counterparty_key_linkage` generates a real 98-byte Schnorr ZK proof demonstrating knowledge of the private key and correct ECDH computation. The proof is encoded as:
@@ -194,7 +204,7 @@ not this validation layer.
 |---|---|---|
 | `get_public_key` | `validateGetPublicKeyArgs`: identityKey true/absent, forSelf boolean; identity branch validates any supplied protocol/key/counterparty, then privilege; otherwise common encryption checks | Shared validator before the identity return or derivation; missing protocol/key in the reference's words |
 | `reveal_counterparty_key_linkage` | `validateRevealCounterpartyKeyLinkageArgs`: counterparty public key, verifier public key, privilege without seekPermission | Shared validator on the raw wire keys and the typed keys; trait adapter checks privilege before the inherent method |
-| `reveal_specific_key_linkage` | `validateRevealSpecificKeyLinkageArgs`: required counterparty, verifier, protocol, key ID, privilege without seekPermission | Shared validator before secret derivation; trait adapter checks privilege; internal revelation protocol still permits 430 bytes |
+| `reveal_specific_key_linkage` | `validateRevealSpecificKeyLinkageArgs`: required counterparty, verifier, protocol, key ID, privilege without seekPermission | Shared validator before secret derivation; trait adapter checks privilege; internal revelation protocol still permits 430 bytes; the validator returns the present counterparty so the wire needs no second missing-key check (#427) |
 | `encrypt` | `validateWalletEncryptArgs`: common encryption checks, plaintext byte array <=268435456 bytes | Shared validator before derivation and encryption |
 | `decrypt` | `validateWalletDecryptArgs`: common encryption checks, ciphertext byte array <=268435456 bytes | Shared validator before derivation and decryption |
 | `create_hmac` | `validateCreateHmacArgs`: common encryption checks, data <=268435456 bytes | Shared validator before cryptography (#415) |

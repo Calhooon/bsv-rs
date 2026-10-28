@@ -213,7 +213,7 @@ pub(super) fn reveal_counterparty_args(
 pub(super) fn reveal_specific_args(
     request: RevealSpecificRequest,
 ) -> Checked<RevealSpecificKeyLinkageArgs> {
-    let verifier = crypto::reveal_specific_args(
+    let (counterparty, verifier) = crypto::reveal_specific_args(
         request.counterparty.as_ref(),
         &request.verifier,
         &request.protocol_id,
@@ -221,11 +221,8 @@ pub(super) fn reveal_specific_args(
         request.privileged,
         request.privileged_reason.as_deref(),
     )?;
-    let counterparty = request
-        .counterparty
-        .ok_or_else(|| invalid("counterparty", "a hexadecimal string"))?;
     Ok(RevealSpecificKeyLinkageArgs {
-        counterparty,
+        counterparty: counterparty.clone(),
         verifier,
         protocol_id: request.protocol_id,
         key_id: request.key_id,

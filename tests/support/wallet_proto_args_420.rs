@@ -170,9 +170,9 @@ fn counterparty_linkage(wallet: &ProtoWallet, r: &Request, inherent: bool) -> Re
         })?;
         RevealCounterpartyKeyLinkageResult {
             linkage: bsv_rs::wallet::KeyLinkageResult {
-                prover: wallet.identity_key(),
-                verifier,
-                counterparty,
+                prover: PublicKey::from_hex(&result.prover)?,
+                verifier: PublicKey::from_hex(&result.verifier)?,
+                counterparty: PublicKey::from_hex(&result.counterparty)?,
                 encrypted_linkage: result.encrypted_linkage,
                 encrypted_linkage_proof: result.encrypted_linkage_proof,
             },
@@ -223,12 +223,9 @@ fn specific_result(
         })?;
         Ok(RevealSpecificKeyLinkageResult {
             linkage: bsv_rs::wallet::KeyLinkageResult {
-                prover: wallet.identity_key(),
-                verifier,
-                counterparty: counterparty
-                    .public_key()
-                    .cloned()
-                    .unwrap_or_else(|| wallet.identity_key()),
+                prover: PublicKey::from_hex(&result.prover)?,
+                verifier: PublicKey::from_hex(&result.verifier)?,
+                counterparty: PublicKey::from_hex(&result.counterparty)?,
                 encrypted_linkage: result.encrypted_linkage,
                 encrypted_linkage_proof: result.encrypted_linkage_proof,
             },

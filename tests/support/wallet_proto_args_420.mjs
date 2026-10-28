@@ -2,7 +2,7 @@
 // Actual ProtoWallet calls at ts-stack@edf6e03 under Node 22, no copied validators.
 import { createHash } from 'node:crypto'
 
-export async function recordRemaining({ ProtoWallet, PrivateKey }) {
+export async function recordRemaining({ ProtoWallet, PrivateKey }, linkageSource) {
   // Fix only entropy and time; every result still comes from the actual wallet.
   let counter = 0
   Object.defineProperty(globalThis, 'crypto', { configurable: true, value: {
@@ -85,6 +85,18 @@ export async function recordRemaining({ ProtoWallet, PrivateKey }) {
     } catch (error) { expected = { error: error.message, code: error.code ?? null } }
     if (expected.result !== undefined) expected.observed = await observe(method, actual, expected.result)
     cases.push({ name, method, args, ...(unrepresentable ? { unrepresentable } : {}), expected })
+  }
+
+  // #427: retain the result's actual strings as well as the decrypted linkage.
+  // A separate selection leaves #420's original 257-case corpus unchanged.
+  if (linkageSource) {
+    for (const [name, counterparty] of [['self', 'self'], ['anyone', 'anyone'], ['other', compressed]]) {
+      await record(name, 'revealSpecificKeyLinkage', { counterparty })
+    }
+    return {
+      source: `${linkageSource}: ProtoWallet.ts revealSpecificKeyLinkage`,
+      node: process.version, key: 42, verifierKey: 88, cases
+    }
   }
 
   for (const method of methods) {

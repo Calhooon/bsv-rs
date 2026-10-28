@@ -11,6 +11,16 @@ import { pathToFileURL } from 'node:url'
 
 if (process.versions.node.split('.')[0] !== '22') throw new Error('Use Node 22')
 const { ProtoWallet, PrivateKey } = await import(pathToFileURL(process.argv[2]).href)
+// #427 records both pinned ProtoWallets using #420's deterministic observations:
+//   node wallet_proto_args_415.mjs "$W/ts-stack.mjs" --specific-linkage "$W/ts-sdk.mjs"
+if (process.argv[3] === '--specific-linkage') {
+  const { recordRemaining } = await import('./wallet_proto_args_420.mjs')
+  const current = await recordRemaining({ ProtoWallet, PrivateKey }, 'ts-stack@edf6e03')
+  const older = await import(pathToFileURL(process.argv[4]).href)
+  const olderReference = await recordRemaining(older, 'ts-sdk@9e3ede6b')
+  process.stdout.write(JSON.stringify({ ...current, olderReference }, null, 2) + '\n')
+  process.exit(0)
+}
 // The five remaining methods and encoded-key intake use the same pinned build.
 // Add --remaining to record #420 without changing #415's 202-case corpus.
 if (process.argv[3] === '--remaining') {

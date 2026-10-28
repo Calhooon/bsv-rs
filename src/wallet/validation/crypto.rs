@@ -166,21 +166,22 @@ pub(crate) fn reveal_counterparty_args(
 }
 
 /// `validateRevealSpecificKeyLinkageArgs`: counterparty, verifier, protocol,
-/// key ID, privilege. Unlike encryption, the counterparty must be present.
-pub(crate) fn reveal_specific_args(
-    counterparty: Option<&Counterparty>,
+/// key ID, privilege. Returns the required counterparty and checked verifier.
+pub(crate) fn reveal_specific_args<'a>(
+    counterparty: Option<&'a Counterparty>,
     verifier: &[u8],
     protocol_id: &Protocol,
     key_id: &str,
     privileged: Option<bool>,
     reason: Option<&str>,
-) -> Result<PublicKey> {
-    counterparty.ok_or_else(|| invalid_parameter("counterparty", "a hexadecimal string"))?;
+) -> Result<(&'a Counterparty, PublicKey)> {
+    let counterparty =
+        counterparty.ok_or_else(|| invalid_parameter("counterparty", "a hexadecimal string"))?;
     let verifier = public_key(verifier, "verifier")?;
     protocol(protocol_id)?;
     string_length(key_id, "keyID", 1, 800)?;
     privilege(privileged, reason)?;
-    Ok(verifier)
+    Ok((counterparty, verifier))
 }
 
 /// `validateCreateHmacArgs`, before derivation or hashing.
