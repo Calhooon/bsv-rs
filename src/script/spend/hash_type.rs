@@ -1,5 +1,5 @@
 //! Signature hash-type legality. The default's Chronicle gate is the
-//! transaction version; under a word it is CHRONICLE, independently of the
+//! transaction version, refused in the reference's visible words; under a word it is CHRONICLE, independently of the
 //! UTXO's opcode/number-length era (bsv-rs#22, #397).
 
 use crate::primitives::bsv::sighash::{
@@ -41,10 +41,12 @@ impl Spend {
                         .error("The signature must not use SIGHASH_CHRONICLE before Chronicle."));
                 }
                 // Spend.ts:586-591, :338-341: the default uses version > 1.
-                // The keeper's #397 fold requires this inner gate's words;
-                // TS :622-625 wraps them in its generic signature error.
+                // The gate's own text (`... invalid before Chronicle.`) is
+                // thrown inside the try at :614-622, whose catch (:622-625) rethrows the
+                // DER wrapper's words (the default always enforces DER,
+                // :376-386); the caller sees only those.
                 None if self.transaction_version <= 1 => {
-                    return Err(self.error("The signature hash type is invalid before Chronicle."));
+                    return Err(self.error("The signature format is invalid."));
                 }
                 _ => {}
             }

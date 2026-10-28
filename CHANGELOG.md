@@ -778,9 +778,17 @@ now it executes the reference's semantics:
   encodings at version 1 use `non-minimally encoded script number`.
 
 The default formerly admitted `SIGHASH_CHRONICLE` at every version. It now
-requires version > 1 (`:338-341`, `:586-591`) and at version 1 refuses with
-`The signature hash type is invalid before Chronicle.`, the exact inner
-gate words required by the keeper. `hash_type.rs` holds the check; the
+requires version > 1 (`:338-341`, `:586-591`) and at version 1 refuses in
+the reference's visible words, `The signature format is invalid.`
+(`Script evaluation error: The signature format is invalid.` as the
+first line of the error's `Display`, the reference's own prefix,
+`ScriptEvaluationError.ts:38`). The gate at `:586-591` throws `The
+signature hash type is invalid before Chronicle.` inside the `try` of
+`#checkSignatureEncoding` (`:614-622`), and its `catch` (`:622-625`)
+rethrows the DER wrapper's words, the default mode always enforcing DER
+(`:376-386`; `ts-sdk@9e3ede6` the same, the gate at `Spend.ts:450-456`,
+the catch at `:473-476`); the inner words, the keeper's first reading,
+reach no caller there and none here. `hash_type.rs` holds the check; the
 original-digest dispatch of #22 is unchanged. `set_utxo_after_chronicle`
 overrides the opcodes and a word's number length, not the transaction
 version or the separate `CHRONICLE` bit. Under a word every gate and refusal
@@ -843,12 +851,12 @@ Chronicle (`go-sdk@2ca481c` `script/interpreter/thread.go:370-374`, the
 admits `SIGHASH_CHRONICLE` at version 1 (`:807-812`), where this crate and
 the reference refuse it.
 
-An observed words difference remains explicit: the unmodified reference
-raises the Chronicle gate's inner error at `Spend.ts:591`, then catches it
-in `#checkSignatureEncoding` (`:622-625`) and exposes `The signature format
-is invalid.`. The Node 22 recording pins that outer message too. The
-keeper explicitly requires the inner gate text in this crate; this fold
-uses it and does not claim byte-for-byte parity with that outer wrapper.
+The version-1 refusal's words are the reference's visible ones, byte for
+byte with the Node 22 recording (`Script evaluation error: The signature
+format is invalid.`): the second fold took the gate's inner words at
+`Spend.ts:591`, which the wrapper at `:622-625` never lets out; the third
+fold answers the wrapper's words, by the captain's reading of rule 1, and
+no words difference remains.
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 

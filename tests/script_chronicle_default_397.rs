@@ -168,20 +168,19 @@ fn issue_397_op_2div_runs_at_version_1_and_truncates_toward_zero() {
     opcode("OP_2DIV");
 }
 
-const HASH_GATE: &str = "The signature hash type is invalid before Chronicle.";
+/// The reference's visible text: the gate's own words (`Spend.ts:586-591`)
+/// are rethrown by the DER wrapper's catch (`:622-625`).
+const HASH_GATE: &str = "The signature format is invalid.";
 
 #[test]
-fn issue_397_default_chronicle_hash_type_is_invalid_at_version_1_in_the_gate_words() {
+fn issue_397_default_chronicle_hash_type_is_invalid_at_version_1_in_the_reference_visible_words() {
     let r = recording();
     let c = r
         .signatures
         .iter()
         .find(|c| c.version == Some(1) && c.name == "CHECKSIG-61")
         .unwrap();
-    assert_eq!(
-        c.error.as_deref(),
-        Some("Script evaluation error: The signature format is invalid.")
-    );
+    let recorded = c.error.as_deref().unwrap();
     for era in [None, Some(false), Some(true)] {
         let mut s = spend(c);
         if let Some(after) = era {
@@ -190,6 +189,7 @@ fn issue_397_default_chronicle_hash_type_is_invalid_at_version_1_in_the_gate_wor
         let error = s.validate().unwrap_err();
         assert!(!error.is_resource_limit());
         assert_eq!(error.message, HASH_GATE);
+        assert_eq!(error.to_string().lines().next(), Some(recorded));
     }
 }
 
