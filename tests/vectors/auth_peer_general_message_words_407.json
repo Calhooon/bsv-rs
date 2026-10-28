@@ -1,0 +1,108 @@
+{
+  "node": "v22.18.0",
+  "keys": {
+    "client": 41,
+    "server": 42,
+    "stranger": 43
+  },
+  "malformed": [
+    110,
+    111,
+    116,
+    32,
+    97,
+    32,
+    115,
+    105,
+    103,
+    110,
+    97,
+    116,
+    117,
+    114,
+    101
+  ],
+  "references": {
+    "ts-stack@edf6e03": {
+      "identities": {
+        "client": "037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb",
+        "server": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+        "stranger": "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+      },
+      "cases": {
+        "honest": {
+          "proto": {
+            "error": null,
+            "delivered": 1
+          },
+          "answering": {
+            "error": null,
+            "delivered": 1
+          }
+        },
+        "other_key": {
+          "proto": {
+            "error": "Signature is not valid",
+            "code": "ERR_INVALID_SIGNATURE",
+            "delivered": 0
+          },
+          "answering": {
+            "error": "Invalid signature in generalMessage from 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "delivered": 0
+          }
+        },
+        "malformed": {
+          "proto": {
+            "error": "The signature parameter must be a canonical DER-encoded ECDSA signature",
+            "code": 6,
+            "delivered": 0
+          },
+          "answering": {
+            "error": "Invalid signature in generalMessage from 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "delivered": 0
+          }
+        }
+      }
+    },
+    "ts-sdk@9e3ede6b": {
+      "identities": {
+        "client": "037a9375ad6167ad54aa74c6348cc54d344cc5dc9487d847049d5eabb0fa03c8fb",
+        "server": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+        "stranger": "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+      },
+      "cases": {
+        "honest": {
+          "proto": {
+            "error": null,
+            "delivered": 1
+          },
+          "answering": {
+            "error": null,
+            "delivered": 1
+          }
+        },
+        "other_key": {
+          "proto": {
+            "error": "Signature is not valid",
+            "code": "ERR_INVALID_SIGNATURE",
+            "delivered": 0
+          },
+          "answering": {
+            "error": "Invalid signature in generalMessage from 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "delivered": 0
+          }
+        },
+        "malformed": {
+          "proto": {
+            "error": "Signature DER must start with 0x30",
+            "delivered": 0
+          },
+          "answering": {
+            "error": "Invalid signature in generalMessage from 02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "delivered": 0
+          }
+        }
+      }
+    }
+  }
+}

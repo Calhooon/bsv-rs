@@ -328,6 +328,55 @@ removed (the test red there), the same factor of two as 800,000,099 against
 time the other eleven tests'). CI runs the file in the debug
 profile, alone (`ci.yml`, `Run the memory profiling tests`, `cargo test
 --test memory_profiling --all-features -- --test-threads=1`).
+### Verified: a general message's wallet refusal precedes the Peer's own signature words (#407)
+
+The proposed change in #407 would replace a `ProtoWallet`'s error with the
+Peer's error. The premise was wrong: both pinned TypeScript references
+already propagate `Signature is not valid` from `ProtoWallet.verifySignature`
+for a signature made by another key. Neither `processGeneralMessage` nor
+the incoming-message dispatcher catches that rejection. The Peer throws
+`Invalid signature in generalMessage from <identityKey>` only when its
+wallet **returns** `{ valid: false }`. Rust already preserves that distinction;
+no runtime behavior or public API changes in this entry.
+
+`tests/auth_peer_general_message_words_407.rs` pins both paths on `start`
+and `start_server`, no listener called on either refusal, an honest message,
+and an unrelated wallet error propagated unchanged. Its fixture is recorded
+by `tests/support/auth_peer_general_message_words_407.mjs` from the actual
+Peers in `ts-stack@edf6e03` and `ts-sdk@9e3ede6b`, built from those commits
+and run under Node v22.18.0. The recorder runs an honest handshake before
+each message and records both `ProtoWallet` and an explicitly adapting wallet
+that returns `false` on a verification error. Rust reconstructs the messages
+with its own nonce writer, as #353's witness does, because the nonce HMAC
+inputs differ. These parity tests are already green on the base; the two
+proposed replacement expectations are red there, not evidence of a parity fix.
+
+Downstream old / proposed new (replacement **not applied**): `wallet error: Signature is not valid` / `authentication error: Invalid signature in generalMessage from <identityKey>`.
+
+Line for the toolbox's operator-visible table: `| Bad signature in a certifier's general answer (ProtoWallet) | wallet error: Signature is not valid | Unchanged; a wallet returning valid: false instead produces authentication error: Invalid signature in generalMessage from <identityKey>. |`
+
+### Notes: cross-SDK parity
+
+The Peer's own words interpolate the established session identity string
+directly (`ts-stack` `Peer.ts:1286-1304`), the compressed public-key hex in
+these witnesses (66 lowercase characters, no `0x`). The wallet call has no
+catch (`:1292-1301`), and neither does its dispatcher (`:766-800`). Both
+reference `ProtoWallet`s throw `Signature is not valid` with code
+`ERR_INVALID_SIGNATURE`; they do not return `false` for a non-verifying
+signature (`ts-stack` `ProtoWallet.ts:358-396`, `ts-sdk` `:267-302`).
+
+Unparseable bytes are a different refusal, also propagated: `ts-stack`'s
+wallet validation throws `The signature parameter must be a canonical
+DER-encoded ECDSA signature` (code 6, `validationHelpers.ts:1795-1802`),
+while `ts-sdk`'s parser throws `Signature DER must start with 0x30` for the
+recorded bytes. Rust retains its existing `InvalidSignature` parser error,
+`invalid signature: Expected sequence tag 0x30`; that wording difference is
+recorded, not normalized into a false verification result. Go at `2ca481c`
+parses first (`auth/peer.go:1013-1017`, `failed to parse signature`), then
+classifies a wallet's `ErrInvalidSignature` or `Valid: false` as
+`general message - invalid-signature` (`:414-435`, `:1036-1038`), wrapping
+other wallet errors separately. Its classification is not the TypeScript
+Peer's propagation rule.
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 

@@ -12,7 +12,7 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | 669 |
 | `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles, the callback's Peer holding the transport weakly so a dropped Peer is freed (#353) | 970 |
+| `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles, the callback's Peer holding the transport weakly so a dropped Peer is freed (#353); a general message propagates a wallet's error, and only `valid: false` reaches the Peer's signature words (#407) | 970 |
 | `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
@@ -433,6 +433,19 @@ On the initiator side, the responder's session nonce (`initial_nonce`) is stored
 Errors during InitialResponse processing (e.g., signature verification failure) are sent through the oneshot channel to the waiting `initiate_handshake()` caller: `process_initial_response()` delegates to `process_initial_response_inner()` and on an error sends it through the oneshot named by `your_nonce` (a `your_nonce` naming none of ours leaves the handshake to time out, as the reference's does).
 
 Without this, errors would be swallowed by the routing task and the caller would time out instead of receiving the actual error.
+
+General messages preserve the wallet's rejection too (#407): a `ProtoWallet`
+throws `Signature is not valid` for a non-verifying signature in both pinned
+TypeScript references, and neither the Peer's wallet call nor its dispatcher
+catches it. Only a returned `valid: false` produces `Invalid signature in
+generalMessage from <identityKey>`, with the session identity's compressed
+hex (no `0x`). Rust's existing behavior is the same. Unparseable bytes throw
+before that branch: `ts-stack@edf6e03` has the wallet's canonical-DER parameter
+error (code 6), `ts-sdk@9e3ede6b` has the DER parser's words, and Rust retains
+its own `InvalidSignature` parser error. The two references and that existing
+wording difference are recorded in `tests/auth_peer_general_message_words_407.rs`
+and the #407 changelog entry. Do not turn every wallet error into a signature
+verdict: an unavailable wallet must keep its own error.
 
 ### Nonce Generation
 
