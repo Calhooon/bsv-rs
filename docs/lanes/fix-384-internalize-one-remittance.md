@@ -1,0 +1,17 @@
+# #384: `validateInternalizeOutput`'s one-remittance check comes before the remittances' fields, as the reference orders it
+
+Branch `lane/fix-384-internalize-one-remittance` from `origin/beta`'s tip (949f2782 or later; beta.3). Read `CLAUDE.md`, `src/wallet/CLAUDE.md`, `src/wallet/validation/internalize.rs` (today: `validate_internalize_action_args` checks `insertionRemittance.customInstructions`'s length on every output without reading which remittances the output carries), `src/wallet/validation/` siblings (the words and shapes of a refusal, `Error::WalletError`, `WalletRefusalClass`), `tests/CLAUDE.md`, `docs/FIXTURES.md` (the HTTP JSON and wire fixtures of `internalizeAction`), issue #384 (from the toolbox's #337 lane). The reference: `ts-stack@edf6e03` `packages/sdk/src/wallet/validationHelpers.ts:972-982` (`validateInternalizeOutput`: `invalid('output remittance', 'only paymentRemittance for wallet payment')` and the basket-insertion twin ahead of the remittances' fields at `:981-982`; the surrounding `validateInternalizeActionArgs` for what else it checks that this crate does not, say). Do not read `~/bsv/bsv-low/` or `~/vault/`, and do not grep across `~/bsv/` as a whole. Run every gate in the foreground; never end your turn with a gate running in the background. Never push. A MetaNet Client listens on 3301, 3321 and 2121 on this host: no test or probe on a default URL. Use your own `CARGO_TARGET_DIR` under `~/bsv/targets/bsv-rs-lanes/fix-384`.
+
+## What to do
+
+1. The validator in the reference's order: per output, the protocol read, the other protocol's remittance refused first with the reference's exact words (both twins; quote them from the source), then the remittances' fields (the customInstructions length as today, in the reference's words and order; anything else `:981-982` checks); the error's class and index form as the crate's other validators (`Invalid outputs[i].…`). Under the owner's ruling (c) the reference's own order needs no new word.
+2. Tests, RED before green (a scratch copy without the change, its own target dir): `tests/wallet_internalize_one_remittance_384.rs`: a wallet payment carrying an over-long insertion remittance answers the one-remittance text (where today the customInstructions text); the basket-insertion twin; the field checks still reached when the protocol matches; the HTTP JSON substrate's and the wire processor's verdicts where they validate (read whether they call this validator); the fixtures' rows if a recorded refusal moves (its own commit; `fixtures_replay` green).
+3. The entry under `[Unreleased]` (the toolbox's finding credited, the reference's sites, the words, the toolbox's own door doing the same), the rows, the ratchet.
+
+## Gate
+
+`cargo fmt --check`; `cargo clippy --all-targets --all-features -- -D warnings`; `cargo test --features "full,http"` on every test file matching `wallet_*`, `wire_*`, `arch_*` (not the `arch_support` module), `fixtures_replay`; `--lib wallet`; the doc tests; `cargo build --examples --all-features`; `cargo test --test readme_examples`; the wasm32 build of the CLAUDE.md feature set; `cargo semver-checks --release-type minor --baseline-rev <your base sha>`; `tools/ratchet/run --check --against origin/beta`.
+
+## Report
+
+A REPORT: base and tip, each commit, the order before and after with the reference's words, RED counts then green, the gate's results, anything unverified.
