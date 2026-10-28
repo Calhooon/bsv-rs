@@ -82,9 +82,11 @@ allocates: `tests/transaction_verify_budget_331.rs`'s left shift by 2^40
 count's verdict under both) and the by-hand left shift by 2^33 + 8 in
 `tests/script_default_mode_uncapped_331.rs`. The element bound stays at the
 shift's site but is out of its reach in the default mode: a readable value
-(536,870,888 bits) shifted by `INT_MAX` is 335 MB, and V8's `BigInt` cap
-refuses past 2^30 bits before it; the word branch never reaches it. No test
-pins it (none can reach it); a comment at `splice.rs:327` says so.
+(536,870,888 bits) shifted by `INT_MAX` is 335 MB, below the 1 GiB bound, so
+the bound (which runs before the shift's refusal at `splice.rs:332`) never
+trips, and V8's `BigInt` cap refuses the result past 2^30 bits; the word
+branch never reaches it. No test pins it (none can reach it); a comment at
+`splice.rs:327` says so.
 
 ### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
 
