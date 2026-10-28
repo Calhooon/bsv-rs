@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: internalizeAction judges an output's protocol and its one remittance before the remittances' fields, as the reference orders it (#384)
+
+`wallet::validation::validate_internalize_action_args` read each output's
+`insertionRemittance.customInstructions` without reading which remittances
+the output carried, so a wallet payment that also carried an over-long
+insertion remittance was refused in the customInstructions words, where the
+reference refuses it for carrying the other remittance. The toolbox's #337
+lane, which ported the reference's one-remittance check at its own
+internalize door, found it (filed as #384). Each output is now judged in the
+reference's `validateInternalizeOutput` order (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/validationHelpers.ts:966-984`):
+
+1. the protocol (`:968-970`): neither `wallet payment` nor `basket
+   insertion` is refused, `The protocol parameter must be 'basket
+   insertion' or 'wallet payment'`;
+2. the one remittance (`:971-977`): a wallet payment without a
+   `paymentRemittance` or with an `insertionRemittance`, `The output
+   remittance parameter must be only paymentRemittance for wallet
+   payment`, and the twin, a basket insertion without an
+   `insertionRemittance` or with a `paymentRemittance`, `The output
+   remittance parameter must be only insertionRemittance for basket
+   insertion`;
+3. the remittances' fields (`:978-983`): the insertion's
+   `customInstructions` at most 1,000 UTF-8 bytes in this crate's words as
+   before (#117), `Invalid outputs[i].insertionRemittance.customInstructions:
+   must be no more than 1000 bytes, got N`.
+
+The first two are `Error::WalletRefusal` of class
+`WalletRefusalClass::InvalidParameter` (`WERR_INVALID_PARAMETER`, code 6)
+in the reference's words, which name no output index (`invalid`,
+`:77-79`, and `WERR_INVALID_PARAMETER.ts:14`); output `i`'s checks all run
+before output `i + 1`'s, as the reference's `map` runs them. Every door that
+calls the validator answers so before it acts or sends: `ProtoWallet`,
+`WalletClient`, `HttpWalletJson` and `WalletWireTransceiver` (whose writer's
+own `payment_remittance required for wallet payment` is no longer reached,
+and which no longer writes an empty insertion for a basket insertion without
+one); the wire processor refuses internalizeAction as needing a full wallet
+and calls no validator, its frame unchanged. No recorded fixture moves
+(`fixtures_replay` green: every recorded output carries its own remittance
+alone). Pinned by `tests/wallet_internalize_one_remittance_384.rs` (9
+tests; 7 RED on the pre-fix tree, the two that pin the field checks still
+reached green on both). No public shape changes; a caller whose output
+carried both remittances, neither, or another protocol now gets the
+refusal. The toolbox's door makes the same check (its #337): one verdict
+across the two.
+
+### Notes: cross-SDK parity (#384)
+
+The reference's `validateInternalizeActionArgs` (`:1046-1074`) and the
+remittance validators check more than this crate's validator does, and
+none of it is ported here: the output index a non-negative integer
+(`:979`; a `u32` here by type), `derivationPrefix` and `derivationSuffix`
+base64 and `senderIdentityKey` a public key (`validateWalletPayment`,
+`:914-923`), the basket and the tags (`validateBasketInsertion`,
+`:937-951`), `tx` an exactly framed Atomic BEEF, the description 5 to 2000
+bytes, the labels, and at least one output (`:1050-1071`). go-sdk at
+`2ca481c` has no internalizeAction argument validator: its writer refuses
+an absent remittance in its own words (`payment remittance is required for
+wallet payment protocol`, `wallet/serializer/internalize_action.go:29-30`,
+`:38-39`) and writes the protocol's remittance alone, dropping the other.
+
 ### Fixed: the interpreter holds no number's bytes twice and writes no huge number in an error's text, under a caller's memory budget (#348, #349)
 
 The nightly fuzz job's two crashes in `fuzz_script_spend` (run 40474836749,
