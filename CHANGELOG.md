@@ -32,7 +32,9 @@ and `dhat`'s, at `7029c7e` (the base the fix was made on), at `e813ce4`
   (`dhat`: 695,285 bytes from one site, the error's stack snapshot). What this
   change adds over #331: `push_number` and `push_arithmetic_result` take the
   number and free it once encoded, before its bytes join the stack, so the
-  number and its bytes are never both held through the push.
+  number and its bytes are never both held through the push; on these two
+  inputs that has no measured effect (the same figures at `e813ce4` and at
+  the tip), the tests pinning #331's cure against a return.
 - #349, one allocation of 3,978,066 bytes at `7029c7e` and at `e813ce4`
   (10,872,599 live there): `OP_NUM2BIN`'s refusal of a size above `INT32_MAX`
   (`SCRIPT_ERR_PUSH_SIZE`) wrote the size, an 825,905-byte number, in decimal
@@ -55,7 +57,8 @@ guarded separately by #374's room check, so nothing is left unguarded; the
 fuzz target's bound at ten budgets with its reason stated is a tolerance for
 what the accounting leaves out by design, and its line says so." A product or
 a quotient is computed in num-bigint 0.4.8's working memory, measured at 5.2
-and 8.5 times the operands on operands of 2^16 to 2^24 bytes; a 68-byte script
+and 9.5 times the operands on operands of 2^16 to 2^24 bytes (the step probe
+records 10.0 for a quotient, `arithmetic_room.rs:59`); a 68-byte script
 squaring to a 1,015,808-byte dividend holds 7,667,840 bytes live in `OP_DIV`
 under 1 MiB (`3093a215…`, at `e813ce4` and at the tip). The fuzz target's live
 bound is now four budgets plus six for one arithmetic opcode's working set
@@ -70,13 +73,14 @@ constant named for its issue, held by `dhat` (now a dev-dependency; the crate
 forbids `unsafe`, so no allocator of its own) to the target's bounds when it
 found them (one site at most twice the budget, at most four budgets live, the
 input's term added; a reservation, the step probe's `try_reserve_exact`, out
-of the site read and added to the live bound, since `dhat`'s peak cannot
+of the site read and added to the live bound (the probe's frame read by name
+from `dhat`'s backtraces, so the test needs debug info), since `dhat`'s peak cannot
 leave one out), and #348's to one site under the budget; a 100,001-byte
 product's encoding; the 64-byte edge of the number text. At `7029c7e` three
 were red, then four with #348's site assertion (2,061,735 bytes from one
 site, the encoder's doubled buffer); at `e813ce4` the two #349 tests are red
 and #348's are green (#331's encoder); on the tip with the encoder's buffer
-doubled again, #348's is red (1,380,130 bytes from one site). Both inputs are
+doubled again, #348's is red (1,380,138 bytes from one site). Both inputs are
 in `fuzz/corpus/fuzz_script_spend/` under their sha1, with the 68-byte
 `OP_DIV` script above (`3093a215…`), which the moved bound covers.
 

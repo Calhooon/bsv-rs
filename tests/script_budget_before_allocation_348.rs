@@ -5,10 +5,13 @@
 //! node's count was never crossed by either: the bytes were ones the budget
 //! does not see. A number pushed by an arithmetic opcode held twice the bytes
 //! it was charged (`ScriptNum::to_bytes` grew its buffer for the sign byte),
-//! the number's decode and encode copied it twice more (a negated and an
-//! absolute copy) while the popped operands were still held, and
-//! `OP_NUM2BIN`'s refusal of an 825,905-byte size wrote that size in decimal
-//! into its text (about five times the number's bytes in scratch).
+//! and the number's decode and encode copied it twice more (a negated and an
+//! absolute copy) while the popped operands were still held: #331's guard
+//! (bsv-rs#374, landed first) closed those, so #348's input reads the same on
+//! beta as on this tip, and this file pins them against a return (a mutation
+//! RED: red only with the encoder's buffer doubled again). `OP_NUM2BIN`'s
+//! refusal of an 825,905-byte size wrote that size in decimal into its text
+//! (about five times the number's bytes in scratch): #349's, fixed here.
 //!
 //! Each input is evaluated as the fuzz target evaluates it, with a counting
 //! allocator armed on this thread alone, and held to the target's two
@@ -21,7 +24,8 @@
 //! one, since dhat's peak cannot leave out a reservation held at that moment.
 //! The #348 input is also held to one site under the budget itself, which
 //! the target's live bound no longer separates from the base: that bound
-//! carries six budgets for an arithmetic opcode's working set since #348.
+//! carries ten budgets for an arithmetic opcode's working set since this
+//! change (the keeper's word: the working set is not charged).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::TxOutput;
 use bsv_rs::primitives::from_hex;
@@ -93,7 +97,9 @@ struct Measured {
     peak: usize,
 }
 
-/// The frame of the interpreter's step probe: an allocation under it is a
+/// The frame of the interpreter's step probe (read by name from dhat's
+/// backtraces, so this file needs debug info: a build without symbols would
+/// count the reservations): an allocation under it is a
 /// reservation, given back before the allocator's next call.
 const RESERVATION_FRAME: &str = "arithmetic_room::reserve";
 
@@ -210,10 +216,12 @@ fn issue_348_a_multiplication_chain_stays_within_the_budgets_bounds() {
     assert_eq!(err.message, "Invalid opcode 235 (pc=197).");
     assert_eq!(err.resource_limit, None);
     assert_within_the_fuzz_bounds(&measured, input);
-    // Before #348 one site held 2,061,735 bytes (an encoder's buffer doubled
-    // for the sign byte), within the target's single-request bound and its
-    // live bound of ten budgets: a site under the budget itself is what
-    // separates the fix (695,285 bytes after it, the error's stack snapshot).
+    // Before #331's guard (bsv-rs#374) one site held 2,061,735 bytes (an
+    // encoder's buffer doubled for the sign byte), within the target's
+    // single-request bound and its live bound of ten budgets; #331 closed it
+    // on beta, and this assertion pins it against a return: with the buffer
+    // doubled again it reads 1,380,138 bytes (a mutation RED), 695,285 on the
+    // tip (the error's stack snapshot).
     assert!(
         measured.largest_site < MEMORY_LIMIT,
         "{} bytes live from one site under a budget of {MEMORY_LIMIT}",
@@ -242,9 +250,10 @@ fn issue_349_num2bin_refuses_a_huge_size_without_writing_it_in_decimal() {
 }
 
 /// `<n bytes> OP_DUP OP_MUL OP_DROP OP_1`: a 100,000-byte magnitude whose high
-/// bit is set takes a sign byte. Before #348 the encoder grew its buffer for
-/// that byte by doubling it (a 200,000-byte request) and the element pushed
-/// held twice the bytes the budget charged.
+/// bit is set takes a sign byte. Before #331's guard the encoder grew its
+/// buffer for that byte by doubling it (a 200,000-byte request) and the element
+/// pushed held twice the bytes the budget charged; #331 closed it on beta, and
+/// this test pins it (red with the buffer doubled again).
 #[test]
 fn a_pushed_product_holds_the_bytes_it_is_charged() {
     let mut operand = vec![0xff; 50_000];

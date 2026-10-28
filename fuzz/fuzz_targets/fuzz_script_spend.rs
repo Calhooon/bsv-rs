@@ -56,7 +56,7 @@ const WORK_LIMIT: u64 = 50_000;
 /// while it computes is not, and charging it would decline scripts both of
 /// them judge valid. The abort path is guarded separately, by the step
 /// probe's room check (`arithmetic_room.rs`, bsv-rs#374). Measured on operands of
-/// 2^16 to 2^24 bytes: a quotient or a remainder peaks at 8.5 times its
+/// 2^16 to 2^24 bytes: a quotient or a remainder peaks at 9.5 times its
 /// operands (a divisor of 0.03 to 1 percent of the dividend), a product at
 /// 5.2 times; a 68-byte script squaring to a 1,015,808-byte dividend held
 /// 7,667,840 bytes live under this budget after the #348 fix (the corpus's
