@@ -11,11 +11,11 @@ This module provides transport layer implementations for sending and receiving a
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~49 |
 | `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | 1061 |
-| `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | ~80 |
-| `http/handshake.rs` | Handshake send/status/JSON words (#410), bounded body and certificate-header parse (#416) | ~70 |
+| `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | 85 |
+| `http/handshake.rs` | Handshake send/status/JSON words (#410), bounded body and certificate-header text retained before its typed parse (#416) | 85 |
 | `http/body.rs` | #416: streaming caps, Content-Length check, 1 MiB handshake / 16 MiB application defaults, configurable through positive-safe-integer builders | 99 |
 | `http/response_bounds.rs` | #416: bounded hex signature; optional canonical 32-byte request ID; signed headers: 512, name 1–1,024 bytes, value ≤32,768 bytes, total ≤262,144 bytes; fetch's joined UTF-8 text | 130 |
-| `http/general.rs` | General exchange moved from `http.rs`; applies response checks, preserves `certificateRequest`, omits an absent request ID | 133 |
+| `http/general.rs` | General exchange moved from `http.rs`; applies response checks, preserves `certificateRequest`, omits an absent request ID; retains certificate header text for Peer signatures | 138 |
 | `http/json_syntax.rs` | Node 22 JSON syntax diagnostics after serde refuses; iterative, input-bounded states, no fixed depth cutoff, 20-unit context (#410) | ~310 |
 | `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `head` (the status, the status line's own reason phrase from hyper's `ext::ReasonPhrase`, the headers), `refuse_unauthenticated`, `sender` (the answer's identity key), the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview, an unsigned 429, 502, 503 or 504 a transport fault by `status_fault` | ~226 |
 | `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
@@ -361,11 +361,11 @@ Varint sizes (Bitcoin-style):
 3. Add auth headers (version, identity_key, nonce, your_nonce, signature, request_id)
 4. Include original headers (`x-bsv-*`, `authorization`, `content-type`) excluding `x-bsv-auth-*`
 5. Send request with body from payload
-6. Read the body, then refuse the answer unless it carries `x-bsv-auth-version`, `x-bsv-auth-identity-key` and `x-bsv-auth-signature` (#354); parse response: extract request ID from headers (falls back to original if absent)
-7. Filter response headers: include `x-bsv-*` (excluding `x-bsv-auth-*`) and `authorization`, sorted alphabetically
-8. Build `HttpResponse` payload with status, filtered headers, body
-9. Create the response `AuthMessage` with the answer's identity key as its sender (until 0.9.0-beta.1 the request's own key when the header was absent)
-10. Extract the nonce, your_nonce and signature from response headers; check for certificate request in response message type header
+6. Read the bounded body, then refuse the answer unless it carries `x-bsv-auth-version`, `x-bsv-auth-identity-key` and `x-bsv-auth-signature` (#354)
+7. Check the signature's hex shape; create the `AuthMessage`, preserving `certificateRequest` and using the answer's identity key as its sender (until 0.9.0-beta.1 the request's own key when the header was absent)
+8. Bound and retain the certificate header's text before its typed parse, so the Peer verifies its property order and extra properties (#416 fold)
+9. Build the response payload: optional request ID (since #416, absent means no ID bytes, previously the outgoing ID), status, bounded and sorted signed headers (`x-bsv-*` except `x-bsv-auth*`, plus `authorization`), body
+10. Extract the nonce and your_nonce from response headers
 11. Invoke callback with response message
 
 ## Feature Flags

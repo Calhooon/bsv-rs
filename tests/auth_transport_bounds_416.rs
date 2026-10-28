@@ -1,6 +1,6 @@
 //! #416: six transport bounds replayed from Node 22.18.0's pinned transports.
-//! HTTP/2 on wiremock's ephemeral port lets the SDK, rather than hyper's
-//! HTTP/1 100-header ceiling, judge the 512-header bound. No default URL.
+//! HTTP/2 on wiremock's ephemeral port exercises the SDK's 512-header bound.
+//! No default URL; no HTTP/1 header-count limit is measured here.
 #![cfg(all(feature = "auth", feature = "http"))]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 

@@ -1,0 +1,154 @@
+{
+  "node": "v22.18.0",
+  "scope": "The newer HTTP transport omits initialNonce required by Peer intake; record its refusal, then call processCertificateRequest directly. The older Peer uses its normal intake.",
+  "references": [
+    {
+      "reference": "ts-stack@edf6e03",
+      "cases": [
+        {
+          "name": "property_order",
+          "header": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "signed": "header",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value": {
+                "types": {
+                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
+                    "name"
+                  ]
+                },
+                "certifiers": [
+                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+                ]
+              }
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "extra_property",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"kept\"}",
+          "signed": "header",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"kept\"}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value": {
+                "certifiers": [
+                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+                ],
+                "types": {
+                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
+                    "name"
+                  ]
+                },
+                "extension": "kept"
+              }
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "general_payload_signature",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "signed": "payload",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "spaced_header_signature",
+          "header": "{  \"certifiers\": [   \"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"  ],  \"types\": {   \"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\": [    \"name\"   ]  } }",
+          "signed": "header",
+          "intake_error": "certificateRequest.initialNonce must be canonical base64.",
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        }
+      ]
+    },
+    {
+      "reference": "ts-sdk@9e3ede6b",
+      "cases": [
+        {
+          "name": "property_order",
+          "header": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "signed": "header",
+          "intake_error": null,
+          "verified_text": "{\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"]}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value": {
+                "types": {
+                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
+                    "name"
+                  ]
+                },
+                "certifiers": [
+                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+                ]
+              }
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "extra_property",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"kept\"}",
+          "signed": "header",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]},\"extension\":\"kept\"}",
+          "error": null,
+          "requests": [
+            {
+              "identity": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+              "value": {
+                "certifiers": [
+                  "03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9"
+                ],
+                "types": {
+                  "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=": [
+                    "name"
+                  ]
+                },
+                "extension": "kept"
+              }
+            }
+          ],
+          "general_deliveries": 0
+        },
+        {
+          "name": "general_payload_signature",
+          "header": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "signed": "payload",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        },
+        {
+          "name": "spaced_header_signature",
+          "header": "{  \"certifiers\": [   \"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"  ],  \"types\": {   \"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\": [    \"name\"   ]  } }",
+          "signed": "header",
+          "intake_error": null,
+          "verified_text": "{\"certifiers\":[\"03d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc9\"],\"types\":{\"BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=\":[\"name\"]}}",
+          "error": "Signature is not valid",
+          "requests": [],
+          "general_deliveries": 0
+        }
+      ]
+    }
+  ]
+}
