@@ -158,7 +158,9 @@ Semver: two methods added; `cargo semver-checks` names nothing breaking.
 Ratchet: `src/transaction/beef_stream.rs` shrinks from 3,605 lines to 3,597
 (the two `set_work_limit` methods move to `beef_stream/budget.rs`); every
 counter at or below `docs/ratchets.json` (`tools/ratchet/run --check
---against origin/beta`: duplicate windows 8,247 of 8,257); not re-recorded.
+--against origin/beta`: duplicate windows 8,247 of 8,257, after the two
+`AsyncStreamVerifier` setters were put memory first in `budget.rs:58-68`, the
+natural order measuring 8,260); not re-recorded.
 
 ## [0.9.0-beta.2] - 2026-10-28
 
