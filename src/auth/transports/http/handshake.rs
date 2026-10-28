@@ -54,7 +54,7 @@ impl SimplifiedFetchTransport {
 
 /// Bound the received text before parsing, then retain it beside the typed
 /// view. A certificateRequest's signature must not lose property order or
-/// extra properties through serialization of RequestedCertificateSet.
+/// extra properties through serialization of `RequestedCertificateSet`.
 pub(super) fn requested_certificates(
     url: &str,
     response_headers: &HeaderMap,
@@ -79,7 +79,7 @@ pub(super) fn requested_certificates(
         ))
     };
     let requested_certificates_text: Box<RawValue> =
-        serde_json::from_str(&value).map_err(&malformed)?;
+        serde_json::from_str(&value).map_err(malformed)?;
     let requested = serde_json::from_str(requested_certificates_text.get()).map_err(malformed)?;
     Ok(Some((requested_certificates_text, requested)))
 }
