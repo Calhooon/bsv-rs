@@ -108,9 +108,7 @@
 //! ```
 
 mod cached_key_deriver;
-#[cfg(feature = "http")]
 mod client;
-#[cfg(feature = "http")]
 mod client_instance;
 pub(crate) mod collation;
 pub mod interface;
@@ -243,6 +241,5 @@ pub use types::{
     MAX_SATOSHIS,
 };
 
-// Re-export client types (requires http feature)
-#[cfg(feature = "http")]
+// Re-export the substrate-agnostic client core (wallet feature).
 pub use client::{SubstrateType, WalletClient};

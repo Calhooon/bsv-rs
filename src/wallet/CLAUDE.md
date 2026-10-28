@@ -22,7 +22,9 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
-| `client.rs` | Multi-substrate WalletClient (requires `http` feature); every call forwarded by one macro over the three substrates, including both linkage calls through the transceiver since #406 | ~633 |
+| `client.rs` | Substrate-agnostic `WalletClient` under `wallet`; one forwarding macro for the inherent and trait calls, a shared lazy connection | ~500 |
+| `client/interface.rs` | All 28 `WalletInterface` methods on `WalletClient`, the trait's status records and header name over the same forwarding macro (#404) | ~91 |
+| `client/http.rs` | HTTP-only construction, default URLs and probe order; the fixture-backed wire linkage test (#406), the HTTP dispatch arms gated in `client.rs` | ~150 |
 | `client_instance.rs` | The instance substrate of `WalletClient::with_substrate` (#335): `Instance`, dereferencing to the `WalletInterface` and adapting the six status and header answers to the client's shapes | ~64 |
 | `substrates/` | Transport substrate implementations | - |
 | `wire/` | Wire protocol encoding/decoding | - |
@@ -65,13 +67,16 @@ Marker traits: `CryptoWallet` (crypto-only), `FullWallet` (all methods supported
 
 The trait requires `Send + Sync` and uses `#[async_trait]`. Unsupported methods should return `Err(Error::WalletError(...))`.
 
-### WalletClient (requires `http` feature)
+### WalletClient (`wallet`; named HTTP substrates require `http`)
 
 ```rust
 pub enum SubstrateType {
     Auto,           // Auto-detect (SecureJsonApi -> JsonApi -> Cicada)
+    #[cfg(feature = "http")]
     JsonApi,        // HTTP JSON API (port 3321)
+    #[cfg(feature = "http")]
     Cicada,         // Wire protocol over HTTP (port 3301)
+    #[cfg(feature = "http")]
     SecureJsonApi,  // Secure local JSON API (port 2121)
 }
 
@@ -96,7 +101,9 @@ pub struct WalletClient {
 | `Cicada` | Binary | 3301 | High performance |
 | `SecureJsonApi` | JSON/TLS | 2121 | Secure local communication |
 
-Internally uses `ConnectedSubstrate` enum dispatching to `HttpWalletJson`, `WalletWireTransceiver<HttpWalletWire>` or the caller's instance (`client_instance::Instance`, #335), each call through the `forward!` macro with the client's originator (the configured one or `None`, #329).
+Implements `WalletInterface` (#404), so a client can be passed to `Peer` or another client's `with_substrate`. Both surfaces use `forward!` with this client's configured originator (or `None`, including on a trait call with a different originator); an instance can itself be a client. The inherent methods keep their names and return values and borrow `&self`, matching the trait and the reference's operations. Calls through `&WalletClient` and `Arc<WalletClient>` work. A method-path reference such as `.map(WalletClient::get_version)` becomes `.map(|client| client.get_version())`; a `let mut client` binding may drop `mut`. Cargo-semver-checks 0.51.0 does not lint this receiver change. The trait wraps the bare status values in its result records and spells `get_header` as `get_header_for_height`; its `u32` height refuses overflow.
+
+`ConnectedSubstrate` dispatches to the caller's instance (`client_instance::Instance`, #335) under `wallet`; the HTTP JSON and wire variants, imports, construction and probes require `http`. A `OnceLock` holds the resolved substrate through interior mutability, with a runtime-independent `futures::lock::Mutex` serializing HTTP discovery only; no lock is held across subsequent wallet calls. At `ts-stack@edf6e03`, `WalletClient.ts:121-198` only assigns `this.substrate` during `connectToSubstrate`; all wallet operations read it and the originator. `SubstrateType` stays `Copy + Eq`: the three HTTP names are absent without `http`, while `Auto` remains available and reports no available substrate on a call without `http`. `with_substrate` is always available and probes nothing, including in wasm Workers.
 
 ### ProtoWallet
 
@@ -365,7 +372,7 @@ let decrypted = bob.decrypt(DecryptArgs {
 
 ```rust
 // Remote wallet via auto-detected substrate
-let mut client = WalletClient::new(SubstrateType::Auto, Some("myapp.com".into()));
+let client = WalletClient::new(SubstrateType::Auto, Some("myapp.com".into()));
 let version = client.get_version().await?;
 
 // Direct key derivation
@@ -388,10 +395,10 @@ let pub_key = cached.derive_public_key(&protocol, "key-1", &Counterparty::Self_,
 
 ```toml
 [dependencies]
-# Basic wallet functionality (key derivation, ProtoWallet, validation)
+# Core wallet functionality (key derivation, ProtoWallet, validation, WalletClient instances)
 bsv-rs = { version = "0.3", features = ["wallet"] }
 
-# With remote wallet communication (WalletClient)
+# With HTTP wallet communication (WalletClient named substrates and discovery)
 bsv-rs = { version = "0.3", features = ["wallet", "http"] }
 ```
 
@@ -447,7 +454,7 @@ Key derivation uses the same algorithm (BRC-42) and produces identical keys acro
 | `KeyDeriverApi` (interface) | `KeyDeriverApi` (trait) |
 | `WalletInterface` (interface) | `WalletInterface` (async trait) |
 | `ProtoWallet` (class) | `ProtoWallet` (struct, implements `WalletInterface`) |
-| `Wallet` (class) | `WalletClient` (struct, multi-substrate) |
+| `WalletClient` (class, implements `WalletInterface`) | `WalletClient` (struct, implements `WalletInterface`; core under `wallet`) |
 | `validationHelpers.ts` functions | `validation` module functions |
 
 ## Internal Dependencies

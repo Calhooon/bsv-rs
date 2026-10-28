@@ -36,8 +36,10 @@ frame replaces with `Wallet operation failed`, and one naming a wallet refusal's
 heap profiling tests. `transaction` enables `block`. A Worker should select the
 features it needs and enable `wasm`; native HTTP transports are separate:
 `http` is native-only, and a wasm32 build with it stops at `build.rs` with one
-message (#152). The
-declared minimum Rust is 1.88 (`rust-version`).
+message (#152). `WalletClient` and its `WalletInterface` implementation need
+only `wallet`: `WalletClient::with_substrate` wraps an in-process wallet,
+including another client. The named HTTP substrates and automatic discovery
+require `http`. The declared minimum Rust is 1.88 (`rust-version`).
 
 ## The signing digest (0.7.0)
 
