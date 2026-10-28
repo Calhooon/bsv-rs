@@ -17,7 +17,7 @@ pub(super) fn classify_chronicle_hash_type(
     (id == "node.script.teranode.1388"
         && ctx.expected_valid
         && ctx.flags.is_empty()
-        && ctx.error_message == "The signature hash type is invalid before Chronicle.")
+        && ctx.error_message == "The signature format is invalid.")
         .then_some(CHRONICLE_HASH_TYPE)
 }
 
