@@ -848,10 +848,11 @@ as the reference's `Transaction.verify` refuses it (`Spend` built with
 `Beef.verifyValid` runs no script and still reads such a BEEF as valid).
 The stream answers `SpendRefused` at the input with `Script("The
 signature format is invalid.")`, `Transaction::verify` `Script validation
-failed for input N: The signature format is invalid.`. The overlay engine
-executes scripts at its submit door with `Transaction::verify`, so a
-downstream relying on the old acceptance sends version-2 transactions or
-verifies under a word carrying `CHRONICLE`. `tests/beef_order_held.rs`'s
+failed for input N: The signature format is invalid.`. A downstream that
+executes scripts through `Transaction::verify` or the streaming reader
+(neither takes a word; the keeper's grep of the overlay engine at its main
+found no such call) and relied on the old acceptance sends version-2
+transactions or runs `Spend` under a word carrying `CHRONICLE`. `tests/beef_order_held.rs`'s
 signed family (bsv-rs#22's dispatch to the original digest, under
 ALL|CHRONICLE|FORKID and NONE|CHRONICLE|FORKID) moves its spenders to
 version 2, where the dispatch is still what the signatures are made over
