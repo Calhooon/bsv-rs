@@ -7,6 +7,9 @@ use crate::auth::types::PeerSession;
 use crate::{Error, Result};
 use std::collections::{HashMap, HashSet};
 
+#[path = "session_nonces.rs"]
+mod nonces;
+
 /// Manages multiple concurrent sessions per peer identity.
 ///
 /// Sessions are indexed by both session nonce (unique) and
@@ -27,6 +30,7 @@ pub struct SessionManager {
     session_nonce_to_session: HashMap<String, PeerSession>,
     /// Secondary index: identity_key_hex -> set of session_nonces
     identity_key_to_nonces: HashMap<String, HashSet<String>>,
+    nonce_claims: nonces::NonceClaims,
 }
 
 impl SessionManager {
@@ -133,6 +137,7 @@ impl SessionManager {
     /// Removes a session from the manager.
     pub fn remove_session(&mut self, session: &PeerSession) {
         if let Some(ref nonce) = session.session_nonce {
+            self.nonce_claims.remove_session(nonce);
             self.session_nonce_to_session.remove(nonce);
 
             // Remove from secondary index
@@ -150,6 +155,7 @@ impl SessionManager {
 
     /// Removes a session by its nonce.
     pub fn remove_by_nonce(&mut self, session_nonce: &str) {
+        self.nonce_claims.remove_session(session_nonce);
         if let Some(session) = self.session_nonce_to_session.remove(session_nonce) {
             // Remove from secondary index
             if let Some(ref identity_key) = session.peer_identity_key {
@@ -201,6 +207,7 @@ impl SessionManager {
     pub fn clear(&mut self) {
         self.session_nonce_to_session.clear();
         self.identity_key_to_nonces.clear();
+        self.nonce_claims = nonces::NonceClaims::default();
     }
 
     /// Selects the "best" session from a set of nonces.
@@ -238,6 +245,7 @@ impl SessionManager {
     /// Returns the number of sessions removed.
     pub fn prune_stale_sessions(&mut self, max_age_ms: u64) -> usize {
         let now = crate::auth::types::current_time_ms();
+        self.nonce_claims.prune_initial(now);
         let cutoff = now.saturating_sub(max_age_ms);
 
         let stale_nonces: Vec<String> = self

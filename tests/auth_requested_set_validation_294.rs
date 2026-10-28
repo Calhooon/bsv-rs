@@ -22,11 +22,11 @@
 use async_trait::async_trait;
 use bsv_rs::auth::transports::{Transport, TransportCallback};
 use bsv_rs::auth::{
-    assert_requested_certificate_set, AuthMessage, MessageType, Peer, PeerOptions, PeerSession,
-    RequestedCertificateSet, SessionManager,
+    assert_requested_certificate_set, create_nonce, AuthMessage, MessageType, Peer, PeerOptions,
+    PeerSession, RequestedCertificateSet, SessionManager,
 };
 use bsv_rs::primitives::PrivateKey;
-use bsv_rs::wallet::ProtoWallet;
+use bsv_rs::wallet::{Counterparty, CreateSignatureArgs, ProtoWallet, Protocol, SecurityLevel};
 use bsv_rs::{Error, Result};
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
@@ -338,6 +338,38 @@ fn received_message(receiver: &Value) -> AuthMessage {
     serde_json::from_str(receiver["message_text"].as_str().unwrap()).unwrap()
 }
 
+/// #363 verifies the receiver's wallet nonce. Keep the recorded policy text,
+/// but remake the nonce and its signature: the two SDKs' nonce HMACs differ.
+async fn locally_signed_message(verifier: &End, receiver: &Value) -> AuthMessage {
+    let v = vector();
+    let wallet = ProtoWallet::new(Some(key(&v, "verifier")));
+    let nonce = create_nonce(&wallet, None, Some("test-294")).await.unwrap();
+    let mut message = received_message(receiver);
+    let mut sessions = verifier.peer.session_manager().write().await;
+    let mut session = sessions
+        .get_session(message.your_nonce.as_deref().unwrap())
+        .unwrap()
+        .clone();
+    sessions.remove_session(&session);
+    session.session_nonce = Some(nonce.clone());
+    sessions.add_session(session).unwrap();
+    drop(sessions);
+    message.your_nonce = Some(nonce.clone());
+    message.signature = Some(
+        ProtoWallet::new(Some(key(&v, "requester")))
+            .create_signature(CreateSignatureArgs {
+                data: Some(message.signing_data()),
+                protocol_id: Protocol::new(SecurityLevel::Counterparty, "auth message signature"),
+                key_id: message.get_key_id(Some(&nonce)),
+                counterparty: Some(Counterparty::Other(key(&v, "verifier").public_key())),
+                ..Default::default()
+            })
+            .unwrap()
+            .signature,
+    );
+    message
+}
+
 #[tokio::test]
 async fn a_received_certificate_request_with_a_malformed_type_id_is_refused_before_the_handler_294()
 {
@@ -385,9 +417,10 @@ async fn a_received_certificate_request_with_a_32_byte_type_id_reaches_the_handl
     assert_eq!(receiver["signatures_checked"], 1);
 
     let verifier = verifier_for(c).await;
+    let message = locally_signed_message(&verifier, receiver).await;
     verifier
         .peer
-        .handle_incoming_message(received_message(receiver))
+        .handle_incoming_message(message)
         .await
         .unwrap();
     let requested = verifier.requested.lock().unwrap();

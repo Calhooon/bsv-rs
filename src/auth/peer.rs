@@ -166,6 +166,8 @@ pub struct Peer<W: WalletInterface, T: Transport> {
 
     // Pending handshakes: session_nonce -> oneshot sender
     pending_handshakes: Arc<RwLock<HashMap<String, oneshot::Sender<Result<PeerSession>>>>>,
+    pending_certificate_validation:
+        Arc<RwLock<HashMap<String, Arc<certificate_wait::PendingValidation>>>>,
 
     // Options
     #[allow(dead_code)]
@@ -192,6 +194,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             certificate_request_callbacks: Arc::new(RwLock::new(HashMap::new())),
             next_callback_id: Arc::new(AtomicU32::new(1)),
             pending_handshakes: Arc::new(RwLock::new(HashMap::new())),
+            pending_certificate_validation: Arc::new(RwLock::new(HashMap::new())),
             auto_persist_last_session: options.auto_persist_last_session,
             originator: options.originator,
             identity_key: Arc::new(RwLock::new(None)),
@@ -239,6 +242,7 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
             certificate_request_callbacks: Arc::clone(&self.certificate_request_callbacks),
             next_callback_id: Arc::clone(&self.next_callback_id),
             pending_handshakes: Arc::clone(&self.pending_handshakes),
+            pending_certificate_validation: Arc::clone(&self.pending_certificate_validation),
             auto_persist_last_session: self.auto_persist_last_session,
             originator: self.originator.clone(),
             identity_key: Arc::clone(&self.identity_key),
@@ -655,314 +659,14 @@ impl<W: WalletInterface + 'static, T: Transport + 'static> Peer<W, T> {
         }
         result
     }
-
-    async fn process_initial_request(&self, message: AuthMessage) -> Result<()> {
-        let my_identity = self.get_identity_key().await?;
-
-        // Create our session nonce (counterparty=None=Self, matching Go/TS)
-        let session_nonce = create_nonce(&*self.wallet, None, self.originator.as_deref()).await?;
-        let mut session = PeerSession::with_nonce(session_nonce.clone());
-        session.peer_identity_key = Some(message.identity_key.clone());
-        session.peer_nonce = message.initial_nonce.clone();
-        session.is_authenticated = true;
-        session.touch();
-
-        // Check if certificates are required
-        if let Some(ref req) = message.requested_certificates {
-            if !req.is_empty() {
-                session.certificates_required = true;
-            }
-        }
-
-        // Add to session manager
-        {
-            let mut mgr = self.session_manager.write().await;
-            mgr.add_session(session.clone())?;
-        }
-
-        // Build InitialResponse (matching Go/TS field mapping)
-        // initial_nonce = responder's session nonce (matches Go: InitialNonce = session.SessionNonce)
-        // nonce = responder's session nonce (same value, matches Go: Nonce = ourNonce)
-        // your_nonce = initiator's nonce echoed back (for session lookup by initiator)
-        let mut response = AuthMessage::new(MessageType::InitialResponse, my_identity);
-        response.nonce = Some(session_nonce.clone());
-        response.initial_nonce = Some(session_nonce);
-        response.your_nonce = message.initial_nonce.clone();
-
-        // Sign the response
-        self.sign_message(&mut response, &session).await?;
-
-        // Send response
-        self.transport()?.send(&response).await?;
-
-        // If peer requested certificates, try to provide them
-        if let Some(ref req) = message.requested_certificates {
-            if !req.is_empty() {
-                let certs = get_verifiable_certificates(
-                    &*self.wallet,
-                    req,
-                    &message.identity_key,
-                    self.originator.as_deref(),
-                )
-                .await
-                .unwrap_or_default();
-
-                if !certs.is_empty() {
-                    self.send_certificate_response(&message.identity_key.to_hex(), certs)
-                        .await?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn process_initial_response(&self, message: AuthMessage) -> Result<()> {
-        // The pending handshake is the one named by yourNonce (our nonce
-        // echoed back); a refusal is delivered to it, not left to time out.
-        let our_nonce = message.your_nonce.clone().unwrap_or_default();
-        let result = self
-            .process_initial_response_inner(&message, &our_nonce)
-            .await;
-
-        if let Err(ref e) = result {
-            let mut pending = self.pending_handshakes.write().await;
-            if let Some(tx) = pending.remove(&our_nonce) {
-                let _ = tx.send(Err(e.clone()));
-            }
-        }
-
-        result
-    }
-
-    /// The reference's `authenticateInitialResponse` (`Peer.ts:886-930`), its
-    /// checks in its order and words: yourNonce is ours, its session exists,
-    /// the responder is the pinned peer, the signature verifies, the
-    /// responder's nonce is present (#353).
-    async fn process_initial_response_inner(
-        &self,
-        message: &AuthMessage,
-        our_nonce: &str,
-    ) -> Result<()> {
-        let sender = message.identity_key.to_hex();
-        if !self.verify_own_nonce(our_nonce).await {
-            return Err(Error::AuthError(format!(
-                "Initial response nonce verification failed from peer: {sender}"
-            )));
-        }
-
-        let session = self
-            .session_manager
-            .read()
-            .await
-            .get_session(our_nonce)
-            .cloned();
-        let session = session.ok_or_else(|| {
-            Error::AuthError(format!("Peer session not found for peer: {sender}"))
-        })?;
-        if session
-            .peer_identity_key
-            .as_ref()
-            .is_some_and(|pinned| *pinned != message.identity_key)
-        {
-            return Err(Error::AuthError(
-                "initialResponse identity does not match the requested peer identity.".into(),
-            ));
-        }
-
-        if !self.verify_message_signature(message, &session).await? {
-            return Err(Error::AuthError(format!(
-                "Unable to verify initial response signature for peer: {sender}"
-            )));
-        }
-        let peer_nonce = message
-            .initial_nonce
-            .clone()
-            .filter(|nonce| !nonce.is_empty())
-            .ok_or_else(|| {
-                Error::AuthError("Initial response message nonce is required.".into())
-            })?;
-
-        // Update the session and its secondary index (identity key mapping).
-        let mut updated = session;
-        updated.peer_identity_key = Some(message.identity_key.clone());
-        updated.peer_nonce = Some(peer_nonce);
-        updated.is_authenticated = true;
-        updated.touch();
-        if let Some(ref req) = self.certificates_to_request {
-            if !req.is_empty() {
-                updated.certificates_required = true;
-            }
-        }
-        self.session_manager
-            .write()
-            .await
-            .update_session(updated.clone());
-
-        // Notify pending handshake
-        let mut pending = self.pending_handshakes.write().await;
-        if let Some(tx) = pending.remove(our_nonce) {
-            let _ = tx.send(Ok(updated));
-        }
-
-        Ok(())
-    }
-
-    /// Whether `nonce` is one this peer's wallet made (counterparty self), as
-    /// the reference's `verifyNonce` reads it: a malformed nonce is `false`.
-    async fn verify_own_nonce(&self, nonce: &str) -> bool {
-        verify_nonce(nonce, &*self.wallet, None, self.originator.as_deref())
-            .await
-            .unwrap_or(false)
-    }
-
-    async fn process_certificate_request(&self, message: AuthMessage) -> Result<()> {
-        // Find session
-        let sender_hex = message.identity_key.to_hex();
-        let mgr = self.session_manager.read().await;
-        let session = mgr
-            .get_session(&sender_hex)
-            .ok_or_else(|| Error::AuthError("No session with sender".into()))?;
-
-        // Verify signature
-        if !self.verify_message_signature(&message, session).await? {
-            return Err(Error::AuthError(
-                "CertificateRequest signature invalid".into(),
-            ));
-        }
-
-        drop(mgr);
-
-        // Notify callbacks
-        if let Some(ref requested) = message.requested_certificates {
-            let cbs = self.certificate_request_callbacks.read().await;
-            for callback in cbs.values() {
-                let _ = callback(message.identity_key.clone(), requested.clone()).await;
-            }
-        }
-
-        Ok(())
-    }
-
-    async fn process_certificate_response(&self, message: AuthMessage) -> Result<()> {
-        // Find session
-        let sender_hex = message.identity_key.to_hex();
-        let mgr = self.session_manager.read().await;
-        let session = mgr
-            .get_session(&sender_hex)
-            .ok_or_else(|| Error::AuthError("No session with sender".into()))?
-            .clone();
-        drop(mgr);
-
-        // Verify signature
-        if !self.verify_message_signature(&message, &session).await? {
-            return Err(Error::AuthError(
-                "CertificateResponse signature invalid".into(),
-            ));
-        }
-
-        // Validate certificates
-        validate_certificates(
-            &*self.wallet,
-            &message,
-            self.certificates_to_request.as_ref(),
-            self.originator.as_deref(),
-        )
-        .await?;
-
-        // Update session
-        {
-            let mut mgr = self.session_manager.write().await;
-            if let Some(session) = mgr.get_session_mut(&sender_hex) {
-                session.certificates_validated = true;
-                session.touch();
-            }
-        }
-
-        // Notify callbacks
-        if let Some(ref certs) = message.certificates {
-            let cbs = self.certificate_callbacks.read().await;
-            for callback in cbs.values() {
-                let _ = callback(message.identity_key.clone(), certs.clone()).await;
-            }
-        }
-
-        Ok(())
-    }
-
-    /// The reference's `processGeneralMessage` (`Peer.ts:1270-1314`), its
-    /// checks in its order and words: yourNonce is ours, its session exists
-    /// and is the sender's, the signature verifies, the message's nonce and
-    /// the session's are present (#353).
-    async fn process_general_message(&self, message: AuthMessage) -> Result<()> {
-        let sender = message.identity_key.to_hex();
-        let your_nonce = message.your_nonce.as_deref().unwrap_or_default();
-        if !self.verify_own_nonce(your_nonce).await {
-            return Err(Error::AuthError(format!(
-                "Unable to verify nonce for general message from: {sender}"
-            )));
-        }
-
-        let session = self
-            .session_manager
-            .read()
-            .await
-            .get_session(your_nonce)
-            .cloned();
-        let session = session.ok_or_else(|| {
-            Error::AuthError(format!("Session not found for nonce: {your_nonce}"))
-        })?;
-        match session.peer_identity_key {
-            None => {
-                return Err(Error::AuthError(
-                    "Peer identity is not established for general message.".into(),
-                ))
-            }
-            Some(ref verified) if *verified != message.identity_key => {
-                return Err(Error::AuthError(
-                    "general identity does not match the authenticated session.".into(),
-                ))
-            }
-            Some(_) => {}
-        }
-
-        if !self.verify_message_signature(&message, &session).await? {
-            return Err(Error::AuthError(format!(
-                "Invalid signature in generalMessage from {sender}"
-            )));
-        }
-        if message.nonce.as_deref().is_none_or(str::is_empty) {
-            return Err(Error::AuthError(
-                "General message nonce is required.".into(),
-            ));
-        }
-        let session_nonce = session.session_nonce.clone().ok_or_else(|| {
-            Error::AuthError("Session nonce is required for general messages".into())
-        })?;
-
-        // The session marked authenticated (`Peer.ts:1315`); its peer nonce is
-        // the one its initial message named, not this message's
-        if let Some(s) = self
-            .session_manager
-            .write()
-            .await
-            .get_session_mut(&session_nonce)
-        {
-            s.is_authenticated = true;
-            s.touch();
-        }
-
-        // Notify callbacks, a listener's error the message's (`Peer.ts:1329-1331`)
-        let payload = message.payload.unwrap_or_default();
-        let cbs = self.general_message_callbacks.read().await;
-        for callback in cbs.values() {
-            callback(message.identity_key.clone(), payload.clone()).await?;
-        }
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 #[path = "peer_tests.rs"]
 mod tests;
+
+#[path = "peer_incoming.rs"]
+mod incoming;
+
+#[path = "peer_certificate_wait.rs"]
+mod certificate_wait;

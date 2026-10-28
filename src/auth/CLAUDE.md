@@ -12,8 +12,12 @@ This module provides peer-to-peer authentication using the BRC-31 (Authrite) pro
 | `mod.rs` | Module root with re-exports (incl. WebSocket gated exports) | 85 |
 | `types.rs` | Core types (AuthMessage with its signed texts and hand-written serde, PeerSession, MessageType, RequestedCertificateSet with its ordered types) | ~660 |
 | `requested_certificates_json.rs` | #426: parsed-object request preimages; ordered maps, JavaScript integer keys, UTF-16 escapes and ECMAScript numbers; no recursive parser stack | 217 |
-| `session_manager.rs` | Session management with dual indexing | 444 |
-| `peer.rs` | Core Peer implementation: `start()` installs the one verifying path of both roles, the callback's Peer holding the transport weakly so a dropped Peer is freed (#353); a general message propagates a wallet's error, and only `valid: false` reaches the Peer's signature words (#407) | 970 |
+| `session_manager.rs` | Session management with dual indexing and nonce-claim API | 452 |
+| `session_nonces.rs` | #362: atomic signed claims (100,000 per session), initial-request window (100,000 total / 256 per identity / 30 minutes), expiry and removal | 156 |
+| `session_nonces_tests.rs` | Four #362 store-capacity, eviction and lifetime witnesses against the Node recorder | 116 |
+| `peer.rs` | Peer API, transport ownership, handshake initiation and signatures; incoming handlers split for #362-364 | 672 |
+| `peer_incoming.rs` | #362-364: five nonce claims; certificate yourNonce, exact session and identity checks; listener errors; ready flag on the response session | 313 |
+| `peer_certificate_wait.rs` | #364: shared per-session certificate wait and 30-second deadline, resolved after validation | 83 |
 | `peer_tests.rs` | `Peer`'s unit tests (`#[path]` from `peer.rs`, moved out with #294 to keep `peer.rs` under its ratchet bound) | 46 |
 | `certificates/` | Certificate submodule | - |
 | `transports/` | Transport layer implementations (HTTP, WebSocket, Mock) | - |
@@ -205,6 +209,8 @@ impl SessionManager {
     pub fn get_sessions_for_identity(&self, identity_key_hex: &str) -> Vec<&PeerSession>
     pub fn iter(&self) -> impl Iterator<Item = &PeerSession>
     pub fn clear(&mut self)
+    pub fn claim_message_nonce(&mut self, session_nonce: &str, nonce: &str) -> Result<bool>
+    pub fn claim_initial_request_nonce(&mut self, identity: &str, nonce: &str) -> Result<bool>
     pub fn prune_stale_sessions(&mut self, max_age_ms: u64) -> usize
 }
 ```
@@ -262,11 +268,11 @@ impl<W: WalletInterface, T: Transport> Peer<W, T> {
 - `verify_message_signature()` - Verifies an incoming AuthMessage signature
 - `initiate_handshake()` - Creates the session pinned to the identity key given (a string that is not one refused), sends InitialRequest, waits for InitialResponse via oneshot channel with timeout; a failed handshake's session removed (`Peer.ts:658-664`)
 - `process_initial_request()` - Server-side: creates session, sends InitialResponse, optionally sends certificates
-- `process_initial_response()` - Client-side: delegates to `process_initial_response_inner()`, sends errors through oneshot channel
-- `process_initial_response_inner()` - The reference's `authenticateInitialResponse` (`Peer.ts:886-930`) in its order and words: `your_nonce` made by this wallet, its session, the pinned identity, the signature, `initial_nonce` present; updates session, resolves pending handshake (#353)
-- `process_certificate_request()` - Verifies signature, notifies certificate request callbacks
-- `process_certificate_response()` - Verifies signature, validates certificates, updates session, notifies callbacks
-- `process_general_message()` - The reference's `processGeneralMessage` (`Peer.ts:1270-1314`) in its order and words: `your_nonce` made by this wallet, its session, the session's peer the sender, the signature, the nonce and the session's nonce present; marks the session authenticated, notifies callbacks (a listener's error the message's) (#353)
+- `process_initial_response()` - Client-side: delegates to `authenticate_initial_response()`, sends errors through oneshot channel
+- `authenticate_initial_response()` - The reference's `authenticateInitialResponse` (`Peer.ts:886-956`): own `your_nonce`, its session, pinned identity, signature, initial nonce, replay claim; updates the session and resolves the pending handshake (#353, #362)
+- `process_certificate_request()` - Own `yourNonce`, exact session and matching identity, signature, nonce claim, authentication; returns a listener's error (#362, #363)
+- `process_certificate_response()` - Same checks, validates nonempty certificates, marks the response's session ready and releases its waiters, then returns any listener error (#362-364)
+- `process_general_message()` - The reference's `processGeneralMessage` (`Peer.ts:1270-1314`) in its order and words: `your_nonce` made by this wallet, its session, the session's peer the sender, the signature, the nonce and the session's nonce present; claims the nonce, marks the session authenticated, waits for required certificate validation, notifies callbacks (a listener's error the message's) (#353, #362, #364)
 - `verify_own_nonce()` - `verify_nonce` with counterparty self, a malformed nonce `false` (the reference's `verifyNonce`)
 
 **PeerOptions** - Configuration for creating a Peer:
@@ -437,7 +443,7 @@ On the initiator side, the responder's session nonce (`initial_nonce`) is stored
 
 ### Error Propagation
 
-Errors during InitialResponse processing (e.g., signature verification failure) are sent through the oneshot channel to the waiting `initiate_handshake()` caller: `process_initial_response()` delegates to `process_initial_response_inner()` and on an error sends it through the oneshot named by `your_nonce` (a `your_nonce` naming none of ours leaves the handshake to time out, as the reference's does).
+Errors during InitialResponse processing (e.g., signature verification failure) are sent through the oneshot channel to the waiting `initiate_handshake()` caller: `process_initial_response()` delegates to `authenticate_initial_response()` and on an error sends it through the oneshot named by `your_nonce` (a `your_nonce` naming none of ours leaves the handshake to time out, as the reference's does).
 
 Without this, errors would be swallowed by the routing task and the caller would time out instead of receiving the actual error.
 
@@ -459,7 +465,7 @@ verdict: an unavailable wallet must keep its own error.
 
 Message nonces for General/CertificateRequest/CertificateResponse use simple 32-byte random values (base64-encoded), matching TypeScript's `Utils.toBase64(Random(32))`. Session nonces use HMAC-based `create_nonce()` with counterparty=Self (None); `ProtoWallet::create_hmac` now issues the amended BRC-56 minimal-length key, with the 32-byte-key tag only a named and counted legacy verification acceptance (#379, owner 19.5 (a)).
 
-An InitialResponse's and a General message's `your_nonce` is verified against this peer's own wallet (counterparty self), a failure a refusal, as the reference and Go refuse it (#353; until then the responder's nonce was checked against the responder's key, which no wallet but the responder's can match, and the failure passed). The replay claim of each message nonce (`Peer.ts:258-272`) and the `your_nonce` check of a certificate request and response are not yet here (the #353 changelog's parity note).
+An InitialResponse's, certificate request's, certificate response's and General message's `your_nonce` is verified against this peer's own wallet (counterparty self), a failure a refusal, as the reference and Go refuse it (#353; until then the responder's nonce was checked against the responder's key, which no wallet but the responder's can match, and the failure passed). Every accepted nonce is claimed since #362 (`Peer.ts:258-283,808,935,1085,1220,1314`), the initial request before wallet work, the four signed kinds after verification. A replay is `Replayed initialRequest nonce.` or `Replayed <messageType> message nonce.`. Signed claims fail closed at 100,000 per session and expire with session removal or 30 minutes idle (checked at claim time); initial claims survive session removal, expire at 30 minutes and evict oldest-first at 256 per identity or 100,000 total. General messages wait on one shared per-session validation result for up to 30 seconds (`Peer.ts:286-329,1318-1325`); only a nonempty validated response releases it, before notifying certificate listeners. See the #362-364 changelog parity paragraph for the retained session-policy and certificate-policy differences.
 
 ### Cryptographic Details
 
@@ -512,7 +518,7 @@ Key compatibility details:
 - InitialResponse `signing_data` signs `your_nonce || initial_nonce` (matches Go/TS byte order)
 - InitialResponse `get_key_id` uses `"{your_nonce} {initial_nonce}"` format (matches Go `keyID()`)
 - `create_nonce` uses counterparty=Self (matches Go/TS)
-- Nonce verification on InitialResponse is optional (non-fatal failure, matches Go/TS behavior)
+- Nonce verification on InitialResponse and all three signed follow-ups is mandatory; nonce claims prevent replay (#353, #362, #363).
 
 ## Dependencies
 
@@ -549,7 +555,7 @@ Run with WebSocket transport tests:
 cargo test --features auth,websocket
 ```
 
-**Test pattern note**: `ChannelTransport` (MockTransport) in tests never invokes the `start()` callback. Messages go through `handle_incoming_message` → `process_initial_response`, NOT through the `start()` callback. The `start()` callback path is only exercised by real transports (HTTP, WebSocket) that invoke the registered callback when they receive data.
+**Test pattern note**: `auth_peer_nonces_362_364` and #353 use in-process transports whose deliveries invoke the callback installed by `start()`. The older `auth_peer_e2e_tests` channel routers call `handle_incoming_message` directly. Neither needs a network port.
 
 ## Related Documentation
 
