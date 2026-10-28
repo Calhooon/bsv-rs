@@ -122,11 +122,11 @@ pub struct RevealSpecificKeyLinkageResult {
 /// ProtoWallet provides cryptographic operations without blockchain interaction.
 /// It uses [`CachedKeyDeriver`] internally for efficient key derivation.
 ///
-/// It has one keyring and asks no one. The signature and HMAC calls validate
+/// It has one keyring and asks no one. All nine cryptographic calls validate
 /// `privileged` and `privileged_reason`, as the reference's argument validators
-/// do (#415); `seek_permission` is already a boolean. These fields do not
-/// change key derivation. The other calls' validators remain outstanding;
-/// the two linkage calls drop their privilege pair (#193).
+/// do (#415, #420); `seek_permission` is already a boolean. These fields do
+/// not change key derivation. The linkage trait adapters validate privilege
+/// before calling the inherent methods, whose arguments have no such fields.
 ///
 /// # Example
 ///
@@ -203,32 +203,18 @@ impl ProtoWallet {
     /// If `identity_key` is true, returns the root identity public key.
     /// Otherwise, derives a public key using the protocol, key ID, and counterparty.
     pub fn get_public_key(&self, args: GetPublicKeyArgs) -> Result<GetPublicKeyResult> {
-        if args.identity_key {
+        let Some((protocol_id, key_id)) = crypto::get_public_key_args(&args)? else {
             return Ok(GetPublicKeyResult {
                 public_key: self.identity_key_hex(),
             });
-        }
+        };
 
-        let protocol_id = args.protocol_id.ok_or_else(|| {
-            Error::WalletError("protocolID is required when identityKey is false".to_string())
-        })?;
-
-        let key_id = args.key_id.ok_or_else(|| {
-            Error::WalletError("keyID is required when identityKey is false".to_string())
-        })?;
-
-        if key_id.is_empty() {
-            return Err(Error::WalletError(
-                "keyID is required when identityKey is false".to_string(),
-            ));
-        }
-
-        let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
+        let counterparty = args.counterparty.as_ref().unwrap_or(&Counterparty::Self_);
         let for_self = args.for_self.unwrap_or(false);
 
         let public_key =
             self.key_deriver
-                .derive_public_key(&protocol_id, &key_id, &counterparty, for_self)?;
+                .derive_public_key(protocol_id, key_id, counterparty, for_self)?;
 
         Ok(GetPublicKeyResult {
             public_key: public_key.to_hex(),
@@ -240,6 +226,7 @@ impl ProtoWallet {
     /// The symmetric key is derived using the protocol, key ID, and counterparty.
     /// Uses AES-256-GCM encryption.
     pub fn encrypt(&self, args: EncryptArgs) -> Result<EncryptResult> {
+        crypto::encrypt_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -256,6 +243,7 @@ impl ProtoWallet {
     ///
     /// The symmetric key is derived using the protocol, key ID, and counterparty.
     pub fn decrypt(&self, args: DecryptArgs) -> Result<DecryptResult> {
+        crypto::decrypt_args(&args)?;
         let counterparty = args.counterparty.unwrap_or(Counterparty::Self_);
         let symmetric_key = self.key_deriver.derive_symmetric_key(
             &args.protocol_id,
@@ -369,6 +357,12 @@ impl ProtoWallet {
         &self,
         args: RevealCounterpartyKeyLinkageArgs,
     ) -> Result<RevealCounterpartyKeyLinkageResult> {
+        crypto::reveal_counterparty_args(
+            &args.counterparty.to_compressed(),
+            &args.verifier.to_compressed(),
+            None,
+            None,
+        )?;
         let identity_key = self.identity_key();
 
         // Get the shared secret point with the counterparty
@@ -444,6 +438,14 @@ impl ProtoWallet {
         &self,
         args: RevealSpecificKeyLinkageArgs,
     ) -> Result<RevealSpecificKeyLinkageResult> {
+        crypto::reveal_specific_args(
+            Some(&args.counterparty),
+            &args.verifier.to_compressed(),
+            &args.protocol_id,
+            &args.key_id,
+            None,
+            None,
+        )?;
         let identity_key = self.identity_key();
 
         // Get the specific secret
@@ -461,26 +463,18 @@ impl ProtoWallet {
         );
 
         // Encrypt linkage for verifier
-        let encrypted_linkage = self
-            .encrypt(EncryptArgs {
-                plaintext: linkage,
-                protocol_id: Protocol::new(SecurityLevel::Counterparty, &protocol_name),
-                key_id: args.key_id.clone(),
-                counterparty: Some(Counterparty::Other(args.verifier.clone())),
-                ..Default::default()
-            })?
-            .ciphertext;
+        let protocol = Protocol::new(SecurityLevel::Counterparty, &protocol_name);
+        let key = self.key_deriver.derive_symmetric_key(
+            &protocol,
+            &args.key_id,
+            &Counterparty::Other(args.verifier.clone()),
+        )?;
+        // Internal derivation permits the 430-byte revelation protocol. The
+        // reference calls deriveSymmetricKey directly, not public encrypt.
+        let encrypted_linkage = key.encrypt(&linkage)?;
 
         // Proof type 0: no proof provided
-        let encrypted_linkage_proof = self
-            .encrypt(EncryptArgs {
-                plaintext: vec![0],
-                protocol_id: Protocol::new(SecurityLevel::Counterparty, &protocol_name),
-                key_id: args.key_id.clone(),
-                counterparty: Some(Counterparty::Other(args.verifier.clone())),
-                ..Default::default()
-            })?
-            .ciphertext;
+        let encrypted_linkage_proof = key.encrypt(&[0])?;
 
         // Format counterparty for result
         let counterparty_str = match &args.counterparty {
@@ -583,698 +577,7 @@ fn is_leap_year(year: u64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || (year % 400 == 0)
 }
 
-// =============================================================================
-// WalletInterface Implementation
-// =============================================================================
-
-use super::interface::{
-    RevealCounterpartyKeyLinkageArgs as InterfaceRevealCounterpartyArgs,
-    RevealSpecificKeyLinkageArgs as InterfaceRevealSpecificArgs, WalletInterface,
-};
-use super::types::{
-    KeyLinkageResult, RevealCounterpartyKeyLinkageResult as TypesRevealCounterpartyResult,
-    RevealSpecificKeyLinkageResult as TypesRevealSpecificResult,
-};
-use super::{
-    AbortActionArgs, AbortActionResult, AcquireCertificateArgs, AuthenticatedResult,
-    CreateActionArgs, CreateActionResult, DiscoverByAttributesArgs, DiscoverByIdentityKeyArgs,
-    DiscoverCertificatesResult, GetHeaderArgs, GetHeaderResult, GetHeightResult, GetNetworkResult,
-    GetVersionResult, InternalizeActionArgs, InternalizeActionResult, ListActionsArgs,
-    ListActionsResult, ListCertificatesArgs, ListCertificatesResult, ListOutputsArgs,
-    ListOutputsResult, Network, ProveCertificateArgs, ProveCertificateResult,
-    RelinquishCertificateArgs, RelinquishCertificateResult, RelinquishOutputArgs,
-    RelinquishOutputResult, SignActionArgs, SignActionResult, WalletCertificate,
-};
-use async_trait::async_trait;
-
-#[async_trait]
-impl WalletInterface for ProtoWallet {
-    // =========================================================================
-    // Key Operations (all supported)
-    // =========================================================================
-
-    async fn get_public_key(
-        &self,
-        args: GetPublicKeyArgs,
-        _: Option<&str>,
-    ) -> Result<GetPublicKeyResult> {
-        self.get_public_key(args)
-    }
-
-    async fn encrypt(&self, args: EncryptArgs, _: Option<&str>) -> Result<EncryptResult> {
-        self.encrypt(args)
-    }
-
-    async fn decrypt(&self, args: DecryptArgs, _: Option<&str>) -> Result<DecryptResult> {
-        self.decrypt(args)
-    }
-
-    async fn create_hmac(&self, args: CreateHmacArgs, _: Option<&str>) -> Result<CreateHmacResult> {
-        self.create_hmac(args)
-    }
-
-    async fn verify_hmac(&self, args: VerifyHmacArgs, _: Option<&str>) -> Result<VerifyHmacResult> {
-        self.verify_hmac(args)
-    }
-
-    async fn create_signature(
-        &self,
-        args: CreateSignatureArgs,
-        _: Option<&str>,
-    ) -> Result<CreateSignatureResult> {
-        self.create_signature(args)
-    }
-
-    async fn verify_signature(
-        &self,
-        args: VerifySignatureArgs,
-        _: Option<&str>,
-    ) -> Result<VerifySignatureResult> {
-        self.verify_signature(args)
-    }
-
-    async fn reveal_counterparty_key_linkage(
-        &self,
-        args: InterfaceRevealCounterpartyArgs,
-        _: Option<&str>,
-    ) -> Result<TypesRevealCounterpartyResult> {
-        let result = self.reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs {
-            counterparty: args.counterparty.clone(),
-            verifier: args.verifier.clone(),
-        })?;
-
-        // Parse the hex strings back to PublicKeys
-        let prover = PublicKey::from_hex(&result.prover)?;
-        let counterparty_key = PublicKey::from_hex(&result.counterparty)?;
-
-        Ok(TypesRevealCounterpartyResult {
-            linkage: KeyLinkageResult {
-                encrypted_linkage: result.encrypted_linkage,
-                encrypted_linkage_proof: result.encrypted_linkage_proof,
-                prover,
-                verifier: args.verifier,
-                counterparty: counterparty_key,
-            },
-            revelation_time: result.revelation_time,
-        })
-    }
-
-    async fn reveal_specific_key_linkage(
-        &self,
-        args: InterfaceRevealSpecificArgs,
-        _: Option<&str>,
-    ) -> Result<TypesRevealSpecificResult> {
-        let result = self.reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs {
-            counterparty: args.counterparty.clone(),
-            verifier: args.verifier.clone(),
-            protocol_id: args.protocol_id.clone(),
-            key_id: args.key_id.clone(),
-        })?;
-
-        // Parse the hex strings back to PublicKeys
-        let prover = PublicKey::from_hex(&result.prover)?;
-        // Self is the prover's identity key, anyone `PrivateKey(1)`'s key, as
-        // the reference names them (`ProtoWallet.ts:235-240`, bsv-rs#216)
-        let counterparty_key = match args.counterparty {
-            Counterparty::Self_ => self.identity_key(),
-            Counterparty::Anyone => super::KeyDeriver::anyone_key().1,
-            Counterparty::Other(ref pk) => pk.clone(),
-        };
-
-        Ok(TypesRevealSpecificResult {
-            linkage: KeyLinkageResult {
-                encrypted_linkage: result.encrypted_linkage,
-                encrypted_linkage_proof: result.encrypted_linkage_proof,
-                prover,
-                verifier: args.verifier,
-                counterparty: counterparty_key,
-            },
-            protocol: result.protocol_id,
-            key_id: result.key_id,
-            proof_type: result.proof_type,
-        })
-    }
-
-    // =========================================================================
-    // Action Operations (NOT supported - require full wallet)
-    // =========================================================================
-
-    async fn create_action(
-        &self,
-        _args: CreateActionArgs,
-        _: Option<&str>,
-    ) -> Result<CreateActionResult> {
-        Err(Error::WalletError(
-            "createAction requires a full wallet implementation with UTXO management".to_string(),
-        ))
-    }
-
-    async fn sign_action(
-        &self,
-        _args: SignActionArgs,
-        _: Option<&str>,
-    ) -> Result<SignActionResult> {
-        Err(Error::WalletError(
-            "signAction requires a full wallet implementation with UTXO management".to_string(),
-        ))
-    }
-
-    async fn abort_action(
-        &self,
-        _args: AbortActionArgs,
-        _: Option<&str>,
-    ) -> Result<AbortActionResult> {
-        Err(Error::WalletError(
-            "abortAction requires a full wallet implementation with UTXO management".to_string(),
-        ))
-    }
-
-    async fn list_actions(
-        &self,
-        _args: ListActionsArgs,
-        _: Option<&str>,
-    ) -> Result<ListActionsResult> {
-        Err(Error::WalletError(
-            "listActions requires a full wallet implementation with transaction history"
-                .to_string(),
-        ))
-    }
-
-    async fn internalize_action(
-        &self,
-        args: InternalizeActionArgs,
-        _: Option<&str>,
-    ) -> Result<InternalizeActionResult> {
-        crate::wallet::validation::validate_internalize_action_args(&args)?;
-        Err(Error::WalletError(
-            "internalizeAction requires a full wallet implementation with UTXO management".into(),
-        ))
-    }
-
-    // =========================================================================
-    // Output Operations (NOT supported - require full wallet)
-    // =========================================================================
-
-    async fn list_outputs(
-        &self,
-        _args: ListOutputsArgs,
-        _: Option<&str>,
-    ) -> Result<ListOutputsResult> {
-        Err(Error::WalletError(
-            "listOutputs requires a full wallet implementation with UTXO management".to_string(),
-        ))
-    }
-
-    async fn relinquish_output(
-        &self,
-        _args: RelinquishOutputArgs,
-        _: Option<&str>,
-    ) -> Result<RelinquishOutputResult> {
-        Err(Error::WalletError(
-            "relinquishOutput requires a full wallet implementation with UTXO management"
-                .to_string(),
-        ))
-    }
-
-    // =========================================================================
-    // Certificate Operations (NOT supported - require full wallet)
-    // =========================================================================
-
-    async fn acquire_certificate(
-        &self,
-        _args: AcquireCertificateArgs,
-        _: Option<&str>,
-    ) -> Result<WalletCertificate> {
-        Err(Error::WalletError(
-            "acquireCertificate requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
-    }
-
-    async fn list_certificates(
-        &self,
-        _args: ListCertificatesArgs,
-        _: Option<&str>,
-    ) -> Result<ListCertificatesResult> {
-        Err(Error::WalletError(
-            "listCertificates requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
-    }
-
-    async fn prove_certificate(
-        &self,
-        _args: ProveCertificateArgs,
-        _: Option<&str>,
-    ) -> Result<ProveCertificateResult> {
-        Err(Error::WalletError(
-            "proveCertificate requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
-    }
-
-    async fn relinquish_certificate(
-        &self,
-        _args: RelinquishCertificateArgs,
-        _: Option<&str>,
-    ) -> Result<RelinquishCertificateResult> {
-        Err(Error::WalletError(
-            "relinquishCertificate requires a full wallet implementation with certificate storage"
-                .to_string(),
-        ))
-    }
-
-    // =========================================================================
-    // Discovery Operations (NOT supported - require full wallet)
-    // =========================================================================
-
-    async fn discover_by_identity_key(
-        &self,
-        _args: DiscoverByIdentityKeyArgs,
-        _: Option<&str>,
-    ) -> Result<DiscoverCertificatesResult> {
-        Err(Error::WalletError(
-            "discoverByIdentityKey requires a full wallet implementation with certificate discovery"
-                .to_string(),
-        ))
-    }
-
-    async fn discover_by_attributes(
-        &self,
-        _args: DiscoverByAttributesArgs,
-        _: Option<&str>,
-    ) -> Result<DiscoverCertificatesResult> {
-        Err(Error::WalletError(
-            "discoverByAttributes requires a full wallet implementation with certificate discovery"
-                .to_string(),
-        ))
-    }
-
-    // =========================================================================
-    // Chain/Status Operations (partial support)
-    // =========================================================================
-
-    async fn is_authenticated(&self, _: Option<&str>) -> Result<AuthenticatedResult> {
-        // ProtoWallet is always authenticated (it has a key)
-        Ok(AuthenticatedResult {
-            authenticated: true,
-        })
-    }
-
-    async fn wait_for_authentication(&self, _: Option<&str>) -> Result<AuthenticatedResult> {
-        // ProtoWallet is always authenticated
-        Ok(AuthenticatedResult {
-            authenticated: true,
-        })
-    }
-
-    async fn get_height(&self, _: Option<&str>) -> Result<GetHeightResult> {
-        // ProtoWallet doesn't track chain state
-        // Return 0 to indicate unknown
-        Ok(GetHeightResult { height: 0 })
-    }
-
-    async fn get_header_for_height(
-        &self,
-        _args: GetHeaderArgs,
-        _: Option<&str>,
-    ) -> Result<GetHeaderResult> {
-        Err(Error::WalletError(
-            "getHeaderForHeight requires a full wallet implementation with block header storage"
-                .to_string(),
-        ))
-    }
-
-    async fn get_network(&self, _: Option<&str>) -> Result<GetNetworkResult> {
-        // ProtoWallet defaults to mainnet
-        Ok(GetNetworkResult {
-            network: Network::Mainnet,
-        })
-    }
-
-    async fn get_version(&self, _: Option<&str>) -> Result<GetVersionResult> {
-        // BRC-100's vendor-1.0.0 shape (`wallet/0100.md:2517` at `5119a9b`),
-        // 7 to 30 bytes as the reference's result check asks
-        // (`WalletResultValidation.ts:2304-2306`, bsv-rs#222)
-        Ok(GetVersionResult {
-            version: concat!("bsv-rs-", env!("CARGO_PKG_VERSION")).to_string(),
-        })
-    }
-}
-
-// =============================================================================
-// Tests
-// =============================================================================
+mod interface;
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_proto_wallet_creation() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        assert!(!wallet.identity_key_hex().is_empty());
-    }
-
-    #[test]
-    fn test_proto_wallet_anyone() {
-        let wallet = ProtoWallet::anyone();
-        let wallet2 = ProtoWallet::anyone();
-        // Anyone wallets should have the same identity key
-        assert_eq!(wallet.identity_key_hex(), wallet2.identity_key_hex());
-    }
-
-    #[test]
-    fn test_get_public_key_identity() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let result = wallet
-            .get_public_key(GetPublicKeyArgs {
-                identity_key: true,
-                protocol_id: None,
-                key_id: None,
-                counterparty: None,
-                for_self: None,
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(result.public_key, wallet.identity_key_hex());
-    }
-
-    #[test]
-    fn test_get_public_key_derived() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let protocol = Protocol::new(SecurityLevel::App, "test application");
-
-        let result = wallet
-            .get_public_key(GetPublicKeyArgs {
-                identity_key: false,
-                protocol_id: Some(protocol.clone()),
-                key_id: Some("key-1".to_string()),
-                counterparty: Some(Counterparty::Self_),
-                for_self: Some(true),
-                ..Default::default()
-            })
-            .unwrap();
-
-        // Should be different from identity key
-        assert_ne!(result.public_key, wallet.identity_key_hex());
-
-        // Should be deterministic
-        let result2 = wallet
-            .get_public_key(GetPublicKeyArgs {
-                identity_key: false,
-                protocol_id: Some(protocol),
-                key_id: Some("key-1".to_string()),
-                counterparty: Some(Counterparty::Self_),
-                for_self: Some(true),
-                ..Default::default()
-            })
-            .unwrap();
-        assert_eq!(result.public_key, result2.public_key);
-    }
-
-    #[test]
-    fn test_encrypt_decrypt() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let protocol = Protocol::new(SecurityLevel::App, "encryption test");
-        let plaintext = b"Hello, ProtoWallet!".to_vec();
-
-        let encrypted = wallet
-            .encrypt(EncryptArgs {
-                plaintext: plaintext.clone(),
-                protocol_id: protocol.clone(),
-                key_id: "enc-1".to_string(),
-                counterparty: None,
-                ..Default::default()
-            })
-            .unwrap();
-
-        let decrypted = wallet
-            .decrypt(DecryptArgs {
-                ciphertext: encrypted.ciphertext,
-                protocol_id: protocol,
-                key_id: "enc-1".to_string(),
-                counterparty: None,
-                ..Default::default()
-            })
-            .unwrap();
-
-        assert_eq!(decrypted.plaintext, plaintext);
-    }
-
-    #[test]
-    fn test_create_verify_hmac() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let protocol = Protocol::new(SecurityLevel::App, "hmac test");
-        let data = b"HMAC me!".to_vec();
-
-        let created = wallet
-            .create_hmac(CreateHmacArgs {
-                data: data.clone(),
-                protocol_id: protocol.clone(),
-                key_id: "hmac-1".to_string(),
-                counterparty: None,
-                ..Default::default()
-            })
-            .unwrap();
-
-        // Verify should pass
-        let verified = wallet
-            .verify_hmac(VerifyHmacArgs {
-                data: data.clone(),
-                hmac: created.hmac,
-                protocol_id: protocol.clone(),
-                key_id: "hmac-1".to_string(),
-                counterparty: None,
-                ..Default::default()
-            })
-            .unwrap();
-        assert!(verified.valid);
-
-        // Verify with wrong data should fail
-        let bad_result = wallet.verify_hmac(VerifyHmacArgs {
-            data: b"wrong data".to_vec(),
-            hmac: created.hmac,
-            protocol_id: protocol,
-            key_id: "hmac-1".to_string(),
-            counterparty: None,
-            ..Default::default()
-        });
-        assert!(bad_result.is_err());
-    }
-
-    #[test]
-    fn test_create_verify_signature() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let protocol = Protocol::new(SecurityLevel::App, "signature test");
-        let data = b"Sign me!".to_vec();
-
-        let signed = wallet
-            .create_signature(CreateSignatureArgs {
-                data: Some(data.clone()),
-                hash_to_directly_sign: None,
-                protocol_id: protocol.clone(),
-                key_id: "sig-1".to_string(),
-                counterparty: None,
-                ..Default::default()
-            })
-            .unwrap();
-
-        // Verify should pass (note: for_self must be true to verify our own signature)
-        let verified = wallet
-            .verify_signature(VerifySignatureArgs {
-                data: Some(data.clone()),
-                hash_to_directly_verify: None,
-                signature: signed.signature.clone(),
-                protocol_id: protocol.clone(),
-                key_id: "sig-1".to_string(),
-                counterparty: Some(Counterparty::Anyone),
-                for_self: Some(true),
-                ..Default::default()
-            })
-            .unwrap();
-        assert!(verified.valid);
-
-        // Verify with wrong data should fail
-        let bad_result = wallet.verify_signature(VerifySignatureArgs {
-            data: Some(b"wrong data".to_vec()),
-            hash_to_directly_verify: None,
-            signature: signed.signature,
-            protocol_id: protocol,
-            key_id: "sig-1".to_string(),
-            counterparty: Some(Counterparty::Anyone),
-            for_self: Some(true),
-            ..Default::default()
-        });
-        assert!(bad_result.is_err());
-    }
-
-    #[test]
-    fn test_signature_with_hash() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let protocol = Protocol::new(SecurityLevel::App, "hash signature test");
-        let hash = sha256(b"prehashed data");
-
-        let signed = wallet
-            .create_signature(CreateSignatureArgs {
-                data: None,
-                hash_to_directly_sign: Some(hash),
-                protocol_id: protocol.clone(),
-                key_id: "hash-sig-1".to_string(),
-                counterparty: None,
-                ..Default::default()
-            })
-            .unwrap();
-
-        let verified = wallet
-            .verify_signature(VerifySignatureArgs {
-                data: None,
-                hash_to_directly_verify: Some(hash),
-                signature: signed.signature,
-                protocol_id: protocol,
-                key_id: "hash-sig-1".to_string(),
-                counterparty: Some(Counterparty::Anyone),
-                for_self: Some(true),
-                ..Default::default()
-            })
-            .unwrap();
-        assert!(verified.valid);
-    }
-
-    #[test]
-    fn test_reveal_specific_key_linkage() {
-        let wallet = ProtoWallet::new(Some(PrivateKey::random()));
-        let verifier = PrivateKey::random().public_key();
-        let protocol = Protocol::new(SecurityLevel::App, "linkage test");
-
-        let result = wallet
-            .reveal_specific_key_linkage(RevealSpecificKeyLinkageArgs {
-                counterparty: Counterparty::Self_,
-                verifier: verifier.clone(),
-                protocol_id: protocol.clone(),
-                key_id: "linkage-1".to_string(),
-            })
-            .unwrap();
-
-        assert_eq!(result.prover, wallet.identity_key_hex());
-        assert_eq!(result.verifier, verifier.to_hex());
-        assert_eq!(result.counterparty, "self");
-        assert_eq!(result.proof_type, 0);
-        assert!(!result.encrypted_linkage.is_empty());
-    }
-
-    #[test]
-    fn test_reveal_counterparty_key_linkage() {
-        let prover_key = PrivateKey::random();
-        let wallet = ProtoWallet::new(Some(prover_key.clone()));
-        let counterparty = PrivateKey::random().public_key();
-        let verifier_key = PrivateKey::random();
-        let verifier = verifier_key.public_key();
-
-        let result = wallet
-            .reveal_counterparty_key_linkage(RevealCounterpartyKeyLinkageArgs {
-                counterparty: counterparty.clone(),
-                verifier: verifier.clone(),
-            })
-            .unwrap();
-
-        assert_eq!(result.prover, wallet.identity_key_hex());
-        assert_eq!(result.verifier, verifier.to_hex());
-        assert_eq!(result.counterparty, counterparty.to_hex());
-        assert!(!result.revelation_time.is_empty());
-        assert!(!result.encrypted_linkage.is_empty());
-        assert!(!result.encrypted_linkage_proof.is_empty());
-
-        // Verifier decrypts and validates the Schnorr proof
-        let verifier_wallet = ProtoWallet::new(Some(verifier_key));
-        let protocol = Protocol::new(
-            SecurityLevel::Counterparty,
-            "counterparty linkage revelation",
-        );
-
-        // Decrypt the linkage
-        let decrypted_linkage = verifier_wallet
-            .decrypt(DecryptArgs {
-                ciphertext: result.encrypted_linkage,
-                protocol_id: protocol.clone(),
-                key_id: result.revelation_time.clone(),
-                counterparty: Some(Counterparty::Other(wallet.identity_key())),
-                ..Default::default()
-            })
-            .unwrap();
-        let linkage_point = PublicKey::from_bytes(&decrypted_linkage.plaintext).unwrap();
-
-        // Decrypt the proof
-        let decrypted_proof = verifier_wallet
-            .decrypt(DecryptArgs {
-                ciphertext: result.encrypted_linkage_proof,
-                protocol_id: protocol,
-                key_id: result.revelation_time,
-                counterparty: Some(Counterparty::Other(wallet.identity_key())),
-                ..Default::default()
-            })
-            .unwrap();
-
-        // Parse the 98-byte proof: R (33) || S' (33) || z (32)
-        let proof_bytes = &decrypted_proof.plaintext;
-        assert_eq!(proof_bytes.len(), 98);
-
-        use crate::primitives::bsv::schnorr::{Schnorr, SchnorrProof};
-        use crate::primitives::BigNumber;
-
-        let r = PublicKey::from_bytes(&proof_bytes[0..33]).unwrap();
-        let s_prime = PublicKey::from_bytes(&proof_bytes[33..66]).unwrap();
-        let z = BigNumber::from_bytes_be(&proof_bytes[66..98]);
-
-        let proof = SchnorrProof { r, s_prime, z };
-
-        // Verify the Schnorr proof
-        assert!(Schnorr::verify_proof(
-            &wallet.identity_key(),
-            &counterparty,
-            &linkage_point,
-            &proof,
-        ));
-    }
-
-    #[test]
-    fn test_two_party_encryption() {
-        let alice = ProtoWallet::new(Some(PrivateKey::random()));
-        let bob = ProtoWallet::new(Some(PrivateKey::random()));
-        let protocol = Protocol::new(SecurityLevel::App, "two party encryption");
-        let message = b"Secret message from Alice to Bob".to_vec();
-
-        // Alice encrypts for Bob
-        let encrypted = alice
-            .encrypt(EncryptArgs {
-                plaintext: message.clone(),
-                protocol_id: protocol.clone(),
-                key_id: "message-1".to_string(),
-                counterparty: Some(Counterparty::Other(bob.identity_key())),
-                ..Default::default()
-            })
-            .unwrap();
-
-        // Bob decrypts using Alice as counterparty
-        let decrypted = bob
-            .decrypt(DecryptArgs {
-                ciphertext: encrypted.ciphertext,
-                protocol_id: protocol,
-                key_id: "message-1".to_string(),
-                counterparty: Some(Counterparty::Other(alice.identity_key())),
-                ..Default::default()
-            })
-            .unwrap();
-
-        assert_eq!(decrypted.plaintext, message);
-    }
-
-    #[test]
-    fn test_iso_timestamp() {
-        let timestamp = get_iso_timestamp();
-        // Should be in format "YYYY-MM-DDTHH:MM:SS.mmmZ"
-        assert!(timestamp.len() == 24, "Timestamp: {}", timestamp);
-        assert!(timestamp.ends_with('Z'));
-        assert!(timestamp.contains('T'));
-    }
-}
+mod tests;
