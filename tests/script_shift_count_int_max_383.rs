@@ -106,6 +106,23 @@ fn a_left_shift_by_a_count_above_int_max_is_invalid_before_the_value_is_read() {
     );
 }
 
+/// The order: a value of 67,108,863 bytes (its magnitude 536,870,897 bits,
+/// past the reference's read, `Invalid string length` with a count of 1)
+/// and a count above `INT_MAX`: the count's refusal comes first, in its
+/// words, as the reference checks the count before it pops the value
+/// (`Spend.ts:1058-1061`, `1084-1087`). With the check after the read the
+/// value's words would win.
+#[test]
+fn a_count_above_int_max_is_refused_before_an_unreadable_value_is_read() {
+    let mut value = vec![0u8; 67_108_862];
+    value.push(1);
+    for (opcode, name) in [(OP_NOP7, "OP_LSHIFTNUM"), (OP_NOP8, "OP_RSHIFTNUM")] {
+        let error = run(&[&value, &[1]], opcode, None, None).expect_err("the value unreadable");
+        assert_eq!(error.message, "Invalid string length", "{name}");
+        exceeds_int_max(run(&[&value, INT_MAX_PLUS_ONE], opcode, None, None), name);
+    }
+}
+
 /// A caller's budget does not turn the count's refusal into a decline: the
 /// reference's check is before any shift, so nothing is sized (a 268 MB
 /// result declined under 1,000 bytes until #383).
