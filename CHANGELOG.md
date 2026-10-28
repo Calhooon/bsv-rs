@@ -507,9 +507,9 @@ JSON such as `{"ok":true}` to their callback, where this crate's typed
 `AuthMessage` refuses it in its existing serde words. A syntactically valid
 certificate header outside `RequestedCertificateSet`'s shape is refused
 with the header wrapper and serde's cause; the reference only casts its
-parsed value and passes it to the callback. Other typed shape,
-lone-surrogate and valid-JSON depth-limit refusals remain serde's; only the
-diagnostic scanner's artificial cutoff is removed. Node's syntax wording is runtime
+parsed value and passes it to the callback. Other typed shape and
+lone-surrogate refusals remain serde's; only the diagnostic scanner's
+artificial cutoff is removed. Node's syntax wording is runtime
 specific, pinned here to 22.18.0. A lone surrogate left by a diagnostic's
 context cut is recorded as U+FFFD, its UTF-8 wire representation, as in
 #354. The existing non-ASCII HTTP reason-phrase difference of #354 remains.
