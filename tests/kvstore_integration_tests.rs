@@ -6,6 +6,9 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 #![cfg(feature = "kvstore")]
 
+use bsv_rs as sdk;
+#[path = "support/kvstore_mock_actions.rs"]
+mod mock_actions;
 use bsv_rs::kvstore::{
     KVStoreConfig, KVStoreContext, KVStoreEntry, KVStoreFields, KVStoreGetOptions,
     KVStoreInterpreter, KVStoreQuery, KVStoreRemoveOptions, KVStoreSetOptions, KVStoreToken,
@@ -76,6 +79,7 @@ struct MockWallet {
     list_outputs_count: AtomicU32,
     /// Stored outputs from create_action calls.
     outputs: Mutex<Vec<MockOutput>>,
+    actions: mock_actions::Actions,
 }
 
 impl std::fmt::Debug for MockWallet {
@@ -112,6 +116,7 @@ impl MockWallet {
             create_action_count: AtomicU32::new(0),
             list_outputs_count: AtomicU32::new(0),
             outputs: Mutex::new(Vec::new()),
+            actions: Default::default(),
         }
     }
 
@@ -123,18 +128,6 @@ impl MockWallet {
     fn with_create_action_error(self) -> Self {
         self.create_action_error.store(true, Ordering::SeqCst);
         self
-    }
-
-    /// Generate a unique mock txid from the call counter.
-    fn generate_txid(counter: u32) -> [u8; 32] {
-        let mut txid = [0u8; 32];
-        let bytes = counter.to_le_bytes();
-        txid[0..4].copy_from_slice(&bytes);
-        // Fill remaining bytes with a pattern for uniqueness
-        for (i, byte) in txid.iter_mut().enumerate().skip(4) {
-            *byte = (counter as u8).wrapping_add(i as u8);
-        }
-        txid
     }
 }
 
@@ -221,12 +214,13 @@ impl WalletInterface for MockWallet {
         args: CreateActionArgs,
         _originator: Option<&str>,
     ) -> Result<CreateActionResult> {
-        let counter = self.create_action_count.fetch_add(1, Ordering::SeqCst);
+        self.create_action_count.fetch_add(1, Ordering::SeqCst);
         if self.create_action_error.load(Ordering::SeqCst) {
             return Err(Error::WalletError("wallet error".to_string()));
         }
 
-        let txid = Self::generate_txid(counter);
+        let result = self.actions.create(&args);
+        let txid = result.txid.unwrap();
 
         // Store outputs if present
         if let Some(ref action_outputs) = args.outputs {
@@ -268,29 +262,15 @@ impl WalletInterface for MockWallet {
             }
         }
 
-        Ok(CreateActionResult {
-            txid: Some(txid),
-            tx: None,
-            no_send_change: None,
-            send_with_results: None,
-            signable_transaction: None,
-            input_type: None,
-            inputs: None,
-            reference_number: None,
-            beef: None,
-        })
+        Ok(result)
     }
 
     async fn sign_action(
         &self,
-        _args: SignActionArgs,
+        args: SignActionArgs,
         _originator: Option<&str>,
     ) -> Result<SignActionResult> {
-        Ok(SignActionResult {
-            txid: Some([0u8; 32]),
-            tx: None,
-            send_with_results: None,
-        })
+        Ok(self.actions.sign(args))
     }
 
     async fn abort_action(
