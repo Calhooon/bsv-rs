@@ -87,17 +87,44 @@ re-recorded), and neither did the #280 vector's texts
 (`auth_signed_text_280` green, every recorded certificate's maps already in
 the order the vector holds).
 
-Not done: `resolve_by_attributes` sends its attributes in byte order. The
-lookup question's query is a `serde_json::Value` (`LookupQuestion::query`, a
-public field), and without `serde_json`'s `preserve_order` (a feature every
-downstream would unify into) that type sorts its keys. Ordering the body
-needs either a change to `LookupQuestion`'s public shape or that feature,
-and neither is in this issue's word. The reference's `resolveByAttributes`
-sends no lookup: it asks its wallet's `discoverByAttributes`
-(`IdentityClient.ts:605-655`), whose arguments keep their order here since
-#385. So the lookup body's key order has no reference to follow. The
-wiremock witness of the body that #394 asked for is not written, since it
-could only pin byte order.
+`resolve_by_attributes` sends its attributes in insertion order. The lookup
+question's query is a `serde_json::Value` (`LookupQuestion::query`, a public
+field), which sorts its keys in this build (no `preserve_order`).
+`LookupQuestion` is unchanged: `bsv-overlay-cloudflare` re-exports it and
+builds it with struct literals, so a field of any kind would break it. The
+text travels beside the question instead. `resolve_by_attributes` serializes
+its `IndexMap` once (the crate's `LookupResolver::query_ordered`, the `Value`
+read back from that text) and the resolver hands the text to each host's
+facilitator through `OverlayLookupFacilitator::lookup_ordered`, a new
+provided method whose default ignores the text and calls `lookup`.
+`HttpsOverlayLookupFacilitator` sends the text as the body's `query`.
+`LookupResolver::query` passes no text, so its bodies are the `Value`'s, as
+before. The body's members stay `query` then `service`, the order `json!`
+gave them. A single attribute is still `{"any": value}`. `query` moved, as
+is, to `src/overlay/lookup_resolver/query.rs`: `lookup_resolver.rs` is over
+the ratchet's 800-line bound and may not grow.
+
+The keeper's word (2026-10-28 04:5xZ, under ruling (c)): "one order through the crate" is the data model, the map type wherever the
+reference holds a `Record`, not a claim about every body's bytes. JSON key
+order is a parity item only where the reference's bytes are hashed, signed or
+compared whole, and this body is the one place found where the port's bytes
+sit beside the reference's: the attributes in insertion order through
+`JSON.stringify` (`IdentityClient.ts:667`). The reference's
+`resolveByAttributes` itself sends no lookup; it asks its wallet's
+`discoverByAttributes` (`:605-655`), whose arguments keep their order here
+since #385. Every other body keeps its bytes: every other question goes
+through `LookupResolver::query` or a facilitator's `lookup`, and its `Value`
+writes what `json!` wrote. `preserve_order` crate-wide, the rest of the
+`Value` bodies, is #400.
+
+Pinned by `tests/identity_lookup_attribute_order_394.rs` (5), through a
+wiremock lookup host: `zeta` then `alpha` sent in that order, byte for byte;
+a single attribute still the `any` matcher; a question sent through `lookup`
+sending the bytes `json!` of both members gives; `lookup_ordered` sending the
+text it is given. An injected facilitator that keeps the default is asked
+through `lookup` with the same `Value` as before. Red 1 of 3 on a scratch
+copy of `6741a44a` (the two tests that name `lookup_ordered` left out): the
+attributes arrived `alpha` first. The other two are green on both trees.
 
 Public shape (no semver lint reads a field's or a parameter's type; the list
 is complete):
@@ -112,6 +139,8 @@ is complete):
   `IdentityClient::resolve_by_attributes`.
 - 3 orders: `field_names`, `revealable_fields` and `to_wallet_certificate`
   now give the map's order.
+- 1 addition: `OverlayLookupFacilitator::lookup_ordered`, a provided method
+  (an implementor needs nothing new). `LookupQuestion` is unchanged.
 
 Migration: the same as #385's. Build an `IndexMap` where you built a
 `HashMap` (`[(k, v)].into_iter().collect()` compiles unchanged;
@@ -125,9 +154,13 @@ and the LOW workers were not checked.
 Semver: `cargo semver-checks --release-type minor --baseline-rev 5f8fc526
 --all-features` passes 202 checks and names nothing. It has no lint for a
 changed field or parameter type, so the pass is not evidence; this entry is.
+A private field on `LookupQuestion` failed it
+(`constructible_struct_adds_private_field`), which is why the text travels
+beside the question.
 Ratchet: every counter at or below `docs/ratchets.json` (`tools/ratchet/run
 --check --against origin/beta`). `identity/client.rs`, over its bound, shrank
-(the token's maps moved to `token_maps.rs`). Not re-recorded.
+(the token's maps moved to `token_maps.rs`), and `overlay/lookup_resolver.rs`
+went from 907 lines to 779 (`query` moved). Not re-recorded.
 
 ### Notes: cross-SDK parity (#394)
 

@@ -20,6 +20,7 @@ The module maintains cross-SDK compatibility with the TypeScript and Go BSV SDKs
 | `overlay_admin_token_template.rs` | SHIP/SLAP advertisement token encoding/decoding via PushDrop |
 | `historian.rs` | Transaction ancestry traversal for building chronological history |
 | `lookup_resolver.rs` | SLAP query resolution with host discovery, caching, and request coalescing |
+| `lookup_resolver/query.rs` | `LookupResolver::query` (moved as is, #394) and the crate's `query_ordered`, which serializes a query once and hands the text to `lookup_ordered` (`resolve_by_attributes`' attributes in insertion order) |
 | `topic_broadcaster.rs` | SHIP topic broadcasting with acknowledgment requirements |
 | `retry.rs` | Double-spend retry helper for overlay broadcast operations |
 
@@ -97,7 +98,7 @@ pub use facilitators::{
 
 Traits and HTTPS implementations for overlay communication. Require the `http` feature for actual HTTP calls. Both traits use `#[async_trait(?Send)]` (not `Send`-bound), allowing non-Send futures.
 
-- **`OverlayLookupFacilitator`** trait: `async fn lookup(&self, url, question, timeout_ms) -> Result<LookupAnswer>`
+- **`OverlayLookupFacilitator`** trait: `async fn lookup(&self, url, question, timeout_ms) -> Result<LookupAnswer>`; provided `lookup_ordered(url, question, query_text, timeout_ms)` (#394): the query sent as `query_text` when given, its keys in the order built where the `Value` sorts them, the default ignoring it and calling `lookup`
 - **`OverlayBroadcastFacilitator`** trait: `async fn send(&self, url, tagged_beef) -> Result<Steak>`
 - **`HttpsOverlayLookupFacilitator`** - POST to `/lookup` with JSON body and `X-Aggregation: yes` header; handles both JSON and binary (`octet-stream`) responses. JSON BEEF fields accept arrays of numbers, hex strings, or base64 strings. Default timeout: 5000ms
 - **`HttpsOverlayBroadcastFacilitator`** - POST to `/submit` with binary BEEF body, `X-Topics` header (JSON array), and `Content-Type: application/octet-stream`. Supports off-chain values via varint-prefixed BEEF length + `x-includes-off-chain-values: true` header

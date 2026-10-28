@@ -20,6 +20,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{watch, RwLock};
 
+mod query; // `query` and the ordered lookup (#394)
+
 /// Configuration for the lookup resolver.
 #[derive(Clone)]
 pub struct LookupResolverConfig {
@@ -151,136 +153,6 @@ impl LookupResolver {
             tx_memo_ttl_ms: config.tx_memo_ttl_ms,
             tx_memo_max_entries: config.tx_memo_max_entries,
             hosts_in_flight: RwLock::new(HashMap::new()),
-        }
-    }
-
-    /// Execute a lookup query.
-    ///
-    /// Discovers competent hosts and queries them in parallel,
-    /// aggregating results.
-    ///
-    /// # Arguments
-    ///
-    /// * `question` - The lookup question to execute
-    /// * `timeout_ms` - Optional timeout in milliseconds
-    ///
-    /// # Returns
-    ///
-    /// The aggregated lookup answer.
-    pub async fn query(
-        &self,
-        question: &LookupQuestion,
-        timeout_ms: Option<u64>,
-    ) -> Result<LookupAnswer> {
-        // Find hosts that can answer this query
-        let hosts = self.get_competent_hosts(&question.service).await?;
-
-        if hosts.is_empty() {
-            return Err(Error::OverlayError(format!(
-                "No competent {} hosts found by the SLAP trackers for lookup service: {}",
-                self.network_preset_str(),
-                question.service
-            )));
-        }
-
-        // Rank hosts by reputation, filtering out those in backoff
-        let now = now_ms();
-        let ranked = self.reputation_tracker.rank_hosts(&hosts);
-        let available: Vec<_> = ranked
-            .iter()
-            .filter(|h| h.entry.backoff_until <= now)
-            .map(|h| h.entry.host.clone())
-            .collect();
-
-        if available.is_empty() {
-            let soonest = ranked
-                .iter()
-                .map(|h| h.entry.backoff_until)
-                .min()
-                .unwrap_or(0);
-            let wait_ms = soonest.saturating_sub(now);
-            return Err(Error::OverlayError(format!(
-                "All competent hosts for {} are backing off for approximately {}ms",
-                question.service, wait_ms
-            )));
-        }
-
-        // Query all available hosts in parallel
-        let mut all_outputs: Vec<OutputListItem> = Vec::new();
-        let mut seen_outputs: HashSet<String> = HashSet::new();
-        let mut first_freeform: Option<LookupAnswer> = None;
-
-        let futures: Vec<_> = available
-            .iter()
-            .map(|host| {
-                let host = host.clone();
-                let facilitator = self.facilitator.clone();
-                let question = question.clone();
-                let timeout = timeout_ms;
-
-                async move {
-                    let start = Instant::now();
-                    let result = facilitator.lookup(&host, &question, timeout).await;
-                    let elapsed = start.elapsed().as_millis() as u64;
-                    (host, result, elapsed)
-                }
-            })
-            .collect();
-
-        let results = futures::future::join_all(futures).await;
-
-        for (host, result, elapsed) in results {
-            match result {
-                Ok(answer) => {
-                    // Validate the response
-                    let is_valid = matches!(&answer, LookupAnswer::OutputList { outputs } if !outputs.is_empty())
-                        || matches!(&answer, LookupAnswer::Freeform { .. });
-
-                    if is_valid {
-                        self.reputation_tracker.record_success(&host, elapsed);
-                    } else {
-                        self.reputation_tracker
-                            .record_failure(&host, Some("Invalid lookup response"));
-                    }
-
-                    match answer {
-                        LookupAnswer::OutputList { outputs } => {
-                            // Deduplicate using TX memoization (txId.outputIndex as unique key)
-                            for output in outputs {
-                                if let Some(tx_id) = self.get_or_cache_tx_id(&output.beef).await {
-                                    let uniq_key = format!("{}.{}", tx_id, output.output_index);
-                                    if !seen_outputs.contains(&uniq_key) {
-                                        seen_outputs.insert(uniq_key);
-                                        all_outputs.push(output);
-                                    }
-                                }
-                                // Skip outputs with invalid BEEF (can't parse)
-                            }
-                        }
-                        LookupAnswer::Freeform { .. } => {
-                            if first_freeform.is_none() {
-                                first_freeform = Some(answer);
-                            }
-                        }
-                        LookupAnswer::Formula { .. } => {
-                            // Formula responses are not aggregated
-                        }
-                    }
-                }
-                Err(e) => {
-                    self.reputation_tracker
-                        .record_failure(&host, Some(&e.to_string()));
-                }
-            }
-        }
-
-        // Return freeform if we got one, otherwise aggregated output list
-        if let Some(freeform) = first_freeform {
-            Ok(freeform)
-        } else {
-            Ok(LookupAnswer::OutputList {
-                outputs: all_outputs,
-            })
         }
     }
 
