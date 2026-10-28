@@ -53,8 +53,9 @@ impl SimplifiedFetchTransport {
 }
 
 /// Bound the received text before parsing, then retain it beside the typed
-/// view. A certificateRequest's signature must not lose property order or
-/// extra properties through serialization of `RequestedCertificateSet`.
+/// view. The Peer's certificateRequest preimage re-serializes the complete
+/// object as JSON.stringify does (#426), preserving order and extra properties
+/// that serialization of `RequestedCertificateSet` would lose.
 pub(super) fn requested_certificates(
     url: &str,
     response_headers: &HeaderMap,
