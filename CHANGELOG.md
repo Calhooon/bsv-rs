@@ -700,6 +700,94 @@ skip applies under explicit flags alone, `Spend.ts:827-848`), where this
 crate's default runs them as `OP_NOP4`-`OP_NOP8` unless the coin is marked
 post-Chronicle (`aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` at version 1:
 `ok true` there, a refusal here). Both are #397, with the keeper's word (the opcode gate and the words follow the reference's default; the cross-SDK filing ts-stack #1437).
+### Fixed: `HttpWalletJson` reads every success-path byte field as the reference's `HTTPWalletJSON` does, the historical object form included (#365)
+
+The reference runs `normalizeBRC100WalletByteFields` over every answer's
+body before `validateWalletResult` reads it (`ts-stack@edf6e03`
+`packages/sdk/src/wallet/substrates/HTTPWalletJSON.ts:322-341`): each own
+member named in `walletByteFieldNames`, at any depth
+(`packages/sdk/src/wallet/BRC100ByteEncoding.ts:5-23`, `:164-190`), read
+by `normalizeBRC100ByteArray` (`:81-86`): an array of byte numbers, or
+the historical object form `JSON.stringify(new Uint8Array(..))` wrote
+(keys `"0"` to `"n-1"`), each value `isByte` (`Number.isInteger` from 0
+to 255, `:32-34`, so `1.0` and `-0` too). Since #339 this crate read
+createAction's and signAction's top-level `tx` so; the other byte fields a
+success answer carries were read as plain arrays of integers, so a body
+the reference reads was refused, and one it refuses was refused in
+`serde_json`'s words. The #339 fold's re-review found it (filed as #365).
+The fields, per call, as `validateWalletResult` reads them
+(`packages/sdk/src/wallet/WalletResultValidation.ts`):
+
+| Call | Field | Reference's site | Byte reader before | After |
+|---|---|---|---|---|
+| createAction | `tx` | `validateActionResult`, `:1247-1248` | yes (#339) | yes |
+| createAction | `signableTransaction.tx` | `:1266-1271` | no | yes |
+| signAction | `tx` | `:1247-1248` | yes (#339) | yes |
+| encrypt | `ciphertext` | `:2210-2212` | no | yes |
+| decrypt | `plaintext` | `:2213-2215` | no | yes |
+| createHmac | `hmac` | `:2216-2218` | no | yes |
+| createSignature | `signature` | `:2219-2225` | no | yes |
+| revealCounterpartyKeyLinkage | `encryptedLinkage`, `encryptedLinkageProof` | `validateKeyLinkage`, `:2163-2173` | no | yes |
+| revealSpecificKeyLinkage | `encryptedLinkage`, `encryptedLinkageProof` | `:2163-2173` | no | yes |
+| listOutputs | `BEEF` | `validateListOutputs`, `:2082` | no | yes |
+
+The certificate results carry no byte field (a certificate's `signature`
+is hex text, which the walk leaves; the keyrings are base64 text, outside
+`walletByteFieldNames`), nor do the other calls' results.
+
+One reader for all of them: `src/wallet/substrates/http_json/byte_fields.rs`
+holds #339's `byte_array` (moved from `review_actions.rs`, which reads the
+code-5 body's `tx` and `competingBeef` through it as before), the
+reference's walk (`normalize`: every member of the seventeen names at any
+depth, one it does not read walked into, as `visitBRC100WalletByteField`
+does) and the fields above (`refusal`: the first in the reference's order
+that is no array of bytes after the walk, present or, for the required
+ones, absent, refused `Error::WalletError` in `bytes`' words, `Invalid
+<call> result <field>: expected an array of bytes`, `:868-906`).
+`answer::success` reads every call's answer as #339's second fold read the
+two action calls': the typed reading first, at the cost it costs, the
+`Value` tree built only for an answer the typed reading refuses, then the
+walk, the refusal, and the typed reading of the tree; an answer neither
+takes is refused in `serde_json`'s words as before. A body that is no JSON
+is refused in `serde_json`'s words on every call now, where the calls other
+than createAction and signAction gave reqwest's (`error decoding response
+body`): one recorded fixture moves, in its own commit (F22,
+`http_json/errors.json`'s `malformed_json`).
+
+Pinned by `tests/wallet_http_json_success_bytes_365.rs` against
+`tests/vectors/http_json_success_bytes_365.json` (109 bodies, the
+reference's `HTTPWalletJSON` under Node v22.18.0, written by
+`tests/support/http_json_success_bytes_365.mjs`, the body's text recorded
+as served so `1.0` and `-0` cross as written, the BEEF and action requests
+#339's): each of the twelve fields as an array, in the object form and
+with every byte `1.0`, read to the reference's bytes; with its first byte
+`256`, `-1` or `1.5` in the array and in the object form, refused in the
+reference's words; ciphertext's object form with the integer text `-0`
+read as the byte 0, as `isByte` reads it (the #339 re-review's unpinned
+case, `the_integer_text_minus_zero_in_the_object_form_is_the_byte_zero`).
+2 of 3 tests and 93 of the 109 bodies red on `5f8fc526` (the 21 forms the
+reference reads refused, the 72 refusals in `serde_json`'s words), the 16
+that agree the twelve arrays and #339's four action `tx` forms; green
+after. The walk and the refusal are unit-tested in `byte_fields.rs`. #339's
+`{"tx": "x"}` pin moves to `bytes`' words
+(`a_success_answer_neither_reading_takes_is_refused_in_serdes_or_the_references_words`,
+renamed from `..._in_serdes_words`). No public shape moves; no migration.
+
+### Notes: cross-SDK parity (#365)
+
+The typed reading still answers first, so an answer it takes and the
+reference refuses is read here, as before #365: `validateWalletResult`'s
+other checks of these fields are not ported (createHmac's `hmac` 32
+bytes, which the typed reading's `[u8; 32]` holds, createSignature's 72
+bytes and canonical DER, `:2217-2225`; an action `tx` of `null`, which the
+typed `Option` reads as absent where the reference refuses it; the BEEF
+checks of listOutputs and the signable transaction). Where a byte field
+and another member are both malformed, the byte field is named here, where
+the reference names whichever it checks first (the linkages' keys before
+their bytes, `:2167-2170`). go-sdk@2ca481c's JSON substrate decodes each
+result with `json.Unmarshal` (`wallet/substrates/http_wallet_json.go:77-79`,
+`:187-189`), its byte fields `BytesList` read as `[]uint8`
+(`wallet/encoding.go:24-31`), and normalizes nothing.
 
 ### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
 
@@ -1728,7 +1816,8 @@ bytes`): both refuse, in other words. On the success path only
 createAction's and signAction's `tx` is normalized; the other byte fields
 the reference's `normalizeBRC100WalletByteFields` cleans (`signature`,
 `ciphertext`, `hmac` and the rest) are read here as plain arrays of
-integers, a stated difference this change leaves as it was (#365). A
+integers, a stated difference this change leaves as it was (#365; read as
+the reference reads them since #365's entry above). A
 success answer neither reading takes is refused in `serde_json`'s words
 (above), where the reference throws its runtime's `SyntaxError` for a body
 that is not JSON and `validateWalletResult`'s words for a member
