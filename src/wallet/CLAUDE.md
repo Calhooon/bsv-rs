@@ -21,7 +21,8 @@ This module provides the wallet interface, key derivation, and cryptographic ope
 | `validation.rs` | 40+ input validation helpers + validated structs; `validation/create_action_input.rs` (`validate_create_action_input`, #282), `validation/internalize.rs` (#117) and `validation/originator.rs` (`validate_originator`, #323) re-exported from it | ~1111 |
 | `collation.rs` | A certificate's field-name order, the reference's `localeCompare` under ICU root for U+0000..U+00FF (#249): `sort_field_names`, `pub(crate)`, the one order `auth::Certificate` signs over and `WireWriter::write_wallet_certificate` writes (here since #246: `wallet` builds the wire without `auth`); the table parsed at compile time | ~325 |
 | `collation_latin1.txt` | The DUCET 13.0.0 rows of U+0000..U+00FF and the two `l·` contractions, ranked; written by `tests/support/certificate_collation_table_249.mjs`, never edited by hand (#249) | 264 |
-| `client.rs` | Multi-substrate WalletClient (requires `http` feature) | ~665 |
+| `client.rs` | Multi-substrate WalletClient (requires `http` feature); every call forwarded by one macro over the three substrates | ~582 |
+| `client_instance.rs` | The instance substrate of `WalletClient::with_substrate` (#335): `Instance`, dereferencing to the `WalletInterface` and adapting the six status and header answers to the client's shapes | ~64 |
 | `substrates/` | Transport substrate implementations | - |
 | `wire/` | Wire protocol encoding/decoding | - |
 
@@ -75,9 +76,13 @@ pub enum SubstrateType {
 
 pub struct WalletClient {
     pub fn new(substrate_type: SubstrateType, originator: Option<String>) -> Self
+    // The reference's `substrate: WalletInterface` alternative (#335): the instance is the
+    // connected substrate, nothing probed; substrate_type() answers Auto
+    pub fn with_substrate(substrate: Arc<dyn WalletInterface>, originator: Option<String>) -> Self
     pub fn substrate_type(&self) -> SubstrateType
     pub fn originator(&self) -> Option<&str>   // passed to every call as given; None when none is set (#329)
-    // All wallet operations as async methods (connect lazily on first call)
+    // All 28 wallet operations as async methods (connect lazily on first call); the wire
+    // substrate refuses the two linkage calls unsent (its transceiver writes neither, #335)
 }
 ```
 
@@ -90,7 +95,7 @@ pub struct WalletClient {
 | `Cicada` | Binary | 3301 | High performance |
 | `SecureJsonApi` | JSON/TLS | 2121 | Secure local communication |
 
-Internally uses `ConnectedSubstrate` enum dispatching to either `HttpWalletJson` or `WalletWireTransceiver<HttpWalletWire>`.
+Internally uses `ConnectedSubstrate` enum dispatching to `HttpWalletJson`, `WalletWireTransceiver<HttpWalletWire>` or the caller's instance (`client_instance::Instance`, #335), each call through the `forward!` macro with the client's originator (the configured one or `None`, #329).
 
 ### ProtoWallet
 
