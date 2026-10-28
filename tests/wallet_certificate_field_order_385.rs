@@ -239,6 +239,31 @@ fn a_certificates_fields_are_signed_in_the_references_order_not_the_maps() {
     assert!(Certificate::from_binary(&frame).unwrap().verify().unwrap());
 }
 
+/// The wallet's certificate writer checks the fields' bounds in the map's
+/// order and sorts only to write, as `toBinary` snapshots the fields in
+/// `Reflect.ownKeys` order before it sorts (`Certificate.ts:56-83`,
+/// `:281-282`): of two names over 50 bytes, the one refused is the first
+/// given, not the first signed.
+#[test]
+fn the_wallet_certificate_writer_refuses_the_first_bad_field_given_not_the_first_sorted() {
+    let mut certificate = signed_certificate();
+    // given: 51 bytes then 52; sorted: the 52-byte name first
+    certificate.fields = [
+        ("z".repeat(51), "dg==".to_string()),
+        ("a".repeat(52), "dg==".to_string()),
+    ]
+    .into_iter()
+    .collect();
+    let mut writer = WireWriter::new();
+    let Err(refused) = writer.write_wallet_certificate(&certificate) else {
+        panic!("two names over 50 bytes are written");
+    };
+    assert_eq!(
+        refused,
+        Error::WalletError("Invalid certificate field name length: received 51".into())
+    );
+}
+
 // ---------------------------------------------------------------------------
 // JSON: each of the nine maps read and written in the order given
 // ---------------------------------------------------------------------------
