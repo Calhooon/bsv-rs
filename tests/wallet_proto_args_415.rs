@@ -120,13 +120,26 @@ fn assert_case(case: &Value) {
 
 fn cases() -> Vec<Value> {
     let fixture: Value = serde_json::from_str(VECTOR).unwrap();
-    fixture["cases"]
-        .as_array()
-        .unwrap()
+    let recorded = fixture["cases"].as_array().unwrap();
+    let unrepresentable = recorded
+        .iter()
+        .filter(|case| case.get("unrepresentable").is_some())
+        .count();
+    assert_eq!(
+        unrepresentable, 85,
+        "the recorded type-enforced case count changed"
+    );
+    let replayable: Vec<_> = recorded
         .iter()
         .filter(|case| case.get("unrepresentable").is_none())
         .cloned()
-        .collect()
+        .collect();
+    assert_eq!(
+        replayable.len(),
+        117,
+        "the recorded replayable case count changed"
+    );
+    replayable
 }
 
 fn assert_refusal(words: &str) {
