@@ -222,7 +222,7 @@ The reference's order (`ts-stack@edf6e03`, `validationHelpers.ts:1717-1762`):
   verifier public key, protocol, key ID, privilege without seekPermission.
 
 Common encryption checks are protocol name 5..400 raw UTF-8 bytes, key ID
-1..800 bytes, optional counterparty, then privilege. A present privileged
+1..800 bytes, optional counterparty, then privilege. A counterparty given as hex that is not a key is refused when the `Counterparty` is built (`src/wallet/types.rs:321`), before any call exists, so a call with both a bad protocol and a bad hex counterparty is refused for the counterparty here where the reference names the protocol. A present privileged
 reason needs 5..50 UTF-8 bytes, even without privilege; privileged=true needs
 a reason. Key checks trim as JavaScript does, require even hex, then exactly
 66 characters, then a compressed secp256k1 point. `Counterparty::from_hex`
