@@ -18,8 +18,8 @@
 //! evaluation mode (no flag word passed). That mode enforces, for transaction
 //! version <= 1, MINIMALDATA (minimal pushes + minimally-encoded numbers),
 //! LOW_S, NULLDUMMY and CLEANSTACK, and at every version SIGPUSHONLY
-//! (push-only unlocking scripts), strict DER/pubkey encodings and
-//! SIGHASH_FORKID-required; it has no NULLFAIL, MINIMALIF or
+//! (push-only unlocking scripts) and strict DER/pubkey encodings. A signature
+//! without SIGHASH_FORKID uses the original digest (#429); it has no NULLFAIL, MINIMALIF or
 //! DISCOURAGE_UPGRADABLE_NOPS rule; and it runs the post-genesis BSV opcode
 //! set (OP_MUL/OP_CAT/OP_LSHIFT... enabled; a second OP_ELSE, an undefined
 //! opcode executed and a truncated push reached are failures; no pre-genesis
@@ -44,6 +44,8 @@ use conformance_script_allowlist::{classify_chronicle_hash_type, EVALUATION_UNSU
 #[path = "support/conformance_signature_words_417.rs"]
 mod conformance_signature_words_417;
 use conformance_signature_words_417::classify_signature_words_417;
+#[path = "support/conformance_forkid_gate_429.rs"]
+mod conformance_forkid_gate_429;
 
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -321,9 +323,9 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
                 Some("flag-dependent ELSE/ENDIF structure rules not expressible in bsv-rs")
             }
             // STRICTENC without SIGHASH_FORKID: a signature CARRYING the
-            // FORKID bit must be rejected. bsv-rs always requires FORKID.
+            // FORKID bit must be rejected. The default permits that bit.
             "ILLEGAL_FORKID" => {
-                Some("bsv-rs always requires SIGHASH_FORKID (cannot reject FORKID-bit sigs)")
+                Some("the default mode permits SIGHASH_FORKID (fixture forbids the bit)")
             }
             // node-transaction fixtures carry no result code; attribute via
             // flags.
@@ -373,17 +375,16 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
         if msg.contains("clean stack") && !has("CLEANSTACK") {
             return Some("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)");
         }
-        if msg.contains("SIGHASH_FORKID") && !has("SIGHASH_FORKID") {
-            return Some("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)");
-        }
         // Since 0.3.29 the hash type's base is tested before the FORKID bit,
         // as the reference orders the two (interpreter.cpp:291-294, then
         // 305-306), so a legacy signature whose base is undefined (the node's
         // "undefined hashtype but no STRICTENC" fixtures) is refused at the
-        // base test first. The fixture is the same legacy-signature class:
-        // bsv-rs always requires FORKID and cannot run it either way.
+        // base test first. Since #429 legacy signatures run, so this class
+        // names only the undefined-type restriction still applied by default.
         if msg.starts_with("The signature's hash type (") && !has("SIGHASH_FORKID") {
-            return Some("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)");
+            return Some(
+                "the default mode enforces defined hash types (legacy fixtures without STRICTENC)",
+            );
         }
         if msg.contains("low S") && !has("LOW_S") {
             return Some("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)");
@@ -391,7 +392,9 @@ fn classify_node_mismatch(ctx: &MismatchContext<'_>) -> Option<&'static str> {
         if msg.contains("dummy") && !has("NULLDUMMY") {
             return Some("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)");
         }
-        if (msg.contains("signature format is invalid") || msg.contains("public key"))
+        if (msg.contains("signature format is invalid")
+            || msg.contains("public key")
+            || msg == "Public key is empty.")
             && !has("STRICTENC")
             && !has("DERSIG")
         {
@@ -427,7 +430,7 @@ fn is_p2sh_hex(script_pubkey_hex: &str) -> bool {
 /// (a new failure fails the test, and once a bug is fixed its entry goes
 /// stale and must be removed).
 ///
-/// *** BUG 1 (15 vectors): bsv-rs OP_CHECKMULTISIG validates the DER/pubkey
+/// *** BUG 1 (10 vectors after #429): bsv-rs OP_CHECKMULTISIG validates the DER/pubkey
 /// encoding of EVERY signature and public key up front
 /// (src/script/spend/crypto.rs::op_checkmultisig), while the node and ts-sdk only
 /// check encodings for (sig, key) pairs actually evaluated — empty sigs and
@@ -452,18 +455,6 @@ const EVALUATION_KNOWN_FAILURES: &[(&str, &str)] = &[
     ),
     // BUG 1 — eager OP_CHECKMULTISIG encoding validation (see above):
     (
-        "node.script.bitcoin-sv.0698",
-        "eager CHECKMULTISIG encoding check (BUG 1)",
-    ),
-    (
-        "node.script.bitcoin-sv.0699",
-        "eager CHECKMULTISIG encoding check (BUG 1)",
-    ),
-    (
-        "node.script.bitcoin-sv.1433",
-        "eager CHECKMULTISIG encoding check (BUG 1)",
-    ),
-    (
         "node.script.bitcoin-sv.1535",
         "eager CHECKMULTISIG encoding check (BUG 1)",
     ),
@@ -481,18 +472,6 @@ const EVALUATION_KNOWN_FAILURES: &[(&str, &str)] = &[
     ),
     (
         "node.script.bitcoin-sv.1541",
-        "eager CHECKMULTISIG encoding check (BUG 1)",
-    ),
-    (
-        "node.script.teranode.0666",
-        "eager CHECKMULTISIG encoding check (BUG 1)",
-    ),
-    (
-        "node.script.teranode.0667",
-        "eager CHECKMULTISIG encoding check (BUG 1)",
-    ),
-    (
-        "node.script.teranode.1384",
         "eager CHECKMULTISIG encoding check (BUG 1)",
     ),
     (

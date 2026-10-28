@@ -1,0 +1,1252 @@
+{
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "id": "node.script.bitcoin-sv.0698",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "STRICTENC"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.0699",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "STRICTENC"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1370",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1372",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1374",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1381",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1403",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "DERSIG"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1405",
+      "expected": {
+        "result": "NULLFAIL",
+        "valid": false
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "DERSIG",
+            "NULLFAIL"
+          ],
+          "error": "Script evaluation error: OP_CHECKSIG requires failing signatures to be empty."
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1424",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1426",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The public key is in an unknown format."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1430",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The public key is in an unknown format."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1432",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1433",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "STRICTENC"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1435",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1437",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1441",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1443",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1445",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1455",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "SIGPUSHONLY"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1456",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 2."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1464",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1465",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.bitcoin-sv.1466",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.0666",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "STRICTENC"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.0667",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "STRICTENC"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1321",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1323",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1325",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1332",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1354",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "DERSIG"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1356",
+      "expected": {
+        "result": "NULLFAIL",
+        "valid": false
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "DERSIG",
+            "NULLFAIL"
+          ],
+          "error": "Script evaluation error: OP_CHECKSIG requires failing signatures to be empty."
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1375",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1377",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The public key is in an unknown format."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1381",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The public key is in an unknown format."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1383",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1384",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "STRICTENC"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1386",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1388",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1392",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1394",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1396",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: OP_CHECKMULTISIG requires the extra stack item (dummy) to be empty."
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1406",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "SIGPUSHONLY"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1407",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 2."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1415",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1416",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.script.teranode.1417",
+      "expected": {
+        "result": "OK",
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0023",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0025",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0027",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 2."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0051",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0053",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0055",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0057",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0062",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 5."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0064",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: Public key is empty."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0067",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0070",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0073",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0074",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0076",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0078",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0080",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0082",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0093",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The clean stack rule requires exactly one item to be on the stack after script execution, found 4."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0097",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "error": "Script evaluation error: The signature format is invalid."
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    },
+    {
+      "id": "node.tx-valid.shared.0174",
+      "expected": {
+        "valid": true
+      },
+      "default": {
+        "valid": true
+      },
+      "words": [
+        {
+          "flags": [
+            "P2SH"
+          ],
+          "valid": true
+        },
+        {
+          "flags": [
+            "P2SH",
+            "UTXO_AFTER_GENESIS"
+          ],
+          "valid": true
+        }
+      ]
+    }
+  ]
+}

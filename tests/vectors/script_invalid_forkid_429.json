@@ -1,0 +1,30 @@
+{
+  "reference": "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9",
+  "node": "v22.18.0",
+  "cases": [
+    {
+      "name": "script-invalid-408",
+      "index": 408,
+      "version": 1,
+      "mode": "default",
+      "unlock": "004730440220b119d67d389315308d1745f734a51ff3ec72e06081e84e236fdf9dc2f5d2a64802204b04e3bc38674c4422ea317231d642b56dc09d214a1ecbbf16ecca01ed996e2201473044022079ea80afd538d9ada421b5101febeb6bc874e01dde5bca108c1d0479aec339a4022004576db8f66130d1df686ccf00935703689d69cf539438da1edab208b0d63c4801",
+      "lock": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464052ae91",
+      "flags": "",
+      "comment": "BIP66 example 8, without DERSIG",
+      "lowSChecks": 1,
+      "valid": true
+    },
+    {
+      "name": "script-invalid-409",
+      "index": 409,
+      "version": 1,
+      "mode": "default",
+      "unlock": "004730440220b119d67d389315308d1745f734a51ff3ec72e06081e84e236fdf9dc2f5d2a64802204b04e3bc38674c4422ea317231d642b56dc09d214a1ecbbf16ecca01ed996e2201473044022079ea80afd538d9ada421b5101febeb6bc874e01dde5bca108c1d0479aec339a4022004576db8f66130d1df686ccf00935703689d69cf539438da1edab208b0d63c4801",
+      "lock": "5221038282263212c609d9ea2a6e3e172de238d8c39cabd5ac1ca10646e23fd5f515082103363d90d447b00c9c99ceac05b6262ee053441c7e55552ffe526bad8f83ff464052ae91",
+      "flags": "DERSIG",
+      "comment": "BIP66 example 8, with DERSIG",
+      "lowSChecks": 1,
+      "valid": true
+    }
+  ]
+}

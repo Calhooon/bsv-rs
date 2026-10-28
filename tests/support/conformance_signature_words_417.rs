@@ -1,6 +1,6 @@
 //! #417's visible wrapper hides the individual rule from the census.
-//! Keep each audited vector in its existing capability class: nine low-S
-//! cases and five undefined legacy hash types. No verdict or total moves.
+//! Keep each audited vector in its actual capability class: nine original
+//! low-S cases, two exposed by #429, and five undefined legacy hash types.
 
 use super::MismatchContext;
 
@@ -14,6 +14,9 @@ const LOW_S: &[&str] = &[
     "node.tx-valid.shared.0076",
     "node.tx-valid.shared.0078",
     "node.tx-valid.shared.0080",
+    // #429 reaches a later high-S signature after accepting a legacy one.
+    "node.tx-valid.shared.0055",
+    "node.tx-valid.shared.0097",
 ];
 
 const UNDEFINED_LEGACY_TYPE: &[&str] = &[
@@ -28,7 +31,13 @@ pub(super) fn classify_signature_words_417(
     id: &str,
     ctx: &MismatchContext<'_>,
 ) -> Option<&'static str> {
-    if !ctx.expected_valid || ctx.error_message != "The signature format is invalid." {
+    if !ctx.expected_valid
+        || !matches!(
+            ctx.error_message,
+            "The signature format is invalid."
+                | "OP_CHECKMULTISIG requires correct encoding for the public key and signature."
+        )
+    {
         return None;
     }
     let has = |flag: &str| ctx.flags.iter().any(|f| f == flag);
@@ -38,7 +47,9 @@ pub(super) fn classify_signature_words_417(
         );
     }
     if UNDEFINED_LEGACY_TYPE.contains(&id) && !has("SIGHASH_FORKID") {
-        return Some("bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)");
+        return Some(
+            "the default mode enforces defined hash types (legacy fixtures without STRICTENC)",
+        );
     }
     None
 }

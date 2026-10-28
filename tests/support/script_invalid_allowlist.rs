@@ -24,6 +24,14 @@ const ACCEPTED: &[(usize, &str)] = &[
         209,
         "the pre-Genesis opcode count limit is absent in skipped branches",
     ),
+    (
+        408,
+        "the default skips the fork-ID gate; a failed CHECKMULTISIG followed by NOT succeeds (#429)",
+    ),
+    (
+        409,
+        "the default skips the fork-ID gate; a failed CHECKMULTISIG followed by NOT succeeds (#429)",
+    ),
 ];
 
 pub(super) fn assert_accepted(actual: &[usize]) {
@@ -32,4 +40,31 @@ pub(super) fn assert_accepted(actual: &[usize]) {
         actual, expected,
         "script_invalid default-mode allowlist drift: {ACCEPTED:?}"
     );
+}
+
+#[test]
+fn issue_429_historical_invalid_multisig_rows_match_both_reference_defaults() {
+    let recorded: serde_json::Value =
+        serde_json::from_str(include_str!("../vectors/script_invalid_forkid_429.json")).unwrap();
+    assert_eq!(recorded["node"], "v22.18.0");
+    assert_eq!(
+        recorded["reference"],
+        "ts-stack@edf6e03dad39bd7bc4fc6e73e64de3a2b6f805c9"
+    );
+    let vectors = super::load_script_invalid_vectors();
+    let cases = recorded["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 2);
+    for c in cases {
+        let index = usize::try_from(c["index"].as_u64().unwrap()).unwrap();
+        let v = &vectors[index];
+        assert_eq!(v.script_sig, c["unlock"].as_str().unwrap());
+        assert_eq!(v.script_pub_key, c["lock"].as_str().unwrap());
+        assert_eq!(c["valid"], true);
+        let v = super::SpendVector {
+            script_sig: v.script_sig.clone(),
+            script_pub_key: v.script_pub_key.clone(),
+            comment: v.comment.clone(),
+        };
+        assert_eq!(super::run_spend_vector(index, &v), Ok(true), "row {index}");
+    }
 }

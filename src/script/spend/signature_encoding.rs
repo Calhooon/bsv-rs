@@ -29,8 +29,10 @@ impl Spend {
             self.check_signature_hash_type(tx_sig.scope())?;
         }
 
-        // Preserve the existing FORKID requirement, including under a word.
-        if (tx_sig.scope() & SIGHASH_FORKID) == 0 {
+        // The SDK default skips the fork-ID gate (Spend.ts:595-604).
+        // Every supported word requires FORKID and implies STRICTENC,
+        // as VerifyScript does (interpreter.cpp:2315-2318).
+        if self.flags.is_some() && (tx_sig.scope() & SIGHASH_FORKID) == 0 {
             return Err(self.error("The signature must use SIGHASH_FORKID."));
         }
         Ok(())
@@ -40,9 +42,8 @@ impl Spend {
         &self,
         sig: &TransactionSignature,
     ) -> Result<(), ScriptEvaluationError> {
-        // The reference's default fork-ID check is a no-op (Spend.ts:596).
-        // Version-2 undefined-type words stay as pinned by the #23 witness;
-        // #417 changes the strict version-1 path only.
+        // The default fork-ID check is a no-op at every version (#429).
+        // Version-2 undefined-type words stay as pinned by the #23 witness.
         self.check_signature_hash_type(sig.scope())?;
         self.check_low_s(sig)
     }
