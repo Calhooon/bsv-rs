@@ -30,8 +30,8 @@ use crate::primitives::{bounded_capacity, Reader, Writer};
 use crate::transaction::chain_tracker::ChainTracker;
 
 use super::{
-    AsyncStreamVerifier, AsyncVerifyError, BeefIndex, ChainTip, Folded, Hash32, InputRef, Judge,
-    Pending, Stop, TxBody, Verdict, MAX_MONEY,
+    AsyncStreamVerifier, AsyncVerifyError, BeefIndex, Budget, ChainTip, Folded, Hash32, InputRef,
+    Judge, Pending, Stop, TxBody, Verdict, MAX_MONEY,
 };
 /// An input of a held transaction: where it lies and the outpoint it spends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -350,7 +350,7 @@ impl BeefIndex {
         &mut self,
         from: u32,
         spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
+        budget: Budget,
         tip: Option<ChainTip>,
     ) -> Result<Option<Folded>, Stop> {
         let Some((at, _)) = self.deferred.next_ready() else {
@@ -367,7 +367,7 @@ impl BeefIndex {
             &held,
             from,
             spent,
-            work_limit,
+            budget,
             tip,
         );
         match folded {
@@ -399,7 +399,7 @@ impl Judge {
     pub(super) fn release_next(
         &mut self,
         spent: &mut dyn FnMut() -> bool,
-        work_limit: Option<u64>,
+        budget: Budget,
         tip: Option<ChainTip>,
     ) -> Option<Result<bool, Stop>> {
         let (at, txid) = self.index.deferred.next_ready()?;
@@ -410,7 +410,7 @@ impl Judge {
             }
             _ => 0,
         };
-        Some(match self.index.release_one(from, spent, work_limit, tip) {
+        Some(match self.index.release_one(from, spent, budget, tip) {
             Ok(Some(Folded::Paused(input))) => {
                 self.resume_at = Some(Pending {
                     offset: at,
@@ -445,7 +445,7 @@ impl AsyncStreamVerifier {
         } else {
             None
         };
-        while let Some(released) = self.judge.release_next(&mut || false, self.work_limit, tip) {
+        while let Some(released) = self.judge.release_next(&mut || false, self.budget, tip) {
             if let Err(stop) = released {
                 return Ok(Some(stop.into()));
             }
