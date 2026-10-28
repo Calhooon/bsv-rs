@@ -378,12 +378,15 @@ classifies a wallet's `ErrInvalidSignature` or `Valid: false` as
 other wallet errors separately. Its classification is not the TypeScript
 Peer's propagation rule.
 ### Fixed: the HTTP auth transport's handshake, JSON and redirect refusals use the reference's words (#410)
+### Fixed: the HTTP auth transport's handshake, JSON, certificate-header and redirect refusals use the reference's words (#410)
 
-The toolbox's #315 review found three operator-visible refusals whose words
-differed from `SimplifiedFetchTransport` at `ts-stack@edf6e03`: a non-2xx
+The four changes cover three operator-visible refusals whose words differed
+from `SimplifiedFetchTransport` at `ts-stack@edf6e03`, found by the toolbox's
+#315 review, and one silently accepted header: a non-2xx
 handshake used `Auth endpoint returned ...`, malformed handshake JSON used
 `Failed to parse auth response: ...`, and a redirect used `redirect refused:
-...`. Downstreams match these texts. The owner's ruling (c) requires the
+...`; a malformed `x-bsv-auth-requested-certificates` header was discarded.
+Downstreams match these texts. The owner's ruling (c) requires the
 reference's words, including its status description, URL, header message
 and body preview.
 
@@ -392,7 +395,8 @@ reference's empty missing-header list: `response lacked required BSV auth
 headers`, even if some or all headers are present. The HTTP status is read
 before the body and still selects #87's fault class. Malformed JSON uses Node
 22's unwrapped syntax diagnostic; an iterative scanner runs only after
-serde refuses, with bounded pending states and a 20-UTF-16-unit context,
+serde refuses, with pending states proportional to input depth, no fixed
+depth cutoff, and a 20-UTF-16-unit context,
 and constructs no JSON value. A malformed `x-bsv-auth-requested-certificates`
 header uses the reference's separate wrapper and syntax cause; previously
 this crate silently dropped it. The header is parsed on every general
@@ -400,16 +404,20 @@ response, not only one labelled `certificateRequest`, as in the reference.
 Redirect refusals on both paths use Node 22's outer fetch wrapper, and still
 never replay a request with the default client.
 
-Pinned by `tests/auth_transport_refusal_words_410.rs`: six tests RED on a
+Pinned by `tests/auth_transport_refusal_words_410.rs` (12 tests): six tests RED on a
 scratch copy of `7257d73dcc258643f64b63e296d9b3bc0bcfa624`, with its own
 target directory (404, malformed body, malformed header, 307, fault classes,
 and the syntax replay); the seventh pins the existing typed refusal of
-well-formed non-auth JSON. `auth_transport_refusal_words_410.json` is the
+well-formed non-auth JSON. Two more tests, at depth 127 and 200, are RED on
+both that base and `aaa6b79f` (the latter 2 failed, 10 passed; the base
+8 failed, 4 passed). Three tests pin the unchanged mappings described below.
+`auth_transport_refusal_words_410.json` is the
 unmodified output of `tests/support/auth_transport_refusal_words_410.mjs`
-under Node 22.18.0 / undici 6.21.2, 64 cases per reference: six statuses, 49
+under Node 22.18.0 / undici 6.21.2, 75 cases per reference: six statuses, 57
 JSON syntax errors (empty/truncated JSON, numbers, keys, escapes, Unicode
-positions, context cuts and BOM), six malformed headers (empty and Latin-1
-values included), two redirects, and the valid JSON shape difference.
+positions, context cuts, BOM, and four array/object cases at each of depths
+127 and 200), six malformed headers (empty and Latin-1 values included),
+two redirects, the valid JSON shape difference, and the three mappings below.
 Both SDKs were bundled from their
 clone's pinned commit. The recorder uses fake fetch and, for redirects,
 Node's native fetch with a network-disabled MockAgent; no listening socket.
@@ -418,7 +426,7 @@ assert the new texts; #354's general-response fixtures are unchanged.
 
 Migration for callers matching the error payload (the existing
 `authentication error: ` / `transport fault ...: ` display prefixes remain).
-The three old/new pairs, on the recorded bodies `not found` and `not auth`,
+The four old/new pairs, on the recorded bodies `not found` and `not auth`,
 are together here; `{url}` is the configured origin:
 
 ```text
@@ -451,6 +459,46 @@ payload byte for byte and keeps `AuthError` with no transport fault; it has
 no equivalent JS stack/cause chain. A caller-supplied reqwest client that
 follows redirects still follows before the transport can refuse (#320).
 
+Node 22.18.0's `JSON.parse` accepts valid arrays and objects at depth 127,
+128, 200, 1,000, 10,000 and 100,000. The actual reference transport also
+delivers them. It delivers a 1,048,575-byte array at depth 524,287 and a
+1,048,573-byte object at depth 174,762; the next depth with a scalar exceeds
+its default 1 MiB handshake-body limit and is refused for size, not nesting.
+`JSON.parse` itself also accepts empty arrays nested 524,288 and 1,000,000
+deep (1 MiB and 2,000,000 bytes): no parser cutoff was reached. Rust's
+diagnostic scanner therefore has no fixed nesting bound or recursive call
+stack. Its pending states are bounded by input length. Rust still buffers
+with `response.bytes()` without the reference's configurable body cap.
+
+The saved review probe (`diff_flat.mjs`, 40,000 generated cases plus 48 depth
+cases with each seed 3 and 99) now matches 80,087 of 80,096 inputs. All nine
+remaining inputs are valid numbers outside finite double range:
+`86e427`, `29E390`, `40e663`, `4e10382`, `5e624`, `2e8332`, `56e955`,
+`44e360`, `7e515` (some with surrounding whitespace). V8 reads each as
+`Infinity`; serde refuses it with `number out of range`. The saved corpus
+reproduces 71 differences before this fold, not the review summary's 86;
+62 depth-related differences are removed. The exact 86-input run was not
+available for replay.
+
+Three response mappings remain explicit divergences, pinned without changing
+their existing behavior:
+
+- The reference measures the UTF-8 certificate-header value against 262,144
+  bytes (`:240-246`). A 262,145-byte valid empty requested set is refused as
+  `Failed to parse x-bsv-auth-requested-certificates returned by {url}: [oversized]. header exceeds its byte limit`.
+  Rust parses and delivers that set; it has no matching header-byte check.
+  The older TypeScript pin also delivers it.
+- The reference requires a nonempty, bounded, even-length hexadecimal
+  signature (at most 2,048 characters, `:328-340`). A base64 `MAA=` is refused
+  as `Failed to parse x-bsv-auth-signature returned by {url}: [invalid]. signature must be bounded even-length hexadecimal`.
+  Rust tries hex then base64, delivering signature bytes `[48, 0]`; neither
+  decoder succeeding leaves `None`, still delivered. The older TypeScript
+  pin refuses `MAA=` with `Invalid hex string`.
+- An exact `x-bsv-auth-message-type: certificateRequest` maps to
+  `certificateRequest`, everything else to `general` (`:343-346`, both pins).
+  Rust always delivers `MessageType::General` on this response path, even
+  with that header. This is a type difference, with no refusal text.
+
 `ts-sdk@9e3ede6b` agrees on status, body and header texts (`:55-93`,
 `:163-170`, `:252-307`), but does not set a redirect option (`:58-64`,
 `:141-145`): the recorded 307 follows and reaches its callback. This crate
@@ -460,8 +508,8 @@ JSON such as `{"ok":true}` to their callback, where this crate's typed
 certificate header outside `RequestedCertificateSet`'s shape is refused
 with the header wrapper and serde's cause; the reference only casts its
 parsed value and passes it to the callback. Other typed shape,
-lone-surrogate and depth-limit refusals remain serde's; the diagnostic
-scanner does not relax those limits. Node's syntax wording is runtime
+lone-surrogate and valid-JSON depth-limit refusals remain serde's; only the
+diagnostic scanner's artificial cutoff is removed. Node's syntax wording is runtime
 specific, pinned here to 22.18.0. A lone surrogate left by a diagnostic's
 context cut is recorded as U+FFFD, its UTF-8 wire representation, as in
 #354. The existing non-ASCII HTTP reason-phrase difference of #354 remains.

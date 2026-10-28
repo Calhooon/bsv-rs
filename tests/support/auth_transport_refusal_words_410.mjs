@@ -66,12 +66,27 @@ async function record (sdkPath, reference) {
     { name: 'handshake_503', status: 503, body: '' },
     { name: 'schema_non_auth', status: 200, body: '{"ok":true}' },
     ...bodies.map((body, i) => ({ name: `body_${i}`, status: 200, body })),
+    ...[127, 200].flatMap(depth => [
+      { name: `depth_${depth}_array_token`, body: '['.repeat(depth) + 'x' },
+      { name: `depth_${depth}_array_end`, body: '['.repeat(depth) + '0' },
+      { name: `depth_${depth}_object_token`, body: '{"a":'.repeat(depth) + 'x' },
+      { name: `depth_${depth}_object_end`, body: '{"a":'.repeat(depth) + '0' }
+    ].map(item => ({ ...item, status: 200 }))),
     ...['not auth', '{', '{"a":1,}', 'é', ''].map((value, i) => ({
       name: `header_${i}`, general: true, status: 200, body: 'signed',
       headers: { ...signed, 'x-bsv-auth-message-type': 'certificateRequest', 'x-bsv-auth-requested-certificates': value }
     })),
     { name: 'header_on_general', general: true, status: 200, body: 'signed',
       headers: { ...signed, 'x-bsv-auth-requested-certificates': 'not auth' } },
+    // Keep the large input reproducible without embedding 256 KiB of spaces
+    // in the fixture. Both record and replay build the same header bytes.
+    { name: 'mapping_oversized', general: true, status: 200, body: 'signed',
+      requested_certificates_padding: 262117,
+      headers: { ...signed, 'x-bsv-auth-message-type': 'certificateRequest' } },
+    { name: 'mapping_signature', general: true, status: 200, body: 'signed',
+      headers: { ...signed, 'x-bsv-auth-signature': 'MAA=' } },
+    { name: 'mapping_certificate_request', general: true, status: 200, body: 'signed',
+      headers: { ...signed, 'x-bsv-auth-message-type': 'certificateRequest' } },
     { name: 'redirect_handshake', status: 307, body: '', redirect: true },
     { name: 'redirect_general', general: true, status: 307, body: '', redirect: true }
   ]
@@ -79,13 +94,19 @@ async function record (sdkPath, reference) {
   for (const item of cases) {
     const url = origin + (item.general ? '/sendMessage' : '/.well-known/auth')
     const headers = { 'content-type': 'text/plain', ...item.headers }
+    const responseHeaders = { ...headers }
+    if (item.requested_certificates_padding != null) {
+      const value = '{"certifiers":[],"types":{' + ' '.repeat(item.requested_certificates_padding) + '}}'
+      assert.equal(Buffer.byteLength(value), 262145)
+      responseHeaders['x-bsv-auth-requested-certificates'] = value
+    }
     const agent = new MockAgent()
     agent.disableNetConnect()
     let redirectOption = null
     const fetchClient = async (input, init) => {
       assert.equal(input, url)
       redirectOption = init.redirect ?? null
-      if (!item.redirect) return new Response(item.body, { status: item.status, statusText: {200:'OK',401:'Unauthorized',404:'Not Found',429:'Too Many Requests',503:'Service Unavailable'}[item.status], headers })
+      if (!item.redirect) return new Response(item.body, { status: item.status, statusText: {200:'OK',401:'Unauthorized',404:'Not Found',429:'Too Many Requests',503:'Service Unavailable'}[item.status], headers: responseHeaders })
       agent.get(origin).intercept({ path: new URL(url).pathname, method: 'POST' })
         .reply(307, '', { headers: { location: elsewhere + new URL(url).pathname } })
       agent.get(elsewhere).intercept({ path: new URL(url).pathname, method: 'POST' })
@@ -94,7 +115,14 @@ async function record (sdkPath, reference) {
     }
     const transport = new SimplifiedFetchTransport(origin, fetchClient)
     let reached = false
-    await transport.onData(async () => { reached = true })
+    let delivered = null
+    await transport.onData(async message => {
+      reached = true
+      if (item.name.startsWith('mapping_')) {
+        delivered = { message_type: message.messageType, signature: message.signature,
+          requested_certificates: message.requestedCertificates ?? null }
+      }
+    })
     let error = null
     try { await transport.send(item.general ? general : handshake) } catch (e) {
       const chain = []
@@ -105,7 +133,8 @@ async function record (sdkPath, reference) {
       }
       error = chain
     } finally { await agent.close() }
-    recorded.push({ ...item, headers, body_hex: Buffer.from(item.body).toString('hex'), redirect_option: redirectOption, error, reached_on_data: reached })
+    recorded.push({ ...item, headers, body_hex: Buffer.from(item.body).toString('hex'), redirect_option: redirectOption, error, reached_on_data: reached,
+      ...(item.name.startsWith('mapping_') ? { delivered } : {}) })
   }
   return { reference, cases: recorded }
 }
