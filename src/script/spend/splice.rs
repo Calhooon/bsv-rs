@@ -414,8 +414,9 @@ impl Spend {
             let value = match bytes.first_chunk::<8>() {
                 Some(first) if bytes.len() > 8 => {
                     if self.require_minimal && !ScriptNum::is_minimally_encoded(bytes) {
-                        // the read's own refusal in its words, judged from the
-                        // last two bytes: a minimal operand is not decoded
+                        // the read's own refusal in its words: `from_bytes` refuses
+                        // a non-minimal operand before it decodes anything, and a
+                        // minimal one never reaches it (judged from the last two bytes)
                         ScriptNum::from_bytes(bytes, true)
                             .map_err(|e| self.error(&format!("Invalid script number: {}", e)))?;
                     }

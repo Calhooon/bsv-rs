@@ -179,7 +179,7 @@ reference's default mode runs `0xb3`-`0xb7` as the Chronicle opcodes (its
 skip applies under explicit flags alone, `Spend.ts:827-848`), where this
 crate's default runs them as `OP_NOP4`-`OP_NOP8` unless the coin is marked
 post-Chronicle (`aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` at version 1:
-`ok true` there, a refusal here).
+`ok true` there, a refusal here). Both are #397, with the keeper's word (the opcode gate and the words follow the reference's default; the cross-SDK filing ts-stack #1437).
 
 ### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
 
