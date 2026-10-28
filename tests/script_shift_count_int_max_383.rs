@@ -95,7 +95,7 @@ fn a_right_shift_by_a_count_above_int_max_is_invalid_as_the_reference_reads_it()
 /// the value is read, so a zero value (valid here until #383) and a nonzero
 /// one (V8's `BigInt` words here until #383) are refused alike.
 #[test]
-fn a_left_shift_by_a_count_above_int_max_is_invalid_before_the_value_is_read() {
+fn a_left_shift_by_a_count_above_int_max_is_invalid() {
     exceeds_int_max(
         run(&[&[1], INT_MAX_PLUS_ONE], OP_NOP7, None, None),
         "OP_LSHIFTNUM",
