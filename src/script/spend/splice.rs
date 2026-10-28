@@ -174,9 +174,11 @@ impl Spend {
     /// them, a left shift's result is sized exactly before it is computed: over
     /// the era's number length it is the reference's size test after the shift
     /// (`script_num.cpp:315-316`), and its charge to the node's stack memory
-    /// count is tested as the push will charge it. The default mode shifts by
-    /// any count, as the TypeScript SDK does, and refuses a result that alone
-    /// would exceed the local budget before computing it (a resource limit).
+    /// count is tested as the push will charge it. The default mode refuses a
+    /// count above `INT_MAX` before the value is read, as the TypeScript SDK
+    /// does (`Spend.ts:1058-1060`, `1084-1086`; bsv-rs#383), and refuses a
+    /// result that alone would exceed the local budget before computing it
+    /// (a resource limit).
     pub(super) fn op_chronicle_splice(&mut self, opcode: u8) -> Result<(), ScriptEvaluationError> {
         let name = match opcode {
             OP_NOP4 => "OP_SUBSTR",
@@ -241,6 +243,13 @@ impl Spend {
                 let n_bn = num(self, &n_bytes)?;
                 if n_bn.is_negative() {
                     return Err(self.error(&format!("{name} bits to shift must not be negative.")));
+                }
+                // The default mode: a count above INT_MAX is the reference's
+                // verdict before the value is read (`Spend.ts:1058-1060`,
+                // `1084-1086`), never a decline (bsv-rs#383). Under a word the
+                // node's check follows the value's read, below.
+                if self.flags.is_none() && n_bn.to_i64().is_none_or(|n| n > i64::from(i32::MAX)) {
+                    return Err(self.error(&format!("{name} shift count exceeds INT_MAX.")));
                 }
                 let x_bytes = self.pop_stack()?;
                 let x = num(self, &x_bytes)?;

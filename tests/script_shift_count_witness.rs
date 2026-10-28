@@ -10,7 +10,11 @@
 //! `SCRIPT_ERR_SCRIPTNUM_OVERFLOW`), before any allocation. 0.3.28 shifted by
 //! any count (`1 OP_RSHIFTNUM 2147483648` was 0, a valid spend) and tested a
 //! left shift only against its local memory budget (a resource limit, not a
-//! verdict). The default mode keeps the TypeScript SDK's behaviour.
+//! verdict). The default mode keeps the TypeScript SDK's behaviour: since
+//! bsv-rs#383 a count above `INT_MAX` is its verdict before the value is read
+//! (`ts-stack@edf6e03` `Spend.ts:1058-1060`, `1084-1086`), on both shifts and
+//! under a caller's budget alike; until then the default mode shifted by any
+//! count.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 use bsv_rs::primitives::bsv::sighash::{parse_transaction, TxOutput};
 use bsv_rs::primitives::from_hex;
@@ -104,6 +108,9 @@ fn run(tx_hex: &str, lock_hex: &str, mode: Mode) -> Result<bool, String> {
 }
 
 const BIG_INT: &str = "OP_RSHIFTNUM count (2147483648) does not fit an int.";
+/// The reference's words for a count above `INT_MAX` (bsv-rs#383).
+const RSHIFT_INT_MAX: &str = "OP_RSHIFTNUM shift count exceeds INT_MAX.";
+const LSHIFT_INT_MAX: &str = "OP_LSHIFTNUM shift count exceeds INT_MAX.";
 /// 1 byte (the value 1) + 2,147,483,647 / 8 = 268,435,456 bytes.
 const OVERFLOW_MAX: &str = "Script number overflow: 268435456 bytes, the limit is 32000000 bytes.";
 /// 1 byte + 2,147,483,648 / 8 = 268,435,457 bytes.
@@ -131,13 +138,14 @@ fn the_witness_is_a_big_integer_error_under_the_standard_word() {
     );
 }
 
-/// The default mode shifts by any count, as the TypeScript SDK does: 0, valid
-/// (0.3.28's verdict under every word).
+/// The default mode refuses the count as the TypeScript SDK does (bsv-rs#383;
+/// until then it shifted by any count: 0, valid, 0.3.28's verdict under every
+/// word).
 #[test]
-fn the_witness_is_valid_in_the_default_mode() {
+fn the_witness_is_the_references_int_max_refusal_in_the_default_mode() {
     assert_eq!(
         run(TX_RSHIFT_MAX_PLUS_1, LOCK_RSHIFT_MAX_PLUS_1, Mode::Default),
-        Ok(true)
+        Err(RSHIFT_INT_MAX.to_string())
     );
 }
 
@@ -184,8 +192,9 @@ fn a_left_shift_by_int_max_overflows_the_number_length_under_a_word() {
 }
 
 /// The left shift by `INT_MAX + 1`: the size test runs first, so an overflow,
-/// not the big-integer error; the default mode under a caller's 32,000,000
-/// bytes declines it.
+/// not the big-integer error; the default mode refuses the count before
+/// anything is sized, under a caller's 32,000,000 bytes too, a verdict
+/// (bsv-rs#383; a decline until then).
 #[test]
 fn a_left_shift_by_int_max_plus_1_overflows_before_the_count_test() {
     assert_eq!(
@@ -199,10 +208,8 @@ fn a_left_shift_by_int_max_plus_1_overflows_before_the_count_test() {
         true,
     )
     .unwrap_err();
-    assert!(
-        default.resource_limit.is_some(),
-        "the caller's local budget, not a verdict"
-    );
+    assert!(default.resource_limit.is_none(), "a verdict, not a decline");
+    assert_eq!(default.message, LSHIFT_INT_MAX);
 }
 
 /// On a zero value: the left shift's size test counts the shift alone
@@ -226,14 +233,15 @@ fn a_zero_value_follows_the_same_tests() {
         ),
         Err(BIG_INT.to_string())
     );
-    // the default mode: 0 shifted is 0 either way, valid
+    // the default mode: the count's refusal before the value is read, on a
+    // zero value too (bsv-rs#383; 0 shifted, valid, until then)
     assert_eq!(
         run(
             TX_RSHIFT_MAX_PLUS_1,
             LOCK_LSHIFT_ZERO_MAX_PLUS_1,
             Mode::Default
         ),
-        Ok(true)
+        Err(LSHIFT_INT_MAX.to_string())
     );
     assert_eq!(
         run(
@@ -241,7 +249,7 @@ fn a_zero_value_follows_the_same_tests() {
             LOCK_RSHIFT_ZERO_MAX_PLUS_1,
             Mode::Default
         ),
-        Ok(true)
+        Err(RSHIFT_INT_MAX.to_string())
     );
 }
 
