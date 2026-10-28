@@ -286,7 +286,7 @@ if let Some(id) = identity {
 }
 
 // Resolve by attributes (second param enables contact override); the
-// lookup body is a `serde_json::Value`, so the attributes cross sorted (#394)
+// lookup body keeps the attributes' insertion order (#394)
 let mut attrs = IndexMap::new();
 attrs.insert("email".to_string(), "user@example.com".to_string());
 let identities = client.resolve_by_attributes(attrs, true).await?;

@@ -680,22 +680,24 @@ impl<W: WalletInterface + Clone> IdentityClient<W> {
             HashMap::new()
         };
 
-        // Build the query
-        let query_attributes: serde_json::Value = match attributes.values().next() {
-            // Single attribute uses "any" matcher for flexible matching
-            Some(value) if attributes.len() == 1 => serde_json::json!({ "any": value }),
-            _ => serde_json::to_value(&attributes).unwrap_or_default(),
+        // A single attribute uses the "any" matcher; several are sent in insertion order (#394)
+        let attributes = match attributes.values().next() {
+            Some(value) if attributes.len() == 1 => IndexMap::from([("any".into(), value.clone())]),
+            _ => attributes,
         };
-
-        let question = LookupQuestion::new(
-            "ls_identity",
-            serde_json::json!({
-                "attributes": query_attributes,
-                "certifiers": [DEFAULT_SOCIALCERT_CERTIFIER]
-            }),
-        );
-
-        let answer = self.resolver.query(&question, None).await?;
+        #[derive(serde::Serialize)]
+        struct Query {
+            attributes: IndexMap<String, String>,
+            certifiers: [&'static str; 1],
+        }
+        let query = Query {
+            attributes,
+            certifiers: [DEFAULT_SOCIALCERT_CERTIFIER],
+        };
+        let answer = self
+            .resolver
+            .query_ordered("ls_identity", &query, None)
+            .await?;
 
         match answer {
             LookupAnswer::OutputList { outputs } => {

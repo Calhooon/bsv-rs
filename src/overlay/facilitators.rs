@@ -8,6 +8,7 @@ use crate::overlay::types::OutputListItem;
 use crate::overlay::types::{LookupAnswer, LookupQuestion, Steak, TaggedBEEF};
 use crate::{Error, Result};
 use async_trait::async_trait;
+use serde_json::value::RawValue;
 
 /// Facilitator for overlay lookup operations.
 ///
@@ -32,6 +33,21 @@ pub trait OverlayLookupFacilitator: Send + Sync {
         question: &LookupQuestion,
         timeout_ms: Option<u64>,
     ) -> Result<LookupAnswer>;
+
+    /// Execute a lookup query whose query is sent as `query_text` when given:
+    /// `question.query` with its objects' keys in the order they were built,
+    /// where the `serde_json::Value` sorts them (#394). The default ignores
+    /// the text and calls `lookup`.
+    async fn lookup_ordered(
+        &self,
+        url: &str,
+        question: &LookupQuestion,
+        query_text: Option<&RawValue>,
+        timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
+        let _ = query_text;
+        self.lookup(url, question, timeout_ms).await
+    }
 }
 
 /// Facilitator for overlay broadcast operations.
@@ -93,9 +109,19 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
         question: &LookupQuestion,
         timeout_ms: Option<u64>,
     ) -> Result<LookupAnswer> {
+        self.lookup_ordered(url, question, None, timeout_ms).await
+    }
+
+    async fn lookup_ordered(
+        &self,
+        url: &str,
+        question: &LookupQuestion,
+        query_text: Option<&RawValue>,
+        timeout_ms: Option<u64>,
+    ) -> Result<LookupAnswer> {
         #[cfg(not(feature = "http"))]
         {
-            let _ = (url, question, timeout_ms);
+            let _ = (url, question, query_text, timeout_ms);
             return Err(Error::OverlayError(
                 "HTTP feature not enabled. Enable the 'http' feature to use HTTP facilitators."
                     .into(),
@@ -114,15 +140,28 @@ impl OverlayLookupFacilitator for HttpsOverlayLookupFacilitator {
             let lookup_url = format!("{}/lookup", url.trim_end_matches('/'));
             let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(5000));
 
+            // `query` before `service`, the order the body always had (a
+            // `Value` sorts its keys); the query's own keys as built (#394).
+            #[derive(serde::Serialize)]
+            struct LookupBody<'a> {
+                query: Box<serde_json::value::RawValue>,
+                service: &'a str,
+            }
+            let body = LookupBody {
+                query: match query_text {
+                    Some(text) => text.to_owned(),
+                    None => serde_json::value::to_raw_value(&question.query)
+                        .map_err(|e| Error::OverlayError(e.to_string()))?,
+                },
+                service: &question.service,
+            };
+
             let request = self
                 .client
                 .post(&lookup_url)
                 .header("Content-Type", "application/json")
                 .header("X-Aggregation", "yes")
-                .json(&serde_json::json!({
-                    "service": question.service,
-                    "query": question.query,
-                }))
+                .json(&body)
                 .timeout(timeout);
 
             let response = request
