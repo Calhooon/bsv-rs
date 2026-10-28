@@ -377,6 +377,106 @@ classifies a wallet's `ErrInvalidSignature` or `Valid: false` as
 `general message - invalid-signature` (`:414-435`, `:1036-1038`), wrapping
 other wallet errors separately. Its classification is not the TypeScript
 Peer's propagation rule.
+### Fixed: the HTTP auth transport's handshake, JSON and redirect refusals use the reference's words (#410)
+
+The toolbox's #315 review found three operator-visible refusals whose words
+differed from `SimplifiedFetchTransport` at `ts-stack@edf6e03`: a non-2xx
+handshake used `Auth endpoint returned ...`, malformed handshake JSON used
+`Failed to parse auth response: ...`, and a redirect used `redirect refused:
+...`. Downstreams match these texts. The owner's ruling (c) requires the
+reference's words, including its status description, URL, header message
+and body preview.
+
+The handshake now shares #354's status/preview formatter, passing the
+reference's empty missing-header list: `response lacked required BSV auth
+headers`, even if some or all headers are present. The HTTP status is read
+before the body and still selects #87's fault class. Malformed JSON uses Node
+22's unwrapped syntax diagnostic; an iterative scanner runs only after
+serde refuses, with bounded pending states and a 20-UTF-16-unit context,
+and constructs no JSON value. A malformed `x-bsv-auth-requested-certificates`
+header uses the reference's separate wrapper and syntax cause; previously
+this crate silently dropped it. The header is parsed on every general
+response, not only one labelled `certificateRequest`, as in the reference.
+Redirect refusals on both paths use Node 22's outer fetch wrapper, and still
+never replay a request with the default client.
+
+Pinned by `tests/auth_transport_refusal_words_410.rs`: six tests RED on a
+scratch copy of `7257d73dcc258643f64b63e296d9b3bc0bcfa624`, with its own
+target directory (404, malformed body, malformed header, 307, fault classes,
+and the syntax replay); the seventh pins the existing typed refusal of
+well-formed non-auth JSON. `auth_transport_refusal_words_410.json` is the
+unmodified output of `tests/support/auth_transport_refusal_words_410.mjs`
+under Node 22.18.0 / undici 6.21.2, 64 cases per reference: six statuses, 49
+JSON syntax errors (empty/truncated JSON, numbers, keys, escapes, Unicode
+positions, context cuts and BOM), six malformed headers (empty and Latin-1
+values included), two redirects, and the valid JSON shape difference.
+Both SDKs were bundled from their
+clone's pinned commit. The recorder uses fake fetch and, for redirects,
+Node's native fetch with a network-disabled MockAgent; no listening socket.
+The Rust replay uses wiremock's ephemeral ports. The #320 and #87 tests now
+assert the new texts; #354's general-response fixtures are unchanged.
+
+Migration for callers matching the error payload (the existing
+`authentication error: ` / `transport fault ...: ` display prefixes remain).
+The three old/new pairs, on the recorded bodies `not found` and `not auth`,
+are together here; `{url}` is the configured origin:
+
+```text
+404 old: Auth endpoint returned 404 Not Found: not found
+404 new: Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found
+200 old: Failed to parse auth response: expected ident at line 1 column 2 - body: not auth
+200 new: Unexpected token 'o', "not auth" is not valid JSON
+307 old: Network error while sending authenticated request to {url}/.well-known/auth: redirect refused: 307 Temporary Redirect
+307 new: Network error while sending authenticated request to {url}/.well-known/auth: fetch failed
+header old: accepted, malformed certificate-request header silently dropped
+header new: Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: not auth. Unexpected token 'o', "not auth" is not valid JSON
+
+Line for the toolbox's `src/wallet/CLAUDE.md` matching table (that checkout
+is not changed by this commit):
+
+| bsv-rs #410 | `Auth endpoint returned ...` → `Received HTTP ... without valid BSV authentication (response lacked required BSV auth headers)` plus optional body preview; `Failed to parse auth response: ...` for malformed JSON → Node 22's unwrapped syntax error; `redirect refused: 307 Temporary Redirect` → `fetch failed` within the same URL wrapper; malformed certificate header → `Failed to parse x-bsv-auth-requested-certificates returned by {url}: {value}. {syntax cause}` |
+
+### Notes: cross-SDK parity (#410)
+
+The full paths were read at both pins. At `ts-stack@edf6e03`, the handshake
+fetch sets `redirect: 'error'` (`SimplifiedFetchTransport.ts:115-173`), a
+non-2xx calls `#createUnauthenticatedResponseError` with no missing-header
+list (`:143-151`, `:464-494`), and the body uses unwrapped `JSON.parse`
+(`:158-162`). The general fetch also refuses redirects (`:206-218`); the
+certificate header's wrapper is separate (`:234-258`, `:496-510`). Node
+22.18.0 measured the outer redirect text as `Network error while sending
+authenticated request to {url}: fetch failed`, with causes `TypeError:
+fetch failed` then `Error: unexpected redirect`. Rust matches the outer
+payload byte for byte and keeps `AuthError` with no transport fault; it has
+no equivalent JS stack/cause chain. A caller-supplied reqwest client that
+follows redirects still follows before the transport can refuse (#320).
+
+`ts-sdk@9e3ede6b` agrees on status, body and header texts (`:55-93`,
+`:163-170`, `:252-307`), but does not set a redirect option (`:58-64`,
+`:141-145`): the recorded 307 follows and reaches its callback. This crate
+follows the newer pin's refusal. Both references pass syntactically valid
+JSON such as `{"ok":true}` to their callback, where this crate's typed
+`AuthMessage` refuses it in its existing serde words. A syntactically valid
+certificate header outside `RequestedCertificateSet`'s shape is refused
+with the header wrapper and serde's cause; the reference only casts its
+parsed value and passes it to the callback. Other typed shape,
+lone-surrogate and depth-limit refusals remain serde's; the diagnostic
+scanner does not relax those limits. Node's syntax wording is runtime
+specific, pinned here to 22.18.0. A lone surrogate left by a diagnostic's
+context cut is recorded as U+FFFD, its UTF-8 wire representation, as in
+#354. The existing non-ASCII HTTP reason-phrase difference of #354 remains.
+
+The Go pin is `2ca481c5931b987a0c8f48bb341c70b7477b6b07`; its file is
+`auth/transports/simplified_http_transport.go` (there is no
+`auth/transports/http.go` at this pin). It wraps a non-2xx handshake in
+`HTTP server failed to authenticate` (`ErrHTTPServerFailedToAuthenticate`)
+and `request failed with status %d: %s`
+(`:102-130`), malformed bodies in `failed to unmarshal authmessage from body
+(%q): %w` (`:141-152`) and a bad certificate header in `invalid format of
+requested certificates in response: %w` (`:220-227`). Its default
+`http.Client{}` and supplied client use their own redirect policy
+(`:31-44`, `:111`, `:175`); no `CheckRedirect` is installed. Those Go words
+and policy are not the TypeScript reference's.
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 

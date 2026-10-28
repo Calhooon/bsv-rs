@@ -73,18 +73,42 @@ pub(super) fn refuse_unauthenticated(
     if missing.is_empty() {
         return Ok(());
     }
+    Err(refusal(
+        url,
+        status,
+        reason,
+        response_headers,
+        body,
+        &missing,
+    ))
+}
+
+/// Shared with a non-success handshake, whose missing-header list is empty.
+pub(super) fn refusal(
+    url: &str,
+    status: StatusCode,
+    reason: Option<&[u8]>,
+    response_headers: &HeaderMap,
+    body: &[u8],
+    missing: &[&str],
+) -> Error {
+    let header_message = if missing.is_empty() {
+        "response lacked required BSV auth headers".into()
+    } else {
+        format!("missing headers: {}", missing.join(", "))
+    };
     let mut text = format!(
-        "Received HTTP {} from {} without valid BSV authentication (missing headers: {})",
+        "Received HTTP {} from {} without valid BSV authentication ({})",
         status_description(status, reason),
         url,
-        missing.join(", ")
+        header_message
     );
     if let Some(preview) = body_preview(body, &header_text(response_headers, CONTENT_TYPE)) {
         text.push_str(" - body preview: ");
         text.push_str(&preview);
     }
     let class = fault::status_fault(status, response_headers);
-    Err(fault::fault_or(class, Some(status), text, Error::AuthError))
+    fault::fault_or(class, Some(status), text, Error::AuthError)
 }
 
 /// The answer's sender: the identity key it carries, which

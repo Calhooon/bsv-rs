@@ -1,0 +1,2321 @@
+{
+  "description": "Actual SimplifiedFetchTransport refusal words (#410); fake fetch, native Node fetch + MockAgent for redirects; {url} is the configured origin",
+  "node": "v22.18.0",
+  "undici": "6.21.2",
+  "references": [
+    {
+      "reference": "ts-stack@edf6e03",
+      "cases": [
+        {
+          "name": "handshake_404",
+          "status": 404,
+          "body": "not found",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e6f7420666f756e64",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_404_empty",
+          "status": 404,
+          "body": "",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_404_signed",
+          "status": 404,
+          "body": "not found",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101"
+          },
+          "body_hex": "6e6f7420666f756e64",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_401",
+          "status": 401,
+          "body": "no",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e6f",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 401 Unauthorized from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: no"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_429",
+          "status": 429,
+          "body": "slow down",
+          "headers": {
+            "content-type": "text/plain",
+            "retry-after": "7"
+          },
+          "body_hex": "736c6f7720646f776e",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 429 Too Many Requests from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: slow down"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_503",
+          "status": 503,
+          "body": "",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 503 Service Unavailable from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "schema_non_auth",
+          "status": 200,
+          "body": "{\"ok\":true}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b226f6b223a747275657d",
+          "redirect_option": "error",
+          "error": null,
+          "reached_on_data": true
+        },
+        {
+          "name": "body_0",
+          "status": 200,
+          "body": "not auth",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e6f742061757468",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_1",
+          "status": 200,
+          "body": "",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_2",
+          "status": 200,
+          "body": "{",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_3",
+          "status": 200,
+          "body": "{\"messageType\":",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b226d65737361676554797065223a",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_4",
+          "status": 200,
+          "body": "<html>not auth</html>",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "3c68746d6c3e6e6f7420617574683c2f68746d6c3e",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token '<', \"<html>not \"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_5",
+          "status": 200,
+          "body": "undefined",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "756e646566696e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "\"undefined\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_6",
+          "status": 200,
+          "body": "NaN",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "4e614e",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "\"NaN\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_7",
+          "status": 200,
+          "body": "[object Object]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b6f626a656374204f626a6563745d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "\"[object Object]\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_8",
+          "status": 200,
+          "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', \"xxxxxxxxxx\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_9",
+          "status": 200,
+          "body": "{oops}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b6f6f70737d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_10",
+          "status": 200,
+          "body": "{\"a\" 1}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b22612220317d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ':' after property name in JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_11",
+          "status": 200,
+          "body": "{\"a\":1,}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a312c7d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 7 (line 1 column 8)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_12",
+          "status": 200,
+          "body": "[1,]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b312c5d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token ']', \"[1,]\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_13",
+          "status": 200,
+          "body": "[1 2]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b3120325d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ',' or ']' after array element in JSON at position 3 (line 1 column 4)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_14",
+          "status": 200,
+          "body": "01",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "3031",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected number in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_15",
+          "status": 200,
+          "body": "-x",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "2d78",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "No number after minus sign in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_16",
+          "status": 200,
+          "body": "1.",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "312e",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unterminated fractional number in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_17",
+          "status": 200,
+          "body": "1e",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "3165",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Exponent part is missing a number in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_18",
+          "status": 200,
+          "body": "1e+",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "31652b",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Exponent part is missing a number in JSON at position 3 (line 1 column 4)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_19",
+          "status": 200,
+          "body": "true false",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "747275652066616c7365",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_20",
+          "status": 200,
+          "body": "nul",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e756c",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_21",
+          "status": 200,
+          "body": "truX",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "74727558",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'X', \"truX\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_22",
+          "status": 200,
+          "body": "\"unterminated",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "22756e7465726d696e61746564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unterminated string in JSON at position 13 (line 1 column 14)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_23",
+          "status": 200,
+          "body": "\"a\nb\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "22610a6222",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad control character in string literal in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_24",
+          "status": 200,
+          "body": "\"\\x\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225c7822",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad escaped character in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_25",
+          "status": 200,
+          "body": "\"\\uZZZZ\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225c755a5a5a5a22",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad Unicode escape in JSON at position 3 (line 1 column 4)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_26",
+          "status": 200,
+          "body": "{\n \"a\": 1,\n bad\n}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b0a202261223a20312c0a206261640a7d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 12 (line 3 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_27",
+          "status": 200,
+          "body": "{\"😀\": 1, bad}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b22f09f9880223a20312c206261647d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 10 (line 1 column 11)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_28",
+          "status": 200,
+          "body": "{\"a\":                                        x}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a20202020202020202020202020202020202020202020202020202020202020202020202020202020787d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', ...\"          x}\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_29",
+          "status": 200,
+          "body": "                                                  x",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202078",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', ...\"          x\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_30",
+          "status": 200,
+          "body": "{\"a\":                                        x                                        }",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a2020202020202020202020202020202020202020202020202020202020202020202020202020202078202020202020202020202020202020202020202020202020202020202020202020202020202020207d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', ...\"          x         \"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_31",
+          "status": 200,
+          "body": "{\"a\":1",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a31",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ',' or '}' after property value in JSON at position 6 (line 1 column 7)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_32",
+          "status": 200,
+          "body": "[1",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b31",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ',' or ']' after array element in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_33",
+          "status": 200,
+          "body": "\"abc\\",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "226162635c",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_34",
+          "status": 200,
+          "body": "\"\\u12",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225c753132",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad Unicode escape in JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_35",
+          "status": 200,
+          "body": "\"a\tb\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "2261096222",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad control character in string literal in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_36",
+          "status": 200,
+          "body": "[",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_37",
+          "status": 200,
+          "body": "]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token ']', \"]\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_38",
+          "status": 200,
+          "body": "\"ok\" false",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "226f6b222066616c7365",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_39",
+          "status": 200,
+          "body": "{\"a\":[1,tre,null,\"str\"],\"b\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a5b312c7472652c6e756c6c2c22737472225d2c2262223a327d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'e', ...\"{\"a\":[1,tre,null,\"st\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_40",
+          "status": 200,
+          "body": "{\"a\":[1,t3e,null,\"str\"],\"b\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a5b312c7433652c6e756c6c2c22737472225d2c2262223a327d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected number in JSON at position 9 (line 1 column 10)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_41",
+          "status": 200,
+          "body": "f\"x\",\"y\"]:",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "662278222c2279225d3a",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected string in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_42",
+          "status": 200,
+          "body": "{\"a\"::1,true,null,\"str\"],\"b\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a3a312c747275652c6e756c6c2c22737472225d2c2262223a327d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token ':', \"{\"a\"::1,true,nu\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_43",
+          "status": 200,
+          "body": "true\r\nx",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "747275650d0a78",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected non-whitespace character after JSON at position 6 (line 2 column 1)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_44",
+          "status": 200,
+          "body": "\"\\é\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225cc3a922",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad escaped character in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_45",
+          "status": 200,
+          "body": "\"\\Ā\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225cc48022",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'Ā', \"\"\\Ā\"\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_46",
+          "status": 200,
+          "body": "\"\\😀\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225cf09f988022",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token '�', \"\"\\😀\"\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_47",
+          "status": 200,
+          "body": "﻿not auth",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "efbbbf6e6f742061757468",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_48",
+          "status": 200,
+          "body": "{\"a\":[1,true,nulz,\"3r\"],\"😀\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a5b312c747275652c6e756c7a2c223372225d2c22f09f9880223a327d",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'z', ...\"1,true,nulz,\"3r\"],\"�\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_0",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "not auth"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: not auth. Unexpected token 'o', \"not auth\" is not valid JSON"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_1",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "{"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: {. Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_2",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "{\"a\":1,}"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: {\"a\":1,}. Expected double-quoted property name in JSON at position 7 (line 1 column 8)"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 7 (line 1 column 8)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_3",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "é"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: é. Unexpected token 'é', \"é\" is not valid JSON"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'é', \"é\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_4",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": ""
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: . Unexpected end of JSON input"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_on_general",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-requested-certificates": "not auth"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: not auth. Unexpected token 'o', \"not auth\" is not valid JSON"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "redirect_handshake",
+          "status": 307,
+          "body": "",
+          "redirect": true,
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Network error while sending authenticated request to {url}/.well-known/auth: fetch failed"
+            },
+            {
+              "name": "TypeError",
+              "message": "fetch failed"
+            },
+            {
+              "name": "Error",
+              "message": "unexpected redirect"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "redirect_general",
+          "general": true,
+          "status": 307,
+          "body": "",
+          "redirect": true,
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": "error",
+          "error": [
+            {
+              "name": "Error",
+              "message": "Network error while sending authenticated request to {url}/sendMessage: fetch failed"
+            },
+            {
+              "name": "TypeError",
+              "message": "fetch failed"
+            },
+            {
+              "name": "Error",
+              "message": "unexpected redirect"
+            }
+          ],
+          "reached_on_data": false
+        }
+      ]
+    },
+    {
+      "reference": "ts-sdk@9e3ede6b",
+      "cases": [
+        {
+          "name": "handshake_404",
+          "status": 404,
+          "body": "not found",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e6f7420666f756e64",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_404_empty",
+          "status": 404,
+          "body": "",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_404_signed",
+          "status": 404,
+          "body": "not found",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101"
+          },
+          "body_hex": "6e6f7420666f756e64",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 404 Not Found from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: not found"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_401",
+          "status": 401,
+          "body": "no",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e6f",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 401 Unauthorized from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: no"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_429",
+          "status": 429,
+          "body": "slow down",
+          "headers": {
+            "content-type": "text/plain",
+            "retry-after": "7"
+          },
+          "body_hex": "736c6f7720646f776e",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 429 Too Many Requests from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: slow down"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "handshake_503",
+          "status": 503,
+          "body": "",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Received HTTP 503 Service Unavailable from {url}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "schema_non_auth",
+          "status": 200,
+          "body": "{\"ok\":true}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b226f6b223a747275657d",
+          "redirect_option": null,
+          "error": null,
+          "reached_on_data": true
+        },
+        {
+          "name": "body_0",
+          "status": 200,
+          "body": "not auth",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e6f742061757468",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_1",
+          "status": 200,
+          "body": "",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_2",
+          "status": 200,
+          "body": "{",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_3",
+          "status": 200,
+          "body": "{\"messageType\":",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b226d65737361676554797065223a",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_4",
+          "status": 200,
+          "body": "<html>not auth</html>",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "3c68746d6c3e6e6f7420617574683c2f68746d6c3e",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token '<', \"<html>not \"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_5",
+          "status": 200,
+          "body": "undefined",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "756e646566696e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "\"undefined\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_6",
+          "status": 200,
+          "body": "NaN",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "4e614e",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "\"NaN\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_7",
+          "status": 200,
+          "body": "[object Object]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b6f626a656374204f626a6563745d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "\"[object Object]\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_8",
+          "status": 200,
+          "body": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878787878",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', \"xxxxxxxxxx\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_9",
+          "status": 200,
+          "body": "{oops}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b6f6f70737d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_10",
+          "status": 200,
+          "body": "{\"a\" 1}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b22612220317d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ':' after property name in JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_11",
+          "status": 200,
+          "body": "{\"a\":1,}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a312c7d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 7 (line 1 column 8)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_12",
+          "status": 200,
+          "body": "[1,]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b312c5d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token ']', \"[1,]\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_13",
+          "status": 200,
+          "body": "[1 2]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b3120325d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ',' or ']' after array element in JSON at position 3 (line 1 column 4)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_14",
+          "status": 200,
+          "body": "01",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "3031",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected number in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_15",
+          "status": 200,
+          "body": "-x",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "2d78",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "No number after minus sign in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_16",
+          "status": 200,
+          "body": "1.",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "312e",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unterminated fractional number in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_17",
+          "status": 200,
+          "body": "1e",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "3165",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Exponent part is missing a number in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_18",
+          "status": 200,
+          "body": "1e+",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "31652b",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Exponent part is missing a number in JSON at position 3 (line 1 column 4)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_19",
+          "status": 200,
+          "body": "true false",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "747275652066616c7365",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_20",
+          "status": 200,
+          "body": "nul",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "6e756c",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_21",
+          "status": 200,
+          "body": "truX",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "74727558",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'X', \"truX\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_22",
+          "status": 200,
+          "body": "\"unterminated",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "22756e7465726d696e61746564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unterminated string in JSON at position 13 (line 1 column 14)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_23",
+          "status": 200,
+          "body": "\"a\nb\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "22610a6222",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad control character in string literal in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_24",
+          "status": 200,
+          "body": "\"\\x\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225c7822",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad escaped character in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_25",
+          "status": 200,
+          "body": "\"\\uZZZZ\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225c755a5a5a5a22",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad Unicode escape in JSON at position 3 (line 1 column 4)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_26",
+          "status": 200,
+          "body": "{\n \"a\": 1,\n bad\n}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b0a202261223a20312c0a206261640a7d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 12 (line 3 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_27",
+          "status": 200,
+          "body": "{\"😀\": 1, bad}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b22f09f9880223a20312c206261647d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 10 (line 1 column 11)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_28",
+          "status": 200,
+          "body": "{\"a\":                                        x}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a20202020202020202020202020202020202020202020202020202020202020202020202020202020787d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', ...\"          x}\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_29",
+          "status": 200,
+          "body": "                                                  x",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202020202078",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', ...\"          x\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_30",
+          "status": 200,
+          "body": "{\"a\":                                        x                                        }",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a2020202020202020202020202020202020202020202020202020202020202020202020202020202078202020202020202020202020202020202020202020202020202020202020202020202020202020207d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'x', ...\"          x         \"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_31",
+          "status": 200,
+          "body": "{\"a\":1",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a31",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ',' or '}' after property value in JSON at position 6 (line 1 column 7)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_32",
+          "status": 200,
+          "body": "[1",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b31",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Expected ',' or ']' after array element in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_33",
+          "status": 200,
+          "body": "\"abc\\",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "226162635c",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_34",
+          "status": 200,
+          "body": "\"\\u12",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225c753132",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad Unicode escape in JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_35",
+          "status": 200,
+          "body": "\"a\tb\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "2261096222",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad control character in string literal in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_36",
+          "status": 200,
+          "body": "[",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5b",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_37",
+          "status": 200,
+          "body": "]",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "5d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token ']', \"]\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_38",
+          "status": 200,
+          "body": "\"ok\" false",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "226f6b222066616c7365",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected non-whitespace character after JSON at position 5 (line 1 column 6)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_39",
+          "status": 200,
+          "body": "{\"a\":[1,tre,null,\"str\"],\"b\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a5b312c7472652c6e756c6c2c22737472225d2c2262223a327d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'e', ...\"{\"a\":[1,tre,null,\"st\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_40",
+          "status": 200,
+          "body": "{\"a\":[1,t3e,null,\"str\"],\"b\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a5b312c7433652c6e756c6c2c22737472225d2c2262223a327d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected number in JSON at position 9 (line 1 column 10)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_41",
+          "status": 200,
+          "body": "f\"x\",\"y\"]:",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "662278222c2279225d3a",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected string in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_42",
+          "status": 200,
+          "body": "{\"a\"::1,true,null,\"str\"],\"b\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a3a312c747275652c6e756c6c2c22737472225d2c2262223a327d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token ':', \"{\"a\"::1,true,nu\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_43",
+          "status": 200,
+          "body": "true\r\nx",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "747275650d0a78",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected non-whitespace character after JSON at position 6 (line 2 column 1)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_44",
+          "status": 200,
+          "body": "\"\\é\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225cc3a922",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Bad escaped character in JSON at position 2 (line 1 column 3)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_45",
+          "status": 200,
+          "body": "\"\\Ā\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225cc48022",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'Ā', \"\"\\Ā\"\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_46",
+          "status": 200,
+          "body": "\"\\😀\"",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "225cf09f988022",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token '�', \"\"\\😀\"\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_47",
+          "status": 200,
+          "body": "﻿not auth",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "efbbbf6e6f742061757468",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "body_48",
+          "status": 200,
+          "body": "{\"a\":[1,true,nulz,\"3r\"],\"😀\":2}",
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "7b2261223a5b312c747275652c6e756c7a2c223372225d2c22f09f9880223a327d",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'z', ...\"1,true,nulz,\"3r\"],\"�\"... is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_0",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "not auth"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: not auth. Unexpected token 'o', \"not auth\" is not valid JSON"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_1",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "{"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: {. Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Expected property name or '}' in JSON at position 1 (line 1 column 2)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_2",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "{\"a\":1,}"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: {\"a\":1,}. Expected double-quoted property name in JSON at position 7 (line 1 column 8)"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Expected double-quoted property name in JSON at position 7 (line 1 column 8)"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_3",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": "é"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: é. Unexpected token 'é', \"é\" is not valid JSON"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'é', \"é\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_4",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-message-type": "certificateRequest",
+            "x-bsv-auth-requested-certificates": ""
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: . Unexpected end of JSON input"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected end of JSON input"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "header_on_general",
+          "general": true,
+          "status": 200,
+          "body": "signed",
+          "headers": {
+            "content-type": "text/plain",
+            "x-bsv-auth-version": "0.1",
+            "x-bsv-auth-identity-key": "02fe8d1eb1bcb3432b1db5833ff5f2226d9cb5e65cee430558c18ed3a3c86ce1af",
+            "x-bsv-auth-signature": "3006020101020101",
+            "x-bsv-auth-requested-certificates": "not auth"
+          },
+          "body_hex": "7369676e6564",
+          "redirect_option": null,
+          "error": [
+            {
+              "name": "Error",
+              "message": "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: not auth. Unexpected token 'o', \"not auth\" is not valid JSON"
+            },
+            {
+              "name": "SyntaxError",
+              "message": "Unexpected token 'o', \"not auth\" is not valid JSON"
+            }
+          ],
+          "reached_on_data": false
+        },
+        {
+          "name": "redirect_handshake",
+          "status": 307,
+          "body": "",
+          "redirect": true,
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": null,
+          "error": null,
+          "reached_on_data": true
+        },
+        {
+          "name": "redirect_general",
+          "general": true,
+          "status": 307,
+          "body": "",
+          "redirect": true,
+          "headers": {
+            "content-type": "text/plain"
+          },
+          "body_hex": "",
+          "redirect_option": null,
+          "error": null,
+          "reached_on_data": true
+        }
+      ]
+    }
+  ]
+}

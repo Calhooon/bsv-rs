@@ -79,11 +79,6 @@ const ALLOWED: &[(&str, &str, usize)] = &[
         "&& !key_str.starts_with(\"x-bsv-auth\")",
         1,
     ),
-    (
-        "src/auth/transports/http.rs",
-        "if msg_type.to_str().ok() == Some(\"certificateRequest\") {",
-        1,
-    ),
     // The unsigned general answer's body preview (#354): the reference's
     // `#isTextualContent` reads the answer's `Content-Type` header for a
     // `charset=` (`SimplifiedFetchTransport.ts:559`) to choose text or hex

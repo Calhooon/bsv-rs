@@ -40,7 +40,7 @@ fn general() -> AuthMessage {
     message
 }
 
-async fn handshake_answered(answer: ResponseTemplate) -> Error {
+async fn handshake_answered(answer: ResponseTemplate) -> (Error, String) {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/.well-known/auth"))
@@ -48,10 +48,11 @@ async fn handshake_answered(answer: ResponseTemplate) -> Error {
         .expect(1)
         .mount(&server)
         .await;
-    SimplifiedFetchTransport::new(&server.uri())
+    let error = SimplifiedFetchTransport::new(&server.uri())
         .send(&handshake())
         .await
-        .expect_err("the handshake fails")
+        .expect_err("the handshake fails");
+    (error, server.uri())
 }
 
 fn assert_fault(err: &Error, fault: TransportFault, status: Option<u16>) {
@@ -123,7 +124,7 @@ async fn a_timeout_after_the_request_was_written_may_have_been_received() {
 
 #[tokio::test]
 async fn a_429_with_retry_after_and_a_text_body_is_rate_limited_with_its_wait() {
-    let err = handshake_answered(
+    let (err, _) = handshake_answered(
         ResponseTemplate::new(429)
             .insert_header("Retry-After", "5")
             .set_body_raw("Too Many Requests", "text/plain"),
@@ -137,18 +138,18 @@ async fn a_429_with_retry_after_and_a_text_body_is_rate_limited_with_its_wait() 
 
 #[tokio::test]
 async fn a_bare_503_may_have_been_received() {
-    let err = handshake_answered(ResponseTemplate::new(503)).await;
+    let (err, origin) = handshake_answered(ResponseTemplate::new(503)).await;
     assert_fault(&err, TransportFault::MayHaveBeenReceived, Some(503));
     assert_eq!(
         err.to_string(),
-        "transport fault MAY_HAVE_BEEN_RECEIVED: Auth endpoint returned 503 Service Unavailable: "
+        format!("transport fault MAY_HAVE_BEEN_RECEIVED: Received HTTP 503 Service Unavailable from {origin}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers)")
     );
 }
 
 #[tokio::test]
 async fn a_503_with_a_busy_code_is_still_a_transport_fault() {
     // The auth handshake has no busy word: the status alone promises nothing
-    let err = handshake_answered(
+    let (err, _) = handshake_answered(
         ResponseTemplate::new(503).set_body_json(serde_json::json!({"code": "STORE_BUSY"})),
     )
     .await;
@@ -157,10 +158,10 @@ async fn a_503_with_a_busy_code_is_still_a_transport_fault() {
 
 #[tokio::test]
 async fn any_other_status_stays_the_auth_error() {
-    let err = handshake_answered(ResponseTemplate::new(401).set_body_string("no")).await;
+    let (err, origin) = handshake_answered(ResponseTemplate::new(401).set_body_string("no")).await;
     assert_eq!(
         err,
-        Error::AuthError("Auth endpoint returned 401 Unauthorized: no".into())
+        Error::AuthError(format!("Received HTTP 401 Unauthorized from {origin}/.well-known/auth without valid BSV authentication (response lacked required BSV auth headers) - body preview: no"))
     );
     assert_eq!(err.transport_fault(), None);
 }

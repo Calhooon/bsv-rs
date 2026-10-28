@@ -65,7 +65,9 @@ impl SimplifiedFetchTransport {
 }
 
 /// Refuses an answer with a redirect status, the fetch standard's 301, 302,
-/// 303, 307 and 308, in the reference's words for its thrown fetch. The far
+/// 303, 307 and 308, in Node 22's outer wrapper words for its thrown fetch
+/// (#410). The reference retains `TypeError: fetch failed` with a cause of
+/// `Error: unexpected redirect`; `AuthError` has no JS cause/stack chain. The far
 /// side answered, so it is the named host's answer (`AuthError`), never a
 /// [`crate::TransportFault`]: the request was received, and nothing of it
 /// went anywhere else.
@@ -75,7 +77,7 @@ pub(super) fn refuse_redirect(url: &str, response: &Response) -> Result<()> {
         return Ok(());
     }
     Err(Error::AuthError(format!(
-        "Network error while sending authenticated request to {}: redirect refused: {}",
-        url, status
+        "Network error while sending authenticated request to {}: fetch failed",
+        url
     )))
 }
