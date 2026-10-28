@@ -179,7 +179,7 @@ fn the_field_checks_are_still_reached_when_the_protocol_matches() {
 }
 
 #[test]
-fn an_earlier_outputs_crossed_remittance_is_named_before_a_later_outputs_field() {
+fn an_earlier_outputs_field_is_named_before_a_later_outputs_crossed_remittance() {
     let a = args(vec![
         output(
             "basket insertion",
