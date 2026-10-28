@@ -87,6 +87,99 @@ the bound (which runs before the shift's refusal at `splice.rs:332`) never
 trips, and V8's `BigInt` cap refuses the result past 2^30 bits; the word
 branch never reaches it. No test pins it (none can reach it); a comment at
 `splice.rs:327` says so.
+### Fixed: the default mode reads the splice operands as the reference does: a substring operand past 8 bytes by its first 8, every one clamped to the `int` range, and `OP_NUM2BIN`'s size refused in the reference's words (#382)
+
+The #331 third fold's cold re-review noted that this crate read a splice
+operand with a wider reader than the reference's. The reference's default
+mode (`ts-stack@edf6e03` `packages/sdk/src/script/Spend.ts`, no
+`verifyFlags`; each outcome below its `Spend.validate()` under Node 22.18.0
+on the bundle of that commit) reads the three substring opcodes' operands
+with `#readSpliceOperand` (`:540-561`), not `#readScriptNumber`: no length
+bound (`#scriptNumMaxSize()` is `undefined` without flags), the
+minimal-encoding check when MINIMALDATA holds (version 1; `non-minimally
+encoded script number`), an operand of at most 8 bytes read as a script
+number, a longer one read as its first 8 bytes in two's complement
+(`BigInt.asIntN(64, ..)`), the bytes after the eighth never read, and the
+value clamped to `[-2^31, 2^31 - 1]`. This crate read every byte of a longer
+operand as a sign-magnitude number (one past an `i64` as -1) and clamped
+nothing, so a 9-byte operand was a verdict here where it is a reading
+there, and the reverse:
+
+| Script (version 2) | The reference | This crate before | After |
+|---|---|---|---|
+| `aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` | `ok true` | `OP_LEFT length (-1) must be in range [0, 3]` | `ok true` |
+| `aabbcc <02 00×7 80> OP_LEFT <aabb> OP_EQUAL` | `ok true` | `OP_LEFT length (-2) ...` | `ok true` |
+| `aabbcc <fe ff×7 01> OP_LEFT` | `OP_LEFT length (-2) ...` | `OP_LEFT length (-1) ...` | the reference's |
+| `aabbcc <02 00×6 01> OP_LEFT` (8 bytes) | `OP_LEFT length (2147483647) ...` | `OP_LEFT length (72057594037927938) ...` | the reference's |
+| `aabbcc <01 00×7 01> <01 00×7 01> OP_SUBSTR <bb> OP_EQUAL` | `ok true` | the range refusal at -1 | `ok true` |
+| the 0.3.33 witness, `<04 00×7 80>` as `OP_SUBSTR`'s offset | `ok true` | the range refusal at -4 | `ok true` |
+
+`OP_SPLIT`'s position is read whole by the reference (`#readScriptNumber`,
+`:1913`), as here: a 9-byte and an 8-byte position are the same range
+refusal on both sides, unchanged. `OP_NUM2BIN`'s size is read whole too
+(`:1930`); its refusals are now the reference's words in its order
+(`:1931-1950`): a negative size `It's not currently possible to push data
+larger than Infinity bytes or negative size.` (its push size unbounded
+without flags), a size above `INT32_MAX` `OP_NUM2BIN size exceeds the node
+int32 push limit.`, then a size above a caller's budget the `element-size`
+decline, where this crate gave its 1 GiB bound's sentence for all three and
+checked the bound before the budget; the 1 GiB bound stays last, a refusal
+the reference does not make (its `Array.from` of `2^31 - 1` elements aborts
+the process, `FATAL ERROR: invalid table size Allocation failed`).
+`OP_BIN2NUM` reads no number; unchanged, as the reference's.
+
+Under a word nothing moves: the operands follow the node's checked `int64`
+reading of 0.3.33 (bsv-rs#41, `int_serialization.h:61-118`), whose pins hold.
+
+Pinned by `tests/script_splice_position_reader_382.rs` (16): per site the
+longest operand the reference reads as a number (8 bytes) clamped, a 9-byte
+one read by its first 8 bytes (two's complement, non-minimal without
+MINIMALDATA, refused with it), a 100-byte operand whose later bytes are never
+read, `OP_SPLIT`'s whole reading, `OP_NUM2BIN`'s three refusals, and the block
+word's reading beside them. Red 13 of 16 on a scratch copy of `1791d2f8`
+(every `issue_382_` test; the three guards green on both). Four default-mode
+pins moved to the reference's outcomes: `script_int64_operand_witness.rs`
+(the witness and the `OP_LEFT`/`OP_RIGHT` cases, each `ok true` in the
+reference, until now read as -4 here; the test renamed
+`the_witness_is_valid_in_the_default_mode`) and
+`script_stack_memory_witness.rs` (the default mode's 2^31 and -1 sizes).
+The conformance census holds (`BSV_CONFORMANCE_DIR`: 2,834 passed, 17 known
+failures, 2,228 unsupported, as pinned).
+
+The cold review's finding (PR #396): the minimal-encoding check of an
+operand past 8 bytes decoded the whole operand (`ScriptNum::from_bytes`, a
+`BigUint` of its bytes, with no #374 room check) where its comment said it
+copied nothing. It is now judged from the operand's last two bytes
+(`ScriptNum::is_minimally_encoded`), the decoder called only for the
+refusal's words, so a minimal operand is read by its first 8 bytes alone.
+Pinned by `tests/memory_profiling.rs`'s
+`test_issue_382_a_minimal_splice_operand_is_not_decoded` (`dhat`): an
+800,000,000-byte minimal `OP_LEFT` length at version 1 peaks at
+800,000,099 bytes (its one copy onto the stack), 1,600,000,099 on a scratch
+copy of `b149d6b6` without the guard.
+
+Migration: none in the API. A caller matching the default mode's
+`OP_NUM2BIN` text for a size above `INT32_MAX` or below 0 reads the
+reference's now.
+
+### Notes: cross-SDK parity (#382)
+
+The 0.3.33 row ("the default mode retains the TypeScript SDK's unrestricted
+number reader") is corrected: the default mode reads the substring operands
+as the reference's `#readSpliceOperand`. Under explicit flags the reference
+uses the same reader (the era's length bound first), so a 10-byte operand is
+its first 8 bytes there and `Script number overflow: operand does not fit
+int64.` under this crate's word, the node's reading (`int_serialization.h`):
+the reference against the node, not followed. Two differences this lane
+found and did not change: a non-minimal operand under MINIMALDATA is refused
+in this crate's reader's words at every number site (`Invalid script number:
+script execution error: Non-minimally encoded script number`, the
+reference's `non-minimally encoded script number`); and at version 1 the
+reference's default mode runs `0xb3`-`0xb7` as the Chronicle opcodes (its
+skip applies under explicit flags alone, `Spend.ts:827-848`), where this
+crate's default runs them as `OP_NOP4`-`OP_NOP8` unless the coin is marked
+post-Chronicle (`aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` at version 1:
+`ok true` there, a refusal here).
 
 ### Changed: the wallet types' certificate field and keyring maps keep insertion order, the reference's `Object.keys` order, as `RequestedCertificateSet::types` does since #288 (#385)
 
@@ -440,100 +533,6 @@ counter at or below `docs/ratchets.json` (`tools/ratchet/run --check
 --against origin/beta`: duplicate windows 8,247 of 8,257, after the two
 `AsyncStreamVerifier` setters were put memory first in `budget.rs:58-68`, the
 natural order measuring 8,260); not re-recorded.
-
-### Fixed: the default mode reads the splice operands as the reference does: a substring operand past 8 bytes by its first 8, every one clamped to the `int` range, and `OP_NUM2BIN`'s size refused in the reference's words (#382)
-
-The #331 third fold's cold re-review noted that this crate read a splice
-operand with a wider reader than the reference's. The reference's default
-mode (`ts-stack@edf6e03` `packages/sdk/src/script/Spend.ts`, no
-`verifyFlags`; each outcome below its `Spend.validate()` under Node 22.18.0
-on the bundle of that commit) reads the three substring opcodes' operands
-with `#readSpliceOperand` (`:540-561`), not `#readScriptNumber`: no length
-bound (`#scriptNumMaxSize()` is `undefined` without flags), the
-minimal-encoding check when MINIMALDATA holds (version 1; `non-minimally
-encoded script number`), an operand of at most 8 bytes read as a script
-number, a longer one read as its first 8 bytes in two's complement
-(`BigInt.asIntN(64, ..)`), the bytes after the eighth never read, and the
-value clamped to `[-2^31, 2^31 - 1]`. This crate read every byte of a longer
-operand as a sign-magnitude number (one past an `i64` as -1) and clamped
-nothing, so a 9-byte operand was a verdict here where it is a reading
-there, and the reverse:
-
-| Script (version 2) | The reference | This crate before | After |
-|---|---|---|---|
-| `aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` | `ok true` | `OP_LEFT length (-1) must be in range [0, 3]` | `ok true` |
-| `aabbcc <02 00×7 80> OP_LEFT <aabb> OP_EQUAL` | `ok true` | `OP_LEFT length (-2) ...` | `ok true` |
-| `aabbcc <fe ff×7 01> OP_LEFT` | `OP_LEFT length (-2) ...` | `OP_LEFT length (-1) ...` | the reference's |
-| `aabbcc <02 00×6 01> OP_LEFT` (8 bytes) | `OP_LEFT length (2147483647) ...` | `OP_LEFT length (72057594037927938) ...` | the reference's |
-| `aabbcc <01 00×7 01> <01 00×7 01> OP_SUBSTR <bb> OP_EQUAL` | `ok true` | the range refusal at -1 | `ok true` |
-| the 0.3.33 witness, `<04 00×7 80>` as `OP_SUBSTR`'s offset | `ok true` | the range refusal at -4 | `ok true` |
-
-`OP_SPLIT`'s position is read whole by the reference (`#readScriptNumber`,
-`:1913`), as here: a 9-byte and an 8-byte position are the same range
-refusal on both sides, unchanged. `OP_NUM2BIN`'s size is read whole too
-(`:1930`); its refusals are now the reference's words in its order
-(`:1931-1950`): a negative size `It's not currently possible to push data
-larger than Infinity bytes or negative size.` (its push size unbounded
-without flags), a size above `INT32_MAX` `OP_NUM2BIN size exceeds the node
-int32 push limit.`, then a size above a caller's budget the `element-size`
-decline, where this crate gave its 1 GiB bound's sentence for all three and
-checked the bound before the budget; the 1 GiB bound stays last, a refusal
-the reference does not make (its `Array.from` of `2^31 - 1` elements aborts
-the process, `FATAL ERROR: invalid table size Allocation failed`).
-`OP_BIN2NUM` reads no number; unchanged, as the reference's.
-
-Under a word nothing moves: the operands follow the node's checked `int64`
-reading of 0.3.33 (bsv-rs#41, `int_serialization.h:61-118`), whose pins hold.
-
-Pinned by `tests/script_splice_position_reader_382.rs` (16): per site the
-longest operand the reference reads as a number (8 bytes) clamped, a 9-byte
-one read by its first 8 bytes (two's complement, non-minimal without
-MINIMALDATA, refused with it), a 100-byte operand whose later bytes are never
-read, `OP_SPLIT`'s whole reading, `OP_NUM2BIN`'s three refusals, and the block
-word's reading beside them. Red 13 of 16 on a scratch copy of `1791d2f8`
-(every `issue_382_` test; the three guards green on both). Four default-mode
-pins moved to the reference's outcomes: `script_int64_operand_witness.rs`
-(the witness and the `OP_LEFT`/`OP_RIGHT` cases, each `ok true` in the
-reference, until now read as -4 here; the test renamed
-`the_witness_is_valid_in_the_default_mode`) and
-`script_stack_memory_witness.rs` (the default mode's 2^31 and -1 sizes).
-The conformance census holds (`BSV_CONFORMANCE_DIR`: 2,834 passed, 17 known
-failures, 2,228 unsupported, as pinned).
-
-The cold review's finding (PR #396): the minimal-encoding check of an
-operand past 8 bytes decoded the whole operand (`ScriptNum::from_bytes`, a
-`BigUint` of its bytes, with no #374 room check) where its comment said it
-copied nothing. It is now judged from the operand's last two bytes
-(`ScriptNum::is_minimally_encoded`), the decoder called only for the
-refusal's words, so a minimal operand is read by its first 8 bytes alone.
-Pinned by `tests/memory_profiling.rs`'s
-`test_issue_382_a_minimal_splice_operand_is_not_decoded` (`dhat`): an
-800,000,000-byte minimal `OP_LEFT` length at version 1 peaks at
-800,000,099 bytes (its one copy onto the stack), 1,600,000,099 on a scratch
-copy of `b149d6b6` without the guard.
-
-Migration: none in the API. A caller matching the default mode's
-`OP_NUM2BIN` text for a size above `INT32_MAX` or below 0 reads the
-reference's now.
-
-### Notes: cross-SDK parity (#382)
-
-The 0.3.33 row ("the default mode retains the TypeScript SDK's unrestricted
-number reader") is corrected: the default mode reads the substring operands
-as the reference's `#readSpliceOperand`. Under explicit flags the reference
-uses the same reader (the era's length bound first), so a 10-byte operand is
-its first 8 bytes there and `Script number overflow: operand does not fit
-int64.` under this crate's word, the node's reading (`int_serialization.h`):
-the reference against the node, not followed. Two differences this lane
-found and did not change: a non-minimal operand under MINIMALDATA is refused
-in this crate's reader's words at every number site (`Invalid script number:
-script execution error: Non-minimally encoded script number`, the
-reference's `non-minimally encoded script number`); and at version 1 the
-reference's default mode runs `0xb3`-`0xb7` as the Chronicle opcodes (its
-skip applies under explicit flags alone, `Spend.ts:827-848`), where this
-crate's default runs them as `OP_NOP4`-`OP_NOP8` unless the coin is marked
-post-Chronicle (`aabbcc <02 00×7 01> OP_LEFT <aabb> OP_EQUAL` at version 1:
-`ok true` there, a refusal here).
 
 ## [0.9.0-beta.2] - 2026-10-28
 
