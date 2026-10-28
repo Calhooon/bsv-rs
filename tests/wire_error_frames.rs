@@ -134,6 +134,9 @@ async fn every_wallet_error_variant_is_framed_as_the_same_constant() {
         Error::HmacMinimalLengthKey {
             leading_zero_bytes: 1,
         },
+        Error::HmacLegacyKey {
+            leading_zero_bytes: 1,
+        },
     ] {
         let frame = refusal_frame(error.clone()).await;
         assert_eq!(

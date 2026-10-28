@@ -1,20 +1,10 @@
-//! BRC-56's HMAC key vectors and the verifier of both encodings (#148, #379).
+//! Amended BRC-56 HMAC issuance and legacy verification (#148, #379).
 //!
-//! The vectors are `bsv-blockchain/BRCs` at `5119a9b` (the line's pin since
-//! #154), `wallet/0056.md`, read with `git -C ~/bsv/brcs show 5119a9b:wallet/0056.md`: the key is the
-//! shared point's X coordinate as exactly 32 bytes (line 66); a sender that
-//! drops its leading zero bytes makes another tag (line 73); the inputs at
-//! lines 81-85 and the six rows at lines 91-96.
-//!
-//! The table is the one ts-stack PR #1423 tests its verifier on
-//! (`packages/sdk/src/wallet/__tests/ProtoWallet.brc56-hmac-key.test.ts` at
-//! `109bc7017`): the same six keys, `tag` here its `hmac`, `minimal_tag`
-//! here its `legacyTag`. `verify_hmac` accepts both tags by default (the
-//! owner's 18.10 (a), #379), the minimal-length one counted and named
-//! (`HmacKeyEncoding::MinimalLength`); under
-//! `HmacVerifyPolicy::ThirtyTwoByteOnly` it is refused as
-//! `Error::HmacMinimalLengthKey` (#148's verdict); a tag matching neither key
-//! is `WalletError("HMAC is not valid")` under both.
+//! The six shared vectors are recorded from ts-stack PR 1423 at `9a2787b8c`
+//! under Node 22 by `support/hmac_key_379.mjs`. Its `hmac` is standard and
+//! `rejectedTag` is the pre-amendment 32-byte-key tag accepted here as legacy.
+//! The default counts and names only that legacy acceptance; the strict
+//! `MinimalLengthOnly` policy agrees with the reference and amended BRC.
 
 #![cfg(feature = "wallet")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
@@ -26,89 +16,40 @@ use bsv_rs::wallet::{
 };
 use bsv_rs::Error;
 
-/// `wallet/0056.md:81` at `5119a9b`: the root private key, SHA-256 of the
-/// label below.
+/// The amended BRC-56 and PR 1423 root key, SHA-256 of the label below.
 const ROOT_KEY: &str = "f0efba88c117ca2614554bb676d743f413822a31e3c8d70cfcc5fff119d20a07";
 const ROOT_LABEL: &str = "BRC-56 HMAC key test vectors: root";
-/// `wallet/0056.md:82`: the root public key.
+/// Shared vector input: the root public key.
 const ROOT_PUB: &str = "035818cd7cc614fea816c8b39eebe6e43cafc635451ec5a873f8757b418aaae91a";
-/// `wallet/0056.md:83`: the counterparty public key, its private key SHA-256
+/// Shared vector input: the counterparty public key, its private key SHA-256
 /// of the label below.
 const COUNTERPARTY_PUB: &str = "03458d551018414b8fe1adbcef2d0afc17e1074bfab3fdde3e1b0750bdde58a9a7";
 const COUNTERPARTY_LABEL: &str = "BRC-56 HMAC key test vectors: counterparty";
-/// `wallet/0056.md:84`: the protocol, `[2, "hmac key vectors"]`.
+/// Shared vector input: the protocol, `[2, "hmac key vectors"]`.
 const PROTOCOL_NAME: &str = "hmac key vectors";
-/// `wallet/0056.md:85`: the data, `4252432d353620484d41432074657374`.
+/// Shared vector input: the data, `4252432d353620484d41432074657374`.
 const DATA: &[u8] = b"BRC-56 HMAC test";
 
-/// One row of `wallet/0056.md:91-96`.
+/// Byte-for-byte values from the merged PR 1423 table, read by the recorder.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Row {
-    line: u32,
-    counterparty_key: bool,
-    key_id: &'static str,
+    counterparty: String,
+    #[serde(rename = "keyID")]
+    key_id: String,
     leading_zero_bytes: usize,
-    hmac_key: &'static str,
-    tag: &'static str,
-    /// `None` where the table says `same`.
-    minimal_tag: Option<&'static str>,
+    hmac_key: String,
+    #[serde(rename = "hmac")]
+    tag: String,
+    #[serde(rename = "rejectedTag")]
+    legacy_tag: Option<String>,
 }
 
-const ROWS: [Row; 6] = [
-    Row {
-        line: 91,
-        counterparty_key: false,
-        key_id: "k0",
-        leading_zero_bytes: 0,
-        hmac_key: "b1273850ff41cee365a4d590e3c323822129f66c5a9b2eacb8b9e790e000e396",
-        tag: "99455edf49ea2156f6109466fb344c3027d4c14485581a50bf5ff0850328a269",
-        minimal_tag: None,
-    },
-    Row {
-        line: 92,
-        counterparty_key: false,
-        key_id: "k95",
-        leading_zero_bytes: 1,
-        hmac_key: "000c82ac78dc853158f24883ccfda332be6ba34f821765357cc4ef2a190a28fd",
-        tag: "054a0fc6a3b0e21b31dc627fb1d645f2eea4127dff71eac95b1f71b7cb13c787",
-        minimal_tag: Some("3a968ebaa25eaa4b1cfad138f96105bb1eb738defc066d01e37b32595900d48b"),
-    },
-    Row {
-        line: 93,
-        counterparty_key: false,
-        key_id: "k91538",
-        leading_zero_bytes: 2,
-        hmac_key: "00009dc11102cc72eca3c6e4e232460eac581e9b2cee1bb35c395b635d3f6393",
-        tag: "ff43127cb1ddfbd19776d01ce34b8c3e83916b51fa55ac045a355b731e6999f5",
-        minimal_tag: Some("5a8b84fb2a7d9ce7b12feb8319f14dc6169e0be005a1a8e58d9b9b2d1ac29d47"),
-    },
-    Row {
-        line: 94,
-        counterparty_key: true,
-        key_id: "k0",
-        leading_zero_bytes: 0,
-        hmac_key: "1896e0210afac8dbb4ca3bd4ea25c8377d0352ab83e62fe6ffabeca78c1a6113",
-        tag: "986af579272261acf3e890bb1650124b0dfbc0b1edacda202f8ed0c3b876c072",
-        minimal_tag: None,
-    },
-    Row {
-        line: 95,
-        counterparty_key: true,
-        key_id: "k497",
-        leading_zero_bytes: 1,
-        hmac_key: "001829e1dd58fc2c45b6edcbb277eecdecbab1c884b42fd779e131fea5881b45",
-        tag: "aa39467c48a116ffb00fd7b56ff158bd9af37d1298df2f031c0125458c30f574",
-        minimal_tag: Some("3a5ea2bf5bcc9bc1461041737384bf258b0a3e5a475fb281a19c2972cdb1cff6"),
-    },
-    Row {
-        line: 96,
-        counterparty_key: true,
-        key_id: "k29510",
-        leading_zero_bytes: 2,
-        hmac_key: "0000a52a35523175d6c181e90f463a27cdbf70f4ecf055e912d6fc24ac7d0e3c",
-        tag: "2677674035f1aaac3219b3405cf8569ec07922a3ceffbd4f7c8a7948b2d3c553",
-        minimal_tag: Some("ecca769bb17b1775ce8ae4326fe721ba0f7ba272300741bf4a5b068cf0cebd60"),
-    },
-];
+fn rows() -> Vec<Row> {
+    let value: serde_json::Value =
+        serde_json::from_str(include_str!("vectors/wallet_hmac_key_379.json")).unwrap();
+    serde_json::from_value(value["vectors"].clone()).unwrap()
+}
 
 fn protocol() -> Protocol {
     Protocol::new(SecurityLevel::Counterparty, PROTOCOL_NAME)
@@ -119,7 +60,7 @@ fn root_key() -> PrivateKey {
 }
 
 fn counterparty(row: &Row) -> Counterparty {
-    if row.counterparty_key {
+    if row.counterparty != "self" {
         Counterparty::Other(PublicKey::from_hex(COUNTERPARTY_PUB).unwrap())
     } else {
         Counterparty::Self_
@@ -146,7 +87,7 @@ fn verify(wallet: &ProtoWallet, row: &Row, hmac: [u8; 32]) -> bsv_rs::Result<boo
 }
 
 fn strict() -> ProtoWallet {
-    ProtoWallet::new(Some(root_key())).with_hmac_verify_policy(HmacVerifyPolicy::ThirtyTwoByteOnly)
+    ProtoWallet::new(Some(root_key())).with_hmac_verify_policy(HmacVerifyPolicy::MinimalLengthOnly)
 }
 
 #[test]
@@ -159,22 +100,27 @@ fn the_brc56_inputs_derive_from_their_labels() {
 }
 
 #[test]
-fn the_six_hmac_keys_are_the_32_byte_x_coordinate_with_its_leading_zeros() {
+fn the_six_minimal_hmac_keys_are_suffixes_of_fixed_width_aes_keys() {
     let deriver = KeyDeriver::new(Some(root_key()));
-    for row in &ROWS {
+    for row in &rows() {
         let key = deriver
-            .derive_symmetric_key(&protocol(), row.key_id, &counterparty(row))
+            .derive_symmetric_key(&protocol(), &row.key_id, &counterparty(row))
             .unwrap();
-        assert_eq!(to_hex(key.as_bytes()), row.hmac_key, "line {}", row.line);
+        assert_eq!(
+            to_hex(&key.as_bytes()[row.leading_zero_bytes..]),
+            row.hmac_key,
+            "key {}",
+            row.key_id
+        );
         let zeros = key.as_bytes().iter().take_while(|b| **b == 0).count();
-        assert_eq!(zeros, row.leading_zero_bytes, "line {}", row.line);
+        assert_eq!(zeros, row.leading_zero_bytes, "key {}", row.key_id);
     }
 }
 
 #[test]
 fn create_hmac_reproduces_the_six_brc56_tags() {
     let wallet = ProtoWallet::new(Some(root_key()));
-    for row in &ROWS {
+    for row in &rows() {
         let created = wallet
             .create_hmac(CreateHmacArgs {
                 data: DATA.to_vec(),
@@ -184,60 +130,60 @@ fn create_hmac_reproduces_the_six_brc56_tags() {
                 ..Default::default()
             })
             .unwrap();
-        assert_eq!(to_hex(&created.hmac), row.tag, "line {}", row.line);
+        assert_eq!(to_hex(&created.hmac), row.tag, "key {}", row.key_id);
     }
 }
 
 #[test]
-fn verify_hmac_accepts_the_six_32_byte_key_tags() {
+fn verify_hmac_accepts_the_six_standard_minimal_length_tags() {
     let wallet = ProtoWallet::new(Some(root_key()));
-    for row in &ROWS {
+    for row in &rows() {
         assert_eq!(
-            verify(&wallet, row, tag(row.tag)),
+            verify(&wallet, row, tag(&row.tag)),
             Ok(true),
-            "line {}",
-            row.line
+            "key {}",
+            row.key_id
         );
     }
     // The counterparty, verifying under the root's identity key, agrees.
     let other = PrivateKey::from_bytes(&sha256(COUNTERPARTY_LABEL.as_bytes())).unwrap();
     let other = ProtoWallet::new(Some(other));
-    for row in ROWS.iter().filter(|r| r.counterparty_key) {
+    for row in rows().iter().filter(|r| r.counterparty != "self") {
         let valid = other
             .verify_hmac(VerifyHmacArgs {
                 data: DATA.to_vec(),
-                hmac: tag(row.tag),
+                hmac: tag(&row.tag),
                 protocol_id: protocol(),
                 key_id: row.key_id.to_string(),
                 counterparty: Some(Counterparty::Other(root_key().public_key())),
                 ..Default::default()
             })
             .map(|r| r.valid);
-        assert_eq!(valid, Ok(true), "line {}", row.line);
+        assert_eq!(valid, Ok(true), "key {}", row.key_id);
     }
 }
 
 #[test]
 fn verify_hmac_accepts_both_encodings_of_the_six_brc56_tags() {
-    // #1423's table both ways: each row's 32-byte-key tag and, where the key
-    // has a leading zero byte, its minimal-length-key tag.
+    // #1423's table both ways: each row's standard tag and, where the key
+    // has a leading zero byte, its legacy 32-byte-key tag.
     let wallet = ProtoWallet::new(Some(root_key()));
     let mut accepted = 0;
-    for row in &ROWS {
-        let full = wallet.verify_hmac_encoding(args(row, tag(row.tag)));
+    for row in &rows() {
+        let standard = wallet.verify_hmac_encoding(args(row, tag(&row.tag)));
         assert_eq!(
-            full,
-            Ok(HmacKeyEncoding::ThirtyTwoByte),
-            "line {}",
-            row.line
+            standard,
+            Ok(HmacKeyEncoding::MinimalLength),
+            "key {}",
+            row.key_id
         );
         accepted += 1;
-        if let Some(minimal) = row.minimal_tag {
+        if let Some(legacy) = row.legacy_tag.as_deref() {
             assert_eq!(
-                verify(&wallet, row, tag(minimal)),
+                verify(&wallet, row, tag(legacy)),
                 Ok(true),
-                "line {}",
-                row.line
+                "key {}",
+                row.key_id
             );
             accepted += 1;
         }
@@ -246,95 +192,99 @@ fn verify_hmac_accepts_both_encodings_of_the_six_brc56_tags() {
 }
 
 #[test]
-fn a_minimal_length_key_tag_is_accepted_named_and_counted() {
+fn a_legacy_32_byte_key_tag_is_accepted_named_and_counted() {
     let wallet = ProtoWallet::new(Some(root_key()));
     let mut named = 0;
-    for row in ROWS.iter().filter(|r| r.leading_zero_bytes > 0) {
-        let minimal = tag(row.minimal_tag.unwrap());
+    for row in rows().iter().filter(|r| r.leading_zero_bytes > 0) {
+        let legacy = tag(row.legacy_tag.as_deref().unwrap());
         assert_eq!(
-            wallet.verify_hmac_encoding(args(row, minimal)),
-            Ok(HmacKeyEncoding::MinimalLength {
+            wallet.verify_hmac_encoding(args(row, legacy)),
+            Ok(HmacKeyEncoding::Legacy {
                 leading_zero_bytes: row.leading_zero_bytes
             }),
-            "line {}",
-            row.line
+            "key {}",
+            row.key_id
         );
         named += 1;
         assert_eq!(
-            wallet.minimal_length_hmac_acceptances(),
+            wallet.legacy_hmac_acceptances(),
             named,
-            "line {}",
-            row.line
+            "key {}",
+            row.key_id
         );
     }
     assert_eq!(named, 4);
-    // A 32-byte-key tag is not counted; a clone shares the count.
-    for row in &ROWS {
+    // A standard tag is not counted; a clone shares the count.
+    for row in &rows() {
         assert_eq!(
-            verify(&wallet, row, tag(row.tag)),
+            verify(&wallet, row, tag(&row.tag)),
             Ok(true),
-            "line {}",
-            row.line
+            "key {}",
+            row.key_id
         );
     }
     let clone = wallet.clone();
     assert_eq!(
-        verify(&clone, &ROWS[1], tag(ROWS[1].minimal_tag.unwrap())),
+        verify(
+            &clone,
+            &rows()[1],
+            tag(rows()[1].legacy_tag.as_deref().unwrap())
+        ),
         Ok(true)
     );
-    assert_eq!(wallet.minimal_length_hmac_acceptances(), 5);
+    assert_eq!(wallet.legacy_hmac_acceptances(), 5);
 }
 
 #[test]
-fn a_minimal_length_key_tag_is_accepted_through_the_async_interface() {
+fn a_legacy_32_byte_key_tag_is_accepted_through_the_async_interface() {
     use bsv_rs::wallet::WalletInterface;
     let wallet = ProtoWallet::new(Some(root_key()));
-    let row = &ROWS[5];
+    let row = &rows()[5];
     let result = futures::executor::block_on(WalletInterface::verify_hmac(
         &wallet,
-        args(row, tag(row.minimal_tag.unwrap())),
+        args(row, tag(row.legacy_tag.as_deref().unwrap())),
         Some("brc56.test"),
     ));
     assert!(result.unwrap().valid);
-    assert_eq!(wallet.minimal_length_hmac_acceptances(), 1);
+    assert_eq!(wallet.legacy_hmac_acceptances(), 1);
 }
 
 #[test]
-fn the_strict_policy_refuses_a_minimal_length_key_tag_by_name() {
+fn the_strict_policy_refuses_a_legacy_32_byte_key_tag_by_name() {
     let wallet = strict();
     assert_eq!(
         wallet.hmac_verify_policy(),
-        HmacVerifyPolicy::ThirtyTwoByteOnly
+        HmacVerifyPolicy::MinimalLengthOnly
     );
     assert_eq!(
         ProtoWallet::new(None).hmac_verify_policy(),
         HmacVerifyPolicy::BothEncodings
     );
     let mut refused = 0;
-    for row in ROWS.iter().filter(|r| r.leading_zero_bytes > 0) {
-        let minimal = tag(row.minimal_tag.unwrap());
-        let err = verify(&wallet, row, minimal).unwrap_err();
+    for row in rows().iter().filter(|r| r.leading_zero_bytes > 0) {
+        let legacy = tag(row.legacy_tag.as_deref().unwrap());
+        let err = verify(&wallet, row, legacy).unwrap_err();
         assert_eq!(
             err,
-            Error::HmacMinimalLengthKey {
+            Error::HmacLegacyKey {
                 leading_zero_bytes: row.leading_zero_bytes
             },
-            "line {}",
-            row.line
+            "key {}",
+            row.key_id
         );
         let text = err.to_string();
-        assert!(text.contains("minimal-length key"), "{text}");
+        assert!(text.contains("legacy 32-byte key"), "{text}");
         assert!(text.starts_with("HMAC is not valid"), "{text}");
         refused += 1;
     }
     assert_eq!(refused, 4);
-    assert_eq!(wallet.minimal_length_hmac_acceptances(), 0);
-    for row in &ROWS {
+    assert_eq!(wallet.legacy_hmac_acceptances(), 0);
+    for row in &rows() {
         assert_eq!(
-            verify(&wallet, row, tag(row.tag)),
+            verify(&wallet, row, tag(&row.tag)),
             Ok(true),
-            "line {}",
-            row.line
+            "key {}",
+            row.key_id
         );
     }
 }
@@ -342,15 +292,15 @@ fn the_strict_policy_refuses_a_minimal_length_key_tag_by_name() {
 #[test]
 fn the_strict_policy_refuses_by_name_through_the_async_interface() {
     use bsv_rs::wallet::WalletInterface;
-    let row = &ROWS[5];
+    let row = &rows()[5];
     let result = futures::executor::block_on(WalletInterface::verify_hmac(
         &strict(),
-        args(row, tag(row.minimal_tag.unwrap())),
+        args(row, tag(row.legacy_tag.as_deref().unwrap())),
         Some("brc56.test"),
     ));
     assert_eq!(
         result.unwrap_err(),
-        Error::HmacMinimalLengthKey {
+        Error::HmacLegacyKey {
             leading_zero_bytes: 2
         }
     );
@@ -358,20 +308,20 @@ fn the_strict_policy_refuses_by_name_through_the_async_interface() {
 
 #[test]
 fn a_key_with_no_leading_zero_has_one_encoding_and_no_refusal_path() {
-    // The table reads `same` for k0 and counterparty k0 (lines 91 and 94):
+    // For k0 and counterparty k0, the two encodings coincide:
     // the minimal-length key is the 32-byte key, so its tag is the accepted
-    // one, named the 32-byte key's, and there is nothing to refuse.
+    // one, named the standard key's, and there is nothing to refuse.
     for wallet in [ProtoWallet::new(Some(root_key())), strict()] {
-        for row in ROWS.iter().filter(|r| r.leading_zero_bytes == 0) {
-            assert_eq!(row.minimal_tag, None, "line {}", row.line);
+        for row in rows().iter().filter(|r| r.leading_zero_bytes == 0) {
+            assert_eq!(row.legacy_tag, None, "key {}", row.key_id);
             assert_eq!(
-                wallet.verify_hmac_encoding(args(row, tag(row.tag))),
-                Ok(HmacKeyEncoding::ThirtyTwoByte),
-                "line {}",
-                row.line
+                wallet.verify_hmac_encoding(args(row, tag(&row.tag))),
+                Ok(HmacKeyEncoding::MinimalLength),
+                "key {}",
+                row.key_id
             );
         }
-        assert_eq!(wallet.minimal_length_hmac_acceptances(), 0);
+        assert_eq!(wallet.legacy_hmac_acceptances(), 0);
     }
 }
 
@@ -379,23 +329,27 @@ fn a_key_with_no_leading_zero_has_one_encoding_and_no_refusal_path() {
 fn a_tag_matching_neither_key_stays_hmac_is_not_valid() {
     let not_valid = Err(Error::WalletError("HMAC is not valid".to_string()));
     for wallet in [ProtoWallet::new(Some(root_key())), strict()] {
-        for row in &ROWS {
-            for accepted in [Some(row.tag), row.minimal_tag].into_iter().flatten() {
+        for row in &rows() {
+            for accepted in [Some(row.tag.as_str()), row.legacy_tag.as_deref()]
+                .into_iter()
+                .flatten()
+            {
                 let mut wrong = tag(accepted);
                 wrong[31] ^= 1;
-                assert_eq!(verify(&wallet, row, wrong), not_valid, "line {}", row.line);
+                assert_eq!(verify(&wallet, row, wrong), not_valid, "key {}", row.key_id);
             }
-            // A row's minimal tag under another row's key is no acceptance either.
-            let other = &ROWS[(ROWS.iter().position(|r| r.line == row.line).unwrap() + 1) % 6];
-            if let Some(minimal) = other.minimal_tag {
+            // A row's legacy tag under another row's key is no acceptance either.
+            let other =
+                &rows()[(rows().iter().position(|r| r.key_id == row.key_id).unwrap() + 1) % 6];
+            if let Some(legacy) = other.legacy_tag.as_deref() {
                 assert_eq!(
-                    verify(&wallet, row, tag(minimal)),
+                    verify(&wallet, row, tag(legacy)),
                     not_valid,
-                    "line {}",
-                    row.line
+                    "key {}",
+                    row.key_id
                 );
             }
         }
-        assert_eq!(wallet.minimal_length_hmac_acceptances(), 0);
+        assert_eq!(wallet.legacy_hmac_acceptances(), 0);
     }
 }

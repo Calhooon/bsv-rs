@@ -1,0 +1,55 @@
+{
+  "reference": {
+    "commit": "9a2787b8cb8c16a9fec50b713e3624322912258e",
+    "node": "v22.18.0",
+    "source": "packages/sdk/src/wallet/__tests/ProtoWallet.brc56-hmac-key.test.ts",
+    "sourceSha256": "7ddbea38147c839ca50d4a80c13ff1a216cb92092c49692fb82aff24e70e1fdb"
+  },
+  "rootKey": "f0efba88c117ca2614554bb676d743f413822a31e3c8d70cfcc5fff119d20a07",
+  "protocolID": [
+    2,
+    "hmac key vectors"
+  ],
+  "keyID": "k95",
+  "binaryHex": "080808080808080808080808080808080808080808080808080808080808080809090909090909090909090909090909090909090909090909090909090909090277f230936ee88cbbd73df930d64702ef881d811e0e1498e2f1c13eb1fc345d7403d528ecd9b696b54c907a9ed045447a79bb408ec39b68df504bb51f459bc3ffc900000000000000000000000000000000000000000000000000000000000000000002066669656c643068554e4d79674b323554775a2b3472773976696f4163576a4c494a67504c476f3171425337346f39494e54666b792b622b6b6e7043797a63586b486b6c594753414e766d4c59527a33686c3251323339584b4a5464374a5049357a7a51557966703869466451684d3d076669656c643736644d4e32737a5073366b56366b626968775a7275394852776b5871776e666d6e2f6f2b356633587a52466c324c6d4d7a45586b755778325734514a533832434667616f566e6755686368782b793053704b4e4842434241544f6551357457316b496b5163643045022100fffd0cd42fde88365dd054ca2ad00b65849470a45f2bac3897dcc172e2f8ab3e0220408c9ac3459242dc3e3ec627af82c2d20dc20251d2fddda2701a12775775c12e",
+  "hmac": "29993f1241ca6784aafe5133030fbe1966be4d1632040e66ffbb52935d202201",
+  "keys": {
+    "certifier": 43,
+    "subject": 47,
+    "verifier": 41
+  },
+  "masterKeyring": {
+    "field0": "LKPhNFua17HA9rRCFs79Utx7/0LcAP3qChvbWURKTuaWEiFFczOnp9VzcPDR1g0VlqCSjtfnrBsaobse19l/30ib6/NZcAAb6trJlhUJTRo=",
+    "field76": "zZIPv0SzZbxPVGB/8sFYEzBtmRoI8VFhTJ8Jkw6AtIOlwJ66hnczLoEXNLY5AjKJYcwqBFuH2ghww6vr//ZIYmRsagdID8euv9bTml94NC4="
+  },
+  "plaintexts": {
+    "field0": "verifier key starts with zero",
+    "field76": "master key starts with zero"
+  },
+  "verifierKeyring": {
+    "field0": "dW5SEZFriZa72JGoD+ke2ndFowM5gUl0cv1CM2FVrYmf9LxYjjV3Y8+k6f9EnjKUPjYZUTVw7NDdhUtyujpKYGvm+XcpVYZBcpGL2ze7HSo=",
+    "field76": "CnAb1i2rRZ2djJGHup0UrNzhIU3YuLr53Qw3JpOYNNR94sPZCevdaDksMqMbPG6wbo8QqnBXkq0nLRq9rwU9k/Offwk+Oxn4WrQc67FnOeo="
+  },
+  "referenceCertificateValid": true,
+  "referenceHmacValid": true,
+  "referenceMasterPlaintexts": {
+    "field0": "verifier key starts with zero",
+    "field76": "master key starts with zero"
+  },
+  "referenceVerifierPlaintexts": {
+    "field0": "verifier key starts with zero",
+    "field76": "master key starts with zero"
+  },
+  "encryptionKeys": [
+    {
+      "name": "field0",
+      "master": "b6f83ff079fc3c24fffe5dc6569495d6da43e5d0b0bb1f37be6bc9d24fa10b66",
+      "verifier": "5f012310e0fd78fa6c95ba28ad2a7f2b7fe438707341d7c6a9fe988efbd63c"
+    },
+    {
+      "name": "field76",
+      "master": "7a0905bd554e4aed0815c576c9cd7bdf6c745501c851d5201c8faa34a934c4",
+      "verifier": "2ca953c6b781f1fda4515320977cb064badb448a09b504664df894d23465c714"
+    }
+  ]
+}

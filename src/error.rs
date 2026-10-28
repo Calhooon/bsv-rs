@@ -288,22 +288,22 @@ pub enum Error {
         detail: String,
     },
 
-    /// An HMAC tag made under the minimal-length key, refused by name.
-    ///
-    /// BRC-56 (`5119a9b` `wallet/0056.md:66`) keys the HMAC with the shared
-    /// point's X coordinate as exactly 32 big-endian bytes; a sender that
-    /// drops the leading zero bytes (ts-sdk's `KeyDeriver`) makes another
-    /// tag, for about one key in 256 (`:73`). `verify_hmac` accepts that tag
-    /// by default (#379); under `HmacVerifyPolicy::ThirtyTwoByteOnly` it is
-    /// refused by this name; a tag matching neither key stays
-    /// [`Error::WalletError`] `"HMAC is not valid"`.
+    /// Former minimal-length-key refusal (#148), retained for source compatibility.
+    /// Never emitted since #379; strict verification returns [`Error::HmacLegacyKey`].
     #[cfg(feature = "wallet")]
     #[error(
         "HMAC is not valid: the tag was made under a minimal-length key (the sender drops the {leading_zero_bytes} leading zero byte(s) of the 32-byte X coordinate; BRC-56)"
     )]
     HmacMinimalLengthKey {
-        /// How many zero bytes the 32-byte key begins with: the bytes the
-        /// sender dropped.
+        /// Leading zero octets omitted by the sender.
+        leading_zero_bytes: usize,
+    },
+
+    /// Strict refusal of a pre-amendment 32-byte-key tag (#379).
+    #[cfg(feature = "wallet")]
+    #[error("HMAC is not valid: legacy 32-byte key ({leading_zero_bytes} leading zero byte(s))")]
+    HmacLegacyKey {
+        /// The leading zero octets retained by the legacy key.
         leading_zero_bytes: usize,
     },
 

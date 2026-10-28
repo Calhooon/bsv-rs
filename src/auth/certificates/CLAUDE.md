@@ -82,7 +82,10 @@ pub const CERTIFICATE_SIGNATURE_PROTOCOL: &str = "certificate signature";
 ## Field Encryption
 
 Each field is encrypted with `SymmetricKey` (AES-256-GCM, 32-byte IV) under a
-random 32-byte revelation key; the field value held, signed and written is
+random 32-byte revelation key; master and verifier keyring encryption also
+retains BRC-2 fixed-width keys. The BRC-56 amendment changes HMAC serialization
+only (#379); `auth_hmac_issuance_379` checks both keyrings, including leading-zero
+derived keys, in ts-stack PR 1423 at `9a2787b8c`. The field value held, signed and written is
 the base64 text of `IV || ciphertext || tag`. The revelation keys are
 encrypted by the wallet (BRC-2) with BRC-42 key derivation, Security Level 2
 (counterparty-specific). Decryption decodes the field's text at decrypt
