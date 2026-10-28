@@ -2,7 +2,9 @@
 
 use reqwest::header::HeaderMap;
 
-use super::{client, headers, json_syntax, unauthenticated, SimplifiedFetchTransport};
+use super::{
+    body, client, headers, json_syntax, response_bounds, unauthenticated, SimplifiedFetchTransport,
+};
 use crate::auth::{AuthMessage, RequestedCertificateSet};
 use crate::transaction::broadcasters::transport_fault as fault;
 use crate::{Error, Result};
@@ -19,10 +21,13 @@ impl SimplifiedFetchTransport {
             .map_err(|e| fault::auth_error(&e, "HTTP request failed"))?;
         client::refuse_redirect(&url, &response)?;
         let (status, reason, response_headers) = unauthenticated::head(&response);
-        let body = response
-            .bytes()
-            .await
-            .map_err(|e| fault::auth_error(&e, "Failed to read auth response"))?;
+        let body = body::read(
+            &url,
+            response,
+            self.limits.handshake,
+            "Failed to read auth response",
+        )
+        .await?;
         if !status.is_success() {
             // The reference supplies no missing-header list here, even when
             // some or all authentication headers are present (:143-151).
@@ -52,21 +57,18 @@ pub(super) fn requested_certificates(
     url: &str,
     response_headers: &HeaderMap,
 ) -> Result<Option<RequestedCertificateSet>> {
-    if !response_headers.contains_key(headers::REQUESTED_CERTIFICATES) {
+    let Some(value) = response_bounds::value(response_headers, headers::REQUESTED_CERTIFICATES)
+    else {
         return Ok(None);
+    };
+    if value.len() > 256 * 1024 {
+        return Err(response_bounds::malformed(
+            url,
+            headers::REQUESTED_CERTIFICATES,
+            "[oversized]",
+            "header exceeds its byte limit",
+        ));
     }
-    let value = response_headers
-        .get_all(headers::REQUESTED_CERTIFICATES)
-        .iter()
-        .map(|value| {
-            value
-                .as_bytes()
-                .iter()
-                .map(|byte| char::from(*byte))
-                .collect::<String>()
-        })
-        .collect::<Vec<_>>()
-        .join(", ");
     serde_json::from_str(&value).map(Some).map_err(|error| {
         let cause = json_syntax::diagnostic(&value).unwrap_or_else(|| error.to_string());
         Error::AuthError(format!(

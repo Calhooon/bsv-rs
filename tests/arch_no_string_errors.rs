@@ -50,33 +50,30 @@ const ALLOWED: &[(&str, &str, usize)] = &[
         2,
     ),
     (
-        "src/auth/transports/http.rs",
-        "if lower_key.starts_with(\"x-bsv-\")",
+        "src/auth/transports/http/general.rs",
+        "if (lower.starts_with(\"x-bsv-\") || lower == \"authorization\" || lower == \"content-type\")",
+        3,
+    ),
+    (
+        "src/auth/transports/http/general.rs",
+        "&& !lower.starts_with(\"x-bsv-auth\")",
         1,
     ),
     (
-        "src/auth/transports/http.rs",
-        "|| lower_key == \"authorization\"",
-        1,
-    ),
-    (
-        "src/auth/transports/http.rs",
-        "|| lower_key == \"content-type\"",
-        1,
-    ),
-    (
-        "src/auth/transports/http.rs",
-        "if !lower_key.starts_with(\"x-bsv-auth\") {",
-        1,
-    ),
-    (
-        "src/auth/transports/http.rs",
-        "if (key_str.starts_with(\"x-bsv-\") || key_str == \"authorization\")",
+        "src/auth/transports/http/response_bounds.rs",
+        "(name.starts_with(\"x-bsv-\") || *name == \"authorization\")",
         2,
     ),
     (
-        "src/auth/transports/http.rs",
-        "&& !key_str.starts_with(\"x-bsv-auth\")",
+        "src/auth/transports/http/response_bounds.rs",
+        "&& !name.starts_with(\"x-bsv-auth\")",
+        1,
+    ),
+    // #416: the response's protocol message-type header, not an error text.
+    // SimplifiedFetchTransport.ts:343-346 preserves this exact type.
+    (
+        "src/auth/transports/http/general.rs",
+        "== Some(\"certificateRequest\")",
         1,
     ),
     // The unsigned general answer's body preview (#354): the reference's

@@ -10,11 +10,14 @@ This module provides transport layer implementations for sending and receiving a
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with exports and usage examples | ~49 |
-| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | ~1200 |
+| `http.rs` | Transport trait, HTTP transport, mock transport, BRC-104 payload types | 1061 |
 | `http/client.rs` | The HTTP transport's client (`http` feature, #320): `default_client` (`new`'s), `with_client`, `refuse_redirect` | ~80 |
-| `http/handshake.rs` | Handshake send, status refusal, and the certificate header parse on every general response (#410) | ~70 |
+| `http/handshake.rs` | Handshake send/status/JSON words (#410), bounded body and certificate-header parse (#416) | ~70 |
+| `http/body.rs` | #416: streaming caps, Content-Length check, 1 MiB handshake / 16 MiB application defaults, configurable through positive-safe-integer builders | 99 |
+| `http/response_bounds.rs` | #416: bounded hex signature; optional canonical 32-byte request ID; signed headers: 512, name 1–1,024 bytes, value ≤32,768 bytes, total ≤262,144 bytes; fetch's joined UTF-8 text | 130 |
+| `http/general.rs` | General exchange moved from `http.rs`; applies response checks, preserves `certificateRequest`, omits an absent request ID | 133 |
 | `http/json_syntax.rs` | Node 22 JSON syntax diagnostics after serde refuses; iterative, input-bounded states, no fixed depth cutoff, 20-unit context (#410) | ~310 |
-| `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `head` (the status, the status line's own reason phrase from hyper's `ext::ReasonPhrase`, the headers), `refuse_unauthenticated`, `sender` (the answer's identity key), `signature` (its signature, hex then base64), the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview, an unsigned 429, 502, 503 or 504 a transport fault by `status_fault` | ~226 |
+| `http/unauthenticated.rs` | A general answer's authentication (`http` feature, #354): `head` (the status, the status line's own reason phrase from hyper's `ext::ReasonPhrase`, the headers), `refuse_unauthenticated`, `sender` (the answer's identity key), the reference's `#validateResponseAuthentication` and `#createUnauthenticatedResponseError` with its body preview, an unsigned 429, 502, 503 or 504 a transport fault by `status_fault` | ~226 |
 | `websocket_transport.rs` | WebSocket transport (requires `websocket` feature) | ~599 |
 
 ## Key Exports
@@ -57,6 +60,7 @@ pub struct SimplifiedFetchTransport {
     base_url: String,
     #[cfg(feature = "http")]
     client: reqwest::Client,
+    // Private response limits behind the http feature (1 MiB / 16 MiB).
     callback: Arc<StdRwLock<Option<Box<TransportCallback>>>>,
 }
 
@@ -64,6 +68,10 @@ impl SimplifiedFetchTransport {
     pub fn new(base_url: &str) -> Self
     #[cfg(feature = "http")]
     pub fn with_client(base_url: &str, client: reqwest::Client) -> Self   // #320
+    #[cfg(feature = "http")]
+    pub fn with_max_response_bytes(self, bytes: usize) -> Result<Self>
+    #[cfg(feature = "http")]
+    pub fn with_max_handshake_response_bytes(self, bytes: usize) -> Result<Self>
     pub fn base_url(&self) -> &str
     pub fn message_to_headers(&self, message: &AuthMessage) -> Vec<(String, String)>
     pub fn headers_to_message_fields(&self, header_map: &[(String, String)])
@@ -73,7 +81,7 @@ impl SimplifiedFetchTransport {
 
 Features:
 - Sends handshake messages (InitialRequest, InitialResponse, CertificateRequest, CertificateResponse) as JSON POST to `/.well-known/auth`
-- Sends General messages via BRC-104: deserializes payload as `HttpRequest`, makes actual HTTP request with auth headers, wraps response in `HttpResponse` payload
+- Sends General messages via BRC-104: deserializes payload as `HttpRequest`, makes actual HTTP request with auth headers, writes the response payload (the request ID omitted when its header is absent)
 - Automatically strips trailing slashes from base URL
 - Uses `reqwest` client (requires `http` feature): `new` builds one with a 30 s request and 10 s connect timeout, `pool_max_idle_per_host(0)` and `redirect(Policy::none())`; `with_client` takes the caller's, used as given (its timeouts, proxy, resolution and redirect policy the caller's), the reference's `fetchClient` (`ts-stack@edf6e03` `SimplifiedFetchTransport.ts:64-67`; #320)
 - Refuses an answer with a redirect status (301, 302, 303, 307, 308) on both paths before its body, whatever the client, as the reference's `redirect: 'error'` (`:128`, `:212`) does; a client that follows redirects has followed them before the transport sees the answer
@@ -217,7 +225,7 @@ pub mod headers {
 | `x-bsv-auth-identity-key` | Sender's public key | hex |
 | `x-bsv-auth-nonce` | Sender's nonce | base64 |
 | `x-bsv-auth-your-nonce` | Peer's previous nonce | base64 |
-| `x-bsv-auth-signature` | Message signature | base64 or hex |
+| `x-bsv-auth-signature` | Response signature | nonempty even-length hex, at most 2,048 characters |
 | `x-bsv-auth-message-type` | Message type | string |
 | `x-bsv-auth-request-id` | Request correlation ID | base64 |
 | `x-bsv-auth-requested-certificates` | Certificate requirements | JSON |
@@ -413,7 +421,8 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `AuthError("Empty varint")` | Empty bytes when reading varint |
 | `AuthError("Incomplete varint (fd/fe/ff)")` | Truncated varint encoding |
 | `AuthError("Response payload too short for request ID")` | HttpResponse payload < 32 bytes |
-| `AuthError("Invalid request ID length")` | Response request ID not 32 bytes |
+| `AuthError("Authenticated response request ID must encode exactly 32 bytes")` | Response request ID has the wrong decoded length or padding bits (#416) |
+| `AuthError("Authenticated response request ID must be canonical base64")` | Response request ID has malformed base64 framing (#416) |
 | `AuthError("Failed to acquire callback lock")` | Poisoned std::sync::RwLock on callback |
 | `TransportError("base_url is required...")` | WebSocket created with empty URL |
 | `TransportError("WebSocket URL must start with ws://...")` | Invalid WebSocket URL scheme |
@@ -423,20 +432,30 @@ The `websocket` feature is opt-in and not included in `full`. It gates:
 | `TransportError("failed to marshal auth message: {}")` | JSON serialization error |
 | `TransportError("WebSocket connection not available")` | Connection dropped after error |
 
-The #410 entry names four changes and four old/new pairs: handshake status,
-malformed JSON, malformed certificate header (previously accepted), and
-redirect words. Its 12 tests replay 75 cases per reference. Three unchanged
-response mappings are stated divergences: a 262,145-byte valid certificate
-header is delivered here (reference `[oversized]. header exceeds its byte
-limit`); signature `MAA=` decodes as base64 `[48, 0]` here (reference
-`[invalid]. signature must be bounded even-length hexadecimal`); and a
-`certificateRequest` header still yields `MessageType::General` here.
-See the changelog's #410 parity paragraph and the root known-divergences list.
+The #410 entry names the handshake, malformed JSON, malformed certificate
+header and redirect changes. Its 12 tests still replay the original 75
+cases per reference; the final three now require #416's conforming header,
+signature and certificateRequest outcomes. The new six-test suite and its
+66-case-per-reference vector cover the full response bound set; two more
+tests cover configured body limits, chunked reads and option validation.
+
+The #416 header wrappers are `Failed to parse {header} returned by {url}: `
+followed by `[oversized]. header exceeds its byte limit` or
+`[invalid]. signature must be bounded even-length hexadecimal`. Bodies use
+`Authenticated response from {url} exceeds {maximum} bytes`; their limits
+are configurable even for a caller-supplied client. A response request ID
+is optional and omitted when absent; when present it must be canonical
+base64 (`Authenticated response request ID must be canonical base64`) of
+exactly 32 bytes (`Authenticated response request ID must encode exactly
+32 bytes`), without comparison to the outgoing ID. Signed-header limits
+use `Authenticated response contains an oversized signed header` for a
+name/value and `Authenticated response signed headers exceed their limit`
+for count/total. See the changelog's #416 entry for all six old/new pairs.
 
 The syntax scanner has no fixed depth cutoff; its states grow with input
 depth. Node 22 accepts arrays and objects at 127, 128, 200, 1,000, 10,000 and
 100,000 levels, up to its handshake-body default of 1 MiB and beyond in
-`JSON.parse` alone. Rust's body reader has no matching byte cap. Valid-JSON
+`JSON.parse` alone. Rust applies the same configurable body cap since #416. Valid-JSON
 typed refusals remain serde's, including out-of-range numbers: nine inputs
 in the saved 80,096-case probe, all finite-double overflows (`86e427` reads
 as `Infinity` in V8).

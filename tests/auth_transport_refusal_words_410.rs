@@ -311,7 +311,7 @@ async fn issue_410_json_syntax_at_depth_200_uses_the_reference_words() {
 }
 
 #[tokio::test]
-async fn issue_410_oversized_certificate_header_is_a_documented_divergence() {
+async fn issue_416_oversized_certificate_header_matches_the_newer_reference_refusal() {
     for reference in references() {
         let case = reference
             .cases
@@ -322,6 +322,7 @@ async fn issue_410_oversized_certificate_header_is_a_documented_divergence() {
             assert_eq!(case.error.as_ref().unwrap()[0].message,
                 "Failed to parse x-bsv-auth-requested-certificates returned by {url}/sendMessage: [oversized]. header exceeds its byte limit");
             assert!(!case.reached_on_data);
+            assert_words(case).await;
         } else {
             assert!(case.error.is_none() && case.reached_on_data);
             assert_eq!(
@@ -329,19 +330,11 @@ async fn issue_410_oversized_certificate_header_is_a_documented_divergence() {
                 Some(serde_json::json!({"certifiers": [], "types": {}}))
             );
         }
-        let (result, messages, _) = exchange(case).await;
-        result.unwrap();
-        assert_eq!(messages.len(), 1);
-        assert!(messages[0]
-            .requested_certificates
-            .as_ref()
-            .unwrap()
-            .is_empty());
     }
 }
 
 #[tokio::test]
-async fn issue_410_base64_signature_is_a_documented_divergence() {
+async fn issue_416_base64_signature_matches_the_newer_reference_refusal() {
     let reference = references().remove(0);
     let case = reference
         .cases
@@ -351,14 +344,11 @@ async fn issue_410_base64_signature_is_a_documented_divergence() {
     assert_eq!(case.error.as_ref().unwrap()[0].message,
         "Failed to parse x-bsv-auth-signature returned by {url}/sendMessage: [invalid]. signature must be bounded even-length hexadecimal");
     assert!(!case.reached_on_data);
-    let (result, messages, _) = exchange(case).await;
-    result.unwrap();
-    assert_eq!(messages.len(), 1);
-    assert_eq!(messages[0].signature, Some(vec![48, 0]));
+    assert_words(case).await;
 }
 
 #[tokio::test]
-async fn issue_410_certificate_request_type_is_a_documented_divergence() {
+async fn issue_416_certificate_request_type_matches_both_references() {
     for reference in references() {
         let case = reference
             .cases
@@ -372,6 +362,6 @@ async fn issue_410_certificate_request_type_is_a_documented_divergence() {
         let (result, messages, _) = exchange(case).await;
         result.unwrap();
         assert_eq!(messages.len(), 1);
-        assert_eq!(messages[0].message_type, MessageType::General);
+        assert_eq!(messages[0].message_type, MessageType::CertificateRequest);
     }
 }

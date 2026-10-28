@@ -122,17 +122,6 @@ pub(super) fn sender(response_headers: &HeaderMap) -> Result<PublicKey> {
     )
 }
 
-/// The answer's signature, the header `refuse_unauthenticated` has required:
-/// its bytes read as hex first, then base64, `None` when neither reads (#354).
-pub(super) fn signature(response_headers: &HeaderMap) -> Option<Vec<u8>> {
-    let sig = response_headers.get(headers::SIGNATURE)?;
-    let sig_str = sig.to_str().unwrap_or_default();
-    // Try hex first, then base64
-    crate::primitives::from_hex(sig_str)
-        .or_else(|_| crate::primitives::from_base64(sig_str))
-        .ok()
-}
-
 /// `statusText.trim()` after the status, or the status alone when nothing is
 /// left (`:470-472`). fetch's `statusText` is the wire's phrase; hyper keeps
 /// no canonical phrase, so its absence is the canonical one, or none for a
