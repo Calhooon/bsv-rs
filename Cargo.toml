@@ -78,7 +78,8 @@ unicode-normalization = { version = "0.1", optional = true }
 
 # Insertion-ordered map (optional, for wallet): a requested certificate set's `types`, the
 # reference's `Record` order on the wire and in the signed text (bsv-rs#288), and the wallet
-# types' certificate field and keyring maps, walked in the reference's `Object.keys` order (#385)
+# types' certificate field and keyring maps, walked in the reference's `Object.keys` order (#385),
+# and the auth and identity certificate maps the same (#394)
 indexmap = { version = "2", features = ["serde"], optional = true }
 
 # HTTP client (optional, for broadcasters and chain trackers)

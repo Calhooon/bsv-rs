@@ -7,6 +7,142 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed: the auth and identity certificate maps and `resolve_by_attributes`'s attributes keep insertion order, the reference's `Record` order, one order through the crate after the wallet's (#394)
+
+#385 moved the wallet types' certificate maps to insertion order and left
+the auth and identity ones `HashMap`s, so a certificate crossing from
+`auth::Certificate` to a wallet type took the signed order and the
+validators here walked byte order. At the pin the reference's certificate
+fields and keyrings are a JavaScript `Record` wherever they appear, which
+keeps insertion order (`ts-stack@edf6e03`
+`packages/sdk/src/auth/certificates/Certificate.ts:179`, `:203`, `:510`;
+`VerifiableCertificate.ts:87`, `:110`; `packages/sdk/src/identity/IdentityClient.ts:667`
+for the attributes `resolveByAttributes` matches contacts against). Its
+`toBinary` checks each field's name and value in `Reflect.ownKeys` order
+(`snapshotCertificateFields`, `Certificate.ts:44-84`) and sorts the names by
+`localeCompare` only to write them (`:282`). The keeper's word (2026-10-28
+04:1xZ) is #385's reading under the owner's ruling (c): no new owner word.
+
+The maps are `indexmap::IndexMap<String, String>`, serde reading and writing
+them in the text's order. `indexmap` was already under `wallet` since #385;
+`auth` and `identity` get it through `wallet` and need nothing of their own,
+and the wasm32 slice builds (`identity,wasm` too). By module:
+
+- `auth` (6 maps, 10 walks): `Certificate.fields`, the binary reader's and
+  the JSON form's maps, `MasterCertificate.master_keyring`,
+  `VerifiableCertificate.keyring` and its decrypted cache. `to_binary`'s
+  checks (`checked_field_names`) take each name's length and safety, then its
+  value's 1 MiB, in the map's order, and sort only after, where they used to
+  judge in the sorted order. `from_binary` keeps the frame's order. The
+  master's snapshot (`snapshot_record`, `MasterCertificate.ts:31-61`), its
+  constructor's two loops (`:195-233`), `create_keyring_for_verifier`'s two
+  loops (`:348-365`) and `create_certificate_fields` (`Object.entries`,
+  `:270`) walk the map, as does the verifier's `decrypt_fields`
+  (`Reflect.ownKeys(keyring)`, `VerifiableCertificate.ts:160`). Each of those
+  walked byte order before. `field_names` and `revealable_fields` give the
+  map's order. `to_wallet_certificate` keeps the map's order, where #385 had
+  it sort. `get_verifiable_certificates` holds the wallet's maps as given and
+  no longer converts at the boundary.
+- `identity` (5 maps, 4 walks): `IdentityQuery.attributes`, both of
+  `IdentityCertificate`'s maps (`publicly_revealed_keyring`,
+  `decrypted_fields`), the attributes parameter and the generic-identity
+  reader's map. Both token parsers read the token's `fields` and `keyring` in
+  the order of its JSON text (`token_maps.rs`, new: a `serde_json::Value`
+  sorts its keys in this build). A member that is not an object reads as
+  empty and a value that is not a string is skipped, as before.
+  `decrypted_fields` follows the keyring.
+- `kvstore`, `registry`: no map of certificate fields, keyrings or
+  attributes. `registry::CertificateDefinitionData.fields`
+  (`HashMap<String, CertificateFieldDescriptor>`) is a definition's field
+  descriptors, not a certificate's values, and stays as it is.
+
+The signer's preimage is unchanged: `localeCompare`'s order, the same
+whatever order the fields come in (#246, #249). A certificate read from a
+frame in another order keeps that frame's bytes (#249).
+
+Pinned by `tests/auth_identity_certificate_field_order_394.rs` (13), on eight
+names out of every sorted order:
+- through `Certificate`'s JSON, `field_names`, `to_wallet_certificate` and
+  the verifier;
+- the binary form written in the signed order and read back in it;
+- an issuer's frame in another order, read in that order and written back
+  byte for byte;
+- a `VerifiableCertificate`'s keyring through its JSON;
+- issuance, the master's `decrypt_fields`, `create_keyring_for_verifier` (in
+  the order of the names to reveal) and the verifier's `decrypt_fields`;
+- the first bad name in insertion order refused by `to_binary` (a value over
+  1 MiB; `prototype` before `__proto__`), by `MasterCertificate::new` (a
+  missing keyring entry), by `create_keyring_for_verifier` (a non-canonical
+  field), by the verifier's `decrypt_fields` (a bad keyring entry) and by
+  `create_certificate_fields` (a plaintext over 64 KiB);
+- a published token's fields and keyring in the order of its text, through
+  `discover_certificates` over an injected facilitator;
+- `IdentityQuery`'s attributes in its JSON.
+
+The maps are built with `collect()` and `insert`, so the file compiles
+against the old shape: red 13 of 13 on a scratch copy of `5f8fc526` with the
+file added, each at its assertion (the sorted name named, a hash order read).
+The golden fixtures did not move (`fixtures_replay` green, nothing
+re-recorded), and neither did the #280 vector's texts
+(`auth_signed_text_280` green, every recorded certificate's maps already in
+the order the vector holds).
+
+Not done: `resolve_by_attributes` sends its attributes in byte order. The
+lookup question's query is a `serde_json::Value` (`LookupQuestion::query`, a
+public field), and without `serde_json`'s `preserve_order` (a feature every
+downstream would unify into) that type sorts its keys. Ordering the body
+needs either a change to `LookupQuestion`'s public shape or that feature,
+and neither is in this issue's word. The reference's `resolveByAttributes`
+sends no lookup: it asks its wallet's `discoverByAttributes`
+(`IdentityClient.ts:605-655`), whose arguments keep their order here since
+#385. So the lookup body's key order has no reference to follow. The
+wiremock witness of the body that #394 asked for is not written, since it
+could only pin byte order.
+
+Public shape (no semver lint reads a field's or a parameter's type; the list
+is complete):
+- 6 fields: `Certificate.fields`, `MasterCertificate.master_keyring`,
+  `VerifiableCertificate.keyring`, `IdentityQuery.attributes`,
+  `IdentityCertificate.publicly_revealed_keyring` and `.decrypted_fields`.
+- 12 signatures: `Certificate::with_fields`, `Certificate::set_fields`,
+  `MasterCertificate::new`, `::create_certificate_fields` (its argument and
+  both results), `::create_keyring_for_verifier` (both maps and its result),
+  `::issue_for_subject`, `::decrypt_fields`, `VerifiableCertificate::new`,
+  `::decrypt_fields`, `::get_decrypted_fields`, `IdentityQuery::by_attributes`,
+  `IdentityClient::resolve_by_attributes`.
+- 3 orders: `field_names`, `revealable_fields` and `to_wallet_certificate`
+  now give the map's order.
+
+Migration: the same as #385's. Build an `IndexMap` where you built a
+`HashMap` (`[(k, v)].into_iter().collect()` compiles unchanged;
+`IndexMap::from([...])` for `HashMap::from([...])`). This crate does not
+re-export `indexmap`, so a downstream that names the type adds
+`indexmap = "2"` to its own manifest. `IndexMap`'s `==` ignores order. None
+of the downstreams on this host (`bsv-overlay-cloudflare`, `rust-message-box`)
+builds these maps. `bsv-middleware-cloudflare-public`, `rust-chaintracks`
+and the LOW workers were not checked.
+
+Semver: `cargo semver-checks --release-type minor --baseline-rev 5f8fc526
+--all-features` passes 202 checks and names nothing. It has no lint for a
+changed field or parameter type, so the pass is not evidence; this entry is.
+Ratchet: every counter at or below `docs/ratchets.json` (`tools/ratchet/run
+--check --against origin/beta`). `identity/client.rs`, over its bound, shrank
+(the token's maps moved to `token_maps.rs`). Not re-recorded.
+
+### Notes: cross-SDK parity (#394)
+
+The integer-like residual is #385's: a JavaScript object walks a name like
+`"7"` first, in ascending order, whatever its place, and `IndexMap` keeps it
+where it was given. On a certificate with such a name, the first name a
+bound refuses and a keyring's walk differ from the reference's. The signed
+bytes do not, because both sides sort. go-sdk@2ca481c holds these maps as Go
+maps (`auth/certificates/certificate.go:49`, `verifiable.go:23`,
+`master.go:34`) and sorts the field names by bytes to sign
+(`wallet/serializer/certificate.go:42-49`). Its JSON writes keys sorted
+(`encoding/json`), so a certificate's JSON with unsorted fields that this
+crate or the reference writes differs from Go's text. Go's readers require
+no order.
+
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 
 The finding (#331's fourth fold's cold re-review, at `bb80a525`): five
@@ -313,7 +449,8 @@ require no order. The Go wire vectors carry maps already sorted and still
 pass. `auth::Certificate`, `MasterCertificate`, `VerifiableCertificate` and
 `identity::IdentityCertificate` keep `HashMap` fields and keyrings: their
 signer sorts and their JSON is #268's (a follow-up decides whether they move
-too); a wallet certificate converted from one takes the signed order.
+too); a wallet certificate converted from one takes the signed order. (#394,
+above, moves them.)
 
 ### Fixed: internalizeAction judges an output's protocol and its one remittance before the remittances' fields, as the reference orders it (#384)
 

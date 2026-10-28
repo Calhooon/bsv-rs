@@ -49,7 +49,7 @@ pub struct Certificate {
     pub subject: PublicKey,            // Subject's identity key
     pub certifier: PublicKey,          // Certifier's public key
     pub revocation_outpoint: Option<Outpoint>,  // On-chain revocation
-    pub fields: HashMap<String, String>,        // each value's base64 text; its UTF-8 bytes signed and written
+    pub fields: IndexMap<String, String>,       // each value's base64 text; its UTF-8 bytes signed and written; insertion order (#394)
     pub signature: Option<Vec<u8>>,    // DER-encoded signature
     #[serde(skip)]
     pub received_unsigned: Option<Vec<u8>>,  // the unsigned prefix as read or signed (#249)
@@ -60,7 +60,7 @@ pub struct Certificate {
 ```rust
 pub struct MasterCertificate {
     pub certificate: Certificate,
-    pub master_keyring: HashMap<String, String>,  // field -> encrypted revelation key, base64 text (#268)
+    pub master_keyring: IndexMap<String, String>, // field -> encrypted revelation key, base64 text (#268); insertion order (#394)
 }
 ```
 
@@ -68,7 +68,7 @@ pub struct MasterCertificate {
 ```rust
 pub struct VerifiableCertificate {
     pub certificate: Certificate,
-    pub keyring: HashMap<String, String>,  // field -> encrypted key for verifier, base64 text (#268)
+    pub keyring: IndexMap<String, String>, // field -> encrypted key for verifier, base64 text (#268); insertion order (#394)
 }
 ```
 
@@ -184,6 +184,7 @@ The `Certificate::to_binary()` method produces a deterministic binary representa
 ```
 
 **Notes:**
+- The maps keep insertion order (`IndexMap`, the reference's `Record`; #394): `to_binary` checks each name and value in the map's order, as `snapshotCertificateFields` walks `Reflect.ownKeys` (`Certificate.ts:44-84`), then sorts the names to write them; `from_binary` keeps the frame's order; the JSON reads and writes the text's order
 - Revocation outpoint uses a sentinel value: all-zeros TXID with index 0 means "no outpoint"
 - Signature is appended as raw bytes without length prefix (matches TypeScript SDK)
 - Fields are written in the reference's order, `a.localeCompare(b)` under Node's default ICU collation (`ts-stack@edf6e03` `Certificate.ts:282`), not by bytes: `a_b, a0, age, éa, f, Name` (`src/wallet/collation.rs`, U+0000..U+00FF; above that, code point order after the table, the residual; under `wallet` since #246, where the wire's certificate writer writes the same order). Go sorts by bytes (`go-sdk@2ca481c` `wallet/serializer/certificate.go:48`)
@@ -201,7 +202,7 @@ let master_cert = MasterCertificate::issue_for_subject(
     &certifier_wallet,
     &certifier_private_key,
     subject_public_key,
-    HashMap::from([
+    IndexMap::from([
         ("name".to_string(), "Alice".to_string()),
         ("email".to_string(), "alice@example.com".to_string()),
     ]),
