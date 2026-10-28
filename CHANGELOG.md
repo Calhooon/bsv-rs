@@ -66,6 +66,127 @@ Go at `2ca481c` resolves the same three forms to public keys
 public keys serialize compressed; #420's existing input-encoding and
 type-enforced limitations still apply. No current-reference result-form
 divergence remains for the three representable counterparty variants.
+### Fixed: the default mode accepts signatures without the fork-ID bit over the original digest (#429)
+
+Without an explicit flag word, a `0x01` signature at transaction version 1
+or 2 now verifies over the original transaction digest, as both TypeScript
+references do. A signature over the wrong digest still fails CHECKSIG; the
+recorded BIP143-signed control answers `The top stack element must be truthy
+after script evaluation.` Previously an unconditional check rejected both
+with `The signature must use SIGHASH_FORKID.` before verification. The
+existing digest dispatcher already selected the original algorithm for a
+signature lacking the bit; the encoding gate prevented it from being used.
+No public API or signing behavior changes. The version-1 DER-wrapper words
+and order fixed by #417, and every explicit-word refusal, stay unchanged.
+
+`tests/script_forkid_gate_429.rs` pins the version-1 acceptance, wrong-digest
+words, both version-2 verdicts, and the node's refusal under a word at both
+versions, with and without an explicit STRICTENC bit. Its three default tests
+are RED on `ff08faa3` in the old fork-ID words. The extended
+`tests/support/script_signature_words_417.mjs` records twelve cases from each
+unmodified pin under Node v22.18.0, with both original and BIP143 digests,
+in `script_forkid_gate_429{,_ts_sdk}.json`. The original nine #417 recordings
+reproduce byte for byte; their tests and the existing witness files have no
+diff. The fix gates only the missing-fork-ID refusal in
+`src/script/spend/signature_encoding.rs`.
+
+The census re-judges 66 rows against both references (identical default
+verdicts), recorded by `tests/support/script_forkid_census_429.mjs` in
+`tests/vectors/script_forkid_census_429.json`. The new test in
+`tests/support/conformance_forkid_gate_429.rs` replays every verdict against
+the shared corpus, including every newly passing allowlisted row, the six
+removed known failures, the newly exposed NULLFAIL cases, and #417's fourteen
+low-S/undefined-type rows plus #397's Chronicle row. With
+`BSV_CONFORMANCE_DIR=~/bsv/ts-stack/conformance`:
+
+| Evaluation census | Before | After |
+|---|---:|---:|
+| Total | 5,116 | 5,116 |
+| Run / passed | 2,851 / 2,834 | 2,876 / 2,865 |
+| Unsupported | 2,228 | 2,203 |
+| Skipped / known failures | 37 / 17 | 37 / 11 |
+| Unexplained failures / panics | 0 / 0 | 0 / 0 |
+
+The regression census stays 11 total, 10 passed and one known failure.
+The separate historical `script_invalid.json` census moves from 420 refused
+and 12 accepted to 418 refused and 14 accepted (432 rows). Rows 408 and 409,
+BIP66 example 8 with and without DERSIG in the fixture, now reach a failed
+CHECKMULTISIG followed by NOT. Both reference defaults accept the same bytes
+under Node 22 (`script_invalid_forkid_429.json`, the #417 recorder's
+`--script-invalid-forkid` mode). `script_invalid_allowlist.rs` names the two
+new accepted rows and replays them against the unchanged source fixture;
+that regression is also RED on `ff08faa3`. The fixture's flags are not passed
+by this default-mode census. No node-word expectation or shared vector is
+rewritten.
+
+The moved rows below use `b` = `node.script.bitcoin-sv`, `t` =
+`node.script.teranode`, `tx` = `node.tx-valid.shared`; every number is the
+four-digit suffix of the recorded ID.
+
+| Previous attribution → new result | Rows | Reason |
+| Legacy-signature → pass (19) | b:1370/1372/1374/1403/1464/1465/1466; t:1321/1323/1325/1354/1415/1416/1417; tx:0025/0051/0057/0082/0174 | The original-digest signature can reach verification |
+| DER/public-key → pass (8) | b:1381/1432/1455; t:1332/1383/1406; tx:0067/0070 | CHECKMULTISIG's encoding wrapper previously hid the fork-ID refusal |
+| Known eager-CHECKMULTISIG failure → pass (6) | b:0698/0699/1433; t:0666/0667/1384 | These six failures were the fork-ID gate; removed from the known-failure list |
+| Legacy-signature → DER/public-key (5) | b:1426/1430; t:1377/1381; tx:0064 | Four unknown-format keys and one empty key are reached |
+| Legacy-signature → CLEANSTACK (4) | b:1456; t:1407; tx:0027/0062 | Verification succeeds but leaves extra stack entries |
+| Legacy-signature → LOW_S (2) | tx:0055/0097 | A later high-S signature is reached |
+| DER/public-key → NULLDUMMY (4) | b:1443/1445; t:1394/1396 | The signature now verifies before the dummy is checked |
+| Pass → NULLFAIL capability gap (2) | b:1405; t:1356 | The default allows a failing nonempty signature followed by NOT; the fixture's NULLFAIL word refuses it |
+
+Thus legacy-signature 35 becomes five undefined-hash-type cases, renamed for
+the actual remaining restriction; DER/public-key 54 → 47, CLEANSTACK 194 →
+198, LOW_S 9 → 11, NULLDUMMY 4 → 8, and NULLFAIL 0 → 2. The six ILLEGAL_FORKID
+rows retain their count under the accurate name “the default mode permits
+SIGHASH_FORKID (fixture forbids the bit)”. `tx:0093` still belongs to the
+P2SH class (72), although its first refusal moves from fork ID to CLEANSTACK.
+Every other class is unchanged. These are capability attributions, not
+relaxations of the node word.
+
+### Notes: cross-SDK parity (#429)
+
+`ts-stack@edf6e03` `Spend.ts:595-604` returns from the fork-ID helper unless
+explicit flags carry STRICTENC; its callers are the encoding check at
+`:617`, CHECKSIG at `:1669` and CHECKMULTISIG at `:1809`. Default verification
+passes `sighashForkIdEnabled: true` (`:720-740`), but
+`TransactionSignature.ts:429-440` selects the original algorithm when the
+signature itself lacks FORKID. `ts-sdk@9e3ede6b` has the same default result
+(`Spend.ts:458-468`, `:571-593`; `TransactionSignature.ts:319-329`); its fork-ID check runs for *any* explicit
+word. Both default recordings accept the original digest and refuse BIP143
+for the same `0x01` signature form at versions 1 and 2.
+
+Under a word the node remains the authority: bitcoin-sv v1.2.2 at `879fc8b`
+adds STRICTENC whenever SIGHASH_FORKID is enabled
+(`interpreter.cpp:2315-2318`), then `CheckSignatureEncoding` refuses the
+missing bit with `SCRIPT_ERR_MUST_USE_FORKID` (`:291-306`). Its sighash
+selector (`:2112-2123`) would choose the original digest without the bit,
+but the encoding refusal prevents that call under this word. Rust retains
+`The signature must use SIGHASH_FORKID.` there. The references expose their
+DER wrapper instead when their gate runs; edf6e03 even skips it if the word
+omits explicit STRICTENC, unlike 9e3ede6b and the node. Neither discrepancy
+changes Rust's explicit-word behavior.
+
+The three DER-off empty-word rows recorded for #417 remain separate from
+the default mode (DER is always on there):
+
+| Empty-word row at version 1 | ts-stack edf6e03 | ts-sdk 9e3ede6b | Node at 879fc8b | Rust before and after |
+|---|---|---|---|---|
+| `der-off-chronicle`, `0x61` | Valid, original digest | Valid, original digest | Valid, original digest | Refuses the unsupported empty word |
+| `der-off-forkid-present`, `0x41`, signed over original | Valid, original digest | Refused, BIP143 digest | Valid, original digest | Refuses the unsupported empty word |
+| `der-off-forkid-absent`, `0x01` | Valid, original digest | Valid, original digest | Valid, original digest | Refuses the unsupported empty word |
+
+These are replays of the same bytes, not signatures regenerated for each
+SDK. Unlike edf6e03, 9e3ede6b's digest dispatch ignores the word's disabled
+fork ID (`TransactionSignature.ts:319-329`), so the original-signed `0x41`
+control reaches its truthy-top refusal. This existing difference does not
+affect a `0x01` signature, which selects the original digest in both.
+
+The census's empty-word b:1435/1437/1441, t:1386/1392 also keep their
+default DER-wrapper refusal for undefined hash types; t:1388 keeps its
+version-1 Chronicle refusal. Both references accept all six with the actual
+empty word. Rust still refuses that word before execution. #429 adds no
+DER-off API and does not change those existing findings.
+
+The default accepts a pre-fork form no BSV wallet produces because the reference's default does, and the node refuses it, so a door on a live chain passes the word.
 
 ### Changed: the default mode runs all ten Chronicle opcodes at every version, gates the Chronicle hash type by version, and uses the reference's non-minimal-number words (#397)
 
@@ -564,11 +685,11 @@ low-S (`:618-621`) run inside it. The catch (`:622-626`) exposes only
 `The signature format is invalid.` when `enforceDer` is true. Without a
 word it is always true (`#shouldEnforceDerSignatures`, `:376-386`), including
 the relaxed version-2 mode; low-S is enabled by default at version 1
-(`:350-353`). The default fork-ID helper is a no-op. Without a word this
-crate still refuses a signature lacking the fork-ID bit outside the wrapper
+(`:350-353`). The default fork-ID helper is a no-op. Before #429, without a word this
+crate refused a signature lacking the fork-ID bit outside the wrapper
 with `The signature must use SIGHASH_FORKID.`, where both pins accept it
 (`0x01` at version 1): a divergence older than this change, stated now in
-`CLAUDE.md`'s list (bsv-rs#429 asks the keeper's word).
+`CLAUDE.md`'s list at the time; the #429 entry corrects that default-mode divergence.
 
 `ts-sdk@9e3ede6b` `Spend.ts:435-489` has the same visible words and order
 for all three version-1 refusals (replayed from the same bytes under Node

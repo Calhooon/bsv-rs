@@ -1,4 +1,6 @@
 //! The default-mode census's enumerated capability classes and their pins.
+//! #429 re-judges every moved vector: the remaining legacy-signature gap
+//! is undefined hash types; see the changelog and the recorded 66-row audit.
 //! #397 moves teranode.1388 (scope 0x21) from the legacy-FORKID class (36 to
 //! 35) to the version-1 Chronicle hash gate (1); totals are unchanged.
 
@@ -26,7 +28,7 @@ pub(super) fn classify_chronicle_hash_type(
 /// last_updated 2026-05-19) — see classify_node_mismatch for what each class
 /// means. THESE ARE NOT FAILURES — they are enumerated capability gaps of
 /// the default mode (strict at version <= 1, post-genesis) and its
-/// FORKID-only sighash. Any drift (corpus update, SDK behavior change) fails
+/// flag-independent default restrictions. Any drift (corpus update, SDK behavior change) fails
 /// the assert and forces a re-audit.
 pub(super) const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     (CHRONICLE_HASH_TYPE, 1),
@@ -47,25 +49,25 @@ pub(super) const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     // 30 version-2 fixtures that previously died at the always-on clean-stack
     // check now execute; 27 pass conformantly (moved to `run`) and 3 progress
     // to the CLTV/CSV gap below (5 -> 8). Zero new mismatches.
-    ("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)", 194),
-    ("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)", 9),
+    ("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)", 198),
+    ("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)", 11),
     ("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)", 181),
-    ("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)", 4),
+    ("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)", 8),
     (
         "bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)",
         319,
     ),
     (
         "strict DER/pubkey encodings are always enforced (SIGHASH_FORKID implies STRICTENC on the reference too)",
-        54,
+        47,
     ),
     (
-        "bsv-rs always requires SIGHASH_FORKID (cannot reject FORKID-bit sigs)",
+        "the default mode permits SIGHASH_FORKID (fixture forbids the bit)",
         6,
     ),
     (
-        "bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)",
-        35,
+        "the default mode enforces defined hash types (legacy fixtures without STRICTENC)",
+        5,
     ),
     (
         "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
@@ -85,6 +87,7 @@ pub(super) const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
     ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 8),
     ("DISCOURAGE_UPGRADABLE_NOPS is not in the default mode (only under a word)", 20),
     ("MINIMALIF is not in the default mode (only under a word)", 6),
+    ("NULLFAIL is not in the default mode (only under a word)", 2),
     (
         "no P2SH redeem-script evaluation in bsv-rs (post-genesis rules)",
         72,

@@ -4,6 +4,9 @@
 //   ~/.nvm/versions/node/v22.18.0/bin/node tests/support/script_signature_words_417.mjs \
 //     "$W/sdk.mjs" > tests/vectors/script_signature_words_417.json
 // The same recorder also runs on ts-sdk@9e3ede6b (pass that label as argv[3]).
+// Pass --forkid-gate as argv[4] to record #429's original/BIP143 digest
+// controls and explicit words. Pass a recording path instead to replay it.
+// Pass --script-invalid-forkid and script_invalid.json to re-judge rows 408/409.
 import { pathToFileURL } from 'node:url'
 import { readFileSync } from 'node:fs'
 
@@ -16,8 +19,34 @@ function parameters(version, lock, mode) {
     transactionVersion: version, otherInputs: [], outputs: [], inputIndex: 0,
     inputSequence: 0xffffffff, lockTime: 0, lockingScript: lock,
     unlockingScript: new UnlockingScript(),
-    ...(mode === 'der-off' ? { verifyFlags: [] } : {})
+    ...(mode === 'der-off' ? { verifyFlags: [] } : {}),
+    ...(mode.startsWith('forkid-') ? { verifyFlags: [
+      'GENESIS', 'UTXO_AFTER_GENESIS', 'SIGHASH_FORKID',
+      ...(mode === 'forkid-strict-word' ? ['STRICTENC'] : [])
+    ] } : {})
   }
+}
+
+function recordForkIdGate(version, wrongDigest, mode) {
+  const key = new PrivateKey(7)
+  const lock = new LockingScript().writeBin(key.toPublicKey().encode(true)).writeOpCode(0xac)
+  const params = parameters(version, lock, mode)
+  const signing = { ...params, subscript: lock, scope: 0x01, sighashForkIdEnabled: true }
+  const original = TransactionSignature.formatBytes(signing)
+  // Force the BIP143 algorithm but keep the signed hash-type word at 0x01.
+  // A signature over this digest must fail the default's original dispatch.
+  const bip143 = TransactionSignature.formatBip143(signing)
+  const preimage = wrongDigest ? bip143 : original
+  const raw = key.sign(Hash.sha256(preimage))
+  const sig = new TransactionSignature(raw.r, raw.s, 0x01)
+  params.unlockingScript = new UnlockingScript().writeBin(sig.toChecksigFormat())
+  return evaluate({
+    name: `v${version}-${wrongDigest ? 'bip143' : 'original'}-${mode}`,
+    version, mode, scope: 0x01, unlock: params.unlockingScript.toHex(), lock: lock.toHex(),
+    signedDigest: wrongDigest ? 'bip143' : 'original',
+    originalDigest: Utils.toHex(Hash.hash256(original)),
+    bip143Digest: Utils.toHex(Hash.hash256(bip143))
+  })
 }
 
 function record(name, version, scope, highS = false, mode = 'default') {
@@ -59,7 +88,16 @@ function evaluate(c) {
   return { ...input, lowSChecks, ...result }
 }
 
-const cases = process.argv[4]
+const cases = process.argv[4] === '--script-invalid-forkid'
+  ? [408, 409].map(index => {
+    const c = JSON.parse(readFileSync(process.argv[5], 'utf8'))[index]
+    return evaluate({ name: `script-invalid-${index}`, index, version: 1, mode: 'default',
+      unlock: c.scriptSig, lock: c.scriptPubKey, flags: c.flags, comment: c.comment })
+  })
+  : process.argv[4] === '--forkid-gate'
+  ? ['default', 'forkid-strict-word', 'forkid-implied-word'].flatMap(mode =>
+    [1, 2].flatMap(version => [false, true].map(wrong => recordForkIdGate(version, wrong, mode))))
+  : process.argv[4]
   ? JSON.parse(readFileSync(process.argv[4], 'utf8')).cases.map(evaluate)
   : [
   record('defined-low-s', 1, 0x41),
