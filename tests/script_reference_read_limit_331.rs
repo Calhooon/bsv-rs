@@ -12,7 +12,8 @@
 //! `verify`; `OP_2MUL`'s, which the reference's `mul` builds without a
 //! string, is pushed. A shift's result past 2^30 bits is invalid in the
 //! words of V8's `BigInt` cap, `Maximum BigInt size exceeded`, which the
-//! reference's shift throws before its string. Under a word the node's number length decides
+//! reference's shift throws before its string. Under a word the node's number
+//! length decides
 //! (32,000,000 bytes after Chronicle). By hand: each operand is 64 MiB, the
 //! file 0.63 s and 1.01 GB resident in release under `--test-threads=1`
 //! (measured on the test binary alone; the figure holds one test at a time,

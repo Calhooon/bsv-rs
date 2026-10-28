@@ -229,7 +229,8 @@ word.
   `a_left_shift_past_2_pow_30_bits_is_invalid_with_the_bigint_words`, RED
   on 8eb1b2c8 with the string's words). No other opcode's result passes
   2^30 bits in one step: two readable operands' product is at most
-  2^30 - 48 bits, a sum one past the longer operand. These are the opcodes whose result can cross the
+  2^30 - 48 bits, a sum one past the longer operand. These are the opcodes
+  whose result can cross the
   figure through the reference's `toString(2)`: `OP_MUL` and `OP_2MUL` can
   pass it, but `mul` sets its magnitude without a string (`:926-933`), so
   their result is pushed there and here (an at-limit `OP_2MUL` is `true`
