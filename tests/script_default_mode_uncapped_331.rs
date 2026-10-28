@@ -151,6 +151,10 @@ fn a_40_000_000_byte_element_is_valid_without_a_budget_and_declined_under_one() 
 /// valid: about 1 GiB asked, 1.9 GB RSS and 63 s on the studio under lane
 /// load (3.2 GB and 6.6 s on the review's host), so it runs by hand: `cargo test --test script_default_mode_uncapped_331 --
 /// --ignored`. A version-2 spend: `OP_LSHIFTNUM` is a post-Chronicle opcode.
+/// Since bsv-rs#383 the count, above `INT_MAX`, is refused first in the
+/// reference's words (`Spend.ts:1058-1060`), before anything is sized: the
+/// element bound is out of a shift's reach (536,870,888 bits read plus
+/// `INT_MAX` is 335 MB).
 #[test]
 #[ignore = "by hand: its RED allocates about 3 GB"]
 fn an_uncapped_left_shift_just_past_the_1_gib_element_bound_is_refused_before_it_allocates() {
@@ -160,10 +164,7 @@ fn an_uncapped_left_shift_just_past_the_1_gib_element_bound_is_refused_before_it
     lock.push(OP_NOP7);
     let mut unlock = Script::new();
     unlock.write_opcode(OP_1);
-    let error = spend(&lock, unlock, 2, None).expect_err("the element bound");
+    let error = spend(&lock, unlock, 2, None).expect_err("the count's refusal");
     assert!(!error.is_resource_limit(), "{}", error.message);
-    assert_eq!(
-        error.message,
-        "It's not currently possible to push data larger than 1073741824 bytes."
-    );
+    assert_eq!(error.message, "OP_LSHIFTNUM shift count exceeds INT_MAX.");
 }

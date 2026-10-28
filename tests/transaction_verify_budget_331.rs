@@ -121,12 +121,14 @@ fn an_invalid_script_is_a_transaction_error_with_or_without_a_budget() {
     assert_eq!(verify(&tx, Some(32_000_000)), verdict);
 }
 
-/// Uncapped, the default mode's 1 GiB element bound still holds: a numeric
-/// left shift of 1 by 2^40 bits (a result of 2^37 bytes) is refused before the
-/// allocation, the verdict `OP_CAT` and `OP_NUM2BIN` give above the bound,
-/// where without the bound it asked the allocator for 128 GiB. Under a budget
-/// the budget declines it first, as before. A version-2 child: `OP_LSHIFTNUM`
-/// is a post-Chronicle opcode, the default mode's for version > 1.
+/// Uncapped, a numeric left shift of 1 by 2^40 bits (a result of 2^37 bytes)
+/// is refused before the allocation, where before #331 it asked the allocator
+/// for 128 GiB. Until bsv-rs#383 the 1 GiB element bound refused it, and a
+/// budget declined it first; since #383 the count above `INT_MAX` is the
+/// reference's verdict before anything is sized (`Spend.ts:1058-1060`), under
+/// a budget too, and the element bound is out of a shift's reach (536,870,888
+/// bits read plus `INT_MAX` is 335 MB). A version-2 child: `OP_LSHIFTNUM` is a
+/// post-Chronicle opcode, the default mode's for version > 1.
 #[test]
 fn an_uncapped_numeric_shift_past_the_element_bound_is_refused_before_it_allocates() {
     let mut lock = Script::new();
@@ -136,22 +138,10 @@ fn an_uncapped_numeric_shift_past_the_element_bound_is_refused_before_it_allocat
     let mut unlock = Script::new();
     unlock.write_opcode(OP_1);
     let tx = child_of(&lock, unlock, 2);
-    assert_eq!(
-        verify(&tx, None),
-        Err(Error::TransactionError(
-            "Script validation failed for input 0: It's not currently possible to push data larger than 1073741824 bytes."
-                .to_string()
-        ))
-    );
-    assert!(matches!(
-        verify(&tx, Some(32_000_000)),
-        Err(Error::ScriptEvaluationDeclined {
-            limit: ScriptResourceLimit {
-                resource: ScriptResource::ElementSize,
-                limit: 32_000_000,
-                ..
-            },
-            ..
-        })
+    let verdict = Err(Error::TransactionError(
+        "Script validation failed for input 0: OP_LSHIFTNUM shift count exceeds INT_MAX."
+            .to_string(),
     ));
+    assert_eq!(verify(&tx, None), verdict);
+    assert_eq!(verify(&tx, Some(32_000_000)), verdict);
 }
