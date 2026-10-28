@@ -312,7 +312,8 @@ async fn a_success_tx_in_the_object_form_or_integral_floats_is_read_as_its_bytes
 /// runtime's `SyntaxError` at the first and `Invalid createAction result
 /// tx: expected an array of bytes` at the second (`HTTPWalletJSON.ts:322-341`).
 #[tokio::test]
-async fn a_success_answer_neither_reading_takes_is_refused_in_serdes_words() {
+async fn a_success_answer_neither_reading_takes_is_refused_in_serdes_or_the_references_words() {
+    // one not JSON in serde_json's; a `tx` that is no bytes in `bytes`'s (#365)
     for (body, words) in [
         (
             "not json",
@@ -320,7 +321,7 @@ async fn a_success_answer_neither_reading_takes_is_refused_in_serdes_words() {
         ),
         (
             r#"{"tx": "x"}"#,
-            r#"failed to parse JSON response: invalid type: string "x", expected a sequence"#,
+            "Invalid createAction result tx: expected an array of bytes",
         ),
     ] {
         let server = MockServer::start().await;
