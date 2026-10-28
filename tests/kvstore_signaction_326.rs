@@ -9,10 +9,9 @@
 //! by `tests/support/signaction_reference_326.mjs` under Node v22.18.0). The
 //! four sites sent the hex of the reference's bytes and no options.
 //!
-//! This crate's stores send their createAction no options, so the carried
-//! members are absent here where the reference's are its configuration's
-//! (`acceptDelayedBroadcast: false`, the global store's `noSend: false`): a
-//! stated difference, pinned below so a change to it is seen.
+//! #341/#342 now bind the transaction and carry the reference's options.
+//! Global set still does not request a prior token (#343), so it has the
+//! new-token path's empty signer set, never a signer for wallet funding.
 //!
 //! Hermetic: the counting wallet of #318 (`tests/support/identity_reveal_wallet.rs`)
 //! lists the local store's token and answers createAction with a signable
@@ -72,12 +71,9 @@ fn token_of(wallet: &Counting) -> Transaction {
     source
 }
 
-/// This crate's signAction against the reference's case, and the stated
-/// difference: no createAction options here, so the options are
-/// `returnTXIDOnly: false` alone. `spends_token`: whether this crate's
-/// createAction spends the token, as the reference's always does; the global
-/// store's `set` does not (its lookup asks for no token, so it finds none to
-/// spend), a finding outside #326 pinned here.
+/// Retain #326's reference and spend-member assertions, now with #342's
+/// exact create/sign options. The global update's missing token is #343;
+/// its signer set is the reference's new-token path's empty set (#341).
 fn assert_case(name: &str, case: &Value, wallet: &Counting, spends_token: bool) {
     let signed = wallet.signed.lock().unwrap().take().unwrap();
     let created = wallet.created.lock().unwrap().take().unwrap();
@@ -90,12 +86,20 @@ fn assert_case(name: &str, case: &Value, wallet: &Counting, spends_token: bool) 
         .collect();
     let expected = spends_token.then(|| format!("{}.0", token.id()));
     assert_eq!(spent, Vec::from_iter(expected), "{name}: the inputs");
-    assert_reference_sign(name, case, &signed, created.options.as_ref());
-    assert!(created.options.is_none(), "{name}: the stated difference");
+    let comparable = if spends_token {
+        case.clone()
+    } else {
+        vector()["global"]["set_new"].clone()
+    };
+    assert_reference_sign(name, &comparable, &signed, created.options.as_ref());
+    assert_eq!(
+        serde_json::to_value(created.options.unwrap()).unwrap(),
+        case["create_action_options"],
+        "{name}: #342 closes the previously stated option difference"
+    );
     assert_eq!(
         serde_json::to_value(signed.options.unwrap()).unwrap(),
-        serde_json::json!({ "returnTXIDOnly": false }),
-        "{name}"
+        case["sign_action"]["options"]
     );
 }
 
@@ -202,6 +206,6 @@ async fn the_local_update_signs_with_the_reference_text_and_the_bound_options() 
 #[tokio::test]
 async fn the_local_removal_signs_with_the_reference_text_and_the_bound_options() {
     let (store, wallet) = local_with_token().await;
-    store.remove("alpha", None).await.unwrap();
+    store.remove("alpha", None).await.unwrap_err();
     assert_case("local remove", &vector()["local"]["remove"], &wallet, true);
 }

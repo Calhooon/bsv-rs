@@ -15,10 +15,12 @@ Both implementations maintain cross-SDK compatibility with the TypeScript and Go
 | File | Purpose | Lines |
 |------|---------|-------|
 | `mod.rs` | Module root with re-exports and documentation | ~120 |
-| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~849 |
-| `local.rs` | LocalKVStore implementation with MockWallet tests | ~1729 |
-| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~838 |
-| `bound.rs` | `bound_sign_options` (crate-private): the signAction options the reference's `completeBoundAction` sends, `{ acceptDelayedBroadcast, returnTXIDOnly: false, noSend, sendWith }` carried from the createAction's (`ts-stack@edf6e03` `completeBoundAction.ts:1111-1120`; #326) | ~47 |
+| `types.rs` | Core types (Config, Entry, Token, Query, Options, KvProtocolFields, TTL encoding) | ~833 |
+| `local.rs` | LocalKVStore implementation; tests in local_tests.rs | ~894 |
+| `global.rs` | GlobalKVStore implementation with SyncHistorian history building | ~788 |
+| `bound.rs`, `bound/action.rs`, `bound/checks.rs` | Shared owned create/sign boundary: request and signer binding, result validation, carried options and abort (#341/#342) | — |
+| `action_options.rs` | Config builders and the reference's per-store createAction options (#342) | — |
+| `local_tests.rs` | Local store unit tests, separated from production code; writer-built wallet transactions | — |
 | `interpreter.rs` | PushDrop token interpreter, KVStoreFields; #344 separates the five/six-field forms, validates tags in reference order, and authenticates the reference writer's JSON protocol/key-ID form; the older raw-protocol form retained | ~620 |
 
 ## Key Exports
@@ -240,6 +242,10 @@ pub struct KVStoreConfig {
     pub originator: Option<String>,
     /// Whether to encrypt values (LocalKVStore only, default: true)
     pub encrypt: bool,
+    /// Both stores; default false
+    pub accept_delayed_broadcast: bool,
+    /// Global noSend; default false, ignored by local
+    pub overlay_broadcast: bool,
 }
 
 impl KVStoreConfig {
@@ -250,6 +256,8 @@ impl KVStoreConfig {
     pub fn with_topics(self, topics: Vec<String>) -> Self;
     pub fn with_originator(self, originator: impl Into<String>) -> Self;
     pub fn with_encrypt(self, encrypt: bool) -> Self;
+    pub fn with_accept_delayed_broadcast(self, accept: bool) -> Self;
+    pub fn with_overlay_broadcast(self, enabled: bool) -> Self;
 }
 ```
 
@@ -560,9 +568,32 @@ match store.get("key", "default").await {
 
 ## Internal Design
 
-### signAction (#326)
+### Bound actions (#326, #341, #342)
 
-Both stores' `set` and `remove` send signAction the reference as the wallet answered createAction, its base64 text (`to_base64` of `SignableTransaction.reference`, the bytes a substrate decoded), and `bound_sign_options` of the createAction's options, as the reference's stores do through `completeBoundAction`; until #326 they sent the hex of the bytes and no options. The createAction sends no options, so the signAction's options are `{ returnTXIDOnly: false }`, where the reference's carry `acceptDelayedBroadcast: false` (and the global store's `noSend: false`). `completeBoundAction`'s checks are not made here: the spends carry empty unlocking scripts for the wallet to fill (the reference signs each input with its PushDrop unlocker), nothing binds the signable transaction to the request or the signed one to the template, and no action is aborted on failure (the parity note of #326). Pinned by `tests/kvstore_signaction_326.rs`.
+Both stores call `bound::complete_action` for set and removal. It owns the
+request before createAction, validates the signable reference and atomic BEEF,
+binds version, lock time, requested input outpoints/sequences/scripts, requested
+outputs and values, then maps token signers onto those input indexes. Wallet
+funding inputs receive no token signer. The signed transaction must preserve
+the template and authorized scripts and agree with any returned txid. The
+validated signed result supplies the stores' result; failures after accepting
+a reference abort best-effort. Rust ownership replaces the reference's dynamic
+property snapshots and shared-JavaScript-intrinsics checks.
+
+`action_options` sends the reference's false defaults for
+`acceptDelayedBroadcast` and global `noSend` (`overlay_broadcast`), with
+`randomizeOutputs: false` except on local removal. The boundary forces
+`signAndProcess: false` and `returnTXIDOnly: false`; `bound_sign_options` carries
+the same create options into signAction, including `sendWith` if present.
+The reference text is re-encoded as canonical base64 (#326).
+
+The stores' empty unlocking-script signers remain a divergence from PushDrop
+signing. Global set does not collect prior tokens and removal takes one (#343);
+untagged tokens remain unreadable (#344). The request-binding checks do not
+hide those earlier findings. Pinned by `tests/kvstore_signaction_326.rs`,
+`tests/kvstore_bound_action_341_342.rs`, `tests/kvstore_options_342.rs` and the
+unused-signer unit test; the reference's calls and refusals are recorded by
+`tests/support/signaction_reference_326.mjs --bound-actions` under Node 22.
 
 ### Per-Key Locking
 

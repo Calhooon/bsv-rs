@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed: bind key-value actions before signing and carry their options (#341, #342)
+
+Both stores now use one owned-data create/sign boundary under `kvstore/bound`.
+The wallet's signable transaction is checked before any signAction: version,
+lock time, unique input outpoints, every requested input and its sequence and
+script, the requested outputs in their configured order, and input/output
+values. Signers are matched by requested outpoint to the returned input index;
+a wallet-added funding input has no token signer. The signed result must retain
+the authorized template and unlocking scripts, and any returned txid must name
+that transaction. The stores return the validated signed result, rather than
+ignoring it and reading a txid from the earlier createAction result. A failure
+after accepting a reference aborts the action best-effort, preserving the first
+error. Previously the stores signed whatever transaction the wallet returned,
+used positional empty spends, ignored the completed transaction, and made none
+of these checks.
+
+`KVStoreConfig` adds `accept_delayed_broadcast: bool` and
+`overlay_broadcast: bool`, both defaulting to `false`, with corresponding
+`with_*` builders. The first reaches both stores; the second is the global
+store's `noSend` option, named `overlayBroadcast` by the reference. createAction
+also sends `signAndProcess: false`, `returnTXIDOnly: false`, and
+`randomizeOutputs: false` except on local removal. signAction carries that
+same createAction's `acceptDelayedBroadcast`, `noSend` and `sendWith`, alongside
+`returnTXIDOnly: false`; it does not reconstitute them from defaults. Previously
+createAction had no options and signAction sent `returnTXIDOnly: false` alone,
+so a configured broadcast policy could not reach either call.
+
+`tests/kvstore_bound_action_341_342.rs` pins the pre-signing refusals and order,
+the unsigned funding input, signed-template checks, the completed txid, and
+both calls' default options. Its seven tests are RED on base `bf97cc74` in a
+scratch checkout with a separate target directory. `tests/kvstore_options_342.rs`
+pins enabled configuration on new, update and removal paths for both stores.
+The unused-signer refusal is pinned separately by the recording-wallet test
+`an_unused_input_signer_is_refused_in_the_recorded_words_341`, which asserts
+createAction then abortAction, with no signAction; it is also RED with only
+the unused-signer guard removed in a separate scratch copy. The #326 recorder
+is extended with `--bound-actions`: Node v22.18.0 runs the actual reference
+stores with a fake wallet, records both calls' options and sixteen boundary
+refusals in `tests/vectors/kvstore_bound_action_341_342.json`; two recordings are
+byte-identical. Existing mock wallets now build their transactions with this
+crate's writer, and the #326 tests retain their reference-text checks.
+
+Public shape: the two config fields and builders are additions with the
+reference's defaults. Exhaustive Rust config literals must provide the two
+fields or use `..Default::default()`. The required minor semver check reports
+`constructible_struct_adds_field`: defaults do not preserve exhaustive literal
+construction. Existing default/builder callers need no source edit.
+Migration: none. Stored data and wallet references are unchanged.
+
+### Notes: cross-SDK parity (#341, #342)
+
+Under the owner's ruling (c), this follows `ts-stack@edf6e03`
+`completeBoundAction.ts:1022-1070` (forced create options, owned snapshot,
+reference validation and request binding), `:1076-1108` (outpoint signer matching
+and the unused-signer refusal), `:1111-1150` (carried options, signed-result
+checks and abort), and its binding/template helpers at `:646-883`.
+`GlobalKVStore.ts:46-56,319-389,473-488` defaults both broadcast flags to false
+and maps `overlayBroadcast` to `noSend`; `LocalKVStore.ts:94,413-425,515-537`
+sends only `acceptDelayedBroadcast`, with output randomization disabled on set.
+The older `ts-sdk@9e3ede6b` sends the store options but has no bound-action
+checks (`GlobalKVStore.ts:198-260,318-350`, `LocalKVStore.ts:260-339`). Go at
+`2ca481c` has only a local store, no broadcast config members, and sends empty
+create options and no sign options (`kvstore/interfaces.go:36-48`,
+`local_kv_store.go:301-345,470-497`).
+
+Rust's owned typed arguments/results exclude the reference's JavaScript
+getters, shared byte storage and mutable prototype intrinsics; these have no
+safe-Rust test input. The recorder pins a changed `Array.prototype.push` being
+refused before signing in the reference's words. Base64 text is decoded by the
+wallet types; re-encoding makes it canonical, with its nonempty/4096-character
+bound enforced here. The stores still supply empty unlocking scripts rather
+than the reference's PushDrop signers, and global set still does not collect
+prior tokens, global removal takes one, and untagged tokens remain unreadable
+(the existing #326 findings, #343/#344). These are not silently represented as
+parity by the new checks. The reference's output-satoshi ranges, additional
+output authorization and trusted-input-amount extension are not exposed by
+either store and are not added here. Rust errors retain the `KvStoreError`
+variant and its display prefix.
+
 ### Changed: issue the amended BRC-56 minimal-length HMAC key; name and count the 32-byte-key tag as legacy (#379, PR #389)
 
 The owner's two words, through the keeper:

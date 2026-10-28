@@ -59,7 +59,7 @@ Object.defineProperty(globalThis, 'crypto', {
 const [sdkPath] = process.argv.slice(2)
 const {
   ContactsManager326: ContactsManager, GlobalKVStore, LocalKVStore, LookupResolver, ProtoWallet, PrivateKey,
-  Script, Transaction, Utils, PushDrop, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344
+  Script, Transaction, Utils, PushDrop, decodeAndVerifyKVStoreToken344, kvStoreInterpreter344, completeBoundAction
 } = await import(pathToFileURL(sdkPath).href)
 
 const REFERENCE = Utils.toBase64(new Array(8).fill(0x52))
@@ -237,6 +237,23 @@ if (process.argv.includes('--kvstore-tags')) {
   process.exit(0)
 }
 
+// A store's token: the output of the first set's createAction, carried by a
+// source transaction at output 0.
+const tokenOf = (state, run) => {
+  const output = run.create_action_outputs[0]
+  const source = sourceOf([output])
+  state.sources[source.id('hex')] = source
+  return source
+}
+
+// #341/#342 extend the same recorder, keeping the #326 recording unchanged.
+if (process.argv.includes('--bound-actions')) {
+  const { recordBoundActions } = await import('./bound_action_reference_341_342.mjs')
+  console.log(JSON.stringify(await recordBoundActions({
+    recording, fresh, record, stop, tokenOf, sourceOf, LookupResolver,
+    LocalKVStore, GlobalKVStore, Transaction, Script, Utils, completeBoundAction
+  }), null, 2))
+} else {
 // The contacts manager.
 counter = 0
 const contacts = {}
@@ -268,15 +285,6 @@ const contacts = {}
   }
   contacts.update = record(state, await stop(() => manager.saveContact({ ...contact, name: 'Bob Updated' })))
   contacts.remove = record(state, await stop(() => manager.removeContact(contact.identityKey)))
-}
-
-// A store's token: the output of the first set's createAction, carried by a
-// source transaction at output 0.
-const tokenOf = (state, run) => {
-  const output = run.create_action_outputs[0]
-  const source = sourceOf([output])
-  state.sources[source.id('hex')] = source
-  return source
 }
 
 // The global key-value store: its token written with no token found, then
@@ -328,3 +336,5 @@ console.log(JSON.stringify({
   global,
   local
 }, null, 2))
+
+}

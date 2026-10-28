@@ -7,17 +7,17 @@ use crate::overlay::{
     LookupAnswer, LookupQuestion, LookupResolver, LookupResolverConfig, NetworkPreset,
     TopicBroadcaster, TopicBroadcasterConfig,
 };
-use crate::primitives::{from_hex, to_base64, to_hex, PublicKey};
+use crate::primitives::{from_hex, to_hex, PublicKey};
 use crate::script::templates::PushDrop;
 use crate::transaction::Broadcaster;
 use crate::transaction::Transaction;
 use crate::wallet::{
     Counterparty, CreateActionArgs, CreateActionInput, CreateActionOutput, GetPublicKeyArgs,
-    Protocol, SecurityLevel, SignActionArgs, SignActionSpend, WalletInterface,
+    Protocol, SecurityLevel, WalletInterface,
 };
 use crate::{Error, Result};
 
-use super::bound::bound_sign_options;
+use super::bound::complete_action;
 use super::interpreter::{KVStoreContext, KVStoreInterpreter};
 use super::types::{
     KVStoreConfig, KVStoreEntry, KVStoreGetOptions, KVStoreQuery, KVStoreRemoveOptions,
@@ -259,46 +259,21 @@ impl<W: WalletInterface> GlobalKVStore<W> {
         }];
 
         // Create action
-        let create_result = self
-            .wallet
-            .create_action(
-                CreateActionArgs {
-                    description,
-                    inputs,
-                    outputs: Some(outputs),
-                    input_beef,
-                    lock_time: None,
-                    version: None,
-                    labels: Some(self.config.topics.clone()),
-                    options: None,
-                },
-                self.originator(),
-            )
-            .await?;
-
-        // Sign if needed: the reference as answered, its base64 text (#326)
-        if let Some(signable) = &create_result.signable_transaction {
-            let reference_str = to_base64(&signable.reference);
-
-            let spends = HashMap::from([(
-                0u32,
-                SignActionSpend {
-                    unlocking_script: Vec::new(), // Will be computed by wallet
-                    sequence_number: None,
-                },
-            )]);
-
-            self.wallet
-                .sign_action(
-                    SignActionArgs {
-                        reference: reference_str,
-                        spends,
-                        options: Some(bound_sign_options(None)),
-                    },
-                    self.originator(),
-                )
-                .await?;
-        }
+        let create_result = complete_action(
+            &self.wallet,
+            CreateActionArgs {
+                description,
+                inputs,
+                outputs: Some(outputs),
+                input_beef,
+                lock_time: None,
+                version: None,
+                labels: Some(self.config.topics.clone()),
+                options: Some(self.config.action_options(true, false)),
+            },
+            self.originator(),
+        )
+        .await?;
 
         // Broadcast to overlay using tx field (atomic BEEF format)
         if let Some(tx_bytes) = &create_result.tx {
@@ -387,46 +362,21 @@ impl<W: WalletInterface> GlobalKVStore<W> {
             .unwrap_or_else(|| format!("Remove {} from kvstore", key));
 
         // Create action (spending only, no new outputs)
-        let create_result = self
-            .wallet
-            .create_action(
-                CreateActionArgs {
-                    description,
-                    inputs: Some(vec![input]),
-                    outputs: None,
-                    input_beef: token.beef.clone(),
-                    lock_time: None,
-                    version: None,
-                    labels: Some(self.config.topics.clone()),
-                    options: None,
-                },
-                self.originator(),
-            )
-            .await?;
-
-        // Sign if needed: the reference as answered, its base64 text (#326)
-        if let Some(signable) = &create_result.signable_transaction {
-            let reference_str = to_base64(&signable.reference);
-
-            let spends = HashMap::from([(
-                0u32,
-                SignActionSpend {
-                    unlocking_script: Vec::new(),
-                    sequence_number: None,
-                },
-            )]);
-
-            self.wallet
-                .sign_action(
-                    SignActionArgs {
-                        reference: reference_str,
-                        spends,
-                        options: Some(bound_sign_options(None)),
-                    },
-                    self.originator(),
-                )
-                .await?;
-        }
+        let create_result = complete_action(
+            &self.wallet,
+            CreateActionArgs {
+                description,
+                inputs: Some(vec![input]),
+                outputs: None,
+                input_beef: token.beef.clone(),
+                lock_time: None,
+                version: None,
+                labels: Some(self.config.topics.clone()),
+                options: Some(self.config.action_options(true, true)),
+            },
+            self.originator(),
+        )
+        .await?;
 
         // Broadcast removal to overlay
         if let Some(tx_bytes) = &create_result.tx {

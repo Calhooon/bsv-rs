@@ -6,10 +6,12 @@
 
 use crate::wallet::{CreateActionOptions, SignActionOptions};
 
+mod action;
+mod checks;
+pub(crate) use action::complete_action;
+
 /// The options `completeBoundAction` signs with, carried from `create`, the
-/// options of the createAction the signAction completes (`None` where the
-/// createAction sent none, as this crate's stores' do: every carried member
-/// absent then).
+/// options of the createAction the signAction completes.
 pub(crate) fn bound_sign_options(create: Option<&CreateActionOptions>) -> SignActionOptions {
     SignActionOptions {
         accept_delayed_broadcast: create.and_then(|o| o.accept_delayed_broadcast),

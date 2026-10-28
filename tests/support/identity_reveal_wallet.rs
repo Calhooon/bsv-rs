@@ -43,7 +43,7 @@ fn spending_signable(source: &Transaction, outputs: &[CreateActionOutput]) -> Si
             .unwrap();
     }
     SignableTransaction {
-        tx: partial.to_beef(true).unwrap(),
+        tx: partial.to_atomic_beef(true).unwrap(),
         reference: from_base64(SIGNABLE_REFERENCE).unwrap(),
     }
 }
@@ -80,6 +80,10 @@ pub struct Counting {
     pub aborts: Arc<Mutex<Vec<AbortActionArgs>>>,
     /// The wallet that answers signAction in place of the queue (#339).
     pub sign_via: Option<Arc<dyn WalletInterface>>,
+    /// #341: mutation applied to the owned createAction answer.
+    pub create_mode: Arc<Mutex<&'static str>>,
+    pub sign_mode: Arc<Mutex<&'static str>>,
+    pending: Arc<Mutex<Option<SignableTransaction>>>,
 }
 
 // The key-value stores ask their wallet for `Debug` (#326).
@@ -121,6 +125,9 @@ impl Counting {
             signs: Arc::default(),
             aborts: Arc::default(),
             sign_via: None,
+            create_mode: Arc::new(Mutex::new("")),
+            sign_mode: Arc::new(Mutex::new("")),
+            pending: Arc::default(),
         }
     }
 
@@ -175,12 +182,16 @@ macro_rules! counting {
                 self.note("create_action", o);
                 self.creates.lock().unwrap().push(args.clone());
                 let spent = self.spending.lock().unwrap().clone();
-                let signable = match spent {
+                let mut signable = match spent {
                     Some(source) => {
                         Some(spending_signable(&source, args.outputs.as_deref().unwrap_or(&[])))
                     }
                     None => self.signable.clone(),
                 };
+                if let Some(answer) = &mut signable {
+                    mutate_bound_answer(answer, &self.create_mode.lock().unwrap());
+                }
+                *self.pending.lock().unwrap() = signable.clone();
                 *self.created.lock().unwrap() = Some(args);
                 *self.created_originator.lock().unwrap() = o.map(str::to_string);
                 Ok(CreateActionResult {
@@ -196,6 +207,10 @@ macro_rules! counting {
                 self.note("sign_action", o);
                 self.signs.lock().unwrap().push(args.clone());
                 *self.signed.lock().unwrap() = Some(args.clone());
+                let mode = *self.sign_mode.lock().unwrap();
+                if !mode.is_empty() {
+                    return Ok(bound_sign_answer(self.pending.lock().unwrap().as_ref().unwrap(), &args, mode));
+                }
                 if let Some(via) = &self.sign_via {
                     return via.sign_action(args, o).await;
                 }
@@ -287,4 +302,67 @@ counting! {
     (discover_by_identity_key, DiscoverByIdentityKeyArgs, DiscoverCertificatesResult),
     (discover_by_attributes, DiscoverByAttributesArgs, DiscoverCertificatesResult),
     (get_header_for_height, GetHeaderArgs, GetHeaderResult),
+}
+
+/// Mutations whose refusals were recorded by the #326 Node recorder's extension.
+fn mutate_bound_answer(answer: &mut SignableTransaction, mode: &str) {
+    if mode.is_empty() {
+        return;
+    }
+    if mode == "empty_reference" {
+        answer.reference.clear();
+        return;
+    }
+    let mut tx = Transaction::from_atomic_beef(&answer.tx).unwrap();
+    match mode {
+        "version" | "version_before_input" => tx.version = 2,
+        "lock_time" => tx.lock_time = 1,
+        "sequence" => tx.inputs[0].sequence = 0,
+        "duplicate_input" => tx.inputs.push(tx.inputs[0].clone()),
+        "output" => tx.outputs[0].satoshis = Some(0),
+        "inflation" | "unrequested_output" => {
+            let value = if mode == "inflation" { 2 } else { 1 };
+            tx.add_output(TransactionOutput::new(
+                value,
+                LockingScript::from_binary(&[0x51]).unwrap(),
+            ))
+            .unwrap();
+        }
+        _ => {}
+    }
+    if mode == "missing_input" || mode == "version_before_input" {
+        tx.inputs[0].source_output_index = 1;
+    }
+    tx.invalidate_caches();
+    answer.tx = tx.to_atomic_beef(true).unwrap();
+}
+
+fn bound_sign_answer(
+    pending: &SignableTransaction,
+    args: &SignActionArgs,
+    mode: &str,
+) -> SignActionResult {
+    let mut tx = Transaction::from_atomic_beef(&pending.tx).unwrap();
+    for (index, spend) in &args.spends {
+        tx.inputs[*index as usize].unlocking_script =
+            Some(bsv_rs::script::UnlockingScript::from_binary(&spend.unlocking_script).unwrap());
+    }
+    match mode {
+        "signed_version" => tx.version = 2,
+        "signed_output" => tx.outputs[0].satoshis = Some(0),
+        "signed_script" => {
+            tx.inputs[0].unlocking_script =
+                Some(bsv_rs::script::UnlockingScript::from_binary(&[0]).unwrap())
+        }
+        _ => {}
+    }
+    tx.invalidate_caches();
+    let id = Outpoint::from_string(&format!("{}.0", tx.id()))
+        .unwrap()
+        .txid;
+    SignActionResult {
+        tx: Some(tx.to_atomic_beef(true).unwrap()),
+        txid: Some(id),
+        send_with_results: None,
+    }
 }

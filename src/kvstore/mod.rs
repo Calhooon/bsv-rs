@@ -101,6 +101,7 @@
 //! - [`Error::KvStoreKeyNotFound`](crate::Error::KvStoreKeyNotFound): Key doesn't exist
 //! - [`Error::KvStoreCorruptedState`](crate::Error::KvStoreCorruptedState): Invalid state
 
+mod action_options;
 mod bound;
 pub mod global;
 pub mod interpreter;
