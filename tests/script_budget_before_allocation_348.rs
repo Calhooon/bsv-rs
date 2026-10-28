@@ -22,6 +22,13 @@
 //! bsv-rs#374), is left out as the target leaves it out (bsv-rs#331): its
 //! sites are out of the single-site read, and the live bound adds the largest
 //! one, since dhat's peak cannot leave out a reservation held at that moment.
+//! The target finds a reservation by its rule (an allocation freed before the
+//! allocator's next call) in an allocator of its own; this file cannot have
+//! one (`unsafe_code` is forbidden in every target of the crate), so it finds
+//! one by the probe's frame in dhat's backtraces, which `reserve` keeps out
+//! of line in every profile: the symbol table names it, no debug info needed
+//! (bsv-rs#401: three of these four failed under `--release`, the frame
+//! inlined away and the reservation read as a site).
 //! The #348 input is also held to one site under the budget itself, which
 //! the target's live bound no longer separates from the base: that bound
 //! carries ten budgets for an arithmetic opcode's working set since this
@@ -97,10 +104,11 @@ struct Measured {
     peak: usize,
 }
 
-/// The frame of the interpreter's step probe (read by name from dhat's
-/// backtraces, so this file needs debug info: a build without symbols would
-/// count the reservations): an allocation under it is a
-/// reservation, given back before the allocator's next call.
+/// The frame of the interpreter's step probe, read by name from dhat's
+/// backtraces (`#[inline(never)]`, so the symbol table names it in a build
+/// without debug info, bsv-rs#401): an allocation under it is a reservation,
+/// given back before the allocator's next call. A build stripped of its
+/// symbols names no frame, and [`assert_a_reservation_was_found`] says so.
 const RESERVATION_FRAME: &str = "arithmetic_room::reserve";
 
 /// Runs `unlocking` then `locking` as the fuzz target does, under `word`
@@ -188,10 +196,21 @@ fn measure_fuzz_input(hex: &[&str]) -> (Measured, usize) {
     )
 }
 
+/// Every input here takes a step past the probe's 64 KiB floor: no
+/// reservation found is a build whose backtraces do not name the probe, which
+/// would read every reservation as a site.
+fn assert_a_reservation_was_found(measured: &Measured) {
+    assert!(
+        measured.largest_reservation > 0,
+        "no allocation under `{RESERVATION_FRAME}`: dhat's backtraces do not name the probe"
+    );
+}
+
 /// The fuzz target's two bounds on an input of `input` script bytes, a
 /// reservation out of both: the live bound holds with the largest
 /// reservation added whenever the target's read holds.
 fn assert_within_the_fuzz_bounds(measured: &Measured, input: usize) {
+    assert_a_reservation_was_found(measured);
     let slack = 256 * input + (64 << 10);
     assert!(
         measured.largest_site <= 2 * MEMORY_LIMIT + slack,
@@ -268,6 +287,7 @@ fn a_pushed_product_holds_the_bytes_it_is_charged() {
         &unlocking,
         &locking,
     );
+    assert_a_reservation_was_found(&measured);
     assert!(measured.verdict.unwrap());
     // The product's own digits (num-bigint's 100,000 bytes and its word's
     // rounding) are the largest; the encoder's buffer is 100,001 bytes.
