@@ -33,8 +33,8 @@ use bsv_rs::primitives::{
     from_base64, from_hex, sha256, to_base64, to_hex, PrivateKey, SymmetricKey,
 };
 use bsv_rs::wallet::*;
+use indexmap::IndexMap;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 
 const SITES: [(&str, usize); 8] = [
     ("to_binary", 10),
@@ -74,7 +74,7 @@ fn verifier() -> PrivateKey {
 }
 const SERIAL: [u8; 32] = [2; 32];
 
-fn certificate(fields: HashMap<String, String>) -> Certificate {
+fn certificate(fields: IndexMap<String, String>) -> Certificate {
     Certificate::new(
         [1; 32],
         SERIAL,
@@ -182,7 +182,7 @@ fn spec(s: &Value) -> String {
     }
 }
 
-fn record(entries: &Value) -> HashMap<String, String> {
+fn record(entries: &Value) -> IndexMap<String, String> {
     entries
         .as_array()
         .unwrap()
@@ -199,9 +199,9 @@ fn protocol() -> Protocol {
 /// keyring (certifier to subject, key ID `name`) and the verifier's
 /// (subject to verifier, `<serial> name`), as the script builds it.
 struct Issued {
-    fields: HashMap<String, String>,
-    master_keyring: HashMap<String, String>,
-    verifier_keyring: HashMap<String, String>,
+    fields: IndexMap<String, String>,
+    master_keyring: IndexMap<String, String>,
+    verifier_keyring: IndexMap<String, String>,
 }
 
 /// `revelation_key` encrypted by `from`'s wallet to `to` under `key_id`.
@@ -233,12 +233,12 @@ async fn issued(plaintext: usize) -> Issued {
     let revelation_key = field_key.as_bytes();
     let serial_name = format!("{} name", to_base64(&SERIAL));
     Issued {
-        fields: HashMap::from([("name".into(), field)]),
-        master_keyring: HashMap::from([(
+        fields: IndexMap::from([("name".into(), field)]),
+        master_keyring: IndexMap::from([(
             "name".into(),
             encrypt_key(revelation_key, certifier(), "name".into(), subject()).await,
         )]),
-        verifier_keyring: HashMap::from([(
+        verifier_keyring: IndexMap::from([(
             "name".into(),
             encrypt_key(revelation_key, subject(), serial_name, verifier()).await,
         )]),
@@ -269,10 +269,10 @@ fn mutate(c: &mut Issued, input: &Value) {
         }
     }
     if input["verifier_keyring_ghost"] == true {
-        c.verifier_keyring = HashMap::from([("ghost".into(), b64(48))]);
+        c.verifier_keyring = IndexMap::from([("ghost".into(), b64(48))]);
     }
     if input["verifier_keyring_proto"] == true {
-        c.verifier_keyring = HashMap::from([("__proto__".into(), b64(48))]);
+        c.verifier_keyring = IndexMap::from([("__proto__".into(), b64(48))]);
     }
     if input["field_tampered"] == true {
         let mut bytes = from_base64(&c.fields["name"]).unwrap();
@@ -306,7 +306,7 @@ async fn decrypt_site(site: &str, input: &Value) -> bsv_rs::Result<Value> {
     // A master certificate carrying the records as given: the constructor's
     // checks are not the decrypt sites' (the reference's are static).
     let master = || {
-        let mut m = MasterCertificate::new(certificate(HashMap::new()), HashMap::new()).unwrap();
+        let mut m = MasterCertificate::new(certificate(IndexMap::new()), IndexMap::new()).unwrap();
         m.certificate.fields = c.fields.clone();
         m.master_keyring = c.master_keyring.clone();
         m
@@ -385,7 +385,7 @@ async fn run(case: &Value) -> Value {
     let result = match case["site"].as_str().unwrap() {
         "to_binary" => {
             let value = input["value"].as_str().unwrap();
-            let fields: HashMap<String, String> = match input["count"].as_u64() {
+            let fields: IndexMap<String, String> = match input["count"].as_u64() {
                 Some(n) => (0..n).map(|i| (format!("f{i}"), value.into())).collect(),
                 None => input["names"]
                     .as_array()
@@ -407,7 +407,7 @@ async fn run(case: &Value) -> Value {
         .and_then(|m| m.to_binary(false))
         .map(|b| sha(&b)),
         "create_certificate_fields" => {
-            let plaintexts: HashMap<String, String> = input["plaintexts"]
+            let plaintexts: IndexMap<String, String> = input["plaintexts"]
                 .as_array()
                 .unwrap()
                 .iter()
@@ -562,7 +562,7 @@ async fn issue_for_subject_refuses_a_plaintext_over_64_kib_and_issues_one_at_the
             &ProtoWallet::new(Some(certifier())),
             &certifier(),
             subject().public_key(),
-            HashMap::from([("name".to_string(), "A".repeat(len))]),
+            IndexMap::from([("name".to_string(), "A".repeat(len))]),
             [1; 32],
             Some(SERIAL),
             Some("test"),

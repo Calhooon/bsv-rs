@@ -9,8 +9,8 @@ use bsv_rs::auth::certificates::Certificate;
 use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, to_hex, PublicKey, Signature};
 use bsv_rs::wallet::types::Outpoint;
 use bsv_rs::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
+use indexmap::IndexMap;
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::fs;
 
 // =================
@@ -28,7 +28,7 @@ struct CertificateVector {
     certifier: String,
     revocation_outpoint: Option<String>,
     signature: Option<String>,
-    fields: HashMap<String, String>,
+    fields: IndexMap<String, String>,
 }
 
 // =================
@@ -294,7 +294,7 @@ struct OriginalCertificate {
     certifier: String,
     revocation_outpoint: String,
     signature: String,
-    fields: HashMap<String, String>,
+    fields: IndexMap<String, String>,
 }
 
 #[derive(Debug, Deserialize)]

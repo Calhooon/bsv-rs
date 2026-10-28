@@ -19,8 +19,8 @@ use bsv_rs::auth::{validate_certificates, AuthMessage, MessageType};
 use bsv_rs::primitives::{from_hex, to_base64, to_hex, PrivateKey};
 use bsv_rs::wallet::ProtoWallet;
 use bsv_rs::Error;
+use indexmap::IndexMap;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Witnesses {
@@ -56,7 +56,7 @@ fn key(scalar: u8) -> PrivateKey {
 /// The script's certificate: certifier 7, subject 9, type 32 x 1, serial
 /// 32 x 2, the zero outpoint, `email` = base64 of "v-email".
 fn certificate(signature: Option<Vec<u8>>) -> Certificate {
-    let fields = HashMap::from([("email".to_string(), to_base64(b"v-email"))]);
+    let fields = IndexMap::from([("email".to_string(), to_base64(b"v-email"))]);
     Certificate::new([1; 32], [2; 32], key(9).public_key(), key(7).public_key())
         .with_fields(fields)
         .with_signature(signature)
@@ -134,14 +134,14 @@ fn a_non_hex_signature_is_refused_at_the_json_this_crate_reads_it_from() {
 
 #[test]
 fn the_master_and_verifiable_certificates_verify_false_not_an_error() {
-    let keyring = HashMap::from([("email".to_string(), to_base64(&[0x41; 48]))]);
+    let keyring = IndexMap::from([("email".to_string(), to_base64(&[0x41; 48]))]);
     let master = MasterCertificate::new(certificate(None), keyring.clone()).unwrap();
     assert_eq!(master.verify(), Ok(false));
     let verifiable = VerifiableCertificate::new(certificate(None), keyring);
     assert_eq!(verifiable.verify(), Ok(false));
     let not_der = VerifiableCertificate::new(
         certificate(Some(vec![0x30, 0x06, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])),
-        HashMap::new(),
+        IndexMap::new(),
     );
     assert_eq!(not_der.verify(), Ok(false));
 }
@@ -159,7 +159,7 @@ async fn validate_certificates_refuses_an_unsigned_certificate_in_the_references
         let mut message = AuthMessage::new(MessageType::CertificateResponse, key(9).public_key());
         message.set_certificates(vec![VerifiableCertificate::new(
             certificate(signature),
-            HashMap::new(),
+            IndexMap::new(),
         )]);
         let verifier = ProtoWallet::new(Some(key(5)));
         assert_eq!(

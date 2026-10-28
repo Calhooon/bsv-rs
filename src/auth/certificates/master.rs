@@ -14,8 +14,8 @@ use crate::wallet::{
     Counterparty, DecryptArgs, EncryptArgs, Protocol, SecurityLevel, WalletInterface,
 };
 use crate::{Error, Result};
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Certificate with master keyring for field encryption.
 ///
@@ -36,7 +36,7 @@ pub struct MasterCertificate {
     /// `auth/certificates/master.go:34`) hold it, and written so in JSON;
     /// decoded only where the wallet decrypts (#268).
     #[serde(default)]
-    pub master_keyring: HashMap<String, String>,
+    pub master_keyring: IndexMap<String, String>,
 }
 
 impl MasterCertificate {
@@ -51,7 +51,7 @@ impl MasterCertificate {
     /// oversized, or non-canonical`). `Result` since bsv-rs#297; go-sdk's
     /// `NewMasterCertificate` refuses an empty keyring and a missing entry
     /// alone (`go-sdk@2ca481c` `auth/certificates/master.go:39-60`).
-    pub fn new(certificate: Certificate, master_keyring: HashMap<String, String>) -> Result<Self> {
+    pub fn new(certificate: Certificate, master_keyring: IndexMap<String, String>) -> Result<Self> {
         bounds::require_master_certificate(&certificate.fields, &master_keyring)?;
         Ok(Self {
             certificate,
@@ -84,23 +84,22 @@ impl MasterCertificate {
     /// the maximum of 65536 bytes`, `:271-276`), and a wallet's ciphertext
     /// outside 1 to 2048 bytes is refused (`Encrypted master keyring field
     /// <name> must be a non-empty byte array of at most 2048 bytes`,
-    /// `:292-298`; bsv-rs#297). The fields are taken in byte order.
+    /// `:292-298`; bsv-rs#297). The fields are taken in the map's order, the
+    /// reference's `Object.entries` (`:270`; #394).
     ///
     /// # Returns
     /// Tuple of (encrypted_fields, master_keyring)
     pub async fn create_certificate_fields<W: WalletInterface>(
         creator_wallet: &W,
         subject: &PublicKey,
-        fields: HashMap<String, String>,
+        fields: IndexMap<String, String>,
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: Option<&str>,
-    ) -> Result<(HashMap<String, String>, HashMap<String, String>)> {
+    ) -> Result<(IndexMap<String, String>, IndexMap<String, String>)> {
         bounds::snapshot_record(&fields, "Certificate plaintext fields")?;
-        let mut encrypted_fields = HashMap::new();
-        let mut master_keyring = HashMap::new();
-        let mut fields: Vec<(String, String)> = fields.into_iter().collect();
-        fields.sort_unstable();
+        let mut encrypted_fields = IndexMap::new();
+        let mut master_keyring = IndexMap::new();
 
         for (field_name, plain_value) in fields {
             if plain_value.len() > MAX_DECRYPTED_FIELD_BYTES {
@@ -185,16 +184,16 @@ impl MasterCertificate {
         subject_wallet: &W,
         certifier: &PublicKey,
         verifier: &PublicKey,
-        fields: &HashMap<String, String>,
+        fields: &IndexMap<String, String>,
         fields_to_reveal: &[String],
-        master_keyring: &HashMap<String, String>,
+        master_keyring: &IndexMap<String, String>,
         serial_number: &[u8; 32],
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: Option<&str>,
-    ) -> Result<HashMap<String, String>> {
+    ) -> Result<IndexMap<String, String>> {
         bounds::require_keyring_for_verifier_inputs(fields, fields_to_reveal, master_keyring)?;
-        let mut keyring = HashMap::new();
+        let mut keyring = IndexMap::new();
 
         for field_name in fields_to_reveal {
             let field_value = bounds::field_to_reveal(fields, field_name)?;
@@ -248,7 +247,7 @@ impl MasterCertificate {
     #[allow(clippy::too_many_arguments)]
     async fn decrypt_field_wrapped<W: WalletInterface>(
         wallet: &W,
-        master_keyring: &HashMap<String, String>,
+        master_keyring: &IndexMap<String, String>,
         counterparty: &PublicKey,
         field_name: &str,
         field_value: Option<&String>,
@@ -284,7 +283,7 @@ impl MasterCertificate {
     #[allow(clippy::too_many_arguments)]
     async fn decrypt_with_master_keyring<W: WalletInterface>(
         wallet: &W,
-        master_keyring: &HashMap<String, String>,
+        master_keyring: &IndexMap<String, String>,
         counterparty: &PublicKey,
         field_name: &str,
         field_value: &str,
@@ -347,7 +346,7 @@ impl MasterCertificate {
         certifier_wallet: &W,
         certifier_key: &crate::primitives::PrivateKey,
         subject: PublicKey,
-        plain_fields: HashMap<String, String>,
+        plain_fields: IndexMap<String, String>,
         cert_type: [u8; 32],
         serial_number: Option<[u8; 32]>,
         originator: Option<&str>,
@@ -445,7 +444,7 @@ impl MasterCertificate {
         privileged: Option<bool>,
         privileged_reason: Option<&str>,
         originator: Option<&str>,
-    ) -> Result<HashMap<String, String>> {
+    ) -> Result<IndexMap<String, String>> {
         let fields = &self.certificate.fields;
         bounds::snapshot_record(&self.master_keyring, "Master certificate keyring")?;
         bounds::snapshot_record(fields, "Certificate fields")?;
@@ -462,7 +461,7 @@ impl MasterCertificate {
         for (field_name, field_value) in fields {
             field_ciphertext(field_name, field_value).map_err(all_failed)?;
         }
-        let mut decrypted = HashMap::new();
+        let mut decrypted = IndexMap::new();
         for field_name in fields.keys() {
             let value = self
                 .decrypt_field(
@@ -521,7 +520,7 @@ mod tests {
         let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key());
         cert.sign(&certifier).unwrap();
 
-        let master_keyring = HashMap::new();
+        let master_keyring = IndexMap::new();
         let master_cert = MasterCertificate::new(cert, master_keyring).unwrap();
 
         assert!(master_cert.verify().unwrap());
@@ -540,7 +539,7 @@ mod tests {
         );
         cert.sign(&certifier).unwrap();
 
-        let master_cert = MasterCertificate::new(cert, HashMap::new()).unwrap();
+        let master_cert = MasterCertificate::new(cert, IndexMap::new()).unwrap();
 
         // Should be able to access Certificate fields via Deref
         assert_eq!(master_cert.subject, subject);

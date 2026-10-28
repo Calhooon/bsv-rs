@@ -55,7 +55,7 @@ fn publish(json: &serde_json::Value) -> OutputListItem {
     }
 }
 
-fn plaintexts(r: &serde_json::Value) -> HashMap<String, String> {
+fn plaintexts(r: &serde_json::Value) -> IndexMap<String, String> {
     serde_json::from_value(r["plaintexts"].clone()).unwrap()
 }
 
@@ -123,7 +123,7 @@ async fn a_malformed_signature_skips_its_output_and_the_resolution_goes_on() {
     let signature = from_hex(malformed["signature"].as_str().unwrap()).unwrap();
     malformed["signature"] = crate::primitives::to_base64(&signature).into();
 
-    let mut host_overrides = HashMap::new();
+    let mut host_overrides = std::collections::HashMap::new();
     host_overrides.insert(
         "ls_identity".to_string(),
         vec!["http://identity-lookup.invalid".to_string()],
@@ -137,7 +137,7 @@ async fn a_malformed_signature_skips_its_output_and_the_resolution_goes_on() {
     let client =
         IdentityClient::with_resolver(ProtoWallet::new(None), Default::default(), resolver);
 
-    let attributes = HashMap::from([("email".to_string(), "x".to_string())]);
+    let attributes = IndexMap::from([("email".to_string(), "x".to_string())]);
     let identities = client
         .resolve_by_attributes(attributes, false)
         .await

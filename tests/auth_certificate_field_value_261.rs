@@ -21,8 +21,8 @@ use bsv_rs::auth::certificates::{Certificate, MasterCertificate, VerifiableCerti
 use bsv_rs::primitives::{from_base64, from_hex, sha256, to_base64, to_hex, PrivateKey};
 use bsv_rs::wallet::ProtoWallet;
 use bsv_rs::Error;
+use indexmap::IndexMap;
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Vectors {
@@ -40,36 +40,36 @@ struct CertificateJson {
     subject: String,
     certifier: String,
     revocation_outpoint: String,
-    fields: HashMap<String, String>,
+    fields: IndexMap<String, String>,
     signature: String,
 }
 
 #[derive(Deserialize)]
 struct ReferenceIssued {
     keys: Keys,
-    plaintexts: HashMap<String, String>,
+    plaintexts: IndexMap<String, String>,
     certificate: CertificateJson,
-    master_keyring: HashMap<String, String>,
-    verifier_keyring: HashMap<String, String>,
-    anyone_keyring: HashMap<String, String>,
+    master_keyring: IndexMap<String, String>,
+    verifier_keyring: IndexMap<String, String>,
+    anyone_keyring: IndexMap<String, String>,
     binary_hex: String,
     preimage_sha256: String,
     reference_verify: bool,
-    reference_master_plaintexts: HashMap<String, String>,
-    reference_verifier_plaintexts: HashMap<String, String>,
-    reference_anyone_plaintexts: HashMap<String, String>,
+    reference_master_plaintexts: IndexMap<String, String>,
+    reference_verifier_plaintexts: IndexMap<String, String>,
+    reference_anyone_plaintexts: IndexMap<String, String>,
 }
 
 #[derive(Deserialize)]
 struct RustIssued {
     keys: Keys,
-    plaintexts: HashMap<String, String>,
+    plaintexts: IndexMap<String, String>,
     certificate: CertificateJson,
     binary_hex: String,
     reference_to_binary_hex: String,
     reference_verify: bool,
-    reference_master_plaintexts: HashMap<String, String>,
-    reference_verifier_plaintexts: HashMap<String, String>,
+    reference_master_plaintexts: IndexMap<String, String>,
+    reference_verifier_plaintexts: IndexMap<String, String>,
 }
 
 #[derive(Deserialize)]
@@ -349,7 +349,7 @@ fn certificate_fields_serialize_as_the_base64_strings_they_hold() {
     assert!(back.verify().unwrap());
     let wallet = cert.to_wallet_certificate();
     assert_eq!(
-        wallet.fields.into_iter().collect::<HashMap<_, _>>(),
+        wallet.fields.into_iter().collect::<IndexMap<_, _>>(),
         r.certificate.fields
     );
 }
@@ -361,7 +361,7 @@ fn certificate_fields_serialize_as_the_base64_strings_they_hold() {
 #[ignore]
 async fn print_a_certificate_issued_here_for_the_reference() {
     let (certifier, subject, verifier) = (key(43), key(47), key(41));
-    let plaintexts: HashMap<String, String> = [
+    let plaintexts: IndexMap<String, String> = [
         ("name", "Bob Example"),
         ("email", "bob@example.com"),
         ("city", "Zoë's Café"),

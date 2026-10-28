@@ -24,9 +24,9 @@ use bsv_rs::auth::types::{AuthMessage, MessageType};
 use bsv_rs::primitives::{to_hex, PrivateKey};
 use bsv_rs::wallet::types::Outpoint;
 use bsv_rs::wallet::ProtoWallet;
+use indexmap::IndexMap;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct Vectors {
@@ -45,25 +45,25 @@ struct Texts {
 #[derive(Deserialize)]
 struct ReferenceIssued {
     keys: Keys,
-    plaintexts: HashMap<String, String>,
+    plaintexts: IndexMap<String, String>,
     json: Texts,
     binary_hex: String,
     reference_verify: bool,
-    reference_master_plaintexts: HashMap<String, String>,
-    reference_verifier_plaintexts: HashMap<String, String>,
+    reference_master_plaintexts: IndexMap<String, String>,
+    reference_verifier_plaintexts: IndexMap<String, String>,
 }
 
 #[derive(Deserialize)]
 struct RustIssued {
     keys: Keys,
-    plaintexts: HashMap<String, String>,
+    plaintexts: IndexMap<String, String>,
     json: Texts,
     binary_hex: String,
     reference_json: Texts,
     reference_to_binary_hex: String,
     reference_verify: bool,
-    reference_master_plaintexts: HashMap<String, String>,
-    reference_verifier_plaintexts: HashMap<String, String>,
+    reference_master_plaintexts: IndexMap<String, String>,
+    reference_verifier_plaintexts: IndexMap<String, String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Copy)]
@@ -121,7 +121,7 @@ fn with_the_index(text: &str) -> String {
 async fn read_the_three(
     json: &Texts,
     keys: Keys,
-    plaintexts: &HashMap<String, String>,
+    plaintexts: &IndexMap<String, String>,
     binary_hex: &str,
 ) {
     let exact = plaintexts.len() == 1;
@@ -450,7 +450,7 @@ async fn issue_here(
     verifier: &PrivateKey,
     fields: &[(&str, &str)],
 ) -> (MasterCertificate, VerifiableCertificate) {
-    let plaintexts: HashMap<String, String> = fields
+    let plaintexts: IndexMap<String, String> = fields
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
         .collect();
@@ -508,7 +508,7 @@ async fn print_the_certificates_issued_here_for_the_reference() {
         &[("name", "Bob Example")][..],
     ] {
         let (master, verifiable) = issue_here(&certifier, &subject, &verifier, fields).await;
-        let plaintexts: HashMap<&str, &str> = fields.iter().copied().collect();
+        let plaintexts: IndexMap<&str, &str> = fields.iter().copied().collect();
         out.push(serde_json::json!({
             "origin": "issued by this crate's MasterCertificate::issue_for_subject (certifier key 43, subject key 47, type 32 x 0x08, serial 32 x 0x09, no revocation outpoint) with a keyring for verifier key 41 by create_keyring_for_verifier; each JSON text this crate's serde_json::to_string",
             "keys": keys,

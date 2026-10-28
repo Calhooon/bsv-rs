@@ -5,8 +5,8 @@
 
 use crate::auth::VerifiableCertificate;
 use crate::overlay::NetworkPreset;
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ============================================================================
 // Type Aliases (matching Go SDK)
@@ -306,7 +306,7 @@ pub struct IdentityQuery {
     pub identity_key: Option<String>,
     /// Filter by attribute name and value.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub attributes: Option<HashMap<String, String>>,
+    pub attributes: Option<IndexMap<String, String>>,
     /// Filter by certificate type (base64 type ID).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub certificate_type: Option<String>,
@@ -331,7 +331,7 @@ impl IdentityQuery {
     }
 
     /// Create a query to find identities by attributes.
-    pub fn by_attributes(attributes: HashMap<String, String>) -> Self {
+    pub fn by_attributes(attributes: IndexMap<String, String>) -> Self {
         Self {
             attributes: Some(attributes),
             ..Default::default()
@@ -340,7 +340,7 @@ impl IdentityQuery {
 
     /// Create a query to find identities by a single attribute.
     pub fn by_attribute(key: impl Into<String>, value: impl Into<String>) -> Self {
-        let mut attributes = HashMap::new();
+        let mut attributes = IndexMap::new();
         attributes.insert(key.into(), value.into());
         Self {
             attributes: Some(attributes),
@@ -423,9 +423,9 @@ pub struct IdentityCertificate {
     /// Information about the certifier.
     pub certifier_info: CertifierInfo,
     /// Publicly revealed keyring: field name -> encrypted key, base64 text (`Wallet.interfaces.ts:879`, #268).
-    pub publicly_revealed_keyring: HashMap<String, String>,
+    pub publicly_revealed_keyring: IndexMap<String, String>,
     /// Decrypted field values.
-    pub decrypted_fields: HashMap<String, String>,
+    pub decrypted_fields: IndexMap<String, String>,
 }
 
 impl IdentityCertificate {
@@ -782,7 +782,7 @@ mod tests {
 
     #[test]
     fn test_identity_query_by_attributes() {
-        let mut attrs = HashMap::new();
+        let mut attrs = IndexMap::new();
         attrs.insert("email".to_string(), "test@example.com".to_string());
 
         let query = IdentityQuery::by_attributes(attrs);

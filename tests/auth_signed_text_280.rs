@@ -21,9 +21,9 @@ use bsv_rs::primitives::{to_base64, PrivateKey, PublicKey};
 use bsv_rs::wallet::{
     Counterparty, CreateSignatureArgs, ProtoWallet, Protocol, SecurityLevel, VerifySignatureArgs,
 };
+use indexmap::IndexMap;
 use serde_json::value::RawValue;
 use serde_json::Value;
-use std::collections::HashMap;
 
 const VECTOR: &str = include_str!("vectors/auth_signed_text_280.json");
 
@@ -137,7 +137,7 @@ fn policy(certifier: &PublicKey) -> RequestedCertificateSet {
 /// A certificate built here with three fields and a three-key keyring
 fn certificate(subject: &PublicKey, certifier: &PrivateKey) -> VerifiableCertificate {
     let names = ["name", "email", "country"];
-    let fields: HashMap<String, String> = names
+    let fields: IndexMap<String, String> = names
         .iter()
         .enumerate()
         .map(|(i, n)| {

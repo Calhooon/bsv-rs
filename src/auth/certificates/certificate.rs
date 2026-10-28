@@ -11,7 +11,7 @@ use crate::wallet::types::Outpoint;
 use crate::wallet::wire::{certificate_field_value_refusal, MAX_CERTIFICATE_FIELD_VALUE_BYTES};
 use crate::wallet::{Counterparty, KeyDeriver, Protocol, SecurityLevel};
 use crate::{Error, Result};
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 /// Base certificate structure (BRC-52).
 ///
@@ -34,11 +34,11 @@ use std::collections::HashMap;
 /// use bsv_rs::auth::Certificate;
 /// use bsv_rs::primitives::PrivateKey;
 /// use bsv_rs::wallet::types::Outpoint;
-/// use std::collections::HashMap;
+/// use indexmap::IndexMap;
 ///
 /// let certifier = PrivateKey::random();
 /// let subject = PrivateKey::random().public_key();
-/// let fields = HashMap::from([("email".to_string(), "ZW1haWw=".to_string())]);
+/// let fields = IndexMap::from([("email".to_string(), "ZW1haWw=".to_string())]);
 /// let mut cert = Certificate::new([1u8; 32], [2u8; 32], subject, certifier.public_key())
 ///     .with_revocation_outpoint(Some(Outpoint::new([3u8; 32], 0)))
 ///     .with_fields(fields);
@@ -88,8 +88,10 @@ pub struct Certificate {
     pub revocation_outpoint: Option<Outpoint>,
 
     /// Field values (name -> base64 text), signed and written as the text's UTF-8 bytes
-    /// (`brcs@5119a9b` `0052.md:41,97`; `ts-stack@edf6e03` `Certificate.ts:294-296`; `go-sdk@2ca481c` `wallet/interfaces.go:122`; #261).
-    pub fields: HashMap<String, String>,
+    /// (`brcs@5119a9b` `0052.md:41,97`; `ts-stack@edf6e03` `Certificate.ts:294-296`; `go-sdk@2ca481c` `wallet/interfaces.go:122`; #261),
+    /// in insertion order, the reference's `Record` (`Certificate.ts:179`, `:203`): walked and
+    /// checked so, sorted only to write and sign (`:282`; #394).
+    pub fields: IndexMap<String, String>,
 
     /// Certificate signature (DER-encoded). Hex in JSON, as the
     /// reference's `HexString` (`Certificate.ts:184`) and Go's
@@ -119,7 +121,7 @@ impl Certificate {
             subject,
             certifier,
             revocation_outpoint: None,
-            fields: HashMap::new(),
+            fields: IndexMap::new(),
             signature: None,
             received_unsigned: None,
         }
@@ -132,7 +134,7 @@ impl Certificate {
     }
 
     /// Returns the certificate with its fields replaced.
-    pub fn with_fields(mut self, fields: HashMap<String, String>) -> Self {
+    pub fn with_fields(mut self, fields: IndexMap<String, String>) -> Self {
         self.set_fields(fields);
         self
     }
@@ -150,7 +152,7 @@ impl Certificate {
     }
 
     /// Replaces every field, each value its base64 text (#261).
-    pub fn set_fields(&mut self, fields: HashMap<String, String>) {
+    pub fn set_fields(&mut self, fields: IndexMap<String, String>) {
         self.received_unsigned = None;
         self.fields = fields;
     }
@@ -528,15 +530,14 @@ impl Certificate {
         self.fields.get(name)
     }
 
-    /// Returns all field names.
+    /// Returns all field names, in the map's order (#394).
     pub fn field_names(&self) -> Vec<&String> {
         self.fields.keys().collect()
     }
 
-    /// Converts to wallet certificate format, each field its text (#261), the
-    /// fields in the order they are signed over (`localeCompare`'s,
-    /// `Certificate.ts:282`): this type's map keeps no order, the wallet's
-    /// does (#385).
+    /// Converts to wallet certificate format, each field its text (#261), in
+    /// this certificate's order (the wallet's map and this one keep
+    /// insertion order, the reference's `Record`; #385, #394).
     pub fn to_wallet_certificate(&self) -> crate::wallet::types::Certificate {
         crate::wallet::types::Certificate {
             certificate_type: self.type_base64(),
@@ -544,14 +545,7 @@ impl Certificate {
             serial_number: self.serial_number_base64(),
             certifier: self.certifier.clone(),
             revocation_outpoint: self.revocation_outpoint.clone(),
-            fields: {
-                let mut names: Vec<&str> = self.fields.keys().map(String::as_str).collect();
-                crate::wallet::collation::sort_field_names(&mut names);
-                names
-                    .into_iter()
-                    .map(|name| (name.to_string(), self.fields[name].clone()))
-                    .collect()
-            },
+            fields: self.fields.clone(),
             signature: self.signature.clone(),
         }
     }
@@ -572,7 +566,7 @@ struct Unsigned {
     subject: PublicKey,
     certifier: PublicKey,
     revocation_outpoint: Option<Outpoint>,
-    fields: HashMap<String, String>,
+    fields: IndexMap<String, String>,
 }
 
 /// Reads a certificate's unsigned prefix, the reader left at the signature.
@@ -610,7 +604,7 @@ fn read_unsigned(reader: &mut BinaryReader<'_>) -> Result<Unsigned> {
     // bsv-rs#297)
     let field_count = reader.read_len()?;
     bounds::require_field_count(field_count, reader.remaining())?;
-    let mut fields = HashMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 3));
+    let mut fields = IndexMap::with_capacity(bounded_capacity(field_count, reader.remaining(), 3));
     for _ in 0..field_count {
         let name_len = reader.read_len()?;
         bounds::require_field_name_length(name_len)?;

@@ -15,7 +15,7 @@ use bsv_rs::identity::{
     IdentityQuery, KnownCertificateType, StaticAvatarUrls, DEFAULT_SOCIALCERT_CERTIFIER,
 };
 use bsv_rs::overlay::NetworkPreset;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 // =================
 // KnownCertificateType Tests
@@ -426,7 +426,7 @@ fn test_identity_query_by_attribute() {
 
 #[test]
 fn test_identity_query_by_attributes() {
-    let mut attrs = HashMap::new();
+    let mut attrs = IndexMap::new();
     attrs.insert("email".to_string(), "test@example.com".to_string());
     attrs.insert("firstName".to_string(), "Alice".to_string());
 
