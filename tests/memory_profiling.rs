@@ -832,3 +832,51 @@ fn test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks() {
         );
     }
 }
+
+/// A minimal splice operand past 8 bytes is not decoded (bsv-rs#382, the cold review's
+/// finding): the default mode reads its first 8 bytes (`ts-stack@edf6e03`
+/// `Spend.ts:540-561`) and under MINIMALDATA judges its minimality from its last two bytes,
+/// where the check decoded the whole operand, a second copy of it with no #374 room check.
+/// An 800,000,000-byte minimal `OP_LEFT` length (its first 8 bytes zero, its last `01`), the
+/// spend built before the profiler starts: the peak is the operand's one copy onto the stack
+/// and 99 bytes (800,000,099), where the decode made it 1,600,000,099.
+#[test]
+fn test_issue_382_a_minimal_splice_operand_is_not_decoded() {
+    use bsv_rs::script::{LockingScript, Spend, SpendParams, UnlockingScript};
+
+    const OPERAND: usize = 800_000_000;
+    let _serial = serial();
+    // `aabbcc`, then an OP_PUSHDATA4 of the operand
+    let mut unlock = vec![0x03, 0xaa, 0xbb, 0xcc, 0x4e];
+    unlock.extend_from_slice(&(OPERAND as u32).to_le_bytes());
+    unlock.resize(unlock.len() + OPERAND, 0);
+    *unlock.last_mut().unwrap() = 0x01;
+    let unlocking_script = UnlockingScript::from_binary(&unlock).unwrap();
+    drop(unlock);
+    let mut spend = Spend::new(SpendParams {
+        source_txid: [0u8; 32],
+        source_output_index: 0,
+        source_satoshis: 1,
+        // OP_LEFT OP_0 OP_EQUAL: the data's first 0 bytes are empty
+        locking_script: LockingScript::from_binary(&[0xb4, 0x00, 0x87]).unwrap(),
+        transaction_version: 1,
+        other_inputs: vec![],
+        outputs: vec![],
+        input_index: 0,
+        unlocking_script,
+        input_sequence: 0xffff_ffff,
+        lock_time: 0,
+        memory_limit: None,
+        work_limit: None,
+    });
+    // version 1 holds MINIMALDATA; the coin post-Chronicle runs 0xb4 as OP_LEFT
+    spend.set_utxo_after_chronicle(true);
+    let _profiler = dhat::Profiler::builder().testing().build();
+    assert_eq!(spend.validate().map_err(|e| e.message), Ok(true));
+    let peak = dhat::HeapStats::get().max_bytes;
+    println!("\n=== an {OPERAND}-byte minimal OP_LEFT length: peak {peak} bytes ===");
+    assert!(
+        (OPERAND..OPERAND + (1 << 20)).contains(&peak),
+        "the evaluation's peak: {peak} bytes for a {OPERAND}-byte operand (decoded past one copy)"
+    );
+}

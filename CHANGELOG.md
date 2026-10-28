@@ -500,6 +500,18 @@ reference, until now read as -4 here; the test renamed
 The conformance census holds (`BSV_CONFORMANCE_DIR`: 2,834 passed, 17 known
 failures, 2,228 unsupported, as pinned).
 
+The cold review's finding (PR #396): the minimal-encoding check of an
+operand past 8 bytes decoded the whole operand (`ScriptNum::from_bytes`, a
+`BigUint` of its bytes, with no #374 room check) where its comment said it
+copied nothing. It is now judged from the operand's last two bytes
+(`ScriptNum::is_minimally_encoded`), the decoder called only for the
+refusal's words, so a minimal operand is read by its first 8 bytes alone.
+Pinned by `tests/memory_profiling.rs`'s
+`test_issue_382_a_minimal_splice_operand_is_not_decoded` (`dhat`): an
+800,000,000-byte minimal `OP_LEFT` length at version 1 peaks at
+800,000,099 bytes (its one copy onto the stack), 1,600,000,099 on a scratch
+copy of `b149d6b6` without the guard.
+
 Migration: none in the API. A caller matching the default mode's
 `OP_NUM2BIN` text for a size above `INT32_MAX` or below 0 reads the
 reference's now.
