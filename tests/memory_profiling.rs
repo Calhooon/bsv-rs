@@ -837,14 +837,16 @@ fn test_each_arithmetic_steps_peak_is_within_the_room_its_guard_asks() {
 /// finding): the default mode reads its first 8 bytes (`ts-stack@edf6e03`
 /// `Spend.ts:540-561`) and under MINIMALDATA judges its minimality from its last two bytes,
 /// where the check decoded the whole operand, a second copy of it with no #374 room check.
-/// An 800,000,000-byte minimal `OP_LEFT` length (its first 8 bytes zero, its last `01`), the
-/// spend built before the profiler starts: the peak is the operand's one copy onto the stack
-/// and 99 bytes (800,000,099), where the decode made it 1,600,000,099.
+/// A 64 MiB minimal `OP_LEFT` length (its first 8 bytes zero, its last `01`), the spend built
+/// before the profiler starts: the peak is the operand's one copy onto the stack and 99 bytes
+/// (67,108,963), where the decode made it 134,217,827. Until bsv-rs#401 the operand was
+/// 800,000,000 bytes (800,000,099 and 1,600,000,099), about 4 GB resident for one proof
+/// this size gives at a twelfth.
 #[test]
 fn test_issue_382_a_minimal_splice_operand_is_not_decoded() {
     use bsv_rs::script::{LockingScript, Spend, SpendParams, UnlockingScript};
 
-    const OPERAND: usize = 800_000_000;
+    const OPERAND: usize = 64 << 20;
     let _serial = serial();
     // `aabbcc`, then an OP_PUSHDATA4 of the operand
     let mut unlock = vec![0x03, 0xaa, 0xbb, 0xcc, 0x4e];
