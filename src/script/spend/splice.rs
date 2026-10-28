@@ -324,6 +324,11 @@ impl Spend {
                                 usize::try_from(bytes).unwrap_or(usize::MAX),
                             ));
                         }
+                        // Unreachable since #383 and pinned by no test: a readable
+                        // value (536,870,888 bits) shifted by at most INT_MAX is
+                        // 335 MB, and `shift_refusal` below refuses past 2^30 bits;
+                        // the word branch above never comes here. Kept as the
+                        // element bound's guard should either figure move.
                         if bits / 8 + 1 > MAX_SCRIPT_ELEMENT_SIZE as u64 {
                             return Err(self.error(&format!(
                                 "It's not currently possible to push data larger than {} bytes.",
