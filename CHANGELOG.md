@@ -275,6 +275,44 @@ multi-substrate client (its `wallet/README.md` names a
 (`substrates.NewHTTPWalletJSON(originator, baseURL, httpClient)`,
 `NewHTTPWalletWire`) or holds any `wallet.Interface` and calls it with an
 originator per call.
+### Fixed: the #348 test finds the step probe's reservation without debug info, so it holds under `--release` (#401)
+
+The finding (#383's fold's re-review, at `5f8fc526`): under `cargo test
+--release`, three of the four tests in
+`tests/script_budget_before_allocation_348.rs` failed on beta (`a single
+allocation site holds more than the allowed live bytes`: 4,117,104 bytes
+for #348's input, 4,955,436 for #349's, 600,012 for the 100,001-byte
+product) and passed in the debug profile. The test leaves the interpreter's
+step probe out of its single-site read (`arithmetic_room.rs`, `reserve`:
+`try_reserve_exact` of the step's room, given back at once, #374) by finding
+the frame `arithmetic_room::reserve` in dhat's backtraces; a release build
+inlines `reserve` into its callers and has no debug info to name an inlined
+frame, so each reservation was read as a site (600,012 is the product's
+step room, 6 times its operands).
+
+`reserve` is now `#[inline(never)]`: the symbol table names its frame in
+every profile, debug info or none, and the reservation is found by the same
+name. The fuzz target keeps its own rule (an allocation freed before the
+allocator's next call, nothing allocated, grown or freed in between, #331):
+it counts in an allocator of its own, which the test cannot have (the
+crate's `unsafe_code = "forbid"` reaches every target, and a `GlobalAlloc`
+is an `unsafe impl`), and a backtrace per allocation is too slow for a
+fuzzer. Two readings of one thing: the probe's allocation, and nothing else
+under its frame. A build stripped of its symbols (`strip = "symbols"`, no
+profile here sets it) names no frame: each of the three tests now asserts
+it found a reservation, and says so in those words rather than as a bound.
+The probe runs only at a step of 64 KiB or more, so the frame costs nothing
+measurable.
+
+Pinned: the file's four tests, green under `--release` and in the debug
+profile; with the new test on the base's library (`reserve` inlined), three
+of four red under `--release`, ``no allocation under
+`arithmetic_room::reserve`: dhat's backtraces do not name the probe``, and
+the same three red with symbols stripped
+(`CARGO_PROFILE_RELEASE_STRIP=symbols`). CI runs the file in the debug
+profile (`ci.yml`, `Run every integration test`, `cargo test --features
+"full,http,websocket" --tests`), where it passed before the fix too; the
+release profile is the lanes' and the re-reviews' gate.
 
 ### Fixed: the default mode refuses a numeric shift's count above `INT_MAX` as the reference does, a verdict before the value is read; the eight crash inputs confirmed closed (#383)
 

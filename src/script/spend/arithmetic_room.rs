@@ -230,7 +230,11 @@ fn element_bound() -> usize {
 /// Asks the allocator for `len` bytes and gives them back: num-bigint's own
 /// allocations are infallible, so the room is asked of the allocator first,
 /// and its refusal is a decline where the arithmetic's would be an abort.
+/// Never inlined, so the frame keeps its name in the symbol table of a build
+/// without debug info: `tests/script_budget_before_allocation_348.rs` finds
+/// the reservation by it in dhat's backtraces (bsv-rs#401).
 #[cfg(not(test))]
+#[inline(never)]
 fn reserve(len: usize) -> Result<(), TryReserveError> {
     Vec::<u8>::new().try_reserve_exact(len)
 }
