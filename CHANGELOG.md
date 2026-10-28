@@ -202,6 +202,12 @@ high-S but requires both scalars in 1..n-1. Structs, enums, parsed keys, byte
 vectors, fixed 32-byte arrays and booleans enforce the corresponding JS type
 checks here. Their exact reference errors are recorded in the vector.
 
+One input-encoding bound is a stated divergence for #420 to conform: an
+uncompressed counterparty key (130 hex characters) is refused by the reference
+with `The counterparty parameter must be no more than 66 length.`, but parses
+to a `PublicKey` and is accepted here. The type holds a curve point, not its
+input encoding; it does not enforce the reference's compressed-key length.
+
 The older `ts-sdk@9e3ede6b` ProtoWallet has no argument validators
 (`ProtoWallet.ts:267-302` calls its DER parser directly); the re-recorded
 #407 witness still returns `Signature DER must start with 0x30` there.
