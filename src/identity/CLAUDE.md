@@ -25,6 +25,7 @@ This module integrates with the `auth` module for certificate handling and the `
 | `reveal.rs` | The checks `publicly_reveal_attributes` makes around its wallet calls (#307), the reference's in its order and words (`ts-stack@edf6e03` `IdentityClient.ts:420-499`): a field named `__proto__`, `constructor` or `prototype`, no fields, no names, more than 100, a name over 50 bytes or with a display control, empty or unsafe, repeated or absent from the certificate, then the master certificate's signature (read from the wallet certificate's JSON, `Certificate::verify`), all before any wallet call; after `proveCertificate`, a keyring carrying an unsafe name (`proof result keyringForVerifier contains an unsafe field`), then one naming other fields than those asked, then each value as `validateBase64String(.., 1, 2048)` reads it (trimmed as JavaScript trims, base64 by shape, 1 to 2048 bytes), the trimmed values judged and published in the wallet's key order (`:485`, #385). `IdentityError` in each case but the value's, `WalletRefusal` of the `InvalidParameter` class in `WERR_INVALID_PARAMETER`'s words; pinned by `tests/identity_reveal_verifies_307.rs`. Then `identity_token` (#310): the reference's `PushDrop.lock([json], protocolID, keyID, 'anyone', true, true)` (`IdentityClient.ts:502-509`, `PushDrop.ts:146-202`), getPublicKey for anyone with `for_self: true`, createSignature over the JSON for anyone, the JSON `{...certificate, keyring}` in `WalletCertificate`'s member order, the fields in the order held, the keyring in the wallet's (#385): the reference's bytes for its certificate and keyring, admitted by the overlay's identity reader; pinned by `tests/identity_reveal_rest_310.rs`. The createAction after it (in `client.rs`, #315) sends the reference's arguments alone (`IdentityClient.ts:513-528`): the description, one output of satoshis, locking script and output description, `randomizeOutputs: false`; no label, tag, `signAndProcess` or `acceptDelayedBroadcast`, left to the wallet; pinned by `tests/identity_reveal_create_action_315.rs`. The revocation (`revoke.rs` since #327) sends the reference's createAction (`IdentityClient.ts:845-863`: the description, `inputBEEF`, one input of description, outpoint and `unlockingScriptLength: 74`, `randomizeOutputs: false`, `acceptDelayedBroadcast: false`, `noSend: true`; no label, no `signAndProcess`) and signAction (`:896-911`: the reference as createAction answered it, its base64 text, and `returnTXIDOnly: false`), and every wallet call of the client carries the configured originator or none (`""`, `IdentityClient::originator`; the reference's `:369-377`); pinned by `tests/identity_wallet_calls_318.rs` |
 | `revoke.rs` | `revoke_certificate_revelation`, the reference's `revokeCertificateRevelation` step by step in its words (#327; `ts-stack@edf6e03` `IdentityClient.ts:705-950`): the serial number as base64 of 32 bytes (`reveal::base64_parameter`, `WERR_INVALID_PARAMETER`), getPublicKey for the identity key and the token's key, the `ls_identity` answer (`Failed to get lookup result`; at most 10000 outputs and 16 MiB of BEEF), each output authenticated or skipped (the BEEF's subject, the output at the lookup's index, the canonical signed PushDrop locked to the token's key, the JSON's serial number and subject, `Certificate::verify` of its seven members, verifySignature over the token), none: `No authenticated revelation output matches the requested certificate.`; every authenticated output spent at its own index (the signable transaction's one matching input, `revelationInputOutpoint`), the signed transaction checked against the signable one (`assertRevelationTransactionTemplate`, the input, its script, the txid), broadcast on `tm_identity` (`IdentityClient::with_broadcast_facilitator` the seam), abortAction with the reference on any failure after createAction, the spend under `double_spend.rs`; pinned by `tests/identity_revocation_checks_327.rs` |
 | `double_spend.rs` | The reference's `withDoubleSpendRetry` (#327; `overlay-tools/withDoubleSpendRetry.ts:8-165`): an attempt failing with `Error::WalletReviewActions` (which `HttpWalletJson` reads from a wallet's code-5 body since #339; the binary wire carries the class alone) carrying double-spend evidence (each `doubleSpend` result's 1 to 256 distinct txids and 1 byte to 64 MiB of BEEF; 256 results, 64 MiB and 256 txids in all) repeated after each competing transaction is read by txid and acknowledged by the broadcaster, five attempts in all; any other error, malformed evidence or a failed acknowledgement ends it. Not `overlay::with_double_spend_retry`, which matches words and synchronizes nothing |
+| `token_maps.rs` | An identity token's `fields` and `keyring` read in the order of its JSON text (#394), where the `serde_json::Value` the parsers read the rest from sorts its keys: a member not an object empty, a value not a string skipped, as the `Value` reading did; both parsers (`parse_output_to_certificate`, `parse_output_to_verifiable_certificate`) take their maps from it |
 | `contacts.rs` | ContactsManager for encrypted contact storage with caching (1267 lines); its update and removal send signAction the reference as the wallet answered it, its base64 text, and no options, as the reference's (`ts-stack@edf6e03` `ContactsManager.ts:813-834`, `:981-1001`; #326, where they sent the hex of its bytes with `acceptDelayedBroadcast: false`; `tests/contacts_signaction_326.rs`) |
 
 ## Feature Flag
@@ -34,7 +35,7 @@ This module integrates with the `auth` module for certificate handling and the `
 identity = ["auth", "overlay"]
 ```
 
-The identity feature depends on both `auth` (for certificate types) and `overlay` (for network communication).
+The identity feature depends on both `auth` (for certificate types) and `overlay` (for network communication); `indexmap` reaches it through `wallet` (#385), so it needs nothing of its own for its ordered maps (#394).
 
 ## Public Exports
 
@@ -155,7 +156,7 @@ Query parameters for identity resolution with builder pattern:
 
 ```rust
 use bsv_rs::identity::IdentityQuery;
-use std::collections::HashMap;
+use indexmap::IndexMap; // insertion order, the reference's `Record` (#394)
 
 // Query by identity key
 let query = IdentityQuery::by_identity_key("02abc123...");
@@ -164,7 +165,7 @@ let query = IdentityQuery::by_identity_key("02abc123...");
 let query = IdentityQuery::by_attribute("email", "user@example.com");
 
 // Query by multiple attributes
-let mut attrs = HashMap::new();
+let mut attrs = IndexMap::new();
 attrs.insert("email".to_string(), "user@example.com".to_string());
 let query = IdentityQuery::by_attributes(attrs);
 
@@ -183,8 +184,8 @@ Enriched certificate with decrypted fields and certifier information:
 pub struct IdentityCertificate {
     pub certificate: VerifiableCertificate,
     pub certifier_info: CertifierInfo,
-    pub publicly_revealed_keyring: HashMap<String, String>,  // base64 text (#268)
-    pub decrypted_fields: HashMap<String, String>,
+    pub publicly_revealed_keyring: IndexMap<String, String>, // base64 text (#268); the token's order (#394)
+    pub decrypted_fields: IndexMap<String, String>,          // the keyring's order (#394)
 }
 
 // Access methods
@@ -284,8 +285,9 @@ if let Some(id) = identity {
     println!("Found: {} ({})", id.name, id.abbreviated_key);
 }
 
-// Resolve by attributes (second param enables contact override)
-let mut attrs = HashMap::new();
+// Resolve by attributes (second param enables contact override); the
+// lookup body is a `serde_json::Value`, so the attributes cross sorted (#394)
+let mut attrs = IndexMap::new();
 attrs.insert("email".to_string(), "user@example.com".to_string());
 let identities = client.resolve_by_attributes(attrs, true).await?;
 
