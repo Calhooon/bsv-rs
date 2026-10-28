@@ -840,6 +840,31 @@ opcodes select the appropriate `ScriptFlags` word or explicitly name the
 coin's era; version-1 Chronicle signatures must use a word enabling
 `CHRONICLE`, or be signed with a legal hash type.
 
+The version gate reaches BEEF verification and `Transaction::verify` (the
+fourth fold, CI's Test Suite on PR #413): both run the default mode, so a
+version-1 transaction with a CHRONICLE-bit signature is now refused there,
+as the reference's `Transaction.verify` refuses it (`Spend` built with
+`transactionVersion: tx.version` and no flags, `Transaction.ts:1441-1455`;
+`Beef.verifyValid` runs no script and still reads such a BEEF as valid).
+The stream answers `SpendRefused` at the input with `Script("The
+signature format is invalid.")`, `Transaction::verify` `Script validation
+failed for input N: The signature format is invalid.`. The overlay engine
+executes scripts at its submit door with `Transaction::verify`, so a
+downstream relying on the old acceptance sends version-2 transactions or
+verifies under a word carrying `CHRONICLE`. `tests/beef_order_held.rs`'s
+signed family (bsv-rs#22's dispatch to the original digest, under
+ALL|CHRONICLE|FORKID and NONE|CHRONICLE|FORKID) moves its spenders to
+version 2, where the dispatch is still what the signatures are made over
+and every reader verifies it; the new
+`a_chronicle_bit_signature_in_a_version_1_family_is_refused_at_its_input_in_the_reference_words`
+keeps the family at version 1 and pins the refusal at `C`'s input 2 on the
+stream in both orders and on `Transaction::verify` (RED on `bfdd4e7f`,
+where the family was valid). The reference's answers on the same bytes,
+under Node 22.18.0 from `edf6e03` built with bun: `verifyValid` true at
+both versions, `Transaction.verify('scripts only')` of `C` and of `G`
+`Script evaluation error: The signature format is invalid.` at version 1
+and `true` at version 2. No other test in the whole suite moved.
+
 ### Notes: cross-SDK parity (#397)
 
 The keeper's cross-SDK filing is ts-stack #1437, extended by the keeper for
