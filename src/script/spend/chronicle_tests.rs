@@ -150,8 +150,10 @@ fn before_chronicle_0xb3_to_0xb7_are_nops_and_discouraged_under_the_standard_wor
 #[test]
 fn op_ver_pushes_the_version_after_chronicle_and_is_refused_before() {
     assert!(valid(spend("OP_VER 02000000 OP_EQUAL", "", 2).validate()));
+    let mut pre = spend("OP_VER", "", 1);
+    pre.set_flags(ScriptFlags::block(ProtocolEra::PostGenesis));
     assert_eq!(
-        message(spend("OP_VER", "", 1).validate()),
+        message(pre.validate()),
         "OP_VER is disabled until Chronicle."
     );
     let mut s = spend("OP_VER 01000000 OP_EQUAL", "", 1);
@@ -182,22 +184,26 @@ fn op_verif_compares_the_top_with_the_version_and_is_skipped_or_refused_before_c
         spend("OP_VERNOTIF OP_0 OP_ELSE OP_1 OP_ENDIF", "02000000", 2).validate()
     ));
     // before Chronicle: executed is refused, not executed is skipped (no conditional pushed)
+    let mut pre = spend("OP_VERIF OP_1 OP_ENDIF", "02000000", 1);
+    pre.set_flags(ScriptFlags::block(ProtocolEra::PostGenesis));
     assert_eq!(
-        message(spend("OP_VERIF OP_1 OP_ENDIF", "02000000", 1).validate()),
+        message(pre.validate()),
         "OP_VERIF is disabled until Chronicle."
     );
-    assert!(valid(
-        spend("OP_0 OP_IF OP_VERIF OP_ENDIF OP_1", "", 1).validate()
-    ));
-    assert!(valid(
-        spend("OP_0 OP_IF OP_VERNOTIF OP_ENDIF OP_1", "", 1).validate()
-    ));
+    for opcode in ["OP_VERIF", "OP_VERNOTIF"] {
+        let mut pre = spend(&format!("OP_0 OP_IF {opcode} OP_ENDIF OP_1"), "", 1);
+        pre.set_flags(ScriptFlags::block(ProtocolEra::PostGenesis));
+        assert!(valid(pre.validate()));
+    }
 }
 
 #[test]
 fn two_mul_and_two_div_are_disabled_before_chronicle_and_compute_after() {
-    assert!(message(spend("OP_2MUL", "OP_7", 1).validate()).contains("currently disabled"));
-    assert!(message(spend("OP_2DIV", "OP_7", 1).validate()).contains("currently disabled"));
+    for opcode in ["OP_2MUL", "OP_2DIV"] {
+        let mut pre = spend(opcode, "OP_7", 1);
+        pre.set_flags(ScriptFlags::block(ProtocolEra::PostGenesis));
+        assert!(message(pre.validate()).contains("currently disabled"));
+    }
     assert!(valid(spend("OP_2MUL OP_14 OP_EQUAL", "OP_7", 2).validate()));
     assert!(valid(spend("OP_2DIV OP_3 OP_EQUAL", "OP_7", 2).validate()));
     assert!(valid(spend("OP_2DIV 83 OP_EQUAL", "87", 2).validate())); // -7 / 2 = -3

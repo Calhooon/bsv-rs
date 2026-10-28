@@ -107,6 +107,7 @@ mod arithmetic_room;
 mod bitwise;
 mod crypto;
 mod flow;
+mod hash_type;
 mod limits;
 mod num;
 mod push;
@@ -257,14 +258,13 @@ pub struct Spend {
     /// The flag word the rules above were derived from, if `set_flags` was
     /// called; `None` in the TypeScript default mode.
     flags: Option<ScriptFlags>,
-    /// The era switch: the coin taken as created after Chronicle for `OP_2MUL`,
-    /// `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` (`interpreter.cpp:360-375`,
-    /// `598-812`) and a word's number length. Default: `isAfterChronicle()`,
-    /// version > 1; under a word, its `UTXO_AFTER_CHRONICLE`.
+    /// The coin's era for a word's number length; its UTXO_AFTER_CHRONICLE
+    /// bit, overridden by the setter. Stored as version > 1 by default,
+    /// where no number length limit applies (Spend.ts:393-401).
     utxo_after_chronicle: bool,
-    /// The opcode gate: the Chronicle meanings of `0xb3`-`0xb7`, else NOPs
-    /// (`interpreter.cpp:609-764`). Default: on at every version, as the
-    /// reference's (`Spend.ts:827-828`, bsv-rs#397); under a word, its bit.
+    /// All ten Chronicle opcodes: on at every version by default, as in
+    /// Spend.ts:792-803, :827-858 (#397); under a word, UTXO_AFTER_CHRONICLE.
+    /// With the gate off, 0xb3-0xb7 are NOPs and the other five are refused.
     chronicle_opcodes: bool,
     /// The node's `-maxscriptnumlengthpolicy`, the script-number length limit
     /// of the mempool path (`src/policy/policy.h:156`, default 10,000; 0
@@ -606,7 +606,7 @@ impl Spend {
         let is_executing = !self.returning && !self.if_stack.contains(&false);
 
         // Check for disabled opcodes when executing
-        if is_executing && is_opcode_disabled(current_opcode, self.utxo_after_chronicle) {
+        if is_executing && is_opcode_disabled(current_opcode, self.chronicle_opcodes) {
             return Err(self.error(&format!(
                 "This opcode is currently disabled. (Opcode: {}, PC: {})",
                 opcode_to_name(current_opcode).unwrap_or("UNKNOWN"),

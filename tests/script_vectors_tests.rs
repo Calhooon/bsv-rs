@@ -13,6 +13,9 @@ use bsv_rs::script::{LockingScript, Script, Spend, SpendParams, UnlockingScript}
 use serde::Deserialize;
 use std::fs;
 
+#[path = "support/script_invalid_allowlist.rs"]
+mod script_invalid_allowlist;
+
 // ============================================================================
 // Test Vector Structures
 // ============================================================================
@@ -458,6 +461,7 @@ fn test_script_invalid_vectors() {
     let mut passed = 0;
     let mut failed = 0;
     let mut failures: Vec<String> = Vec::new();
+    let mut accepted = Vec::new();
 
     for (i, vector) in vectors.iter().enumerate() {
         // An invalid vector should either:
@@ -508,6 +512,7 @@ fn test_script_invalid_vectors() {
             Ok(true) => {
                 // Invalid vector passed - this is unexpected
                 failed += 1;
+                accepted.push(i);
                 failures.push(format!(
                     "Vector {}: Expected to fail but passed - scriptSig: '{}', scriptPubKey: '{}', comment: '{}'",
                     i, vector.script_sig, vector.script_pub_key, vector.comment
@@ -528,20 +533,8 @@ fn test_script_invalid_vectors() {
         for (i, failure) in failures.iter().take(20).enumerate() {
             println!("  {}. {}", i + 1, failure);
         }
-
-        // Some invalid vectors might pass due to different flag handling between
-        // BSV and BTC (e.g., STRICTENC, CLEANSTACK rules).
-        // Tightened from 10% to 5% tolerance to better catch regressions.
-        let false_positive_rate = (failed as f64) / (total as f64) * 100.0;
-        let max_false_positive_rate = 5.0;
-        if false_positive_rate > max_false_positive_rate {
-            panic!(
-                "Script invalid vectors: {:.1}% false positives ({} of {} incorrectly passed). \
-                 Maximum allowed is {:.1}%. {}/{} correctly failed.",
-                false_positive_rate, failed, total, max_false_positive_rate, passed, total
-            );
-        }
     }
+    script_invalid_allowlist::assert_accepted(&accepted);
 }
 
 // ============================================================================

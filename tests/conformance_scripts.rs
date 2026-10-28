@@ -38,6 +38,10 @@
 #![cfg(feature = "transaction")]
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)] // #134: test code: a failed unwrap is the test failing
 
+#[path = "support/conformance_script_allowlist.rs"]
+mod conformance_script_allowlist;
+use conformance_script_allowlist::{classify_chronicle_hash_type, EVALUATION_UNSUPPORTED_PINS};
+
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -625,7 +629,9 @@ fn eval_node_script_vector(
 
 /// Shared mismatch recording: unsupported class, known failure, or failure.
 fn record_mismatch(id: &str, ctx: &MismatchContext<'_>, got: bool, summary: &mut Summary) {
-    if let Some(class) = classify_node_mismatch(ctx) {
+    if let Some(class) =
+        classify_chronicle_hash_type(id, ctx).or_else(|| classify_node_mismatch(ctx))
+    {
         summary
             .unsupported
             .entry(class)
@@ -1286,84 +1292,6 @@ fn finish_evaluation(summary: Summary) {
         summary.panics
     );
 }
-
-/// Pinned per-class unsupported counts for sdk.scripts.evaluation.
-/// Audited empirically against corpus stats (5,116 vectors, META.json
-/// last_updated 2026-05-19) — see classify_node_mismatch for what each class
-/// means. THESE ARE NOT FAILURES — they are enumerated capability gaps of
-/// the default mode (strict at version <= 1, post-genesis) and its
-/// FORKID-only sighash. Any drift (corpus update, SDK behavior change) fails
-/// the assert and forces a re-audit.
-const EVALUATION_UNSUPPORTED_PINS: &[(&str, usize)] = &[
-    // 2026-09-23 repin (0.3.27, the five residual consensus rules): the class
-    // "UTXO_AFTER_CHRONICLE opcode semantics not implemented" (5) is gone, the
-    // census now sets the Chronicle gate from each fixture's flags and the five
-    // fixtures execute; "flag-dependent ELSE/ENDIF structure rules" (30) is
-    // gone, the post-Genesis fixtures expecting the single-ELSE refusal now
-    // pass and the pre-Genesis ones that assert a second OP_ELSE inverting the
-    // branch are the new class below (26); "flag-dependent opcode set"
-    // 12 -> 4 (undefined opcodes and unexecuted OP_VERIF now judged as the
-    // node does); "pre-genesis OP_RETURN semantics" 34 -> 28 and CLEANSTACK
-    // 195 -> 194 (a RETURN inside a conditional no longer clears the
-    // conditional stack, so those fixtures now match). Zero new mismatches;
-    // script-021 (the TS default's multiple OP_ELSE) is a known failure.
-    // 2026-07-09 repin (225 -> 195): Spend now mirrors ts-sdk's version-based
-    // relaxed mode (tx version > 1 disables CLEANSTACK/LOW_S/MINIMALDATA).
-    // 30 version-2 fixtures that previously died at the always-on clean-stack
-    // check now execute; 27 pass conformantly (moved to `run`) and 3 progress
-    // to the CLTV/CSV gap below (5 -> 8). Zero new mismatches.
-    ("the default mode enforces CLEANSTACK at version <= 1 (a word would express the fixture)", 194),
-    ("the default mode enforces LOW_S at version <= 1 (a word would express the fixture)", 9),
-    ("the default mode enforces MINIMALDATA at version <= 1 (a word would express the fixture)", 181),
-    ("the default mode enforces NULLDUMMY at version <= 1 (a word would express the fixture; the census runs the default mode)", 4),
-    (
-        "bsv-rs always enforces SIGPUSHONLY (push-only unlocking scripts)",
-        319,
-    ),
-    (
-        "strict DER/pubkey encodings are always enforced (SIGHASH_FORKID implies STRICTENC on the reference too)",
-        54,
-    ),
-    (
-        "bsv-rs always requires SIGHASH_FORKID (cannot reject FORKID-bit sigs)",
-        6,
-    ),
-    (
-        "bsv-rs always requires SIGHASH_FORKID (legacy-signature fixtures)",
-        36,
-    ),
-    (
-        "flag-dependent opcode set (pre-genesis/Chronicle) not expressible in bsv-rs",
-        4,
-    ),
-    (
-        "pre-genesis multiple OP_ELSE (bsv-rs runs the post-genesis single-ELSE rule)",
-        26,
-    ),
-    // NOTE: this is HALF the sighash corpus. The fixture's `regular_hash`
-    // uses the original (legacy) digest algorithm whenever the FORKID bit is
-    // absent (or the Chronicle bit applies), and `original_hash` is ALWAYS
-    // legacy. bsv-rs has no legacy-sighash API at all
-    // (`build_sighash_preimage` is BIP-143-only), so the 756 executed
-    // sighash vectors cover the FORKID `regular_hash` side only.
-    ("legacy/OTDA sighash not implemented in bsv-rs", 1244),
-    ("no CLTV/CSV enforcement in bsv-rs (post-genesis NOPs)", 8),
-    ("DISCOURAGE_UPGRADABLE_NOPS is not in the default mode (only under a word)", 20),
-    ("MINIMALIF is not in the default mode (only under a word)", 6),
-    (
-        "no P2SH redeem-script evaluation in bsv-rs (post-genesis rules)",
-        72,
-    ),
-    ("no isRelaxed evaluation mode in bsv-rs", 3),
-    (
-        "pre-genesis OP_RETURN semantics (bsv-rs implements post-genesis skip)",
-        28,
-    ),
-    (
-        "pre-genesis limits (bsv-rs runs post-genesis/unlimited rules)",
-        14,
-    ),
-];
 
 // ============================================================================
 // Script-domain regression vectors

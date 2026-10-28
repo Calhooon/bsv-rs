@@ -82,12 +82,11 @@ impl Spend {
     /// `OP_2MUL`, `OP_2DIV`, `OP_VER`, `OP_VERIF`, `OP_VERNOTIF` and the
     /// Chronicle meanings of `0xb3`-`0xb7` (a coin created after Chronicle),
     /// `false` keeps them disabled, `BAD_OPCODE` or NOPs as before it; under a
-    /// word it also selects the number length. It sets both switches: the era
-    /// (default version > 1, the TypeScript SDK's `isAfterChronicle()`) and
-    /// the opcode gate of `0xb3`-`0xb7` (default on at every version, as the
-    /// reference's default runs them, bsv-rs#397); under a word both are its
-    /// `UTXO_AFTER_CHRONICLE` bit. Called after [`set_flags`](Self::set_flags),
-    /// it overrides the bit.
+    /// word it also selects the number length. All ten opcodes run by default
+    /// at every version (bsv-rs#397); under a word both switches derive from
+    /// `UTXO_AFTER_CHRONICLE`. The hash-type gate is separate: version > 1
+    /// in the default mode, the word's `CHRONICLE` bit under a word. Called
+    /// after [`set_flags`](Self::set_flags), this overrides the UTXO bit.
     pub fn set_utxo_after_chronicle(&mut self, after: bool) {
         self.utxo_after_chronicle = after;
         self.chronicle_opcodes = after;
