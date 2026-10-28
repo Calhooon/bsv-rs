@@ -13,6 +13,7 @@ use crate::wallet::types::{
     WalletCertificate, WalletOutput, WalletPayment,
 };
 use crate::Error;
+use indexmap::IndexMap;
 use std::collections::HashMap;
 
 /// Sentinel value for nil/absent optional values in the Go-compatible wire format.
@@ -370,13 +371,14 @@ impl<'a> WireReader<'a> {
     }
 
     /// Reads a string to string map (Go-compatible: VarInt(MaxUint64) = empty).
-    pub fn read_string_map(&mut self) -> Result<HashMap<String, String>, Error> {
+    pub fn read_string_map(&mut self) -> Result<IndexMap<String, String>, Error> {
         let count = self.read_var_int()?;
         if count == NIL_SENTINEL {
-            return Ok(HashMap::new());
+            return Ok(IndexMap::new());
         }
 
-        let mut map = HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
+        let mut map =
+            IndexMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
         for _ in 0..count {
             let key = self.read_string()?;
             let value = self.read_string()?;
@@ -386,13 +388,14 @@ impl<'a> WireReader<'a> {
     }
 
     /// Reads an optional string map.
-    pub fn read_optional_string_map(&mut self) -> Result<Option<HashMap<String, String>>, Error> {
+    pub fn read_optional_string_map(&mut self) -> Result<Option<IndexMap<String, String>>, Error> {
         let count = self.read_var_int()?;
         if count == NIL_SENTINEL {
             return Ok(None);
         }
 
-        let mut map = HashMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
+        let mut map =
+            IndexMap::with_capacity(bounded_capacity(count as usize, self.remaining(), 2));
         for _ in 0..count {
             let key = self.read_string()?;
             let value = self.read_string()?;
@@ -1067,15 +1070,13 @@ impl WireWriter {
         }
     }
 
-    /// Writes a string to string map (Go-compatible: sorted keys, VarInt count).
-    pub fn write_string_map(&mut self, map: &HashMap<String, String>) -> &mut Self {
-        // Go sorts keys lexicographically
-        let mut keys: Vec<&String> = map.keys().collect();
-        keys.sort();
-        self.write_var_int(keys.len() as u64);
-        for key in keys {
+    /// Writes a string to string map in its order, the reference's `Object.entries`
+    /// (`WalletWireTransceiver.ts:1389`, `:1583`; #385; go-sdk sorts), VarInt count.
+    pub fn write_string_map(&mut self, map: &IndexMap<String, String>) -> &mut Self {
+        self.write_var_int(map.len() as u64);
+        for (key, value) in map {
             self.write_string(key);
-            self.write_string(&map[key]);
+            self.write_string(value);
         }
         self
     }
@@ -1198,12 +1199,11 @@ impl WireWriter {
         self.write_string(&info.description);
         self.write_u8(info.trust);
 
+        // In its order, the reference's `#recordEntries` (`WalletWireProcessor.ts:2523`, #385)
         let keyring = &cert.publicly_revealed_keyring;
-        let mut keys: Vec<&String> = keyring.keys().collect();
-        keys.sort();
-        self.write_var_int(keys.len() as u64);
-        for key in keys {
-            let value = from_base64(&keyring[key])
+        self.write_var_int(keyring.len() as u64);
+        for (key, value) in keyring {
+            let value = from_base64(value)
                 .map_err(|e| Error::WalletError(format!("invalid keyring value base64: {}", e)))?;
             self.write_string(key);
             self.write_var_int(value.len() as u64);
@@ -1430,7 +1430,7 @@ fn decoded_32_bytes(text: &str, what: &str) -> Result<Vec<u8>, Error> {
 /// first: at most 100,000 fields (`Certificate.ts:57-58`), each name 1 to 50
 /// bytes and safe, each value at most 1 MiB (`:76-79`), in the readers' words
 /// (bsv-rs#246).
-fn checked_field_names(fields: &HashMap<String, String>) -> Result<Vec<&str>, Error> {
+fn checked_field_names(fields: &IndexMap<String, String>) -> Result<Vec<&str>, Error> {
     if fields.len() > super::MAX_CERTIFICATE_FIELDS {
         return Err(super::refused(format!(
             "Certificate field count exceeds the maximum of {}",
@@ -1731,7 +1731,7 @@ mod tests {
 
     #[test]
     fn test_string_map_roundtrip() {
-        let mut map = HashMap::new();
+        let mut map = IndexMap::new();
         map.insert("key1".to_string(), "value1".to_string());
         map.insert("key2".to_string(), "value2".to_string());
         map.insert("key3".to_string(), "value3".to_string());
@@ -1742,7 +1742,7 @@ mod tests {
         assert_eq!(reader.read_string_map().unwrap(), map);
 
         // Empty map
-        let empty_map = HashMap::new();
+        let empty_map = IndexMap::new();
         let mut writer = WireWriter::new();
         writer.write_string_map(&empty_map);
         let mut reader = WireReader::new(writer.as_bytes());
@@ -1752,7 +1752,7 @@ mod tests {
     #[test]
     fn test_optional_string_map_roundtrip() {
         // Some map: a count and its pairs
-        let mut map = HashMap::new();
+        let mut map = IndexMap::new();
         map.insert("a".to_string(), "b".to_string());
 
         let mut writer = WireWriter::new();
@@ -1906,7 +1906,7 @@ mod tests {
         // Use valid 33-byte hex strings (compressed pubkey format)
         let pubkey = PrivateKey::random().public_key();
         let certifier = PrivateKey::random().public_key();
-        let mut fields = HashMap::new();
+        let mut fields = IndexMap::new();
         fields.insert("name".to_string(), "encrypted_value_1".to_string());
         fields.insert("email".to_string(), "encrypted_value_2".to_string());
 
@@ -2400,7 +2400,7 @@ mod tests {
         assert!(arr.is_empty());
 
         // Empty string map
-        let empty_map: HashMap<String, String> = HashMap::new();
+        let empty_map: IndexMap<String, String> = IndexMap::new();
         let mut writer = WireWriter::new();
         writer.write_string_map(&empty_map);
         let mut reader = WireReader::new(writer.as_bytes());

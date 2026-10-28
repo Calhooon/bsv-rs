@@ -1242,7 +1242,7 @@ impl<T: WalletWire> WalletWireTransceiver<T> {
         let mut reader = WireReader::new(&response);
 
         let num_fields = reader.read_var_int()?;
-        let mut keyring_for_verifier = std::collections::HashMap::with_capacity(bounded_capacity(
+        let mut keyring_for_verifier = indexmap::IndexMap::with_capacity(bounded_capacity(
             usize::try_from(num_fields).unwrap_or(usize::MAX),
             reader.remaining(),
             1,

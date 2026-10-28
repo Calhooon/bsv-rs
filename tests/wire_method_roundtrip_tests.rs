@@ -33,7 +33,7 @@ use bsv_rs::wallet::{
     WalletInterface, WalletOutput, WalletPayment,
 };
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 use std::sync::Arc;
 
 // ============================================================================
@@ -110,7 +110,7 @@ fn sample_wallet_certificate() -> WalletCertificate {
         revocation_outpoint: sample_outpoint_string(),
         signature: "3006020101020101".to_string(),
         fields: {
-            let mut m = HashMap::new();
+            let mut m = IndexMap::new();
             m.insert("name".to_string(), "Alice".to_string());
             m.insert("email".to_string(), "alice@example.com".to_string());
             m
@@ -1282,7 +1282,7 @@ mod action_tests {
     #[tokio::test]
     async fn test_roundtrip_sign_action() {
         let transceiver = create_loopback();
-        let mut spends = HashMap::new();
+        let mut spends = std::collections::HashMap::new();
         spends.insert(
             0,
             SignActionSpend {
@@ -1565,7 +1565,7 @@ mod certificate_tests {
                     certifier: bsv_rs::primitives::to_hex(&certifier_key.to_compressed()),
                     acquisition_protocol: AcquisitionProtocol::Direct,
                     fields: {
-                        let mut m = HashMap::new();
+                        let mut m = IndexMap::new();
                         m.insert("name".to_string(), "Test User".to_string());
                         m
                     },
@@ -1575,7 +1575,7 @@ mod certificate_tests {
                     certifier_url: None,
                     keyring_revealer: None, // defaults to certifier
                     keyring_for_subject: Some({
-                        let mut m = HashMap::new();
+                        let mut m = IndexMap::new();
                         m.insert(
                             "name".to_string(),
                             bsv_rs::primitives::to_base64(b"key-for-name"),
@@ -1603,7 +1603,7 @@ mod certificate_tests {
                     certificate_type: bsv_rs::primitives::to_base64(&[0xFFu8; 32]),
                     certifier: bsv_rs::primitives::to_hex(&certifier_key.to_compressed()),
                     acquisition_protocol: AcquisitionProtocol::Issuance,
-                    fields: HashMap::new(),
+                    fields: IndexMap::new(),
                     serial_number: None,
                     revocation_outpoint: None,
                     signature: None,
@@ -1752,7 +1752,7 @@ mod discovery_tests {
     #[tokio::test]
     async fn test_roundtrip_discover_by_attributes_populated() {
         let transceiver = create_loopback();
-        let mut attributes = HashMap::new();
+        let mut attributes = IndexMap::new();
         attributes.insert("name".to_string(), "Alice".to_string());
         attributes.insert("email".to_string(), "alice@example.com".to_string());
 
@@ -1775,7 +1775,7 @@ mod discovery_tests {
     #[tokio::test]
     async fn test_roundtrip_discover_by_attributes_minimal() {
         let transceiver = create_loopback();
-        let mut attributes = HashMap::new();
+        let mut attributes = IndexMap::new();
         attributes.insert("key".to_string(), "value".to_string());
 
         let result = transceiver
@@ -2305,7 +2305,7 @@ mod complex_type_roundtrips {
     /// Tests SignActionSpend map roundtrip.
     #[test]
     fn test_sign_action_spends_roundtrip() {
-        let mut spends = HashMap::new();
+        let mut spends = std::collections::HashMap::new();
         spends.insert(
             0,
             SignActionSpend {
@@ -2339,7 +2339,7 @@ mod complex_type_roundtrips {
     /// Tests optional string map roundtrip.
     #[test]
     fn test_optional_string_map_roundtrip() {
-        let mut map = HashMap::new();
+        let mut map = IndexMap::new();
         map.insert("key1".to_string(), "value1".to_string());
         map.insert("key2".to_string(), "value2".to_string());
 
@@ -3059,7 +3059,7 @@ mod index_bounds_tests {
 
     #[test]
     fn a_sign_action_spend_index_above_u32_max_is_refused_not_truncated() {
-        let mut spends = HashMap::new();
+        let mut spends = std::collections::HashMap::new();
         spends.insert(
             u32::MAX,
             SignActionSpend {

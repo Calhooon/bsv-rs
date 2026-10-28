@@ -19,7 +19,7 @@ use bsv_rs::primitives::{from_base64, PrivateKey};
 use bsv_rs::script::LockingScript;
 use bsv_rs::transaction::{Transaction, TransactionInput, TransactionOutput};
 use bsv_rs::wallet::*;
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 /// The reference text the #326 wallet answers createAction with: the
@@ -68,7 +68,7 @@ pub struct Counting {
     /// `OP_FALSE OP_RETURN` when none), its reference `SIGNABLE_REFERENCE`
     /// decoded, as a substrate hands the wallet's text over (#326).
     pub spending: Arc<Mutex<Option<Transaction>>>,
-    pub keyring: Option<HashMap<String, String>>,
+    pub keyring: Option<indexmap::IndexMap<String, String>>,
     pub created: Arc<Mutex<Option<CreateActionArgs>>>,
     pub created_originator: Arc<Mutex<Option<String>>>,
     pub public_key_args: Arc<Mutex<Vec<GetPublicKeyArgs>>>,

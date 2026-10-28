@@ -247,7 +247,7 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
                 .with_revocation_outpoint(revocation_outpoint)
                 // Each value is its base64 text, never decoded: BRC-52 signs
                 // that text (`0052.md:97`; #261).
-                .with_fields(cert_result.certificate.fields.clone())
+                .with_fields(cert_result.certificate.fields.clone().into_iter().collect())
                 .with_signature(signature);
 
         // The keyring held as its base64 text, decoded only where the
@@ -255,8 +255,8 @@ pub async fn get_verifiable_certificates<W: WalletInterface>(
         // wallet's `keyringForVerifier` strings (`ts-stack@edf6e03`
         // `getVerifiableCertificates.ts:92-104`); an entry that did not
         // decode was dropped here before.
-        let verifiable =
-            VerifiableCertificate::new(base_cert, prove_result.keyring_for_verifier.clone());
+        let keyring = std::collections::HashMap::from_iter(prove_result.keyring_for_verifier);
+        let verifiable = VerifiableCertificate::new(base_cert, keyring);
         verifiable_certs.push(verifiable);
     }
 

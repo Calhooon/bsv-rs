@@ -1350,10 +1350,10 @@ mod wire_protocol_tests {
 
     #[test]
     fn test_string_map_roundtrip() {
-        use std::collections::HashMap;
+        use indexmap::IndexMap;
 
         let mut writer = WireWriter::new();
-        let mut map = HashMap::new();
+        let mut map = IndexMap::new();
         map.insert("key1".to_string(), "value1".to_string());
         map.insert("key2".to_string(), "value2".to_string());
 

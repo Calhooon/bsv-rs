@@ -19,7 +19,7 @@ use bsv_rs::primitives::to_base64;
 use bsv_rs::wallet::wire::{WalletWire, WalletWireTransceiver, WireReader, WireWriter};
 use bsv_rs::wallet::*;
 use bsv_rs::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 const G: &str = "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 const TWO_G: &str = "02c6047f9441ed7d6d3045406e95c07cd85c778e4b8cef3ca7abac09b95c709ee5";
@@ -38,7 +38,7 @@ impl WalletWire for CannedWire {
     }
 }
 
-fn map(entries: &[(&str, &str)]) -> HashMap<String, String> {
+fn map(entries: &[(&str, &str)]) -> IndexMap<String, String> {
     entries
         .iter()
         .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -176,7 +176,7 @@ fn the_shared_discovery_vector_entry_reads_through_the_reader_to_the_vectors_fie
     assert_eq!(&wire[..2], &[0, 1], "a success frame of one entry");
     let e = &v["json"]["certificates"][0];
     let s = |key: &str| e[key].as_str().unwrap().to_string();
-    let strings = |value: &serde_json::Value| -> HashMap<String, String> {
+    let strings = |value: &serde_json::Value| -> IndexMap<String, String> {
         serde_json::from_value(value.clone()).unwrap()
     };
     let expected = IdentityCertificate {
@@ -256,7 +256,7 @@ fn the_layout_before_182_is_refused() {
     let cert = identity_certificate();
     // The old layout assembled by hand: the present flag, NIL-sentinel
     // strings, and maps behind a count or the NIL sentinel.
-    let old_map = |w: &mut WireWriter, map: Option<&HashMap<String, String>>| match map {
+    let old_map = |w: &mut WireWriter, map: Option<&IndexMap<String, String>>| match map {
         None => {
             w.write_var_int(u64::MAX);
         }

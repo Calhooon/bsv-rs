@@ -88,7 +88,7 @@ pub use transceiver::WalletWireTransceiver;
 use crate::primitives::PublicKey;
 use crate::wallet::types::{Counterparty, Protocol};
 use crate::Error;
-use std::collections::HashMap;
+use indexmap::IndexMap;
 
 // The u32 field readers live here, not in encoding.rs: that file is held at
 // its recorded line limit by the ratchet (docs/RATCHETS.md).
@@ -177,7 +177,7 @@ pub(crate) const CERTIFICATE_SIGNATURE_DER_LIMIT_REFUSAL: &str =
     "Certificate signature exceeds the DER size limit";
 
 /// A wire record: a key to its value.
-type Record = HashMap<String, String>;
+type Record = IndexMap<String, String>;
 
 fn refused(words: impl Into<String>) -> Error {
     Error::WalletError(words.into())
@@ -280,7 +280,7 @@ impl WireReader<'_> {
         &mut self,
         name: &str,
         value: impl FnMut(&mut Self) -> Result<String, Error>,
-    ) -> Result<HashMap<String, String>, Error> {
+    ) -> Result<IndexMap<String, String>, Error> {
         let count = self.read_collection_count(name)?;
         self.read_wire_record(name, count, value)
     }
@@ -305,8 +305,8 @@ impl WireReader<'_> {
         name: &str,
         count: usize,
         mut value: impl FnMut(&mut Self) -> Result<String, Error>,
-    ) -> Result<HashMap<String, String>, Error> {
-        let mut record = HashMap::with_capacity(count);
+    ) -> Result<IndexMap<String, String>, Error> {
+        let mut record = IndexMap::with_capacity(count);
         for _ in 0..count {
             let length = self.read_var_int_num_strict()?;
             if !(1..=50).contains(&length) {
@@ -337,7 +337,7 @@ impl WireReader<'_> {
     }
 
     /// The certificate's fields (`Certificate.ts:356-387`).
-    pub(crate) fn read_certificate_fields(&mut self) -> Result<HashMap<String, String>, Error> {
+    pub(crate) fn read_certificate_fields(&mut self) -> Result<IndexMap<String, String>, Error> {
         if self.remaining() > MAX_CERTIFICATE_BINARY_BYTES {
             return Err(refused(certificate_binary_read_refusal()));
         }
@@ -352,7 +352,7 @@ impl WireReader<'_> {
                 "Certificate field count exceeds the available data",
             ));
         }
-        let mut fields = HashMap::with_capacity(count);
+        let mut fields = IndexMap::with_capacity(count);
         for _ in 0..count {
             let length = self.read_var_int_num_strict()?;
             require_certificate_field_name_length(length)?;
@@ -432,7 +432,7 @@ pub(crate) fn certificate_signature_der(bytes: &[u8]) -> Result<Vec<u8>, Error> 
 /// `#setUniqueWireRecordEntry` (`:1992-2002`): a repeated key refused, never
 /// kept over the earlier one.
 fn set_unique_record_entry(
-    record: &mut HashMap<String, String>,
+    record: &mut IndexMap<String, String>,
     name: &str,
     key: String,
     value: String,

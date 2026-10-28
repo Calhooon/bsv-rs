@@ -266,11 +266,11 @@ fn optional_tx(w: &mut WireWriter, txid: Option<TxId>, tx: Option<&[u8]>) {
     }
 }
 
-fn keyring_bytes(w: &mut WireWriter, map: &std::collections::HashMap<String, String>) {
-    let mut entries: Vec<_> = map.iter().collect();
-    entries.sort_by_key(|(key, _)| *key);
-    w.write_var_int(entries.len() as u64);
-    for (key, value) in entries {
+/// The keyring in the map's order, as the reference's processor writes it
+/// (`#recordEntries`, `WalletWireProcessor.ts:2075`; #385).
+fn keyring_bytes(w: &mut WireWriter, map: &indexmap::IndexMap<String, String>) {
+    w.write_var_int(map.len() as u64);
+    for (key, value) in map {
         let bytes = from_base64(value).unwrap();
         w.write_string(key)
             .write_var_int(bytes.len() as u64)

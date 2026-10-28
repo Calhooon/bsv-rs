@@ -38,7 +38,7 @@ use identity_reveal_wallet::Counting;
 struct Vector {
     certificate: WalletCertificate,
     fields_to_reveal: Vec<String>,
-    keyring: HashMap<String, String>,
+    keyring: indexmap::IndexMap<String, String>,
     revocation: Revocation,
     witnesses: Vec<Witness>,
 }

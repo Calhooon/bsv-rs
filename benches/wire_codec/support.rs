@@ -87,7 +87,7 @@ pub enum Value {
     OptBlob(Option<Vec<u8>>),
     Strs(Vec<String>),
     OptStrs(Option<Vec<String>>),
-    Map(HashMap<String, String>),
+    Map(indexmap::IndexMap<String, String>),
     Protocol(Protocol),
     OptProtocol(Option<Protocol>),
     Counterparty(Option<Counterparty>),

@@ -932,11 +932,11 @@ pub struct ValidListActionsArgs {
 // Certificate Validation
 // =============================================================================
 
-/// Validates certificate field names (1-50 bytes each).
+/// Validates certificate field names (1-50 bytes each) in the order given (`Object.keys`, #385).
 pub fn validate_certificate_fields(
-    fields: &std::collections::HashMap<String, String>,
-) -> Result<std::collections::HashMap<String, String>> {
-    let mut result = std::collections::HashMap::new();
+    fields: &indexmap::IndexMap<String, String>,
+) -> Result<indexmap::IndexMap<String, String>> {
+    let mut result = indexmap::IndexMap::new();
     for (field_name, value) in fields {
         validate_string_length(field_name, "field name", Some(1), Some(50))?;
         result.insert(field_name.clone(), value.clone());
