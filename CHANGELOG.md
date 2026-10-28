@@ -1297,7 +1297,7 @@ two readers disagree in both directions. The #280 precedent keeps the signed
 text's bytes as received here; the reference verifies the parsed object's
 `JSON.stringify` form. The four cases are:
 
-| Case | Received header | Signed preimage | This crate | Reference handler (both pins) |
+| Case | Received header | Signed preimage | This crate | Both references |
 |---|---|---|---|---|
 | H3 | JSON with whitespace | Raw header text | Verify | Refuse |
 | H3b | JSON with whitespace | Stringified parsed object | Refuse | Verify |
